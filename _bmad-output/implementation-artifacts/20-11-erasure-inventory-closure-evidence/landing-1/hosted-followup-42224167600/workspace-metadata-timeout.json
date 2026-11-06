@@ -1,0 +1,20 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "list",
+    "--workspace",
+    "--locked",
+    "--message-format",
+    "json"
+  ],
+  "exit_code": null,
+  "tool_outcome": "Command timed out after 3000 seconds; no numeric child exit code supplied",
+  "clippy_ratchet_exit_code": 0,
+  "clippy_occurrences": 1329,
+  "clippy_source_distinct": 870,
+  "cargo_metadata_exit_code": 0,
+  "test_cases_executed": 0,
+  "post_timeout_build_processes": [],
+  "disposition": "Resume compilation in a distinct bounded producer cell; preserve partial stderr/stdout. This is not a test retry and no deadline/configuration/source change is made."
+}

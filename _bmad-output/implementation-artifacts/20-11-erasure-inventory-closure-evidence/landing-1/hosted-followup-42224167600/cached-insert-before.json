@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "-p",
+    "maos-iac",
+    "--lib",
+    "--locked",
+    "--no-fail-fast",
+    "-E",
+    "test(review_cached_frame_insert_reuses_the_indexed_program)"
+  ],
+  "exit_code": 100,
+  "elapsed_seconds": 113.1882483959198,
+  "log": "/tmp/dev2011b-perf.242wuR/cached-insert-before.log"
+}

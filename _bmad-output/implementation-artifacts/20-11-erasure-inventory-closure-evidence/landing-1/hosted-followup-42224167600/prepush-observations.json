@@ -1,0 +1,91 @@
+{
+  "exit_code": 1,
+  "elapsed_seconds": 2943.623178958893,
+  "statuses": {
+    "pass": 84,
+    "skip": 6,
+    "red": 1,
+    "advisory": 1
+  },
+  "nonpass_records": [
+    {
+      "check": "cargo-deny",
+      "artifact": "Cargo.lock / deny.toml (required cargo-deny)",
+      "status": "skip",
+      "detail": "neither Cargo.lock nor deny.toml changed",
+      "wall_ms": 0
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "status": "red",
+      "detail": "expected exit 0, actual exit status: 100; 35057 lines omitted; thread 'adapter::transparency_log::tests::insert_frame_panics_on_write_failure' (3496919) panicked at crates/maos-iac/src/adapter/transparency_log.rs:1439:17: thread 'side_row_failure_rolls_back_the_base_row_and_halts' (3497241) panicked at crates/maos-iac/src/adapter/transparency_log.rs:1439:17: thread 'journey_binary_freshness_refuses_newer_source' (3497939) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13: thread 'journey_binary_freshness_refuses_newer_source' (3497939) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13: thread 'missing_prebuilt_fixture_refuses_ci_but_allows_local_compilation' (3499309) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:79:9: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (3499308) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:86:9: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (3499308) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:86:9: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (3499308) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (3499308) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (3499308) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (3499308) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'tokio-rt-worker' (3499555) panicked at crates/maos-kernel-core/tests/crash_detector_in_process_panic.rs:16:9: thread 'tokio-rt-worker' (3500132) panicked at crates/maos-kernel-core/tests/halt_carry_20_3c.rs:190:9: thread 'tokio-rt-worker' (3500226) panicked at crates/maos-kernel-core/tests/hook_dispatch_budget_envelope.rs:41:13: thread 'tokio-rt-worker' (3500260) panicked at crates/maos-kernel-core/tests/hot_swap_cross_major_migration.rs:42:9: thread 'tokio-rt-worker' (3500583) panicked at crates/maos-kernel-core/tests/loaded_spirit_exit_16_6.rs:43:13: thread 'tokio-rt-worker' (3500582) panicked at crates/maos-kernel-core/tests/loaded_spirit_exit_16_6.rs:43:13: thread 'fixture_replay::tests::empty_ring_panics' (3502600) panicked at crates/maos-providers/src/fixture_replay.rs:47:13: thread 'sibling_provenance_refuses_an_unrecorded_executable' (3502890) panicked at crates/maos-registry/tests/../../../tests/harness/fixtures.rs:57:5: thread 'assert_no_deprecations_panics_when_warnings_present' (3503770) panicked at crates/maos-spirit-sdk/tests/deprecation_warnings_smoke.rs:112:5: thread 'assert_panics_message_contains_file_line_and_suggested_fix' (3503847) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:34:9: thread 'assert_panics_on_false_with_diagnostics' (3503849) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:28:5: thread 'assert_diagnostic_stable_output' (3503846) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:227:9: thread 'expect_frame_bytes_exact_fails_on_mismatch' (3503854) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:112:5: thread 'expect_frame_closest_diff_byte_correct' (3503861) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:251:9: thread 'expect_frame_panics_on_no_match' (3503865) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:81:5: thread 'expect_halt_panics_on_no_match' (3503870) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:160:5: thread 'gate_otel_airgap_default_off_no_connects' (3503929) panicked at crates/maos-telemetry/tests/otel_gates.rs:171:13: thread 'gate_otel_airgap_default_off_no_connects' (3504052) panicked at crates/maos-telemetry/tests/otel_gates.rs:173:52: thread 'gate_otel_airgap_default_off_no_connects' (3504097) panicked at crates/maos-telemetry/tests/otel_gates.rs:173:52: thread 'gate_otel_airgap_default_off_no_connects' (3504153) panicked at crates/maos-telemetry/tests/otel_gates.rs:175:13: thread 'gate_otel_airgap_default_off_no_connects' (3504204) panicked at crates/maos-telemetry/tests/otel_gates.rs:175:13: thread 'gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field' (3505478) panicked at xtask/src/gate_common.rs:670:13: thread 'expansion_defaults_only_job_results' (3511627) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'expansion_defaults_only_job_results' (3511627) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'expansion_defaults_only_job_results' (3511627) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field' (3512628) panicked at xtask/src/gate_common.rs:670:13: FAIL [ 50.162s] (5675/5708) maos-bin::erasure_million_20_11 ac5_million_row_pending_forget_finishes_and_repeats_without_corruption FAIL [ 50.162s] (5675/5708) maos-bin::erasure_million_20_11 ac5_million_row_pending_forget_finishes_and_repeats_without_corruption thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (3492325) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:",
+      "wall_ms": 1299601
+    },
+    {
+      "check": "test-budget",
+      "artifact": "/mnt/build/cargo-maos/nextest/default/junit.xml",
+      "status": "advisory",
+      "detail": "expected exit 0, actual exit status: 1; 0 lines omitted; {\"gate\":\"check-test-budget\",\"passed\":false,\"junit\":\"/mnt/build/cargo-maos/nextest/default/junit.xml\",\"binaries\":609,\"total_span_seconds\":518.3350055217743,\"total_sum_seconds\":1173.2239999999993,\"findings\":[\"butler::hallucination took 30.973 s (Σ per-test time) over 5 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml\",\"maos-bin::erasu ::error::check-test-budget: FAIL — 7 finding(s): - butler::hallucination took 30.973 s (Σ per-test time) over 5 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::erasure_uninstall_13_5b took 37.547 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::hook_pump_17_4 took 38.154 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::maos_uninstall_16_4 took 35.868 s (Σ per-test time) over 23 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::one_daemon_one_door_16_1 took 39.011 s (Σ per-test time) over 42 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-iac::participant_recall_17_8 took 41.008 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - suite test time 1173.224 s (Σ per-test time) exceeds total_seconds 1100.000 check-test-budget: FAIL — 7 finding(s): - butler::hallucination took 30.973 s (Σ per-test time) over 5 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::erasure_uninstall_13_5b took 37.547 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::hook_pump_17_4 took 38.154 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::maos_uninstall_16_4 took 35.868 s (Σ per-test time) over 23 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::one_daemon_one_door_16_1 took 39.011 s (Σ per-test time) over 42 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-iac::participant_recall_17_8 took 41.008 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - suite test time 1173.224 s (Σ per-test time) exceeds total_seconds 1100.000",
+      "wall_ms": 84
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"SCOPED-VERDICT \": 1 static emission sites; pin 8 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"GOVERNED-ATOMIC \": 1 static emission sites; pin 10 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"HOSTILE-LIFTING \": 1 static emission sites; pin 2 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"HOSTILE-LIFTING-CONTROL \": 1 static emission sites; pin 1 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"RUNNER-SIGSYS \": 1 static emission sites; pin 2 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    }
+  ],
+  "junit_root": {
+    "name": "nextest-run",
+    "tests": "5708",
+    "skipped": "0",
+    "failures": "1",
+    "errors": "0",
+    "uuid": "8bf57298-d183-4caf-814a-2e1858a991ee",
+    "timestamp": "2026-11-06T19:22:39.383+00:00",
+    "time": "69.709"
+  },
+  "failed_cases": [
+    {
+      "suite": "maos-bin::erasure_million_20_11",
+      "name": "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption",
+      "seconds": "50.162",
+      "failure_attributes": {
+        "message": "thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (3492325) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17",
+        "type": "test failure with exit code 101"
+      },
+      "diagnostic_prefix": "thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (3492325) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:\npending operation did not finish: op-97afc1692021b8c44279b92c\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n   1: core::panicking::panic_fmt\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n   2: door_scan_with_continuous_writer\n             at ./tests/erasure_million_20_11.rs:186:17\n   3: erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption\n             at ./tests/erasure_million_20_11.rs:20:5\n   4: erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption::{closure#0}\n             at ./tests/erasure_million_20_11.rs:19:76\n   5: <erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption::{closure#0} as core::ops::function::FnOnce<()>>::call_once\n             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5\n   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace."
+    }
+  ],
+  "generated_intent_report_restoration": "copy-back + cmp + touch observed exit0; saved preimage retained until final scratch cleanup"
+}

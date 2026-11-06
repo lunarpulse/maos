@@ -1,0 +1,19 @@
+{
+  "command": [
+    "env",
+    "-u",
+    "CI",
+    "-u",
+    "GITHUB_ACTIONS",
+    "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+    "/mnt/build/cargo-maos/debug/xtask",
+    "check-coverage-matrix-completeness",
+    "--json"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.01245427131652832,
+  "log": "/tmp/dev2011b-perf.242wuR/final-gate-check-coverage-matrix-completeness.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

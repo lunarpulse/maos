@@ -1,0 +1,20 @@
+{
+  "command": [
+    "env",
+    "-u",
+    "CI",
+    "-u",
+    "GITHUB_ACTIONS",
+    "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+    "MAOS_17_2_CGROUP_MODE=undelegated",
+    "/mnt/build/cargo-maos/debug/xtask",
+    "prepush",
+    "--json"
+  ],
+  "exit_code": 1,
+  "elapsed_seconds": 2943.623178958893,
+  "log": "/tmp/dev2011b-perf.242wuR/prepush-final.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

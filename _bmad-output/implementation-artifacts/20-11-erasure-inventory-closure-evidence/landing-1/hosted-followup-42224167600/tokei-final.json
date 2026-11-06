@@ -1,0 +1,16 @@
+{
+  "command": [
+    "tokei",
+    "--types",
+    "Rust",
+    "--output",
+    "json",
+    "crates/maos-iac/src",
+    "crates/maos-iac/tests",
+    "crates/maos-bin/src",
+    "crates/maos-bin/tests"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.012331724166870117,
+  "log": "/tmp/dev2011b-perf.242wuR/tokei-final.log"
+}

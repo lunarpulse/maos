@@ -1,0 +1,14 @@
+{
+  "command": [
+    "diff",
+    "-u",
+    "/tmp/dev2011b-perf.242wuR/plant-final-door.rs",
+    "crates/maos-bin/src/operator_door.rs"
+  ],
+  "exit_code": 1,
+  "elapsed_seconds": 0.0016422271728515625,
+  "log": "/tmp/dev2011b-perf.242wuR/plants-a-door-diff.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

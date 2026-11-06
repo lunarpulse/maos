@@ -1,0 +1,11 @@
+--- /tmp/dev2011b-perf.242wuR/plant-final-door.rs	2026-11-06 16:04:43.897842218 +0000
++++ crates/maos-bin/src/operator_door.rs	2026-11-06 16:05:59.030191906 +0000
+@@ -2193,7 +2193,7 @@
+             };
+         }
+         match tokio::task::block_in_place(|| self.completed_forget(principal, reason)) {
+-            Ok(Some(report)) => return OperatorOutcome::Completed(report),
++            Ok(Some(_report)) => {}
+             Ok(None) => {}
+             Err(detail) => {
+                 return OperatorOutcome::Failed {

@@ -1,0 +1,14 @@
+{
+  "command": [
+    "diff",
+    "-u",
+    "/tmp/dev2011b-perf.242wuR/plant-final-iac.rs",
+    "crates/maos-iac/src/adapter/transparency_log.rs"
+  ],
+  "exit_code": 1,
+  "elapsed_seconds": 0.001645803451538086,
+  "log": "/tmp/dev2011b-perf.242wuR/plants-a-iac-diff.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

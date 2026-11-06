@@ -1,0 +1,20 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "list",
+    "--workspace",
+    "--locked",
+    "--list-type",
+    "binaries-only",
+    "--message-format",
+    "json"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 15.250831365585327,
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  },
+  "stdout": "/tmp/dev2011b-perf.242wuR/workspace-binaries-only-final.stdout",
+  "stderr": "/tmp/dev2011b-perf.242wuR/workspace-binaries-only-final.stderr"
+}

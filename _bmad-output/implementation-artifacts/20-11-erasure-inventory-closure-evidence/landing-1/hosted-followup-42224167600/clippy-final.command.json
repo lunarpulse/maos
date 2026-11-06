@@ -1,0 +1,18 @@
+{
+  "command": [
+    "cargo",
+    "clippy",
+    "--workspace",
+    "--all-targets",
+    "--locked",
+    "--message-format",
+    "json"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 621.861138343811,
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  },
+  "stdout": "/tmp/dev2011b-perf.242wuR/clippy-final.jsonl",
+  "stderr": "/tmp/dev2011b-perf.242wuR/clippy-final.stderr"
+}

@@ -1,0 +1,158 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: `maos-iac` (lib test) generated 3 warnings (run `cargo fix --lib -p maos-iac --tests` to apply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.74s
+────────────
+ Nextest run ID 84bd43a9-8ad4-40d2-9392-9594ea785de9 with nextest profile: default
+    Starting 2 tests across 1 binary (114 tests skipped)
+        FAIL [   0.017s] (1/2) maos-iac adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report ... FAILED
+
+    failures:
+
+    failures:
+        adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 115 filtered out; finished in 0.01s
+
+  stderr ───
+
+    thread 'adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report' (3183812) panicked at crates/maos-iac/src/adapter/../../tests/support/erasure_races_20_11.rs:718:5:
+    assertion `left == right` failed: DESC applied only to the frame-id tie breaker, selecting the oldest report
+      left: [1, 161, 177, 156, 60, 165, 114, 32, 58, 169, 152, 246, 107, 24, 7, 241]
+     right: [1, 161, 177, 156, 60, 165, 140, 153, 185, 127, 252, 244, 241, 85, 140, 85]
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: core::panicking::assert_failed_inner
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+       3: core::panicking::assert_failed::<[u8; 16], [u8; 16]>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+       4: maos_iac::adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report
+                 at ./src/adapter/../../tests/support/erasure_races_20_11.rs:718:5
+       5: maos_iac::adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report::{closure#0}
+                 at ./src/adapter/../../tests/support/erasure_races_20_11.rs:685:67
+       6: <maos_iac::adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        FAIL [   0.017s] (2/2) maos-iac adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program ... FAILED
+
+    failures:
+
+    failures:
+        adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 115 filtered out; finished in 0.01s
+
+  stderr ───
+
+    thread 'adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program' (3183811) panicked at crates/maos-iac/src/adapter/../../tests/support/erasure_races_20_11.rs:677:5:
+    assertion `left == right` failed: ordinary appends recompiled the indexed INSERT instead of reusing it
+      left: 0
+     right: 2
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: core::panicking::assert_failed_inner
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+       3: core::panicking::assert_failed::<i32, i32>
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:394:5
+       4: maos_iac::adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program
+                 at ./src/adapter/../../tests/support/erasure_races_20_11.rs:677:5
+       5: maos_iac::adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program::{closure#0}
+                 at ./src/adapter/../../tests/support/erasure_races_20_11.rs:660:59
+       6: <maos_iac::adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+────────────
+     Summary [   0.018s] 2 tests run: 0 passed, 2 failed, 114 skipped
+        FAIL [   0.017s] (1/2) maos-iac adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report
+        FAIL [   0.017s] (2/2) maos-iac adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program
+error: test run failed

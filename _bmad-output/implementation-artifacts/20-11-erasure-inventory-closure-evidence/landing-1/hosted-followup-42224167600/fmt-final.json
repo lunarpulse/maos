@@ -1,0 +1,10 @@
+{
+  "command": [
+    "cargo",
+    "fmt",
+    "--all"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 3.4321861267089844,
+  "log": "/tmp/dev2011b-perf.242wuR/fmt-final.log"
+}

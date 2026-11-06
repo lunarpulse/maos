@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="3" skipped="0" failures="3" errors="0" uuid="4ee3c301-2d6e-4c72-9a51-c026444b4683" timestamp="2026-11-06T16:11:33.469+00:00" time="1.248">
+    <testsuite name="maos-bin::erasure_million_20_11" tests="3" skipped="0" errors="0" failures="3">
+        <testcase name="ac5_replay_invalidates_for_new_matching_frames_and_changed_reason" classname="maos-bin::erasure_million_20_11" timestamp="2026-11-06T16:11:33.474+00:00" time="0.398">
+            <failure message="thread &apos;ac5_replay_invalidates_for_new_matching_frames_and_changed_reason&apos; (3189824) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:371:5" type="test failure with exit code 101">thread &apos;ac5_replay_invalidates_for_new_matching_frames_and_changed_reason&apos; (3189824) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:371:5:
+assertion `left != right` failed
+  left: String(&quot;op-520d81d3b84aa6a520774190&quot;)
+ right: String(&quot;op-520d81d3b84aa6a520774190&quot;)
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::&lt;serde_json::value::Value, serde_json::value::Value&gt;
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: erasure_million_20_11::ac5_replay_invalidates_for_new_matching_frames_and_changed_reason
+             at ./tests/erasure_million_20_11.rs:371:5
+   5: erasure_million_20_11::ac5_replay_invalidates_for_new_matching_frames_and_changed_reason::{closure#0}
+             at ./tests/erasure_million_20_11.rs:352:71
+   6: &lt;erasure_million_20_11::ac5_replay_invalidates_for_new_matching_frames_and_changed_reason::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.</failure>
+            <system-out>
+running 1 test
+test ac5_replay_invalidates_for_new_matching_frames_and_changed_reason ... FAILED
+
+failures:
+
+failures:
+    ac5_replay_invalidates_for_new_matching_frames_and_changed_reason
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.38s
+
+</system-out>
+            <system-err>
+thread &apos;ac5_replay_invalidates_for_new_matching_frames_and_changed_reason&apos; (3189824) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:371:5:
+assertion `left != right` failed
+  left: String(&quot;op-520d81d3b84aa6a520774190&quot;)
+ right: String(&quot;op-520d81d3b84aa6a520774190&quot;)
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::&lt;serde_json::value::Value, serde_json::value::Value&gt;
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: erasure_million_20_11::ac5_replay_invalidates_for_new_matching_frames_and_changed_reason
+             at ./tests/erasure_million_20_11.rs:371:5
+   5: erasure_million_20_11::ac5_replay_invalidates_for_new_matching_frames_and_changed_reason::{closure#0}
+             at ./tests/erasure_million_20_11.rs:352:71
+   6: &lt;erasure_million_20_11::ac5_replay_invalidates_for_new_matching_frames_and_changed_reason::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+</system-err>
+        </testcase>
+        <testcase name="ac5_replay_rechecks_the_current_global_hold" classname="maos-bin::erasure_million_20_11" timestamp="2026-11-06T16:11:33.876+00:00" time="0.396">
+            <failure message="thread &apos;ac5_replay_rechecks_the_current_global_hold&apos; (3189832) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:460:5" type="test failure with exit code 101">thread &apos;ac5_replay_rechecks_the_current_global_hold&apos; (3189832) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:460:5:
+a historical completion bypassed the current hold: Completed(Completed(Object {&quot;redistill_outcomes&quot;: Array [], &quot;redistilled_count&quot;: Number(0), &quot;pending_count&quot;: Number(0), &quot;purge_undelivered&quot;: Array [], &quot;late_redacted_distillate_frame_ids&quot;: Array [], &quot;late_redacted_principal_frame_ids&quot;: Array [], &quot;held_frame_ids&quot;: Array [], &quot;malformed_frame_ids&quot;: Array [], &quot;held_principal_ids&quot;: Array [], &quot;frame_sweep_status&quot;: String(&quot;complete&quot;), &quot;completion_boundary&quot;: String(&quot;durable_transactional_marker&quot;), &quot;frame_sweep_completion&quot;: Object {&quot;frame_id&quot;: String(&quot;01a1b1a133438c4a8df67225e5f0ec7c&quot;), &quot;through_rowid&quot;: Number(4)}, &quot;frame_sweep_pending&quot;: Null, &quot;principal_id&quot;: String(&quot;held-replay@example.org&quot;), &quot;outcome&quot;: String(&quot;erased&quot;), &quot;forget&quot;: Object {&quot;outcome&quot;: String(&quot;Erased&quot;), &quot;receipt&quot;: Object {&quot;principal_id&quot;: String(&quot;held-replay@example.org&quot;), &quot;deleted_entries&quot;: Number(0), &quot;deleted_index_rows&quot;: Number(0), &quot;timestamp_ns&quot;: Number(1793981494082755234), &quot;frame_id&quot;: Array [Number(1), Number(161), Number(177), Number(161), Number(51), Number(60), Number(251), Number(28), Number(126), Number(62), Number(182), Number(169), Number(71), Number(149), Number(253), Number(230)]}, &quot;redacted_distillate_frame_ids&quot;: Array [], &quot;redacted_principal_frame_ids&quot;: Array [], &quot;redistill&quot;: Array []}, &quot;terminal_code&quot;: Number(0), &quot;operation_id&quot;: String(&quot;op-3eacd659ad4c524d3fec7af9&quot;), &quot;replayed&quot;: Bool(true)}))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: erasure_million_20_11::ac5_replay_rechecks_the_current_global_hold
+             at ./tests/erasure_million_20_11.rs:460:5
+   3: erasure_million_20_11::ac5_replay_rechecks_the_current_global_hold::{closure#0}
+             at ./tests/erasure_million_20_11.rs:438:49
+   4: &lt;erasure_million_20_11::ac5_replay_rechecks_the_current_global_hold::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   5: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.</failure>
+            <system-out>
+running 1 test
+test ac5_replay_rechecks_the_current_global_hold ... FAILED
+
+failures:
+
+failures:
+    ac5_replay_rechecks_the_current_global_hold
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.38s
+
+</system-out>
+            <system-err>
+thread &apos;ac5_replay_rechecks_the_current_global_hold&apos; (3189832) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:460:5:
+a historical completion bypassed the current hold: Completed(Completed(Object {&quot;redistill_outcomes&quot;: Array [], &quot;redistilled_count&quot;: Number(0), &quot;pending_count&quot;: Number(0), &quot;purge_undelivered&quot;: Array [], &quot;late_redacted_distillate_frame_ids&quot;: Array [], &quot;late_redacted_principal_frame_ids&quot;: Array [], &quot;held_frame_ids&quot;: Array [], &quot;malformed_frame_ids&quot;: Array [], &quot;held_principal_ids&quot;: Array [], &quot;frame_sweep_status&quot;: String(&quot;complete&quot;), &quot;completion_boundary&quot;: String(&quot;durable_transactional_marker&quot;), &quot;frame_sweep_completion&quot;: Object {&quot;frame_id&quot;: String(&quot;01a1b1a133438c4a8df67225e5f0ec7c&quot;), &quot;through_rowid&quot;: Number(4)}, &quot;frame_sweep_pending&quot;: Null, &quot;principal_id&quot;: String(&quot;held-replay@example.org&quot;), &quot;outcome&quot;: String(&quot;erased&quot;), &quot;forget&quot;: Object {&quot;outcome&quot;: String(&quot;Erased&quot;), &quot;receipt&quot;: Object {&quot;principal_id&quot;: String(&quot;held-replay@example.org&quot;), &quot;deleted_entries&quot;: Number(0), &quot;deleted_index_rows&quot;: Number(0), &quot;timestamp_ns&quot;: Number(1793981494082755234), &quot;frame_id&quot;: Array [Number(1), Number(161), Number(177), Number(161), Number(51), Number(60), Number(251), Number(28), Number(126), Number(62), Number(182), Number(169), Number(71), Number(149), Number(253), Number(230)]}, &quot;redacted_distillate_frame_ids&quot;: Array [], &quot;redacted_principal_frame_ids&quot;: Array [], &quot;redistill&quot;: Array []}, &quot;terminal_code&quot;: Number(0), &quot;operation_id&quot;: String(&quot;op-3eacd659ad4c524d3fec7af9&quot;), &quot;replayed&quot;: Bool(true)}))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: erasure_million_20_11::ac5_replay_rechecks_the_current_global_hold
+             at ./tests/erasure_million_20_11.rs:460:5
+   3: erasure_million_20_11::ac5_replay_rechecks_the_current_global_hold::{closure#0}
+             at ./tests/erasure_million_20_11.rs:438:49
+   4: &lt;erasure_million_20_11::ac5_replay_rechecks_the_current_global_hold::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   5: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+</system-err>
+        </testcase>
+        <testcase name="ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail" classname="maos-bin::erasure_million_20_11" timestamp="2026-11-06T16:11:34.273+00:00" time="0.443">
+            <failure message="thread &apos;ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail&apos; (3189840) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:429:5" type="test failure with exit code 101">thread &apos;ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail&apos; (3189840) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:429:5:
+assertion `left != right` failed
+  left: String(&quot;op-eed42b83312e45d087cf3e2f&quot;)
+ right: String(&quot;op-eed42b83312e45d087cf3e2f&quot;)
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::&lt;serde_json::value::Value, serde_json::value::Value&gt;
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: erasure_million_20_11::ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail
+             at ./tests/erasure_million_20_11.rs:429:5
+   5: erasure_million_20_11::ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail::{closure#0}
+             at ./tests/erasure_million_20_11.rs:397:83
+   6: &lt;erasure_million_20_11::ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.</failure>
+            <system-out>
+running 1 test
+test ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail ... FAILED
+
+failures:
+
+failures:
+    ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.43s
+
+</system-out>
+            <system-err>
+thread &apos;ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail&apos; (3189840) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:429:5:
+assertion `left != right` failed
+  left: String(&quot;op-eed42b83312e45d087cf3e2f&quot;)
+ right: String(&quot;op-eed42b83312e45d087cf3e2f&quot;)
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::&lt;serde_json::value::Value, serde_json::value::Value&gt;
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: erasure_million_20_11::ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail
+             at ./tests/erasure_million_20_11.rs:429:5
+   5: erasure_million_20_11::ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail::{closure#0}
+             at ./tests/erasure_million_20_11.rs:397:83
+   6: &lt;erasure_million_20_11::ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+</system-err>
+        </testcase>
+    </testsuite>
+</testsuites>

@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "-p",
+    "maos-iac",
+    "--lib",
+    "--locked",
+    "--no-fail-fast",
+    "-E",
+    "test(review_descending_correlation_query_selects_the_latest_report)"
+  ],
+  "exit_code": 100,
+  "elapsed_seconds": 16.479701042175293,
+  "log": "/tmp/dev2011b-perf.242wuR/descending-order-before.log"
+}

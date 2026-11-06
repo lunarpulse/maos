@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "-p",
+    "maos-bin",
+    "--test",
+    "erasure_million_20_11",
+    "--locked",
+    "--no-fail-fast",
+    "-E",
+    "test(ac5_replay_)"
+  ],
+  "exit_code": 100,
+  "elapsed_seconds": 40.87174844741821,
+  "log": "/tmp/dev2011b-perf.242wuR/plants-b-tail-hold.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

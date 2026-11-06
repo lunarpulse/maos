@@ -1,0 +1,16 @@
+{
+  "command": [
+    "cargo",
+    "metadata",
+    "--format-version",
+    "1",
+    "--locked"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.7111046314239502,
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  },
+  "stdout": "/tmp/dev2011b-perf.242wuR/workspace-cargo-metadata.stdout",
+  "stderr": "/tmp/dev2011b-perf.242wuR/workspace-cargo-metadata.stderr"
+}

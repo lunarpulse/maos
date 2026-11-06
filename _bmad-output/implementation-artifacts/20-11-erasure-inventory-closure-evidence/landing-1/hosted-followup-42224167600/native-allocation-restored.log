@@ -1,0 +1,10 @@
+{
+  "metric": "iac-routing-allocations",
+  "iterations": 2000,
+  "allocations": 42481,
+  "observed": 21.2405,
+  "baseline": 21.24,
+  "regression_tolerance": 0.02,
+  "ceiling": 21.6648,
+  "passed": true
+}

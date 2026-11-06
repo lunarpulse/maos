@@ -1,0 +1,13 @@
+{
+  "command": [
+    "cargo",
+    "fmt",
+    "--all"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 2.8811774253845215,
+  "log": "/tmp/dev2011b-perf.242wuR/fmt-after-order-repair.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

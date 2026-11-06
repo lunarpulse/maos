@@ -15,6 +15,7 @@ maos-attrs = { path = "../maos-attrs" }
 tokio = { version = "1", features = ["sync", "rt", "time", "macros", "rt-multi-thread"] }
 dashmap = "6.1"
 parking_lot = "0.12"
+smallvec = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
@@ -37,4 +38,3 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread", "time", "test-util"] }
 tempfile = "3"
 async-trait = "0.1"
-smallvec = "1"

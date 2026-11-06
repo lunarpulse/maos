@@ -179,6 +179,17 @@ An HTTP503
 in-flight handler; inspect its eventual report or repeat the identical request.
 Do not read a pending result as erased or complete. Regeneration-only pending
 is separate: unavailable writers can remain pending after frame erasure.
+Once the operator's completed receipt is durable, the same decoded principal and
+optional reason return its stored report with the original `operation_id`,
+component counts and frame marker, plus `replayed: true`. This is historical
+marker-scoped replay, not a new claim about current stores. An indexed lookup
+validates that marker and checks at most 4096 later TL rows: new matching bodies,
+any new distillate, an active hold or reaching the limit start a fresh forget.
+Retained control metadata is not a new application body.
+The transport request still has a fresh handle; its completion audit row links
+`replayed_operation_id` to the original without extending the route deadline.
+Other stores are not inventoried again during replay. For new data outside the
+observable TL tail, submit a fresh request with a distinct `--reason`.
 Only journaled requests with no recorded outcome are recovered on a later
 forget/pump pass. A recorded Pending outcome is not automatically retried;
 requests do not automatically resume across boots.

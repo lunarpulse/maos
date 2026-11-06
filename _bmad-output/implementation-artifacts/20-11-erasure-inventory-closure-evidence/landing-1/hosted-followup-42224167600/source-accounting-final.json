@@ -1,0 +1,26 @@
+{
+  "crates/maos-bin/src/": {
+    "code": 35102,
+    "comments": 2940,
+    "blanks": 1896,
+    "files": 37
+  },
+  "crates/maos-iac/src/": {
+    "code": 8625,
+    "comments": 403,
+    "blanks": 675,
+    "files": 18
+  },
+  "crates/maos-bin/tests/": {
+    "code": 64146,
+    "comments": 2452,
+    "blanks": 3555,
+    "files": 115
+  },
+  "crates/maos-iac/tests/": {
+    "code": 3640,
+    "comments": 96,
+    "blanks": 241,
+    "files": 14
+  }
+}

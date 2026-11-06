@@ -1,0 +1,4 @@
+gate:routes — 119 passed, 0 failed
+PASS: gate:routes
+gate:cookbook-count — 13 structural patterns (verified in build)
+PASS: gate:cookbook-count

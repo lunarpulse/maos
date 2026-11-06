@@ -1,0 +1,19 @@
+{
+  "command": [
+    "env",
+    "-u",
+    "CI",
+    "-u",
+    "GITHUB_ACTIONS",
+    "-C",
+    "/home/lunarpulse/dev_ws/docs-site",
+    "node",
+    "scripts/gate-anchor-ids.js"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.059940338134765625,
+  "log": "/tmp/dev2011b-perf.242wuR/docs-anchors-final.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

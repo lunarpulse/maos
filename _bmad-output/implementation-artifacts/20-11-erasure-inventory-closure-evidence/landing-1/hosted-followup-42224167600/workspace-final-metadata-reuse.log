@@ -1,0 +1,7 @@
+error: error reading metadata from argument --binaries-metadata
+
+Caused by:
+  error deserializing metadata file `/tmp/dev2011b-perf.242wuR/workspace-binaries-metadata-continuation-1.stdout`
+
+Caused by:
+  missing field `rust-binaries` at line 1 column 1029337

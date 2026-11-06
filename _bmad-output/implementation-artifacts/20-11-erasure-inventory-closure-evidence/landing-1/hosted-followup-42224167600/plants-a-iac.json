@@ -1,0 +1,20 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "-p",
+    "maos-iac",
+    "--lib",
+    "--locked",
+    "--no-fail-fast",
+    "-E",
+    "test(review_cached_frame_insert_reuses_the_indexed_program) | test(review_descending_correlation_query_selects_the_latest_report)"
+  ],
+  "exit_code": 100,
+  "elapsed_seconds": 3.240617275238037,
+  "log": "/tmp/dev2011b-perf.242wuR/plants-a-iac.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

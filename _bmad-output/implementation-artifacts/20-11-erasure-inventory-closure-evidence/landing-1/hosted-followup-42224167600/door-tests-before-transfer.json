@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "list",
+    "-p",
+    "maos-bin",
+    "--test",
+    "shell_host_16_2",
+    "--locked",
+    "--message-format",
+    "json"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 411.3892080783844,
+  "log": "/tmp/dev2011b-perf.242wuR/door-tests-before-transfer.log"
+}

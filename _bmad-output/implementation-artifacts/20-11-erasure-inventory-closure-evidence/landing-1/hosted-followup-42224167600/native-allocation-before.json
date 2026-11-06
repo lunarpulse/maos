@@ -1,0 +1,13 @@
+{
+  "command": [
+    "python3",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/hosted-followup-42224167600/check-native-allocation.py.txt",
+    "/tmp/dev2011b-perf.242wuR/native-routing-smoke.log"
+  ],
+  "exit_code": 1,
+  "elapsed_seconds": 0.020470380783081055,
+  "log": "/tmp/dev2011b-perf.242wuR/native-allocation-before.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

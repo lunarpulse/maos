@@ -1,0 +1,19 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "-p",
+    "maos-bench",
+    "--bin",
+    "tier_c_harness",
+    "--features",
+    "kernel_measurement",
+    "--locked"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 40.05622577667236,
+  "log": "/tmp/dev2011b-perf.242wuR/native-inline-build.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

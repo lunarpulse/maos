@@ -1,0 +1,47 @@
+{
+  "run_id": "906f0275-9ff0-4ea0-a462-35667d8a0014",
+  "probe_mode": "read-only immutable; exact deterministic seed frame,kind,pid,boot,intent,length and case-start ctime join",
+  "candidates": [
+    {
+      "database": "/tmp/.tmpUSZKGg/transparency.sqlite",
+      "directory_ctime": 1793989717.5848272,
+      "database_bytes": 1390219264,
+      "case_start": 1793989712.131,
+      "exact_seed_probe": [
+        1,
+        7,
+        2011,
+        "scan.filler",
+        1024
+      ],
+      "max_rowid": 937988,
+      "owned_current_aborted_heavy_fixture": false
+    },
+    {
+      "database": "/tmp/.tmp3ybjY4/transparency.sqlite",
+      "directory_ctime": 1793989802.8392634,
+      "database_bytes": 4096,
+      "case_start": 1793989712.131,
+      "read_only_error": "no such table: transparency_log",
+      "owned_current_aborted_heavy_fixture": false
+    },
+    {
+      "database": "/tmp/.tmprykFsN/transparency.sqlite",
+      "directory_ctime": 1793715071.9625618,
+      "database_bytes": 4096,
+      "case_start": 1793989712.131,
+      "read_only_error": "no such table: transparency_log",
+      "owned_current_aborted_heavy_fixture": false
+    },
+    {
+      "database": "/tmp/.tmpthTPXb/transparency.sqlite",
+      "directory_ctime": 1793592318.491021,
+      "database_bytes": 4096,
+      "case_start": 1793989712.131,
+      "read_only_error": "no such table: transparency_log",
+      "owned_current_aborted_heavy_fixture": false
+    }
+  ],
+  "owned_aborted_fixtures": [],
+  "owned_surviving_processes": []
+}

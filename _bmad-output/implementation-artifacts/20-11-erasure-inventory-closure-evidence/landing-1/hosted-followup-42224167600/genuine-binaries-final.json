@@ -1,0 +1,19 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "-p",
+    "maos-bin",
+    "-p",
+    "maos-cli",
+    "-p",
+    "xtask",
+    "--locked"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 8.552603721618652,
+  "log": "/tmp/dev2011b-perf.242wuR/genuine-binaries-final.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

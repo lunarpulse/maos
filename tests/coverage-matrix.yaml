@@ -1005,8 +1005,9 @@ coverage:
       principal.uninstall.category observation and post-inclusion proof per
       category, including empty/gap statuses. erasure_inventory_20_11 checks
       both verifiers reject re-signed missing evidence. erasure_scan_20_11
-      and shell_host_16_2 exercise intervening holds, serialized door release
-      and 100k/1M-frame writer latency. The IAC erasure_scan_work module also
+      and shell_host_16_2 exercise intervening holds and serialized door release;
+      erasure_million_20_11 owns the unchanged100k/1M-frame writer latency
+      vectors and durable marker-scoped replay. The IAC erasure_scan_work module also
       measures the actual production predicates' SQLite VM work, including
       recovery, malformed records and the boundary query. Its two in-memory
       fixtures use 100k physical rows each (the sparse case reaches 1M rowid);
@@ -1015,6 +1016,10 @@ coverage:
       page plant must red without enlarging its own budget. A route503
       handler_still_running is pending, never erased/complete; its in-flight
       durable marker and an identical repeat are separate completion witnesses.
+      Completed replay uses the indexed canonical request and a bounded TL-tail
+      check; new matching bodies or a changed reason cause fresh erasure.
+      The returned report retains the original operation id and marker, while
+      a fresh transport completion links the replay instead of certifying it again.
       Pending halt receipts and watchdog cleanup remain final-kernel
       dependencies; hosted proof is owed.
       erasure_review_20_11 tests the complete typed sixteen-category evidence

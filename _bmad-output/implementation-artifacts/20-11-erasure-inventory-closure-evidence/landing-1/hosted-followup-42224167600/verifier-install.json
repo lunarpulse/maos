@@ -1,0 +1,16 @@
+{
+  "command": [
+    "/tmp/dev2011b-perf.242wuR/verifier-venv/bin/python",
+    "-m",
+    "pip",
+    "install",
+    "--disable-pip-version-check",
+    "--require-hashes",
+    "--only-binary=:all:",
+    "-r",
+    "tools/verify-erasure/requirements.txt"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.6071083545684814,
+  "log": "/tmp/dev2011b-perf.242wuR/verifier-install.log"
+}

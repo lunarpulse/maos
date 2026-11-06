@@ -1,0 +1,18 @@
+{
+  "command": [
+    "cargo",
+    "check",
+    "-p",
+    "maos-bin",
+    "--tests",
+    "--target",
+    "aarch64-apple-darwin",
+    "--locked"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 168.51321816444397,
+  "log": "/tmp/dev2011b-perf.242wuR/apple-tests-final.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

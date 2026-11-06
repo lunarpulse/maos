@@ -224,8 +224,29 @@ the unchanged wall bound and real 1M completion await hosted stable-runner proof
 
 The unchanged route deadline may return HTTP503 `handler_still_running`:
 **pending**, not erased or complete. The in-flight handler is not cancelled.
-Its eventual marker/report and an identical subsequent request distinguish
-completion from retention; regeneration-only pending is separately reported.
+After the completed operator report is durable, an identical decoded principal
+and optional reason replays that report through the existing correlation index.
+The lookup validates the original transactional marker and reads at most 4096
+post-marker rows; a matching new application body, any new distillate, an active
+hold or reaching that finite limit starts a fresh forget instead. Retained
+control receipts are not application bodies. There is no rescan of old history
+on a valid replay, and no second memory cascade or frame marker.
+
+The returned report preserves the original erasure `operation_id`, component
+counts and marker, and says `replayed: true`. It is a **historical marker-scoped
+report**, not certification of the stores at replay-return time. Each transport
+submission still has its ordinary fresh CSPRNG handle; its completion audit row
+links `replayed_operation_id` to the original, so a contended replay remains
+findable without moving lookup work outside the unchanged route deadline.
+The original completion row stores the serialized control-report snapshot, not
+application frame payloads. Regeneration-only Pending is replayed as recorded,
+not redriven or promoted to completed regeneration.
+
+The bounded check covers the TL tail and current hold authority, not a fresh
+inventory of private/index or other stores. New state outside that observable
+tail needs a fresh request with a distinct reason using the existing command;
+replay never claims that post-marker state erased. No new retry API, deadline,
+writer barrier or frozen-kernel presence API is introduced.
 Independent same-UID process writers have no writer barrier in L1: SQLite
 orders the marker against their commits, but they may introduce new data after
 it. That named limitation is not erased by a successful verification result.

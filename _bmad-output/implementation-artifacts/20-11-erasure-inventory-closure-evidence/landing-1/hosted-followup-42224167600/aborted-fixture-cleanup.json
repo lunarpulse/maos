@@ -1,0 +1,25 @@
+{
+  "run_id": "906f0275-9ff0-4ea0-a462-35667d8a0014",
+  "note": "Operational cleanup of the positively identified aborted fixture before prepush, not final incremental/scratch cleanup or a successful1M footprint assertion. Other candidate dirs left untouched.",
+  "removed": [
+    {
+      "directory": "/tmp/.tmpUSZKGg",
+      "ownership": "Exact deterministic seed frame id/kind1/pid7/boot2011/scan.filler/1024-byte shape plus directory ctime within this unique120.006s case window; initial5s heuristic excluded its ctime5.454s after case start, so the actual case interval is used. No other candidate is deleted.",
+      "seed_probe": [
+        1,
+        7,
+        2011,
+        "scan.filler",
+        1024
+      ],
+      "checkpoint_max_rowid": 937988,
+      "apparent_bytes_unlinked": 1396526824,
+      "allocated_file_bytes_unlinked": 1396523008,
+      "files_unlinked": 4,
+      "observed_free_space_gain_bytes": 1294843904,
+      "directory_absent_after_removal": true,
+      "stage_inference": "Checkpoint max_rowid937988 is below the required physical1M seed; timeout occurs before the ready-seed metric, not proven to reach forget/replay.",
+      "owned_surviving_processes": []
+    }
+  ]
+}

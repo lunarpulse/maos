@@ -1,0 +1,78 @@
+import collections
+import json
+import re
+from pathlib import Path
+
+def parse(path):
+    names = {}
+    own = collections.Counter()
+    arcs = collections.Counter()
+    calls = collections.Counter()
+    current = None
+    callee = None
+    pending = None
+    summary = None
+    for raw in Path(path).read_text().splitlines():
+        if raw.startswith('summary:'):
+            summary = int(raw.split()[1])
+        if raw.startswith(('fn=', 'cfn=')):
+            field, value = raw.split('=', 1)
+            match = re.fullmatch(r'\((\d+)\)(?: (.*))?', value)
+            if match:
+                key = int(match[1])
+                if match[2] is not None:
+                    names[key] = match[2]
+            else:
+                key = value
+                names[key] = value
+            if field == 'fn':
+                current = key
+                pending = None
+            else:
+                callee = key
+            continue
+        if raw.startswith('calls='):
+            pending = (current, callee)
+            calls[pending] += int(raw.split('=', 1)[1].split()[0])
+            continue
+        if raw and raw[0] in '*+-0123456789':
+            fields = raw.split()
+            if len(fields) < 2:
+                continue
+            cost = int(fields[1])
+            if pending is not None:
+                arcs[pending] += cost
+                pending = None
+            else:
+                own[current] += cost
+    def normalize(name):
+        return re.sub(r'::h[0-9a-f]{16}\b', '', name)
+    self_names = collections.Counter()
+    inclusive_names = collections.Counter()
+    arc_names = collections.Counter()
+    call_names = collections.Counter()
+    for key, count in own.items():
+        name = normalize(names.get(key, str(key)))
+        self_names[name] += count
+        inclusive_names[name] += count
+    for (source, target), count in arcs.items():
+        source_name = normalize(names.get(source, str(source)))
+        target_name = normalize(names.get(target, str(target)))
+        inclusive_names[source_name] += count
+        arc_names[(source_name, target_name)] += count
+        call_names[(source_name, target_name)] += calls[(source, target)]
+    return {'summary':summary, 'self_total':sum(own.values()), 'self':self_names, 'inclusive':inclusive_names, 'arcs':arc_names, 'calls':call_names}
+
+if __name__ == '__main__':
+    root = Path(__file__).parent
+    reference = parse(root / 'reference/iac_routing.callgrind')
+    current = parse(root / 'current/iac_routing.callgrind')
+    empty_reference = parse(root / 'reference/empty.callgrind')
+    empty_current = parse(root / 'current/empty.callgrind')
+    report = {'iterations':2000, 'summary':{name:{'routing':data['summary'],'exclusive_sum':data['self_total'],'empty':empty['summary'],'per_iteration':(data['summary']-empty['summary'])/2000} for name,data,empty in [('reference',reference,empty_reference),('current',current,empty_current)]}}
+    for metric in ['self','inclusive']:
+        keys = set(reference[metric]) | set(current[metric])
+        deltas = [(current[metric][name]-reference[metric][name], name) for name in keys]
+        report[metric+'_deltas'] = [{'name':name,'reference':reference[metric][name]/2000,'current':current[metric][name]/2000,'delta':delta/2000} for delta,name in sorted(deltas, reverse=True)[:50]]
+    (root / 'comparison.json').write_text(json.dumps(report, indent=2)+'\n')
+    print(json.dumps(report, indent=2))

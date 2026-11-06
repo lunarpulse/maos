@@ -1,0 +1,54 @@
+{
+  "before_captured_names_count": 15,
+  "before_note": "Original14 shell cases plus the first new durable-replay control already present at capture time.",
+  "after_suites": {
+    "maos-bin::erasure_million_20_11": [
+      "ac5_completed_forget_is_durable_marker_scoped_replay",
+      "ac5_door_bounded_scan_admits_continuous_writer",
+      "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption",
+      "ac5_replay_invalidates_for_new_matching_frames_and_changed_reason",
+      "ac5_replay_rechecks_the_current_global_hold",
+      "ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail"
+    ],
+    "maos-bin::shell_host_16_2": [
+      "ac4_door_snapshots_real_scb_schedules_before_unload",
+      "ac5_door_hold_release_waits_for_inflight_forget",
+      "both_surfaces_resolving_one_halt_journal_one_approval_and_type_the_loser_409",
+      "eof_with_pending_halt_unloads_and_closes_it",
+      "err_arm_with_pending_halt_still_unloads_and_exits_nonzero",
+      "halt_list_records_from_the_real_writers",
+      "raise_ambiguity_halt_is_real",
+      "repl_clarification_resolves_with_no_control_json",
+      "resolved_halt_is_not_closed_again_at_eof",
+      "shell_boot_then_butler_boot_on_one_tl_never_mix",
+      "shell_boots_and_answers_from_a_cwd_with_no_spirits_dir",
+      "take_context_reads_the_resolvers_channel_key"
+    ]
+  },
+  "after_total_count": 18,
+  "retained_original_names": [
+    "ac4_door_snapshots_real_scb_schedules_before_unload",
+    "ac5_completed_forget_is_durable_marker_scoped_replay",
+    "ac5_door_bounded_scan_admits_continuous_writer",
+    "ac5_door_hold_release_waits_for_inflight_forget",
+    "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption",
+    "both_surfaces_resolving_one_halt_journal_one_approval_and_type_the_loser_409",
+    "eof_with_pending_halt_unloads_and_closes_it",
+    "err_arm_with_pending_halt_still_unloads_and_exits_nonzero",
+    "halt_list_records_from_the_real_writers",
+    "raise_ambiguity_halt_is_real",
+    "repl_clarification_resolves_with_no_control_json",
+    "resolved_halt_is_not_closed_again_at_eof",
+    "shell_boot_then_butler_boot_on_one_tl_never_mix",
+    "shell_boots_and_answers_from_a_cwd_with_no_spirits_dir",
+    "take_context_reads_the_resolvers_channel_key"
+  ],
+  "added_after_capture": [
+    "ac5_replay_invalidates_for_new_matching_frames_and_changed_reason",
+    "ac5_replay_rechecks_the_current_global_hold",
+    "ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail"
+  ],
+  "removed_names": [],
+  "duplicate_names": 0,
+  "interpretation": "All15 captured names retained exactly; three newly added safety controls explain the18 total. The two physical vectors and first replay control intentionally change binary id, not function name; tests-to-tests only."
+}

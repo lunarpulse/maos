@@ -1,0 +1,18 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "-p",
+    "maos-bin",
+    "--test",
+    "shell_host_16_2",
+    "--locked",
+    "--no-fail-fast",
+    "-E",
+    "test(=ac5_million_row_pending_forget_finishes_and_repeats_without_corruption)"
+  ],
+  "exit_code": 100,
+  "elapsed_seconds": 714.0252335071564,
+  "log": "/tmp/dev2011b-perf.242wuR/replay-million-before.log"
+}

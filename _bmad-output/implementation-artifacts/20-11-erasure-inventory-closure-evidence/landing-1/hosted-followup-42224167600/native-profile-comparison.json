@@ -1,0 +1,64 @@
+{
+  "reference_run": 41910498869,
+  "reference_artifact": 13361299405,
+  "current_run": 42224167600,
+  "current_artifact": 13504529758,
+  "iterations": 2000,
+  "empty_ir": 36,
+  "reference_summary": 1994279034,
+  "reference_exclusive_sum": 1994279034,
+  "current_summary": 2077260353,
+  "current_exclusive_sum": 2077260353,
+  "profiles": [
+    {
+      "function": "sqlite3_prepare_v3",
+      "reference_inclusive_ir_per_iteration": 87342.788,
+      "current_inclusive_ir_per_iteration": 118267.5875,
+      "delta": 30924.7995
+    },
+    {
+      "function": "sqlite3_step",
+      "reference_inclusive_ir_per_iteration": 80854.739,
+      "current_inclusive_ir_per_iteration": 85680.806,
+      "delta": 4826.067
+    },
+    {
+      "function": "sqlite3_finalize",
+      "reference_inclusive_ir_per_iteration": 4316.3995,
+      "current_inclusive_ir_per_iteration": 5502.8415,
+      "delta": 1186.442
+    },
+    {
+      "function": "sqlite3Insert",
+      "reference_inclusive_ir_per_iteration": 38725.751,
+      "current_inclusive_ir_per_iteration": 66403.027,
+      "delta": 27677.276
+    },
+    {
+      "function": "sqlite3GenerateConstraintChecks",
+      "reference_inclusive_ir_per_iteration": 14219.4815,
+      "current_inclusive_ir_per_iteration": 41969.027,
+      "delta": 27749.5455
+    },
+    {
+      "function": "sqlite3BtreeInsert",
+      "reference_inclusive_ir_per_iteration": 48223.744,
+      "current_inclusive_ir_per_iteration": 48483.843,
+      "delta": 260.099
+    },
+    {
+      "function": "<maos_iac::adapter::redaction::CorpusBackedRedactionPolicy as maos_iac::adapter::redaction::RedactionPolicy>::redact",
+      "reference_inclusive_ir_per_iteration": 684750.538,
+      "current_inclusive_ir_per_iteration": 689229.832,
+      "delta": 4479.294
+    }
+  ],
+  "sha256": {
+    "reference/iac_routing.callgrind": "2cc6c6e675a359d11abcfec1e4718b70c6d5c742b1196874122ca7d7b76e4c15",
+    "reference/iac_routing.json": "79d614e0ebdaab0901acbf1a6003732b2c1b8b9c89e390d30fd18cad8b45f869",
+    "reference/empty.callgrind": "38da2be8d551e61d891de253b4a4ebe76d5c7db5c6dd8c8b0539cefc3c92b2c5",
+    "current/iac_routing.callgrind": "0312813990393ac070d1799c8e501dc488e0a9cfe8dac46ad16ca9fde1c2bb9e",
+    "current/iac_routing.json": "bebb4eb686f511902dab777c5fa6d4d405624af76aca6a369b95e9085fd72f6a",
+    "current/empty.callgrind": "7000d1b95934368fcbf293656f47a8ba2297ec8d03db608d52294c52d11c07fb"
+  }
+}

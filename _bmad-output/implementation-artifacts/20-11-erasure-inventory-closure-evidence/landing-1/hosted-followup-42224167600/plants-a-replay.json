@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "-p",
+    "maos-bin",
+    "--test",
+    "erasure_million_20_11",
+    "--locked",
+    "--no-fail-fast",
+    "-E",
+    "test(=ac5_completed_forget_is_durable_marker_scoped_replay)"
+  ],
+  "exit_code": 100,
+  "elapsed_seconds": 44.53849673271179,
+  "log": "/tmp/dev2011b-perf.242wuR/plants-a-replay.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

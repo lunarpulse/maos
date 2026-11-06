@@ -7,6 +7,13 @@
 //! exclusion), and every kernel object it touches is real — never a registry
 //! the test filled and read back.
 
+#[path = "support/shell_world_16_2.rs"]
+mod shell_world;
+use shell_world::{
+    kernel_world, regression_door, regression_door_with_ops, scheduler_with_bundle,
+    scheduler_with_hello, KernelWorld, UnwiredBinOps,
+};
+
 use std::io::Write as _;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
@@ -19,21 +26,12 @@ use maos_domain::invariants::i10::LifecycleEvent;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::memory::{MemoryTier, MemoryValue};
 use maos_domain::ports::MemoryManagerPort;
-use maos_kernel_core::capability::cap_policy::{
-    ManifestCapabilityScope, PolicyTable, PolicyTableInner,
-};
-use maos_kernel_core::capability::cap_quota::CapQuotaTracker;
-use maos_kernel_core::capability::cap_tokens::Ed25519SigningKey;
-use maos_kernel_core::capability::{CapabilityRegistryAdapter, WorkingMemoryStore};
 use maos_kernel_core::halt::terminate_spirit;
 use maos_kernel_core::halt::HaltRegistry;
-use maos_kernel_core::iac::{FrameKind, TransparencyLogAdapter};
-use maos_kernel_core::journal::JournalAdapter;
+use maos_kernel_core::iac::TransparencyLogAdapter;
 use maos_kernel_core::memory::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
 };
-use maos_kernel_core::security::crypto::RingCryptoProvider;
-use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 use maos_shell::ShellHost as _; // trait methods on the concrete host
 
 fn maos_bin() -> &'static str {
@@ -73,79 +71,6 @@ fn wait_bounded(
 // ─────────────────────────────────────────────────────────────────────────────
 // AC3 — the halt is real, against REAL kernel objects (D-16-2-B/E)
 // ─────────────────────────────────────────────────────────────────────────────
-
-struct KernelWorld {
-    dir: tempfile::TempDir,
-    transparency_log: Arc<TransparencyLogAdapter>,
-    journal: Arc<JournalAdapter>,
-    halt_registry: Arc<HaltRegistry>,
-    memory: Arc<MemoryManagerAdapter>,
-    capability: Arc<CapabilityRegistryAdapter>,
-    /// Live (ArcSwap) — re-seeded with the scheduler's ACTUAL pid below:
-    /// `allocate_pid` is a PROCESS-GLOBAL counter, so under the parallel
-    /// workspace suite the loaded Spirit is not always pid 1.
-    policy: Arc<PolicyTable>,
-}
-
-fn kernel_world(boot_nonce: u64) -> KernelWorld {
-    let dir = tempfile::TempDir::new().unwrap();
-    let audit_db = dir.path().join("transparency.sqlite");
-    let journal_path = dir.path().join("journal.sqlite");
-    let memory_root = dir.path().join("memory");
-    std::fs::create_dir_all(&memory_root).unwrap();
-    let principal_index =
-        Arc::new(PrincipalNamespaceIndex::open(&audit_db).expect("open principal index"));
-    let transparency_log = Arc::new(
-        TransparencyLogAdapter::open_with_global_legal_holds(&audit_db, &audit_db, boot_nonce)
-            .expect("open transparency log"),
-    );
-    let memory = MemoryManagerAdapter::new(
-        Arc::new(PrivateMemoryStore::new(memory_root, 4 * 1024)),
-        Arc::new(SharedMemoryStore::open(&audit_db).expect("open shared store")),
-        principal_index,
-        Arc::clone(&transparency_log),
-    );
-    // Seed the policy table with hello-spirit's manifest scope so turn-token
-    // issuance succeeds exactly as it does against the real composition root
-    // (the manifest-derived policy the daemon builds).
-    let policy = Arc::new(PolicyTable::new());
-    let mut policy_inner = PolicyTableInner::default();
-    policy_inner.manifest_scopes.insert(
-        1,
-        ManifestCapabilityScope {
-            scopes: vec![maos_domain::invariants::i1::Scope::ProviderInfer {
-                provider: "anthropic".into(),
-            }],
-            declared_tier: maos_domain::invariants::i9::SandboxTier(0),
-            trust_tier: maos_kernel_core::capability::cap_policy::decision::TrustTier::Verified,
-        },
-    );
-    policy.update(policy_inner);
-    let (audit_tx, mut audit_rx) = maos_kernel_core::capability::cap_audit::channel();
-    std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
-    let capability = Arc::new(CapabilityRegistryAdapter::new(
-        Arc::new(RingCryptoProvider),
-        Ed25519SigningKey::new([0x16; 32]),
-        boot_nonce,
-        Arc::clone(&policy),
-        audit_tx,
-        CapQuotaTracker::new(),
-        Arc::new(WorkingMemoryStore::new()),
-        Arc::new(TelemetryStreamAdapter::default()),
-    ));
-    let journal = Arc::new(JournalAdapter::open(&journal_path).expect("open journal"));
-    let halt_registry = Arc::new(HaltRegistry::new());
-    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-    KernelWorld {
-        dir,
-        transparency_log,
-        journal,
-        halt_registry,
-        memory: Arc::new(memory),
-        capability,
-        policy,
-    }
-}
 
 /// A door port that fails any submission — the kernel-object vectors below
 /// exercise raise/state/context/receipts, never the resolve path (the
@@ -489,83 +414,7 @@ fn shell_boots_and_answers_from_a_cwd_with_no_spirits_dir() {
 // AC4 — EOF unloads the Spirit; every pending halt gets a receipt (§15 R6)
 // ─────────────────────────────────────────────────────────────────────────────
 
-use maos_iac::adapter::{IacBusAdapter, Mailbox};
 use maos_kernel_core::scheduler::SpiritSchedulerAdapter;
-use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
-
-/// A real scheduler with a real loaded hello-spirit — the object `main`
-/// drives, so `finish_shell_session` runs exactly the path production runs.
-fn scheduler_with_hello(world: &KernelWorld, boot_nonce: u64) -> Arc<SpiritSchedulerAdapter> {
-    scheduler_with_bundle(world, boot_nonce, Default::default())
-}
-
-fn scheduler_with_bundle(
-    world: &KernelWorld,
-    boot_nonce: u64,
-    bundle: maos_kernel_core::scheduler::SpiritManifestBundle,
-) -> Arc<SpiritSchedulerAdapter> {
-    let iac = IacBusAdapter::new(
-        Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new()))),
-        Arc::clone(&world.transparency_log),
-    );
-    let scheduler = Arc::new(SpiritSchedulerAdapter::new(
-        Arc::clone(&world.transparency_log),
-        Arc::clone(&world.capability),
-        Arc::clone(&world.memory),
-        Arc::new(iac),
-        Arc::clone(&world.halt_registry),
-        Arc::new(IacRtMetrics::new()),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    ));
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("test runtime");
-    let pid = rt.block_on(async {
-        let pid = scheduler
-            .load(
-                "hello-spirit",
-                bundle,
-                maos_spirit_hello::HelloSpirit,
-                boot_nonce,
-            )
-            .await
-            .expect("load hello-spirit");
-        // `allocate_pid` is PROCESS-GLOBAL: under the parallel suite the
-        // real pid is not always 1. Re-seed the LIVE policy table (ArcSwap —
-        // the adapter sees the update) with the ACTUAL pid so turn-token
-        // issuance succeeds.
-        let mut policy_inner = PolicyTableInner::default();
-        policy_inner.manifest_scopes.insert(
-            pid,
-            ManifestCapabilityScope {
-                scopes: vec![maos_domain::invariants::i1::Scope::ProviderInfer {
-                    provider: "anthropic".into(),
-                }],
-                declared_tier: maos_domain::invariants::i9::SandboxTier(0),
-                trust_tier: maos_kernel_core::capability::cap_policy::decision::TrustTier::Verified,
-            },
-        );
-        world.policy.update(policy_inner);
-        // The shell block's exact sequence: load → admit (security, not
-        // wired in the kernel-object world) → start.
-        //
-        // ⚠ Story 16-6 — this used to add "without start the transition
-        // table refuses Unload from Loaded, the residual the epic-16 retro
-        // row names". That arm now exists, so the refusal is gone and the
-        // residual is closed; `start` stays because this fixture is
-        // reproducing the shell's sequence, not working around a defect.
-        scheduler.start(pid).await.expect("start hello-spirit");
-        pid
-    });
-    assert_ne!(pid, 0, "the scheduler assigns a real pid");
-    scheduler
-}
 
 fn run_finish(
     scheduler: &SpiritSchedulerAdapter,
@@ -884,105 +733,9 @@ fn repl_clarification_resolves_with_no_control_json() {
 // §A6 review obligation (d) — ONE halt, BOTH surfaces resolving at once
 // ─────────────────────────────────────────────────────────────────────────────
 
-use std::path::{Path, PathBuf};
 use std::sync::Barrier;
 
-use async_trait::async_trait;
-use maos_bin::operator_door::{BinPrivateOps, OperatorDoor, SuccessorManifestSlot};
 use maos_control::{submit_and_wait, OperatorCommand, OperatorOutcome, SubmitOutcome};
-use maos_director_surface::notification::NotificationDispatcher;
-use maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator;
-use maos_kernel_core::halt::OutputMarkerRegistry;
-use maos_kernel_core::hot_swap::HotSwapCoordinator;
-use maos_kernel_core::orchestrator::OrchestratorBufferRegistry;
-use maos_kernel_core::revocation::RevocationApplier;
-use maos_kernel_core::scheduler::HookDispatcher;
-
-/// The bin-private ops, unwired — they back uninstall/upgrade/migration, none
-/// of which the halt-resolve race below drives, so every method is
-/// unreachable by construction of that vector.
-#[derive(Default)]
-struct UnwiredBinOps {
-    schedule_capture: Option<Arc<std::sync::Mutex<Vec<String>>>>,
-}
-
-#[async_trait]
-impl BinPrivateOps for UnwiredBinOps {
-    async fn append_lifecycle_journal(
-        &self,
-        _event: maos_domain::invariants::i10::LifecycleEvent,
-        _spirit_id: &str,
-    ) -> Result<PathBuf, String> {
-        unreachable!("the halt-resolve race never touches the bin-private ops");
-    }
-    async fn load_spirit(
-        &self,
-        _manifest: &std::path::Path,
-        _pread: Option<std::sync::Arc<String>>,
-    ) -> Result<maos_bin::admission::Admitted, maos_bin::admission::AdmissionRefusal> {
-        unreachable!("the halt-resolve race never touches the bin-private ops");
-    }
-
-    async fn run_uninstall_cascade(
-        &self,
-        _spirit_id: &str,
-        schedule_ids: Vec<String>,
-    ) -> maos_bin::operator_door::UninstallOutcome {
-        let capture = self
-            .schedule_capture
-            .as_ref()
-            .expect("only the snapshot oracle reaches this fixture spy");
-        *capture.lock().expect("snapshot") = schedule_ids;
-        maos_bin::operator_door::UninstallOutcome {
-            body: serde_json::json!({"fixture_snapshot_only":true}),
-            terminal_code: 0,
-        }
-    }
-
-    async fn enforce_vetted_upgrade_precondition(
-        &self,
-        _spirit_id: &str,
-        _target_manifest: &Path,
-        _attestation: Option<&str>,
-        _vetter_keyring: Option<&str>,
-    ) -> Result<(), String> {
-        unreachable!("the halt-resolve race never touches the bin-private ops");
-    }
-
-    async fn upgrade_with_plan_guard(
-        &self,
-        _spirit_id: &str,
-        _target_manifest: &Path,
-        _original_target: &Path,
-        _policy: maos_kernel_core::lifecycle::UpgradePolicy,
-        _attestation: Option<&str>,
-        _vetter_keyring: Option<&str>,
-    ) -> Result<serde_json::Value, maos_bin::operator_door::UpgradeFailure> {
-        unreachable!("the halt-resolve race never touches the bin-private ops");
-    }
-
-    async fn create_migration_plan(
-        &self,
-        _spirit_id: &str,
-        _from_version: &str,
-        _target_manifest: &Path,
-        _candidates: &[String],
-    ) -> Result<serde_json::Value, String> {
-        unreachable!("the halt-resolve race never touches the bin-private ops");
-    }
-
-    fn admitted_manifest(&self, _spirit_id: &str) -> Option<Arc<String>> {
-        unreachable!("the halt-resolve race never touches the bin-private ops");
-    }
-
-    fn record_upgraded_manifest(&self, _spirit_id: &str, _text: &str) {
-        unreachable!("the halt-resolve race never touches the bin-private ops");
-    }
-
-    fn migration_plan_pending(&self, _spirit_id: &str) -> bool {
-        unreachable!("the halt-resolve race never touches the bin-private ops");
-    }
-}
 
 /// §A6 review obligation (d) — resolve the SAME halt id from BOTH surfaces at
 /// once ⇒ exactly one `approval_decision_log` row and one typed 409. At review
@@ -1318,82 +1071,6 @@ fn shell_boot_then_butler_boot_on_one_tl_never_mix() {
     );
 }
 
-fn regression_door(
-    world: &KernelWorld,
-    scheduler: &Arc<maos_kernel_core::scheduler::SpiritSchedulerAdapter>,
-    rt: &tokio::runtime::Runtime,
-    boot_nonce: u64,
-) -> Arc<OperatorDoor> {
-    regression_door_with_ops(
-        world,
-        scheduler,
-        rt,
-        boot_nonce,
-        Arc::new(UnwiredBinOps::default()),
-    )
-}
-
-fn regression_door_with_ops(
-    world: &KernelWorld,
-    scheduler: &Arc<SpiritSchedulerAdapter>,
-    rt: &tokio::runtime::Runtime,
-    boot_nonce: u64,
-    ops: Arc<dyn BinPrivateOps>,
-) -> Arc<OperatorDoor> {
-    let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
-    let iac = Arc::new(IacBusAdapter::new(
-        Arc::clone(&mailbox),
-        Arc::clone(&world.transparency_log),
-    ));
-    let door = Arc::new(OperatorDoor::new(
-        Arc::clone(scheduler),
-        Arc::clone(&world.policy),
-        Arc::clone(&world.halt_registry),
-        Arc::new(OutputMarkerRegistry::new()),
-        Arc::new(OrchestratorBufferRegistry::new()),
-        Arc::new(RevocationApplier::new(
-            scheduler.scbs(),
-            Arc::clone(&world.capability),
-            Arc::clone(scheduler),
-            Arc::clone(&iac),
-            Arc::clone(&world.halt_registry),
-            Arc::clone(&world.transparency_log),
-            Arc::clone(&world.journal),
-            Arc::new(IacRtMetrics::new()),
-        )),
-        Arc::new(HotSwapCoordinator::new(
-            scheduler.scbs(),
-            Arc::clone(&world.journal),
-            Arc::clone(&world.transparency_log),
-            Arc::clone(&world.halt_registry),
-            Arc::clone(&world.capability),
-            Arc::clone(&iac),
-            Arc::new(HookDispatcher::new(
-                Arc::clone(&world.transparency_log),
-                Arc::new(IacRtMetrics::new()),
-            )),
-            Arc::new(IacRtMetrics::new()),
-            world.dir.path().join("hot-swap-archive"),
-        )),
-        Arc::clone(&world.capability),
-        Arc::clone(&world.memory),
-        Arc::new(WorkingMemoryOrchestrator::new(
-            Arc::clone(&world.capability),
-            Arc::clone(&world.halt_registry),
-        )),
-        mailbox,
-        Arc::new(NotificationDispatcher::new()),
-        Arc::clone(&world.transparency_log),
-        Arc::new(RingCryptoProvider),
-        None, // crl_trust_anchor — no CRL verification on this path
-        boot_nonce,
-        rt.handle().clone(),
-        ops,
-        SuccessorManifestSlot::default(),
-    ));
-    door
-}
-
 #[derive(Debug)]
 struct PauseForget20_11 {
     entered: std::sync::mpsc::SyncSender<()>,
@@ -1497,263 +1174,6 @@ fn ac5_door_hold_release_waits_for_inflight_forget() {
         .transparency_log
         .is_under_legal_hold("release@example.org")
         .expect("query hold"));
-}
-
-#[test]
-fn ac5_door_bounded_scan_admits_continuous_writer() {
-    door_scan_with_continuous_writer(100_000);
-}
-
-#[test]
-fn ac5_million_row_pending_forget_finishes_and_repeats_without_corruption() {
-    door_scan_with_continuous_writer(1_000_000);
-}
-
-fn erasure_fixture_footprint(root: &std::path::Path) -> (u64, u64) {
-    let mut bytes = (0, 0);
-    for entry in std::fs::read_dir(root).expect("fixture footprint directory") {
-        let entry = entry.expect("fixture footprint entry");
-        let metadata = std::fs::symlink_metadata(entry.path()).expect("fixture metadata");
-        if metadata.is_dir() {
-            let child = erasure_fixture_footprint(&entry.path());
-            bytes.0 += child.0;
-            bytes.1 += child.1;
-        } else {
-            bytes.0 += metadata.len();
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::MetadataExt as _;
-                bytes.1 += metadata.blocks() * 512;
-            }
-            #[cfg(not(unix))]
-            {
-                bytes.1 += metadata.len();
-            }
-        }
-    }
-    bytes
-}
-
-fn door_scan_with_continuous_writer(count: u64) {
-    use rusqlite::OptionalExtension as _;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::time::Instant;
-    struct StopOnDrop<'a>(&'a AtomicBool);
-    impl Drop for StopOnDrop<'_> {
-        fn drop(&mut self) {
-            self.0.store(true, Ordering::Release);
-        }
-    }
-    let world = kernel_world(2011);
-    let scheduler = scheduler_with_hello(&world, 2011);
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-        .expect("runtime");
-    let door = regression_door(&world, &scheduler, &rt, 2011);
-    let mut db = rusqlite::Connection::open(world.dir.path().join("transparency.sqlite"))
-        .expect("seed connection");
-    let body = vec![b'x'; 1024];
-    let target_id = [0u8; 16];
-    let mut footprint = (0_u64, 0_u64);
-    // A single million-row transaction retains a second database-sized WAL.
-    // Keep the real 1 KiB payload and row count, but checkpoint each bounded
-    // seed batch before the door/writer latency interval starts.
-    for first in (1..=count).step_by(4096) {
-        let tx = db.transaction().expect("seed transaction");
-        {
-            let mut insert = tx.prepare("INSERT INTO transparency_log (frame_id, timestamp_ns, kind, spirit_pid, boot_nonce, capability_token, intent, payload_redacted, origin, correlation_id) VALUES (?1,?2,1,7,2011,NULL,'scan.filler',?3,0,NULL)").expect("seed statement");
-            for i in first..=first.saturating_add(4095).min(count) {
-                let mut id = [0_u8; 16];
-                id[..8].copy_from_slice(&i.to_be_bytes());
-                id[8..].copy_from_slice(&i.to_be_bytes());
-                insert
-                    .execute(rusqlite::params![id.as_slice(), i as i64, &body])
-                    .expect("seed row");
-            }
-            if first == 1 {
-                insert
-                    .execute(rusqlite::params![
-                        target_id.as_slice(),
-                        0,
-                        br#"{"principal_id":"scan-target@example.org"}"#.as_slice(),
-                    ])
-                    .expect("real principal-bearing frame");
-            }
-        }
-        tx.commit().expect("seed commit");
-        // Before truncation, both the just-committed WAL and copied database
-        // are present: this captures the seed's physical high-water.
-        let current = erasure_fixture_footprint(world.dir.path());
-        footprint.0 = footprint.0.max(current.0);
-        footprint.1 = footprint.1.max(current.1);
-        db.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")
-            .expect("truncate seed WAL");
-    }
-    eprintln!(
-        "EC-13 fixture rows={count} seed_peak_apparent_bytes={} seed_peak_allocated_bytes={}",
-        footprint.0, footprint.1
-    );
-    assert!(
-        footprint.1 <= count * 1792 + 32 * 1024 * 1024,
-        "large fixture retained a second database-sized WAL: rows={count}, footprint={footprint:?}"
-    );
-    let tl = Arc::clone(&world.transparency_log);
-    let stop = Arc::new(AtomicBool::new(false));
-    let _stop_guard = StopOnDrop(stop.as_ref());
-    let running = Arc::clone(&stop);
-    let barrier = Arc::new(std::sync::Barrier::new(2));
-    let ready = Arc::clone(&barrier);
-    let writer = std::thread::spawn(move || {
-        let mut delays = Vec::new();
-        ready.wait();
-        while !running.load(Ordering::Acquire) {
-            let start = Instant::now();
-            tl.insert_frame_event(
-                FrameKind::TaskAssign,
-                8,
-                None,
-                "continuous.writer",
-                b"concurrent",
-                FrameOrigin::Kernel,
-            );
-            delays.push(start.elapsed());
-            std::thread::sleep(Duration::from_millis(1));
-        }
-        delays
-    });
-    let forget = || OperatorCommand::ForgetMemory {
-        principal: "scan-target@example.org".into(),
-        reason: None,
-    };
-    // The completion is necessarily newer than this operation's entry fence.
-    // Do not make its observer scan the entire 1 GiB fixture on every poll
-    // after the routed-append full indexes have correctly been removed.
-    let completion_after: i64 = db
-        .query_row(
-            "SELECT coalesce(max(rowid),0) FROM transparency_log",
-            [],
-            |row| row.get(0),
-        )
-        .expect("completion observation fence");
-    barrier.wait();
-    let start = Instant::now();
-    let result = submit_and_wait(door.as_ref(), forget());
-    eprintln!(
-        "EC-13 route rows={count} wall={:?} response={result:?}",
-        start.elapsed()
-    );
-    match result {
-        SubmitOutcome::Completed(OperatorOutcome::Completed(ref report)) => {
-            assert_eq!(report["outcome"], "erased");
-            assert_eq!(report["terminal_code"], 0);
-        }
-        SubmitOutcome::HandlerStillRunning { ref operation_id } => {
-            // The shipped route deadline is unchanged. This response is only
-            // pending, never an erased report; its durable completion must be
-            // observable within one further unchanged route-budget interval.
-            eprintln!("EC-13 pending rows={count} operation_id={operation_id}");
-            let deadline = Instant::now() + forget().route_budget();
-            let intent = format!("operator.forget.{operation_id}:completed");
-            loop {
-                let completed: Option<Vec<u8>> = db
-                    .query_row(
-                        "SELECT payload_redacted FROM transparency_log WHERE rowid>?3 AND kind=?1 AND intent=?2",
-                        rusqlite::params![FrameKind::TelemetryEvent as i64, intent, completion_after],
-                        |row| row.get(0),
-                    )
-                    .optional()
-                    .expect("completion lookup");
-                if let Some(bytes) = completed {
-                    let receipt: serde_json::Value = serde_json::from_slice(&bytes)
-                        .unwrap_or_else(|error| panic!("completion receipt: {error}"));
-                    assert_eq!(receipt["operation_id"], operation_id.as_str());
-                    assert_eq!(receipt["outcome"], "completed");
-                    break;
-                }
-                assert!(
-                    Instant::now() < deadline,
-                    "pending operation did not finish: {operation_id}"
-                );
-                std::thread::sleep(Duration::from_millis(10));
-            }
-        }
-        other => panic!("forget failed rather than completing or reporting pending: {other:?}"),
-    }
-    let elapsed = start.elapsed();
-    stop.store(true, Ordering::Release);
-    let delays = writer.join().expect("writer");
-    let max = delays.iter().copied().max().expect("writer attempted");
-    let ratio = max.as_secs_f64() / elapsed.as_secs_f64();
-    // The wall-latency criterion is independent of the constituent VM-work bound.
-    eprintln!("EC-13 door rows={count} wall={elapsed:?} max_insert={max:?} writes={} wall_ratio={ratio} response={result:?}", delays.len());
-    let read_body = |id: &[u8]| {
-        db.query_row(
-            "SELECT payload_redacted FROM transparency_log WHERE frame_id=?1",
-            [id],
-            |row| row.get::<_, Vec<u8>>(0),
-        )
-        .expect("frame body")
-    };
-    let tombstone = read_body(&target_id);
-    let redacted: serde_json::Value =
-        serde_json::from_slice(&tombstone).unwrap_or_else(|error| panic!("tombstone: {error}"));
-    assert_eq!(redacted["redacted"], true);
-    let repeated = submit_and_wait(door.as_ref(), forget());
-    assert!(
-        matches!(&repeated, SubmitOutcome::Completed(OperatorOutcome::Completed(report))
-            if report["outcome"] == "erased" && report["terminal_code"] == 0),
-        "identical request must return its completed report after the prior handler finishes: {repeated:?}"
-    );
-    assert_eq!(read_body(&target_id), tombstone);
-    assert_eq!(read_body(&count.to_be_bytes().repeat(2)), body);
-    let current = erasure_fixture_footprint(world.dir.path());
-    footprint.0 = footprint.0.max(current.0);
-    footprint.1 = footprint.1.max(current.1);
-    eprintln!(
-        "EC-13 fixture rows={count} peak_apparent_bytes={} peak_allocated_bytes={}",
-        footprint.0, footprint.1
-    );
-    assert!(
-        footprint.1 <= count * 1792 + 32 * 1024 * 1024,
-        "fixture peak exceeded its concurrency-safe disk envelope: {footprint:?}"
-    );
-    drop(door);
-    drop(rt);
-    drop(scheduler);
-    db.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")
-        .expect("truncate completed fixture WAL");
-    drop(db);
-    // Close every owner before TempDir cleanup, not merely at process exit.
-    let KernelWorld {
-        dir,
-        transparency_log,
-        journal,
-        halt_registry,
-        memory,
-        capability,
-        policy,
-    } = world;
-    drop((
-        transparency_log,
-        journal,
-        halt_registry,
-        memory,
-        capability,
-        policy,
-    ));
-    let path = dir.path().to_owned();
-    dir.close().expect("remove large fixture immediately");
-    assert!(
-        !path.exists(),
-        "large fixture directory leaked: {}",
-        path.display()
-    );
-    assert!(
-        ratio < 0.25,
-        "writer blocked for {max:?} of {elapsed:?} at {count} rows (ratio={ratio})"
-    );
 }
 
 #[test]

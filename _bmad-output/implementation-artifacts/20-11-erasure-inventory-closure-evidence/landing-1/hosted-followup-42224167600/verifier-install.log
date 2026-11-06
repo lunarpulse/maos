@@ -1,0 +1,9 @@
+Collecting cryptography==50.0.0 (from -r tools/verify-erasure/requirements.txt (line 3))
+  Using cached cryptography-50.0.0-cp311-abi3-manylinux_2_34_x86_64.whl (4.7 MB)
+Collecting cffi==2.1.1 (from -r tools/verify-erasure/requirements.txt (line 6))
+  Using cached cffi-2.1.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (221 kB)
+Collecting pycparser==3.12 (from -r tools/verify-erasure/requirements.txt (line 13))
+  Using cached pycparser-3.12-py3-none-any.whl (62 kB)
+Installing collected packages: pycparser, cffi, cryptography
+
+Successfully installed cffi-2.1.1 cryptography-50.0.0 pycparser-3.12

@@ -1,0 +1,66 @@
+import json
+import os
+from pathlib import Path
+import stat
+import time
+
+repo = Path('/home/lunarpulse/dev_ws')
+scratch = Path(__file__).parent.resolve()
+assert scratch == Path('/tmp/dev2011b-perf.242wuR')
+target = Path(os.environ['CARGO_TARGET_DIR']).resolve()
+assert target == Path('/mnt/build/cargo-maos')
+incremental = target/'debug/incremental'
+evidence = repo/'_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/hosted-followup-42224167600/cleanup-final.json'
+processes = []
+for entry in Path('/proc').iterdir():
+    if not entry.name.isdigit(): continue
+    try: name = (entry/'comm').read_text().strip()
+    except (FileNotFoundError, ProcessLookupError, PermissionError): continue
+    if name.startswith(('cargo','rustc','rustdoc','clippy')) or name == 'nextest': processes.append({'pid':int(entry.name),'name':name})
+assert not processes, processes
+cutoff = time.time()-7200
+selected = []
+kept_newest = []
+kept_recent = []
+for crate in incremental.iterdir():
+    if crate.is_symlink() or not crate.is_dir(): continue
+    sessions = []
+    for session in crate.glob('s-*'):
+        if session.is_symlink() or not session.is_dir(): continue
+        modified = session.stat().st_mtime
+        for base, directories, files in os.walk(session, followlinks=False):
+            for name in directories+files: modified = max(modified,(Path(base)/name).lstat().st_mtime)
+        sessions.append((modified,session))
+    if not sessions: continue
+    newest = max(sessions,key=lambda item:(item[0],item[1].name))[1]
+    for modified,session in sessions:
+        if session == newest: kept_newest.append(str(session))
+        elif modified >= cutoff: kept_recent.append(str(session))
+        else: selected.append(session)
+free_before = os.statvfs(target).f_bavail*os.statvfs(target).f_frsize
+scratch_free_before = os.statvfs(scratch).f_bavail*os.statvfs(scratch).f_frsize
+counts = {'logical_unlinked_bytes':0,'last_link_file_allocated_bytes':0,'files_unlinked':0,'directories_removed':0}
+def remove_file(path):
+    info = path.lstat()
+    counts['logical_unlinked_bytes'] += info.st_size
+    if info.st_nlink == 1: counts['last_link_file_allocated_bytes'] += info.st_blocks*512
+    path.unlink()
+    counts['files_unlinked'] += 1
+def remove_tree(path):
+    for base, directories, files in os.walk(path,topdown=False,followlinks=False):
+        for name in files: remove_file(Path(base)/name)
+        for name in directories:
+            item = Path(base)/name
+            if item.is_symlink(): remove_file(item)
+            else:
+                item.rmdir()
+                counts['directories_removed'] += 1
+    path.rmdir()
+    counts['directories_removed'] += 1
+for session in selected: remove_tree(session)
+remove_tree(scratch)
+free_after = os.statvfs(target).f_bavail*os.statvfs(target).f_frsize
+scratch_free_after = os.statvfs(scratch.parent).f_bavail*os.statvfs(scratch.parent).f_frsize
+record = {'process_guard_matches':processes,'cutoff_unix_seconds':cutoff,'removed_incremental_sessions':[str(item) for item in selected],'kept_newest_sessions':kept_newest,'kept_recent_sessions':kept_recent,'removed_owned_scratch':str(scratch),**counts,'cargo_filesystem_observed_free_delta_bytes':free_after-free_before,'scratch_filesystem_observed_free_delta_bytes':scratch_free_after-scratch_free_before,'untouched':['deps','build','.fingerprint','/tmp/2011-wip','/home/lunarpulse/wt-w3','.devcontainer'],'note':'Last-link allocation is file st_blocks at unlink, not a claim of exclusive physical blocks on a reflink filesystem; observed free-space deltas can include unrelated host activity.'}
+evidence.write_text(json.dumps(record,indent=2)+'\n')
+print(json.dumps({'removed_sessions':len(selected),**counts,'cargo_observed_free_delta_bytes':free_after-free_before,'evidence':str(evidence)}),flush=True)

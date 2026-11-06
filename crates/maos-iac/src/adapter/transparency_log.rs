@@ -532,6 +532,11 @@ pub fn capability_token_column(token: &maos_domain::invariants::i1::TokenId) -> 
     std::array::from_fn(|i| token.0.get(i).copied().unwrap_or(0))
 }
 
+const FRAME_ROW_INSERT_SQL: &str = "INSERT INTO transparency_log
+                (frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce,
+                 capability_token, kind, intent, correlation_id, payload_redacted, origin)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)";
+
 /// SQL schema for both tables.
 const SCHEMA_SQL: &str = "\
 CREATE TABLE IF NOT EXISTS transparency_log (
@@ -951,6 +956,10 @@ impl TransparencyLogAdapter {
         let conn = Connection::open_in_memory().expect("in-memory SQLite must succeed");
         conn.execute_batch(SCHEMA_SQL)
             .expect("schema init must succeed");
+        conn.execute_batch(
+            "CREATE INDEX idx_tlog_correlation ON transparency_log(correlation_id, timestamp_ns)",
+        )
+        .expect("in-memory correlation index must match the file-backed holder");
         conn.execute_batch(LEGAL_HOLDS_TABLE_SQL)
             .expect("in-memory legal-hold schema init must succeed");
         Self {
@@ -1375,26 +1384,24 @@ impl TransparencyLogAdapter {
         let boot_nonce = inner.boot_nonce;
         let transactional = sides.is_some();
         let write = |conn: &Connection| {
-            match conn.execute(
-                "INSERT INTO transparency_log
-                (frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce,
-                 capability_token, kind, intent, correlation_id, payload_redacted, origin)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-                rusqlite::params![
-                    &frame_id[..],
-                    timestamp_ns as i64,
-                    spirit_pid as i64,
-                    from_spirit_id,
-                    to_spirit_id,
-                    boot_nonce as i64,
-                    capability_token.map(|token| &token[..]),
-                    kind as i64,
-                    intent,
-                    correlation_id,
-                    &redacted[..],
-                    origin as i64,
-                ],
-            ) {
+            match conn
+                .prepare_cached(FRAME_ROW_INSERT_SQL)
+                .and_then(|mut statement| {
+                    statement.execute(rusqlite::params![
+                        &frame_id[..],
+                        timestamp_ns as i64,
+                        spirit_pid as i64,
+                        from_spirit_id,
+                        to_spirit_id,
+                        boot_nonce as i64,
+                        capability_token.map(|token| &token[..]),
+                        kind as i64,
+                        intent,
+                        correlation_id,
+                        &redacted[..],
+                        origin as i64,
+                    ])
+                }) {
                 Ok(_) => sides
                     .map_or(Ok(()), |sides| sides.write(conn, &frame_id))
                     .map(|()| FrameRowWrite::Written),
@@ -2828,16 +2835,14 @@ impl TransparencyLogAdapter {
             sql.push_str(" WHERE ");
             sql.push_str(&where_clauses.join(" AND "));
         }
-        let order_key = if filter.order_by_insertion {
-            "t.rowid"
-        } else {
-            "timestamp_ns, frame_id"
+        let order_key = match (filter.order_by_insertion, filter.descending) {
+            (true, true) => "t.rowid DESC",
+            (true, false) => "t.rowid ASC",
+            (false, true) => "timestamp_ns DESC, frame_id DESC",
+            (false, false) => "timestamp_ns, frame_id ASC",
         };
-        if filter.descending {
-            sql.push_str(&format!(" ORDER BY {order_key} DESC"));
-        } else {
-            sql.push_str(&format!(" ORDER BY {order_key} ASC"));
-        }
+        sql.push_str(" ORDER BY ");
+        sql.push_str(order_key);
         if let Some(limit) = filter.limit {
             sql.push_str(" LIMIT ?");
             params.push(Box::new(limit as i64));

@@ -1,0 +1,69 @@
+{
+  "source": "Exact human findings in prepush-final-records.json; its one-line embedded JSON is truncated, so it is not parsed as complete JSON.",
+  "binary_findings": [
+    {
+      "binary": "butler::hallucination",
+      "observed_seconds": 30.973,
+      "test_count": 5,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "maos-bin::erasure_uninstall_13_5b",
+      "observed_seconds": 37.547,
+      "test_count": 26,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "maos-bin::hook_pump_17_4",
+      "observed_seconds": 38.154,
+      "test_count": 26,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "maos-bin::maos_uninstall_16_4",
+      "observed_seconds": 35.868,
+      "test_count": 23,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "maos-bin::one_daemon_one_door_16_1",
+      "observed_seconds": 39.011,
+      "test_count": 42,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "maos-iac::participant_recall_17_8",
+      "observed_seconds": 41.008,
+      "test_count": 29,
+      "budget_seconds": 30.0
+    }
+  ],
+  "suite_finding": {
+    "observed_seconds": 1173.224,
+    "budget_seconds": 1100.0
+  },
+  "junit_source_comparison": {
+    "standalone": {
+      "total_case_seconds": 3059.815,
+      "finding_binary_sums": {
+        "butler::hallucination": 54.137,
+        "maos-bin::erasure_uninstall_13_5b": 106.586,
+        "maos-bin::hook_pump_17_4": 67.37400000000001,
+        "maos-bin::maos_uninstall_16_4": 65.52399999999999,
+        "maos-bin::one_daemon_one_door_16_1": 163.353,
+        "maos-iac::participant_recall_17_8": 187.13899999999998
+      }
+    },
+    "prepush": {
+      "total_case_seconds": 1173.224,
+      "finding_binary_sums": {
+        "butler::hallucination": 30.973,
+        "maos-bin::erasure_uninstall_13_5b": 37.547,
+        "maos-bin::hook_pump_17_4": 38.153999999999996,
+        "maos-bin::maos_uninstall_16_4": 35.868,
+        "maos-bin::one_daemon_one_door_16_1": 39.010999999999996,
+        "maos-iac::participant_recall_17_8": 41.007999999999996
+      }
+    }
+  }
+}

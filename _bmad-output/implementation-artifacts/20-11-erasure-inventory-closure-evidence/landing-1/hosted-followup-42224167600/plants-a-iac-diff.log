@@ -1,0 +1,20 @@
+--- /tmp/dev2011b-perf.242wuR/plant-final-iac.rs	2026-11-06 16:04:43.895842235 +0000
++++ crates/maos-iac/src/adapter/transparency_log.rs	2026-11-06 16:05:59.019192002 +0000
+@@ -1385,7 +1385,7 @@
+         let transactional = sides.is_some();
+         let write = |conn: &Connection| {
+             match conn
+-                .prepare_cached(FRAME_ROW_INSERT_SQL)
++                .prepare(FRAME_ROW_INSERT_SQL)
+                 .and_then(|mut statement| {
+                     statement.execute(rusqlite::params![
+                         &frame_id[..],
+@@ -2838,7 +2838,7 @@
+         let order_key = match (filter.order_by_insertion, filter.descending) {
+             (true, true) => "t.rowid DESC",
+             (true, false) => "t.rowid ASC",
+-            (false, true) => "timestamp_ns DESC, frame_id DESC",
++            (false, true) => "timestamp_ns, frame_id DESC",
+             (false, false) => "timestamp_ns, frame_id ASC",
+         };
+         sql.push_str(" ORDER BY ");

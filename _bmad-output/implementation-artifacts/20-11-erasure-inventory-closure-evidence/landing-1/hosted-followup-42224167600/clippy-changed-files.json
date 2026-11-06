@@ -1,0 +1,95 @@
+{
+  "compiler_command_exit_code": 0,
+  "changed_file_warnings": [
+    {
+      "code": "{'code': 'clippy::needless_borrows_for_generic_args', 'explanation': None}",
+      "message": "the borrowed expression implements the required traits",
+      "file": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 481
+    },
+    {
+      "code": "{'code': 'clippy::result_large_err', 'explanation': None}",
+      "message": "the `Err`-variant returned from this function is very large",
+      "file": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 266
+    },
+    {
+      "code": "{'code': 'clippy::result_large_err', 'explanation': None}",
+      "message": "the `Err`-variant returned from this function is very large",
+      "file": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 400
+    },
+    {
+      "code": "{'code': 'clippy::result_large_err', 'explanation': None}",
+      "message": "the `Err`-variant returned from this function is very large",
+      "file": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 410
+    },
+    {
+      "code": "{'code': 'clippy::result_large_err', 'explanation': None}",
+      "message": "the `Err`-variant returned from this function is very large",
+      "file": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 684
+    },
+    {
+      "code": "{'code': 'clippy::result_unit_err', 'explanation': None}",
+      "message": "this returns a `Result<_, ()>`",
+      "file": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 242
+    },
+    {
+      "code": "{'code': 'clippy::result_unit_err', 'explanation': None}",
+      "message": "this returns a `Result<_, ()>`",
+      "file": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 248
+    },
+    {
+      "code": "{'code': 'clippy::result_unit_err', 'explanation': None}",
+      "message": "this returns a `Result<_, ()>`",
+      "file": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 262
+    },
+    {
+      "code": "{'code': 'clippy::result_unit_err', 'explanation': None}",
+      "message": "this returns a `Result<_, ()>`",
+      "file": "crates/maos-iac/src/adapter/transparency_log.rs",
+      "line": 729
+    },
+    {
+      "code": "{'code': 'clippy::too_many_arguments', 'explanation': None}",
+      "message": "this function has too many arguments (10/7)",
+      "file": "crates/maos-iac/src/adapter/transparency_log.rs",
+      "line": 1186
+    },
+    {
+      "code": "{'code': 'clippy::too_many_arguments', 'explanation': None}",
+      "message": "this function has too many arguments (10/7)",
+      "file": "crates/maos-iac/src/adapter/transparency_log.rs",
+      "line": 1230
+    },
+    {
+      "code": "{'code': 'clippy::too_many_arguments', 'explanation': None}",
+      "message": "this function has too many arguments (9/7)",
+      "file": "crates/maos-iac/src/adapter/transparency_log.rs",
+      "line": 1140
+    },
+    {
+      "code": "{'code': 'clippy::type_complexity', 'explanation': None}",
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "file": "crates/maos-bin/src/operator_door.rs",
+      "line": 462
+    },
+    {
+      "code": "{'code': 'clippy::type_complexity', 'explanation': None}",
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "file": "crates/maos-iac/src/adapter/transparency_log.rs",
+      "line": 2049
+    },
+    {
+      "code": "{'code': 'clippy::useless_conversion', 'explanation': None}",
+      "message": "useless conversion to the same type: `maos_skill::ESkillStore`",
+      "file": "crates/maos-bin/src/operator_door.rs",
+      "line": 2781
+    }
+  ]
+}

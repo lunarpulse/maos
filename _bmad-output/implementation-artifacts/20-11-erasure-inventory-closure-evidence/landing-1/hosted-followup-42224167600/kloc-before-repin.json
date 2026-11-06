@@ -1,0 +1,16 @@
+{
+  "command": [
+    "env",
+    "-u",
+    "CI",
+    "-u",
+    "GITHUB_ACTIONS",
+    "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+    "/mnt/build/cargo-maos/debug/xtask",
+    "kloc-check",
+    "--json"
+  ],
+  "exit_code": 1,
+  "elapsed_seconds": 0.369354248046875,
+  "log": "/tmp/dev2011b-perf.242wuR/kloc-before-repin.log"
+}

@@ -1,0 +1,195 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: `maos-iac` (lib test) generated 3 warnings (run `cargo fix --lib -p maos-iac --tests` to apply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 39.73s
+────────────
+ Nextest run ID 9be9c394-4fe9-4585-a5b7-b23871b53638 with nextest profile: default
+    Starting 116 tests across 1 binary
+        PASS [   0.003s] (  1/116) maos-iac adapter::channels::tests::audit_frame_kinds_reject_router
+        PASS [   0.003s] (  2/116) maos-iac adapter::channels::tests::all_iac_frame_kinds_are_routable
+        PASS [   0.005s] (  3/116) maos-iac adapter::decision_audit_tests::i12_non_decision_frames_not_decorated
+        PASS [   0.006s] (  4/116) maos-iac adapter::decision_audit_tests::i12_10_decision_frames_100_percent_carry_refs
+        PASS [   0.004s] (  5/116) maos-iac adapter::log_recall::tests::cross_wall_recall_journals_disclosure_before_remote_read
+        PASS [   0.005s] (  6/116) maos-iac adapter::log_recall::tests::cross_wall_recall_journals_failure_when_remote_read_fails
+        PASS [   0.006s] (  7/116) maos-iac adapter::log_recall::tests::cross_wall_recall_no_grant_is_observable
+        PASS [   0.005s] (  8/116) maos-iac adapter::decision_logger::tests::frame_carries_i12_refs_non_decision_frame_true
+        PASS [   0.012s] (  9/116) maos-iac adapter::decision_logger::tests::frame_carries_i12_refs_empty_decision_frame_false
+        PASS [   0.012s] ( 10/116) maos-iac adapter::channels::tests::channel_classes_match_addendum
+        PASS [   0.012s] ( 11/116) maos-iac adapter::decision_audit_tests::lineage_broadcast_empty_to_succeeds
+        PASS [   0.007s] ( 12/116) maos-iac adapter::log_recall::tests::cross_wall_recall_journals_refusal
+        PASS [   0.013s] ( 13/116) maos-iac adapter::decision_audit_tests::lineage_same_spirit_empty_lineage_spirit_auto_succeeds
+        PASS [   0.007s] ( 14/116) maos-iac adapter::decision_logger::tests::decorate_decision_frame_does_not_mutate_non_decision_frames
+        PASS [   0.013s] ( 15/116) maos-iac adapter::decision_audit_tests::lineage_spirit_auto_cross_spirit_empty_lineage_rejected
+        PASS [   0.008s] ( 16/116) maos-iac adapter::log_recall::tests::cross_wall_recall_granted_without_read_port_fails_closed
+        PASS [   0.008s] ( 17/116) maos-iac adapter::decision_audit_tests::lineage_spirit_auto_cross_spirit_non_empty_lineage_succeeds
+        PASS [   0.008s] ( 18/116) maos-iac adapter::distillate::tests::two_hop_flattening_to_original_raw
+        PASS [   0.008s] ( 19/116) maos-iac adapter::distillate::tests::admit_for_consumer_denies_non_matching_lineage
+        PASS [   0.007s] ( 20/116) maos-iac adapter::log_recall::tests::cross_wall_recall_stale_state_is_observable
+        PASS [   0.008s] ( 21/116) maos-iac adapter::distillate::tests::write_distillate_source_frame_not_found
+        PASS [   0.015s] ( 22/116) maos-iac adapter::distillate::tests::write_distillate_single_hop_returns_receipt
+        PASS [   0.007s] ( 23/116) maos-iac adapter::log_recall::tests::cross_wall_recall_unavailable_state_is_observable
+        PASS [   0.009s] ( 24/116) maos-iac adapter::distillate::tests::write_distillate_rejects_depth_zero
+        PASS [   0.015s] ( 25/116) maos-iac adapter::decision_audit_tests::lineage_human_authored_cross_spirit_auto_populates
+        PASS [   0.009s] ( 26/116) maos-iac adapter::distillate::tests::same_principal_citation_still_succeeds
+        PASS [   0.016s] ( 27/116) maos-iac adapter::distillate::tests::admit_for_consumer_allows_matching_lineage
+        PASS [   0.006s] ( 28/116) maos-iac adapter::log_recall::tests::cross_wall_recall_wrong_direction_is_observable
+        PASS [   0.007s] ( 29/116) maos-iac adapter::log_recall::tests::cross_wall_recall_without_injected_consent_fails_closed
+        PASS [   0.006s] ( 30/116) maos-iac adapter::log_recall::tests::cursor_pagination_no_overlap_and_monotonic_order
+        PASS [   0.004s] ( 31/116) maos-iac adapter::mailbox::tests::deliver_and_receive_round_trip
+        PASS [   0.006s] ( 32/116) maos-iac adapter::mailbox::tests::broadcast_slow_subscriber_sees_lagged
+        PASS [   0.006s] ( 33/116) maos-iac adapter::mailbox::tests::cross_host_addressing_rejected_when_no_router_configured
+        PASS [   0.007s] ( 34/116) maos-iac adapter::log_recall::tests::fetch_cross_spirit_rejected
+        PASS [   0.007s] ( 35/116) maos-iac adapter::log_recall::tests::fetch_emits_capability_invocation
+        PASS [   0.006s] ( 36/116) maos-iac adapter::log_recall::tests::fetch_returns_owned_frame
+        PASS [   0.004s] ( 37/116) maos-iac adapter::metrics::tests::exact_buckets_equality
+        PASS [   0.006s] ( 38/116) maos-iac adapter::log_recall::tests::recall_emitter_scope_only_returns_own_frames
+        PASS [   0.007s] ( 39/116) maos-iac adapter::log_recall::tests::fetch_nonexistent_frame_returns_not_found
+        PASS [   0.006s] ( 40/116) maos-iac adapter::mailbox::tests::cross_host_routes_through_installed_a2a_router
+        PASS [   0.005s] ( 41/116) maos-iac adapter::metrics::tests::histogram_observation_in_correct_bucket
+        PASS [   0.005s] ( 42/116) maos-iac adapter::mailbox::tests::register_spirit_creates_channels
+        PASS [   0.005s] ( 43/116) maos-iac adapter::mailbox::tests::telemetry_event_uses_broadcast
+        PASS [   0.007s] ( 44/116) maos-iac adapter::log_recall::tests::recall_limit_zero_returns_empty
+        PASS [   0.007s] ( 45/116) maos-iac adapter::log_recall::tests::recall_emits_capability_invocation
+        PASS [   0.021s] ( 46/116) maos-iac adapter::decision_logger::tests::frame_carries_i12_refs_nonempty_decision_frame_true
+        PASS [   0.006s] ( 47/116) maos-iac adapter::mailbox::tests::deliver_to_unregistered_spirit_fails
+        PASS [   0.016s] ( 48/116) maos-iac adapter::decision_logger::tests::decorate_decision_frame_passes_spirit_id_to_provider
+        PASS [   0.007s] ( 49/116) maos-iac adapter::mailbox::tests::register_spirit_rejects_double_registration
+        PASS [   0.023s] ( 50/116) maos-iac adapter::decision_logger::tests::decorate_decision_frame_attaches_digest_refs
+        PASS [   0.005s] ( 51/116) maos-iac adapter::metrics::tests::label_strings_are_snake_case
+        PASS [   0.011s] ( 52/116) maos-iac adapter::log_recall::tests::cursor_pagination_three_page_walk
+        PASS [   0.006s] ( 53/116) maos-iac adapter::metrics::tests::inflight_guard_decrements_on_early_return
+        PASS [   0.005s] ( 54/116) maos-iac adapter::metrics::tests::inflight_guard_increments_and_decrements
+        PASS [   0.025s] ( 55/116) maos-iac adapter::decision_audit_tests::lineage_human_authored_non_empty_lineage_not_overwritten
+        PASS [   0.025s] ( 56/116) maos-iac adapter::distillate::tests::cross_principal_citation_is_rejected_and_writes_no_row
+        PASS [   0.007s] ( 57/116) maos-iac adapter::redaction::tests::clause_source_frame_refs_survive_without_exempting_other_hex_or_secrets
+        PASS [   0.020s] ( 58/116) maos-iac adapter::distillate::tests::write_distillate_rejects_empty_intent_lineage
+        PASS [   0.007s] ( 59/116) maos-iac adapter::metrics::tests::pending_frames_no_increment_on_error_path
+        PASS [   0.006s] ( 60/116) maos-iac adapter::redaction::tests::detect_credential_flags_prefix_secrets_but_not_hex_refs
+        PASS [   0.008s] ( 61/116) maos-iac adapter::metrics::tests::pending_frames_gauge_increment_decrement_round_trip
+        PASS [   0.008s] ( 62/116) maos-iac adapter::metrics::tests::render_prometheus_has_required_lines
+        PASS [   0.008s] ( 63/116) maos-iac adapter::payload::tests::schedule_fire_record_optional_compliance_claim_round_trip
+        PASS [   0.007s] ( 64/116) maos-iac adapter::redaction::tests::redaction_preserves_surrounding_text
+        PASS [   0.008s] ( 65/116) maos-iac adapter::redaction::tests::redaction_detects_hex_token
+        PASS [   0.007s] ( 66/116) maos-iac adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report
+        PASS [   0.009s] ( 67/116) maos-iac adapter::redaction::tests::redaction_detects_aws_key
+        PASS [   0.009s] ( 68/116) maos-iac adapter::redaction::tests::redaction_detects_github_token
+        PASS [   0.024s] ( 69/116) maos-iac adapter::log_recall::tests::cross_wall_recall_has_five_distinguishable_outcomes
+        PASS [   0.010s] ( 70/116) maos-iac adapter::redaction::tests::redaction_detects_private_key
+        PASS [   0.010s] ( 71/116) maos-iac adapter::redaction::tests::redaction_detects_anthropic_key
+        PASS [   0.010s] ( 72/116) maos-iac adapter::redaction::tests::redaction_filter_zero_alloc_on_clean_payload
+        PASS [   0.011s] ( 73/116) maos-iac adapter::payload::tests::schedule_fire_record_round_trip
+        PASS [   0.007s] ( 74/116) maos-iac adapter::transparency_log::erasure_races_20_11::review_legacy_receipt_order_is_timestamp_then_frame_id_after_closure
+        PASS [   0.008s] ( 75/116) maos-iac adapter::transparency_log::erasure_races_20_11::review_f13_sustained_matching_writer_returns_pending_at_the_fixed_pass_cap
+        PASS [   0.013s] ( 76/116) maos-iac adapter::metrics::tests::pending_frames_gauge_saturates_at_zero
+        PASS [   0.004s] ( 77/116) maos-iac adapter::transparency_log::tests::frame_kind_non_exhaustive_match
+        PASS [   0.010s] ( 78/116) maos-iac adapter::transparency_log::erasure_races_20_11::review_legacy_direct_parent_closure_reads_each_snapshot_window_once
+        PASS [   0.007s] ( 79/116) maos-iac adapter::transparency_log::erasure_scan_work::ac5_rowid_scans_restore_timestamp_and_frame_id_order
+        PASS [   0.028s] ( 80/116) maos-iac adapter::distillate::tests::write_distillate_rejects_empty_source
+        PASS [   0.013s] ( 81/116) maos-iac adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program
+        PASS [   0.029s] ( 82/116) maos-iac adapter::distillate::tests::write_distillate_emits_capability_invocation
+        PASS [   0.007s] ( 83/116) maos-iac adapter::transparency_log::tests::approval_log_is_distinct_table
+        PASS [   0.007s] ( 84/116) maos-iac adapter::transparency_log::tests::concurrent_inserts_from_threads
+        PASS [   0.019s] ( 85/116) maos-iac adapter::distillate::tests::diamond_dependency_is_not_a_cycle
+        PASS [   0.007s] ( 86/116) maos-iac adapter::transparency_log::tests::cross_team_correlation_requires_both_physical_logs
+        PASS [   0.011s] ( 87/116) maos-iac adapter::transparency_log::erasure_scan_work::ac5_opaque_outcome_payload_is_storable_but_bad_recovery_is_reported
+        PASS [   0.006s] ( 88/116) maos-iac adapter::transparency_log::tests::frame_kind_task_stalled_from_i64
+        PASS [   0.007s] ( 89/116) maos-iac adapter::transparency_log::tests::insert_approval_decision_creates_row
+        PASS [   0.008s] ( 90/116) maos-iac adapter::transparency_log::tests::frame_kind_spirit_revoked_discriminant
+        PASS [   0.009s] ( 91/116) maos-iac adapter::transparency_log::tests::frame_kind_spirit_revoked_from_i64
+        PASS [   0.009s] ( 92/116) maos-iac adapter::transparency_log::tests::frame_kind_silent_failure_suspect_from_i64
+        PASS [   0.009s] ( 93/116) maos-iac adapter::transparency_log::tests::insert_frame_event_creates_one_row
+        PASS [   0.009s] ( 94/116) maos-iac adapter::transparency_log::tests::iac_bus_port_enqueue_writes_and_routes
+        PASS [   0.009s] ( 95/116) maos-iac adapter::transparency_log::tests::hundred_sequential_inserts_are_ordered
+        PASS [   0.004s] ( 96/116) maos-iac adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit
+        PASS [   0.006s] ( 97/116) maos-iac adapter::transparency_log::tests::insert_frame_with_capability_token
+        PASS [   0.038s] ( 98/116) maos-iac adapter::distillate::tests::direct_distillate_insert_is_rejected
+        PASS [   0.011s] ( 99/116) maos-iac adapter::transparency_log::tests::iac_bus_port_broadcast_writes_and_routes
+        PASS [   0.006s] (100/116) maos-iac adapter::transparency_log::tests::query_filter_by_spirit_pid
+        PASS [   0.006s] (101/116) maos-iac adapter::transparency_log::tests::open_in_memory_succeeds
+        PASS [   0.007s] (102/116) maos-iac adapter::transparency_log::tests::insertion_cursor_does_not_skip_a_later_row_after_clock_rollback
+        PASS [   0.016s] (103/116) maos-iac adapter::transparency_log::tests::query_filter_by_since_ns_excludes_older_frames
+        PASS [   0.028s] (104/116) maos-iac adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction
+        PASS [   0.029s] (105/116) maos-iac adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed
+        PASS [   0.029s] (106/116) maos-iac adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed
+        PASS [   0.037s] (107/116) maos-iac adapter::transparency_log::tests::insert_frame_panics_on_write_failure
+        PASS [   0.056s] (108/116) maos-iac adapter::transparency_log::erasure_races_20_11::review_f13_scan_snapshot_does_not_chase_a_sustained_writer
+        PASS [   0.081s] (109/116) maos-iac adapter::transparency_log::erasure_races_20_11::review_p1_append_after_the_final_partial_page_is_not_left_unscrubbed
+        PASS [   0.353s] (110/116) maos-iac adapter::transparency_log::erasure_races_20_11::review_f7_cross_process_replaced_hold_is_not_released_by_a_stale_observation
+        PASS [   0.353s] (111/116) maos-iac adapter::transparency_log::erasure_races_20_11::review_f8_cross_process_hold_and_body_mutation_have_one_sqlite_order
+        PASS [   0.362s] (112/116) maos-iac adapter::transparency_log::tests::correlation_column_migrates_an_existing_transparency_log
+        PASS [   0.417s] (113/116) maos-iac adapter::transparency_log::erasure_races_20_11::review_marker_orders_independent_writer_commits_not_handler_return_time
+        PASS [   0.408s] (114/116) maos-iac adapter::transparency_log::tests::team_shard_keeps_legal_holds_in_global_database
+        PASS [   1.256s] (115/116) maos-iac adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_100k
+        PASS [   1.414s] (116/116) maos-iac adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_1m_rowid_with_100k_rows
+────────────
+     Summary [   1.441s] 116 tests run: 116 passed, 0 skipped

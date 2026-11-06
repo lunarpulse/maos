@@ -655,3 +655,68 @@ fn review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed() {
         2
     );
 }
+
+#[test]
+fn review_cached_frame_insert_reuses_the_indexed_program() {
+    let log = TransparencyLogAdapter::open_in_memory(2011);
+    for _ in 0..2 {
+        log.insert_frame_event(
+            FrameKind::TaskAssign,
+            7,
+            None,
+            "cached.insert",
+            b"ordinary routed-row shape",
+            FrameOrigin::Kernel,
+        );
+    }
+    let inner = log.inner.lock();
+    let statement = inner
+        .conn
+        .prepare_cached(FRAME_ROW_INSERT_SQL)
+        .expect("the exact production insert program");
+    assert_eq!(
+        statement.get_status(rusqlite::StatementStatus::Run),
+        2,
+        "ordinary appends recompiled the indexed INSERT instead of reusing it"
+    );
+}
+
+#[test]
+fn review_descending_correlation_query_selects_the_latest_report() {
+    let log = TransparencyLogAdapter::open_in_memory(2011);
+    let mut ids = [[0_u8; 16]; 2];
+    for id in &mut ids {
+        log.insert_frame_event_with_correlation(
+            FrameKind::TelemetryEvent,
+            0,
+            None,
+            "completed.report",
+            "operator.forget.fixture:completed",
+            b"receipt metadata",
+            FrameOrigin::Kernel,
+        );
+        *id = log.last_frame_id();
+    }
+    for (id, timestamp) in ids.iter().zip([10_i64, 20]) {
+        log.inner
+            .lock()
+            .conn
+            .execute(
+                "UPDATE transparency_log SET timestamp_ns=?2 WHERE frame_id=?1",
+                rusqlite::params![id.as_slice(), timestamp],
+            )
+            .expect("explicitly distinct receipt clocks");
+    }
+    let latest = log
+        .query_frames(FrameFilter {
+            correlation_id: Some("completed.report".into()),
+            descending: true,
+            limit: Some(1),
+            ..Default::default()
+        })
+        .expect("indexed completed-report lookup");
+    assert_eq!(
+        latest[0].frame_id, ids[1],
+        "DESC applied only to the frame-id tie breaker, selecting the oldest report"
+    );
+}

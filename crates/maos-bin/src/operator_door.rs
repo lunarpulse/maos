@@ -2056,6 +2056,136 @@ impl DoorInner {
         }
     }
 
+    fn forget_replay_key(principal: &str, reason: Option<&str>) -> String {
+        use sha2::{Digest as _, Sha256};
+        let mut key = Sha256::new();
+        key.update(b"maos.operator.forget.v1");
+        key.update((principal.len() as u64).to_le_bytes());
+        key.update(principal.as_bytes());
+        key.update([u8::from(reason.is_some())]);
+        if let Some(reason) = reason {
+            key.update(reason.as_bytes());
+        }
+        format!("operator.forget.replay:{:x}", key.finalize())
+    }
+
+    /// A historical completed report, not a new erasure certification.
+    /// The indexed lookup and finite tail check stay inside the route budget.
+    fn completed_forget(
+        &self,
+        principal: &str,
+        reason: Option<&str>,
+    ) -> Result<Option<serde_json::Value>, String> {
+        use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind};
+        let Some(row) = self
+            .transparency_log
+            .query_frames(FrameFilter {
+                correlation_id: Some(Self::forget_replay_key(principal, reason)),
+                descending: true,
+                limit: Some(1),
+                ..Default::default()
+            })
+            .map_err(|error| error.to_string())?
+            .pop()
+        else {
+            return Ok(None);
+        };
+        #[derive(serde::Deserialize)]
+        struct CompletedReport {
+            operation_id: String,
+            outcome: String,
+            completed_report: Vec<u8>,
+        }
+        let saved: CompletedReport = serde_json::from_slice(&row.payload_redacted)
+            .map_err(|error| format!("invalid durable forget report: {error}"))?;
+        let mut report: serde_json::Value = serde_json::from_slice(&saved.completed_report)
+            .map_err(|error| format!("invalid completed forget snapshot: {error}"))?;
+        if row.origin != maos_domain::invariants::i3::FrameOrigin::Kernel
+            || row.kind != FrameKind::TelemetryEvent
+            || row
+                .intent
+                .strip_prefix("operator.forget.")
+                .and_then(|intent| intent.strip_suffix(":completed"))
+                != Some(saved.operation_id.as_str())
+            || saved.outcome != "completed"
+            || report["operation_id"] != saved.operation_id
+            || report["principal_id"] != principal
+            || report["outcome"] != "erased"
+            || report["terminal_code"] != 0
+            || report["frame_sweep_status"] != "complete"
+        {
+            return Err("durable forget report is not a completed kernel receipt".into());
+        }
+        let marker = &report["frame_sweep_completion"];
+        let mut marker_id = [0_u8; 16];
+        hex::decode_to_slice(
+            marker["frame_id"]
+                .as_str()
+                .ok_or("completed forget has no frame marker")?,
+            &mut marker_id,
+        )
+        .map_err(|error| format!("invalid completed forget marker: {error}"))?;
+        let through = marker["through_rowid"]
+            .as_u64()
+            .and_then(|rowid| i64::try_from(rowid).ok())
+            .ok_or("completed forget has no valid high-water")?;
+        let certified = self
+            .transparency_log
+            .query_frame_by_id(marker_id)
+            .map_err(|error| error.to_string())?
+            .ok_or("completed forget marker is missing")?;
+        let boundary: serde_json::Value = serde_json::from_slice(&certified.payload_redacted)
+            .map_err(|error| format!("invalid forget completion boundary: {error}"))?;
+        if certified.origin != maos_domain::invariants::i3::FrameOrigin::Kernel
+            || certified.kind != FrameKind::Decision
+            || certified.intent != "principal.uninstall.frame_sweep_complete"
+            || certified.insertion_id <= through
+            || row.insertion_id <= certified.insertion_id
+            || boundary["through_rowid"] != through
+            || boundary["completion_boundary"] != "durable_transactional_marker"
+        {
+            return Err("durable forget report does not match its certified marker".into());
+        }
+        if self
+            .transparency_log
+            .is_under_legal_hold(principal)
+            .map_err(|error| error.to_string())?
+        {
+            return Ok(None);
+        }
+        let tail = self
+            .transparency_log
+            .query_frames(FrameFilter {
+                cursor_insertion_id: Some(through),
+                order_by_insertion: true,
+                limit: Some(4096),
+                ..Default::default()
+            })
+            .map_err(|error| error.to_string())?;
+        if tail.len() == 4096
+            || tail.iter().any(|frame| {
+                // These are retained control receipts, not application bodies.
+                let retained = frame.origin == maos_domain::invariants::i3::FrameOrigin::Kernel
+                    && (frame.intent.starts_with("operator.forget.")
+                        || frame.intent.starts_with("principal.uninstall.")
+                        || matches!(
+                            frame.intent.as_str(),
+                            "principal.forget" | "principal.forget.held" | "distillate.redacted"
+                        ));
+                !retained
+                    && (frame.kind == FrameKind::Distillate
+                        || maos_domain::memory::principal_id_occurs(
+                            &frame.payload_redacted,
+                            principal,
+                        ))
+            })
+        {
+            return Ok(None);
+        }
+        report["replayed"] = serde_json::json!(true);
+        Ok(Some(report))
+    }
+
     /// The offline-forget cascade, reached over the door while the daemon
     /// holds the stores: the in-memory private values and live tokens the
     /// one-shot child could not see are the reason this route exists.
@@ -2065,6 +2195,16 @@ impl DoorInner {
                 code: "invalid_principal".into(),
                 detail: "principal must not be empty".into(),
             };
+        }
+        match tokio::task::block_in_place(|| self.completed_forget(principal, reason)) {
+            Ok(Some(report)) => return OperatorOutcome::Completed(report),
+            Ok(None) => {}
+            Err(detail) => {
+                return OperatorOutcome::Failed {
+                    code: "forget_failed".into(),
+                    detail,
+                };
+            }
         }
         match tokio::task::block_in_place(|| self.memory.forget_with_reason(principal, reason)) {
             Err(error) => OperatorOutcome::Failed {
@@ -2304,7 +2444,13 @@ impl DoorInner {
             .or_else(|| lock_key.clone())
             .unwrap_or_default();
         let spirit_pid = self.scheduler.resolve_pid(&spirit_id).unwrap_or(0);
-        let outcome = self.dispatch(command, pread).await;
+        let replay_key = match &command {
+            OperatorCommand::ForgetMemory { principal, reason } => {
+                Some(Self::forget_replay_key(principal, reason.as_deref()))
+            }
+            _ => None,
+        };
+        let mut outcome = self.dispatch(command, pread).await;
         // ONE completion TL row per started mutating command, `intent`
         // carrying the `operation_id` so
         // `maosctl audit query --intent-contains <id>` finds it. Written
@@ -2327,20 +2473,70 @@ impl DoorInner {
             | OperatorOutcome::Invalid { code, .. }
             | OperatorOutcome::Failed { code, .. } => code.clone(),
         };
-        let payload = serde_json::json!({
-            "operation_id": operation_id,
-            "verb": verb,
-            "spirit_id": spirit_id,
-            "outcome": outcome_label,
-        });
-        let _ = self.transparency_log.insert_frame_event(
-            maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
-            spirit_pid,
-            None,
-            &format!("operator.{verb}.{operation_id}:{outcome_label}"),
-            payload.to_string().as_bytes(),
-            maos_domain::invariants::i3::FrameOrigin::Kernel,
-        );
+        let mut completed_report = None;
+        let mut replayed_operation_id = None;
+        let correlation = match (replay_key, &mut outcome) {
+            (Some(key), OperatorOutcome::Completed(report))
+                if report["outcome"] == "erased" && report["frame_sweep_status"] == "complete" =>
+            {
+                if report["replayed"] == true {
+                    replayed_operation_id = report["operation_id"].as_str();
+                    None
+                } else {
+                    report["operation_id"] = serde_json::json!(operation_id);
+                    report["replayed"] = serde_json::json!(false);
+                    // Receipt metadata only; byte serialization preserves real
+                    // frame references through the TL's credential redactor.
+                    completed_report = Some(report.to_string().into_bytes());
+                    Some(key)
+                }
+            }
+            _ => None,
+        };
+        let intent = format!("operator.{verb}.{operation_id}:{outcome_label}");
+        #[derive(serde::Serialize)]
+        struct CompletionReceipt<'a> {
+            operation_id: &'a str,
+            verb: &'a str,
+            spirit_id: &'a str,
+            outcome: &'a str,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            completed_report: Option<&'a [u8]>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            replayed_operation_id: Option<&'a str>,
+        }
+        // Stream the byte slice; do not allocate a JSON Value for every byte.
+        let bytes = match serde_json::to_vec(&CompletionReceipt {
+            operation_id: &operation_id,
+            verb,
+            spirit_id: &spirit_id,
+            outcome: &outcome_label,
+            completed_report: completed_report.as_deref(),
+            replayed_operation_id,
+        }) {
+            Ok(bytes) => bytes,
+            Err(error) => panic!("MAOS I2 operator completion serialization failed: {error}"),
+        };
+        if let Some(key) = correlation {
+            let _ = self.transparency_log.insert_frame_event_with_correlation(
+                maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
+                spirit_pid,
+                None,
+                &key,
+                &intent,
+                &bytes,
+                maos_domain::invariants::i3::FrameOrigin::Kernel,
+            );
+        } else {
+            let _ = self.transparency_log.insert_frame_event(
+                maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
+                spirit_pid,
+                None,
+                &intent,
+                &bytes,
+                maos_domain::invariants::i3::FrameOrigin::Kernel,
+            );
+        }
         // A receiver that already timed out may be gone; the rows are
         // written either way.
         let _ = completion_tx.send(outcome);

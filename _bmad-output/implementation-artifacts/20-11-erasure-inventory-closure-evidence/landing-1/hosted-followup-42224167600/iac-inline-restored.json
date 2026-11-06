@@ -1,0 +1,18 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "-p",
+    "maos-iac",
+    "--lib",
+    "--locked",
+    "--no-fail-fast"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 7.938953399658203,
+  "log": "/tmp/dev2011b-perf.242wuR/iac-inline-restored.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

@@ -1,0 +1,16 @@
+"""Check only the registered allocation metric against an actual native harness JSON.
+This is not a substitute for hosted callgrind instruction evidence.
+"""
+import json
+from pathlib import Path
+import sys
+import tomllib
+
+metrics = tomllib.loads(Path('xtask/perf-budgets.toml').read_text())['metric']
+metric = next(row for row in metrics if row['id'] == 'iac-routing-allocations')
+actual = json.loads(Path(sys.argv[1]).read_text())
+observed = actual['allocations'] / actual['iterations']
+ceiling = metric['baseline'] * (1 + metric['regression_tolerance'])
+result = {'metric':metric['id'], 'iterations':actual['iterations'], 'allocations':actual['allocations'], 'observed':observed, 'baseline':metric['baseline'], 'regression_tolerance':metric['regression_tolerance'], 'ceiling':ceiling, 'passed':observed <= ceiling}
+print(json.dumps(result, indent=2))
+sys.exit(0 if result['passed'] else 1)

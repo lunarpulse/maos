@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="116" skipped="0" failures="1" errors="0" uuid="36892ad7-7e83-4e5a-b8f7-8be4bb16e97d" timestamp="2026-11-06T15:50:22.404+00:00" time="1.382">
+    <testsuite name="maos-iac" tests="116" skipped="0" errors="0" failures="1">
+        <testcase name="adapter::channels::tests::channel_classes_match_addendum" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.003"/>
+        <testcase name="adapter::channels::tests::all_iac_frame_kinds_are_routable" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.003"/>
+        <testcase name="adapter::decision_audit_tests::lineage_broadcast_empty_to_succeeds" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.004"/>
+        <testcase name="adapter::decision_audit_tests::i12_non_decision_frames_not_decorated" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.005"/>
+        <testcase name="adapter::distillate::tests::write_distillate_emits_capability_invocation" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.005"/>
+        <testcase name="adapter::decision_audit_tests::i12_10_decision_frames_100_percent_carry_refs" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.005"/>
+        <testcase name="adapter::decision_logger::tests::decorate_decision_frame_does_not_mutate_non_decision_frames" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.004"/>
+        <testcase name="adapter::decision_logger::tests::frame_carries_i12_refs_nonempty_decision_frame_true" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.015"/>
+        <testcase name="adapter::decision_logger::tests::decorate_decision_frame_passes_spirit_id_to_provider" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.005"/>
+        <testcase name="adapter::channels::tests::audit_frame_kinds_reject_router" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.015"/>
+        <testcase name="adapter::decision_logger::tests::decorate_decision_frame_attaches_digest_refs" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.016"/>
+        <testcase name="adapter::decision_logger::tests::frame_carries_i12_refs_empty_decision_frame_false" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.005"/>
+        <testcase name="adapter::decision_logger::tests::frame_carries_i12_refs_non_decision_frame_true" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.006"/>
+        <testcase name="adapter::decision_audit_tests::lineage_spirit_auto_cross_spirit_empty_lineage_rejected" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.017"/>
+        <testcase name="adapter::decision_audit_tests::lineage_human_authored_non_empty_lineage_not_overwritten" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.017"/>
+        <testcase name="adapter::log_recall::tests::cross_wall_recall_journals_disclosure_before_remote_read" classname="maos-iac" timestamp="2026-11-06T15:50:22.415+00:00" time="0.007"/>
+        <testcase name="adapter::decision_audit_tests::lineage_human_authored_cross_spirit_auto_populates" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.017"/>
+        <testcase name="adapter::log_recall::tests::cross_wall_recall_unavailable_state_is_observable" classname="maos-iac" timestamp="2026-11-06T15:50:22.415+00:00" time="0.007"/>
+        <testcase name="adapter::distillate::tests::write_distillate_rejects_empty_source" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.018"/>
+        <testcase name="adapter::decision_audit_tests::lineage_same_spirit_empty_lineage_spirit_auto_succeeds" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.018"/>
+        <testcase name="adapter::distillate::tests::same_principal_citation_still_succeeds" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.019"/>
+        <testcase name="adapter::distillate::tests::admit_for_consumer_allows_matching_lineage" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.008"/>
+        <testcase name="adapter::distillate::tests::two_hop_flattening_to_original_raw" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.019"/>
+        <testcase name="adapter::distillate::tests::write_distillate_rejects_depth_zero" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.008"/>
+        <testcase name="adapter::distillate::tests::write_distillate_rejects_empty_intent_lineage" classname="maos-iac" timestamp="2026-11-06T15:50:22.414+00:00" time="0.008"/>
+        <testcase name="adapter::log_recall::tests::cross_wall_recall_wrong_direction_is_observable" classname="maos-iac" timestamp="2026-11-06T15:50:22.419+00:00" time="0.005"/>
+        <testcase name="adapter::decision_audit_tests::lineage_spirit_auto_cross_spirit_non_empty_lineage_succeeds" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.010"/>
+        <testcase name="adapter::log_recall::tests::cross_wall_recall_without_injected_consent_fails_closed" classname="maos-iac" timestamp="2026-11-06T15:50:22.419+00:00" time="0.006"/>
+        <testcase name="adapter::distillate::tests::admit_for_consumer_denies_non_matching_lineage" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.010"/>
+        <testcase name="adapter::distillate::tests::diamond_dependency_is_not_a_cycle" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.021"/>
+        <testcase name="adapter::log_recall::tests::cursor_pagination_no_overlap_and_monotonic_order" classname="maos-iac" timestamp="2026-11-06T15:50:22.419+00:00" time="0.006"/>
+        <testcase name="adapter::distillate::tests::cross_principal_citation_is_rejected_and_writes_no_row" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.011"/>
+        <testcase name="adapter::log_recall::tests::fetch_cross_spirit_rejected" classname="maos-iac" timestamp="2026-11-06T15:50:22.420+00:00" time="0.006"/>
+        <testcase name="adapter::mailbox::tests::broadcast_slow_subscriber_sees_lagged" classname="maos-iac" timestamp="2026-11-06T15:50:22.421+00:00" time="0.005"/>
+        <testcase name="adapter::log_recall::tests::recall_emits_capability_invocation" classname="maos-iac" timestamp="2026-11-06T15:50:22.421+00:00" time="0.006"/>
+        <testcase name="adapter::log_recall::tests::fetch_nonexistent_frame_returns_not_found" classname="maos-iac" timestamp="2026-11-06T15:50:22.420+00:00" time="0.006"/>
+        <testcase name="adapter::log_recall::tests::fetch_returns_owned_frame" classname="maos-iac" timestamp="2026-11-06T15:50:22.421+00:00" time="0.006"/>
+        <testcase name="adapter::log_recall::tests::cursor_pagination_three_page_walk" classname="maos-iac" timestamp="2026-11-06T15:50:22.419+00:00" time="0.008"/>
+        <testcase name="adapter::log_recall::tests::recall_limit_zero_returns_empty" classname="maos-iac" timestamp="2026-11-06T15:50:22.421+00:00" time="0.006"/>
+        <testcase name="adapter::log_recall::tests::recall_emitter_scope_only_returns_own_frames" classname="maos-iac" timestamp="2026-11-06T15:50:22.421+00:00" time="0.006"/>
+        <testcase name="adapter::mailbox::tests::telemetry_event_uses_broadcast" classname="maos-iac" timestamp="2026-11-06T15:50:22.423+00:00" time="0.005"/>
+        <testcase name="adapter::mailbox::tests::deliver_and_receive_round_trip" classname="maos-iac" timestamp="2026-11-06T15:50:22.423+00:00" time="0.005"/>
+        <testcase name="adapter::log_recall::tests::fetch_emits_capability_invocation" classname="maos-iac" timestamp="2026-11-06T15:50:22.420+00:00" time="0.008"/>
+        <testcase name="adapter::mailbox::tests::cross_host_routes_through_installed_a2a_router" classname="maos-iac" timestamp="2026-11-06T15:50:22.422+00:00" time="0.005"/>
+        <testcase name="adapter::mailbox::tests::cross_host_addressing_rejected_when_no_router_configured" classname="maos-iac" timestamp="2026-11-06T15:50:22.422+00:00" time="0.005"/>
+        <testcase name="adapter::mailbox::tests::deliver_to_unregistered_spirit_fails" classname="maos-iac" timestamp="2026-11-06T15:50:22.423+00:00" time="0.005"/>
+        <testcase name="adapter::mailbox::tests::register_spirit_creates_channels" classname="maos-iac" timestamp="2026-11-06T15:50:22.423+00:00" time="0.005"/>
+        <testcase name="adapter::mailbox::tests::register_spirit_rejects_double_registration" classname="maos-iac" timestamp="2026-11-06T15:50:22.423+00:00" time="0.005"/>
+        <testcase name="adapter::metrics::tests::exact_buckets_equality" classname="maos-iac" timestamp="2026-11-06T15:50:22.424+00:00" time="0.005"/>
+        <testcase name="adapter::metrics::tests::label_strings_are_snake_case" classname="maos-iac" timestamp="2026-11-06T15:50:22.425+00:00" time="0.004"/>
+        <testcase name="adapter::metrics::tests::pending_frames_gauge_saturates_at_zero" classname="maos-iac" timestamp="2026-11-06T15:50:22.425+00:00" time="0.004"/>
+        <testcase name="adapter::log_recall::tests::cross_wall_recall_journals_refusal" classname="maos-iac" timestamp="2026-11-06T15:50:22.415+00:00" time="0.015"/>
+        <testcase name="adapter::metrics::tests::histogram_observation_in_correct_bucket" classname="maos-iac" timestamp="2026-11-06T15:50:22.424+00:00" time="0.006"/>
+        <testcase name="adapter::log_recall::tests::cross_wall_recall_journals_failure_when_remote_read_fails" classname="maos-iac" timestamp="2026-11-06T15:50:22.415+00:00" time="0.016"/>
+        <testcase name="adapter::log_recall::tests::cross_wall_recall_no_grant_is_observable" classname="maos-iac" timestamp="2026-11-06T15:50:22.415+00:00" time="0.016"/>
+        <testcase name="adapter::metrics::tests::inflight_guard_increments_and_decrements" classname="maos-iac" timestamp="2026-11-06T15:50:22.425+00:00" time="0.006"/>
+        <testcase name="adapter::metrics::tests::pending_frames_gauge_increment_decrement_round_trip" classname="maos-iac" timestamp="2026-11-06T15:50:22.425+00:00" time="0.006"/>
+        <testcase name="adapter::metrics::tests::inflight_guard_decrements_on_early_return" classname="maos-iac" timestamp="2026-11-06T15:50:22.425+00:00" time="0.007"/>
+        <testcase name="adapter::redaction::tests::redaction_detects_hex_token" classname="maos-iac" timestamp="2026-11-06T15:50:22.428+00:00" time="0.004"/>
+        <testcase name="adapter::metrics::tests::pending_frames_no_increment_on_error_path" classname="maos-iac" timestamp="2026-11-06T15:50:22.426+00:00" time="0.005"/>
+        <testcase name="adapter::payload::tests::schedule_fire_record_round_trip" classname="maos-iac" timestamp="2026-11-06T15:50:22.426+00:00" time="0.005"/>
+        <testcase name="adapter::payload::tests::schedule_fire_record_optional_compliance_claim_round_trip" classname="maos-iac" timestamp="2026-11-06T15:50:22.426+00:00" time="0.005"/>
+        <testcase name="adapter::redaction::tests::redaction_filter_zero_alloc_on_clean_payload" classname="maos-iac" timestamp="2026-11-06T15:50:22.428+00:00" time="0.004"/>
+        <testcase name="adapter::redaction::tests::detect_credential_flags_prefix_secrets_but_not_hex_refs" classname="maos-iac" timestamp="2026-11-06T15:50:22.427+00:00" time="0.005"/>
+        <testcase name="adapter::log_recall::tests::cross_wall_recall_granted_without_read_port_fails_closed" classname="maos-iac" timestamp="2026-11-06T15:50:22.415+00:00" time="0.017"/>
+        <testcase name="adapter::redaction::tests::redaction_detects_aws_key" classname="maos-iac" timestamp="2026-11-06T15:50:22.427+00:00" time="0.004"/>
+        <testcase name="adapter::metrics::tests::render_prometheus_has_required_lines" classname="maos-iac" timestamp="2026-11-06T15:50:22.426+00:00" time="0.006"/>
+        <testcase name="adapter::redaction::tests::redaction_detects_anthropic_key" classname="maos-iac" timestamp="2026-11-06T15:50:22.427+00:00" time="0.005"/>
+        <testcase name="adapter::redaction::tests::redaction_preserves_surrounding_text" classname="maos-iac" timestamp="2026-11-06T15:50:22.428+00:00" time="0.005"/>
+        <testcase name="adapter::redaction::tests::redaction_detects_private_key" classname="maos-iac" timestamp="2026-11-06T15:50:22.428+00:00" time="0.005"/>
+        <testcase name="adapter::redaction::tests::clause_source_frame_refs_survive_without_exempting_other_hex_or_secrets" classname="maos-iac" timestamp="2026-11-06T15:50:22.427+00:00" time="0.006"/>
+        <testcase name="adapter::redaction::tests::redaction_detects_github_token" classname="maos-iac" timestamp="2026-11-06T15:50:22.428+00:00" time="0.005"/>
+        <testcase name="adapter::log_recall::tests::cross_wall_recall_stale_state_is_observable" classname="maos-iac" timestamp="2026-11-06T15:50:22.415+00:00" time="0.018"/>
+        <testcase name="adapter::log_recall::tests::cross_wall_recall_has_five_distinguishable_outcomes" classname="maos-iac" timestamp="2026-11-06T15:50:22.415+00:00" time="0.009"/>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program" classname="maos-iac" timestamp="2026-11-06T15:50:22.428+00:00" time="0.006"/>
+        <testcase name="adapter::distillate::tests::write_distillate_source_frame_not_found" classname="maos-iac" timestamp="2026-11-06T15:50:22.415+00:00" time="0.019"/>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report" classname="maos-iac" timestamp="2026-11-06T15:50:22.428+00:00" time="0.008"/>
+        <testcase name="adapter::transparency_log::tests::frame_kind_silent_failure_suspect_from_i64" classname="maos-iac" timestamp="2026-11-06T15:50:22.433+00:00" time="0.004"/>
+        <testcase name="adapter::transparency_log::tests::frame_kind_task_stalled_from_i64" classname="maos-iac" timestamp="2026-11-06T15:50:22.433+00:00" time="0.004"/>
+        <testcase name="adapter::transparency_log::tests::frame_kind_spirit_revoked_from_i64" classname="maos-iac" timestamp="2026-11-06T15:50:22.433+00:00" time="0.004"/>
+        <testcase name="adapter::transparency_log::tests::frame_kind_non_exhaustive_match" classname="maos-iac" timestamp="2026-11-06T15:50:22.432+00:00" time="0.005"/>
+        <testcase name="adapter::transparency_log::tests::frame_kind_spirit_revoked_discriminant" classname="maos-iac" timestamp="2026-11-06T15:50:22.433+00:00" time="0.004"/>
+        <testcase name="adapter::distillate::tests::write_distillate_single_hop_returns_receipt" classname="maos-iac" timestamp="2026-11-06T15:50:22.415+00:00" time="0.023"/>
+        <testcase name="adapter::transparency_log::tests::approval_log_is_distinct_table" classname="maos-iac" timestamp="2026-11-06T15:50:22.432+00:00" time="0.006"/>
+        <testcase name="adapter::transparency_log::erasure_scan_work::ac5_opaque_outcome_payload_is_storable_but_bad_recovery_is_reported" classname="maos-iac" timestamp="2026-11-06T15:50:22.432+00:00" time="0.006"/>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_legacy_receipt_order_is_timestamp_then_frame_id_after_closure" classname="maos-iac" timestamp="2026-11-06T15:50:22.430+00:00" time="0.008"/>
+        <testcase name="adapter::transparency_log::erasure_scan_work::ac5_rowid_scans_restore_timestamp_and_frame_id_order" classname="maos-iac" timestamp="2026-11-06T15:50:22.432+00:00" time="0.007"/>
+        <testcase name="adapter::transparency_log::tests::iac_bus_port_broadcast_writes_and_routes" classname="maos-iac" timestamp="2026-11-06T15:50:22.433+00:00" time="0.006"/>
+        <testcase name="adapter::transparency_log::tests::iac_bus_port_enqueue_writes_and_routes" classname="maos-iac" timestamp="2026-11-06T15:50:22.434+00:00" time="0.006"/>
+        <testcase name="adapter::transparency_log::tests::concurrent_inserts_from_threads" classname="maos-iac" timestamp="2026-11-06T15:50:22.432+00:00" time="0.007"/>
+        <testcase name="adapter::transparency_log::tests::insert_frame_event_creates_one_row" classname="maos-iac" timestamp="2026-11-06T15:50:22.434+00:00" time="0.006"/>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_legacy_direct_parent_closure_reads_each_snapshot_window_once" classname="maos-iac" timestamp="2026-11-06T15:50:22.430+00:00" time="0.010"/>
+        <testcase name="adapter::transparency_log::tests::cross_team_correlation_requires_both_physical_logs" classname="maos-iac" timestamp="2026-11-06T15:50:22.432+00:00" time="0.008"/>
+        <testcase name="adapter::transparency_log::tests::insert_approval_decision_creates_row" classname="maos-iac" timestamp="2026-11-06T15:50:22.434+00:00" time="0.006"/>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_f13_sustained_matching_writer_returns_pending_at_the_fixed_pass_cap" classname="maos-iac" timestamp="2026-11-06T15:50:22.429+00:00" time="0.012"/>
+        <testcase name="adapter::transparency_log::tests::hundred_sequential_inserts_are_ordered" classname="maos-iac" timestamp="2026-11-06T15:50:22.433+00:00" time="0.008"/>
+        <testcase name="adapter::distillate::tests::direct_distillate_insert_is_rejected" classname="maos-iac" timestamp="2026-11-06T15:50:22.404+00:00" time="0.027"/>
+        <testcase name="adapter::transparency_log::tests::insert_frame_with_capability_token" classname="maos-iac" timestamp="2026-11-06T15:50:22.437+00:00" time="0.005"/>
+        <testcase name="adapter::transparency_log::tests::insertion_cursor_does_not_skip_a_later_row_after_clock_rollback" classname="maos-iac" timestamp="2026-11-06T15:50:22.437+00:00" time="0.005"/>
+        <testcase name="adapter::transparency_log::tests::open_in_memory_succeeds" classname="maos-iac" timestamp="2026-11-06T15:50:22.437+00:00" time="0.005"/>
+        <testcase name="adapter::transparency_log::tests::query_filter_by_spirit_pid" classname="maos-iac" timestamp="2026-11-06T15:50:22.437+00:00" time="0.007"/>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed" classname="maos-iac" timestamp="2026-11-06T15:50:22.431+00:00" time="0.020"/>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed" classname="maos-iac" timestamp="2026-11-06T15:50:22.430+00:00" time="0.021"/>
+        <testcase name="adapter::transparency_log::tests::query_filter_by_since_ns_excludes_older_frames" classname="maos-iac" timestamp="2026-11-06T15:50:22.437+00:00" time="0.015"/>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction" classname="maos-iac" timestamp="2026-11-06T15:50:22.431+00:00" time="0.021"/>
+        <testcase name="adapter::transparency_log::tests::insert_frame_panics_on_write_failure" classname="maos-iac" timestamp="2026-11-06T15:50:22.436+00:00" time="0.019"/>
+        <testcase name="adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit" classname="maos-iac" timestamp="2026-11-06T15:50:22.438+00:00" time="0.018">
+            <failure message="thread &apos;adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit&apos; (3176117) panicked at crates/maos-iac/src/adapter/../../tests/support/transparency_log_unit.rs:24:5" type="test failure with exit code 101">thread &apos;adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit&apos; (3176117) panicked at crates/maos-iac/src/adapter/../../tests/support/transparency_log_unit.rs:24:5:
+assertion failed: predicates.ends_with(&quot;ORDER BY timestamp_ns, frame_id ASC LIMIT ?&quot;)
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+   3: recall_metadata_query_projects_only_payload_length_before_limit
+             at ./src/adapter/../../tests/support/transparency_log_unit.rs:24:5
+   4: maos_iac::adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit::{closure#0}
+             at ./src/adapter/../../tests/support/transparency_log_unit.rs:4:69
+   5: &lt;maos_iac::adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.</failure>
+            <system-out>
+running 1 test
+test adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit ... FAILED
+
+failures:
+
+failures:
+    adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 115 filtered out; finished in 0.01s
+
+</system-out>
+            <system-err>
+thread &apos;adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit&apos; (3176117) panicked at crates/maos-iac/src/adapter/../../tests/support/transparency_log_unit.rs:24:5:
+assertion failed: predicates.ends_with(&quot;ORDER BY timestamp_ns, frame_id ASC LIMIT ?&quot;)
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+   3: recall_metadata_query_projects_only_payload_length_before_limit
+             at ./src/adapter/../../tests/support/transparency_log_unit.rs:24:5
+   4: maos_iac::adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit::{closure#0}
+             at ./src/adapter/../../tests/support/transparency_log_unit.rs:4:69
+   5: &lt;maos_iac::adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+</system-err>
+        </testcase>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_f13_scan_snapshot_does_not_chase_a_sustained_writer" classname="maos-iac" timestamp="2026-11-06T15:50:22.428+00:00" time="0.044"/>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_p1_append_after_the_final_partial_page_is_not_left_unscrubbed" classname="maos-iac" timestamp="2026-11-06T15:50:22.432+00:00" time="0.070"/>
+        <testcase name="adapter::transparency_log::tests::correlation_column_migrates_an_existing_transparency_log" classname="maos-iac" timestamp="2026-11-06T15:50:22.432+00:00" time="0.367"/>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_f7_cross_process_replaced_hold_is_not_released_by_a_stale_observation" classname="maos-iac" timestamp="2026-11-06T15:50:22.429+00:00" time="0.370"/>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_f8_cross_process_hold_and_body_mutation_have_one_sqlite_order" classname="maos-iac" timestamp="2026-11-06T15:50:22.430+00:00" time="0.397"/>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_marker_orders_independent_writer_commits_not_handler_return_time" classname="maos-iac" timestamp="2026-11-06T15:50:22.430+00:00" time="0.432"/>
+        <testcase name="adapter::transparency_log::tests::team_shard_keeps_legal_holds_in_global_database" classname="maos-iac" timestamp="2026-11-06T15:50:22.438+00:00" time="0.436"/>
+        <testcase name="adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_100k" classname="maos-iac" timestamp="2026-11-06T15:50:22.432+00:00" time="1.190"/>
+        <testcase name="adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_1m_rowid_with_100k_rows" classname="maos-iac" timestamp="2026-11-06T15:50:22.432+00:00" time="1.353"/>
+    </testsuite>
+</testsuites>

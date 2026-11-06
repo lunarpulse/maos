@@ -650,12 +650,15 @@ fn review_p6_nonappendable_lifecycle_journal_retains_package_and_partial_proof()
         .expect("valid empty queue");
     let queue_bytes = std::fs::read(&queue).expect("queue bytes");
     std::fs::remove_file(&queue).expect("prepare inventory barrier");
-    rustix::fs::mkfifoat(
-        rustix::fs::CWD,
-        &queue,
-        rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
-    )
-    .expect("real retained-inventory read barrier");
+    assert!(
+        Command::new("mkfifo")
+            .args(["-m", "600"])
+            .arg(&queue)
+            .status()
+            .expect("POSIX mkfifo creates the portable retained-inventory barrier")
+            .success(),
+        "real retained-inventory read barrier creation failed"
+    );
     let mut child = ChildGuard(Some(
         f.command()
             .stdout(Stdio::piped())

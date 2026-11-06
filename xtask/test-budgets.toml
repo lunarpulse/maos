@@ -82,6 +82,12 @@ seconds = 42
 reason = "26 real-tree model currency vectors, including the 20-4 constructor/default scan: hosted run 42224167600 observed Σ32.983 s versus 30 s (cb0abc06 baseline29.82 s). Reusing one copied tree across 11 plants measured5.92 s before/5.96 s trial, no material saving; reverted without dropping vectors. Budget rounds observed Σ x1.25 up to42 s per R3; local trial Σ21.989 s is not hosted improvement proof."
 owner = "20-4-gemini-driver-and-endpoint-pin"
 
+[[exception]]
+binary = "maos-bin::erasure_million_20_11"
+seconds = 78
+reason = "20-11 real 100k/1M disk/WAL writer, completion and marker-scoped replay vectors, isolated from shell_host_16_2: hosted run42224167600/artifact13507273876 measured5.646+56.675=62.321 s; R3 observed Σ x1.25=77.90125 rounds up to78 s. The unchanged25% wall oracle and10 s route/observation deadlines remain independent and blocking; this finite exception does not waive AC5."
+owner = "20-11-erasure-inventory-closure"
+
 # --- Expensive tests (ignored in the default run) ---------------------------
 
 [[expensive]]

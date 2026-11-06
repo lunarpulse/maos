@@ -1,0 +1,13 @@
+{
+  "command": [
+    "python3",
+    "-c",
+    "import cryptography; from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey; assert cryptography.__version__ == \"50.0.0\"; key=Ed25519PrivateKey.from_private_bytes(bytes(range(32))); key.public_key().verify(key.sign(b\"20-11 verifier preflight\"), b\"20-11 verifier preflight\"); print(\"erasure verifier backend:\", cryptography.__version__)"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.02190089225769043,
+  "log": "/tmp/dev2011b-perf.242wuR/verifier-preflight.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "run_id": "906f0275-9ff0-4ea0-a462-35667d8a0014",
+  "failures": [
+    {
+      "suite": "maos-bin::cert_rotation_trigger_14_2a",
+      "name": "t_14_2a_the_installed_production_closer_closes_the_window_and_journals_the_close",
+      "seconds": "7.911",
+      "diagnostic_attributes": {
+        "message": "thread 't_14_2a_the_installed_production_closer_closes_the_window_and_journals_the_close' (3332959) panicked at crates/maos-bin/tests/cert_rotation_trigger_14_2a.rs:333:10",
+        "type": "test failure with exit code 101"
+      },
+      "diagnostic_prefix": "thread 't_14_2a_the_installed_production_closer_closes_the_window_and_journals_the_close' (3332959) panicked at crates/maos-bin/tests/cert_rotation_trigger_14_2a.rs:333:10:\nread operator response: Os { code: 11, kind: WouldBlock, message: \"Resource temporarily unavailable\" }\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n   1: core::panicking::panic_fmt\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n   2: core::result::unwrap_failed\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:1870:5\n   3: <core::result::Result<usize, core::io::error::Error>>::expect\n             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:1183:23\n   4: operator_get\n             at ./tests/cert_rotation_trigger_14_2a.rs:333:10\n   5: {async_block#0}"
+    },
+    {
+      "suite": "maos-bin::hook_pump_17_4",
+      "name": "one_budget_overrun_quarantines_the_subscriber",
+      "seconds": "7.775",
+      "diagnostic_attributes": {
+        "message": "thread 'one_budget_overrun_quarantines_the_subscriber' (3339293) panicked at crates/maos-bin/tests/hook_pump_17_4.rs:440:5",
+        "type": "test failure with exit code 101"
+      },
+      "diagnostic_prefix": "thread 'one_budget_overrun_quarantines_the_subscriber' (3339293) panicked at crates/maos-bin/tests/hook_pump_17_4.rs:440:5:\nassertion `left == right` failed\n  left: PumpStats { delivered: 1, lagged_skipped: 0, shutdown_skipped: 0, ineligible: 0, skipped_manifest: 0, failed: 0, in_flight: 0 }\n right: PumpStats { delivered: 0, lagged_skipped: 0, shutdown_skipped: 0, ineligible: 0, skipped_manifest: 0, failed: 1, in_flight: 0 }\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n   1: core::panicking::panic_fmt\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n   2: core::panicking::assert_failed_inner\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:439:17\n   3: core::panicking::assert_failed::<maos_bin::hook_pump::PumpStats, maos_bin::hook_pump::PumpStats>\n             at /home/lunarpulse/.rustup/t"
+    },
+    {
+      "suite": "maos-bin::erasure_million_20_11",
+      "name": "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption",
+      "seconds": "120.006",
+      "diagnostic_attributes": {
+        "type": "test timeout"
+      },
+      "diagnostic_prefix": ""
+    },
+    {
+      "suite": "maos-bin::observer_activity_corpus_17_4",
+      "name": "observer_activity_corpus_production_path",
+      "seconds": "120.023",
+      "diagnostic_attributes": {
+        "type": "test timeout"
+      },
+      "diagnostic_prefix": ""
+    },
+    {
+      "suite": "maos-bin::one_daemon_one_door_16_1",
+      "name": "ac4_root_e_a_faithful_successor_survives_the_hot_swap",
+      "seconds": "25.195",
+      "diagnostic_attributes": {
+        "message": "thread 'ac4_root_e_a_faithful_successor_survives_the_hot_swap' (3345885) panicked at crates/maos-bin/tests/one_daemon_one_door_16_1.rs:2784:5",
+        "type": "test failure with exit code 101"
+      },
+      "diagnostic_prefix": "thread 'ac4_root_e_a_faithful_successor_survives_the_hot_swap' (3345885) panicked at crates/maos-bin/tests/one_daemon_one_door_16_1.rs:2784:5:\nthe successor must be bound to the Inference Port: infer frames stayed at 1\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n   1: core::panicking::panic_fmt\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n   2: one_daemon_one_door_16_1::ac4_root_e_a_faithful_successor_survives_the_hot_swap\n             at ./tests/one_daemon_one_door_16_1.rs:2784:5\n   3: one_daemon_one_door_16_1::ac4_root_e_a_faithful_successor_survives_the_hot_swap::{closure#0}\n             at ./tests/one_daemon_one_door_16_1.rs:2694:59\n   4: <one_daemon_one_door_16_1::ac4_root_e_a_faithful_successor_survives_the_hot_swap::{closure#0} as core::ops::function::FnOnce<()>>::call_once\n             at /home/lunarpulse/.rustup/toolcha"
+    },
+    {
+      "suite": "maos-bin::forget_floors_18_6",
+      "name": "fifty_door_cascades_and_one_hundred_all_store_probes",
+      "seconds": "93.498",
+      "diagnostic_attributes": {
+        "message": "thread 'fifty_door_cascades_and_one_hundred_all_store_probes' (3338931) panicked at crates/maos-bin/tests/forget_floors_18_6.rs:102:9",
+        "type": "test failure with exit code 101"
+      },
+      "diagnostic_prefix": "thread 'fifty_door_cascades_and_one_hundred_all_store_probes' (3338931) panicked at crates/maos-bin/tests/forget_floors_18_6.rs:102:9:\nforget floor-048@example.org: maosctl: forget \u2014 the command outlived its route budget but is running to completion; operation_id op-80b70393fa3cb011ab08afef; inspect its row later with: maosctl audit query --intent-contains op-80b70393fa3cb011ab08afef\n\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n   1: core::panicking::panic_fmt\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n   2: fifty_door_cascades_and_one_hundred_all_store_probes\n             at ./tests/forget_floors_18_6.rs:102:9\n   3: forget_floors_18_6::fifty_door_cascades_and_one_hundred_all_store_probes::{closure#0}\n             at ./tests/forget_floors_18_6.rs:9:58\n   4: <forget_floors_18_6::fifty_door_cascades_and_one_hundred_all_store_pro"
+    }
+  ],
+  "owned_survivors": []
+}

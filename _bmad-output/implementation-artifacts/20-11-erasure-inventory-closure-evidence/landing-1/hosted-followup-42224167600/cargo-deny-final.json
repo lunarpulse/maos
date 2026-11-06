@@ -1,0 +1,13 @@
+{
+  "command": [
+    "cargo",
+    "deny",
+    "check"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 1.3511722087860107,
+  "log": "/tmp/dev2011b-perf.242wuR/cargo-deny-final.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

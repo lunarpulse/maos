@@ -1,0 +1,299 @@
+[
+  {
+    "label": "final-gate-check-env-contract",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-env-contract",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "final-gate-check-test-cost",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-test-cost",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "final-gate-check-composition-root-completeness",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-composition-root-completeness",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "final-gate-check-breaking-md",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-breaking-md",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "final-gate-check-serde-error-handling",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-serde-error-handling",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "final-gate-check-pub-field-constructors",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-pub-field-constructors",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "final-gate-check-coverage-matrix-completeness",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-coverage-matrix-completeness",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "final-gate-check-service-boundary",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-service-boundary",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "final-gate-kloc-check",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "kloc-check",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "final-gate-check-kernel-baseline",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-kernel-baseline",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "final-gate-check-exit-commands",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-exit-commands",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "final-gate-check-decision-register",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-decision-register",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "final-gate-check-dev-record-completeness",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-dev-record-completeness",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "final-gate-check-epic-close-coherence",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-epic-close-coherence",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "fmt-final-check",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "docs-glossary-final",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "-C",
+      "/home/lunarpulse/dev_ws/docs-site",
+      "node",
+      "scripts/gate-glossary-lock.js"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "docs-bidi-final",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "-C",
+      "/home/lunarpulse/dev_ws/docs-site",
+      "node",
+      "scripts/gate-troubleshoot-bidi.js"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "docs-anchors-final",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "-C",
+      "/home/lunarpulse/dev_ws/docs-site",
+      "node",
+      "scripts/gate-anchor-ids.js"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "docs-routes-final",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "-C",
+      "/home/lunarpulse/dev_ws/docs-site",
+      "node",
+      "scripts/gate-routes.js"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "docs-build-final",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "-C",
+      "/home/lunarpulse/dev_ws/docs-site",
+      "npm",
+      "run",
+      "build"
+    ],
+    "exit_code": 0
+  }
+]

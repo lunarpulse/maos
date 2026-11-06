@@ -1,0 +1,20 @@
+--- /tmp/dev2011b-perf.242wuR/plant-final-door.rs	2026-11-06 16:04:43.897842218 +0000
++++ crates/maos-bin/src/operator_door.rs	2026-11-06 16:10:47.098694652 +0000
+@@ -2145,7 +2145,7 @@
+         if self
+             .transparency_log
+             .is_under_legal_hold(principal)
+-            .map_err(|error| error.to_string())?
++            .map_err(|error| error.to_string())? && false
+         {
+             return Ok(None);
+         }
+@@ -2159,7 +2159,7 @@
+             })
+             .map_err(|error| error.to_string())?;
+         if tail.len() == 4096
+-            || tail.iter().any(|frame| {
++            && tail.iter().any(|frame| {
+                 // These are retained control receipts, not application bodies.
+                 let retained = frame.origin == maos_domain::invariants::i3::FrameOrigin::Kernel
+                     && (frame.intent.starts_with("operator.forget.")

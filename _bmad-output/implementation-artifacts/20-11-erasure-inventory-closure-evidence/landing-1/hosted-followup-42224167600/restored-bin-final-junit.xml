@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="7" skipped="0" failures="0" errors="0" uuid="00b26cd8-a216-4b22-a585-8c59536e1821" timestamp="2026-11-06T16:16:16.648+00:00" time="1.759">
+    <testsuite name="maos-bin::shell_host_16_2" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="ac4_door_snapshots_real_scb_schedules_before_unload" classname="maos-bin::shell_host_16_2" timestamp="2026-11-06T16:16:16.685+00:00" time="0.581"/>
+    </testsuite>
+    <testsuite name="maos-bin::erasure_million_20_11" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="ac5_completed_forget_is_durable_marker_scoped_replay" classname="maos-bin::erasure_million_20_11" timestamp="2026-11-06T16:16:16.685+00:00" time="0.601"/>
+        <testcase name="ac5_replay_invalidates_for_new_matching_frames_and_changed_reason" classname="maos-bin::erasure_million_20_11" timestamp="2026-11-06T16:16:17.286+00:00" time="0.491"/>
+        <testcase name="ac5_replay_rechecks_the_current_global_hold" classname="maos-bin::erasure_million_20_11" timestamp="2026-11-06T16:16:17.777+00:00" time="0.315"/>
+        <testcase name="ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail" classname="maos-bin::erasure_million_20_11" timestamp="2026-11-06T16:16:18.091+00:00" time="0.315"/>
+    </testsuite>
+    <testsuite name="maos-bin::erasure_inventory_20_11" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="review_p6_nonappendable_lifecycle_journal_retains_package_and_partial_proof" classname="maos-bin::erasure_inventory_20_11" timestamp="2026-11-06T16:16:16.685+00:00" time="1.263"/>
+        <testcase name="ac1_category_evidence_is_required_by_both_verifiers" classname="maos-bin::erasure_inventory_20_11" timestamp="2026-11-06T16:16:16.685+00:00" time="1.286"/>
+    </testsuite>
+</testsuites>

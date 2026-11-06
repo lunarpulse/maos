@@ -1,0 +1,13 @@
+{
+  "command": [
+    "tokei",
+    "--output",
+    "json",
+    "crates/maos-bin/src",
+    "crates/maos-iac/src",
+    "crates/maos-bin/tests",
+    "crates/maos-iac/tests"
+  ],
+  "exit_code": 0,
+  "stderr": ""
+}

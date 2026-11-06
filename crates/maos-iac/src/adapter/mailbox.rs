@@ -117,7 +117,7 @@ fn generate_rupture_id() -> [u8; 16] {
 /// the mailbox consumes the verdicts instead of evaluating the gate again.
 #[derive(Debug, Clone, Default)]
 pub struct PreparedDelivery {
-    accepted: Vec<FrameAddress>,
+    accepted: smallvec::SmallVec<[FrameAddress; 1]>,
     rejected: Vec<RuptureRejection>,
     recipients: Vec<FrameRecipient>,
     rejected_pids: Vec<u32>,
@@ -506,7 +506,7 @@ impl Mailbox {
                     rupture_id: generate_rupture_id(),
                     original_frame_id: frame.frame_id,
                     original_kind: frame.kind,
-                    accepted: accepted_recipients.clone(),
+                    accepted: accepted_recipients.to_vec(),
                     rejected: rejected_recipients,
                     ruptured_at_ns: maos_capability::cap_tokens::monotonic_now_ns(),
                 };

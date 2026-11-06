@@ -1,0 +1,621 @@
+{
+  "iterations": 2000,
+  "summary": {
+    "reference": {
+      "routing": 1994279034,
+      "exclusive_sum": 1994279034,
+      "empty": 36,
+      "per_iteration": 997139.499
+    },
+    "current": {
+      "routing": 2077260353,
+      "exclusive_sum": 2077260353,
+      "empty": 36,
+      "per_iteration": 1038630.1585
+    }
+  },
+  "self_deltas": [
+    {
+      "name": "__memcmp_avx2_movbe",
+      "reference": 66898.9005,
+      "current": 71448.0775,
+      "delta": 4549.177
+    },
+    {
+      "name": "exprDup'2",
+      "reference": 0.0,
+      "current": 2378.0,
+      "delta": 2378.0
+    },
+    {
+      "name": "sqlite3VdbeAddOp3",
+      "reference": 3182.0,
+      "current": 5037.0,
+      "delta": 1855.0
+    },
+    {
+      "name": "sqlite3DbMallocRawNN",
+      "reference": 2507.0025,
+      "current": 3964.035,
+      "delta": 1457.0325
+    },
+    {
+      "name": "exprDup",
+      "reference": 0.0,
+      "current": 1408.0,
+      "delta": 1408.0
+    },
+    {
+      "name": "sqlite3VdbeExec",
+      "reference": 6925.431,
+      "current": 8327.431,
+      "delta": 1402.0
+    },
+    {
+      "name": "sqlite3DbNNFreeNN",
+      "reference": 1938.0,
+      "current": 3282.0,
+      "delta": 1344.0
+    },
+    {
+      "name": "sqlite3StrICmp",
+      "reference": 5252.0,
+      "current": 6384.0,
+      "delta": 1132.0
+    },
+    {
+      "name": "exprNodeIsConstant",
+      "reference": 0.0,
+      "current": 1123.0,
+      "delta": 1123.0
+    },
+    {
+      "name": "sqlite3ExprCodeTarget'2",
+      "reference": 0.0,
+      "current": 893.0,
+      "delta": 893.0
+    },
+    {
+      "name": "__memcpy_avx_unaligned_erms",
+      "reference": 13966.3675,
+      "current": 14839.4525,
+      "delta": 873.085
+    },
+    {
+      "name": "sqlite3ExprCodeTarget",
+      "reference": 972.0,
+      "current": 1784.0,
+      "delta": 812.0
+    },
+    {
+      "name": "sqlite3ExprCodeRunJustOnce",
+      "reference": 0.0,
+      "current": 625.0,
+      "delta": 625.0
+    },
+    {
+      "name": "sqlite3WalkExprNN",
+      "reference": 300.0,
+      "current": 895.0,
+      "delta": 595.0
+    },
+    {
+      "name": "exprIsConst",
+      "reference": 0.0,
+      "current": 540.0,
+      "delta": 540.0
+    },
+    {
+      "name": "sqlite3GenerateConstraintChecks",
+      "reference": 2048.0,
+      "current": 2574.0,
+      "delta": 526.0
+    },
+    {
+      "name": "sqlite3ExprDeleteNN'2",
+      "reference": 0.0,
+      "current": 500.0,
+      "delta": 500.0
+    },
+    {
+      "name": "sqlite3VdbeChangeP4",
+      "reference": 87.0,
+      "current": 582.0,
+      "delta": 495.0
+    },
+    {
+      "name": "exprStructSize",
+      "reference": 0.0,
+      "current": 442.0,
+      "delta": 442.0
+    },
+    {
+      "name": "vdbeFreeOpArray",
+      "reference": 834.0,
+      "current": 1275.0,
+      "delta": 441.0
+    },
+    {
+      "name": "__strlen_avx2",
+      "reference": 336.0,
+      "current": 774.0,
+      "delta": 438.0
+    },
+    {
+      "name": "sqlite3ExprDup'2",
+      "reference": 0.0,
+      "current": 396.0,
+      "delta": 396.0
+    },
+    {
+      "name": "resolveP2Values",
+      "reference": 753.0,
+      "current": 1143.0,
+      "delta": 390.0
+    },
+    {
+      "name": "strHash",
+      "reference": 272.0,
+      "current": 656.0,
+      "delta": 384.0
+    },
+    {
+      "name": "sqlite3ExprIfFalse",
+      "reference": 0.0,
+      "current": 375.0,
+      "delta": 375.0
+    },
+    {
+      "name": "allocateCursor",
+      "reference": 610.0,
+      "current": 982.0,
+      "delta": 372.0
+    },
+    {
+      "name": "out2Prerelease",
+      "reference": 28.0,
+      "current": 392.0,
+      "delta": 364.0
+    },
+    {
+      "name": "sqlite3ExprDeleteNN",
+      "reference": 288.0,
+      "current": 636.0,
+      "delta": 348.0
+    },
+    {
+      "name": "sqlite3ExprCompare",
+      "reference": 0.0,
+      "current": 348.0,
+      "delta": 348.0
+    },
+    {
+      "name": "btreeCursor",
+      "reference": 400.0,
+      "current": 748.0,
+      "delta": 348.0
+    },
+    {
+      "name": "sqlite3ExprListDup",
+      "reference": 0.0,
+      "current": 344.0,
+      "delta": 344.0
+    },
+    {
+      "name": "sqlite3ExprCodeTemp",
+      "reference": 0.0,
+      "current": 342.0,
+      "delta": 342.0
+    },
+    {
+      "name": "sqlite3KeyInfoOfIndex",
+      "reference": 612.0,
+      "current": 945.0,
+      "delta": 333.0
+    },
+    {
+      "name": "sqlite3AffinityType",
+      "reference": 0.0,
+      "current": 318.0,
+      "delta": 318.0
+    },
+    {
+      "name": "sqlite3BtreeCloseCursor",
+      "reference": 347.0,
+      "current": 662.0,
+      "delta": 315.0
+    },
+    {
+      "name": "sqlite3VdbeChangeP5",
+      "reference": 546.0,
+      "current": 858.0,
+      "delta": 312.0
+    },
+    {
+      "name": "freeP4",
+      "reference": 512.0,
+      "current": 824.0,
+      "delta": 312.0
+    },
+    {
+      "name": "dupedExprStructSize",
+      "reference": 0.0,
+      "current": 312.0,
+      "delta": 312.0
+    },
+    {
+      "name": "releaseMemArray",
+      "reference": 942.0,
+      "current": 1252.0,
+      "delta": 310.0
+    },
+    {
+      "name": "sqlite3WalkExprNN'2",
+      "reference": 0.0,
+      "current": 308.0,
+      "delta": 308.0
+    },
+    {
+      "name": "sqlite3VdbeAddOp4",
+      "reference": 56.0,
+      "current": 364.0,
+      "delta": 308.0
+    },
+    {
+      "name": "sqlite3ExprListDup'2",
+      "reference": 0.0,
+      "current": 300.0,
+      "delta": 300.0
+    },
+    {
+      "name": "sqlite3ExprCodeIN",
+      "reference": 0.0,
+      "current": 295.0,
+      "delta": 295.0
+    },
+    {
+      "name": "sqlite3VdbeAddOp2",
+      "reference": 527.0,
+      "current": 816.0,
+      "delta": 289.0
+    },
+    {
+      "name": "sqlite3WalkExpr",
+      "reference": 0.0,
+      "current": 288.0,
+      "delta": 288.0
+    },
+    {
+      "name": "_int_malloc",
+      "reference": 6334.4855,
+      "current": 6586.4425,
+      "delta": 251.957
+    },
+    {
+      "name": "initMemArray",
+      "reference": 666.0,
+      "current": 906.0,
+      "delta": 240.0
+    },
+    {
+      "name": "sqlite3CompleteInsertion",
+      "reference": 335.0,
+      "current": 569.0,
+      "delta": 234.0
+    },
+    {
+      "name": "sqlite3ReleaseTempReg",
+      "reference": 25.0,
+      "current": 245.0,
+      "delta": 220.0
+    },
+    {
+      "name": "exprListDeleteNN",
+      "reference": 188.0,
+      "current": 402.0,
+      "delta": 214.0
+    }
+  ],
+  "inclusive_deltas": [
+    {
+      "name": "<core::result::Result<rusqlite::transaction::Transaction, rusqlite::error::Error>>::and_then::<maos_iac::adapter::transparency_log::FrameRowWrite, <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_row_with_correlation::{closure#2}>",
+      "reference": 0.0,
+      "current": 214859.235,
+      "delta": 214859.235
+    },
+    {
+      "name": "<maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_row_with_correlation::{closure#2}",
+      "reference": 82.0,
+      "current": 214807.235,
+      "delta": 214725.235
+    },
+    {
+      "name": "(below main)",
+      "reference": 1994279.034,
+      "current": 2077260.353,
+      "delta": 82981.319
+    },
+    {
+      "name": "<maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_routed_frame",
+      "reference": 871856.4645,
+      "current": 913541.067,
+      "delta": 41684.6025
+    },
+    {
+      "name": "<maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_row_with_correlation",
+      "reference": 871441.4645,
+      "current": 913126.067,
+      "delta": 41684.6025
+    },
+    {
+      "name": "tokio::runtime::context::set_scheduler::<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut <maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>>::{closure#0}, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>>::{closure#0}>::{closure#0}",
+      "reference": 992301.802,
+      "current": 1033792.4615,
+      "delta": 41490.6595
+    },
+    {
+      "name": "tokio::runtime::context::set_scheduler::<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut <maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>>::{closure#0}, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>>::{closure#0}>",
+      "reference": 992462.802,
+      "current": 1033953.4615,
+      "delta": 41490.6595
+    },
+    {
+      "name": "tokio::runtime::context::runtime::enter_runtime::<<tokio::runtime::scheduler::current_thread::CurrentThread>::block_on<<maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>::{closure#0}, core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>",
+      "reference": 995251.623,
+      "current": 1036742.2825,
+      "delta": 41490.6595
+    },
+    {
+      "name": "tier_c_harness::run::{closure#5}",
+      "reference": 997084.499,
+      "current": 1038575.1585,
+      "delta": 41490.6595
+    },
+    {
+      "name": "tier_c_harness::run",
+      "reference": 997139.517,
+      "current": 1038630.1765,
+      "delta": 41490.6595
+    },
+    {
+      "name": "tier_c_harness::measure",
+      "reference": 997139.517,
+      "current": 1038630.1765,
+      "delta": 41490.6595
+    },
+    {
+      "name": "tier_c_harness::main",
+      "reference": 997139.517,
+      "current": 1038630.1765,
+      "delta": 41490.6595
+    },
+    {
+      "name": "std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>",
+      "reference": 997139.517,
+      "current": 1038630.1765,
+      "delta": 41490.6595
+    },
+    {
+      "name": "std::rt::lang_start_internal",
+      "reference": 997139.517,
+      "current": 1038630.1765,
+      "delta": 41490.6595
+    },
+    {
+      "name": "std::rt::lang_start::<()>::{closure#0}",
+      "reference": 997139.517,
+      "current": 1038630.1765,
+      "delta": 41490.6595
+    },
+    {
+      "name": "std::rt::lang_start::<()>",
+      "reference": 997139.517,
+      "current": 1038630.1765,
+      "delta": 41490.6595
+    },
+    {
+      "name": "maos_tier_c_measured",
+      "reference": 997139.517,
+      "current": 1038630.1765,
+      "delta": 41490.6595
+    },
+    {
+      "name": "main",
+      "reference": 997139.517,
+      "current": 1038630.1765,
+      "delta": 41490.6595
+    },
+    {
+      "name": "__libc_start_main@@GLIBC_2.34",
+      "reference": 997139.517,
+      "current": 1038630.1765,
+      "delta": 41490.6595
+    },
+    {
+      "name": "<tokio::runtime::scheduler::current_thread::CurrentThread>::block_on::<<maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>::{closure#0}",
+      "reference": 994018.623,
+      "current": 1035509.2825,
+      "delta": 41490.6595
+    },
+    {
+      "name": "<tokio::runtime::scheduler::current_thread::CurrentThread>::block_on::<<maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>",
+      "reference": 995496.623,
+      "current": 1036987.2825,
+      "delta": 41490.6595
+    },
+    {
+      "name": "<tokio::runtime::scheduler::current_thread::CoreGuard>::enter::<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut <maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>>::{closure#0}, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>>::{closure#0}",
+      "reference": 992225.802,
+      "current": 1033716.4615,
+      "delta": 41490.6595
+    },
+    {
+      "name": "<tokio::runtime::scheduler::current_thread::CoreGuard>::enter::<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut <maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>>::{closure#0}, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>>",
+      "reference": 993264.623,
+      "current": 1034755.2825,
+      "delta": 41490.6595
+    },
+    {
+      "name": "<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut <maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>>::{closure#0}",
+      "reference": 992214.802,
+      "current": 1033705.4615,
+      "delta": 41490.6595
+    },
+    {
+      "name": "<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut <maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>>",
+      "reference": 993343.623,
+      "current": 1034834.2825,
+      "delta": 41490.6595
+    },
+    {
+      "name": "<tokio::runtime::runtime::Runtime>::block_on_inner::<<maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>",
+      "reference": 996294.623,
+      "current": 1037785.2825,
+      "delta": 41490.6595
+    },
+    {
+      "name": "<tokio::runtime::runtime::Runtime>::block_on::<<maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>",
+      "reference": 996545.623,
+      "current": 1038036.2825,
+      "delta": 41490.6595
+    },
+    {
+      "name": "<tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<<tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut <maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>>::{closure#0}, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>)>",
+      "reference": 992282.802,
+      "current": 1033773.4615,
+      "delta": 41490.6595
+    },
+    {
+      "name": "<std::thread::local::LocalKey<tokio::runtime::context::Context>>::with::<tokio::runtime::context::set_scheduler<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut <maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>>::{closure#0}, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>>::{closure#0}>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>)>",
+      "reference": 992446.802,
+      "current": 1033937.4615,
+      "delta": 41490.6595
+    },
+    {
+      "name": "<std::thread::local::LocalKey<tokio::runtime::context::Context>>::try_with::<tokio::runtime::context::set_scheduler<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut <maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>>::{closure#0}, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>>::{closure#0}>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>)>",
+      "reference": 992397.802,
+      "current": 1033888.4615,
+      "delta": 41490.6595
+    },
+    {
+      "name": "<fn() as core::ops::function::FnOnce<()>>::call_once",
+      "reference": 997139.517,
+      "current": 1038630.1765,
+      "delta": 41490.6595
+    },
+    {
+      "name": "0x000000000001f540",
+      "reference": 997139.517,
+      "current": 1038630.1765,
+      "delta": 41490.6595
+    },
+    {
+      "name": "<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut <maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>>::{closure#0}::{closure#0}::{closure#0}",
+      "reference": 982712.745,
+      "current": 1024202.4645,
+      "delta": 41489.7195
+    },
+    {
+      "name": "<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut <maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>>::{closure#0}::{closure#0}",
+      "reference": 982955.4495,
+      "current": 1024445.169,
+      "delta": 41489.7195
+    },
+    {
+      "name": "<tokio::runtime::scheduler::current_thread::Context>::enter::<core::task::poll::Poll<core::result::Result<maos_domain::invariants::i2::LogBeforeDeliver<maos_iac::adapter::transparency_log::FrameRowWrite>, maos_domain::iac_bus_types::IacBusError>>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut <maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}>>::{closure#0}::{closure#0}>",
+      "reference": 983235.7275,
+      "current": 1024725.447,
+      "delta": 41489.7195
+    },
+    {
+      "name": "<maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}",
+      "reference": 982678.218,
+      "current": 1024167.9375,
+      "delta": 41489.7195
+    },
+    {
+      "name": "<core::pin::Pin<&mut <maos_iac::adapter::IacBusAdapter>::deliver_typed::{closure#0}> as core::future::future::Future>::poll",
+      "reference": 982695.4815,
+      "current": 1024185.201,
+      "delta": 41489.7195
+    },
+    {
+      "name": "<maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_row_with_correlation::{closure#1}",
+      "reference": 159528.771,
+      "current": 196527.234,
+      "delta": 36998.463
+    },
+    {
+      "name": "<rusqlite::Connection>::execute::<&[&dyn rusqlite::types::to_sql::ToSql]>",
+      "reference": 159367.771,
+      "current": 196194.234,
+      "delta": 36826.463
+    },
+    {
+      "name": "sqlite3_prepare_v3",
+      "reference": 87342.788,
+      "current": 118267.5875,
+      "delta": 30924.7995
+    },
+    {
+      "name": "sqlite3Prepare",
+      "reference": 86844.788,
+      "current": 117769.5875,
+      "delta": 30924.7995
+    },
+    {
+      "name": "sqlite3LockAndPrepare",
+      "reference": 87255.788,
+      "current": 118180.5875,
+      "delta": 30924.7995
+    },
+    {
+      "name": "<rusqlite::inner_connection::InnerConnection>::prepare_",
+      "reference": 87429.788,
+      "current": 118354.5875,
+      "delta": 30924.7995
+    },
+    {
+      "name": "<rusqlite::inner_connection::InnerConnection>::prepare",
+      "reference": 88371.788,
+      "current": 119296.5875,
+      "delta": 30924.7995
+    },
+    {
+      "name": "<rusqlite::Connection>::prepare_with_flags",
+      "reference": 88617.788,
+      "current": 119542.5875,
+      "delta": 30924.7995
+    },
+    {
+      "name": "<rusqlite::Connection>::prepare",
+      "reference": 88716.788,
+      "current": 119641.5875,
+      "delta": 30924.7995
+    },
+    {
+      "name": "sqlite3RunParser",
+      "reference": 85229.188,
+      "current": 115567.8955,
+      "delta": 30338.7075
+    },
+    {
+      "name": "yy_reduce",
+      "reference": 61799.188,
+      "current": 92099.8955,
+      "delta": 30300.7075
+    },
+    {
+      "name": "sqlite3Parser",
+      "reference": 72974.188,
+      "current": 103274.8955,
+      "delta": 30300.7075
+    },
+    {
+      "name": "sqlite3GenerateConstraintChecks",
+      "reference": 14219.4815,
+      "current": 41969.027,
+      "delta": 27749.5455
+    }
+  ]
+}

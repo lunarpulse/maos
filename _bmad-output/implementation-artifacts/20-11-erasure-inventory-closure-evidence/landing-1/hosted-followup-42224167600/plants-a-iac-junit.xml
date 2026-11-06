@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="2" skipped="0" failures="2" errors="0" uuid="84bd43a9-8ad4-40d2-9392-9594ea785de9" timestamp="2026-11-06T16:06:08.801+00:00" time="0.018">
+    <testsuite name="maos-iac" tests="2" skipped="0" errors="0" failures="2">
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report" classname="maos-iac" timestamp="2026-11-06T16:06:08.801+00:00" time="0.017">
+            <failure message="thread &apos;adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report&apos; (3183812) panicked at crates/maos-iac/src/adapter/../../tests/support/erasure_races_20_11.rs:718:5" type="test failure with exit code 101">thread &apos;adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report&apos; (3183812) panicked at crates/maos-iac/src/adapter/../../tests/support/erasure_races_20_11.rs:718:5:
+assertion `left == right` failed: DESC applied only to the frame-id tie breaker, selecting the oldest report
+  left: [1, 161, 177, 156, 60, 165, 114, 32, 58, 169, 152, 246, 107, 24, 7, 241]
+ right: [1, 161, 177, 156, 60, 165, 140, 153, 185, 127, 252, 244, 241, 85, 140, 85]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::&lt;[u8; 16], [u8; 16]&gt;
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: maos_iac::adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report
+             at ./src/adapter/../../tests/support/erasure_races_20_11.rs:718:5
+   5: maos_iac::adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report::{closure#0}
+             at ./src/adapter/../../tests/support/erasure_races_20_11.rs:685:67
+   6: &lt;maos_iac::adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.</failure>
+            <system-out>
+running 1 test
+test adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report ... FAILED
+
+failures:
+
+failures:
+    adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 115 filtered out; finished in 0.01s
+
+</system-out>
+            <system-err>
+thread &apos;adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report&apos; (3183812) panicked at crates/maos-iac/src/adapter/../../tests/support/erasure_races_20_11.rs:718:5:
+assertion `left == right` failed: DESC applied only to the frame-id tie breaker, selecting the oldest report
+  left: [1, 161, 177, 156, 60, 165, 114, 32, 58, 169, 152, 246, 107, 24, 7, 241]
+ right: [1, 161, 177, 156, 60, 165, 140, 153, 185, 127, 252, 244, 241, 85, 140, 85]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::&lt;[u8; 16], [u8; 16]&gt;
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: maos_iac::adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report
+             at ./src/adapter/../../tests/support/erasure_races_20_11.rs:718:5
+   5: maos_iac::adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report::{closure#0}
+             at ./src/adapter/../../tests/support/erasure_races_20_11.rs:685:67
+   6: &lt;maos_iac::adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+</system-err>
+        </testcase>
+        <testcase name="adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program" classname="maos-iac" timestamp="2026-11-06T16:06:08.801+00:00" time="0.017">
+            <failure message="thread &apos;adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program&apos; (3183811) panicked at crates/maos-iac/src/adapter/../../tests/support/erasure_races_20_11.rs:677:5" type="test failure with exit code 101">thread &apos;adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program&apos; (3183811) panicked at crates/maos-iac/src/adapter/../../tests/support/erasure_races_20_11.rs:677:5:
+assertion `left == right` failed: ordinary appends recompiled the indexed INSERT instead of reusing it
+  left: 0
+ right: 2
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::&lt;i32, i32&gt;
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:394:5
+   4: maos_iac::adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program
+             at ./src/adapter/../../tests/support/erasure_races_20_11.rs:677:5
+   5: maos_iac::adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program::{closure#0}
+             at ./src/adapter/../../tests/support/erasure_races_20_11.rs:660:59
+   6: &lt;maos_iac::adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.</failure>
+            <system-out>
+running 1 test
+test adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program ... FAILED
+
+failures:
+
+failures:
+    adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 115 filtered out; finished in 0.01s
+
+</system-out>
+            <system-err>
+thread &apos;adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program&apos; (3183811) panicked at crates/maos-iac/src/adapter/../../tests/support/erasure_races_20_11.rs:677:5:
+assertion `left == right` failed: ordinary appends recompiled the indexed INSERT instead of reusing it
+  left: 0
+ right: 2
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::&lt;i32, i32&gt;
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:394:5
+   4: maos_iac::adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program
+             at ./src/adapter/../../tests/support/erasure_races_20_11.rs:677:5
+   5: maos_iac::adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program::{closure#0}
+             at ./src/adapter/../../tests/support/erasure_races_20_11.rs:660:59
+   6: &lt;maos_iac::adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+</system-err>
+        </testcase>
+    </testsuite>
+</testsuites>

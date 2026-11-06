@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="1" skipped="0" failures="1" errors="0" uuid="b062ba09-63ce-491c-82c3-5b051af17824" timestamp="2026-11-06T16:09:07.285+00:00" time="0.393">
+    <testsuite name="maos-bin::erasure_million_20_11" tests="1" skipped="0" errors="0" failures="1">
+        <testcase name="ac5_completed_forget_is_durable_marker_scoped_replay" classname="maos-bin::erasure_million_20_11" timestamp="2026-11-06T16:09:07.289+00:00" time="0.385">
+            <failure message="thread &apos;ac5_completed_forget_is_durable_marker_scoped_replay&apos; (3186775) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:315:5" type="test failure with exit code 101">thread &apos;ac5_completed_forget_is_durable_marker_scoped_replay&apos; (3186775) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:315:5:
+assertion `left == right` failed: an identical completed request restarted the real forget cascade
+  left: 2
+ right: 1
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::&lt;usize, usize&gt;
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:394:5
+   4: erasure_million_20_11::ac5_completed_forget_is_durable_marker_scoped_replay
+             at ./tests/erasure_million_20_11.rs:315:5
+   5: erasure_million_20_11::ac5_completed_forget_is_durable_marker_scoped_replay::{closure#0}
+             at ./tests/erasure_million_20_11.rs:270:58
+   6: &lt;erasure_million_20_11::ac5_completed_forget_is_durable_marker_scoped_replay::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.</failure>
+            <system-out>
+running 1 test
+test ac5_completed_forget_is_durable_marker_scoped_replay ... FAILED
+
+failures:
+
+failures:
+    ac5_completed_forget_is_durable_marker_scoped_replay
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.38s
+
+</system-out>
+            <system-err>
+thread &apos;ac5_completed_forget_is_durable_marker_scoped_replay&apos; (3186775) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:315:5:
+assertion `left == right` failed: an identical completed request restarted the real forget cascade
+  left: 2
+ right: 1
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::&lt;usize, usize&gt;
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:394:5
+   4: erasure_million_20_11::ac5_completed_forget_is_durable_marker_scoped_replay
+             at ./tests/erasure_million_20_11.rs:315:5
+   5: erasure_million_20_11::ac5_completed_forget_is_durable_marker_scoped_replay::{closure#0}
+             at ./tests/erasure_million_20_11.rs:270:58
+   6: &lt;erasure_million_20_11::ac5_completed_forget_is_durable_marker_scoped_replay::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+</system-err>
+        </testcase>
+    </testsuite>
+</testsuites>

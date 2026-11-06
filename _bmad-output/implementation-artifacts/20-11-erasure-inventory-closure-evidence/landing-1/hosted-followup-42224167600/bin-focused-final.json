@@ -1,0 +1,20 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "-p",
+    "maos-bin",
+    "--test",
+    "erasure_million_20_11",
+    "--test",
+    "erasure_inventory_20_11",
+    "--test",
+    "shell_host_16_2",
+    "--locked",
+    "--no-fail-fast"
+  ],
+  "exit_code": 100,
+  "elapsed_seconds": 469.75743770599365,
+  "log": "/tmp/dev2011b-perf.242wuR/bin-focused-final.log"
+}

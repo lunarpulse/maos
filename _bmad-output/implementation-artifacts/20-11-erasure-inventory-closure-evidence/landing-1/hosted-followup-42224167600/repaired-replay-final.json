@@ -1,0 +1,25 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "-p",
+    "maos-bin",
+    "--test",
+    "erasure_million_20_11",
+    "--test",
+    "erasure_inventory_20_11",
+    "--locked",
+    "--no-fail-fast",
+    "--success-output",
+    "final",
+    "-E",
+    "test(ac5_completed_forget_is_durable_marker_scoped_replay) | test(ac5_replay_) | test(ac1_category_evidence_is_required_by_both_verifiers)"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 35.705339431762695,
+  "log": "/tmp/dev2011b-perf.242wuR/repaired-replay-final.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

@@ -44,9 +44,7 @@ binary_id(xtask::example_spirit_regen_integration)
 | binary_id(maos-bin::host_grants_2b)
 | binary_id(maos-bin::cross_team_consent_13_3)
 | binary_id(maos-registry::fr59_yank_propagation_within_5min_test)
-| (binary_id(maos-bin::shell_host_16_2)
-   & (test(ac5_door_bounded_scan_admits_continuous_writer)
-      | test(ac5_million_row_pending_forget_finishes_and_repeats_without_corruption)))
+| binary_id(maos-bin::erasure_million_20_11)
 """
 test-group = "serial"
 

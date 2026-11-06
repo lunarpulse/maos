@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/mnt/build/cargo-maos/debug/tier_c_harness",
+    "iac_routing",
+    "2000"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.16129708290100098,
+  "log": "/tmp/dev2011b-perf.242wuR/native-inline-smoke.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}

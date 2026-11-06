@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "run",
+    "-p",
+    "xtask",
+    "--locked",
+    "--",
+    "build-test-fixtures"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 83.14576387405396,
+  "log": "/tmp/dev2011b-perf.242wuR/fixtures-inline-final.log",
+  "environment_overrides": {
+    "PYTHONPATH": "/tmp/dev2011b-perf.242wuR/verifier-venv/lib/python3.13/site-packages"
+  }
+}
