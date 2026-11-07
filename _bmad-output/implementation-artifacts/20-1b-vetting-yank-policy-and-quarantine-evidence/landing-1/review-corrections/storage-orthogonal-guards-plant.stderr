@@ -1,0 +1,229 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance)
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+   Compiling maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:179:27
+    |
+179 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `stored_origin`
+   --> crates/maos-registry/src/storage.rs:577:17
+    |
+577 |             let stored_origin: crate::origin::RegistryOrigin = serde_json::from_slice(
+    |                 ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_stored_origin`
+
+warning: unused variable: `stored`
+   --> crates/maos-registry/src/storage.rs:739:17
+    |
+739 |             let stored: SignedPackage = serde_json::from_reader(io::BufReader::new(
+    |                 ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stored`
+
+warning: `maos-registry` (lib) generated 6 warnings (run `cargo fix --lib -p maos-registry` to apply 6 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.22s
+────────────
+ Nextest run ID eb82cc9b-9dd2-41f0-91c0-10277b531e43 with nextest profile: default
+    Starting 6 tests across 1 binary (24 tests skipped)
+        FAIL [   0.506s] (1/6) maos-registry::yank_auth_20_1b installed_publisher_and_version_pins_survive_uninstall_d2
+  stdout ───
+
+    running 1 test
+    test installed_publisher_and_version_pins_survive_uninstall_d2 ... FAILED
+
+    failures:
+
+    failures:
+        installed_publisher_and_version_pins_survive_uninstall_d2
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.50s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:45199
+    maos-registry: listening on 127.0.0.1:44427
+
+    thread 'installed_publisher_and_version_pins_survive_uninstall_d2' (4107113) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:482:9:
+    uninstall must not release the durable publisher/version pin (changed_publisher=false)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.016s] (2/6) maos-registry::yank_auth_20_1b published_versions_are_immutable_and_identical_publish_is_idempotent_d3
+  stdout ───
+
+    running 1 test
+    test published_versions_are_immutable_and_identical_publish_is_idempotent_d3 ... FAILED
+
+    failures:
+
+    failures:
+        published_versions_are_immutable_and_identical_publish_is_idempotent_d3
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.01s
+
+  stderr ───
+
+    thread 'published_versions_are_immutable_and_identical_publish_is_idempotent_d3' (4107126) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:419:5:
+    changed published bytes must be refused
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.405s] (3/6) maos-registry::yank_auth_20_1b renewed_promotion_replaces_only_evidence_for_identical_package_d4
+  stdout ───
+
+    running 1 test
+    test renewed_promotion_replaces_only_evidence_for_identical_package_d4 ... FAILED
+
+    failures:
+
+    failures:
+        renewed_promotion_replaces_only_evidence_for_identical_package_d4
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.40s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:36531
+
+    thread 'renewed_promotion_replaces_only_evidence_for_identical_package_d4' (4107128) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:522:9:
+    identical-package promotion renewal must succeed: Err(ImmutableVersion { spirit_id: "renewal", version: "1.0.0" })
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.256s] (4/6) maos-registry::yank_auth_20_1b signed_nonce_cannot_be_reused_for_another_withdrawal_f4
+  stdout ───
+
+    running 1 test
+    test signed_nonce_cannot_be_reused_for_another_withdrawal_f4 ... FAILED
+
+    failures:
+
+    failures:
+        signed_nonce_cannot_be_reused_for_another_withdrawal_f4
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.25s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:35847
+
+    thread 'signed_nonce_cannot_be_reused_for_another_withdrawal_f4' (4107138) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:1414:5:
+    even an otherwise valid signature must not rebind a used nonce: {"id":1,"jsonrpc":"2.0","result":{"spirit_id":"nonce","version":"2.0.0","yank_id":"yank-2"}}
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.305s] (5/6) maos-registry::yank_auth_20_1b signed_yank_resigning_does_not_append_duplicate_rows_p13
+  stdout ───
+
+    running 1 test
+    test signed_yank_resigning_does_not_append_duplicate_rows_p13 ... FAILED
+
+    failures:
+
+    failures:
+        signed_yank_resigning_does_not_append_duplicate_rows_p13
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.30s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:34515
+
+    thread 'signed_yank_resigning_does_not_append_duplicate_rows_p13' (4107145) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:569:5:
+    assertion `left == right` failed: re-signing must reuse the original receipt
+      left: 3
+     right: 1
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.255s] (6/6) maos-registry::yank_auth_20_1b uninstall_waits_for_cross_process_mutation_lock_p8
+  stdout ───
+
+    running 1 test
+    test uninstall_waits_for_cross_process_mutation_lock_p8 ... FAILED
+
+    failures:
+
+    failures:
+        uninstall_waits_for_cross_process_mutation_lock_p8
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.25s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:35899
+
+    thread 'uninstall_waits_for_cross_process_mutation_lock_p8' (4107155) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:652:5:
+    uninstall escaped the held mutation lock: Ok(())
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary [   1.745s] 6 tests run: 0 passed, 6 failed, 24 skipped
+        FAIL [   0.506s] (1/6) maos-registry::yank_auth_20_1b installed_publisher_and_version_pins_survive_uninstall_d2
+        FAIL [   0.016s] (2/6) maos-registry::yank_auth_20_1b published_versions_are_immutable_and_identical_publish_is_idempotent_d3
+        FAIL [   0.405s] (3/6) maos-registry::yank_auth_20_1b renewed_promotion_replaces_only_evidence_for_identical_package_d4
+        FAIL [   0.256s] (4/6) maos-registry::yank_auth_20_1b signed_nonce_cannot_be_reused_for_another_withdrawal_f4
+        FAIL [   0.305s] (5/6) maos-registry::yank_auth_20_1b signed_yank_resigning_does_not_append_duplicate_rows_p13
+        FAIL [   0.255s] (6/6) maos-registry::yank_auth_20_1b uninstall_waits_for_cross_process_mutation_lock_p8
+error: test run failed

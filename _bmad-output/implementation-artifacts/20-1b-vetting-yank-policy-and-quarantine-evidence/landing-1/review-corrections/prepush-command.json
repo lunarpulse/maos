@@ -1,0 +1,18 @@
+{
+  "label": "prepush-once",
+  "command": [
+    "env",
+    "-u",
+    "CI",
+    "-u",
+    "GITHUB_ACTIONS",
+    "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+    "MAOS_17_2_CGROUP_MODE=undelegated",
+    "/mnt/build/cargo-maos/debug/xtask",
+    "prepush",
+    "--json"
+  ],
+  "exit_code": 1,
+  "started_at_unix": 1794081964.022627,
+  "elapsed_seconds": 1536.08
+}

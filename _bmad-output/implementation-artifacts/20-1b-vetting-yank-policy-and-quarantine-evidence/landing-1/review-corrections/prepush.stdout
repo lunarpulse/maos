@@ -1,0 +1,1443 @@
+{
+  "base": "62faff63aea2d82907e3abedc901427bd02a7b9a",
+  "base_age_seconds": 66875,
+  "changed_paths": [
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/ci/ci-20-1b-verify.yml",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/plants.md",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/attestation-unscoped-role-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/attestation-unscoped-role-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/audience-and-clock-guards-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/audience-and-clock-guards-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/audience-and-clock-guards-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/audience-and-clock-guards-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/audience-and-clock-guards-save.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/audience-and-clock-guards-save.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/audience-and-clock-guards-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/audience-and-clock-guards-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/bin-guard-plant-fixtures.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/bin-guard-plant-fixtures.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/bin-policy-and-boot-focus.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/bin-policy-and-boot-focus.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/bin-review-affected-binaries.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/bin-review-affected-binaries.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/bin-review-policy-after-harness-fix.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/bin-review-policy-after-harness-fix.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/bin-review-policy-focused.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/bin-review-policy-focused.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/bin-review-policy-harness-failure.log",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/blocked-fetch-shutdown-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/blocked-fetch-shutdown-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/blocked-transport-shutdown-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/blocked-transport-shutdown-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/blocked-transport-shutdown-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/blocked-transport-shutdown-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/blocked-transport-shutdown-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/blocked-transport-shutdown-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/blocked-transport-shutdown-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/blocked-transport-shutdown-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/boot-latency-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/boot-latency-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/boot-latency-profile-provisioned.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/boot-latency-profile-provisioned.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/boot-latency-profile.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/boot-latency-profile.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/commands.json",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/compliance-vetting-unit.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/compliance-vetting-unit.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-coverage-matrix-completeness.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-coverage-matrix-completeness.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-decision-register.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-decision-register.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-dev-record-completeness.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-dev-record-completeness.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-env-contract.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-env-contract.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-epic-close-coherence.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-epic-close-coherence.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-exit-commands.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-exit-commands.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-fkcs.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-fkcs.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-kernel-baseline.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-kernel-baseline.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-test-cost.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-check-test-cost.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-coverage-matrix.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-coverage-matrix.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-dev-record-disposition-fixed.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-dev-record-disposition-fixed.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-kloc-check.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/correction-kloc-check.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/corrupt_install_does_not_hide_another_spirits_expiry_p1-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/corrupt_install_does_not_hide_another_spirits_expiry_p1-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/cursor_from_another_registry_is_replayed_from_zero_p2-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/cursor_from_another_registry_is_replayed_from_zero_p2-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/deployed-promotion-yank-guards-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/deployed-promotion-yank-guards-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/deployed-promotion-yank-guards-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/deployed-promotion-yank-guards-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/deployed-promotion-yank-guards-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/deployed-promotion-yank-guards-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/deployed-promotion-yank-guards-save.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/deployed-promotion-yank-guards-save.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/deployed-promotion-yank-guards-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/deployed-promotion-yank-guards-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/distinct-authorized-yank-roles-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/distinct-authorized-yank-roles-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/distinct-authorized-yank-roles-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/distinct-authorized-yank-roles-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/distinct-authorized-yank-roles-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/distinct-authorized-yank-roles-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/distinct-authorized-yank-roles-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/distinct-authorized-yank-roles-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/distinct-authorized-yank-roles-save.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/distinct-authorized-yank-roles-save.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/distinct-authorized-yank-roles-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/distinct-authorized-yank-roles-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/door-vetted-upgrade-after.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/door-vetted-upgrade-after.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/environment-serialization-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/environment-serialization-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/environment-serialization-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/environment-serialization-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/environment-serialization-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/environment-serialization-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/environment-serialization-save.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/environment-serialization-save.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/environment-serialization-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/environment-serialization-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/erasure-and-boot-drain-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/erasure-and-boot-drain-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/erasure-and-boot-drain-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/erasure-and-boot-drain-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/erasure-and-boot-drain-save.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/erasure-and-boot-drain-save.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/erasure-and-boot-drain-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/erasure-and-boot-drain-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/exact-pin-updates.json",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/expired_signed_yank_request_cannot_mutate_registry_f4-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/expired_signed_yank_request_cannot_mutate_registry_f4-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/explicit-door-package-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/explicit-door-package-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/explicit-door-package-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/explicit-door-package-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/explicit-door-package-save.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/explicit-door-package-save.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/explicit-door-package-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/explicit-door-package-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/failing_auto_revoke_retries_policy_without_repeating_observation_p12-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/failing_auto_revoke_retries_policy_without_repeating_observation_p12-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/faithful-erasure-and-shell-drain-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/faithful-erasure-and-shell-drain-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/faithful-erasure-and-shell-drain-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/faithful-erasure-and-shell-drain-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/faithful-erasure-and-shell-drain-plants.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/faithful-erasure-and-shell-drain-plants.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/faithful-erasure-and-shell-drain-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/faithful-erasure-and-shell-drain-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/final-formatted-counts.json",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/final-formatted-source-measurement.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/final-formatted-source-measurement.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/final-review-fmt.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/final-review-fmt.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/fkcs-and-count-contracts.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/fkcs-and-count-contracts.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/formatted-counts.json",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/formatted-source-measurement.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/formatted-source-measurement.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/fr59-final-clippy.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/fr59-final-clippy.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/fr59-final-focus.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/fr59-final-focus.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/fr59-fixture-cleanup-focus.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/fr59-fixture-cleanup-focus.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/fully-final-fmt.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/fully-final-fmt.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/handoff-clippy-ratchet.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/handoff-clippy-ratchet.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/handoff-clippy-workspace.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/handoff-clippy-workspace.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/handoff-fmt.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/handoff-fmt.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/install-and-vet-cli-affected.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/install-and-vet-cli-affected.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/installed_publisher_and_version_pins_survive_uninstall_d2-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/installed_publisher_and_version_pins_survive_uninstall_d2-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/keyring-unscoped-role-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/keyring-unscoped-role-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/legacy-inactive-pin-d2-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/legacy-inactive-pin-d2-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/legacy-inactive-pin-import-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/legacy-inactive-pin-import-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/legacy-inactive-pin-import-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/legacy-inactive-pin-import-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/legacy-inactive-pin-import-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/legacy-inactive-pin-import-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/legacy-inactive-pin-import-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/legacy-inactive-pin-import-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/local_reevaluation_failure_does_not_prevent_fetch_p1-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/local_reevaluation_failure_does_not_prevent_fetch_p1-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/metadata-build-origin-field-error.log",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/missing_home_never_selects_shared_temporary_cursor_p14-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/missing_home_never_selects_shared_temporary_cursor_p14-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/no-default-verb-table.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/no-default-verb-table.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/origin-plant-fixtures.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/origin-plant-fixtures.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/owned-clippy-diagnostics.json",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/plants.md",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/poller-orthogonal-guards-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/poller-orthogonal-guards-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/poller-orthogonal-guards-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/poller-orthogonal-guards-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/poller-orthogonal-guards-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/poller-orthogonal-guards-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/poller-orthogonal-guards-save.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/poller-orthogonal-guards-save.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/poller-orthogonal-guards-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/poller-orthogonal-guards-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/post-plant-fmt.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/post-plant-fmt.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/pre-gates-head-drift-log.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/pre-gates-head-drift-log.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/prepush-default-binaries-restored.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/prepush-default-binaries-restored.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/present-yank-authority-f2-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/present-yank-authority-f2-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/production-admission-door-erasure-boot-plants.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/production-admission-door-erasure-boot-plants.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/production-spill-binding-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/production-spill-binding-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/production-spill-binding-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/production-spill-binding-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/production-spill-binding-save.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/production-spill-binding-save.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/production-spill-binding-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/production-spill-binding-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/profile-fixtures.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/profile-fixtures.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/profile-restore-main.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/profile-restore-main.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/profile-restore-yank.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/profile-restore-yank.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/profile-restore-yank_policy.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/profile-restore-yank_policy.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/published_versions_are_immutable_and_identical_publish_is_idempotent_d3-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/published_versions_are_immutable_and_identical_publish_is_idempotent_d3-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/publisher-bound-erasure-p3-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/publisher-bound-erasure-p3-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/registry-review-focused.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/registry-review-focused.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/rejected-row-starvation-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/rejected-row-starvation-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/rejected-row-starvation-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/rejected-row-starvation-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/rejected-row-starvation-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/rejected-row-starvation-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/rejected_vetter_row_does_not_hide_later_publisher_yank_p1-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/rejected_vetter_row_does_not_hide_later_publisher_yank_p1-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/renewed_promotion_replaces_only_evidence_for_identical_package_d4-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/renewed_promotion_replaces_only_evidence_for_identical_package_d4-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/review-clippy-ratchet.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/review-clippy-ratchet.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/review-clippy-workspace.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/review-clippy-workspace.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/review-corrections-fmt.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/review-corrections-fmt.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/review-fixtures.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/review-fixtures.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/review-genuine-journey-build.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/review-genuine-journey-build.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/role-corrected-registry-focus.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/role-corrected-registry-focus.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/role-final-source-measurement.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/role-final-source-measurement.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/role-preimage-guards-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/role-preimage-guards-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/role-preimage-guards-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/role-preimage-guards-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/role-preimage-guards-save.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/role-preimage-guards-save.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/role-preimage-guards-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/role-preimage-guards-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/runtime-orthogonal-guards-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/runtime-orthogonal-guards-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/runtime-orthogonal-guards-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/runtime-orthogonal-guards-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/runtime-orthogonal-guards-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/runtime-orthogonal-guards-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/runtime-orthogonal-guards-save.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/runtime-orthogonal-guards-save.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/runtime-orthogonal-guards-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/runtime-orthogonal-guards-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/same-key-other-registry-origin-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/same-key-other-registry-origin-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/signature-preimage-v2-vectors.json",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/signature-role-audience-and-clock-plants.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/signature-role-audience-and-clock-plants.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/signed_yank_cannot_be_replayed_to_another_registry_f4-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/signed_yank_cannot_be_replayed_to_another_registry_f4-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/signed_yank_resigning_does_not_append_duplicate_rows_p13-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/signed_yank_resigning_does_not_append_duplicate_rows_p13-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/storage-orthogonal-guards-cmp.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/storage-orthogonal-guards-cmp.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/storage-orthogonal-guards-copyback.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/storage-orthogonal-guards-copyback.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/storage-orthogonal-guards-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/storage-orthogonal-guards-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/storage-orthogonal-guards-save.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/storage-orthogonal-guards-save.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/storage-orthogonal-guards-touch.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/storage-orthogonal-guards-touch.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/uninstall_waits_for_cross_process_mutation_lock_p8-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/uninstall_waits_for_cross_process_mutation_lock_p8-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/uninstalled_unsigned_row_never_advances_authenticated_cursor_f1-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/uninstalled_unsigned_row_never_advances_authenticated_cursor_f1-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/unreadable_promotion_is_not_treated_as_absent_p17-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/unreadable_promotion_is_not_treated_as_absent_p17-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/verifier-backend-provision.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/verifier-backend-provision.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/verifier-backend-venv.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/verifier-backend-venv.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/vetted-door-upgrade-d1-before-corrected-cli.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/vetted-door-upgrade-d1-before-corrected-cli.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/vetted-door-upgrade-d1-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/vetted-door-upgrade-d1-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-binaries-metadata.json",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-budget-calibrated.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-budget-calibrated.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-cargo-metadata.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-cargo-metadata.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-final-fixtures.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-final-fixtures.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-final-genuine-build.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-final-genuine-build.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-junit.xml",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-metadata-build-completed.log",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-nextest-command.json",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-nextest.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-nextest.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-provisioned-fixtures.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-provisioned-fixtures.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-provisioned-genuine-build.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-provisioned-genuine-build.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-summary.json",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/yank_authorization_allows_bounded_clock_skew_p10-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/yank_authorization_allows_bounded_clock_skew_p10-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/zero-cadence-p11-before.stderr",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/zero-cadence-p11-before.stdout",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review/acceptance.md",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review/blind.md",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review/diff.patch",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review/edge.md",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review/security.md",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review/triage.md",
+    "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine.md",
+    "_bmad-output/implementation-artifacts/cleanup-2026-11-07-deleted-manifest.tsv",
+    "_bmad-output/implementation-artifacts/cleanup-2026-11-07.md",
+    "_bmad-output/implementation-artifacts/deferred-work.md",
+    "_bmad-output/implementation-artifacts/sprint-status.yaml",
+    "_bmad-output/planning-artifacts/epic-20-preflight-2026-10-30.md",
+    "_bmad-output/planning-artifacts/epics/epic-20-ship-it-w5.md",
+    "crates/maos-audit/src/lib.rs",
+    "crates/maos-bin/src/admission.rs",
+    "crates/maos-bin/src/env_contract.rs",
+    "crates/maos-bin/src/main.rs",
+    "crates/maos-bin/src/operator_door.rs",
+    "crates/maos-bin/src/yank_policy.rs",
+    "crates/maos-bin/tests/erasure_inventory_20_11.rs",
+    "crates/maos-bin/tests/installed_spirit_dispatch_20_1.rs",
+    "crates/maos-bin/tests/one_daemon_one_door_16_1.rs",
+    "crates/maos-bin/tests/support/shell_world_16_2.rs",
+    "crates/maos-bin/tests/support/worker_revoke_root.rs",
+    "crates/maos-bin/tests/yank_policy_20_1b.rs",
+    "crates/maos-cli/tests/spirit_install_20_1.rs",
+    "crates/maos-compliance/src/vetting/attestation.rs",
+    "crates/maos-compliance/src/vetting/keyring.rs",
+    "crates/maos-compliance/src/vetting/mod.rs",
+    "crates/maos-registry/Cargo.toml",
+    "crates/maos-registry/SECURITY.md",
+    "crates/maos-registry/src/bin/server.rs",
+    "crates/maos-registry/src/handlers/deprecate.rs",
+    "crates/maos-registry/src/install.rs",
+    "crates/maos-registry/src/server.rs",
+    "crates/maos-registry/src/storage.rs",
+    "crates/maos-registry/src/yank.rs",
+    "crates/maos-registry/src/yank_auth.rs",
+    "crates/maos-registry/tests/fr59_yank_propagation_within_5min_test.rs",
+    "crates/maos-registry/tests/yank_auth_20_1b.rs",
+    "crates/maos-registry/tests/yank_cadence_20_1b.rs",
+    "crates/maos-spirit-cli/src/yank.rs",
+    "docs/adr/ADR-056-fr37-vetting-machinery.md",
+    "tests/coverage-matrix.yaml",
+    "tests/harness/registry_trust_20_1b.rs",
+    "xtask/fkcs-baseline.toml",
+    "xtask/kloc.toml",
+    "xtask/test-budgets.toml"
+  ],
+  "records": [
+    {
+      "check": "changed-paths",
+      "artifact": "merge-base..HEAD / HEAD..working tree / untracked",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "stability-matrix",
+      "artifact": "STABILITY.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 213
+    },
+    {
+      "check": "error-catalog-check",
+      "artifact": "docs/errors/error-catalog.json",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 494
+    },
+    {
+      "check": "gen-abi-docs",
+      "artifact": "docs-site/abi/v1",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 13899
+    },
+    {
+      "check": "check-serde-error-handling",
+      "artifact": "crates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 250
+    },
+    {
+      "check": "check-workspace-count",
+      "artifact": "Cargo.toml / docs/kernel-design.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 4
+    },
+    {
+      "check": "check-manifest-schema-version",
+      "artifact": "manifest schema",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 4
+    },
+    {
+      "check": "check-skill-schema",
+      "artifact": "skill schema",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "check-epic-close-coherence",
+      "artifact": "epic closure / discipline workflow",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 22
+    },
+    {
+      "check": "check-coverage-matrix-completeness",
+      "artifact": "tests/coverage-matrix.yaml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 10
+    },
+    {
+      "check": "check-test-cost",
+      "artifact": "xtask/test-budgets.toml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 302
+    },
+    {
+      "check": "check-env-contract",
+      "artifact": "environment contract",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 458
+    },
+    {
+      "check": "check-unsafe",
+      "artifact": "capability validation sources",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 2
+    },
+    {
+      "check": "check-service-boundary",
+      "artifact": "service boundary sources",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1150
+    },
+    {
+      "check": "check-kernel-baseline",
+      "artifact": "kernel baseline",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 9
+    },
+    {
+      "check": "kloc-check",
+      "artifact": "xtask/kloc.toml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 47
+    },
+    {
+      "check": "check-breaking-md",
+      "artifact": "BREAKING.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "check-composition-root-completeness",
+      "artifact": "composition roots",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 39
+    },
+    {
+      "check": "check-pub-field-constructors",
+      "artifact": "public field constructors",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 252
+    },
+    {
+      "check": "check-dependency-closure",
+      "artifact": "Cargo.lock / dependency closure",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 584
+    },
+    {
+      "check": "coverage-matrix",
+      "artifact": "tests/coverage-matrix.yaml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 13
+    },
+    {
+      "check": "check-corpus",
+      "artifact": "corpus manifest",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 102
+    },
+    {
+      "check": "abi-diff",
+      "artifact": "ABI surface",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1310
+    },
+    {
+      "check": "check-empty-kernel",
+      "artifact": "kernel invariant I9",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 270
+    },
+    {
+      "check": "check-loom",
+      "artifact": "loom substrate",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 265
+    },
+    {
+      "check": "check-fr47",
+      "artifact": "FR47 bindings",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 15
+    },
+    {
+      "check": "check-a2a-sender-completeness",
+      "artifact": "A2A sender boundary",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 32
+    },
+    {
+      "check": "check-judge-config",
+      "artifact": "pinned judge configuration",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1770
+    },
+    {
+      "check": "check-security-md",
+      "artifact": "SECURITY.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "templates-regen",
+      "artifact": "example Spirit templates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "corpus-staleness",
+      "artifact": "corpus validity dates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 9
+    },
+    {
+      "check": "calibrate",
+      "artifact": "calibration seed",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 5
+    },
+    {
+      "check": "check-review-findings-resolved",
+      "artifact": "review closure",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 108
+    },
+    {
+      "check": "check-dev-record-completeness",
+      "artifact": "story records",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 64
+    },
+    {
+      "check": "check-dev-model-tier",
+      "artifact": "story model tiers",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 16
+    },
+    {
+      "check": "check-ship-gate-completeness",
+      "artifact": "ship registry",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 30
+    },
+    {
+      "check": "check-pentest-gate",
+      "artifact": "pen-test evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "check-third-party-trial",
+      "artifact": "trial evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "check-trial-attestation",
+      "artifact": "trial attestation",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 185
+    },
+    {
+      "check": "check-red-team-gate",
+      "artifact": "red-team evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 8
+    },
+    {
+      "check": "check-migration-merkle",
+      "artifact": "migration evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 16063
+    },
+    {
+      "check": "nfr-onb-1-gate",
+      "artifact": "onboarding evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 8
+    },
+    {
+      "check": "cassette-age-gate",
+      "artifact": "cassette age policy",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 4
+    },
+    {
+      "check": "build-test-fixtures",
+      "artifact": "target/maos-fixtures/manifest.json",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 142945
+    },
+    {
+      "check": "binary-size:trigger",
+      "artifact": "cargo metadata / change set",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "binary-size:build",
+      "artifact": "release maos",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 79193
+    },
+    {
+      "check": "binary-size",
+      "artifact": "tests/integration/onb_nfr2_timing.sh: stripped release maos",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "fmt",
+      "artifact": "workspace Rust sources",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3055
+    },
+    {
+      "check": "docs:troubleshoot-bidi",
+      "artifact": "docs-site/route-manifest.json / docs/errors/error-catalog.json",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 103
+    },
+    {
+      "check": "docs:glossary-lock",
+      "artifact": "docs-site/i18n/ko / glossary",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 73
+    },
+    {
+      "check": "docs:anchor-ids",
+      "artifact": "docs-site anchors",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 63
+    },
+    {
+      "check": "docs:ko-coverage",
+      "artifact": "docs-site/i18n/ko (KO_COVERAGE_MIN=100)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 65
+    },
+    {
+      "check": "docs:build",
+      "artifact": "docs-site/build",
+      "status": "skip",
+      "detail": "no docs-site/**, docs/errors/** or xtask/error-catalog.toml changes",
+      "wall_ms": 0
+    },
+    {
+      "check": "docs:routes",
+      "artifact": "docs-site/build / route-manifest.json",
+      "status": "skip",
+      "detail": "no docs-site/**, docs/errors/** or xtask/error-catalog.toml changes",
+      "wall_ms": 0
+    },
+    {
+      "check": "cargo-deny",
+      "artifact": "Cargo.lock / deny.toml (required cargo-deny)",
+      "status": "skip",
+      "detail": "neither Cargo.lock nor deny.toml changed",
+      "wall_ms": 0
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "status": "red",
+      "detail": "expected exit 0, actual exit status: 100; 35379 lines omitted; thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (325103) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:86:9: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (325103) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (325103) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (325103) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (325103) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'tokio-rt-worker' (325354) panicked at crates/maos-kernel-core/tests/crash_detector_in_process_panic.rs:16:9: thread 'tokio-rt-worker' (325938) panicked at crates/maos-kernel-core/tests/halt_carry_20_3c.rs:190:9: thread 'tokio-rt-worker' (326026) panicked at crates/maos-kernel-core/tests/hook_dispatch_budget_envelope.rs:41:13: thread 'tokio-rt-worker' (326066) panicked at crates/maos-kernel-core/tests/hot_swap_cross_major_migration.rs:42:9: thread 'tokio-rt-worker' (326403) panicked at crates/maos-kernel-core/tests/loaded_spirit_exit_16_6.rs:43:13: thread 'tokio-rt-worker' (326404) panicked at crates/maos-kernel-core/tests/loaded_spirit_exit_16_6.rs:43:13: thread 'fixture_replay::tests::empty_ring_panics' (328400) panicked at crates/maos-providers/src/fixture_replay.rs:47:13: thread 'sibling_provenance_refuses_an_unrecorded_executable' (328687) panicked at crates/maos-registry/tests/../../../tests/harness/fixtures.rs:57:5: thread 'assert_no_deprecations_panics_when_warnings_present' (329837) panicked at crates/maos-spirit-sdk/tests/deprecation_warnings_smoke.rs:112:5: thread 'assert_panics_message_contains_file_line_and_suggested_fix' (329917) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:34:9: thread 'expect_frame_bytes_exact_fails_on_mismatch' (329927) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:112:5: thread 'assert_panics_on_false_with_diagnostics' (329919) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:28:5: thread 'assert_diagnostic_stable_output' (329921) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:227:9: thread 'expect_frame_closest_diff_byte_correct' (329932) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:251:9: thread 'expect_frame_panics_on_no_match' (329937) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:81:5: thread 'expect_halt_panics_on_no_match' (329941) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:160:5: thread 'gate_otel_airgap_default_off_no_connects' (330021) panicked at crates/maos-telemetry/tests/otel_gates.rs:171:13: thread 'gate_otel_airgap_default_off_no_connects' (330128) panicked at crates/maos-telemetry/tests/otel_gates.rs:173:52: thread 'gate_otel_airgap_default_off_no_connects' (330188) panicked at crates/maos-telemetry/tests/otel_gates.rs:173:52: thread 'gate_otel_airgap_default_off_no_connects' (330224) panicked at crates/maos-telemetry/tests/otel_gates.rs:175:13: thread 'gate_otel_airgap_default_off_no_connects' (330283) panicked at crates/maos-telemetry/tests/otel_gates.rs:175:13: thread 'gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field' (331533) panicked at xtask/src/gate_common.rs:670:13: FAIL [ 0.099s] (4613/5753) xtask::check_test_budget_proven_red the_committed_register_parses FAIL [ 0.108s] (4614/5753) xtask::check_test_budget_proven_red hosted_1_model_currency_calibration_changes_only_its_binary_budget thread 'expansion_defaults_only_job_results' (337613) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'expansion_defaults_only_job_results' (337613) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'expansion_defaults_only_job_results' (337613) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field' (338650) panicked at xtask/src/gate_common.rs:670:13: FAIL [ 45.123s] (5719/5753) maos-bin::erasure_million_20_11 ac5_million_row_pending_forget_finishes_and_repeats_without_corruption FAIL [ 0.099s] (4613/5753) xtask::check_test_budget_proven_red the_committed_register_parses thread 'the_committed_register_parses' (332454) panicked at xtask/tests/check_test_budget_proven_red.rs:271:5: FAIL [ 0.108s] (4614/5753) xtask::check_test_budget_proven_red hosted_1_model_currency_calibration_changes_only_its_binary_budget thread 'hosted_1_model_currency_calibration_changes_only_its_binary_budget' (332452) panicked at xtask/tests/check_test_budget_proven_red.rs:288:5: FAIL [ 45.123s] (5719/5753) maos-bin::erasure_million_20_11 ac5_million_row_pending_forget_finishes_and_repeats_without_corruption thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (325478) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:",
+      "wall_ms": 813802
+    },
+    {
+      "check": "kernel-core-lib",
+      "artifact": "maos-kernel-core lib tests",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 37350
+    },
+    {
+      "check": "workspace-doc",
+      "artifact": "workspace doctests",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 200705
+    },
+    {
+      "check": "test-budget",
+      "artifact": "/mnt/build/cargo-maos/nextest/default/junit.xml",
+      "status": "advisory",
+      "detail": "expected exit 0, actual exit status: 1; 0 lines omitted; {\"gate\":\"check-test-budget\",\"passed\":false,\"junit\":\"/mnt/build/cargo-maos/nextest/default/junit.xml\",\"binaries\":613,\"total_span_seconds\":546.947005033493,\"total_sum_seconds\":1186.3729999999987,\"findings\":[\"butler::hallucination took 30.229 s (Σ per-test time) over 5 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml\",\"maos-bin::erasur ::error::check-test-budget: FAIL — 5 finding(s): - butler::hallucination took 30.229 s (Σ per-test time) over 5 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::erasure_uninstall_13_5b took 34.447 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::hook_pump_17_4 took 32.110 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::one_daemon_one_door_16_1 took 37.776 s (Σ per-test time) over 43 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-iac::participant_recall_17_8 took 44.916 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml check-test-budget: FAIL — 5 finding(s): - butler::hallucination took 30.229 s (Σ per-test time) over 5 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::erasure_uninstall_13_5b took 34.447 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::hook_pump_17_4 took 32.110 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::one_daemon_one_door_16_1 took 37.776 s (Σ per-test time) over 43 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-iac::participant_recall_17_8 took 44.916 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+      "wall_ms": 89
+    },
+    {
+      "check": "ci-pins",
+      "artifact": ".github/workflows/discipline.yml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:nfr-rel-1-crash-detection-2s/Run crash corpus (exactly one passing test)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:nfr-rel-2-hang-detection-60s/Run hang corpus (exactly one passing test)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:epic-17-exit/Epic-17 exit line 4 — retained T3 terminal facts (Story 17-7)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:epic-17-exit/CLI-wrapper spawn refuses on issuance-quota exhaustion (Story 17-9)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:epic-17-exit/Epic-17 exit line 5 — Observer live scene + activity corpus (Story 17-4)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:journey-hermetic-tier-1/Live skill port security witnesses (18-7, ten tests)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-delegated/Native cgroup-v2 smoke — four real cases",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-delegated/Real admitted session suite — 23 cases, serial",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-delegated/Rootless T3 Worker resource enforcement (x64)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-undelegated/Full undelegated session suite — live fallback, strict refusal, persistence and ordering",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"SCOPED-VERDICT \": 1 static emission sites; pin 8 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"GOVERNED-ATOMIC \": 1 static emission sites; pin 10 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"HOSTILE-LIFTING \": 1 static emission sites; pin 2 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"HOSTILE-LIFTING-CONTROL \": 1 static emission sites; pin 1 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"RUNNER-SIGSYS \": 1 static emission sites; pin 2 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"REPEATED-MAILBOX \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-PROVENANCE \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-REFUSALS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-FLOODS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-DIAGNOSTICS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-EXITS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-ONCE \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-IAC-SEND \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"WASM-IAC-SEND \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Live escape-anomaly consumer under real T2 (Story 17-10)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/In-band recall through the admitted session (Story 17-3d)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Participant recall and consent envelopes, both forms (Story 17-8)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:windows-check/Run platform-neutral recall wire tests (Story 17-3d)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:check-reza-production-path/GDPR response-only MCP principal cannot resurrect from cache (18-6)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:macos-check/Run platform-neutral recall wire tests (Story 17-3d)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "tracked-tree",
+      "artifact": "git diff HEAD / tracked status",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    }
+  ],
+  "output_diagnostics": [
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP (assert_fd_headroom): cannot read /tmp/maos-absent-limits-292813/limits: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP (assert_fd_headroom): cannot read /tmp/maos-absent-limits-292813/limits: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 absent_grant_keeps_d1_tokenless_proceed_posture: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 local_exhaustion_refuses_before_workload: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 remote_exhaustion_refuses_before_workload: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 founder-loop audit-drain Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic crashed second Worker (nack): signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic pending-halt stop: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic reassigned section crashes twice: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic reassigning first section crashes: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic section crashed once, re-dispatched: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic escalating section: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic three-Worker dispatch: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic clear-judgement twin: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic hold resumed with provided context: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic hold released by accepted-halt: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic ambiguity halt resolved over the door: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic hold expiring at its bound: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 20-11 AC6 live Worker uninstall (AC2 fallback; schedule admission absent): signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V1 delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V2 delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V4 re-pin consent delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V3 recovered delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: NFR-Perf-8 real-spawn fan-out: set MAOS_20_7_FANOUT=smoke|soak (hosted smoke / Tier W soak only)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 paused Orchestrator holds dispatch: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 recall: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 safe-point drain: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root unload live Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown serving Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown one-shot Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown topology Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown interrupted topology Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown standalone Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown descendant Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 cohort root shutdown Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 cohort root startup shutdown Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 cohort root descendant Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 founder-loop delegated goal Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 founder-loop delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 maos run cli-wrapper Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 two-host delegation Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 replayed inbound delegation Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 hostless completion Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 completion permission-denial Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 completion prose-refusal Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 completion no-effect Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 fixture credential-immunity Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 standalone completion Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 Worker freeze: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 Worker revoke-stop: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 17-2 Worker FD hard-limit refusal: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 17-2 live Worker resource enforcement: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 binary root stalled Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 binary root crashed Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 binary root stalled then crashed Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 client-first: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root-crash: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 fallback: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 ownership: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S1 immediate exit: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S3 external SIGKILL: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S2 exit-137: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S4 memory.max OOM: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S5 on_unload over-budget: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S5 on_unload panic: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 configured workspaces root claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 workspace no-effect claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 host-probe marker claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 workspace effect claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 workspace no-effect codex Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic three-workspace dispatch: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 purge-cgroups: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 every executable escape-corpus-v1 scenario: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 t3 egress socket custody: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 J1 clear-twin topology Workers: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 J1 founder-loop journey delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 J1 resume-continuity topology Workers: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 sandbox_t3_spawn_linux: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_enabled_proven_red_network_canary_detected): strace unavailable: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_enabled_no_endpoint_no_connects): strace unavailable: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_default_off_no_connects): strace unavailable: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_default_off_no_connects): strace -V failed:"
+    }
+  ],
+  "wall_ms": 1536012
+}

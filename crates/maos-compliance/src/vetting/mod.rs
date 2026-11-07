@@ -29,10 +29,10 @@
 //! # Independence of issue and verify (AC2/AC6 leg 1)
 //!
 //! Issuance encodes the claim ([`attestation::encode_claim`], `serde_cbor::to_vec`)
-//! and signs `sha256(claim_bytes)`. Verification **re-derives** `sha256` over the
-//! ON-WIRE `claim_bytes` and decodes independently ([`attestation::decode_claim`],
-//! `serde_cbor::from_slice`) — it never trusts a value the issuer computed and
-//! never re-encodes a struct it was handed. The signature primitive is `ring`
+//! and signs a role-domain-framed SHA-256 digest (signature preimage v2).
+//! Verification re-derives that digest over the ON-WIRE `claim_bytes` and
+//! decodes independently ([`attestation::decode_claim`], `serde_cbor::from_slice`);
+//! it never re-encodes a struct it was handed. The signature primitive is `ring`
 //! Ed25519 (same monoculture as the rest of the workspace).
 
 pub mod attestation;
@@ -53,12 +53,24 @@ pub use terminal::{
 
 use crate::canonical_cbor::sha256;
 
+/// Signature-preimage v2: domain || NUL || little-endian u64 length || wire bytes.
+/// No v1 fallback: old attestations and key events must be reissued.
+fn signing_digest(domain: &[u8], bytes: &[u8]) -> [u8; 32] {
+    use sha2::{Digest, Sha256};
+    let mut hash = Sha256::new();
+    hash.update(domain);
+    hash.update([0]);
+    hash.update((bytes.len() as u64).to_le_bytes());
+    hash.update(bytes);
+    hash.finalize().into()
+}
+
 /// The typed rejection taxonomy for the vetting verify chain. Every refusal
 /// names its own distinct cause so a negative test reds on its own defect and
 /// never on a neighbor's (the anti-null discipline of AC6).
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum VettingRejection {
-    /// The Ed25519 signature over `sha256(claim_bytes)` did not verify under the
+    /// The role-domain-framed signature digest did not verify under the
     /// attestation's `vetter_pubkey` (forged / tampered / wrong key).
     #[error("vetting attestation signature invalid (forged or tampered)")]
     ForgedSignature,

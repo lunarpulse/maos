@@ -1,0 +1,11 @@
+
+running 1 test
+test deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9 ... FAILED
+
+failures:
+
+failures:
+    deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+

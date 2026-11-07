@@ -47,10 +47,14 @@ fn installed_component_dispatch_reports_typed_boot_refusal() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
+    let boot_started = std::time::Instant::now();
     let mut child = scratch
         .command(std::path::Path::new(own))
         .args(["shell", "--plain"])
         .env("MAOS_INFERENCE_MODE", "replay")
+        .env("MAOS_REGISTRY_URI", "")
+        .env("MAOS_REGISTRY_YANK_POLL_INTERVAL_S", "300")
+        .env("MAOS_YANK_POLICY", "warn")
         .env(
             "MAOS_REPLAY_CASSETTE",
             root().join("crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json"),
@@ -68,12 +72,21 @@ fn installed_component_dispatch_reports_typed_boot_refusal() {
         .write_all(b"@example-spirit-ts hello\n")
         .unwrap();
     let output = child.wait_with_output().unwrap();
+    let boot_elapsed = boot_started.elapsed();
+    assert!(
+        boot_elapsed < std::time::Duration::from_secs(2),
+        "installed boot without a registry source took {boot_elapsed:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert!(
         output.status.success(),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("registry-fetch=disabled"), "{stderr}");
+    assert!(!stderr.contains("audit_drain_timeout"), "{stderr}");
     assert!(stdout.lines().any(|line| line == "maos: spirit 'example-spirit-ts' refused at boot: wasm_engine_off"), "{stdout}");
     assert!(!stdout.contains("unknown spirit 'example-spirit-ts'"));
 }

@@ -112,3 +112,37 @@ The FKCS conformance review that discharged decision D8 (`epic-14-preflight-deci
   `maos-spirit-cli`; `vet issue`/`vet revoke` do not enroll a vetter implicitly.
   Running expiry/revocation uses the yank cadence and preserves cause labels.
   Quarantine requests in L1 do not claim the final KQ1 isolation effect.
+
+## Amendment — 20-1b L1 independent-review corrections (2026-11-07)
+
+The operator door resolves the named target's installed `SignedPackage` before
+creating temporary manifest snapshots. It carries that explicit identity through
+both upgrade guards; neither `/tmp` neighbors nor a genuine sidecar hiding altered
+deployed bytes supplies identity. One verifier checks the actual manifest, artifact
+and declared component against that package.
+
+Attestation and operator key-event signature preimages are now v2 role-separated:
+`SHA-256(domain || NUL || wire_length_u64_le || wire_claim)`, signed with Ed25519.
+The domains are `maos.vetting.attestation.v2` and `maos.vetting.key-event.v2`.
+Canonical claim CBOR stays byte-pinned; old unscoped signatures require reissuance.
+Role/framing vectors and raw-digest refusal controls live in
+`maos-registry/tests/yank_auth_20_1b.rs`. CRL/attestation-revocation role migration
+still depends on the existing kernel signature contract and is not changed here.
+The shipped `vet issue`/`vet revoke` verbs operate on attestations, not vetter-key
+enrollment or key revocation: those lifecycle witnesses use fixture-built keyrings,
+and the missing operator verbs remain an explicit 20-1b deferred obligation.
+
+Signed yank mutation credentials v2 additionally bind registry audience, random
+nonce and bounded lifetime. Accepted historical withdrawals do not expire merely
+because their mutation credential has aged. Schema-2 daemon cursors bind the URI,
+persist each verified frontier, reject unsigned advancement and resync on sequence
+anomalies. These controls do not detect an omitted/rolled-back registry head:
+authenticated first contact/TLS and head integrity remain AC15 work.
+
+Local running-promotion reevaluation remains active without a registry source
+and discovers installs appearing after boot; zero cadence is refused, maximum
+cadence is 300 seconds. Network work cannot hold boot/shutdown or the audit drain
+open. One bad Spirit or rejected withdrawal does not starve another observation,
+and retrying an effect does not repeat its terminal observation.
+The correction landing has zero kernel delta (26,841 physical / 21,042 tokei);
+quarantine is still a typed request only, with its effect reserved for final KQ1.

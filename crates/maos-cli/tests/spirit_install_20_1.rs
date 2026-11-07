@@ -321,50 +321,74 @@ fn installed_version_is_immutable_ac14() {
     let original_index = std::fs::read(&index).unwrap();
     let original_package = std::fs::read(installed.join("signed_package.json")).unwrap();
     let original_origin = std::fs::read(installed.join("origin.json")).unwrap();
-    let other = Scratch::new();
-    let second = InProcessServer::start(&other);
-    let artifact = scratch.0.join("changed.wasm");
-    std::fs::write(&artifact, b"replacement under the same publisher key").unwrap();
-    for (index, addr) in [&first.addr, &second.addr].into_iter().enumerate() {
-        if index == 1 {
+    let changed = scratch.0.join("changed.wasm");
+    std::fs::write(&changed, b"replacement under the same publisher key").unwrap();
+    for case in [
+        "same-key-other-registry-identical",
+        "same-key-other-registry-changed",
+        "same-key-same-registry-changed",
+        "different-publisher",
+    ] {
+        let other = Scratch::new();
+        let second = InProcessServer::start(&other);
+        let artifact = &changed;
+        if case == "different-publisher" {
             std::fs::write(scratch.0.join("publisher.key"), "54".repeat(32)).unwrap();
         }
-        let result = publish_artifact(
-            &scratch,
-            &sibling("maos-spirit"),
-            addr,
-            &manifest,
-            &artifact,
-            &scratch.0.join("publisher.key"),
-        );
-        assert!(
-            result.status.success(),
-            "{}",
-            String::from_utf8_lossy(&result.stderr)
-        );
+        if case == "same-key-other-registry-identical" {
+            let response = rpc(
+                &second.addr,
+                "registry.publish",
+                serde_json::from_slice(&original_package).unwrap(),
+            );
+            assert!(response.get("result").is_some(), "{response}");
+        } else {
+            let published = publish_artifact(
+                &scratch,
+                &sibling("maos-spirit"),
+                &second.addr,
+                &manifest,
+                artifact,
+                &scratch.0.join("publisher.key"),
+            );
+            assert!(
+                published.status.success(),
+                "{}",
+                String::from_utf8_lossy(&published.stderr)
+            );
+        }
+        let addr = if case == "same-key-same-registry-changed" {
+            // Hostile-registry fixture bypasses the now-immutable publish API.
+            // The client must independently refuse a validly signed replacement.
+            for file in ["manifest.toml", "artifact.bin", "signed_package.json"] {
+                std::fs::copy(
+                    other
+                        .0
+                        .join("registry/spirits/example-spirit-ts/0.1.0")
+                        .join(file),
+                    scratch
+                        .0
+                        .join("registry/spirits/example-spirit-ts/0.1.0")
+                        .join(file),
+                )
+                .unwrap();
+            }
+            &first.addr
+        } else {
+            &second.addr
+        };
         let result = install(&scratch, addr);
-        assert!(
-            !result.status.success(),
-            "same-key or different-registry replacement must fail"
-        );
+        assert!(!result.status.success(), "{case} must fail");
         let diagnostic = String::from_utf8_lossy(&result.stderr);
         assert!(
-            diagnostic.contains(if index == 0 {
-                "immutable"
-            } else {
+            diagnostic.contains(if case == "different-publisher" {
                 "publisher key differs"
+            } else {
+                "immutable"
             }),
-            "{diagnostic}"
+            "{case}: {diagnostic}"
         );
-        assert_eq!(
-            std::fs::read(
-                scratch
-                    .0
-                    .join("home/.local/share/maos/registry/installed-index.json")
-            )
-            .unwrap(),
-            original_index
-        );
+        assert_eq!(std::fs::read(&index).unwrap(), original_index);
         assert_eq!(
             std::fs::read(installed.join("signed_package.json")).unwrap(),
             original_package
@@ -390,12 +414,15 @@ fn yanked_install_is_refused_before_persistence_ac16() {
     .success());
     let authorization = maos_registry::yank_auth::YankAuthorization::sign(
         &[0x53; 32],
-        "example-spirit-ts",
-        "0.1.0",
-        "withdrawn",
+        maos_registry::yank_auth::YankScope {
+            name: "example-spirit-ts",
+            version: "0.1.0",
+            reason: "withdrawn",
+            registry_uri: &format!("http://{}/mcp", server.addr),
+        },
         maos_domain::ports::registry::YankOrigin::Publisher,
         String::new(),
-        10,
+        maos_registry::yank_auth::now_unix_ms().unwrap(),
     )
     .unwrap();
     let response = rpc(

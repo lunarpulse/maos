@@ -1,0 +1,2282 @@
+[
+  {
+    "label": "boot-latency-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "installed_spirit_dispatch_20_1",
+      "installed_component_dispatch_reports_typed_boot_refusal",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 59.483
+  },
+  {
+    "label": "boot-latency-profile",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "installed_spirit_dispatch_20_1",
+      "installed_component_dispatch_reports_typed_boot_refusal",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 20.058
+  },
+  {
+    "label": "profile-fixtures",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "build-test-fixtures",
+      "--only",
+      "maos-registry-server,maos-spirit,maosctl",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 36.374
+  },
+  {
+    "label": "boot-latency-profile-provisioned",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "installed_spirit_dispatch_20_1",
+      "installed_component_dispatch_reports_typed_boot_refusal",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 5.721
+  },
+  {
+    "label": "profile-restore-main",
+    "command": [
+      "bash",
+      "-c",
+      "cp \"$1\" \"$2\" && cmp \"$1\" \"$2\" && touch \"$2\"",
+      "restore",
+      "/tmp/201b-review-corrections/profile-main.rs",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.012
+  },
+  {
+    "label": "profile-restore-yank_policy",
+    "command": [
+      "bash",
+      "-c",
+      "cp \"$1\" \"$2\" && cmp \"$1\" \"$2\" && touch \"$2\"",
+      "restore",
+      "/tmp/201b-review-corrections/profile-yank_policy.rs",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/src/yank_policy.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.003
+  },
+  {
+    "label": "profile-restore-yank",
+    "command": [
+      "bash",
+      "-c",
+      "cp \"$1\" \"$2\" && cmp \"$1\" \"$2\" && touch \"$2\"",
+      "restore",
+      "/tmp/201b-review-corrections/profile-yank.rs",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.003
+  },
+  {
+    "label": "published_versions_are_immutable_and_identical_publish_is_idempotent_d3-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "published_versions_are_immutable_and_identical_publish_is_idempotent_d3",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 5.297
+  },
+  {
+    "label": "installed_publisher_and_version_pins_survive_uninstall_d2-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "installed_publisher_and_version_pins_survive_uninstall_d2",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.631
+  },
+  {
+    "label": "renewed_promotion_replaces_only_evidence_for_identical_package_d4-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "renewed_promotion_replaces_only_evidence_for_identical_package_d4",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.531
+  },
+  {
+    "label": "signed_yank_resigning_does_not_append_duplicate_rows_p13-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "signed_yank_resigning_does_not_append_duplicate_rows_p13",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.429
+  },
+  {
+    "label": "unreadable_promotion_is_not_treated_as_absent_p17-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "unreadable_promotion_is_not_treated_as_absent_p17",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.383
+  },
+  {
+    "label": "uninstall_waits_for_cross_process_mutation_lock_p8-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "uninstall_waits_for_cross_process_mutation_lock_p8",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 2.532
+  },
+  {
+    "label": "yank_authorization_allows_bounded_clock_skew_p10-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "yank_authorization_allows_bounded_clock_skew_p10",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.129
+  },
+  {
+    "label": "missing_home_never_selects_shared_temporary_cursor_p14-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "missing_home_never_selects_shared_temporary_cursor_p14",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.129
+  },
+  {
+    "label": "local_reevaluation_failure_does_not_prevent_fetch_p1-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "local_reevaluation_failure_does_not_prevent_fetch_p1",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.126
+  },
+  {
+    "label": "signed_yank_cannot_be_replayed_to_another_registry_f4-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "signed_yank_cannot_be_replayed_to_another_registry_f4",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 5.843
+  },
+  {
+    "label": "expired_signed_yank_request_cannot_mutate_registry_f4-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "expired_signed_yank_request_cannot_mutate_registry_f4",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.285
+  },
+  {
+    "label": "present-yank-authority-f2-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "install_refuses_present_yank_with_unpinned_authority_f2",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 5.904
+  },
+  {
+    "label": "unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 5.31
+  },
+  {
+    "label": "cursor_from_another_registry_is_replayed_from_zero_p2-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "cursor_from_another_registry_is_replayed_from_zero_p2",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.137
+  },
+  {
+    "label": "deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 23.563
+  },
+  {
+    "label": "failing_auto_revoke_retries_policy_without_repeating_observation_p12-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "failing_auto_revoke_retries_policy_without_repeating_observation_p12",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.291
+  },
+  {
+    "label": "signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.27
+  },
+  {
+    "label": "rejected_vetter_row_does_not_hide_later_publisher_yank_p1-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "rejected_vetter_row_does_not_hide_later_publisher_yank_p1",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 2.869
+  },
+  {
+    "label": "uninstalled_unsigned_row_never_advances_authenticated_cursor_f1-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "uninstalled_unsigned_row_never_advances_authenticated_cursor_f1",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.271
+  },
+  {
+    "label": "corrupt_install_does_not_hide_another_spirits_expiry_p1-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "corrupt_install_does_not_hide_another_spirits_expiry_p1",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.274
+  },
+  {
+    "label": "zero-cadence-p11-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "zero_interval_cannot_silently_disable_local_vetting_p11",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 7.804
+  },
+  {
+    "label": "publisher-bound-erasure-p3-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "erasure_inventory_20_11",
+      "registry_bound_principal_is_counted_and_erased_on_uninstall_p3",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 550.164
+  },
+  {
+    "label": "vetted-door-upgrade-d1-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "one_daemon_one_door_16_1",
+      "vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 79.853
+  },
+  {
+    "label": "vetted-door-upgrade-d1-before-corrected-cli",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "one_daemon_one_door_16_1",
+      "vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 160.968
+  },
+  {
+    "label": "blocked-fetch-shutdown-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "blocked_registry_fetch_does_not_block_shutdown_or_boot",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 200.776
+  },
+  {
+    "label": "legacy-inactive-pin-d2-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "legacy_inactive_version_pins_are_migrated_before_uninstall_d2",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 175.703
+  },
+  {
+    "label": "attestation-unscoped-role-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "attestation_rejects_unscoped_digest_signature_review_f5",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 151.638
+  },
+  {
+    "label": "keyring-unscoped-role-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "keyring_event_rejects_unscoped_digest_signature_review_f5",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 1.097
+  },
+  {
+    "label": "review-corrections-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.76
+  },
+  {
+    "label": "registry-review-focused",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 152.793
+  },
+  {
+    "label": "formatted-source-measurement",
+    "command": [
+      "tokei",
+      "--output",
+      "json",
+      "--types",
+      "Rust",
+      "-e",
+      "target",
+      "-e",
+      "tests",
+      "-e",
+      "benches",
+      "-e",
+      "examples",
+      "-e",
+      "fuzz",
+      "-e",
+      "spirits",
+      "-e",
+      "crates/maos-kernel-core/src/memory/spill_test_faults.rs",
+      "."
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.042
+  },
+  {
+    "label": "bin-review-policy-focused",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 50.162
+  },
+  {
+    "label": "bin-review-policy-harness-failure",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 22.02,
+    "source": "bg_513; artifact14615/14616",
+    "cause": "test harness incorrectly assumed process-global PID allocator resets between worlds; other three reds are poisoned ENV mutex cascades"
+  },
+  {
+    "label": "bin-review-policy-after-harness-fix",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 11.996
+  },
+  {
+    "label": "review-fixtures",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "build-test-fixtures",
+      "--only",
+      "maosctl,maos-spirit,maos-registry-server",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 44.937
+  },
+  {
+    "label": "review-genuine-journey-build",
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "-p",
+      "maos-cli"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 81.022
+  },
+  {
+    "label": "bin-review-affected-binaries",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "--test",
+      "one_daemon_one_door_16_1",
+      "--test",
+      "erasure_inventory_20_11",
+      "--test",
+      "installed_spirit_dispatch_20_1",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 18.359
+  },
+  {
+    "label": "verifier-backend-venv",
+    "command": [
+      "/usr/bin/python3",
+      "-m",
+      "venv",
+      "--system-site-packages",
+      "/tmp/201b-review-verifier"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.236
+  },
+  {
+    "label": "verifier-backend-provision",
+    "command": [
+      "/tmp/201b-review-verifier/bin/python3",
+      "-m",
+      "pip",
+      "install",
+      "--no-cache-dir",
+      "--only-binary=:all:",
+      "--require-hashes",
+      "-r",
+      "tools/verify-erasure/requirements.txt"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.874
+  },
+  {
+    "label": "bin-policy-and-boot-focus",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "--test",
+      "installed_spirit_dispatch_20_1",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 21.516
+  },
+  {
+    "label": "door-vetted-upgrade-after",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "one_daemon_one_door_16_1",
+      "vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.847
+  },
+  {
+    "label": "install-and-vet-cli-affected",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-cli",
+      "--test",
+      "spirit_install_20_1",
+      "-p",
+      "maos-spirit-cli",
+      "--test",
+      "vet_lifecycle_20_1b",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 91.476
+  },
+  {
+    "label": "compliance-vetting-unit",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-compliance",
+      "--lib",
+      "vetting::",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 10.178
+  },
+  {
+    "label": "storage-orthogonal-guards-save",
+    "command": [
+      "cp",
+      "crates/maos-registry/src/storage.rs",
+      "/tmp/201b-review-corrections/plants/storage-orthogonal-guards.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.009
+  },
+  {
+    "label": "storage-orthogonal-guards-plant",
+    "command": [
+      "cargo",
+      "nextest",
+      "run",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "--no-fail-fast",
+      "--test-threads",
+      "1",
+      "-E",
+      "test(=installed_publisher_and_version_pins_survive_uninstall_d2) | test(=published_versions_are_immutable_and_identical_publish_is_idempotent_d3) | test(=renewed_promotion_replaces_only_evidence_for_identical_package_d4) | test(=uninstall_waits_for_cross_process_mutation_lock_p8) | test(=signed_yank_resigning_does_not_append_duplicate_rows_p13) | test(=signed_nonce_cannot_be_reused_for_another_withdrawal_f4)"
+    ],
+    "exit_code": 100,
+    "elapsed_seconds": 17.795
+  },
+  {
+    "label": "origin-plant-fixtures",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "build-test-fixtures",
+      "--only",
+      "maosctl,maos-spirit,maos-registry-server",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 66.271
+  },
+  {
+    "label": "same-key-other-registry-origin-plant",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-cli",
+      "--test",
+      "spirit_install_20_1",
+      "installed_version_is_immutable_ac14",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 28.896
+  },
+  {
+    "label": "storage-orthogonal-guards-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/storage-orthogonal-guards.saved",
+      "crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.01
+  },
+  {
+    "label": "storage-orthogonal-guards-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/storage-orthogonal-guards.saved",
+      "crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.003
+  },
+  {
+    "label": "storage-orthogonal-guards-touch",
+    "command": [
+      "touch",
+      "crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "legacy-inactive-pin-import-plant",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "legacy_inactive_version_pins_are_migrated_before_uninstall_d2",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 9.834
+  },
+  {
+    "label": "legacy-inactive-pin-import-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/storage-orthogonal-guards.saved",
+      "crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.004
+  },
+  {
+    "label": "legacy-inactive-pin-import-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/storage-orthogonal-guards.saved",
+      "crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "legacy-inactive-pin-import-touch",
+    "command": [
+      "touch",
+      "crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "poller-orthogonal-guards-save",
+    "command": [
+      "cp",
+      "crates/maos-registry/src/yank.rs",
+      "/tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "poller-orthogonal-guards-plant",
+    "command": [
+      "cargo",
+      "nextest",
+      "run",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "--no-fail-fast",
+      "--test-threads",
+      "1",
+      "-E",
+      "test(=local_reevaluation_failure_does_not_prevent_fetch_p1) | test(=unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2) | test(=cursor_from_another_registry_is_replayed_from_zero_p2) | test(=verified_cursor_is_persisted_before_later_transient_failure_p2) | test(=zero_interval_cannot_silently_disable_local_vetting_p11) | test(=missing_home_never_selects_shared_temporary_cursor_p14)"
+    ],
+    "exit_code": 100,
+    "elapsed_seconds": 6.144
+  },
+  {
+    "label": "poller-orthogonal-guards-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved",
+      "crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "poller-orthogonal-guards-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved",
+      "crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "poller-orthogonal-guards-touch",
+    "command": [
+      "touch",
+      "crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "runtime-orthogonal-guards-save",
+    "command": [
+      "cp",
+      "crates/maos-bin/src/yank_policy.rs",
+      "/tmp/201b-review-corrections/plants/runtime-orthogonal-guards.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "runtime-orthogonal-guards-plant",
+    "command": [
+      "cargo",
+      "nextest",
+      "run",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "--no-fail-fast",
+      "--test-threads",
+      "1",
+      "-E",
+      "test(=rejected_vetter_row_does_not_hide_later_publisher_yank_p1) | test(=uninstalled_unsigned_row_never_advances_authenticated_cursor_f1) | test(=poller_runtime_clock_and_cursor_restart_reach_expiry_p6) | test(=signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8) | test(=failing_auto_revoke_retries_policy_without_repeating_observation_p12)"
+    ],
+    "exit_code": 100,
+    "elapsed_seconds": 18.98
+  },
+  {
+    "label": "runtime-orthogonal-guards-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/runtime-orthogonal-guards.saved",
+      "crates/maos-bin/src/yank_policy.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "runtime-orthogonal-guards-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/runtime-orthogonal-guards.saved",
+      "crates/maos-bin/src/yank_policy.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "runtime-orthogonal-guards-touch",
+    "command": [
+      "touch",
+      "crates/maos-bin/src/yank_policy.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "rejected-row-starvation-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved",
+      "crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "rejected-row-starvation-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved",
+      "crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "rejected-row-starvation-touch",
+    "command": [
+      "touch",
+      "crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "role-preimage-guards-save",
+    "command": [
+      "cp",
+      "crates/maos-compliance/src/vetting/mod.rs",
+      "/tmp/201b-review-corrections/plants/role-preimage-guards.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "audience-and-clock-guards-save",
+    "command": [
+      "cp",
+      "crates/maos-registry/src/yank_auth.rs",
+      "/tmp/201b-review-corrections/plants/audience-and-clock-guards.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "signature-role-audience-and-clock-plants",
+    "command": [
+      "cargo",
+      "nextest",
+      "run",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "--no-fail-fast",
+      "--test-threads",
+      "1",
+      "-E",
+      "test(=attestation_rejects_unscoped_digest_signature_review_f5) | test(=keyring_event_rejects_unscoped_digest_signature_review_f5) | test(=signed_yank_cannot_be_replayed_to_another_registry_f4) | test(=expired_signed_yank_request_cannot_mutate_registry_f4) | test(=yank_authorization_allows_bounded_clock_skew_p10)"
+    ],
+    "exit_code": 100,
+    "elapsed_seconds": 8.346
+  },
+  {
+    "label": "role-preimage-guards-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/role-preimage-guards.saved",
+      "crates/maos-compliance/src/vetting/mod.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "role-preimage-guards-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/role-preimage-guards.saved",
+      "crates/maos-compliance/src/vetting/mod.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "role-preimage-guards-touch",
+    "command": [
+      "touch",
+      "crates/maos-compliance/src/vetting/mod.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "audience-and-clock-guards-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/audience-and-clock-guards.saved",
+      "crates/maos-registry/src/yank_auth.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "audience-and-clock-guards-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/audience-and-clock-guards.saved",
+      "crates/maos-registry/src/yank_auth.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "audience-and-clock-guards-touch",
+    "command": [
+      "touch",
+      "crates/maos-registry/src/yank_auth.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "deployed-promotion-yank-guards-save",
+    "command": [
+      "cp",
+      "crates/maos-registry/src/install.rs",
+      "/tmp/201b-review-corrections/plants/deployed-promotion-yank-guards.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "deployed-promotion-yank-guards-plant",
+    "command": [
+      "cargo",
+      "nextest",
+      "run",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_auth_20_1b",
+      "--test",
+      "yank_policy_20_1b",
+      "--no-fail-fast",
+      "--test-threads",
+      "1",
+      "-E",
+      "test(=install_refuses_present_yank_with_unpinned_authority_f2) | test(=unreadable_promotion_is_not_treated_as_absent_p17) | test(=deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9)"
+    ],
+    "exit_code": 100,
+    "elapsed_seconds": 26.142
+  },
+  {
+    "label": "deployed-promotion-yank-guards-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/deployed-promotion-yank-guards.saved",
+      "crates/maos-registry/src/install.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.003
+  },
+  {
+    "label": "deployed-promotion-yank-guards-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/deployed-promotion-yank-guards.saved",
+      "crates/maos-registry/src/install.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "deployed-promotion-yank-guards-touch",
+    "command": [
+      "touch",
+      "crates/maos-registry/src/install.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "production-spill-binding-save",
+    "command": [
+      "cp",
+      "crates/maos-bin/src/admission.rs",
+      "/tmp/201b-review-corrections/plants/production-spill-binding.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "explicit-door-package-save",
+    "command": [
+      "cp",
+      "crates/maos-bin/src/operator_door.rs",
+      "/tmp/201b-review-corrections/plants/explicit-door-package.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "erasure-and-boot-drain-save",
+    "command": [
+      "cp",
+      "crates/maos-bin/src/main.rs",
+      "/tmp/201b-review-corrections/plants/erasure-and-boot-drain.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "bin-guard-plant-fixtures",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "build-test-fixtures",
+      "--only",
+      "maosctl,maos-spirit,maos-registry-server",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 40.185
+  },
+  {
+    "label": "production-admission-door-erasure-boot-plants",
+    "command": [
+      "cargo",
+      "nextest",
+      "run",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "--test",
+      "one_daemon_one_door_16_1",
+      "--test",
+      "erasure_inventory_20_11",
+      "--test",
+      "installed_spirit_dispatch_20_1",
+      "--no-fail-fast",
+      "--test-threads",
+      "1",
+      "-E",
+      "test(=registry_publishers_cannot_share_principal_spill_ac10) | test(=vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9) | test(=registry_bound_principal_is_counted_and_erased_on_uninstall_p3) | test(=installed_component_dispatch_reports_typed_boot_refusal)"
+    ],
+    "exit_code": 100,
+    "elapsed_seconds": 28.665
+  },
+  {
+    "label": "production-spill-binding-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/production-spill-binding.saved",
+      "crates/maos-bin/src/admission.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.007
+  },
+  {
+    "label": "production-spill-binding-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/production-spill-binding.saved",
+      "crates/maos-bin/src/admission.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "production-spill-binding-touch",
+    "command": [
+      "touch",
+      "crates/maos-bin/src/admission.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "explicit-door-package-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/explicit-door-package.saved",
+      "crates/maos-bin/src/operator_door.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.003
+  },
+  {
+    "label": "explicit-door-package-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/explicit-door-package.saved",
+      "crates/maos-bin/src/operator_door.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "explicit-door-package-touch",
+    "command": [
+      "touch",
+      "crates/maos-bin/src/operator_door.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "erasure-and-boot-drain-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/erasure-and-boot-drain.saved",
+      "crates/maos-bin/src/main.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.003
+  },
+  {
+    "label": "erasure-and-boot-drain-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/erasure-and-boot-drain.saved",
+      "crates/maos-bin/src/main.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "erasure-and-boot-drain-touch",
+    "command": [
+      "touch",
+      "crates/maos-bin/src/main.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "environment-serialization-save",
+    "command": [
+      "cp",
+      "crates/maos-registry/tests/yank_auth_20_1b.rs",
+      "/tmp/201b-review-corrections/plants/environment-serialization.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "faithful-erasure-and-shell-drain-plants",
+    "command": [
+      "cargo",
+      "nextest",
+      "run",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "erasure_inventory_20_11",
+      "--test",
+      "installed_spirit_dispatch_20_1",
+      "--no-fail-fast",
+      "--test-threads",
+      "1",
+      "-E",
+      "test(=registry_bound_principal_is_counted_and_erased_on_uninstall_p3) | test(=installed_component_dispatch_reports_typed_boot_refusal)"
+    ],
+    "exit_code": 100,
+    "elapsed_seconds": 23.92
+  },
+  {
+    "label": "faithful-erasure-and-shell-drain-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/erasure-and-boot-drain.saved",
+      "crates/maos-bin/src/main.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.005
+  },
+  {
+    "label": "faithful-erasure-and-shell-drain-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/erasure-and-boot-drain.saved",
+      "crates/maos-bin/src/main.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "faithful-erasure-and-shell-drain-touch",
+    "command": [
+      "touch",
+      "crates/maos-bin/src/main.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "environment-serialization-plant",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "every_registry_auth_test_holds_the_shared_environment_mutex_p15",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 14.487
+  },
+  {
+    "label": "environment-serialization-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/environment-serialization.saved",
+      "crates/maos-registry/tests/yank_auth_20_1b.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.006
+  },
+  {
+    "label": "environment-serialization-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/environment-serialization.saved",
+      "crates/maos-registry/tests/yank_auth_20_1b.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "environment-serialization-touch",
+    "command": [
+      "touch",
+      "crates/maos-registry/tests/yank_auth_20_1b.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "post-plant-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.946
+  },
+  {
+    "label": "blocked-transport-shutdown-plant",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "blocked_registry_fetch_does_not_block_shutdown_or_boot",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 9.244
+  },
+  {
+    "label": "blocked-transport-shutdown-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved",
+      "crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.007
+  },
+  {
+    "label": "blocked-transport-shutdown-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved",
+      "crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "blocked-transport-shutdown-touch",
+    "command": [
+      "touch",
+      "crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-clippy-workspace",
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--locked",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1144.326
+  },
+  {
+    "label": "review-clippy-ratchet",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "clippy-ratchet",
+      "--input",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/review-clippy-workspace.stdout"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.258
+  },
+  {
+    "label": "final-formatted-source-measurement",
+    "command": [
+      "tokei",
+      "--output",
+      "json",
+      "--types",
+      "Rust",
+      "-e",
+      "target",
+      "-e",
+      "tests",
+      "-e",
+      "benches",
+      "-e",
+      "examples",
+      "-e",
+      "fuzz",
+      "-e",
+      "spirits",
+      "-e",
+      "crates/maos-kernel-core/src/memory/spill_test_faults.rs",
+      "."
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.04
+  },
+  {
+    "label": "pre-gates-head-drift-log",
+    "command": [
+      "git",
+      "log",
+      "--oneline",
+      "-5"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.004
+  },
+  {
+    "label": "distinct-authorized-yank-roles-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 212.614
+  },
+  {
+    "label": "distinct-authorized-yank-roles-save",
+    "command": [
+      "cp",
+      "crates/maos-registry/src/storage.rs",
+      "/tmp/201b-review-corrections/plants/distinct-authorized-yank-roles.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.01
+  },
+  {
+    "label": "distinct-authorized-yank-roles-plant",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 128.754
+  },
+  {
+    "label": "distinct-authorized-yank-roles-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-review-corrections/plants/distinct-authorized-yank-roles.saved",
+      "crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.021
+  },
+  {
+    "label": "distinct-authorized-yank-roles-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-review-corrections/plants/distinct-authorized-yank-roles.saved",
+      "crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.006
+  },
+  {
+    "label": "distinct-authorized-yank-roles-touch",
+    "command": [
+      "touch",
+      "crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.003
+  },
+  {
+    "label": "final-review-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.065
+  },
+  {
+    "label": "workspace-final-fixtures",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "build-test-fixtures",
+      "--json"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 176.039
+  },
+  {
+    "label": "workspace-final-genuine-build",
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "-p",
+      "maos-cli"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 93.436
+  },
+  {
+    "label": "workspace-cargo-metadata",
+    "command": [
+      "cargo",
+      "metadata",
+      "--locked",
+      "--format-version",
+      "1"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.519
+  },
+  {
+    "label": "metadata-build-origin-field-error",
+    "command": "set -o pipefail && cargo nextest list --locked --workspace --list-type binaries-only --message-format json | tee /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-binaries-metadata.json",
+    "exit_code": 101,
+    "elapsed_seconds": 174.54,
+    "cause": "new dedupe role referenced YankReason.origin; actual authority origin lives in decoded authorization; fixed before new metadata build"
+  },
+  {
+    "label": "role-corrected-registry-focus",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 235.984
+  },
+  {
+    "label": "fully-final-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.119
+  },
+  {
+    "label": "workspace-provisioned-fixtures",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "build-test-fixtures",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 422.382
+  },
+  {
+    "label": "workspace-provisioned-genuine-build",
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "-p",
+      "maos-cli"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 388.53
+  },
+  {
+    "label": "role-final-source-measurement",
+    "command": [
+      "tokei",
+      "--output",
+      "json",
+      "--types",
+      "Rust",
+      "-e",
+      "target",
+      "-e",
+      "tests",
+      "-e",
+      "benches",
+      "-e",
+      "examples",
+      "-e",
+      "fuzz",
+      "-e",
+      "spirits",
+      "-e",
+      "crates/maos-kernel-core/src/memory/spill_test_faults.rs",
+      "."
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.126
+  },
+  {
+    "label": "correction-check-kernel-baseline",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-kernel-baseline",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.163
+  },
+  {
+    "label": "correction-kloc-check",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "kloc-check",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.065
+  },
+  {
+    "label": "correction-check-env-contract",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-env-contract",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.471
+  },
+  {
+    "label": "correction-check-decision-register",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-decision-register",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.011
+  },
+  {
+    "label": "correction-check-test-cost",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-test-cost",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.361
+  },
+  {
+    "label": "workspace-binary-metadata-tool-timeout",
+    "command": "set -o pipefail && cargo nextest list --locked --workspace --list-type binaries-only --message-format json | tee /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-binaries-metadata.json",
+    "exit_code": null,
+    "outcome": "tool deadline interrupted compilation; no test executed",
+    "timeout_seconds": 3000,
+    "elapsed_seconds": 3000.63
+  },
+  {
+    "label": "correction-coverage-matrix",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "coverage-matrix",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.382
+  },
+  {
+    "label": "correction-check-coverage-matrix-completeness",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-coverage-matrix-completeness",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.015
+  },
+  {
+    "label": "correction-check-dev-record-completeness",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-dev-record-completeness",
+      "--json"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.131
+  },
+  {
+    "label": "correction-check-epic-close-coherence",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-epic-close-coherence",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.027
+  },
+  {
+    "label": "correction-check-exit-commands",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-exit-commands",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.676
+  },
+  {
+    "label": "workspace-binary-metadata-completed",
+    "command": "set -o pipefail && cargo nextest list --locked --workspace --list-type binaries-only --message-format json | tee /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-binaries-metadata.json",
+    "exit_code": 0,
+    "elapsed_seconds": 3788.44,
+    "source": "bg_516 completed; continuation of interrupted compilation, no test retry"
+  },
+  {
+    "label": "correction-dev-record-disposition-fixed",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-dev-record-completeness",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.189
+  },
+  {
+    "label": "workspace-nextest-once",
+    "command": [
+      "cargo",
+      "nextest",
+      "run",
+      "--no-fail-fast",
+      "--profile",
+      "ci",
+      "--test-threads",
+      "1",
+      "--cargo-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-cargo-metadata.stdout",
+      "--binaries-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-binaries-metadata.json"
+    ],
+    "exit_code": 100,
+    "elapsed_seconds": 884.179
+  },
+  {
+    "label": "no-default-verb-table",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--no-default-features",
+      "--test",
+      "verb_table_15_3"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 65.536
+  },
+  {
+    "label": "handoff-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.148
+  },
+  {
+    "label": "fr59-fixture-cleanup-focus",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "fr59_yank_propagation_within_5min_test"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 25.743
+  },
+  {
+    "label": "fkcs-and-count-contracts",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "xtask",
+      "--test",
+      "fkcs_oracle",
+      "--test",
+      "d11_xtask_ceiling_ratchet",
+      "--test",
+      "recovery_lane_ceiling_rule"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 68.194
+  },
+  {
+    "label": "handoff-clippy-workspace",
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--locked",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 473.788
+  },
+  {
+    "label": "handoff-clippy-ratchet",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "clippy-ratchet",
+      "--input",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/handoff-clippy-workspace.stdout"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.215
+  },
+  {
+    "label": "workspace-budget-calibrated",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-test-budget",
+      "--json",
+      "--junit",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-junit.xml"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.026
+  },
+  {
+    "label": "fr59-final-focus",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "fr59_yank_propagation_within_5min_test"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 4.037
+  },
+  {
+    "label": "fr59-final-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "fr59_yank_propagation_within_5min_test",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 26.93
+  },
+  {
+    "label": "prepush-default-binaries-restored",
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "-p",
+      "maos-cli"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.069
+  },
+  {
+    "label": "correction-check-fkcs",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-fkcs",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 18.678
+  },
+  {
+    "label": "prepush-once",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "MAOS_17_2_CGROUP_MODE=undelegated",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "prepush",
+      "--json"
+    ],
+    "exit_code": 1,
+    "started_at_unix": 1794081964.022627,
+    "elapsed_seconds": 1536.08
+  },
+  {
+    "label": "budget-pin-contracts-corrected",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "xtask",
+      "--test",
+      "check_test_budget_proven_red"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 45.303
+  },
+  {
+    "label": "handoff-fmt-check",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.857
+  },
+  {
+    "label": "handoff-kloc-check",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "kloc-check",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.049
+  },
+  {
+    "label": "handoff-check-kernel-baseline",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-kernel-baseline",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.011
+  },
+  {
+    "label": "handoff-check-dev-record-completeness",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-dev-record-completeness",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.109
+  },
+  {
+    "label": "handoff-check-epic-close-coherence",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-epic-close-coherence",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.021
+  },
+  {
+    "label": "handoff-check-test-cost",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-test-cost",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.259
+  }
+]

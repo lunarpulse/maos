@@ -221,8 +221,7 @@ impl BinPrivateOps for UnwiredBinOps {
         &self,
         _spirit_id: &str,
         _target_manifest: &Path,
-        _attestation: Option<&str>,
-        _vetter_keyring: Option<&str>,
+        _evidence: maos_bin::operator_door::UpgradeVetting<'_>,
     ) -> Result<(), String> {
         unreachable!("the halt-resolve race never touches the bin-private ops");
     }
@@ -233,8 +232,7 @@ impl BinPrivateOps for UnwiredBinOps {
         _target_manifest: &Path,
         _original_target: &Path,
         _policy: maos_kernel_core::lifecycle::UpgradePolicy,
-        _attestation: Option<&str>,
-        _vetter_keyring: Option<&str>,
+        _evidence: maos_bin::operator_door::UpgradeVetting<'_>,
     ) -> Result<serde_json::Value, maos_bin::operator_door::UpgradeFailure> {
         unreachable!("the halt-resolve race never touches the bin-private ops");
     }

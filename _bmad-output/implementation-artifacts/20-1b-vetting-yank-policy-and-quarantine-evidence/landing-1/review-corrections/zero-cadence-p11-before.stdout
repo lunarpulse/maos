@@ -1,0 +1,11 @@
+
+running 1 test
+test zero_interval_cannot_silently_disable_local_vetting_p11 ... FAILED
+
+failures:
+
+failures:
+    zero_interval_cannot_silently_disable_local_vetting_p11
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 20 filtered out; finished in 0.00s
+

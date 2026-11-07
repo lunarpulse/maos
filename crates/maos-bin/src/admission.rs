@@ -481,47 +481,25 @@ pub struct GatedManifest {
 
 impl GatedManifest {
     pub fn bind_registry_publisher(&mut self, publisher: &[u8; 32]) {
-        use sha2::Digest;
-        let name = if self.spirit_id.len() <= 93 {
-            self.spirit_id.clone()
-        } else {
-            hex::encode(&sha2::Sha256::digest(self.spirit_id.as_bytes())[..16])
-        };
-        self.storage_identity = format!(
-            "{name}:{}",
-            hex::encode(&sha2::Sha256::digest(publisher)[..16])
-        );
+        self.storage_identity =
+            maos_registry::install::publisher_storage_identity(&self.spirit_id, publisher);
     }
 
     /// A signed registry/import sidecar opts into publisher-bound storage.
     /// Ordinary local manifests without a package retain their bare identity.
     pub fn bind_registry_package_at(&mut self, manifest: &Path) -> Result<(), AdmissionRefusal> {
-        let path = manifest
-            .parent()
-            .ok_or_else(|| AdmissionRefusal::Admission {
-                detail: "manifest has no package parent".into(),
-            })?
-            .join("signed_package.json");
-        let bytes = match std::fs::read(path) {
-            Ok(bytes) => bytes,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-            Err(e) => {
-                return Err(AdmissionRefusal::Admission {
-                    detail: e.to_string(),
-                })
-            }
-        };
-        let pkg: maos_domain::ports::registry::SignedPackage = serde_json::from_slice(&bytes)
+        let Some(pkg) = maos_registry::install::signed_package_at(&self.spirit_id, manifest)
             .map_err(|e| AdmissionRefusal::Admission {
                 detail: e.to_string(),
-            })?;
+            })?
+        else {
+            return Ok(());
+        };
         if pkg.manifest_toml != self.manifest_toml.as_bytes()
-            || pkg.spirit_id.as_str() != self.spirit_id
             || pkg.version != self.class_section.version
-            || !maos_registry::admission::verify_publisher_sig(&pkg)
         {
             return Err(AdmissionRefusal::Admission {
-                detail: "registry package identity or signature mismatch".into(),
+                detail: "registry manifest snapshot differs from package".into(),
             });
         }
         self.bind_registry_publisher(&pkg.publisher_pubkey);

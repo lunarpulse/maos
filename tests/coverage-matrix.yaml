@@ -607,7 +607,11 @@ coverage:
       confidentiality, durable same-identity values, owner-correct export and
       identity/legacy forget; butler_scene_18_4.rs tests restore-poison refusal.
       The inline malicious-writer vectors are test corpora, not MANIFEST.toml
-      corpus claims. Same-name identity squatting remains owned by 20-1.
+      corpus claims. 20-1b L1 adds durable publisher/version pins and the real
+      load_admit_start two-process/recycled-PID principal-spill witness in
+      maos-bin/tests/yank_policy_20_1b.rs; its bound-owner erasure witness is
+      registry_bound_principal_is_counted_and_erased_on_uninstall_p3 in
+      erasure_inventory_20_11.rs. Other per-Spirit state is not this claim.
   FR32:
     gates: []
     corpora: []
@@ -666,7 +670,13 @@ coverage:
       Internal-key exact artifact/publisher binding and issuer/revoker machinery:
       maos-registry/tests/vetting_attestation_gate.rs and
       maos-spirit-cli/tests/vet_lifecycle_20_1b.rs (20-1b L1).
-      Running lapse/revocation policy witness: maos-bin/tests/yank_policy_20_1b.rs.
+      Key enrollment/revoke-key is fixture-keyring based, not a shipped operator
+      verb. Role-preimage v2 vectors/refusals are in yank_auth_20_1b.rs.
+      Positive vetted door upgrade/deployed-byte swap refusal:
+      vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9 in
+      maos-bin/tests/one_daemon_one_door_16_1.rs. Actual poller/runtime clock,
+      restart and no-registry late-install lapse observations:
+      maos-bin/tests/yank_policy_20_1b.rs.
       Sticky quarantine effect is not claimed until the final KQ1 landing.
   FR38:
     gates: []
@@ -886,8 +896,14 @@ coverage:
       daemon cursor and install refusal: maos-registry/tests/yank_auth_20_1b.rs,
       yank_cadence_20_1b.rs and maos-cli/tests/spirit_install_20_1.rs.
       Operator policy/cause records: maos-bin/tests/yank_policy_20_1b.rs.
-      First-contact trust/TLS awaits AC15 design ruling; sticky quarantine effect
-      awaits the final KQ1 landing. No accredited-vetter ecosystem claim.
+      URI-bound schema-2 cursors advance only on verified rows, persist partial
+      batches and resync on gaps; role/audience/nonce/lifetime signatures refuse
+      replay rebinding. A rejected row or corrupt install cannot starve a later
+      observation. Existing installed_spirit_dispatch_20_1.rs also enforces a
+      no-registry boot-latency bound without disabling local reevaluation.
+      First-contact trust/TLS D-01/02/03 are ruled A/A/A; execution awaits the
+      separate AC15 handoff. Omitted/rolled-back history is not detected here.
+      Sticky quarantine effect awaits final KQ1; no accredited-vetter claim.
   FR6:
     gates: []
     corpora: []

@@ -1,0 +1,14 @@
+    Checking zeroize v1.8.2
+    Checking subtle v2.6.1
+    Checking getrandom v0.3.4
+    Checking ring v0.17.14
+    Checking tokio v1.53.3
+    Checking serde_cbor v0.11.2
+    Checking curve25519-dalek v4.1.3
+    Checking ed25519-dalek v2.2.0
+    Checking maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain)
+    Checking maos-manifest v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-manifest)
+    Checking maos-mcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-mcp)
+    Checking maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance)
+    Checking maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 26.87s

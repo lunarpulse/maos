@@ -106,16 +106,25 @@ pub fn attestation(
         },
     )
 }
-pub fn yank(name: &str, version: &str, seed: &[u8; 32], origin: YankOrigin) -> serde_json::Value {
+pub fn yank(
+    addr: &str,
+    name: &str,
+    version: &str,
+    seed: &[u8; 32],
+    origin: YankOrigin,
+) -> serde_json::Value {
     let reason = "withdrawn";
     let auth = maos_registry::yank_auth::YankAuthorization::sign(
         seed,
-        name,
-        version,
-        reason,
+        maos_registry::yank_auth::YankScope {
+            name,
+            version,
+            reason,
+            registry_uri: &format!("http://{addr}/mcp"),
+        },
         origin,
         "vetter".into(),
-        10,
+        maos_registry::yank_auth::now_unix_ms().unwrap(),
     )
     .unwrap();
     serde_json::json!({"spirit_id":name,"version":version,"reason":reason,"authorization":auth})

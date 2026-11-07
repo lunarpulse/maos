@@ -410,7 +410,7 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     },
     EnvVar {
         name: "MAOS_REGISTRY_YANK_POLL_INTERVAL_S",
-        purpose: "Yank-poller interval in seconds (0 disables)",
+        purpose: "Yank/local-vetting cadence in seconds (default 300, clamped 30..300; 0 refused)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {

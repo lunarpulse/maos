@@ -1,0 +1,11 @@
+
+running 1 test
+test failing_auto_revoke_retries_policy_without_repeating_observation_p12 ... FAILED
+
+failures:
+
+failures:
+    failing_auto_revoke_retries_policy_without_repeating_observation_p12
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.08s
+

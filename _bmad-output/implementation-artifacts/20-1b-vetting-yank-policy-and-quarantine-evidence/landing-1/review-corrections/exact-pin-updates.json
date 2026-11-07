@@ -1,0 +1,44 @@
+{
+  "baseline": "62faff63",
+  "rows": [
+    {
+      "crate": "maos-bin",
+      "before": 35422,
+      "after": 35626,
+      "delta": 204
+    },
+    {
+      "crate": "maos-registry",
+      "before": 4627,
+      "after": 5071,
+      "delta": 444
+    },
+    {
+      "crate": "maos-spirit-cli",
+      "before": 936,
+      "after": 939,
+      "delta": 3
+    },
+    {
+      "crate": "maos-compliance",
+      "before": 2070,
+      "after": 2077,
+      "delta": 7
+    },
+    {
+      "crate": "maos-audit",
+      "before": 8174,
+      "after": 8179,
+      "delta": 5
+    }
+  ],
+  "aggregate_before": 195738,
+  "aggregate_after": 196401,
+  "hardfail_after": 196402,
+  "kernel_delta": 0,
+  "external_xtask": {
+    "exact_pin": 44696,
+    "driver": "20-2 hosted-3 d84b83dd; +20, unchanged by this correction pass"
+  },
+  "accounting": "includes unknown:spikes144 and unknown:templates11; no source-code relocation"
+}

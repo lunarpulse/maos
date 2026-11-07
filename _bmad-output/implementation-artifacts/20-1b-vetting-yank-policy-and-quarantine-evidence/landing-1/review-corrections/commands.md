@@ -1,0 +1,173 @@
+# Observed correction commands
+
+Exact argv and outcomes; a null exit denotes a tool compilation deadline, not a test result.
+
+- `boot-latency-before`: exit 101; cargo test --locked -p maos-bin --test installed_spirit_dispatch_20_1 installed_component_dispatch_reports_typed_boot_refusal -- --exact --nocapture
+- `boot-latency-profile`: exit 101; cargo test --locked -p maos-bin --test installed_spirit_dispatch_20_1 installed_component_dispatch_reports_typed_boot_refusal -- --exact --nocapture
+- `profile-fixtures`: exit 0; /mnt/build/cargo-maos/debug/xtask build-test-fixtures --only maos-registry-server,maos-spirit,maosctl --json
+- `boot-latency-profile-provisioned`: exit 101; cargo test --locked -p maos-bin --test installed_spirit_dispatch_20_1 installed_component_dispatch_reports_typed_boot_refusal -- --exact --nocapture
+- `profile-restore-main`: exit 0; bash -c 'cp "$1" "$2" && cmp "$1" "$2" && touch "$2"' restore /tmp/201b-review-corrections/profile-main.rs /home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs
+- `profile-restore-yank_policy`: exit 0; bash -c 'cp "$1" "$2" && cmp "$1" "$2" && touch "$2"' restore /tmp/201b-review-corrections/profile-yank_policy.rs /home/lunarpulse/dev_ws/crates/maos-bin/src/yank_policy.rs
+- `profile-restore-yank`: exit 0; bash -c 'cp "$1" "$2" && cmp "$1" "$2" && touch "$2"' restore /tmp/201b-review-corrections/profile-yank.rs /home/lunarpulse/dev_ws/crates/maos-registry/src/yank.rs
+- `published_versions_are_immutable_and_identical_publish_is_idempotent_d3-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b published_versions_are_immutable_and_identical_publish_is_idempotent_d3 -- --exact --nocapture
+- `installed_publisher_and_version_pins_survive_uninstall_d2-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b installed_publisher_and_version_pins_survive_uninstall_d2 -- --exact --nocapture
+- `renewed_promotion_replaces_only_evidence_for_identical_package_d4-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b renewed_promotion_replaces_only_evidence_for_identical_package_d4 -- --exact --nocapture
+- `signed_yank_resigning_does_not_append_duplicate_rows_p13-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b signed_yank_resigning_does_not_append_duplicate_rows_p13 -- --exact --nocapture
+- `unreadable_promotion_is_not_treated_as_absent_p17-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b unreadable_promotion_is_not_treated_as_absent_p17 -- --exact --nocapture
+- `uninstall_waits_for_cross_process_mutation_lock_p8-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b uninstall_waits_for_cross_process_mutation_lock_p8 -- --exact --nocapture
+- `yank_authorization_allows_bounded_clock_skew_p10-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b yank_authorization_allows_bounded_clock_skew_p10 -- --exact --nocapture
+- `missing_home_never_selects_shared_temporary_cursor_p14-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b missing_home_never_selects_shared_temporary_cursor_p14 -- --exact --nocapture
+- `local_reevaluation_failure_does_not_prevent_fetch_p1-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b local_reevaluation_failure_does_not_prevent_fetch_p1 -- --exact --nocapture
+- `signed_yank_cannot_be_replayed_to_another_registry_f4-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b signed_yank_cannot_be_replayed_to_another_registry_f4 -- --exact --nocapture
+- `expired_signed_yank_request_cannot_mutate_registry_f4-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b expired_signed_yank_request_cannot_mutate_registry_f4 -- --exact --nocapture
+- `present-yank-authority-f2-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b install_refuses_present_yank_with_unpinned_authority_f2 -- --exact --nocapture
+- `unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2 -- --exact --nocapture
+- `cursor_from_another_registry_is_replayed_from_zero_p2-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b cursor_from_another_registry_is_replayed_from_zero_p2 -- --exact --nocapture
+- `deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9-before`: exit 101; cargo test --locked -p maos-bin --test yank_policy_20_1b deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9 -- --exact --nocapture
+- `failing_auto_revoke_retries_policy_without_repeating_observation_p12-before`: exit 101; cargo test --locked -p maos-bin --test yank_policy_20_1b failing_auto_revoke_retries_policy_without_repeating_observation_p12 -- --exact --nocapture
+- `signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8-before`: exit 101; cargo test --locked -p maos-bin --test yank_policy_20_1b signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8 -- --exact --nocapture
+- `rejected_vetter_row_does_not_hide_later_publisher_yank_p1-before`: exit 101; cargo test --locked -p maos-bin --test yank_policy_20_1b rejected_vetter_row_does_not_hide_later_publisher_yank_p1 -- --exact --nocapture
+- `uninstalled_unsigned_row_never_advances_authenticated_cursor_f1-before`: exit 101; cargo test --locked -p maos-bin --test yank_policy_20_1b uninstalled_unsigned_row_never_advances_authenticated_cursor_f1 -- --exact --nocapture
+- `corrupt_install_does_not_hide_another_spirits_expiry_p1-before`: exit 101; cargo test --locked -p maos-bin --test yank_policy_20_1b corrupt_install_does_not_hide_another_spirits_expiry_p1 -- --exact --nocapture
+- `zero-cadence-p11-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b zero_interval_cannot_silently_disable_local_vetting_p11 -- --exact --nocapture
+- `publisher-bound-erasure-p3-before`: exit 101; cargo test --locked -p maos-bin --test erasure_inventory_20_11 registry_bound_principal_is_counted_and_erased_on_uninstall_p3 -- --exact --nocapture
+- `vetted-door-upgrade-d1-before`: exit 101; cargo test --locked -p maos-bin --test one_daemon_one_door_16_1 vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9 -- --exact --nocapture
+- `vetted-door-upgrade-d1-before-corrected-cli`: exit 101; cargo test --locked -p maos-bin --test one_daemon_one_door_16_1 vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9 -- --exact --nocapture
+- `blocked-fetch-shutdown-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b blocked_registry_fetch_does_not_block_shutdown_or_boot -- --exact --nocapture
+- `legacy-inactive-pin-d2-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b legacy_inactive_version_pins_are_migrated_before_uninstall_d2 -- --exact --nocapture
+- `attestation-unscoped-role-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b attestation_rejects_unscoped_digest_signature_review_f5 -- --exact --nocapture
+- `keyring-unscoped-role-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b keyring_event_rejects_unscoped_digest_signature_review_f5 -- --exact --nocapture
+- `review-corrections-fmt`: exit 0; cargo fmt --all
+- `registry-review-focused`: exit 0; cargo test --locked -p maos-registry --test yank_auth_20_1b -- --test-threads=1 --nocapture
+- `formatted-source-measurement`: exit 0; tokei --output json --types Rust -e target -e tests -e benches -e examples -e fuzz -e spirits -e crates/maos-kernel-core/src/memory/spill_test_faults.rs .
+- `bin-review-policy-focused`: exit 101; cargo test --locked -p maos-bin --test yank_policy_20_1b -- --test-threads=1 --nocapture
+- `bin-review-policy-harness-failure`: exit 101; cargo test --locked -p maos-bin --test yank_policy_20_1b -- --test-threads=1 --nocapture
+- `bin-review-policy-after-harness-fix`: exit 101; cargo test --locked -p maos-bin --test yank_policy_20_1b -- --test-threads=1 --nocapture
+- `review-fixtures`: exit 0; /mnt/build/cargo-maos/debug/xtask build-test-fixtures --only maosctl,maos-spirit,maos-registry-server --json
+- `review-genuine-journey-build`: exit 0; cargo build --locked -p maos-bin -p maos-cli
+- `bin-review-affected-binaries`: exit 101; cargo test --locked -p maos-bin --test yank_policy_20_1b --test one_daemon_one_door_16_1 --test erasure_inventory_20_11 --test installed_spirit_dispatch_20_1 -- --test-threads=1
+- `verifier-backend-venv`: exit 0; /usr/bin/python3 -m venv --system-site-packages /tmp/201b-review-verifier
+- `verifier-backend-provision`: exit 0; /tmp/201b-review-verifier/bin/python3 -m pip install --no-cache-dir --only-binary=:all: --require-hashes -r tools/verify-erasure/requirements.txt
+- `bin-policy-and-boot-focus`: exit 0; cargo test --locked -p maos-bin --test yank_policy_20_1b --test installed_spirit_dispatch_20_1 -- --test-threads=1
+- `door-vetted-upgrade-after`: exit 0; cargo test --locked -p maos-bin --test one_daemon_one_door_16_1 vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9 -- --exact --nocapture
+- `install-and-vet-cli-affected`: exit 0; cargo test --locked -p maos-cli --test spirit_install_20_1 -p maos-spirit-cli --test vet_lifecycle_20_1b -- --test-threads=1
+- `compliance-vetting-unit`: exit 0; cargo test --locked -p maos-compliance --lib vetting:: -- --test-threads=1
+- `storage-orthogonal-guards-save`: exit 0; cp crates/maos-registry/src/storage.rs /tmp/201b-review-corrections/plants/storage-orthogonal-guards.saved
+- `storage-orthogonal-guards-plant`: exit 100; cargo nextest run --locked -p maos-registry --test yank_auth_20_1b --no-fail-fast --test-threads 1 -E 'test(=installed_publisher_and_version_pins_survive_uninstall_d2) | test(=published_versions_are_immutable_and_identical_publish_is_idempotent_d3) | test(=renewed_promotion_replaces_only_evidence_for_identical_package_d4) | test(=uninstall_waits_for_cross_process_mutation_lock_p8) | test(=signed_yank_resigning_does_not_append_duplicate_rows_p13) | test(=signed_nonce_cannot_be_reused_for_another_withdrawal_f4)'
+- `origin-plant-fixtures`: exit 0; /mnt/build/cargo-maos/debug/xtask build-test-fixtures --only maosctl,maos-spirit,maos-registry-server --json
+- `same-key-other-registry-origin-plant`: exit 101; cargo test --locked -p maos-cli --test spirit_install_20_1 installed_version_is_immutable_ac14 -- --exact --nocapture
+- `storage-orthogonal-guards-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/storage-orthogonal-guards.saved crates/maos-registry/src/storage.rs
+- `storage-orthogonal-guards-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/storage-orthogonal-guards.saved crates/maos-registry/src/storage.rs
+- `storage-orthogonal-guards-touch`: exit 0; touch crates/maos-registry/src/storage.rs
+- `legacy-inactive-pin-import-plant`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b legacy_inactive_version_pins_are_migrated_before_uninstall_d2 -- --exact --nocapture
+- `legacy-inactive-pin-import-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/storage-orthogonal-guards.saved crates/maos-registry/src/storage.rs
+- `legacy-inactive-pin-import-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/storage-orthogonal-guards.saved crates/maos-registry/src/storage.rs
+- `legacy-inactive-pin-import-touch`: exit 0; touch crates/maos-registry/src/storage.rs
+- `poller-orthogonal-guards-save`: exit 0; cp crates/maos-registry/src/yank.rs /tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved
+- `poller-orthogonal-guards-plant`: exit 100; cargo nextest run --locked -p maos-registry --test yank_auth_20_1b --no-fail-fast --test-threads 1 -E 'test(=local_reevaluation_failure_does_not_prevent_fetch_p1) | test(=unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2) | test(=cursor_from_another_registry_is_replayed_from_zero_p2) | test(=verified_cursor_is_persisted_before_later_transient_failure_p2) | test(=zero_interval_cannot_silently_disable_local_vetting_p11) | test(=missing_home_never_selects_shared_temporary_cursor_p14)'
+- `poller-orthogonal-guards-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved crates/maos-registry/src/yank.rs
+- `poller-orthogonal-guards-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved crates/maos-registry/src/yank.rs
+- `poller-orthogonal-guards-touch`: exit 0; touch crates/maos-registry/src/yank.rs
+- `runtime-orthogonal-guards-save`: exit 0; cp crates/maos-bin/src/yank_policy.rs /tmp/201b-review-corrections/plants/runtime-orthogonal-guards.saved
+- `runtime-orthogonal-guards-plant`: exit 100; cargo nextest run --locked -p maos-bin --test yank_policy_20_1b --no-fail-fast --test-threads 1 -E 'test(=rejected_vetter_row_does_not_hide_later_publisher_yank_p1) | test(=uninstalled_unsigned_row_never_advances_authenticated_cursor_f1) | test(=poller_runtime_clock_and_cursor_restart_reach_expiry_p6) | test(=signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8) | test(=failing_auto_revoke_retries_policy_without_repeating_observation_p12)'
+- `runtime-orthogonal-guards-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/runtime-orthogonal-guards.saved crates/maos-bin/src/yank_policy.rs
+- `runtime-orthogonal-guards-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/runtime-orthogonal-guards.saved crates/maos-bin/src/yank_policy.rs
+- `runtime-orthogonal-guards-touch`: exit 0; touch crates/maos-bin/src/yank_policy.rs
+- `rejected-row-starvation-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved crates/maos-registry/src/yank.rs
+- `rejected-row-starvation-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved crates/maos-registry/src/yank.rs
+- `rejected-row-starvation-touch`: exit 0; touch crates/maos-registry/src/yank.rs
+- `role-preimage-guards-save`: exit 0; cp crates/maos-compliance/src/vetting/mod.rs /tmp/201b-review-corrections/plants/role-preimage-guards.saved
+- `audience-and-clock-guards-save`: exit 0; cp crates/maos-registry/src/yank_auth.rs /tmp/201b-review-corrections/plants/audience-and-clock-guards.saved
+- `signature-role-audience-and-clock-plants`: exit 100; cargo nextest run --locked -p maos-registry --test yank_auth_20_1b --no-fail-fast --test-threads 1 -E 'test(=attestation_rejects_unscoped_digest_signature_review_f5) | test(=keyring_event_rejects_unscoped_digest_signature_review_f5) | test(=signed_yank_cannot_be_replayed_to_another_registry_f4) | test(=expired_signed_yank_request_cannot_mutate_registry_f4) | test(=yank_authorization_allows_bounded_clock_skew_p10)'
+- `role-preimage-guards-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/role-preimage-guards.saved crates/maos-compliance/src/vetting/mod.rs
+- `role-preimage-guards-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/role-preimage-guards.saved crates/maos-compliance/src/vetting/mod.rs
+- `role-preimage-guards-touch`: exit 0; touch crates/maos-compliance/src/vetting/mod.rs
+- `audience-and-clock-guards-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/audience-and-clock-guards.saved crates/maos-registry/src/yank_auth.rs
+- `audience-and-clock-guards-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/audience-and-clock-guards.saved crates/maos-registry/src/yank_auth.rs
+- `audience-and-clock-guards-touch`: exit 0; touch crates/maos-registry/src/yank_auth.rs
+- `deployed-promotion-yank-guards-save`: exit 0; cp crates/maos-registry/src/install.rs /tmp/201b-review-corrections/plants/deployed-promotion-yank-guards.saved
+- `deployed-promotion-yank-guards-plant`: exit 100; cargo nextest run --locked -p maos-registry -p maos-bin --test yank_auth_20_1b --test yank_policy_20_1b --no-fail-fast --test-threads 1 -E 'test(=install_refuses_present_yank_with_unpinned_authority_f2) | test(=unreadable_promotion_is_not_treated_as_absent_p17) | test(=deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9)'
+- `deployed-promotion-yank-guards-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/deployed-promotion-yank-guards.saved crates/maos-registry/src/install.rs
+- `deployed-promotion-yank-guards-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/deployed-promotion-yank-guards.saved crates/maos-registry/src/install.rs
+- `deployed-promotion-yank-guards-touch`: exit 0; touch crates/maos-registry/src/install.rs
+- `production-spill-binding-save`: exit 0; cp crates/maos-bin/src/admission.rs /tmp/201b-review-corrections/plants/production-spill-binding.saved
+- `explicit-door-package-save`: exit 0; cp crates/maos-bin/src/operator_door.rs /tmp/201b-review-corrections/plants/explicit-door-package.saved
+- `erasure-and-boot-drain-save`: exit 0; cp crates/maos-bin/src/main.rs /tmp/201b-review-corrections/plants/erasure-and-boot-drain.saved
+- `bin-guard-plant-fixtures`: exit 0; /mnt/build/cargo-maos/debug/xtask build-test-fixtures --only maosctl,maos-spirit,maos-registry-server --json
+- `production-admission-door-erasure-boot-plants`: exit 100; cargo nextest run --locked -p maos-bin --test yank_policy_20_1b --test one_daemon_one_door_16_1 --test erasure_inventory_20_11 --test installed_spirit_dispatch_20_1 --no-fail-fast --test-threads 1 -E 'test(=registry_publishers_cannot_share_principal_spill_ac10) | test(=vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9) | test(=registry_bound_principal_is_counted_and_erased_on_uninstall_p3) | test(=installed_component_dispatch_reports_typed_boot_refusal)'
+- `production-spill-binding-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/production-spill-binding.saved crates/maos-bin/src/admission.rs
+- `production-spill-binding-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/production-spill-binding.saved crates/maos-bin/src/admission.rs
+- `production-spill-binding-touch`: exit 0; touch crates/maos-bin/src/admission.rs
+- `explicit-door-package-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/explicit-door-package.saved crates/maos-bin/src/operator_door.rs
+- `explicit-door-package-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/explicit-door-package.saved crates/maos-bin/src/operator_door.rs
+- `explicit-door-package-touch`: exit 0; touch crates/maos-bin/src/operator_door.rs
+- `erasure-and-boot-drain-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/erasure-and-boot-drain.saved crates/maos-bin/src/main.rs
+- `erasure-and-boot-drain-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/erasure-and-boot-drain.saved crates/maos-bin/src/main.rs
+- `erasure-and-boot-drain-touch`: exit 0; touch crates/maos-bin/src/main.rs
+- `environment-serialization-save`: exit 0; cp crates/maos-registry/tests/yank_auth_20_1b.rs /tmp/201b-review-corrections/plants/environment-serialization.saved
+- `faithful-erasure-and-shell-drain-plants`: exit 100; cargo nextest run --locked -p maos-bin --test erasure_inventory_20_11 --test installed_spirit_dispatch_20_1 --no-fail-fast --test-threads 1 -E 'test(=registry_bound_principal_is_counted_and_erased_on_uninstall_p3) | test(=installed_component_dispatch_reports_typed_boot_refusal)'
+- `faithful-erasure-and-shell-drain-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/erasure-and-boot-drain.saved crates/maos-bin/src/main.rs
+- `faithful-erasure-and-shell-drain-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/erasure-and-boot-drain.saved crates/maos-bin/src/main.rs
+- `faithful-erasure-and-shell-drain-touch`: exit 0; touch crates/maos-bin/src/main.rs
+- `environment-serialization-plant`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b every_registry_auth_test_holds_the_shared_environment_mutex_p15 -- --exact --nocapture
+- `environment-serialization-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/environment-serialization.saved crates/maos-registry/tests/yank_auth_20_1b.rs
+- `environment-serialization-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/environment-serialization.saved crates/maos-registry/tests/yank_auth_20_1b.rs
+- `environment-serialization-touch`: exit 0; touch crates/maos-registry/tests/yank_auth_20_1b.rs
+- `post-plant-fmt`: exit 0; cargo fmt --all
+- `blocked-transport-shutdown-plant`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b blocked_registry_fetch_does_not_block_shutdown_or_boot -- --exact --nocapture
+- `blocked-transport-shutdown-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved crates/maos-registry/src/yank.rs
+- `blocked-transport-shutdown-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/poller-orthogonal-guards.saved crates/maos-registry/src/yank.rs
+- `blocked-transport-shutdown-touch`: exit 0; touch crates/maos-registry/src/yank.rs
+- `review-clippy-workspace`: exit 0; cargo clippy --workspace --all-targets --locked --message-format=json
+- `review-clippy-ratchet`: exit 0; /mnt/build/cargo-maos/debug/xtask clippy-ratchet --input /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/review-clippy-workspace.stdout
+- `final-formatted-source-measurement`: exit 0; tokei --output json --types Rust -e target -e tests -e benches -e examples -e fuzz -e spirits -e crates/maos-kernel-core/src/memory/spill_test_faults.rs .
+- `pre-gates-head-drift-log`: exit 0; git log --oneline -5
+- `distinct-authorized-yank-roles-before`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13 -- --exact --nocapture
+- `distinct-authorized-yank-roles-save`: exit 0; cp crates/maos-registry/src/storage.rs /tmp/201b-review-corrections/plants/distinct-authorized-yank-roles.saved
+- `distinct-authorized-yank-roles-plant`: exit 101; cargo test --locked -p maos-registry --test yank_auth_20_1b signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13 -- --exact --nocapture
+- `distinct-authorized-yank-roles-copyback`: exit 0; cp /tmp/201b-review-corrections/plants/distinct-authorized-yank-roles.saved crates/maos-registry/src/storage.rs
+- `distinct-authorized-yank-roles-cmp`: exit 0; cmp /tmp/201b-review-corrections/plants/distinct-authorized-yank-roles.saved crates/maos-registry/src/storage.rs
+- `distinct-authorized-yank-roles-touch`: exit 0; touch crates/maos-registry/src/storage.rs
+- `final-review-fmt`: exit 0; cargo fmt --all
+- `workspace-final-fixtures`: exit 1; /mnt/build/cargo-maos/debug/xtask build-test-fixtures --json
+- `workspace-final-genuine-build`: exit 101; cargo build --locked -p maos-bin -p maos-cli
+- `workspace-cargo-metadata`: exit 0; cargo metadata --locked --format-version 1
+- `metadata-build-origin-field-error`: exit 101; set -o pipefail && cargo nextest list --locked --workspace --list-type binaries-only --message-format json | tee /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-binaries-metadata.json
+- `role-corrected-registry-focus`: exit 0; cargo test --locked -p maos-registry --test yank_auth_20_1b -- --test-threads=1 --nocapture
+- `fully-final-fmt`: exit 0; cargo fmt --all
+- `workspace-provisioned-fixtures`: exit 0; /mnt/build/cargo-maos/debug/xtask build-test-fixtures --json
+- `workspace-provisioned-genuine-build`: exit 0; cargo build --locked -p maos-bin -p maos-cli
+- `role-final-source-measurement`: exit 0; tokei --output json --types Rust -e target -e tests -e benches -e examples -e fuzz -e spirits -e crates/maos-kernel-core/src/memory/spill_test_faults.rs .
+- `correction-check-kernel-baseline`: exit 0; /mnt/build/cargo-maos/debug/xtask check-kernel-baseline --json
+- `correction-kloc-check`: exit 0; /mnt/build/cargo-maos/debug/xtask kloc-check --json
+- `correction-check-env-contract`: exit 0; /mnt/build/cargo-maos/debug/xtask check-env-contract --json
+- `correction-check-decision-register`: exit 0; /mnt/build/cargo-maos/debug/xtask check-decision-register --json
+- `correction-check-test-cost`: exit 0; /mnt/build/cargo-maos/debug/xtask check-test-cost --json
+- `workspace-binary-metadata-tool-timeout`: exit None; set -o pipefail && cargo nextest list --locked --workspace --list-type binaries-only --message-format json | tee /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-binaries-metadata.json
+- `correction-coverage-matrix`: exit 0; /mnt/build/cargo-maos/debug/xtask coverage-matrix --json
+- `correction-check-coverage-matrix-completeness`: exit 0; /mnt/build/cargo-maos/debug/xtask check-coverage-matrix-completeness --json
+- `correction-check-dev-record-completeness`: exit 1; /mnt/build/cargo-maos/debug/xtask check-dev-record-completeness --json
+- `correction-check-epic-close-coherence`: exit 0; /mnt/build/cargo-maos/debug/xtask check-epic-close-coherence --json
+- `correction-check-exit-commands`: exit 0; /mnt/build/cargo-maos/debug/xtask check-exit-commands --json
+- `workspace-binary-metadata-completed`: exit 0; set -o pipefail && cargo nextest list --locked --workspace --list-type binaries-only --message-format json | tee /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-binaries-metadata.json
+- `correction-dev-record-disposition-fixed`: exit 0; /mnt/build/cargo-maos/debug/xtask check-dev-record-completeness --json
+- `workspace-nextest-once`: exit 100; cargo nextest run --no-fail-fast --profile ci --test-threads 1 --cargo-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-cargo-metadata.stdout --binaries-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-binaries-metadata.json
+- `no-default-verb-table`: exit 0; cargo test --locked -p maos-bin --no-default-features --test verb_table_15_3
+- `handoff-fmt`: exit 0; cargo fmt --all
+- `fr59-fixture-cleanup-focus`: exit 0; cargo test --locked -p maos-registry --test fr59_yank_propagation_within_5min_test
+- `fkcs-and-count-contracts`: exit 0; cargo test --locked -p xtask --test fkcs_oracle --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule
+- `handoff-clippy-workspace`: exit 0; cargo clippy --workspace --all-targets --locked --message-format=json
+- `handoff-clippy-ratchet`: exit 0; /mnt/build/cargo-maos/debug/xtask clippy-ratchet --input /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/handoff-clippy-workspace.stdout
+- `workspace-budget-calibrated`: exit 1; /mnt/build/cargo-maos/debug/xtask check-test-budget --json --junit /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-junit.xml
+- `fr59-final-focus`: exit 0; cargo test --locked -p maos-registry --test fr59_yank_propagation_within_5min_test
+- `fr59-final-clippy`: exit 0; cargo clippy --locked -p maos-registry --test fr59_yank_propagation_within_5min_test --message-format=json
+- `prepush-default-binaries-restored`: exit 0; cargo build --locked -p maos-bin -p maos-cli
+- `correction-check-fkcs`: exit 0; /mnt/build/cargo-maos/debug/xtask check-fkcs --json
+- `prepush-once`: exit 1; env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask MAOS_17_2_CGROUP_MODE=undelegated /mnt/build/cargo-maos/debug/xtask prepush --json
+- `budget-pin-contracts-corrected`: exit 0; cargo test --locked -p xtask --test check_test_budget_proven_red
+- `handoff-fmt-check`: exit 0; cargo fmt --all -- --check
+- `handoff-kloc-check`: exit 0; /mnt/build/cargo-maos/debug/xtask kloc-check --json
+- `handoff-check-kernel-baseline`: exit 0; /mnt/build/cargo-maos/debug/xtask check-kernel-baseline --json
+- `handoff-check-dev-record-completeness`: exit 0; /mnt/build/cargo-maos/debug/xtask check-dev-record-completeness --json
+- `handoff-check-epic-close-coherence`: exit 0; /mnt/build/cargo-maos/debug/xtask check-epic-close-coherence --json
+- `handoff-check-test-cost`: exit 0; /mnt/build/cargo-maos/debug/xtask check-test-cost --json

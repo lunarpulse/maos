@@ -1,0 +1,11 @@
+
+running 1 test
+test unreadable_promotion_is_not_treated_as_absent_p17 ... FAILED
+
+failures:
+
+failures:
+    unreadable_promotion_is_not_treated_as_absent_p17
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.26s
+

@@ -1,0 +1,34 @@
+
+running 17 tests
+test ac1_category_evidence_is_required_by_both_verifiers ... FAILED
+test ac1_principal_free_distillate_gets_a_signed_proof ... ok
+test ac2_all_boots_and_pid_reuse_are_isolated ... ok
+test ac2_empty_query_is_verified_empty_when_only_package_remains ... ok
+test ac2_held_derivation_and_installed_package_are_retained ... ok
+test ac2_principal_and_principal_free_lineage_are_both_erased ... ok
+test ac4_failed_proof_write_keeps_installed_package ... ok
+test ac4_installed_package_and_schedule_are_queried_without_principals ... ok
+test ac7_archive_and_authored_skill_are_named_and_counted ... ok
+test registry_bound_principal_is_counted_and_erased_on_uninstall_p3 ... ok
+test review_f1_cross_boot_pid_reuse_preserves_other_stable_owner ... ok
+test review_f1_legacy_numeric_owner_is_a_named_gap_not_an_erasure ... ok
+test review_f1_same_boot_after_exit_preserves_other_stable_owner_and_lineage ... ok
+test review_p5_partial_delete_retains_complete_generation_and_signed_real_erasures ... ok
+test review_p6_nonappendable_lifecycle_journal_retains_package_and_partial_proof ... ok
+test review_p7_corrupt_admission_does_not_become_installed_unknown ... ok
+test review_pending_uninstall_repeat_recovers_subject_scope_after_index_deletion ... ok
+
+failures:
+
+---- ac1_category_evidence_is_required_by_both_verifiers stdout ----
+
+thread 'ac1_category_evidence_is_required_by_both_verifiers' (4098424) panicked at crates/maos-bin/tests/erasure_inventory_20_11.rs:292:5:
+assertion failed: Command::new("python3").arg(&verifier).arg(&path).arg(&pubkey).status().expect("python verifier").success()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    ac1_category_evidence_is_required_by_both_verifiers
+
+test result: FAILED. 16 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.79s
+

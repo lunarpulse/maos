@@ -1,0 +1,19 @@
+{
+  "label": "workspace-nextest-once",
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "--no-fail-fast",
+    "--profile",
+    "ci",
+    "--test-threads",
+    "1",
+    "--cargo-metadata",
+    "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-cargo-metadata.stdout",
+    "--binaries-metadata",
+    "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/workspace-binaries-metadata.json"
+  ],
+  "exit_code": 100,
+  "elapsed_seconds": 884.179
+}

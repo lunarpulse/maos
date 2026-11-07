@@ -1,0 +1,9 @@
+
+running 4 tests
+test fr59_301s_violates ... ok
+test fr59_300s_boundary_passes ... ok
+test fr59_poll_interval_resolver_clamps_correctly ... ok
+test fr59_yank_propagates_within_5min_window ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

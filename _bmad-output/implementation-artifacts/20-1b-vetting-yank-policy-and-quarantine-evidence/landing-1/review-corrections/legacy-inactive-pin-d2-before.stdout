@@ -1,0 +1,11 @@
+
+running 1 test
+test legacy_inactive_version_pins_are_migrated_before_uninstall_d2 ... FAILED
+
+failures:
+
+failures:
+    legacy_inactive_version_pins_are_migrated_before_uninstall_d2
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 25 filtered out; finished in 0.60s
+

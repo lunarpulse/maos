@@ -24,9 +24,12 @@
 # `pkgid` are `// cargo-query:` instead and need no row.
 
 default_seconds = 30
-# total_seconds 800 -> 1100 (x1.25 of 880.6 s hosted CI sum, run 40955589411 @ cf78d16e): E19 wave-2 adds
-# the T3 Worker/queue/effect-oracle vectors (19-2, 19-3, 19-6); recalibrate on the landing junit.
-total_seconds = 1100
+# 20-1b/Main calibration ruling 2026-11-07: CI max governs, not local runner speed.
+# Hosted42336032162 sum1151.8s (pre-boot-fix); local post-fix JUnit3015a808
+# sum880.766s. ceil(1151.8 * 1.25)=1440; no per-binary exception changes.
+# Record the next green hosted sum and re-tighten under 20-7's rule-10 review row.
+# Prior: 800 -> 1100 from hosted40955589411 sum880.6s, E19 wave-2 vectors.
+total_seconds = 1440
 
 # Story 18-5-context-token-budget-accounting: context_budget_18_5,
 # context_refusal_18_5, context_signal_18_5, context_budget_gate_18_5 and

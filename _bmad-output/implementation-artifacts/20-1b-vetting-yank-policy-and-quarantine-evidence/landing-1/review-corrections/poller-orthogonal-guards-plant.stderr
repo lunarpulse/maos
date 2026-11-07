@@ -1,0 +1,220 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+   Compiling maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:179:27
+    |
+179 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `registry_uri`
+   --> crates/maos-registry/src/yank.rs:295:20
+    |
+295 | pub fn load_cursor(registry_uri: &str) -> std::io::Result<Option<YankCursorFile>> {
+    |                    ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_registry_uri`
+
+warning: `maos-registry` (lib) generated 5 warnings (run `cargo fix --lib -p maos-registry` to apply 5 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.64s
+────────────
+ Nextest run ID 2baa28ad-b1c3-4da6-9009-37ed3b0791b5 with nextest profile: default
+    Starting 6 tests across 1 binary (24 tests skipped)
+        FAIL [   0.017s] (1/6) maos-registry::yank_auth_20_1b cursor_from_another_registry_is_replayed_from_zero_p2
+  stdout ───
+
+    running 1 test
+    test cursor_from_another_registry_is_replayed_from_zero_p2 ... FAILED
+
+    failures:
+
+    failures:
+        cursor_from_another_registry_is_replayed_from_zero_p2
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.01s
+
+  stderr ───
+
+    thread 'cursor_from_another_registry_is_replayed_from_zero_p2' (4114142) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:959:5:
+    assertion `left == right` failed: a registry A cursor must not blind registry B
+      left: 500
+     right: 0
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.003s] (2/6) maos-registry::yank_auth_20_1b local_reevaluation_failure_does_not_prevent_fetch_p1
+  stdout ───
+
+    running 1 test
+    test local_reevaluation_failure_does_not_prevent_fetch_p1 ... FAILED
+
+    failures:
+
+    failures:
+        local_reevaluation_failure_does_not_prevent_fetch_p1
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'local_reevaluation_failure_does_not_prevent_fetch_p1' (4114144) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:741:35:
+    called `Result::unwrap()` on an `Err` value: Transport("one corrupt local promotion")
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.003s] (3/6) maos-registry::yank_auth_20_1b missing_home_never_selects_shared_temporary_cursor_p14
+  stdout ───
+
+    running 1 test
+    test missing_home_never_selects_shared_temporary_cursor_p14 ... FAILED
+
+    failures:
+
+    failures:
+        missing_home_never_selects_shared_temporary_cursor_p14
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'missing_home_never_selects_shared_temporary_cursor_p14' (4114146) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:700:5:
+    no HOME must refuse cursor persistence, not select shared /tmp
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.003s] (4/6) maos-registry::yank_auth_20_1b unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2
+  stdout ───
+
+    running 1 test
+    test unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2 ... FAILED
+
+    failures:
+
+    failures:
+        unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2' (4114148) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:921:5:
+    assertion `left == right` failed: an unsigned sequence must not poison the authenticated cursor
+      left: [18446744073709551615]
+     right: [1]
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.003s] (5/6) maos-registry::yank_auth_20_1b verified_cursor_is_persisted_before_later_transient_failure_p2
+  stdout ───
+
+    running 1 test
+    test verified_cursor_is_persisted_before_later_transient_failure_p2 ... FAILED
+
+    failures:
+
+    failures:
+        verified_cursor_is_persisted_before_later_transient_failure_p2
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'verified_cursor_is_persisted_before_later_transient_failure_p2' (4114150) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:1468:5:
+    assertion `left == right` failed: the first verified row must survive a later per-row transient failure
+      left: 0
+     right: 1
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.003s] (6/6) maos-registry::yank_auth_20_1b zero_interval_cannot_silently_disable_local_vetting_p11
+  stdout ───
+
+    running 1 test
+    test zero_interval_cannot_silently_disable_local_vetting_p11 ... FAILED
+
+    failures:
+
+    failures:
+        zero_interval_cannot_silently_disable_local_vetting_p11
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'zero_interval_cannot_silently_disable_local_vetting_p11' (4114152) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:972:5:
+    zero cadence must be refused, not silently disable promotion expiry
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary [   0.034s] 6 tests run: 0 passed, 6 failed, 24 skipped
+        FAIL [   0.017s] (1/6) maos-registry::yank_auth_20_1b cursor_from_another_registry_is_replayed_from_zero_p2
+        FAIL [   0.003s] (2/6) maos-registry::yank_auth_20_1b local_reevaluation_failure_does_not_prevent_fetch_p1
+        FAIL [   0.003s] (3/6) maos-registry::yank_auth_20_1b missing_home_never_selects_shared_temporary_cursor_p14
+        FAIL [   0.003s] (4/6) maos-registry::yank_auth_20_1b unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2
+        FAIL [   0.003s] (5/6) maos-registry::yank_auth_20_1b verified_cursor_is_persisted_before_later_transient_failure_p2
+        FAIL [   0.003s] (6/6) maos-registry::yank_auth_20_1b zero_interval_cannot_silently_disable_local_vetting_p11
+error: test run failed

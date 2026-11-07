@@ -20,18 +20,22 @@ impl YankSource for Source {
         result
     }
 }
-struct Observer(AtomicBool);
+struct Observer(AtomicBool, String);
 impl YankObserver for Observer {
-    fn on_yank(&self, entry: &YankEntry) -> Result<(), RegistryError> {
+    fn on_yank(
+        &self,
+        entry: &YankEntry,
+    ) -> Result<maos_registry::yank::YankDisposition, RegistryError> {
         maos_registry::yank_auth::verify_entry(
             entry,
             &trust::public(&trust::PUBLISHER),
             None,
+            &self.1,
             maos_registry::yank_auth::now_unix_ms().map_err(RegistryError::Transport)?,
         )
         .map_err(RegistryError::Transport)?;
         self.0.store(true, Ordering::SeqCst);
-        Ok(())
+        Ok(maos_registry::yank::YankDisposition::Verified)
     }
 }
 #[tokio::test]
@@ -58,13 +62,20 @@ async fn signed_yank_crosses_real_server_at_30_second_floor_ac7() {
         .unwrap(),
         polls: AtomicUsize::new(0),
     });
-    let observer = Arc::new(Observer(AtomicBool::new(false)));
-    let stop = Arc::new(AtomicBool::new(false));
-    let interval = maos_registry::yank::resolve_poll_interval();
+    let observer = Arc::new(Observer(
+        AtomicBool::new(false),
+        format!("http://{}/mcp", server.addr),
+    ));
+    let (stop, stopped) = tokio::sync::watch::channel(false);
+    let interval = maos_registry::yank::resolve_poll_interval().unwrap();
     assert_eq!(interval.as_secs(), 30);
     let task = tokio::spawn(maos_registry::yank::yank_poller_production_loop(
-        Arc::new(YankPoller::new(source.clone(), observer.clone())),
-        stop.clone(),
+        Arc::new(YankPoller::new(
+            source.clone(),
+            observer.clone(),
+            format!("http://{}/mcp", server.addr),
+        )),
+        stopped,
         interval,
     ));
     tokio::time::timeout(std::time::Duration::from_secs(2), async {
@@ -78,7 +89,13 @@ async fn signed_yank_crosses_real_server_at_30_second_floor_ac7() {
     assert!(support::rpc(
         &server.addr,
         "registry.deprecate",
-        trust::yank("cadence", "1.0.0", &trust::PUBLISHER, YankOrigin::Publisher)
+        trust::yank(
+            &server.addr,
+            "cadence",
+            "1.0.0",
+            &trust::PUBLISHER,
+            YankOrigin::Publisher
+        )
     )
     .get("result")
     .is_some());
@@ -88,7 +105,7 @@ async fn signed_yank_crosses_real_server_at_30_second_floor_ac7() {
         }
     })
     .await;
-    stop.store(true, Ordering::SeqCst);
+    stop.send(true).unwrap();
     task.await.unwrap();
     propagation.expect("signed yank must arrive on the next clamped production poll");
     assert!(start.elapsed().as_secs() <= 35);

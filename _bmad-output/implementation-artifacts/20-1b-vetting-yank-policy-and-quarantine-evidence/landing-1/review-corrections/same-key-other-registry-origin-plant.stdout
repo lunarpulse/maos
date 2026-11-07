@@ -1,0 +1,11 @@
+
+running 1 test
+test installed_version_is_immutable_ac14 ... FAILED
+
+failures:
+
+failures:
+    installed_version_is_immutable_ac14
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.50s
+

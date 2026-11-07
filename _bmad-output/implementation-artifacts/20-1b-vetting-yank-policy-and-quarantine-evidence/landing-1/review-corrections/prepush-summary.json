@@ -1,0 +1,141 @@
+{
+  "command": {
+    "label": "prepush-once",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "MAOS_17_2_CGROUP_MODE=undelegated",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "prepush",
+      "--json"
+    ],
+    "exit_code": 1,
+    "started_at_unix": 1794081964.022627,
+    "elapsed_seconds": 1536.08
+  },
+  "junit_attributes": {
+    "name": "nextest-run",
+    "tests": "5753",
+    "skipped": "0",
+    "failures": "3",
+    "errors": "0",
+    "uuid": "1cab18a7-0a75-4d94-a47b-aede06a29283",
+    "timestamp": "2026-11-07T20:22:21.502+00:00",
+    "time": "100.035"
+  },
+  "sum_seconds": "1186.373",
+  "failures": [
+    {
+      "binary": "maos-bin::erasure_million_20_11",
+      "test": "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption",
+      "time": "45.123",
+      "failure": "thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (325478) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:\npending operation did not finish: op-42ab8baa6e4114403862e51f\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n   1: core::panicking::panic_fmt\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n   2: door_scan_with_continuous_writer\n             at ./tests/erasure_million_20_11.rs:186:17\n   3: erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption\n             at ./tests/erasure_million_20_11.rs:20:5\n   4: erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption::{closure#0}\n             at ./tests/erasure_million_20_11.rs:19:76\n   5: <erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption::{closure#0} as core::ops::function::FnOnce<()>>::call_once\n             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5\n   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace."
+    },
+    {
+      "binary": "xtask::check_test_budget_proven_red",
+      "test": "the_committed_register_parses",
+      "time": "0.099",
+      "failure": "thread 'the_committed_register_parses' (332454) panicked at xtask/tests/check_test_budget_proven_red.rs:271:5:\nassertion `left == right` failed\n  left: 1440.0\n right: 1100.0\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n   1: core::panicking::panic_fmt\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n   2: core::panicking::assert_failed_inner\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:439:17\n   3: core::panicking::assert_failed::<f64, f64>\n             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5\n   4: the_committed_register_parses\n             at ./tests/check_test_budget_proven_red.rs:271:5\n   5: check_test_budget_proven_red::the_committed_register_parses::{closure#0}\n             at ./tests/check_test_budget_proven_red.rs:265:35\n   6: <check_test_budget_proven_red::the_committed_register_parses::{closure#0} as core::ops::function::FnOnce<()>>::call_once\n             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5\n   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace."
+    },
+    {
+      "binary": "xtask::check_test_budget_proven_red",
+      "test": "hosted_1_model_currency_calibration_changes_only_its_binary_budget",
+      "time": "0.108",
+      "failure": "thread 'hosted_1_model_currency_calibration_changes_only_its_binary_budget' (332452) panicked at xtask/tests/check_test_budget_proven_red.rs:288:5:\nassertion `left == right` failed\n  left: 1440.0\n right: 1100.0\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n   1: core::panicking::panic_fmt\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n   2: core::panicking::assert_failed_inner\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:439:17\n   3: core::panicking::assert_failed::<f64, f64>\n             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5\n   4: hosted_1_model_currency_calibration_changes_only_its_binary_budget\n             at ./tests/check_test_budget_proven_red.rs:288:5\n   5: check_test_budget_proven_red::hosted_1_model_currency_calibration_changes_only_its_binary_budget::{closure#0}\n             at ./tests/check_test_budget_proven_red.rs:275:72\n   6: <check_test_budget_proven_red::hosted_1_model_currency_calibration_changes_only_its_binary_budget::{closure#0} as core::ops::function::FnOnce<()>>::call_once\n             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5\n   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace."
+    }
+  ],
+  "status_counts": {
+    "pass": 82,
+    "skip": 8,
+    "red": 1,
+    "advisory": 1
+  },
+  "non_pass_records": [
+    {
+      "check": "docs:build",
+      "artifact": "docs-site/build",
+      "status": "skip",
+      "detail": "no docs-site/**, docs/errors/** or xtask/error-catalog.toml changes",
+      "wall_ms": 0
+    },
+    {
+      "check": "docs:routes",
+      "artifact": "docs-site/build / route-manifest.json",
+      "status": "skip",
+      "detail": "no docs-site/**, docs/errors/** or xtask/error-catalog.toml changes",
+      "wall_ms": 0
+    },
+    {
+      "check": "cargo-deny",
+      "artifact": "Cargo.lock / deny.toml (required cargo-deny)",
+      "status": "skip",
+      "detail": "neither Cargo.lock nor deny.toml changed",
+      "wall_ms": 0
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "status": "red",
+      "detail": "expected exit 0, actual exit status: 100; 35379 lines omitted; thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (325103) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:86:9: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (325103) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (325103) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (325103) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (325103) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'tokio-rt-worker' (325354) panicked at crates/maos-kernel-core/tests/crash_detector_in_process_panic.rs:16:9: thread 'tokio-rt-worker' (325938) panicked at crates/maos-kernel-core/tests/halt_carry_20_3c.rs:190:9: thread 'tokio-rt-worker' (326026) panicked at crates/maos-kernel-core/tests/hook_dispatch_budget_envelope.rs:41:13: thread 'tokio-rt-worker' (326066) panicked at crates/maos-kernel-core/tests/hot_swap_cross_major_migration.rs:42:9: thread 'tokio-rt-worker' (326403) panicked at crates/maos-kernel-core/tests/loaded_spirit_exit_16_6.rs:43:13: thread 'tokio-rt-worker' (326404) panicked at crates/maos-kernel-core/tests/loaded_spirit_exit_16_6.rs:43:13: thread 'fixture_replay::tests::empty_ring_panics' (328400) panicked at crates/maos-providers/src/fixture_replay.rs:47:13: thread 'sibling_provenance_refuses_an_unrecorded_executable' (328687) panicked at crates/maos-registry/tests/../../../tests/harness/fixtures.rs:57:5: thread 'assert_no_deprecations_panics_when_warnings_present' (329837) panicked at crates/maos-spirit-sdk/tests/deprecation_warnings_smoke.rs:112:5: thread 'assert_panics_message_contains_file_line_and_suggested_fix' (329917) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:34:9: thread 'expect_frame_bytes_exact_fails_on_mismatch' (329927) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:112:5: thread 'assert_panics_on_false_with_diagnostics' (329919) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:28:5: thread 'assert_diagnostic_stable_output' (329921) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:227:9: thread 'expect_frame_closest_diff_byte_correct' (329932) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:251:9: thread 'expect_frame_panics_on_no_match' (329937) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:81:5: thread 'expect_halt_panics_on_no_match' (329941) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:160:5: thread 'gate_otel_airgap_default_off_no_connects' (330021) panicked at crates/maos-telemetry/tests/otel_gates.rs:171:13: thread 'gate_otel_airgap_default_off_no_connects' (330128) panicked at crates/maos-telemetry/tests/otel_gates.rs:173:52: thread 'gate_otel_airgap_default_off_no_connects' (330188) panicked at crates/maos-telemetry/tests/otel_gates.rs:173:52: thread 'gate_otel_airgap_default_off_no_connects' (330224) panicked at crates/maos-telemetry/tests/otel_gates.rs:175:13: thread 'gate_otel_airgap_default_off_no_connects' (330283) panicked at crates/maos-telemetry/tests/otel_gates.rs:175:13: thread 'gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field' (331533) panicked at xtask/src/gate_common.rs:670:13: FAIL [ 0.099s] (4613/5753) xtask::check_test_budget_proven_red the_committed_register_parses FAIL [ 0.108s] (4614/5753) xtask::check_test_budget_proven_red hosted_1_model_currency_calibration_changes_only_its_binary_budget thread 'expansion_defaults_only_job_results' (337613) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'expansion_defaults_only_job_results' (337613) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'expansion_defaults_only_job_results' (337613) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field' (338650) panicked at xtask/src/gate_common.rs:670:13: FAIL [ 45.123s] (5719/5753) maos-bin::erasure_million_20_11 ac5_million_row_pending_forget_finishes_and_repeats_without_corruption FAIL [ 0.099s] (4613/5753) xtask::check_test_budget_proven_red the_committed_register_parses thread 'the_committed_register_parses' (332454) panicked at xtask/tests/check_test_budget_proven_red.rs:271:5: FAIL [ 0.108s] (4614/5753) xtask::check_test_budget_proven_red hosted_1_model_currency_calibration_changes_only_its_binary_budget thread 'hosted_1_model_currency_calibration_changes_only_its_binary_budget' (332452) panicked at xtask/tests/check_test_budget_proven_red.rs:288:5: FAIL [ 45.123s] (5719/5753) maos-bin::erasure_million_20_11 ac5_million_row_pending_forget_finishes_and_repeats_without_corruption thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (325478) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:",
+      "wall_ms": 813802
+    },
+    {
+      "check": "test-budget",
+      "artifact": "/mnt/build/cargo-maos/nextest/default/junit.xml",
+      "status": "advisory",
+      "detail": "expected exit 0, actual exit status: 1; 0 lines omitted; {\"gate\":\"check-test-budget\",\"passed\":false,\"junit\":\"/mnt/build/cargo-maos/nextest/default/junit.xml\",\"binaries\":613,\"total_span_seconds\":546.947005033493,\"total_sum_seconds\":1186.3729999999987,\"findings\":[\"butler::hallucination took 30.229 s (\u03a3 per-test time) over 5 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml\",\"maos-bin::erasur ::error::check-test-budget: FAIL \u2014 5 finding(s): - butler::hallucination took 30.229 s (\u03a3 per-test time) over 5 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::erasure_uninstall_13_5b took 34.447 s (\u03a3 per-test time) over 26 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::hook_pump_17_4 took 32.110 s (\u03a3 per-test time) over 26 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::one_daemon_one_door_16_1 took 37.776 s (\u03a3 per-test time) over 43 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-iac::participant_recall_17_8 took 44.916 s (\u03a3 per-test time) over 29 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml check-test-budget: FAIL \u2014 5 finding(s): - butler::hallucination took 30.229 s (\u03a3 per-test time) over 5 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::erasure_uninstall_13_5b took 34.447 s (\u03a3 per-test time) over 26 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::hook_pump_17_4 took 32.110 s (\u03a3 per-test time) over 26 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::one_daemon_one_door_16_1 took 37.776 s (\u03a3 per-test time) over 43 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-iac::participant_recall_17_8 took 44.916 s (\u03a3 per-test time) over 29 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+      "wall_ms": 89
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"SCOPED-VERDICT \": 1 static emission sites; pin 8 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"GOVERNED-ATOMIC \": 1 static emission sites; pin 10 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"HOSTILE-LIFTING \": 1 static emission sites; pin 2 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"HOSTILE-LIFTING-CONTROL \": 1 static emission sites; pin 1 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"RUNNER-SIGSYS \": 1 static emission sites; pin 2 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    }
+  ],
+  "selected_count": 66,
+  "selected_passed": 66,
+  "post_run_correction": {
+    "tests": "xtask::check_test_budget_proven_red the_committed_register_parses and hosted_1_model_currency_calibration_changes_only_its_binary_budget",
+    "cause": "two hardcoded1100 assertions not coupled to ruled1440 during initial calibration edit",
+    "repair": "both updated1440; entire focused binary14/14 passes, budget-pin-contracts-corrected exit0",
+    "prepush_repeated": false
+  },
+  "million_route_lines": [
+    "EC-13 route rows=1000000 wall=10.005223439s response=HandlerStillRunning { operation_id: \"op-42ab8baa6e4114403862e51f\" }",
+    "EC-13 pending rows=1000000 operation_id=op-42ab8baa6e4114403862e51f"
+  ]
+}

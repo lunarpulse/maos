@@ -7,15 +7,16 @@
 //! §7.3 audit root).
 //!
 //! Each lifecycle event is an envelope signed by the **operator root** over
-//! `sha256(canonical_cbor(event_claim))`. The [`VetterKeyring`] is the ordered,
+//! the v2 key-event-role digest of canonical CBOR. The [`VetterKeyring`] is the ordered,
 //! append-only journal of these events; [`VetterKeyring::verify_enrollment`]
 //! walks it to prove a vetter key was vouched for (enrolled, operator-root
 //! signed, predating issuance) and not revoked.
 
-use super::{ed25519_sign, ed25519_verify, VettingRejection};
-use crate::canonical_cbor::sha256;
+use super::{ed25519_sign, ed25519_verify, signing_digest, VettingRejection};
 use maos_domain::revocation::{semver_range_contains, RevocationOrigin, SignedRevocationList};
 use maos_spirit_abi::compliance::SigningAlg;
+
+const SIGNING_DOMAIN: &[u8] = b"maos.vetting.key-event.v2";
 
 /// The lifecycle verb for a vetter key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -56,7 +57,7 @@ pub struct VetterKeyEventClaim {
 /// operator root. Mirrors the attestation envelope shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VetterKeyEvent {
-    /// Ed25519 signature over `sha256(event_bytes)` by the operator root.
+    /// Ed25519 signature over the v2 key-event-role digest by the operator root.
     pub signature: [u8; 64],
     /// The operator-root public key that signed this event.
     pub operator_pubkey: [u8; 32],
@@ -117,7 +118,7 @@ pub fn encode_event(claim: &VetterKeyEventClaim) -> Vec<u8> {
 pub fn issue_event(operator_seed: &[u8; 32], claim: &VetterKeyEventClaim) -> VetterKeyEvent {
     use super::ed25519_pubkey;
     let event_bytes = encode_event(claim);
-    let sign_bytes = sha256(&event_bytes);
+    let sign_bytes = signing_digest(SIGNING_DOMAIN, &event_bytes);
     let signature = ed25519_sign(operator_seed, &sign_bytes);
     VetterKeyEvent {
         signature,
@@ -177,7 +178,7 @@ impl VetterKeyring {
         {
             return Err(VettingRejection::OperatorRootSignatureInvalid);
         }
-        let sign_bytes = sha256(&event.event_bytes);
+        let sign_bytes = signing_digest(SIGNING_DOMAIN, &event.event_bytes);
         if !ed25519_verify(&self.operator_root_pubkey, &sign_bytes, &event.signature) {
             return Err(VettingRejection::OperatorRootSignatureInvalid);
         }

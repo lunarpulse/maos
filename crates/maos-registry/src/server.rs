@@ -124,7 +124,7 @@ impl SpiritRegistryServer {
             .local_addr()
             .map_err(|e| format!("local_addr: {e}"))?;
         if !addr.ip().is_loopback() {
-            return Err("development registry requires a loopback bind; authenticated first-contact/TLS policy awaits AC15 ruling".into());
+            return Err("development registry requires a loopback bind; authenticated first-contact/TLS implementation is held for AC15".into());
         }
         listener.set_nonblocking(true).map_err(|e| e.to_string())?;
         eprintln!("maos-registry: listening on {addr}");
@@ -190,6 +190,7 @@ pub struct RegistryServerArgs {
     pub signing_key: Option<std::path::PathBuf>,
     pub vetter_keyring: Option<std::path::PathBuf>,
     pub operator_root: Option<String>,
+    pub release_pin: Option<String>,
 }
 
 impl RegistryServerArgs {
@@ -204,6 +205,7 @@ impl RegistryServerArgs {
                 "--signing-key" => result.signing_key = Some(value.into()),
                 "--vetter-keyring" => result.vetter_keyring = Some(value.into()),
                 "--operator-root" => result.operator_root = Some(value),
+                "release-pin" => result.release_pin = Some(value),
                 _ => return Err(format!("unknown registry flag {flag}")),
             }
         }
@@ -211,6 +213,11 @@ impl RegistryServerArgs {
     }
 
     pub fn build(self) -> Result<SpiritRegistryServer, String> {
+        if self.release_pin.is_some() {
+            return Err(
+                "release-pin is a standalone local operator verb, not a server mode".into(),
+            );
+        }
         let storage = match self.root {
             Some(root) => crate::storage::LocalFsRegistryStorage::at_path(root),
             None => crate::storage::LocalFsRegistryStorage::new(),
@@ -309,6 +316,7 @@ fn handle_connection(
         }
     };
 
+    let registry_uri = format!("http://{}/mcp", stream.local_addr()?);
     let handle_result = |method: &str,
                          params: &serde_json::Value|
      -> Result<serde_json::Value, String> {
@@ -339,6 +347,7 @@ fn handle_connection(
                 handlers::deprecate::handle_deprecate(
                     &storage,
                     &args,
+                    &registry_uri,
                     vetters.as_deref().map(|(keyring, root)| (keyring, root)),
                 )
             }

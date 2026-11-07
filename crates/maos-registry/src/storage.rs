@@ -17,13 +17,38 @@
 //!         compliance_claim.envelope
 //!   index.json
 //!   yanks.json
+//!   installed-pins.json  # publisher + version digests; survives uninstall
 //! ```
 
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct InstalledPin {
+    publisher: [u8; 32],
+    versions: BTreeMap<String, [u8; 32]>,
+}
+
+fn package_digest(pkg: &SignedPackage) -> Result<[u8; 32], StorageError> {
+    struct Writer(Sha256);
+    impl io::Write for Writer {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.0.update(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut writer = Writer(Sha256::new());
+    serde_json::to_writer(&mut writer, pkg).map_err(|e| StorageError::Serde(e.to_string()))?;
+    Ok(writer.0.finalize().into())
+}
 
 use maos_domain::ports::registry::{
     SearchQuery, SearchResultItem, SearchResults, SignedArtifact, SignedManifest, SignedPackage,
@@ -114,6 +139,7 @@ pub struct PendingPackageUninstall {
     installs: BTreeMap<String, String>,
     removed: Option<(String, String)>,
     _serializer: std::sync::MutexGuard<'static, ()>,
+    _mutation_lock: fs::File,
     backup: Option<fs::File>,
     deleted: bool,
     restored: bool,
@@ -288,10 +314,16 @@ impl LocalFsRegistryStorage {
             .lock()
             .unwrap_or_else(|error| error.into_inner());
         let root = Self::default_root();
+        let storage = Self::at_path(root.clone()).map_err(|e| StorageError::Io(e.to_string()))?;
+        let mutation_lock = storage.mutation_lock()?;
         let mut installs = Self::load_installs(&root)?;
         let Some(generation) = installs.remove(spirit_id) else {
             return Ok(None);
         };
+        let mut pins = Self::load_pins_at(&root)?;
+        if storage.import_legacy_pin(spirit_id, &mut pins)? {
+            write_json_atomic(&root.join("installed-pins.json"), &pins)?;
+        }
         Self::installed_manifests_at(&root)?;
         let directory = root.join("installed").join(spirit_id);
         let staged = root.join(format!(".uninstall-{spirit_id}-{}", unique_suffix()));
@@ -326,6 +358,7 @@ impl LocalFsRegistryStorage {
             installs,
             removed: Some((spirit_id.to_owned(), generation)),
             _serializer: serializer,
+            _mutation_lock: mutation_lock,
             backup,
             deleted: false,
             restored: false,
@@ -363,10 +396,107 @@ impl LocalFsRegistryStorage {
         rustix::fs::flock(&file, rustix::fs::FlockOperation::LockExclusive)
             .map_err(|e| StorageError::Io(e.to_string()))?;
         #[cfg(not(unix))]
-        return Err(StorageError::Io(
-            "registry mutation locking requires Unix".into(),
-        ));
-        Ok(file)
+        {
+            Err(StorageError::Io(
+                "registry mutation locking requires Unix".into(),
+            ))
+        }
+        #[cfg(unix)]
+        {
+            Ok(file)
+        }
+    }
+
+    fn load_pins_at(root: &Path) -> Result<BTreeMap<String, InstalledPin>, StorageError> {
+        match fs::File::open(root.join("installed-pins.json")) {
+            Ok(file) => serde_json::from_reader(io::BufReader::new(file))
+                .map_err(|e| StorageError::Serde(e.to_string())),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(BTreeMap::new()),
+            Err(e) => Err(StorageError::Io(e.to_string())),
+        }
+    }
+
+    /// Durable trust state is independent of installed generation lifetime.
+    pub fn default_installed_publisher(name: &str) -> Result<Option<[u8; 32]>, StorageError> {
+        path_segment(name)?;
+        Ok(Self::load_pins_at(&Self::default_root())?
+            .get(name)
+            .map(|pin| pin.publisher))
+    }
+
+    /// Explicit local operator authority; uninstall never invokes this verb.
+    pub fn release_installed_pin(&self, name: &str) -> Result<bool, StorageError> {
+        path_segment(name)?;
+        let _serializer = INSTALLED_UNINSTALL
+            .lock()
+            .map_err(|e| StorageError::Io(e.to_string()))?;
+        let _lock = self.mutation_lock()?;
+        let mut pins = Self::load_pins_at(&self.root)?;
+        let removed = pins.remove(name).is_some();
+        if removed {
+            write_json_atomic(&self.root.join("installed-pins.json"), &pins)?;
+        }
+        Ok(removed)
+    }
+
+    /// First use after cutover imports ALL retained signed versions. Ordinary
+    /// installs then use the ledger; historical artifact decoding is not repeated.
+    fn import_legacy_pin(
+        &self,
+        name: &str,
+        pins: &mut BTreeMap<String, InstalledPin>,
+    ) -> Result<bool, StorageError> {
+        if pins.contains_key(name) {
+            return Ok(false);
+        }
+        let generations = match fs::read_dir(self.root.join("installed").join(name)) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(false),
+            Err(e) => return Err(StorageError::Io(e.to_string())),
+        };
+        let mut imported: Option<InstalledPin> = None;
+        for generation in generations {
+            let path = generation
+                .map_err(|e| StorageError::Io(e.to_string()))?
+                .path()
+                .join("signed_package.json");
+            let file = match fs::File::open(path) {
+                Ok(file) => file,
+                Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(StorageError::Io(e.to_string())),
+            };
+            let pkg: SignedPackage = serde_json::from_reader(io::BufReader::new(file))
+                .map_err(|e| StorageError::Serde(e.to_string()))?;
+            if pkg.spirit_id.as_str() != name || !crate::admission::verify_publisher_sig(&pkg) {
+                return Err(StorageError::Serde(
+                    "invalid legacy installed signed package".into(),
+                ));
+            }
+            let pin = imported.get_or_insert_with(|| InstalledPin {
+                publisher: pkg.publisher_pubkey,
+                versions: BTreeMap::new(),
+            });
+            if pin.publisher != pkg.publisher_pubkey {
+                return Err(StorageError::PublisherMismatch(name.into()));
+            }
+            let digest = package_digest(&pkg)?;
+            if pin
+                .versions
+                .get(&pkg.version)
+                .is_some_and(|stored| stored != &digest)
+            {
+                return Err(StorageError::ImmutableVersion {
+                    spirit_id: name.into(),
+                    version: pkg.version,
+                });
+            }
+            pin.versions.insert(pkg.version, digest);
+        }
+        if let Some(pin) = imported {
+            pins.insert(name.into(), pin);
+            return Ok(true);
+        }
+        Ok(false)
     }
 
     /// Pin across every version, including inactive installed generations.
@@ -427,6 +557,33 @@ impl LocalFsRegistryStorage {
             .lock()
             .map_err(|e| StorageError::Io(e.to_string()))?;
         let _lock = self.mutation_lock()?;
+        let mut pins = Self::load_pins_at(&self.root)?;
+        let imported = self.import_legacy_pin(pkg.spirit_id.as_str(), &mut pins)?;
+        let digest = package_digest(pkg)?;
+        if let Some(pin) = pins.get(pkg.spirit_id.as_str()) {
+            if pin.publisher != pkg.publisher_pubkey {
+                return Err(StorageError::PublisherMismatch(
+                    pkg.spirit_id.as_str().into(),
+                ));
+            }
+            if pin
+                .versions
+                .get(&pkg.version)
+                .is_some_and(|stored| stored != &digest)
+            {
+                return Err(StorageError::ImmutableVersion {
+                    spirit_id: pkg.spirit_id.as_str().into(),
+                    version: pkg.version.clone(),
+                });
+            }
+        }
+        let pin = pins
+            .entry(pkg.spirit_id.as_str().into())
+            .or_insert_with(|| InstalledPin {
+                publisher: pkg.publisher_pubkey,
+                versions: BTreeMap::new(),
+            });
+        let pins_changed = pin.versions.insert(pkg.version.clone(), digest).is_none() || imported;
         let parent = self.root.join("installed").join(pkg.spirit_id.as_str());
         if let Some(directory) = Self::check_publisher(&parent, pkg)? {
             let stored: SignedPackage = serde_json::from_slice(
@@ -445,19 +602,13 @@ impl LocalFsRegistryStorage {
                     version: pkg.version.clone(),
                 });
             }
-            let stored_vetting = match fs::read(directory.join("vetting.json")) {
-                Ok(bytes) => Some(
-                    serde_json::from_slice::<crate::install::InstalledVetting>(&bytes)
-                        .map_err(|e| StorageError::Serde(e.to_string()))?,
-                ),
-                Err(e) if e.kind() == io::ErrorKind::NotFound => None,
-                Err(e) => return Err(StorageError::Io(e.to_string())),
-            };
-            if stored_vetting.as_ref() != vetting {
-                return Err(StorageError::ImmutableVersion {
-                    spirit_id: pkg.spirit_id.as_str().into(),
-                    version: pkg.version.clone(),
-                });
+            // Evidence can be renewed, but the immutable package and origin
+            // above cannot change. The install entry point verifies new evidence.
+            if let Some(vetting) = vetting {
+                write_json_atomic(&directory.join("vetting.json"), vetting)?;
+            }
+            if pins_changed {
+                write_json_atomic(&self.root.join("installed-pins.json"), &pins)?;
             }
             let relative = directory
                 .strip_prefix(self.root.join("installed"))
@@ -494,6 +645,9 @@ impl LocalFsRegistryStorage {
             write_json_atomic(&directory.join("origin.json"), origin)?;
             if let Some(vetting) = vetting {
                 write_json_atomic(&directory.join("vetting.json"), vetting)?;
+            }
+            if pins_changed {
+                write_json_atomic(&self.root.join("installed-pins.json"), &pins)?;
             }
             let mut installs = Self::load_installs(&self.root)?;
             installs.insert(
@@ -597,9 +751,28 @@ impl RegistryStorage for LocalFsRegistryStorage {
             ));
         }
         let _lock = self.mutation_lock()?;
-        let _ = Self::check_publisher(&self.spirit_dir(spirit_id)?, pkg)?;
-        fs::create_dir_all(&vdir).map_err(|e| StorageError::Io(e.to_string()))?;
-        Self::write_package(&vdir, pkg)?;
+        if let Some(directory) = Self::check_publisher(&self.spirit_dir(spirit_id)?, pkg)? {
+            let stored: SignedPackage = serde_json::from_reader(io::BufReader::new(
+                fs::File::open(directory.join("signed_package.json"))
+                    .map_err(|e| StorageError::Io(e.to_string()))?,
+            ))
+            .map_err(|e| StorageError::Serde(e.to_string()))?;
+            if stored != *pkg {
+                return Err(StorageError::ImmutableVersion {
+                    spirit_id: spirit_id.as_str().into(),
+                    version: version.into(),
+                });
+            }
+        } else {
+            let parent = self.spirit_dir(spirit_id)?;
+            fs::create_dir_all(&parent).map_err(|e| StorageError::Io(e.to_string()))?;
+            let staged = tempfile::Builder::new()
+                .prefix(".publish-")
+                .tempdir_in(&self.root)
+                .map_err(|e| StorageError::Io(e.to_string()))?;
+            Self::write_package(staged.path(), pkg)?;
+            fs::rename(staged.path(), &vdir).map_err(|e| StorageError::Io(e.to_string()))?;
+        }
 
         let mut idx = self
             .index
@@ -608,7 +781,9 @@ impl RegistryStorage for LocalFsRegistryStorage {
         let name = spirit_id.as_str();
         let previous = idx.get(name).cloned();
         let items = idx.entry(name.to_owned()).or_default();
-        items.retain(|i| i.version != version);
+        if items.iter().any(|item| item.version == version) {
+            return Ok(());
+        }
         items.push(SearchResultItem::new(
             spirit_id.clone(),
             version.to_owned(),
@@ -758,10 +933,39 @@ impl RegistryStorage for LocalFsRegistryStorage {
             .lock()
             .map_err(|e| StorageError::Io(e.to_string()))?;
         *yanks = Self::load_yanks(&self.root).map_err(|e| StorageError::Io(e.to_string()))?;
+        let authorization = reason
+            .authorization
+            .as_deref()
+            .map(crate::yank_auth::decode)
+            .transpose()
+            .map_err(StorageError::Serde)?;
+        let signer = authorization.as_ref().map(|auth| auth.public_key);
+        if let Some(auth) = &authorization {
+            for entry in &*yanks {
+                if let Ok(stored) = crate::yank_auth::decode(&entry.authorization) {
+                    if stored.public_key == auth.public_key
+                        && stored.nonce == auth.nonce
+                        && (entry.spirit_id != *spirit_id
+                            || entry.version != version
+                            || entry.reason != reason.summary
+                            || stored.origin != auth.origin
+                            || stored.registry_uri != auth.registry_uri)
+                    {
+                        return Err(StorageError::Serde(
+                            "yank nonce reused for another withdrawal".into(),
+                        ));
+                    }
+                }
+            }
+        }
         if let Some(existing) = yanks.iter().find(|e| {
             e.spirit_id == *spirit_id
                 && e.version == version
-                && e.authorization.as_slice() == reason.authorization.as_deref().unwrap_or(&[])
+                && e.origin == authorization.as_ref().map(|auth| auth.origin)
+                && crate::yank_auth::decode(&e.authorization)
+                    .ok()
+                    .map(|auth| auth.public_key)
+                    == signer
         }) {
             return Ok(YankReceipt::new(
                 format!("yank-{}", existing.sequence),
@@ -971,7 +1175,7 @@ pub enum StorageError {
     InvalidSegment(String),
     #[error("publisher key differs from pinned owner for '{0}'")]
     PublisherMismatch(String),
-    #[error("installed version '{spirit_id}@{version}' is immutable")]
+    #[error("version '{spirit_id}@{version}' is immutable")]
     ImmutableVersion { spirit_id: String, version: String },
 }
 

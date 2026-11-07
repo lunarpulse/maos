@@ -4,21 +4,21 @@
 //!
 //! The envelope mirrors `maos_spirit_abi::compliance::ComplianceClaimEnvelope`
 //! exactly (hand-rolled fixed-array serde over `[u8;64]` / `[u8;32]`) so it
-//! round-trips byte-stably, and — like that envelope — the signature covers
-//! `sha256(claim_bytes)` rather than the CBOR directly, keeping verification
-//! independent of claim parsing.
+//! round-trips byte-stably. Signature-preimage v2 covers a role-domain-framed
+//! SHA-256 digest of the on-wire claim, independently of claim parsing.
 
 use maos_spirit_abi::compliance::{SigningAlg, TrustTier};
 
-use super::{ed25519_pubkey, ed25519_sign, ed25519_verify, VettingRejection};
-use crate::canonical_cbor::sha256;
+use super::{ed25519_pubkey, ed25519_sign, ed25519_verify, signing_digest, VettingRejection};
+
+const SIGNING_DOMAIN: &[u8] = b"maos.vetting.attestation.v2";
 
 /// An Ed25519-signed vetting attestation — the `public-vetted` promotion
 /// **artifact** (ADR-056, AC1). Presence of a valid attestation is what
 /// promotes a Spirit; there is no mutable registry flag.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VettingAttestation {
-    /// Ed25519 signature over `sha256(claim_bytes)`. 64 bytes.
+    /// Ed25519 signature over the v2 attestation-role digest. 64 bytes.
     pub signature: [u8; 64],
     /// Ed25519 public key of the vetter that signed. 32 bytes. This is the
     /// cryptographic identity the verify chain resolves against the keyring.
@@ -150,10 +150,10 @@ pub fn decode_claim(bytes: &[u8]) -> Result<VettingClaim, String> {
 
 /// Issue (sign) a vetting attestation with a raw 32-byte vetter Ed25519 seed.
 ///
-/// Sets `vetter_pubkey` from the seed and signs `sha256(canonical_cbor(claim))`.
+/// Sets `vetter_pubkey` from the seed and signs the v2 attestation-role digest.
 pub fn issue_attestation(vetter_seed: &[u8; 32], claim: &VettingClaim) -> VettingAttestation {
     let claim_bytes = encode_claim(claim);
-    let sign_bytes = sha256(&claim_bytes);
+    let sign_bytes = signing_digest(SIGNING_DOMAIN, &claim_bytes);
     let signature = ed25519_sign(vetter_seed, &sign_bytes);
     let vetter_pubkey = ed25519_pubkey(vetter_seed);
     VettingAttestation {
@@ -165,7 +165,7 @@ pub fn issue_attestation(vetter_seed: &[u8; 32], claim: &VettingClaim) -> Vettin
 }
 
 /// Verify ONLY the attestation's own signature and decode its claim — the
-/// codec-independent step. Re-derives `sha256` over the on-wire `claim_bytes`
+/// codec-independent step. Re-derives the v2 role digest over on-wire bytes
 /// and checks the Ed25519 signature under `vetter_pubkey`; then decodes the
 /// claim. Does NOT walk the enrollment chain (that is [`super::verify_attestation`]).
 pub fn verify_attestation_signature(
@@ -174,7 +174,7 @@ pub fn verify_attestation_signature(
     if att.signing_alg != SigningAlg::Ed25519 {
         return Err(VettingRejection::UnsupportedSigningAlg);
     }
-    let sign_bytes = sha256(&att.claim_bytes);
+    let sign_bytes = signing_digest(SIGNING_DOMAIN, &att.claim_bytes);
     if !ed25519_verify(&att.vetter_pubkey, &sign_bytes, &att.signature) {
         return Err(VettingRejection::ForgedSignature);
     }

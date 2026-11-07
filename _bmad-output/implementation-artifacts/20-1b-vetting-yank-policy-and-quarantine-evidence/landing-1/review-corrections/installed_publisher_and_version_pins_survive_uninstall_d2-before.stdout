@@ -1,0 +1,11 @@
+
+running 1 test
+test installed_publisher_and_version_pins_survive_uninstall_d2 ... FAILED
+
+failures:
+
+failures:
+    installed_publisher_and_version_pins_survive_uninstall_d2
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.51s
+

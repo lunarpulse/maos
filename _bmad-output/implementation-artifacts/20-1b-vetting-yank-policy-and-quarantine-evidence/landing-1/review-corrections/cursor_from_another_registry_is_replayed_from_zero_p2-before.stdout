@@ -1,0 +1,11 @@
+
+running 1 test
+test cursor_from_another_registry_is_replayed_from_zero_p2 ... FAILED
+
+failures:
+
+failures:
+    cursor_from_another_registry_is_replayed_from_zero_p2
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.01s
+

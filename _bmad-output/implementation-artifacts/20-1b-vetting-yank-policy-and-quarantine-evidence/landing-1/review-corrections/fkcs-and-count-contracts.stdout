@@ -1,0 +1,47 @@
+
+running 9 tests
+test ceiling_raise_after_every_numbered_epic_is_done_reds ... ok
+test ceiling_raise_citing_a_done_story_reds ... ok
+test ceiling_raise_citing_an_open_story_passes ... ok
+test ceiling_raise_without_a_story_citation_reds ... ok
+test the_tree_bound_inputs_exist ... ok
+test the_ceiling_is_not_frozen_while_a_numbered_epic_is_open ... ok
+test the_live_xtask_ceiling_cites_a_real_sprint_story ... ok
+test the_retirement_row_matches_its_exact_story_arrow ... ok
+test planted_current_row_raises_cannot_borrow_historical_or_done_grants ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+
+running 11 tests
+test diff_oracle_derives_kernel_unchanged_and_ignores_self_reported_flags ... ok
+test diff_oracle_ignores_forged_self_report_even_when_it_claims_red ... ok
+test diff_oracle_reports_kernel_unchanged_for_identical_surfaces ... ok
+test disposition_inline_parser_extracts_phase_keys_and_rejects_malformed_stanzas ... ok
+test oracle_fault_injections_red_kernel_unchanged_around_a_stable_base ... ok
+test phase_disposition_inherits_downward_and_resolves_the_blocking_window ... ok
+test read_disposition_extracts_exactly_the_check_fkcs_stanza ... ok
+test frozen_baseline_files_carry_real_public_surfaces_not_synthetic_tokens ... ok
+test every_declared_admission_file_reds_a_one_byte_mutation ... ok
+test frozen_baseline_reconciles_live_triple_and_rejects_src_line_drift ... ok
+test frozen_snapshot_and_current_kernel_baselines_are_independently_valid ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+
+running 12 tests
+test a_raise_citing_a_shipped_story_is_refused ... ok
+test a_raise_citing_an_absent_story_is_refused ... ok
+test a_raise_with_no_cited_story_is_refused ... ok
+test kernel_core_is_outside_the_easing ... ok
+test lowering_is_always_allowed_even_for_kernel_core_and_even_when_sealed ... ok
+test the_easing_is_real_any_crate_may_raise_citing_an_open_story ... ok
+test the_lane_seals_when_every_numbered_epic_is_done ... ok
+test crossing_the_adr_069_alarm_is_acknowledged_in_the_row ... ok
+test kernel_core_ceiling_stays_inside_the_adr_069_envelope ... ok
+test kernel_core_ceiling_has_not_moved_under_the_easing ... ok
+test the_lane_is_not_sealed_while_a_numbered_epic_is_open ... ok
+test the_tree_bound_inputs_exist ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

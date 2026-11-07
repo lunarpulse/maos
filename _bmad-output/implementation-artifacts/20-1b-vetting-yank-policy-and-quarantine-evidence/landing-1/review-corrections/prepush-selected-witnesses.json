@@ -1,0 +1,332 @@
+[
+  {
+    "binary": "maos-bin::erasure_inventory_20_11",
+    "test": "registry_bound_principal_is_counted_and_erased_on_uninstall_p3",
+    "passed": true
+  },
+  {
+    "binary": "maos-bin::installed_spirit_dispatch_20_1",
+    "test": "installed_component_dispatch_reports_typed_boot_refusal",
+    "passed": true
+  },
+  {
+    "binary": "maos-bin::installed_spirit_dispatch_20_1",
+    "test": "boot_rechecks_manifest_component_publisher_and_claim",
+    "passed": true
+  },
+  {
+    "binary": "maos-bin::one_daemon_one_door_16_1",
+    "test": "vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9",
+    "passed": true
+  },
+  {
+    "binary": "maos-bin::yank_policy_20_1b",
+    "test": "deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9",
+    "passed": true
+  },
+  {
+    "binary": "maos-bin::yank_policy_20_1b",
+    "test": "no_registry_local_timer_discovers_promotion_installed_after_start_p11",
+    "passed": true
+  },
+  {
+    "binary": "maos-bin::yank_policy_20_1b",
+    "test": "corrupt_install_does_not_hide_another_spirits_expiry_p1",
+    "passed": true
+  },
+  {
+    "binary": "maos-bin::yank_policy_20_1b",
+    "test": "rejected_vetter_row_does_not_hide_later_publisher_yank_p1",
+    "passed": true
+  },
+  {
+    "binary": "maos-bin::yank_policy_20_1b",
+    "test": "poller_runtime_clock_and_cursor_restart_reach_expiry_p6",
+    "passed": true
+  },
+  {
+    "binary": "maos-bin::yank_policy_20_1b",
+    "test": "uninstalled_unsigned_row_never_advances_authenticated_cursor_f1",
+    "passed": true
+  },
+  {
+    "binary": "maos-bin::yank_policy_20_1b",
+    "test": "expiry_and_vetter_revocation_observe_once_and_request_policy_ac9",
+    "passed": true
+  },
+  {
+    "binary": "maos-bin::yank_policy_20_1b",
+    "test": "registry_publishers_cannot_share_principal_spill_ac10",
+    "passed": true
+  },
+  {
+    "binary": "maos-bin::yank_policy_20_1b",
+    "test": "signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8",
+    "passed": true
+  },
+  {
+    "binary": "maos-bin::yank_policy_20_1b",
+    "test": "failing_auto_revoke_retries_policy_without_repeating_observation_p12",
+    "passed": true
+  },
+  {
+    "binary": "maos-cli::spirit_install_20_1",
+    "test": "built_in_shell_names_are_reserved_before_admission",
+    "passed": true
+  },
+  {
+    "binary": "maos-cli::spirit_install_20_1",
+    "test": "install_refuses_registry_rust_inproc_before_persisting",
+    "passed": true
+  },
+  {
+    "binary": "maos-cli::spirit_install_20_1",
+    "test": "materialization_failure_never_activates_a_partial_install",
+    "passed": true
+  },
+  {
+    "binary": "maos-cli::spirit_install_20_1",
+    "test": "wrong_publisher_key_and_claim_signature_are_refused",
+    "passed": true
+  },
+  {
+    "binary": "maos-cli::spirit_install_20_1",
+    "test": "yanked_install_is_refused_before_persistence_ac16",
+    "passed": true
+  },
+  {
+    "binary": "maos-cli::spirit_install_20_1",
+    "test": "offline_install_persists_remote_origin_and_rejects_tampering",
+    "passed": true
+  },
+  {
+    "binary": "maos-cli::spirit_install_20_1",
+    "test": "independently_keyed_server_is_verified_and_wrong_key_never_persists",
+    "passed": true
+  },
+  {
+    "binary": "maos-cli::spirit_install_20_1",
+    "test": "configured_org_key_requires_a_valid_server_tier_signature",
+    "passed": true
+  },
+  {
+    "binary": "maos-cli::spirit_install_20_1",
+    "test": "installed_version_is_immutable_ac14",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::vetting_attestation_gate",
+    "test": "artifact_swap_is_refused_ac6",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::vetting_attestation_gate",
+    "test": "fkcs_off_surface_refusal_precedes_a_valid_attestation",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::vetting_attestation_gate",
+    "test": "leg2_forged_signature_refused",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::vetting_attestation_gate",
+    "test": "leg1_round_trip_issue_promote_revoke",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::vetting_attestation_gate",
+    "test": "leg3_expired_attestation_refused",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::vetting_attestation_gate",
+    "test": "leg4_forged_vetter_key_refused",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::vetting_attestation_gate",
+    "test": "leg7_four_cause_distinguishability",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::vetting_attestation_gate",
+    "test": "leg5_upgrade_flap_control",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::vetting_attestation_gate",
+    "test": "publisher_swap_is_refused_ac6",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "attestation_rejects_unscoped_digest_signature_review_f5",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "every_registry_auth_test_holds_the_shared_environment_mutex_p15",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "cursor_from_another_registry_is_replayed_from_zero_p2",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "keyring_event_rejects_unscoped_digest_signature_review_f5",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "local_reevaluation_failure_does_not_prevent_fetch_p1",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "missing_home_never_selects_shared_temporary_cursor_p14",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "first_publisher_pin_is_typed_and_survives_restart_ac10",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "published_versions_are_immutable_and_identical_publish_is_idempotent_d3",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "expired_signed_yank_request_cannot_mutate_registry_f4",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "signed_revocation_lists_roundtrip_cbor_and_reject_wrong_byte_lengths",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "daemon_cursor_restart_does_not_replay_journalled_yanks_ac7",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "install_refuses_present_yank_with_unpinned_authority_f2",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "v2_role_nonce_audience_and_lifetime_vectors_reject_rebinding_f4_f5",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "signed_nonce_cannot_be_reused_for_another_withdrawal_f4",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "yank_authorization_allows_bounded_clock_skew_p10",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "verified_cursor_is_persisted_before_later_transient_failure_p2",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "zero_interval_cannot_silently_disable_local_vetting_p11",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "signed_yank_cannot_be_replayed_to_another_registry_f4",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "signed_yank_resigning_does_not_append_duplicate_rows_p13",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "unreadable_promotion_is_not_treated_as_absent_p17",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "renewed_promotion_replaces_only_evidence_for_identical_package_d4",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "publisher_and_enrolled_vetter_yanks_are_signed_labelled_and_restart_safe_ac7",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "legacy_inactive_version_pins_are_migrated_before_uninstall_d2",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "only_explicit_operator_release_allows_repin_after_uninstall_d2",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "uninstall_waits_for_cross_process_mutation_lock_p8",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "installed_publisher_and_version_pins_survive_uninstall_d2",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_auth_20_1b",
+    "test": "blocked_registry_fetch_does_not_block_shutdown_or_boot",
+    "passed": true
+  },
+  {
+    "binary": "maos-spirit-cli::vet_lifecycle_20_1b",
+    "test": "publisher_and_vetter_yank_verbs_authenticate_ac7",
+    "passed": true
+  },
+  {
+    "binary": "maos-spirit-cli::vet_lifecycle_20_1b",
+    "test": "vet_issue_install_promote_revoke_refuses_next_admission_ac6",
+    "passed": true
+  },
+  {
+    "binary": "maos-registry::yank_cadence_20_1b",
+    "test": "signed_yank_crosses_real_server_at_30_second_floor_ac7",
+    "passed": true
+  }
+]

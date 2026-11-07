@@ -7,6 +7,9 @@ use maos_kernel_core::iac::transparency_log::{FrameKind, TransparencyLogAdapter}
 use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::sync::Arc;
+#[cfg(feature = "network")]
+#[path = "../../../tests/harness/registry_trust_20_1b.rs"]
+mod registry_trust;
 
 struct Fixture {
     dir: tempfile::TempDir,
@@ -882,4 +885,43 @@ fn review_pending_uninstall_repeat_recovers_subject_scope_after_index_deletion()
     assert_eq!(proof["subject_count"], 1);
     assert!(proof["frame_sweep_completion"].is_object());
     assert!(!registry.join("installed/hello-spirit").exists());
+}
+
+#[cfg(feature = "network")]
+#[test]
+fn registry_bound_principal_is_counted_and_erased_on_uninstall_p3() {
+    let f = Fixture::new();
+    let root = f.install();
+    let directory = root.join("installed/hello-spirit/1.0.0-test");
+    let pkg = registry_trust::package("hello-spirit", "1.0.0", &registry_trust::PUBLISHER);
+    std::fs::write(directory.join("manifest.toml"), &pkg.manifest_toml).unwrap();
+    std::fs::write(directory.join("artifact.bin"), &pkg.artifact_bytes).unwrap();
+    std::fs::write(
+        directory.join("signed_package.json"),
+        serde_json::to_vec(&pkg).unwrap(),
+    )
+    .unwrap();
+    let identity =
+        maos_registry::install::publisher_storage_identity("hello-spirit", &pkg.publisher_pubkey);
+    seed_identity_principal(&f, 1, Some(&identity), "publisher-owned@example.org");
+    assert_eq!(
+        maos_audit::private_tier_principal_row_count(&f.dir.path().join("memory")).unwrap(),
+        1
+    );
+    let out = f.run();
+    assert_eq!(
+        maos_audit::private_tier_principal_row_count(&f.dir.path().join("memory")).unwrap(),
+        0,
+        "uninstall left publisher-bound private values: {out:?}"
+    );
+    assert_eq!(principal_rows(&f, "publisher-owned@example.org"), 0);
+    let proof = f.proof(&out);
+    assert!(
+        category(&proof, "private")["status"]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("private_before=1"),
+        "the signed partial proof must report its nonzero pre-erasure count: {proof}"
+    );
+    verify(&proof);
 }

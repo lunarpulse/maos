@@ -1,0 +1,40 @@
+
+running 35 tests
+test vetting::attestation::tests::canonical_encoding_is_deterministic ... ok
+test vetting::attestation::tests::claim_cbor_round_trips ... ok
+test vetting::attestation::tests::claim_encoding_golden_byte_pin ... ok
+test vetting::attestation::tests::envelope_serde_round_trips ... ok
+test vetting::attestation::tests::forged_signature_is_rejected ... ok
+test vetting::attestation::tests::issue_then_verify_signature_round_trip ... ok
+test vetting::attestation::tests::tampered_claim_bytes_break_signature ... ok
+test vetting::chain_tests::enrollment_after_issuance_is_refused ... ok
+test vetting::chain_tests::expired_attestation_is_refused ... ok
+test vetting::chain_tests::full_chain_valid_attestation_verifies ... ok
+test vetting::chain_tests::future_and_inverted_validity_windows_are_refused ... ok
+test vetting::chain_tests::identity_and_key_id_are_bound ... ok
+test vetting::chain_tests::manifest_hash_mismatch_is_refused ... ok
+test vetting::chain_tests::signed_spirit_version_revocation_refuses_attestation ... ok
+test vetting::chain_tests::source_tier_and_v2_5_semantics_are_refused ... ok
+test vetting::chain_tests::unenrolled_vetter_is_refused ... ok
+test vetting::chain_tests::upgrade_flap_new_version_without_attestation_is_refused ... ok
+test vetting::chain_tests::upgrade_flap_old_attestation_does_not_bind_new_version ... ok
+test vetting::chain_tests::upgrade_non_vetted_target_passes_without_attestation ... ok
+test vetting::chain_tests::upgrade_positive_new_version_with_its_own_attestation_passes ... ok
+test vetting::chain_tests::wrong_target_tier_is_refused ... ok
+test vetting::keyring::tests::embedded_root_cannot_replace_configured_operator_root ... ok
+test vetting::keyring::tests::enrolled_predating_issuance_verifies ... ok
+test vetting::keyring::tests::enrollment_not_predating_issuance_is_refused ... ok
+test vetting::keyring::tests::journal_sequence_reordering_is_refused ... ok
+test vetting::keyring::tests::revoked_vetter_is_refused ... ok
+test vetting::keyring::tests::rotation_retires_predecessor_and_enrolls_successor ... ok
+test vetting::keyring::tests::tampered_event_breaks_operator_root_signature ... ok
+test vetting::keyring::tests::unenrolled_vetter_is_refused ... ok
+test vetting::keyring::tests::wrong_operator_root_breaks_chain ... ok
+test vetting::terminal::tests::each_cause_classifies_in_isolation ... ok
+test vetting::terminal::tests::four_labels_are_pairwise_distinct ... ok
+test vetting::terminal::tests::live_promotion_has_no_cause ... ok
+test vetting::terminal::tests::observation_note_carries_labeled_cause ... ok
+test vetting::terminal::tests::revocation_is_not_mislabeled_as_expiry ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.03s
+

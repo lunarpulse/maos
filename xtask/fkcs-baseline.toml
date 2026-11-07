@@ -52,8 +52,10 @@ ratifier = "Lunarpulse"
 # off-surface/admission negative controls remain unchanged and passing.
 # 5b3fe85c6abdbf45ea73b57edae6f427d1e4b445b6ae9c4ac24ba5a77798a4f4 ->
 # 136c579d6a2ae4804d0f57864cec8c583363b563e2f063a870f6ae6f38256a46.
-# This re-pin PRECEDES the bmad-code-review round. That review must explicitly
-# re-examine the argument hunk and this pin; no independent review is claimed.
+# The re-pin preceded review. Independent review has now ratified the exact
+# argument/test-field hunk and recomputed fingerprint (2026-11-07):
+# 20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review/triage.md §0.
+# Semantic strengthening lives in compliance, outside this file fingerprint.
 # Code, this fingerprint and exact kloc/kernel pin sets travel together in
 # Main's landing commit. No kernel source/frozen tag/declared file-set change.
 [admission_baseline]

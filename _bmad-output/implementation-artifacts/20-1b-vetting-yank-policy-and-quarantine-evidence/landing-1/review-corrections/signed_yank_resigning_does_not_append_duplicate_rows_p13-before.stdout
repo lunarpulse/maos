@@ -1,0 +1,11 @@
+
+running 1 test
+test signed_yank_resigning_does_not_append_duplicate_rows_p13 ... FAILED
+
+failures:
+
+failures:
+    signed_yank_resigning_does_not_append_duplicate_rows_p13
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.30s
+

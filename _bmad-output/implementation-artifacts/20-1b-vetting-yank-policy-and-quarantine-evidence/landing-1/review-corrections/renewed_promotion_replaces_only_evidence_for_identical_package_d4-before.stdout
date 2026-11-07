@@ -1,0 +1,11 @@
+
+running 1 test
+test renewed_promotion_replaces_only_evidence_for_identical_package_d4 ... FAILED
+
+failures:
+
+failures:
+    renewed_promotion_replaces_only_evidence_for_identical_package_d4
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.41s
+

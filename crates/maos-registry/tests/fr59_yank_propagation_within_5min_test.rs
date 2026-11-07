@@ -13,14 +13,12 @@ use maos_registry::yank::{YankObserver, YankPoller, YankSource};
 /// Controllable yank source — emits whatever `set_pending` has stocked.
 struct ControlledSource {
     pending: Mutex<Vec<YankEntry>>,
-    clock_ns: Arc<AtomicU64>,
 }
 
 impl ControlledSource {
-    fn new(clock_ns: Arc<AtomicU64>) -> Self {
+    fn new() -> Self {
         Self {
             pending: Mutex::new(Vec::new()),
-            clock_ns,
         }
     }
 
@@ -46,9 +44,12 @@ struct RecordingObserver {
 }
 
 impl YankObserver for RecordingObserver {
-    fn on_yank(&self, entry: &YankEntry) -> Result<(), RegistryError> {
+    fn on_yank(
+        &self,
+        entry: &YankEntry,
+    ) -> Result<maos_registry::yank::YankDisposition, RegistryError> {
         self.applied.lock().unwrap().push(entry.clone());
-        Ok(())
+        Ok(maos_registry::yank::YankDisposition::Verified)
     }
 }
 
@@ -66,12 +67,13 @@ fn make_yank(name: &str, version: &str, at_ns: u64) -> YankEntry {
 
 #[test]
 fn fr59_yank_propagates_within_5min_window() {
-    let clock = Arc::new(AtomicU64::new(0));
-    let source = Arc::new(ControlledSource::new(Arc::clone(&clock)));
+    let clock = AtomicU64::new(0);
+    let source = Arc::new(ControlledSource::new());
     let observer = Arc::new(RecordingObserver::default());
     let poller = YankPoller::new(
         Arc::clone(&source) as Arc<dyn YankSource>,
         Arc::clone(&observer) as Arc<dyn YankObserver>,
+        "fixture://fr59".into(),
     );
 
     // T=0s: nothing pending → 0 applied.
@@ -107,28 +109,28 @@ fn fr59_poll_interval_resolver_clamps_correctly() {
     let _guard = ENV_LOCK.lock().unwrap();
 
     std::env::remove_var("MAOS_REGISTRY_YANK_POLL_INTERVAL_S");
-    assert_eq!(resolve_poll_interval().as_secs(), 300);
+    assert_eq!(resolve_poll_interval().unwrap().as_secs(), 300);
 
     std::env::set_var("MAOS_REGISTRY_YANK_POLL_INTERVAL_S", "5");
-    assert_eq!(resolve_poll_interval().as_secs(), 30);
+    assert_eq!(resolve_poll_interval().unwrap().as_secs(), 30);
 
     std::env::set_var("MAOS_REGISTRY_YANK_POLL_INTERVAL_S", "999999");
-    assert_eq!(resolve_poll_interval().as_secs(), 3600);
+    assert_eq!(resolve_poll_interval().unwrap().as_secs(), 300);
 
     std::env::set_var("MAOS_REGISTRY_YANK_POLL_INTERVAL_S", "120");
-    assert_eq!(resolve_poll_interval().as_secs(), 120);
+    assert_eq!(resolve_poll_interval().unwrap().as_secs(), 120);
 
     std::env::remove_var("MAOS_REGISTRY_YANK_POLL_INTERVAL_S");
 }
 
 #[test]
 fn fr59_300s_boundary_passes() {
-    let clock = Arc::new(AtomicU64::new(0));
-    let source = Arc::new(ControlledSource::new(Arc::clone(&clock)));
+    let source = Arc::new(ControlledSource::new());
     let observer = Arc::new(RecordingObserver::default());
     let poller = YankPoller::new(
         Arc::clone(&source) as Arc<dyn YankSource>,
         Arc::clone(&observer) as Arc<dyn YankObserver>,
+        "fixture://fr59".into(),
     );
 
     let deprecate_at_ns: u64 = 100;

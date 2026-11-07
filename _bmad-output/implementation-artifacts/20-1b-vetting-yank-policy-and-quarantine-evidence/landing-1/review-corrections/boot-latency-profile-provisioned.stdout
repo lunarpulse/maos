@@ -1,0 +1,11 @@
+
+running 1 test
+test installed_component_dispatch_reports_typed_boot_refusal ... FAILED
+
+failures:
+
+failures:
+    installed_component_dispatch_reports_typed_boot_refusal
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 5.52s
+

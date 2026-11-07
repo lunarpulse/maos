@@ -1,0 +1,22 @@
+
+running 2 tests
+test boot_rechecks_manifest_component_publisher_and_claim ... ok
+test installed_component_dispatch_reports_typed_boot_refusal ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.69s
+
+
+running 10 tests
+test corrupt_install_does_not_hide_another_spirits_expiry_p1 ... ok
+test deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9 ... ok
+test expiry_and_vetter_revocation_observe_once_and_request_policy_ac9 ... ok
+test failing_auto_revoke_retries_policy_without_repeating_observation_p12 ... ok
+test no_registry_local_timer_discovers_promotion_installed_after_start_p11 ... ok
+test poller_runtime_clock_and_cursor_restart_reach_expiry_p6 ... ok
+test registry_publishers_cannot_share_principal_spill_ac10 ... ok
+test rejected_vetter_row_does_not_hide_later_publisher_yank_p1 ... ok
+test signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8 ... ok
+test uninstalled_unsigned_row_never_advances_authenticated_cursor_f1 ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+

@@ -1,0 +1,11 @@
+
+running 1 test
+test vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9 ... FAILED
+
+failures:
+
+failures:
+    vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 43 filtered out; finished in 1.69s
+

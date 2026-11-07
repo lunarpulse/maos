@@ -41,6 +41,9 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
+#[cfg(feature = "network")]
+#[path = "../../../tests/harness/registry_trust_20_1b.rs"]
+mod registry_trust;
 
 const BUTLER_MANIFEST: &str = "spirits/butler/manifest.toml";
 const BUTLER_CASSETTE: &str = "crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json";
@@ -2813,4 +2816,106 @@ fn malformed_operator_bind_configuration_exits_78() {
         "diagnostic must identify the invalid field: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+#[cfg(feature = "network")]
+#[test]
+fn vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9() {
+    use std::os::unix::fs::PermissionsExt;
+    let keys = tempfile::tempdir().unwrap();
+    let key = keys.path().join("operator.key");
+    std::fs::write(&key, hex::encode(registry_trust::OPERATOR)).unwrap();
+    std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let root = Root::butler_with("vetted-package", &[("MAOS_AUDIT_KEY", utf8(&key))]);
+    let registry = root.scratch.join(".local/share/maos/registry");
+    let keyring = keys.path().join("vetters.cbor");
+    std::fs::write(
+        &keyring,
+        serde_cbor::to_vec(&registry_trust::keyring()).unwrap(),
+    )
+    .unwrap();
+    for version in ["0.3.1", "0.3.2"] {
+        let directory = registry.join(format!("installed/butler/{version}-fixture"));
+        std::fs::create_dir_all(&directory).unwrap();
+        let manifest = directory.join("manifest.toml");
+        let text = butler_at(version, "")
+            .replace("trust_tier = \"local\"", "trust_tier = \"public-vetted\"");
+        let mut pkg = registry_trust::package("butler", version, &registry_trust::PUBLISHER);
+        pkg.manifest_toml = text.as_bytes().to_vec();
+        registry_trust::sign(&mut pkg, &registry_trust::PUBLISHER);
+        std::fs::write(&manifest, &pkg.manifest_toml).unwrap();
+        std::fs::write(directory.join("artifact.bin"), &pkg.artifact_bytes).unwrap();
+        std::fs::write(
+            directory.join("signed_package.json"),
+            serde_json::to_vec(&pkg).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(
+            registry.join("installed-index.json"),
+            serde_json::to_vec(&serde_json::json!({"butler":format!("butler/{version}-fixture")}))
+                .unwrap(),
+        )
+        .unwrap();
+        let now = maos_registry::yank_auth::now_unix_ms().unwrap();
+        let attestation = keys.path().join(format!("{version}.cbor"));
+        std::fs::write(
+            &attestation,
+            serde_cbor::to_vec(&registry_trust::attestation(&pkg, now, now + 600_000)).unwrap(),
+        )
+        .unwrap();
+        let command = || {
+            root.ctl(&[
+                "spirit",
+                "upgrade",
+                "butler",
+                "--to",
+                utf8(&manifest),
+                "--attestation",
+                utf8(&attestation),
+                "--keyring",
+                utf8(&keyring),
+            ])
+        };
+        if version == "0.3.1" {
+            let output = command();
+            assert_eq!(
+                code(&output),
+                0,
+                "a genuine vetted target must upgrade through the real door: {}",
+                stderr(&output)
+            );
+            assert_eq!(
+                std::fs::read_to_string(root.archives.join("butler/0.3.1/manifest.toml")).unwrap(),
+                text
+            );
+            continue;
+        }
+        for swap in ["deployed-artifact", "signed-artifact", "publisher"] {
+            let mut swapped = pkg.clone();
+            match swap {
+                "deployed-artifact" => std::fs::write(
+                    directory.join("artifact.bin"),
+                    b"unsigned deployed replacement",
+                )
+                .unwrap(),
+                "signed-artifact" => {
+                    swapped.artifact_bytes.push(1);
+                    registry_trust::sign(&mut swapped, &registry_trust::PUBLISHER);
+                    std::fs::write(directory.join("artifact.bin"), &swapped.artifact_bytes)
+                        .unwrap();
+                }
+                _ => registry_trust::sign(&mut swapped, &registry_trust::VETTER),
+            }
+            std::fs::write(
+                directory.join("signed_package.json"),
+                serde_json::to_vec(&swapped).unwrap(),
+            )
+            .unwrap();
+            let output = command();
+            assert_ne!(code(&output), 0, "{swap} must be refused before upgrade");
+            assert!(!root.archives.join("butler/0.3.2/manifest.toml").exists());
+            assert_eq!(root.lifecycle_state("butler").as_deref(), Some("Running"));
+            std::fs::write(directory.join("artifact.bin"), &pkg.artifact_bytes).unwrap();
+        }
+    }
 }

@@ -1,0 +1,1432 @@
+[
+  {
+    "code": {
+      "code": "clippy::empty_line_after_doc_comments",
+      "explanation": null
+    },
+    "message": "empty line after doc comment",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        187
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::unnecessary_fallible_conversions",
+      "explanation": null
+    },
+    "message": "use of a fallible conversion when an infallible one could be used",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        208
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::unnecessary_fallible_conversions",
+      "explanation": null
+    },
+    "message": "use of a fallible conversion when an infallible one could be used",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        385
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::explicit_counter_loop",
+      "explanation": null
+    },
+    "message": "the variable `line_no` is used as a loop counter",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        699
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::manual_range_patterns",
+      "explanation": null
+    },
+    "message": "this OR pattern can be rewritten using a range",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        881
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::write_literal",
+      "explanation": null
+    },
+    "message": "literal with an empty format string",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        909
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::write_literal",
+      "explanation": null
+    },
+    "message": "literal with an empty format string",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        946
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::explicit_counter_loop",
+      "explanation": null
+    },
+    "message": "the variable `line_no` is used as a loop counter",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        949
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_late_init",
+      "explanation": null
+    },
+    "message": "unneeded late initialization",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        1244
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      [
+        "crates/maos-compliance/src/vetting/mod.rs",
+        321
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused import: `std::sync::Mutex`",
+    "spans": [
+      [
+        "crates/maos-registry/src/fixture_replay.rs",
+        6
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`",
+    "spans": [
+      [
+        "crates/maos-registry/src/fixture_replay.rs",
+        9
+      ],
+      [
+        "crates/maos-registry/src/fixture_replay.rs",
+        9
+      ],
+      [
+        "crates/maos-registry/src/fixture_replay.rs",
+        9
+      ],
+      [
+        "crates/maos-registry/src/fixture_replay.rs",
+        9
+      ],
+      [
+        "crates/maos-registry/src/fixture_replay.rs",
+        9
+      ],
+      [
+        "crates/maos-registry/src/fixture_replay.rs",
+        9
+      ],
+      [
+        "crates/maos-registry/src/fixture_replay.rs",
+        10
+      ],
+      [
+        "crates/maos-registry/src/fixture_replay.rs",
+        10
+      ],
+      [
+        "crates/maos-registry/src/fixture_replay.rs",
+        10
+      ],
+      [
+        "crates/maos-registry/src/fixture_replay.rs",
+        10
+      ],
+      [
+        "crates/maos-registry/src/fixture_replay.rs",
+        10
+      ],
+      [
+        "crates/maos-registry/src/fixture_replay.rs",
+        10
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused import: `SignedManifest`",
+    "spans": [
+      [
+        "crates/maos-registry/src/handlers/manifest.rs",
+        9
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused import: `SignedManifest`",
+    "spans": [
+      [
+        "crates/maos-registry/src/handlers/manifest.rs",
+        9
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused imports: `ComplianceClaimEnvelope` and `SigningAlg`",
+    "spans": [
+      [
+        "crates/maos-registry/src/server.rs",
+        598
+      ],
+      [
+        "crates/maos-registry/src/server.rs",
+        598
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused imports: `Read` and `Write`",
+    "spans": [
+      [
+        "crates/maos-registry/src/server.rs",
+        599
+      ],
+      [
+        "crates/maos-registry/src/server.rs",
+        599
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused import: `std::net::TcpStream`",
+    "spans": [
+      [
+        "crates/maos-registry/src/server.rs",
+        600
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused import: `std::time::Duration`",
+    "spans": [
+      [
+        "crates/maos-registry/src/server.rs",
+        601
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "deprecated",
+      "explanation": null
+    },
+    "message": "use of deprecated function `maos_compliance::builder::seeded_keypair`: TEST/CORPUS/SMOKE ONLY \u2014 never use in production admission",
+    "spans": [
+      [
+        "crates/maos-registry/src/compliance_verify.rs",
+        129
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_variables",
+      "explanation": null
+    },
+    "message": "unused variable: `server_sig`",
+    "spans": [
+      [
+        "crates/maos-registry/src/client.rs",
+        179
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_variables",
+      "explanation": null
+    },
+    "message": "unused variable: `server_sig`",
+    "spans": [
+      [
+        "crates/maos-registry/src/client.rs",
+        179
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::derivable_impls",
+      "explanation": null
+    },
+    "message": "this `impl` can be derived",
+    "spans": [
+      [
+        "crates/maos-registry/src/admission.rs",
+        437
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/admission.rs",
+        554
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/admission.rs",
+        556
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/client.rs",
+        261
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/client.rs",
+        263
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/client.rs",
+        265
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/handlers/manifest.rs",
+        16
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/handlers/manifest.rs",
+        18
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/handlers/manifest.rs",
+        20
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::manual_clamp",
+      "explanation": null
+    },
+    "message": "clamp-like pattern without using clamp function",
+    "spans": [
+      [
+        "crates/maos-registry/src/operations.rs",
+        44
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::derivable_impls",
+      "explanation": null
+    },
+    "message": "this `impl` can be derived",
+    "spans": [
+      [
+        "crates/maos-registry/src/origin.rs",
+        21
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::manual_clamp",
+      "explanation": null
+    },
+    "message": "clamp-like pattern without using clamp function",
+    "spans": [
+      [
+        "crates/maos-registry/src/storage.rs",
+        916
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::redundant_closure",
+      "explanation": null
+    },
+    "message": "redundant closure",
+    "spans": [
+      [
+        "crates/maos-registry/src/storage.rs",
+        1151
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "dead_code",
+      "explanation": null
+    },
+    "message": "function `temp_storage` is never used",
+    "spans": [
+      [
+        "crates/maos-registry/src/server.rs",
+        603
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::derivable_impls",
+      "explanation": null
+    },
+    "message": "this `impl` can be derived",
+    "spans": [
+      [
+        "crates/maos-registry/src/admission.rs",
+        437
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/admission.rs",
+        554
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/admission.rs",
+        556
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/admission.rs",
+        792
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/admission.rs",
+        794
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/admission.rs",
+        911
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/admission.rs",
+        913
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/admission.rs",
+        1156
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/admission.rs",
+        1158
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/client.rs",
+        261
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/client.rs",
+        263
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/client.rs",
+        265
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/handlers/manifest.rs",
+        16
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/handlers/manifest.rs",
+        18
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-registry/src/handlers/manifest.rs",
+        20
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::manual_clamp",
+      "explanation": null
+    },
+    "message": "clamp-like pattern without using clamp function",
+    "spans": [
+      [
+        "crates/maos-registry/src/operations.rs",
+        44
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::derivable_impls",
+      "explanation": null
+    },
+    "message": "this `impl` can be derived",
+    "spans": [
+      [
+        "crates/maos-registry/src/origin.rs",
+        21
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::manual_clamp",
+      "explanation": null
+    },
+    "message": "clamp-like pattern without using clamp function",
+    "spans": [
+      [
+        "crates/maos-registry/src/storage.rs",
+        916
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::redundant_closure",
+      "explanation": null
+    },
+    "message": "redundant closure",
+    "spans": [
+      [
+        "crates/maos-registry/src/storage.rs",
+        1151
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      [
+        "crates/maos-compliance/src/vetting/mod.rs",
+        321
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::type_complexity",
+      "explanation": null
+    },
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      [
+        "crates/maos-bin/src/operator_door.rs",
+        469
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::useless_conversion",
+      "explanation": null
+    },
+    "message": "useless conversion to the same type: `maos_skill::ESkillStore`",
+    "spans": [
+      [
+        "crates/maos-bin/src/operator_door.rs",
+        2806
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::type_complexity",
+      "explanation": null
+    },
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      [
+        "crates/maos-bin/src/operator_door.rs",
+        469
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::useless_conversion",
+      "explanation": null
+    },
+    "message": "useless conversion to the same type: `maos_skill::ESkillStore`",
+    "spans": [
+      [
+        "crates/maos-bin/src/operator_door.rs",
+        2806
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused import: `maos_mcp::McpClient`",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        1385
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        177
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::type_complexity",
+      "explanation": null
+    },
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        666
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::type_complexity",
+      "explanation": null
+    },
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        2373
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::useless_format",
+      "explanation": null
+    },
+    "message": "useless use of `format!`",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        7546
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::field_reassign_with_default",
+      "explanation": null
+    },
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        8127
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrow",
+      "explanation": null
+    },
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        10178
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::manual_inspect",
+      "explanation": null
+    },
+    "message": "using `map_err` over `inspect_err`",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        10218
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        10729
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        12097
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "message": "this function has too many arguments (16/7)",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        12171
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        12953
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::redundant_guards",
+      "explanation": null
+    },
+    "message": "redundant guard",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        14007
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::cloned_ref_to_slice_refs",
+      "explanation": null
+    },
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        14945
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::await_holding_lock",
+      "explanation": null
+    },
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        16684
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::await_holding_lock",
+      "explanation": null
+    },
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        16747
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::await_holding_lock",
+      "explanation": null
+    },
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        16875
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused import: `maos_mcp::McpClient`",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        1385
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrows_for_generic_args",
+      "explanation": null
+    },
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        177
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::type_complexity",
+      "explanation": null
+    },
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        666
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::type_complexity",
+      "explanation": null
+    },
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        2373
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::useless_format",
+      "explanation": null
+    },
+    "message": "useless use of `format!`",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        7546
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::field_reassign_with_default",
+      "explanation": null
+    },
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        8127
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_borrow",
+      "explanation": null
+    },
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        10178
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::manual_inspect",
+      "explanation": null
+    },
+    "message": "using `map_err` over `inspect_err`",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        10218
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        10729
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        12097
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "message": "this function has too many arguments (16/7)",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        12171
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        12953
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::redundant_guards",
+      "explanation": null
+    },
+    "message": "redundant guard",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        14007
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::cloned_ref_to_slice_refs",
+      "explanation": null
+    },
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      [
+        "crates/maos-bin/src/main.rs",
+        14945
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::empty_line_after_doc_comments",
+      "explanation": null
+    },
+    "message": "empty line after doc comment",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        187
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::unnecessary_fallible_conversions",
+      "explanation": null
+    },
+    "message": "use of a fallible conversion when an infallible one could be used",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        208
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::unnecessary_fallible_conversions",
+      "explanation": null
+    },
+    "message": "use of a fallible conversion when an infallible one could be used",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        385
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::explicit_counter_loop",
+      "explanation": null
+    },
+    "message": "the variable `line_no` is used as a loop counter",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        699
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::manual_range_patterns",
+      "explanation": null
+    },
+    "message": "this OR pattern can be rewritten using a range",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        881
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::write_literal",
+      "explanation": null
+    },
+    "message": "literal with an empty format string",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        909
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::write_literal",
+      "explanation": null
+    },
+    "message": "literal with an empty format string",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        946
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::explicit_counter_loop",
+      "explanation": null
+    },
+    "message": "the variable `line_no` is used as a loop counter",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        949
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::needless_late_init",
+      "explanation": null
+    },
+    "message": "unneeded late initialization",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        1244
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::unnecessary_cast",
+      "explanation": null
+    },
+    "message": "casting integer literal to `u64` is unnecessary",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        2961
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::field_reassign_with_default",
+      "explanation": null
+    },
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        3234
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::field_reassign_with_default",
+      "explanation": null
+    },
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        3250
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::field_reassign_with_default",
+      "explanation": null
+    },
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        3259
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::field_reassign_with_default",
+      "explanation": null
+    },
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        3269
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::field_reassign_with_default",
+      "explanation": null
+    },
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        3281
+      ]
+    ]
+  },
+  {
+    "code": {
+      "code": "clippy::field_reassign_with_default",
+      "explanation": null
+    },
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      [
+        "crates/maos-audit/src/lib.rs",
+        3286
+      ]
+    ]
+  }
+]

@@ -1,0 +1,194 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance)
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+   Compiling maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:179:27
+    |
+179 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-registry` (lib) generated 4 warnings (run `cargo fix --lib -p maos-registry` to apply 4 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.61s
+────────────
+ Nextest run ID 820f025e-8ddf-4755-9ff9-91065a11ebc7 with nextest profile: default
+    Starting 5 tests across 1 binary (25 tests skipped)
+        FAIL [   0.004s] (1/5) maos-registry::yank_auth_20_1b attestation_rejects_unscoped_digest_signature_review_f5
+  stdout ───
+
+    running 1 test
+    test attestation_rejects_unscoped_digest_signature_review_f5 ... FAILED
+
+    failures:
+
+    failures:
+        attestation_rejects_unscoped_digest_signature_review_f5
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'attestation_rejects_unscoped_digest_signature_review_f5' (4117266) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:1281:5:
+    a raw claim digest has no signed role and must not authorize vetting
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.154s] (2/5) maos-registry::yank_auth_20_1b expired_signed_yank_request_cannot_mutate_registry_f4
+  stdout ───
+
+    running 1 test
+    test expired_signed_yank_request_cannot_mutate_registry_f4 ... FAILED
+
+    failures:
+
+    failures:
+        expired_signed_yank_request_cannot_mutate_registry_f4
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.15s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:40481
+
+    thread 'expired_signed_yank_request_cannot_mutate_registry_f4' (4117268) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:809:5:
+    an hour-old mutation authorization must expire: {"id":1,"jsonrpc":"2.0","result":{"spirit_id":"stale","version":"1.0.0","yank_id":"yank-1"}}
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.005s] (3/5) maos-registry::yank_auth_20_1b keyring_event_rejects_unscoped_digest_signature_review_f5
+  stdout ───
+
+    running 1 test
+    test keyring_event_rejects_unscoped_digest_signature_review_f5 ... FAILED
+
+    failures:
+
+    failures:
+        keyring_event_rejects_unscoped_digest_signature_review_f5
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'keyring_event_rejects_unscoped_digest_signature_review_f5' (4117273) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:1320:5:
+    an audit-root signature without its key-event role must be refused
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.256s] (4/5) maos-registry::yank_auth_20_1b signed_yank_cannot_be_replayed_to_another_registry_f4
+  stdout ───
+
+    running 1 test
+    test signed_yank_cannot_be_replayed_to_another_registry_f4 ... FAILED
+
+    failures:
+
+    failures:
+        signed_yank_cannot_be_replayed_to_another_registry_f4
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.25s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:45715
+    maos-registry: listening on 127.0.0.1:37985
+
+    thread 'signed_yank_cannot_be_replayed_to_another_registry_f4' (4117275) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:770:5:
+    registry A authorization must not mutate registry B: {"id":1,"jsonrpc":"2.0","result":{"spirit_id":"audience","version":"1.0.0","yank_id":"yank-1"}}
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.004s] (5/5) maos-registry::yank_auth_20_1b yank_authorization_allows_bounded_clock_skew_p10
+  stdout ───
+
+    running 1 test
+    test yank_authorization_allows_bounded_clock_skew_p10 ... FAILED
+
+    failures:
+
+    failures:
+        yank_authorization_allows_bounded_clock_skew_p10
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'yank_authorization_allows_bounded_clock_skew_p10' (4117283) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:678:9:
+    assertion `left == right` failed: clock skew 1000 ms
+      left: false
+     right: true
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary [   0.424s] 5 tests run: 0 passed, 5 failed, 25 skipped
+        FAIL [   0.004s] (1/5) maos-registry::yank_auth_20_1b attestation_rejects_unscoped_digest_signature_review_f5
+        FAIL [   0.154s] (2/5) maos-registry::yank_auth_20_1b expired_signed_yank_request_cannot_mutate_registry_f4
+        FAIL [   0.005s] (3/5) maos-registry::yank_auth_20_1b keyring_event_rejects_unscoped_digest_signature_review_f5
+        FAIL [   0.256s] (4/5) maos-registry::yank_auth_20_1b signed_yank_cannot_be_replayed_to_another_registry_f4
+        FAIL [   0.004s] (5/5) maos-registry::yank_auth_20_1b yank_authorization_allows_bounded_clock_skew_p10
+error: test run failed

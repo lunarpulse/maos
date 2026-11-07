@@ -83,7 +83,7 @@ Line 5 remains a stub (`crates/maos-registry/src/bin/server.rs:4-6`); daemon arm
 | Key | Story | Closes · Δ |
 |---|---|---|
 | `20-1a-registry-publish-install-exit-path` | Registry server binary, publish to the real server, `spirit install` exit path (AC1–AC5, kernel-free); **done 2026-11-04**, hosted verify 41521253027 fully green; main 41910498869 has 188 green jobs and known 20-7 snapshot-owner flake plus ship-gate cascades, not fully green; 20-1b security deferrals remain open | FR35/36 · kernel-Δ 0 · maos-cli, maos-spirit-cli, maos-registry, maos-bin (ceilings in story 20-1a) · split 2026-11-01 from the pre-split row (D-20-1-01 B); created 2026-11-01 @a4c00897: exit L2/L4 runnable, L5 rc 1, L7 rc 1, L8 rc 2, L9 `unknown spirit`; pre-split forecast +810…+1,686 tokei |
-| `20-1b-vetting-yank-policy-and-quarantine` | Vetter CLI, yank policy, FR13 quarantine (AC6–AC13, kernel last) | FR13/37/59 · kernel-Δ R = KQ1 + P +78 phys / +68 tokei, ruled 2026-11-01 (FLAG-Winston; granted to 20-1b only) · starts only after 20-1a `done` · created 2026-11-01 @a4c00897 |
+| `20-1b-vetting-yank-policy-and-quarantine` | Vetter CLI, yank policy, FR13 quarantine (AC6–AC17); AC15 A/A/A RULED `f5rows` 2026-11-07, execution held for L1 review/corrections and explicit cargo handoff | FR13/37/59 · AC15 ceilings registry6637/aggregate197958; auxiliary D02 A bounds cli6549/bin35467/spirit-cli981 · kernel R = KQ1+P remains final, no AC15 kernel grant · starts after20-1a `done`; historical creation/rulings below retained |
 | `20-2-deb-airgap-docker-and-formula-corrections` | deb (debhelper), air-gap leg, Docker build/push split, formula corrections | FR1 · NFR-Ops-12 · created 2026-11-02 @a8af3215 — ready-for-dev; D-20-2-01…14 RULED as recommended (ask s202); kernel-Δ 0 (rejected D-01 B priced +38/+32); maos-bin −18, xtask +2 measured + renderer +80…+150 [INFERENCE]; ceilings bin 33534, xtask 44860, aggregate 192316 |
 | `20-3a-gate-honesty` | Gate honesty ◆ (out-of-ledger gates → `EvidenceState`: absent is never `passed`, honest-N, ledger loud-fail, `BindingClass` on all **44** ship-gate names) — ⚠ **pulled forward 2026-09-25** (operator, *stop the leaks of failures*): starts right after `17-3a`, in parallel with `17-6`, and carries rule 11's class. **Created 2026-10-15 @`6537454e`** (`20-3a-gate-honesty.md`; re-preflight block below) | S4 · D1/D5.3/D9 (D8, D20 already closed) · NFR-Sec-5/Ops-9/Meta-3 · kernel-Δ 0 · **xtask +490…+1070 measured forecast** (zero headroom → exact grant at landing) · maos-audit +20–40 · maos-bin +20–40 |
 | `20-3b-gate-retirement-and-coverage-generator` | Gate retirement; generator spike NO-GO, hard hand-kept matrix/completeness retained; **done 2026-10-30** (final landing `714a1428`, discipline run 41243340929 184/189, NOT fully green; AC2 generator cut by the spike NO-GO closure). L1 retirement + protective folds; L2 FR31 and dispositions. Round-3 operator ruling w10, 2026-10-31: Raise to measured exactly. | FR31 ◆ FLAG-Winston kernel <=26,793 physical /20,992 tokei (+113/+103 over w9); bin<=33,030 (epic envelope33,021 -> 33,030); audit STOP7,668 -> 7,707; xtask42780 -> 42841 (exact measured42,841); domain9,977; measured aggregate188,451, hardfail188,452. Exact final pins, zero headroom, STOP above. |
@@ -109,6 +109,21 @@ AC1 is always the command and what the operator observes; every AC cites the cod
 ### 20-1a-registry-publish-install-exit-path / 20-1b-vetting-yank-policy-and-quarantine — Registry client, install verb, vetter and yank (split 2026-11-01, D-20-1-01 B: AC1–AC5 = 20-1a, AC6–AC13 = 20-1b; the retired key `20-1-registry-client-install-verb-vetter-and-yank` is not a sprint key)
 
 *Closes · Δ:* FR35/36/37/59 · kernel-Δ R = KQ1 + P +78 phys / +68 tokei (ruled 2026-11-01; granted to 20-1b only) · historical envelope kept as provenance: kernel-Δ 0 · maos-cli +250–400 · maos-spirit-cli +230–400 · maos-registry +230–440 · maos-bin +60–120
+
+**20-1b AC15 superseding ruling — `f5rows`, 2026-11-07:** D-20-1b-01/02/03
+are RULED A/A/A: canonical-URI-bound registry signing key in operator config
+(never a response key alone); rustls leaf/server with operator-supplied
+cert-chain/key paths, hostname/platform-WebPKI validation and optional operator CA;
+HTTP only on literal loopback with explicit development opt-in at **both** ends,
+retaining mutation signatures/publisher pins and never downgrading HTTPS.
+AC15 second-kernel-free-pass ceilings: registry6637, aggregate197958; D02 A ×3
+auxiliary bounds from L1 pins are cli6549/bin35467/spirit-cli981 (+120/+45/+45).
+Rebase external drift at handoff, not unused prior allowances. Rustls edge is
+granted subject to cargo-deny, existing-lock ring/aws-lc feature review, permitted
+crate versions and no rustls leak into no-default-features. Execution waits for
+the L1 review/corrections and Main's **`CARGO HANDOFF AC15`**. This records authority,
+not implementation, tests, new exact pins or kernel spending; KQ1 remains final.
+
 
 ⚠ **AMENDED 2026-10-30 (operator ratified D01 A; preflight §3.1):** Reuse `LocalFsRegistryStorage::at_path(PathBuf)` (`crates/maos-registry/src/storage.rs:125-135`), not a synonymous constructor; `SpiritRegistryServer::new` remains `server.rs:62-74`, signer :77-80, dispatch :235-243. Client wiring `crates/maos-bin/src/main.rs:3281-3320`, constructor `crates/maos-registry/src/client.rs:46-50`, transport `crates/maos-mcp/src/transport/streamable_http.rs:44-47`; missing CLI MCP edge `crates/maos-cli/Cargo.toml:18-27`, exports `crates/maos-registry/src/lib.rs:38-41`, publisher dependencies `crates/maos-spirit-cli/Cargo.toml:30-33`. Reuse import admission/persist/summary (`crates/maos-cli/src/subcommands.rs:1470-1496,1498-1519`, summary `:1521-1542`); `RegistryOrigin::Remote` remains absent (`crates/maos-registry/src/origin.rs:9-17`). Prove dependency closure during development.
 

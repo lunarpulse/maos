@@ -130,9 +130,14 @@ fn resolved_transparency_log_path() -> std::path::PathBuf {
 fn enforce_vetted_upgrade_precondition(
     spirit_id: &str,
     target_manifest_path: &std::path::Path,
-    attestation: Option<&str>,
-    vetter_keyring: Option<&str>,
+    evidence: maos_bin::operator_door::UpgradeVetting<'_>,
 ) -> Result<(), String> {
+    let maos_bin::operator_door::UpgradeVetting {
+        package,
+        source_manifest,
+        attestation,
+        vetter_keyring,
+    } = evidence;
     let target_manifest = std::fs::read(target_manifest_path).map_err(|error| {
         format!(
             "read upgrade target manifest {}: {error}",
@@ -187,25 +192,19 @@ fn enforce_vetted_upgrade_precondition(
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|error| format!("system clock precedes Unix epoch: {error}"))?
         .as_millis() as u64;
-    let package_path = target_manifest_path
-        .parent()
-        .ok_or("upgrade target has no package directory")?
-        .join("signed_package.json");
-    let package: maos_domain::ports::registry::SignedPackage = serde_json::from_slice(
-        &std::fs::read(&package_path).map_err(|e| format!("read vetted upgrade package: {e}"))?,
-    )
-    .map_err(|e| format!("decode vetted upgrade package: {e}"))?;
+    let package = package.ok_or("vetted upgrade needs an explicit installed signed package")?;
+    let source = source_manifest.ok_or("vetted upgrade package has no original source")?;
+    maos_registry::install::verify_deployed_package(package, source).map_err(|e| e.to_string())?;
     if package.manifest_toml != target_manifest
         || package.spirit_id.as_str() != spirit_id
         || package.version != target_version
-        || !maos_registry::admission::verify_publisher_sig(&package)
     {
         return Err("vetted upgrade package signature or manifest mismatch".into());
     }
 
     maos_compliance::evaluate_upgrade_precondition(
         true,
-        maos_compliance::vetting::VettingSubject::from(&package),
+        maos_compliance::vetting::VettingSubject::from(package),
         Some(&attestation),
         &keyring,
         &operator_root,
@@ -871,6 +870,8 @@ impl<P: std::borrow::Borrow<InferencePortAdapter>> maos_domain::ports::inference
 /// providers name a successor's token).
 #[cfg(feature = "network")]
 fn gate_staged(staged: &std::path::Path) -> Result<maos_bin::admission::GatedManifest, String> {
+    // Provider declarations only: constructor callers never use this value's
+    // storage_identity; ownership is bound by the load/admit/start boundary.
     maos_bin::admission::read_manifest(staged)
         .and_then(|text| {
             maos_bin::admission::gate_manifest(&text, &|name| classify_spirit(name).is_some())
@@ -3283,25 +3284,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let yank_policy = std::env::var("MAOS_YANK_POLICY")
         .unwrap_or_else(|_| "warn".into())
         .parse::<maos_registry::yank::YankPolicy>()?;
-    let interval = maos_registry::yank::resolve_poll_interval();
-    let mut yank_poller_task = maos_bin::yank_policy::PollTask::default();
-    let has_installs =
-        !maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()?.is_empty();
-    if !interval.is_zero() && (yank_source.is_some() || has_installs) {
-        // Local promotion expiry/revocation must not depend on registry connectivity.
-        let source = yank_source
-            .unwrap_or_else(|| Arc::new(maos_registry::client::NullSpiritRegistryClient));
+    let interval = maos_registry::yank::resolve_poll_interval()?;
+    let mut yank_poller_task = {
         let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
             transparency_log.clone(),
             scheduler.clone(),
             revocation_applier.clone(),
             yank_policy,
+            registry_cfg.uri.clone(),
         ));
-        yank_poller_task = maos_bin::yank_policy::PollTask::start(
-            Arc::new(maos_registry::yank::YankPoller::new(source, observer)),
-            interval,
+        eprintln!(
+            "maos: yank cadence={}s policy={} registry-fetch={}",
+            interval.as_secs(),
+            match yank_policy {
+                maos_registry::yank::YankPolicy::Warn => "warn",
+                maos_registry::yank::YankPolicy::Quarantine => "quarantine",
+                maos_registry::yank::YankPolicy::AutoRevoke => "auto-revoke",
+            },
+            if yank_source.is_some() {
+                "enabled"
+            } else {
+                "disabled"
+            }
         );
-    }
+        if yank_policy == maos_registry::yank::YankPolicy::Quarantine {
+            eprintln!("maos: quarantine requested only (effect lands with KQ1; not claimed in L1)");
+        }
+        if let Some(source) = yank_source {
+            maos_bin::yank_policy::PollTask::start(
+                Arc::new(maos_registry::yank::YankPoller::new(
+                    source,
+                    observer,
+                    registry_cfg.uri.clone(),
+                )),
+                interval,
+            )
+        } else {
+            maos_bin::yank_policy::PollTask::start_local(observer, interval)
+        }
+    };
     eprintln!(
         "maos: registry uri={} tier_floor={:?} t3_public_untrusted={} allow_unsigned_local={} require_server_tier_signature={}",
         registry_cfg.uri,
@@ -4556,6 +4577,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         // Story 17-4 (AC2.6) — the hook pump is joined before the unload.
         hook_pump.shutdown().await;
+        yank_poller_task.shutdown().await;
         if let Some(root) = installed_supervision.take() {
             root.stop_and_join().await;
         }
@@ -5636,7 +5658,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // load, not after admission), and its `emit_vetter_key_event`
                     // now fires on REJECTION as well as grant — at HEAD a refused
                     // topology admission wrote no vetter row at all.
-                    let gated = maos_bin::admission::gate_manifest(&child_toml, &|name| {
+                    let mut gated = maos_bin::admission::gate_manifest(&child_toml, &|name| {
                         classify_spirit(name).is_some()
                     })
                     .map_err(|refusal| {
@@ -5645,6 +5667,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             child_path.display()
                         )
                     })?;
+                    gated.bind_registry_package_at(&child_path)
+                        .map_err(|refusal| format!("maos run: topology package {}: {refusal}", child_path.display()))?;
                     if let Some(section) = &gated.providers {
                         maos_bin::admission::check_provider_pins(section, provider_catalog.get())
                             .map_err(|refusal| refusal.to_string())?;
@@ -6135,6 +6159,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .await;
                 unload_report.render(&mut std::io::stderr());
+                yank_poller_task.shutdown().await;
                 drop(audit_tx);
                 drop(inference);
                 drop(capability);
@@ -7118,6 +7143,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // registry, so an arm that drops three of them waits out the whole window.
     macro_rules! release_audit_tx_holders {
         () => {
+            yank_poller_task.shutdown().await;
             drop(audit_tx);
             drop(inference);
             drop(orchestrator);
@@ -8157,7 +8183,7 @@ description = "smoke test spirit successor"
                 &dummy_manifest_path,
                 maos_kernel_core::lifecycle::UpgradePolicy::HotSwap,
                 |path| {
-                    enforce_vetted_upgrade_precondition("smoke-spirit", path, None, None)
+                    enforce_vetted_upgrade_precondition("smoke-spirit", path, Default::default())
                         .map_err(Into::into)
                 },
                 |_| {},
@@ -10073,10 +10099,9 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         &self,
         spirit_id: &str,
         target_manifest: &std::path::Path,
-        attestation: Option<&str>,
-        vetter_keyring: Option<&str>,
+        evidence: maos_bin::operator_door::UpgradeVetting<'_>,
     ) -> Result<(), String> {
-        enforce_vetted_upgrade_precondition(spirit_id, target_manifest, attestation, vetter_keyring)
+        enforce_vetted_upgrade_precondition(spirit_id, target_manifest, evidence)
     }
 
     async fn upgrade_with_plan_guard(
@@ -10085,8 +10110,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         target_manifest: &std::path::Path,
         original_target: &std::path::Path,
         policy: maos_kernel_core::lifecycle::UpgradePolicy,
-        attestation: Option<&str>,
-        vetter_keyring: Option<&str>,
+        evidence: maos_bin::operator_door::UpgradeVetting<'_>,
     ) -> Result<serde_json::Value, maos_bin::operator_door::UpgradeFailure> {
         let reports = migration_plan::upgrade_with_plan_guard(
             &self.upgrade_orchestrator,
@@ -10095,12 +10119,13 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
             original_target,
             policy,
             |path| {
-                enforce_vetted_upgrade_precondition(spirit_id, path, attestation, vetter_keyring)
-                    .map_err(|detail| maos_bin::operator_door::UpgradeFailure {
-                    code: "vetting_precondition_failed",
-                    detail,
-                    invalid: true,
-                })?;
+                enforce_vetted_upgrade_precondition(spirit_id, path, evidence).map_err(
+                    |detail| maos_bin::operator_door::UpgradeFailure {
+                        code: "vetting_precondition_failed",
+                        detail,
+                        invalid: true,
+                    },
+                )?;
                 self.successor_manifest_slot.stage(path.to_path_buf());
                 Ok(())
             },
@@ -10732,6 +10757,30 @@ async fn run_uninstall_cascade_inner(
     let installed = maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()?
         .into_iter()
         .find(|(name, _)| name == spirit_id);
+    let storage_identity = match &installed {
+        Some((_, path)) => match maos_registry::install::signed_package_at(spirit_id, path)
+            .map_err(|error| -> Box<dyn std::error::Error> { error })?
+        {
+            Some(pkg) => {
+                maos_registry::install::publisher_storage_identity(spirit_id, &pkg.publisher_pubkey)
+            }
+            None => spirit_id.to_owned(),
+        },
+        None => match maos_registry::storage::LocalFsRegistryStorage::default_installed_publisher(
+            spirit_id,
+        )? {
+            Some(publisher) => {
+                maos_registry::install::publisher_storage_identity(spirit_id, &publisher)
+            }
+            None => spirit_id.to_owned(),
+        },
+    };
+    let owners = [spirit_id, storage_identity.as_str()];
+    let storage_owners = if storage_identity == spirit_id {
+        &owners[..1]
+    } else {
+        &owners[..]
+    };
     // Unknown is a successful empty query. I/O/schema/decode failures are never
     // converted to emptiness, even for a refused-before-admission installation.
     let incarnations = maos_audit::resolve_spirit_name_optional(audit_db_path, spirit_id, false)?;
@@ -10739,6 +10788,9 @@ async fn run_uninstall_cascade_inner(
         maos_audit::resolve_spirit_name_optional(audit_db_path, spirit_id, true)?;
     let (lineage, unknown_lineage) = transparency_log.distillates_written_by_identity(spirit_id)?;
     let mut subjects = memory.principal_ids_for_spirit(spirit_id)?;
+    if storage_identity != spirit_id {
+        subjects.extend(memory.principal_ids_for_spirit(&storage_identity)?);
+    }
     subjects.extend(maos_audit::uninstall_principal_scope(
         audit_db_path,
         spirit_id,
@@ -10748,9 +10800,9 @@ async fn run_uninstall_cascade_inner(
     let legacy = maos_audit::legacy_numeric_principal_owners(memory_db_path)?;
     let memory_root = maos_audit::default_memory_root();
     let shared = maos_audit::shared_tier_principal_row_count(memory_db_path)?;
-    let private_before = maos_audit::private_tier_principal_row_count_for_spirit(
+    let private_before = maos_audit::private_tier_principal_row_count_for_owners(
         &memory_root,
-        spirit_id,
+        storage_owners,
         &subjects,
     )?;
     let retained = RetainedUninstallStore::ALL
@@ -10954,8 +11006,8 @@ async fn run_uninstall_cascade_inner(
     }
     for subject in &subjects {if transparency_log.is_under_legal_hold(subject)? {held_principals.push(subject.clone());}}
     held_principals.sort();held_principals.dedup();held_frames.sort();held_frames.dedup();malformed.sort();malformed.dedup();
-    let (private_after,held_attributable)=maos_audit::private_tier_principal_row_counts_for_spirit(
-        &memory_root,spirit_id,&subjects,&held_principals)?;
+    let (private_after,held_attributable)=maos_audit::private_tier_principal_row_counts_for_owners(
+        &memory_root,storage_owners,&subjects,&held_principals)?;
     let held_private_rows=held_principals.iter().try_fold(0_u64,|count,subject| {
         let rows=memory.export_redactable(subject,true).ok()?;
         count.checked_add(rows.iter().filter(|row|matches!(row.payload,maos_domain::memory::ExportPayload::Raw(_))).count() as u64)
@@ -10982,7 +11034,7 @@ async fn run_uninstall_cascade_inner(
     inventory.status("principal_index",if legacy.is_empty() {removed(index_rows)} else {gap(format!("legacy_numeric_owner: {} ambiguous principal(s) retained; stable-owner deletions separately evidenced",legacy.len()))});
     inventory.status("capability_tokens",removed(tokens));
     inventory.status("shared",if shared==0 {Status::VerifiedEmpty} else {gap(format!("{shared} pre-partition principal rows retained, unreachable but not erased"))});
-    inventory.status("private",gap(format!("kernel_private_index_hold_lease pending final kernel landing; {private_after} private principal value(s) remain; {private_reason}; no cross-store lease claim")));
+    inventory.status("private",gap(format!("kernel_private_index_hold_lease pending final kernel landing; private_before={private_before}; {private_after} private principal value(s) remain; {private_reason}; no cross-store lease claim")));
     let frame_gap=inventory.completion.is_none();
     let frame_reason=format!("frame sweep pending/retained: held={held_frames:?}; uncertified_malformed_observations={malformed:?}; unattributed={unattributed:?}; evidenced_removed_distillates={}; evidenced_removed_principal_frames={}; no completion claim",inventory.distillates.len(),inventory.frames.len());
     inventory.status("principal_frames",if frame_gap {gap(frame_reason.clone())} else {removed(inventory.frames.len() as u64)});
@@ -11895,6 +11947,8 @@ fn admit_daemon_control_spirit(
             manifest_path.display()
         )
     })?;
+    // This is policy bootstrap for an already assigned first-party control pid,
+    // not a registry actor load. It never supplies a MemoryManager identity.
     let gated =
         maos_bin::admission::gate_manifest(&manifest_toml, &|name| classify_spirit(name).is_some())
             .map_err(|refusal| refusal.to_string())?;

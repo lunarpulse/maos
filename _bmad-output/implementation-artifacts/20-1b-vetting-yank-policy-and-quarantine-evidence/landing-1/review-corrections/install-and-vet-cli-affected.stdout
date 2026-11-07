@@ -1,0 +1,21 @@
+
+running 9 tests
+test built_in_shell_names_are_reserved_before_admission ... ok
+test configured_org_key_requires_a_valid_server_tier_signature ... ok
+test independently_keyed_server_is_verified_and_wrong_key_never_persists ... ok
+test install_refuses_registry_rust_inproc_before_persisting ... ok
+test installed_version_is_immutable_ac14 ... ok
+test materialization_failure_never_activates_a_partial_install ... ok
+test offline_install_persists_remote_origin_and_rejects_tampering ... ok
+test wrong_publisher_key_and_claim_signature_are_refused ... ok
+test yanked_install_is_refused_before_persistence_ac16 ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.73s
+
+
+running 2 tests
+test publisher_and_vetter_yank_verbs_authenticate_ac7 ... ok
+test vet_issue_install_promote_revoke_refuses_next_admission_ac6 ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.70s
+

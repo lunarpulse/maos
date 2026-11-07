@@ -7,7 +7,7 @@ context_commit: a4c00897
 baseline_commit: a4c00897
 security_sensitive: true
 kernel_grant: "L1 KERNEL-FREE, RULED Main 2026-11-06: AC8 quarantine effect joins final row R (AC11-AC13 KQ1+P); no KQ0 substitute. Rebase prior measured prototype +78 physical/+68 tokei onto ebf2ab03 and current unchanged26841/21042: forecast26919/21110; D02 A x2 ceilings26997/21178, below shared STOP21250 tokei. No prototype rerun or kernel change claimed in L1. Historical superseded grant: ◆ FLAG-Winston RULED 2026-11-01/02 (ask rows201, operator): row R = KQ1 sticky quarantine (D-20-1-02 A) + P poller edge-trigger (D-20-1-03 A), measured by reverted prototype +78 physical / +68 tokei from HEAD 26801 / 21011 (+40 / +40 of it is the rustfmt churn any `revocation/applier.rs` edit pays, control `fmt0`). Granted ceilings: kernel <= 26957 physical / 21147 tokei. This grant is computed from HEAD 26801 / 21011 and lands in THIS story only (20-1a is kernel-free). INTERACTION with 20-7 row R = K1w + K2r (+40 / +31 measured; ceiling 26881 / 21073, also computed from HEAD 26801 / 21011): if both land, the second to land MUST re-base; cumulative measured tokei +68 +31 => expected 21110; cumulative tokei ceilings MUST NOT exceed 21209 (= 791 under the ADR-069 22000 alarm); STOP otherwise. Room per ADR-069: docs/adr/ADR-069-kernel-core-envelope-through-v1.md:35-46."
-kloc_grant: "L1 REBASE, operator f1b/Main 2026-11-06, D02 A x3 unmeasured kernel-free forecast: current external baseline bin35102, registry4412, spirit-cli755, compliance2032 measured (old reserved pin2117), domain10107, aggregate194954 including external20-2 xtask20. Forecast upper increments245/265/380/30/20; ceilings bin35837, registry5207, spirit-cli1895, compliance2122, domain10167, aggregate197774. Exact formatted L1 pins bin35422/registry4627/spirit-cli936/compliance2070/domain10137/xtask44696; aggregate195738, hardfail195739. xtask44676 -> 44696 is external20-2 hosted-3 d84b83dd, authorized ceiling44920, not own Rust growth. CLI6429 unchanged, existing6666 ceiling/reserved6856 pin unchanged. No kernel/audit/iac growth by L1; F5 prices remain PROPOSED D-20-1b-01/02/03 and are not granted. These are shared ceilings, not reservations; remeasure future competing draws. Historical superseded grant: RULED 2026-11-01/02 (ask rows201; D02 A; D-20-1-11 A). One-key ceilings (STOP above; aggregate hardfail = measured + 1 at landing): kernel <= 26957 / 21147 (row R, this story); maos-registry <= 5163; maos-spirit-cli <= 2043; maos-cli <= 6666 (above its 6382 STOP; inside the reserved 6856 pin because install logic lives in maos-registry, D-20-1-05 A); maos-bin <= 34410; maos-shell <= 728; maos-compliance <= 2122; maos-domain <= 10153; xtask <= 42920; aggregate <= 193768. Each ceiling is shared with 20-1a; the kernel row is 20-1b's alone."
+kloc_grant: "L1 REVIEW CORRECTIONS (Main, 2026-11-07): existing L1 ceilings bin35837/registry5207/spirit-cli1895/compliance2122/domain10167/aggregate197774; additional P3 audit ceiling8204 =8174+30 under D02 A x3 forecast, separate20-11 ceiling8261 unchanged. Formatted correction pins bin35626/registry5071/spirit-cli939/compliance2077/audit8179/domain10137/xtask44696, aggregate196401 and strict hardfail196402; correction delta663, kernel0. Old AC15 absolute/auxiliary bounds below require Main re-base at the explicit handoff; not a source of L1 capacity. | HISTORICAL AC15 GRANT RECORD: RULED operator f5rows 2026-11-07: D-20-1b-01/02/03 A/A/A; AC15 second kernel-free pass AFTER L1 review/corrections and explicit Main CARGO HANDOFF AC15. Registry ceiling6637; aggregate ceiling197958. From last formatted L1 registry4627/aggregate195738, new unmeasured x3 allowances2010/2220; cli+40/bin+15/spirit-cli+15 forecasts x3 give auxiliary per-pass bounds6549/35467/981 from6429/35422/936. Remeasure intervening external drift under D02 A, do not renew unused L1 allowances. Compliance2122/domain10167/external xtask44920 unchanged. Rustls leaf/server dependency edge granted subject to cargo-deny permitted versions, existing-lock ring/aws-lc feature review, and no no-default-features leak. Operator-supplied cert/key paths; configured canonical-URI signing root; explicit both-end literal-loopback dev HTTP only; never HTTPS downgrade. RECORDS ONLY: exact pins remain registry4627/bin35422/cli6429/spirit-cli936/compliance2070/domain10137/xtask44696, aggregate195738/hardfail195739; kernel26841/21042 unchanged; no dependency/source/pin/status change or new verification. Historical L1 grant, superseded for AC15: L1 REBASE, operator f1b/Main 2026-11-06, D02 A x3 unmeasured kernel-free forecast: current external baseline bin35102, registry4412, spirit-cli755, compliance2032 measured (old reserved pin2117), domain10107, aggregate194954 including external20-2 xtask20. Forecast upper increments245/265/380/30/20; ceilings bin35837, registry5207, spirit-cli1895, compliance2122, domain10167, aggregate197774. Exact formatted L1 pins bin35422/registry4627/spirit-cli936/compliance2070/domain10137/xtask44696; aggregate195738, hardfail195739. xtask44676 -> 44696 is external20-2 hosted-3 d84b83dd, authorized ceiling44920, not own Rust growth. CLI6429 unchanged, existing6666 ceiling/reserved6856 pin unchanged. No kernel/audit/iac growth by L1; F5 prices remain PROPOSED D-20-1b-01/02/03 and are not granted. These are shared ceilings, not reservations; remeasure future competing draws. Historical superseded grant: RULED 2026-11-01/02 (ask rows201; D02 A; D-20-1-11 A). One-key ceilings (STOP above; aggregate hardfail = measured + 1 at landing): kernel <= 26957 / 21147 (row R, this story); maos-registry <= 5163; maos-spirit-cli <= 2043; maos-cli <= 6666 (above its 6382 STOP; inside the reserved 6856 pin because install logic lives in maos-registry, D-20-1-05 A); maos-bin <= 34410; maos-shell <= 728; maos-compliance <= 2122; maos-domain <= 10153; xtask <= 42920; aggregate <= 193768. Each ceiling is shared with 20-1a; the kernel row is 20-1b's alone."
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:57-71`): a kernel FLAG-Winston grant (D-20-1-02/03), signatures and supply-chain trust (AC6, AC7, AC10), cross-Spirit isolation (AC11). Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC6/AC7/AC10/AC11, Test Infrastructure on glm-5.3 (standing policy)."
 ---
 
@@ -44,7 +44,8 @@ Rulings are recorded in the Decisions table of `20-1a-registry-publish-install-e
 
 - Operator ask `f1b`: inherited F4, F5, F6 and publish/deprecate authentication
   are **IN scope**, recorded as AC14–AC17 below. The earlier PROPOSED scope
-  dispositions are superseded; F5's implementation design remains unruled.
+  dispositions are superseded. F5's initially unruled design is superseded by
+  operator ask `f5rows` below; this does not claim its implementation or proof.
 - Main's explicit landing-split ruling: AC8's sticky quarantine **effect** and
   its effect witness move to the final KQ1 kernel landing with AC11–AC13.
   Landing 1 implements the kernel-free decision, typed boundary outcome and
@@ -52,37 +53,63 @@ Rulings are recorded in the Decisions table of `20-1a-registry-publish-install-e
   claimed in L1**. KQ0 / a resumable pause is not an approved substitute.
   The final kernel landing remains last; no kernel source change in L1.
 
-### F5 design decisions — PROPOSED, not implementation authority
+### L1 independent-review correction rulings — 2026-11-07
 
-All prices below are **unmeasured forecasts**, additional to the kernel-free
-AC6–AC10 and AC14/16/17 forecast. D02 A means ×3 upper-bound allowances;
-they are not exact pins or reserved capacity. Baseline is `ebf2ab03`:
-registry 4412, spirit-cli 755, cli 6429, bin 34914, compliance 2032,
-domain 10107, xtask 44676, aggregate 194743. Kernel remains 26841 / 21042.
+Main authorized the `landing-1/review/triage.md` correction pass at `62faff63`:
+P1–P18, security F1–F5 and the following D1–D5 choices. This is not the separate
+AC15 cargo handoff. No kernel-dependent repair is included.
+
+| ID | Review choice and disposition | Authority / price |
+|---|---|---|
+| D-20-1b-04 | D1 **A**: resolve the named installed `SignedPackage` at the operator door and carry it explicitly through snapshots/guards; prove a genuine vetted upgrade and swapped deployed bytes/publisher refusal. B (declare unsupported) rejected. | RULED A, Main correction handoff 2026-11-07; existing L1 bin/registry envelopes. |
+| D-20-1b-05 | D2 **A**: durable publisher/version-digest ledger surviving uninstall, explicit local operator `release-pin`, and import of every retained legacy signed generation before deletion. B (per-installation pin) rejected. | RULED A, Main correction handoff 2026-11-07; existing L1 registry envelope. |
+| D-20-1b-06 | D3 **A**: immutable server name/version; identical republish idempotent; initial package files staged and atomically renamed together. B (mutable publication) rejected. | RULED A, Main correction handoff 2026-11-07; existing L1 registry envelope. |
+| D-20-1b-07 | D4 **A**: atomically renew verified `vetting.json` only when package and origin are identical; no uninstall/data-loss requirement. B (require uninstall) rejected. | RULED A, Main correction handoff 2026-11-07; existing L1 registry envelope. |
+| D-20-1b-08 | D5 **A**: label enrollment/revoke-key witnesses fixture-keyring based; explicitly retain the missing shipped operator verbs as an open, rule-10-owned obligation. Do not add those verbs in this correction pass. | RULED A, Main correction handoff 2026-11-07; documentation only. |
+
+Main separately authorized P3's audit correction ceiling **8204 = 8174 + 30**
+(D02 A, unmeasured +5…10 forecast ×3). The separate 20-11 ceiling8261 is unchanged;
+neither its unused room nor the later AC15 grant funds L1 corrections. No private
+data migration is implemented: this pre-release cutover requires operator
+export/reinstall for old bare-identity data; uninstall addresses both old and
+publisher-bound owners.
+
+### F5 design decisions — RULED A/A/A, `f5rows`, 2026-11-07
+
+Operator ask `f5rows` rules D-20-1b-01/02/03 **A/A/A** and grants a second,
+kernel-free AC15 pass **after the landing-1 review round and corrections**.
+Implementation/cargo waits for Main's explicit **`CARGO HANDOFF AC15`**.
+Main has now handed off the L1 review corrections, which may change implementation
+and run their prescribed checks. AC15 implementation/verification remains held
+until the separate explicit cargo handoff.
+
+Prices remain unmeasured forecasts, not exact pins or reserved capacity. D02 A
+uses ×3 upper bounds for AC15; remeasure intervening external changes at handoff.
+The creation baseline `ebf2ab03` remains historical: registry4412, spirit-cli755,
+cli6429, bin34914, compliance2032, domain10107, xtask44676, aggregate194743;
+kernel26841 physical /21042 tokei is unchanged.
 
 | ID | Choice and options | Recommendation, price and envelope consequence | Status |
 |---|---|---|---|
-| D-20-1b-01 | First-contact root: **A** explicit registry signing public key in operator config, bound to canonical registry URI, with registry-signed artifact/publisher metadata; **B** TOFU only after mandatory out-of-band fingerprint confirmation; **C** operator-distributed signed root bundle with expiry and rotation. A response-supplied key alone is never a root. | **A**: no interactive trust race, unattended installs are deterministic. A: registry +100…180, cli +0…10; ×3 allowance +540/+30. B: registry +150…260, cli +30…60; +780/+180. C: registry +220…380, domain +20…40; +1140/+120. All kernel 0. Existing tier-only signature is insufficient: it does not bind artifact or publisher. | PROPOSED 2026-11-06; Main/operator ruling required |
-| D-20-1b-02 | Authenticated TLS/key custody: **A** rustls in the leaf HTTP transport and registry server; explicit certificate chain and private-key files supplied by path, platform/WebPKI trust with optional operator CA, hostname verification; **B** external TLS terminator with registry accessible only through a separately authenticated local upstream. | **A**: end-to-end refusal can be witnessed in owned binaries without assuming a correctly configured proxy. Registry +240…420, bin/cli +0…15 each; ×3 allowance +1260/+45/+45; dependency/lock/deny review required. B: registry +100…180 plus deployment/harness work; +540 allowance, but upstream authentication must be designed rather than treating loopback as authentication. Key files live outside the package/inventory store, operator-owned 0600; certificate chain may be 0644. No generated production key or trust material is silently installed. All kernel 0. | PROPOSED 2026-11-06; Main/operator ruling required |
-| D-20-1b-03 | Loopback/development: **A** require explicit development-mode opt-in at both server and install; permit HTTP only for literal loopback addresses, keep mutation signatures and publisher pins; **B** TLS everywhere including loopback with operator-created test CA. Never downgrade HTTPS after failure. | **A**: retains executable local fixture workflows while preventing production URI downgrade. Registry +35…70, cli +5…15, spirit-cli +5…15; ×3 allowances +210/+45/+45. B: registry +10…25, CLI 0, more fixture certificate custody. A is an explicit exception, not authenticated transport evidence; F5 production hostile-registry/interception witnesses must use TLS and the configured root. All kernel 0. | PROPOSED 2026-11-06; Main/operator ruling required |
+| D-20-1b-01 | First-contact root: **A** explicit registry signing public key in operator config, bound to canonical registry URI, with registry-signed artifact/publisher metadata; **B** TOFU only after mandatory out-of-band fingerprint confirmation; **C** operator-distributed signed root bundle with expiry and rotation. A response-supplied key alone is never a root. | **A**: no interactive trust race, unattended installs are deterministic. A: registry +100…180, cli +0…10; ×3 allowance +540/+30. B: registry +150…260, cli +30…60; +780/+180. C: registry +220…380, domain +20…40; +1140/+120. All kernel 0. Existing tier-only signature is insufficient: it does not bind artifact or publisher. | RULED A — operator `f5rows`, 2026-11-07; implementation held for L1 review/corrections and `CARGO HANDOFF AC15` |
+| D-20-1b-02 | Authenticated TLS/key custody: **A** rustls in the leaf HTTP transport and registry server; explicit certificate chain and private-key files supplied by path, platform/WebPKI trust with optional operator CA, hostname verification; **B** external TLS terminator with registry accessible only through a separately authenticated local upstream. | **A**: end-to-end refusal can be witnessed in owned binaries without assuming a correctly configured proxy. Registry +240…420, bin/cli +0…15 each; ×3 allowance +1260/+45/+45; dependency/lock/deny review required. B: registry +100…180 plus deployment/harness work; +540 allowance, but upstream authentication must be designed rather than treating loopback as authentication. Key files live outside the package/inventory store, operator-owned 0600; certificate chain may be 0644. No generated production key or trust material is silently installed. All kernel 0. | RULED A — operator `f5rows`, 2026-11-07; implementation held for L1 review/corrections and `CARGO HANDOFF AC15` |
+| D-20-1b-03 | Loopback/development: **A** require explicit development-mode opt-in at both server and install; permit HTTP only for literal loopback addresses, keep mutation signatures and publisher pins; **B** TLS everywhere including loopback with operator-created test CA. Never downgrade HTTPS after failure. | **A**: retains executable local fixture workflows while preventing production URI downgrade. Registry +35…70, cli +5…15, spirit-cli +5…15; ×3 allowances +210/+45/+45. B: registry +10…25, CLI 0, more fixture certificate custody. A is an explicit exception, not authenticated transport evidence; F5 production hostile-registry/interception witnesses must use TLS and the configured root. All kernel 0. | RULED A — operator `f5rows`, 2026-11-07; implementation held for L1 review/corrections and `CARGO HANDOFF AC15` |
 
-Recommended A/A/A combined F5 upper forecast: registry +670, cli +40,
-bin +15, spirit-cli +15; ×3 allowances +2010/+120/+45/+45, aggregate
-+2220. These are incremental to other L1 work and competing story draws.
-The initial `ebf2ab03` baseline above is retained as creation provenance, not
-the resumed-tree pin. After external `20-11`/`20-2` changes, the formatted L1
-measurement is registry4627 / cli6429 / bin35422 / spirit-cli936,
-aggregate195738 (kernel unchanged). Against rebased kernel-free ceilings
-registry5207 / bin35837 / spirit-cli1895 / aggregate197774:
+**Granted A/A/A AC15 envelope (`f5rows`, 2026-11-07):** registry6637 and
+aggregate197958. Upper forecasts registry+670, cli+40, bin+15, spirit-cli+15
+give incremental ×3 allowances2010/120/45/45 (aggregate2220).
+From last formatted L1 pins registry4627 /cli6429 /bin35422 /spirit-cli936,
+aggregate195738, the auxiliary AC15 per-pass bounds are cli6549 /bin35467 /
+spirit-cli981. These do not renew unused L1 allowances. Existing compliance2122,
+domain10167 and externally owned xtask44920 ceilings are unchanged.
 
-- Recommended A/A/A raw upper forecast yields registry5297 (**90 above**
-  the existing registry envelope), cli6469 / bin35437 / spirit-cli951 and
-  aggregate196478 (inside the current aggregate ceiling).
-- Applying D02 A ×3 to this new, unmeasured F5 work, without renewing the
-  prior L1 allowance, proposes registry6637 (**1430 above** its current
-  ceiling), cli6549 / bin35467 / spirit-cli981 and aggregate197958
-  (**184 above** the current aggregate ceiling). These increases require
-  the D-row ruling; none is silently granted or pinned.
+The approved registry/aggregate ceilings supersede L1's5207/197774 for AC15,
+increases1430/184. They are **grants, not new exact pins**: no kloc row, aggregate
+hardfail, dependency, source file or kernel pin changes in this recording pass.
+At the eventual handoff rebase only observed external drift per D02 A.
+
+**Unselected historical alternatives (not authorized by `f5rows`):**
+
 - Individually, root B's ×3 registry ceiling5407 exceeds5207 by200; root C
   proposes registry5767 and domain10257, exceeding5207/10167 by560/90.
   Root A alone fits its registry allowance. TLS A alone proposes registry5887
@@ -90,9 +117,9 @@ registry5207 / bin35837 / spirit-cli1895 / aggregate197774:
   current registry ceiling. Combining choices adds their prices, not their
   separately rebased baselines; competing story draws must be remeasured.
 
-No F5 implementation, hostile-registry/TLS-interception refusal witness,
-or security closure is claimed. First-contact/TLS/development choices remain
-PROPOSED until Main/operator rules D-20-1b-01/02/03.
+No F5 implementation, hostile-registry/TLS-interception refusal witness or
+security closure is claimed. Design is now ruled; execution is held for the
+landing-1 review/corrections and Main's explicit `CARGO HANDOFF AC15`.
 
 
 ## Acceptance Criteria
@@ -102,15 +129,15 @@ PROPOSED until Main/operator rules D-20-1b-01/02/03.
 #### AC6 — the vetting attestation binds the exact artifact and publisher (D:1093); vetters can issue and revoke
 
 1. `VettingClaim` (`crates/maos-compliance/src/vetting/attestation.rs:105-133`) binds `artifact_sha256` and the publisher public key; `verify_attestation` (`vetting/mod.rs:220`) and its caller (`crates/maos-registry/src/admission.rs:388`) check both; golden byte pin (`attestation.rs:226-233,280`) updated; ADR-056 §1 amended.
-2. `maos-spirit vet issue|revoke` wraps `issue_attestation` (`attestation.rs:154`) and the keyring's revocation (`keyring.rs:117,157,288,334`); the signed revocation-list **issuer** lives in maos-spirit-cli, not maos-compliance (E20:105).
-3. **Failing-before witnesses (local):** swapped artifact under a valid attestation ⇒ refused; swapped publisher key ⇒ refused — both admitted `PublicVetted` at HEAD (D:1093). `vet issue` → `maosctl spirit install … --vetting-attestation` promotes; `vet revoke` → the next admission refuses.
+2. `maos-spirit vet issue|revoke` issues attestations and writes operator-signed attestation revocations. It does **not** enroll/revoke a vetter key; those key-lifecycle tests use fixture-built keyrings, with the missing operator verbs explicitly deferred (D-20-1b-08).
+3. **Local witnesses:** swapped artifact/publisher under a valid attestation refuse; original assertion-red runs used a partially edited L1 tree, not a clean commit baseline. Real `vet issue` → install promotes, and `vet revoke` → next admission refuses. V2 role-domain vectors additionally refuse old unscoped attestation/key-event signatures.
 4. **Plant (one, local):** `verify_attestation` ignores `artifact_sha256` ⇒ the swap vector red.
 
 #### AC7 — yanks arrive signed, labelled and restart-safe (FR59; D-20-1-06 A, D-20-1-07 B)
 
 1. `maos-spirit yank <name>@<ver>` (publisher key) and the vetter's yank (enrolled vetter key) send signed requests; the server verifies publisher yanks against the stored package's key and vetter yanks against the keyring; unsigned `registry.deprecate` is refused. `YankEntry` carries `origin` and a server sequence; the daemon re-verifies before acting and journals origin-labelled rows distinguishable from operator CRLs (intent + `RevocationOrigin` label).
 2. The yank cursor survives a server restart and a daemon restart (persisted; F2, F3).
-3. **Failing-before witnesses (local):** unsigned deprecate of another publisher's Spirit ⇒ refused (accepted at the baseline); server restart between two yanks ⇒ the second is fetched; daemon restart ⇒ no replay of already-journaled yanks. Propagation ≤ 5 min is witnessed by `poll_once` and one bounded cross-process production-loop run at the 30 s clamp floor (`crates/maos-registry/src/yank.rs:143-179`), separately budgeted under 20-12.
+3. **Local witnesses:** unsigned deprecate refuses; server restart between yanks fetches the second; daemon restart does not replay journaled rows. The original restart cases had no observed before-red and are not represented otherwise. Propagation uses a separately budgeted real 30 s production loop; review adds actual `YankPoller`/`YankRuntime` injected-clock restart coverage, URI-bound cursors, verified-only advancement and rejected-row isolation. Authenticated omitted/rolled-back head detection remains AC15 work.
 4. **Plant (one, local):** accept unsigned deprecate ⇒ red.
 
 #### AC8 — yank policy `warn | quarantine | auto-revoke` (D-20-1-08 A)
@@ -122,13 +149,13 @@ PROPOSED until Main/operator rules D-20-1b-01/02/03.
 #### AC9 — a lapsed or revoked promotion reaches operators as a vetter yank (D9; D-20-1-10 A)
 
 1. On the yank cadence the daemon re-evaluates each running `public-vetted` Spirit's attestation; expiry or revocation journals `RunningSpiritObservation` (`crates/maos-compliance/src/vetting/terminal.rs:99-152`) with its cause label and applies the yank policy as a vetter-origin yank. `enforce_vetted_upgrade_precondition` (`crates/maos-bin/src/main.rs:130`) stays the only refusal point; no crossing check.
-2. **Failing-before witness (local):** a promoted fixture whose attestation expires (injected clock) and one whose vetter key is revoked ⇒ one observation each with labels `expiry-lapse` / `vetting-revocation` and the policy effect — nothing at HEAD (F6).
+2. **Local witnesses:** injected expiry and fixture-keyring revocation yield one cause-labelled observation and policy request each. The original tests were direct runtime calls, not daemon cadence proof. Review adds real poller/runtime clock+cursor restart and independent no-registry local-timer coverage; enrollment/revoke-key operator verbs remain open.
 3. **Plant (one, local):** skip the re-evaluation ⇒ red.
 
 #### AC10 — a name cannot be squatted (D:37; D-20-1-09 A)
 
-1. The registry and install pin the first publisher key per `spirit_id`; a different key is refused, typed. Registry admission derives `spirit_id` + a truncated publisher-key fingerprint (`crates/maos-bin/src/admission.rs:483`) and binds it at load (`:1034`); local Spirits keep the bare `spirit_id`.
-2. **Failing-before witnesses (local):** publish `X` with key K1, then `X` with K2 ⇒ refused (overwrites at HEAD, F4); a second boot admitting `X` under K2 (forced through import) does not read K1's principal spill (extends `crates/maos-kernel-core/tests/principal_identity_20_3b.rs` at the maos-bin admission level).
+1. The server pins the first publisher per name. Installation additionally retains publisher and version-digest pins across uninstall; only explicit local `release-pin` releases them. One shared identity formatter binds publisher-separated principal spill at production `load_admit_start`; local Spirits keep the bare identity.
+2. **Local witnesses:** typed different-publisher refusal and restart; durable pin/version refusal after uninstall and legacy-generation import; two actual admission processes with recycled PID force K1→K2 sidecar replacement and refuse K1's spill. The original hand-bound witness did not cover production binding; review's production-binding mutation now does.
 3. **Plant (one, local):** bind identity to `spirit_id` only ⇒ the spill vector red.
 
 #### AC11 — FR13 quarantine isolates and never kills (D04 A; D-20-1-02 A) ◆ FLAG-Winston
@@ -164,8 +191,20 @@ PROPOSED until Main/operator rules D-20-1b-01/02/03.
 1. Registry installation requires an authenticated first-contact trust root
    and authenticated TLS transport. A registry response is not its own root.
 2. Hostile-registry and network-interception witnesses refuse before persistence.
-3. Implementation awaits D-20-1b-01/02/03; the explicit dev exception, if ruled,
-   must not be reported as TLS proof. Plant: bypass root/peer verification ⇒ red.
+3. Under `f5rows` (2026-11-07), use the canonical-URI-bound operator-configured
+   registry signing public key; a response-supplied key alone is never a root.
+4. Use rustls in both leaf client and server, operator-supplied cert-chain/key
+   paths, platform/WebPKI trust plus optional operator CA, and hostname validation.
+   Keep private key material outside package/installation storage; no silent
+   production key generation. Permit HTTP only for literal loopback addresses
+   with explicit development opt-in at **both** server and install; preserve
+   mutation signatures/publisher pins and never downgrade after HTTPS failure.
+5. The rustls dependency edge is granted subject to cargo-deny and review of
+   ring/aws-lc feature selection against the existing lock. No new crate
+   versions beyond deny policy; rustls must not leak into the no-default-features
+   build. The development exception is not TLS proof.
+6. Plant: bypass root/peer verification ⇒ red. Implementation and all AC15 checks
+   wait for the landing-1 review/corrections and `CARGO HANDOFF AC15`.
 
 #### AC16 — yanked versions are refused before persistence (F6; RULED `f1b`, 2026-11-06)
 
@@ -188,8 +227,9 @@ PROPOSED until Main/operator rules D-20-1b-01/02/03.
   Same-key immutability supplements AC10's publisher pin; both same-registry
   replacement and different-registry overwrite have refusal witnesses.
 - **F5 (security review):** RULED in scope as AC15 by operator `f1b`, 2026-11-06.
-  Its trust-root/TLS/development choices remain PROPOSED D-20-1b-01/02/03,
-  not implementation authority. No first-contact or TLS closure is claimed.
+  Its trust-root/TLS/development choices are now RULED A/A/A by `f5rows`,
+  2026-11-07; implementation waits for the review round/corrections and Main's
+  explicit cargo handoff. No first-contact/TLS closure is claimed by this record.
 - **F6 (security review):** RULED in scope as AC16 by operator `f1b`, 2026-11-06.
   Signed yank propagation for running Spirits does not replace install refusal.
 - **Mutation authentication (security/BMAD reviews):** RULED in scope as AC17
@@ -229,13 +269,22 @@ Shared Dev Notes (what changes by file, guardrails, proven-red controls, tests a
 
 #### Authority, scope and custody
 
+**Historical L1 handoff status, before `f5rows`:**
+
 Operator `f1b` (2026-11-06) adds AC14–AC17. AC6–AC10's kernel-free work and AC14/16/17 are implemented with local refusal/effect witnesses. **AC15/F5 remains blocked on PROPOSED D-20-1b-01/02/03**, not silently designed. Main's explicit split puts AC8's sticky quarantine **effect and effect witness** with AC11–AC13 in the final KQ1 kernel landing: **not claimed in L1**. L1 delivers the signed decision, typed boundary outcome and operator-visible quarantine-requested record; no KQ0/resumable-pause substitute.
 
-No kernel source, `.devcontainer`, protected worktree, workflow on main, commit, push or tracker status was changed. Original task/closure workflow state remains Main-owned. Independent DIFFICULT-tier Blind/Edge/Acceptance/Security/Test Infrastructure/Winston review and hosted execution are not claimed.
+**Superseding records-only ruling — `f5rows`, 2026-11-07.** D-20-1b-01/02/03
+are now RULED A/A/A with the AC15 envelope above. The preceding L1 handoff's
+“blocked on PROPOSED D-rows” is historical. No new code or proof is claimed;
+AC15 execution remains held until the review round/corrections finish and Main
+sends `CARGO HANDOFF AC15`. Kernel-last KQ1 scope and all L1 observations remain
+unchanged.
+
+No kernel source, `.devcontainer`, protected worktree, workflow on main, commit, push or tracker status was changed by the original implementation agent. Main subsequently committed L1 at62faff63 and performed the independent review recorded in `landing-1/review/triage.md`; the correction pass below does not claim its own independent re-review or hosted proof.
 
 Work began at `ebf2ab03ac64de5b828d995f72ae8b24199fa9a0`. At Main's park request, owned changes were archived, removed and an empty status was observed; after the exclusive cargo slot resumed, that archive was reapplied onto `063c13cf`. Current measured source includes external 20-2 commits through `bdfc1430`; `git log --oneline -5` and exact revision capture are preserved. `resume-baseline-kloc` ran **after WIP reapplication**, so its failing measurement is not represented as a clean baseline.
 
-#### Implementation and clean cutover
+#### Historical implementation at original L1 handoff (superseded by corrections below)
 
 - Required vetting fields bind exact manifest, artifact SHA-256 and publisher key. An independent `VettingSubject` reaches verification; both hostile swaps are correctly re-signed so a publisher-signature failure cannot masquerade as attestation binding. Canonical CBOR golden bytes and ADR-056 are updated; old manifest-only attestations require reissuance.
 - Real `maos-spirit vet issue|revoke` signs the claim and operator-root CRL/keyring update; real publisher and enrolled-vetter `yank` commands send domain-separated signed authorizations. The real revoke/install lifecycle exposed the existing CRL fixed-byte CBOR decoder mismatch; accepting the serializer's byte-string representation fixes that codec without changing signed bytes. Wrong 63/31-byte vectors still refuse.
@@ -247,20 +296,20 @@ Work began at `ebf2ab03ac64de5b828d995f72ae8b24199fa9a0`. At Main's park request
 - Registry admission derives a publisher-fingerprinted principal identity, hashes long names to stay below the encoded filename limit, and binds it at the existing load boundary. Signed sidecars feed boot, standalone and operator-door paths; ordinary local Spirits retain the bare identity.
 - `MAOS_YANK_POLICY` is registered UserFacing; the new maos-bin module is in the source scanner. New tests invoke existing harness-resolved binaries, never cargo.
 
-#### AC witness matrix — observed local results
+#### Historical AC witness matrix — original L1 results before `f5rows`
 
 All paths below are repository-relative. Each plant is an executed runtime assertion failure (exit101), followed by copy-back + cmp + touch (exit0). Exact commands and elapsed times are in the linked evidence, not inferred from source.
 
 | AC | Named witness and line | Before / plant | Final focused observation |
 |---|---|---|---|
-| AC6 | `crates/maos-registry/tests/vetting_attestation_gate.rs:411` artifact swap; `:415` publisher swap; `crates/maos-spirit-cli/tests/vet_lifecycle_20_1b.rs:8` real issue/promote/revoke | Both swaps genuine before-red; artifact-ignore plant101, 29.352s | Registry all-targets0; real CLI lifecycle0 |
+| AC6 | `crates/maos-registry/tests/vetting_attestation_gate.rs:411` artifact swap; `:415` publisher swap; `crates/maos-spirit-cli/tests/vet_lifecycle_20_1b.rs:8` real lifecycle | Assertion-red on a partially edited L1 tree, **not** a clean bdfc1430 baseline; artifact-ignore plant101 | Original focused registry/CLI0; review corrections supersede current-state claims below |
 | AC7 | `crates/maos-registry/tests/yank_auth_20_1b.rs:89` signed origins/server restart; `:166` persisted daemon cursor; `yank_cadence_20_1b.rs:38` real server/production30s loop; CLI `vet_lifecycle_20_1b.rs:110` | Unsigned-deprecate plant101, 21.887s | Registry0, real cadence30.52s; publisher/vetter CLI0 |
 | AC8 | `crates/maos-bin/tests/yank_policy_20_1b.rs:163` | Wrong typed quarantine outcome plant101, 127.254s | Policy0: warn leaves running, quarantine request is recorded, auto-revoke reaches existing applier; quarantine effect **not claimed in L1** |
 | AC9 | `crates/maos-bin/tests/yank_policy_20_1b.rs:237` | Skip-reevaluation plant101, 72.735s | Policy0: one cause-labelled observation per fixture, requested policy outcome |
-| AC10 | `crates/maos-registry/tests/yank_auth_20_1b.rs:69`; `crates/maos-bin/tests/yank_policy_20_1b.rs:318` | Bare-name plant101, 34.684s, actually discloses first publisher's spill | Registry/policy0: first-key refusal and real second-boot isolation; local/long-name controls |
-| AC14 / F4 | `crates/maos-cli/tests/spirit_install_20_1.rs:307` | Genuine before-red; replacement-guard plant101, 21.527s | Install9/9: same-key replacement and different-registry overwrite refuse with unchanged bytes/origin/inventory |
-| AC15 / F5 | D-20-1b-01/02/03 | No plant or security proof invented | **Blocked on design ruling**, no root/TLS/interception closure |
-| AC16 / F6 | `crates/maos-cli/tests/spirit_install_20_1.rs:380` | Genuine before-red; removed-yank-refusal plant101, 14.916s | Install9/9: signed yanked version refuses before persistence |
+| AC10 | Original `yank_auth_20_1b.rs:69`; original `yank_policy_20_1b.rs:318` | Bare-name plant101 disclosed spill in a **hand-bound** fixture, not production admission; no original K1→K2 before-red | Original unit-level identity proof only; review replaces it with two real admission processes |
+| AC14 / F4 | `crates/maos-cli/tests/spirit_install_20_1.rs:307` | Assertion-red on a partially edited tree; replacement plant101 | Original first same-key case was red; different-registry iteration varied the key and was not independently before-red. Review adds identical/changed same-key other-registry controls |
+| AC15 / F5 | D-20-1b-01/02/03 | No plant or security proof invented | Design was blocked at L1 handoff; now RULED A/A/A, execution held for review/corrections and explicit cargo handoff; no root/TLS/interception proof |
+| AC16 / F6 | Original `spirit_install_20_1.rs:380` | Assertion-red on a partially edited tree; removed-yank-refusal plant101 | Original signed-yank pre-persistence refusal; review verifies present-entry authority and explicitly preserves the AC15 omission dependency |
 | AC17 | `crates/maos-registry/tests/yank_auth_20_1b.rs:11` | Dropped publish-auth plant101, 15.950s; AC7 independently plants deprecate auth | Registry0: unauthenticated and unauthorized publish/deprecate leave storage unchanged |
 | AC11–AC13 | Final row R / KQ1+P and final ledger closure | Not part of L1 | Not claimed or modified |
 
@@ -284,8 +333,10 @@ The x3 unmeasured kernel-free upper forecasts are registry265, spirit-cli380, bi
 The xtask **44676 -> 44696** driver is external `20-2` hosted-3 `d84b83dd`, `render_packages.rs` aligned multiline `%w[]` checksum arrays, confirmed by Main; subsequent `bdfc1430` packaging corrections do not change this exact count. The HISTORY first segment cites live story keys and carries the attribution; the D11 tree-bound tests pass. Compliance's old reserved2117 is lowered to exact2070. Aggregate hardfail is exactly measured+1, with no hidden headroom.
 
 Kernel source remains26841/21042 with set hash `db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59`. Carry the historical reverted R prototype +78/+68, not a new prototype run: forecast26919/21110; D02 A x2 ceilings26997/21178 remain below shared21250. R is final and unimplemented here.
-
-Recommended F5 A/A/A remains a **proposal**: registry+670, cli+40, bin+15, spirit-cli+15 upper forecast; x3 incremental allowances2010/120/45/45 (aggregate2220). From final L1 pins that proposes registry6637, aggregate197958, **1430/184 above** the current respective envelopes; no such increase is applied. The D-row section prices alternatives and custody/development implications.
+The following F5 price comparison was the **pre-f5rows proposal**. Its A/A/A
+registry6637/aggregate197958 grant is now approved above; original arithmetic
+and L1 measurements below are retained as provenance, not an unruled choice.
+At L1 handoff the A/A/A proposal forecast registry+670, cli+40, bin+15 and spirit-cli+15; ×3 incremental allowances2010/120/45/45 (aggregate2220). Its proposed registry6637/aggregate197958, increases1430/184 over L1 ceilings, are now granted by `f5rows`. Exact pins remain unchanged; the prior L1 measurements are historical proof, not a new AC15 measurement.
 
 #### Observed verification and failure accounting
 
@@ -339,15 +390,219 @@ env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask MAO
 
 #### Limits and ledger disposition
 
-F5 first-contact authenticity/TLS remains open; signing mutations and locally pinning the first publisher do not establish the initial trust root. The server is still a loopback plaintext development listener. No hostile-registry/TLS-interception refusal, public deployment, hosted runner result, delegated-cgroup/rootless/T3 quarantine effect or independently accredited vetter ecosystem is claimed. The branch recipe uses actual harness fixture/test names and labels only the30 kernel-free witnesses.
+F5 first-contact authenticity/TLS remains open, now RULED A/A/A rather than blocked on a design ruling. Mutation signatures/local pins are not that root. No hostile-registry/TLS-interception refusal, public deployment, new hosted result, delegated-cgroup/rootless/T3 quarantine effect or accredited-vetter ecosystem is claimed. The updated branch-only recipe and correction evidence below supersede the original30-witness selection.
 
 AC8's quarantine-effect witness is **not claimed in L1** and depends on final KQ1 with AC11–AC13; story and tracker state this explicitly. Kernel-owned deferred FR13/poller rows and I5 remain untouched. Implemented local attestation-binding, principal-identity and inherited security rows now name their witnesses and historical findings; commit-backed closure remains Main-owned, rather than inventing an uncommitted landing hash. FR37 stays v2.0+; FR59 names its local witnesses without falsely closing F5 or KQ1.
 
 Creation D/S numeric pointers in older acceptance headings are historical. Re-measured code positions are in `cites-ebf2ab03`; current `deferred-work.md` anchors are inherited security54–57, principal identity103, FR59 row122, attestation1160, final-kernel FR13 row1214/poller1336; `sprint-status.yaml` has20-1b at298. No old a4c00897 count is passed off as an ebf2ab03 measurement.
 
+### L1 independent-review correction Dev Agent Record — 2026-11-07
+
+**Authority/baseline.** Main handed off P1–P18, security F1–F5 and D1–D5 after
+the independent review of committed L1 `62faff63`. The explicit pre-gate
+`git log --oneline -5` still showed62faff63; external20-2 renderer20 remains
+attributed to `d84b83dd`, not this pass. No commit, push, tracker status flip,
+kernel source change or AC15 cargo handoff is claimed by this agent.
+
+**Implemented correction cutover.**
+
+- The operator door carries an explicitly resolved installed signed package
+  through both snapshot guards. Shared verification compares actual manifest,
+  artifact.bin and declared component bytes; temporary neighbors supply no identity.
+- Durable `installed-pins.json` survives uninstall, preserves every legacy signed
+  generation's publisher/version digest before removal, and has a real standalone
+  local `release-pin` verb. Existing installed generations remain immutable even
+  if that ledger entry is explicitly released. No private-data migration is added.
+- Server publication is immutable/idempotent and initial files activate by one
+  staged-directory rename. An identical package/origin may atomically renew newly
+  verified promotion evidence without uninstall. Uninstall holds the cross-process
+  mutation flock through staging/proof/accept or rollback.
+- Present install yanks are authenticated against the package publisher/enrolled
+  vetter before a typed Yanked refusal and before persistence. Omission/rolled-back
+  head detection remains AC15, not a property inferred from checking present rows.
+- Withdrawals use required v2 role/URI/nonce/max-age preimages, bounded clock skew,
+  nonce-rebinding refusal and per-(name,version,role,signer-key) deduplication.
+  The role component preserves a publisher withdrawal when the same operator-
+  enrolled key previously acted as vetter; re-signing in one role remains idempotent.
+  Accepted historical withdrawals do not expire with mutation credentials.
+- Schema-2 cursors bind URI, persist each verified frontier and resync on unsigned
+  gaps/overshoots. Unknown uninstalled publishers cannot acknowledge a frontier.
+  Rejected rows are journaled separately from transient faults; one invalid row,
+  local poll failure or corrupt Spirit does not starve later valid observations.
+- Running remote yanks retain the RegistryYank terminal observation. Pending
+  effects retry without re-journaling that observation, and no observation mutex
+  is held across the kernel applier. Quarantine is still only a typed request and
+  operator-visible record: its effect is **not claimed in L1**, final KQ1 only.
+- Real production admission binds publisher-separated principal spill. The new
+  forced K1→K2 witness uses two real processes and recycled scheduler PID, not a
+  hand binding. One shared formatter also supplies uninstall's bare+bound owner
+  and subject queries; the signed partial proof reports its nonzero private_before.
+  P4 caller audit: topology admission now binds its original child path;
+  `gate_staged` supplies provider declarations, not a memory-identity sink;
+  enterprise control bootstrap uses the fixed first-party control PID and no
+  MemoryManager identity. The positive D1 door test uses an installed signed
+  native fixture through the real door, not remote WASM execution. Registry
+  component execution is still export-held; no general cold-swap snapshot
+  publisher-identity/all-state isolation claim is added. Remaining identity
+  inventory is explicitly deferred, not silently covered by P4's boot proof.
+- No remote poller starts without a registry source. Independent local reevaluation
+  remains active for late installs, with cadence30..300/default300 and zero refused.
+  Watch cancellation interrupts in-flight transport without moving kernel owners
+  onto its worker thread; shell, standalone and oneshot drains join owners first.
+- Cheap kernel-free v2 attestation/key-event role digests are independently
+  vectored. Claim CBOR stays byte-pinned; old unscoped signatures need reissuance.
+  Kernel CRL/attestation-revocation role migration remains a separately priced
+  obligation; no kernel signature protocol is changed.
+- Enrollment/revoke-key is explicitly fixture-keyring based, not a shipped verb.
+  D5 and all review deferrals have same-line rule-10 dispositions in deferred-work;
+  live-keyring rollback, startup snapshots, URI aliases and other bare-name state
+  are not silently claimed repaired.
+
+**Boot regression diagnosis.** Hosted42336032162 reported installed dispatch26.9s
+instead of1.3s. A provisioned timestamp profile observed boot5.276212765s: the first
+poll completed in9.4ms, but the audit writer waited5.0012s because the shell's early
+drain still had poller-owned applier/capability senders. It was not DNS or the cadence
+floor. The fixed no-source boot oracle keeps interval300 (not0), asserts <2s and
+registry-fetch=disabled; the affected two-test binary observed2.69s total.
+Removing the actual shell join reds at5.494s; blocked-network cancellation has an
+independent3s before/plant and <2s shutdown oracle. Temporary timing code is removed.
+
+**Evidence quality.** `review-corrections/plants.md` names every before/plant,
+current name:line and applicability exception. Before runs used the evolving
+correction tree, not a clean-commit reconstruction. P4/P5/P6 use triage-prescribed
+mutation-only before controls; P15's runtime before was expressly waived; P16/P18
+are documentary. The incorrect initial D1 CLI flags, stale profiling fixture,
+two policy-harness assertion errors, missing Python backend, compilation typo and
+two passing/incomplete plant probes remain recorded, not counted as behavioral reds.
+Each actual plant has executed copy-back, cmp and touch exit0.
+
+**Exact formatted source prices (canonical tokei14 exclusions/grouping).**
+
+| Surface | Reviewed L1 pin | Correction delta | Exact correction pin | L1 ceiling |
+|---|---:|---:|---:|---:|
+| maos-bin | 35422 | +204 | 35626 | 35837 |
+| maos-registry | 4627 | +444 | 5071 | 5207 |
+| maos-spirit-cli | 936 | +3 | 939 | 1895 |
+| maos-compliance | 2070 | +7 | 2077 | 2122 |
+| maos-audit | 8174 | +5 | 8179 | 8204, additional Main P3 grant |
+| maos-domain | 10137 | 0 | 10137 | 10167 |
+| xtask | 44696 | 0 | 44696 | external20-2 ceiling44920 |
+| aggregate | 195738 | +663 | 196401; strict hardfail196402 | 197774 |
+
+CLI measured6429 and its unrelated reserved row remain unchanged. Kernel tokei
+stays21042; existing physical26841/hash95-file pin is not enlarged. Exact coupled
+rows and provenance are in kloc.toml; this pass does not borrow later AC15 capacity.
+Audit's separate20-11 ceiling8261 remains unchanged: after this measured+5 its
+absolute remaining room is82, not87. Spending the full older87 as well would8266,
+requiring a later honest re-base; the unused P3 correction room is not a reservation.
+
+**AC15 handoff price warning.** A/A/A is ruled, not implemented. Old bounds were
+computed before these corrections. Re-applying only the originally priced ×3
+increments2010/120/45/45 to current exact pins would require registry7081,
+cli6549, bin35671, spirit-cli984 and aggregate198621, not the old absolute
+6637/6549/35467/981/197958. These are **priced options, not a granted re-base**;
+Main must adjudicate the new pass at explicit `CARGO HANDOFF AC15`. No TLS/root,
+interception, hosted-only cgroup/T3 or final quarantine-effect proof is invented.
+
+**FKCS review focus.** Independent review `review/triage.md` §0 ratified the
+original argument hunk/fingerprint136c579d…, and P18 records that review.
+Neither declared admission file changes in this correction pass; no new hash
+re-pin is needed. The fingerprint proves declared-file content, **not unchanged
+semantics**: artifact/publisher checks and the new v2 role preimages live outside
+it. The correction round must re-examine that semantic boundary and explicit
+upgrade evidence; no independent re-review of these corrections is claimed.
+
+#### Correction AC witness matrix and observed verification
+
+Aliases below are exact test files: R=`crates/maos-registry/tests/yank_auth_20_1b.rs`,
+B=`crates/maos-bin/tests/yank_policy_20_1b.rs`,
+I=`crates/maos-cli/tests/spirit_install_20_1.rs`,
+D=`crates/maos-bin/tests/one_daemon_one_door_16_1.rs`,
+E=`crates/maos-bin/tests/erasure_inventory_20_11.rs`.
+The complete patch/decision table is `review-corrections/plants.md`; the fresh
+JUnit-derived66-case selection is `review-corrections/workspace-summary.json`.
+
+| AC | Current named witness:line | Before / plant evidence | Observed corrected result |
+|---|---|---|---|
+| AC6 | `vetting_attestation_gate.rs` artifact_swap_is_refused_ac6:411 / publisher_swap_is_refused_ac6:415; `vet_lifecycle_20_1b.rs` vet_issue_install_promote_revoke_refuses_next_admission_ac6:8; R attestation/key-event role refusals:1268/1308 | Original partial-tree artifact plant; new unscoped-signature before101 and signature-domain plants100 | Gate9/9, real lifecycle and both independent role controls pass in66 |
+| AC7 | R publisher_and_enrolled_vetter_yanks_are_signed_labelled_and_restart_safe_ac7:98 / daemon_cursor_restart_does_not_replay_journalled_yanks_ac7:190; `yank_cadence_20_1b.rs` signed_yank_crosses_real_server_at_30_second_floor_ac7:42 | Original unsigned-auth plant; new cursor/starvation/audience/nonce controls red/restored; no fabricated original restart before | Signed origins/restarts pass; genuine server/production cadence30.177s |
+| AC8 | B signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8:207 | Original policy-outcome plant; restored remote-observation before101 / plant100 | Warn, typed quarantine request/record, RegistryYank observation and existing applier pass; quarantine EFFECT not claimed |
+| AC9 | B expiry_and_vetter_revocation_observe_once_and_request_policy_ac9:296 / poller_runtime_clock_and_cursor_restart_reach_expiry_p6:731 / no_registry_local_timer_discovers_promotion_installed_after_start_p11:766 | Direct-runtime originals honestly labelled; real runtime-link mutation100; retry-dedupe before101 / plant100 | Both cause labels, actual poller/clock/restart and independent late-install timer pass; key revocation is fixture-keyring based |
+| AC10 | R first_publisher_pin_is_typed_and_survives_restart_ac10:77 / installed_publisher_and_version_pins_survive_uninstall_d2:438; B registry_publishers_cannot_share_principal_spill_ac10:378; E registry_bound_principal_is_counted_and_erased_on_uninstall_p3:892 | Durable pin/erasure real before101; production bare-binding mutation100 discloses K1's secret; restored copy/cmp/touch0 | Pin/restart/uninstall/legacy cases and real recycled-PID production admission/erasure pass |
+| AC14 | I installed_version_is_immutable_ac14:307; R durable pins:438 / legacy_inactive_version_pins_are_migrated_before_uninstall_d2:1177 | Original partial-tree replacement red; new same-key other-registry identical-byte origin mutation101, plus durable/legacy plants | All four replacement/origin branches preserve bytes/origin/inventory; uninstall does not reset publisher/version pins |
+| AC15 | D-20-1b-01/02/03 A/A/A | No implementation/plant/security proof invented | Held for explicit Main cargo handoff and priced re-base, not blocked on design choice |
+| AC16 | I yanked_install_is_refused_before_persistence_ac16:404; R install_refuses_present_yank_with_unpinned_authority_f2:817 | Original yank-refusal plant; forged-authority before101 / plant100 | Genuine signed yank refuses before persistence; forged row refuses authentication; omission/head dependency remains AC15 |
+| AC17 | R unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17:12 / published_versions_are_immutable_and_identical_publish_is_idempotent_d3:404 | Original publish/deprecate auth plants unchanged; immutable publication before101 / storage plant100 | Unsigned/wrong-owner/unenrolled mutations leave storage unchanged; authorized immutable/idempotent publication passes |
+| AC11–AC13 | Final KQ1/P kernel landing | No kernel source edit or effect plant here | Not claimed in L1 |
+
+**Full workspace, once:** metadata reused after the canonical fixture builder and
+genuine bin/CLI build. Cargo compilation hit a3000s tool deadline before any tests;
+continuation completed the same prerequisite, not a runtime retry. Actual run
+`3015a808-1010-47d2-a1f7-5dabde864f5b` executed5753 cases: **5752 passed,1 failed,
+138 skipped**, exit100; wall881.646s / sum880.766s. Sole failure is the unchanged
+20-7-owned1M pending oracle36.007s (route10.000111352s HandlerStillRunning), with
+same-line rule-10 evidence in deferred-work. No retry or assertion/deadline change.
+All66 selected L1 witnesses passed in that run; this is **not** a fully green suite.
+
+**Boot costs from that fresh JUnit:** installed dispatch2.517s total: four hostile
+boots2.012s and the <2s no-source boot oracle0.505s. This is local evidence, not a
+claim that the hosted runner will have identical costs.
+
+**Calibration ruling:** Main selected the hosted CI maximum, not local speed:
+ceil(1151.8s from hosted42336032162 ×1.25)=**1440**. The comment also records local
+post-fix880.766s; the next green hosted sum must be recorded and the total re-tightened
+by20-7's rule-10-owned review row. No per-binary exception changed. The local budget
+gate still exits1 solely for unchanged `maos-iac::participant_recall_17_8`
+sum30.730s vs30s; separately recorded, not widened or retried.
+
+**Other observed checks:** no-default verb table7/7; FKCS oracle11/11,
+D11 count contract9/9 and recovery-lane12/12; compliance vetting35/35; final
+FR59 fixture cleanup4/4. Workspace clippy and count ratchet exit0
+(1319 occurrences/865 distinct); the last test-only unused clock was then removed
+and its affected clippy/test targets exit0. No warning-free workspace claim.
+Kernel baseline0 confirms26841 physical,95 unchanged files/hash
+`db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59`;
+KLOC0 confirms196401 and exact coupled pins. FKCS surface/admission gate0,
+environment, decision register, test-cost, exit commands, coverage/completeness,
+dev-record and epic-coherence gates0. One initial ownerless-disposition wording
+violation was corrected to cite its actual Main disposition; the red is retained.
+
+**Prescribed prepush, exactly once:** exit1 after1536.080s; no tracked edits while
+it ran. Its92 records are82 pass,8 deliberate scope/dynamic-marker skips,
+1 workspace red and1 timing advisory. Fresh workspace JUnit
+`1cab18a7-0a75-4d94-a47b-aede06a29283` contains5753 executed cases,
+**5750 passed /3 failed**; all66 L1 selected witnesses pass again.
+The three failures are the known20-7-owned1M pending oracle45.123s
+(route10.005223439s), **plus two owned calibration-test pin omissions**:
+`check_test_budget_proven_red::{the_committed_register_parses,
+hosted_1_model_currency_calibration_changes_only_its_binary_budget}` still expected
+1100 after the ruled1440 change. Both hardcoded expectations are now coupled to1440;
+the entire focused budget-contract binary passes14/14 afterward. **Prepush was
+not rerun, and is not represented as green.**
+
+Its measured suite sum1186.373s is below1440; five per-binary timing advisories
+remain (butler hallucination30.229, erasure_uninstall34.447, hook_pump32.110,
+one_daemon_one_door37.776, participant_recall44.916 seconds against30).
+No per-binary exception or assertion/deadline was changed; same-line20-7/rule-10
+rows name both pending-oracle and timing evidence. The Door sum includes D1's
+additional witness, not an untouched-binary claim. Scope-skipped docs build/routes,
+unchanged-lock cargo-deny and indeterminate dynamic WASM marker counts are not
+claimed exercised. Hosted first-contact/TLS/interception and final KQ1 effects
+remain unverified/unimplemented as already labelled.
+
+**End-of-work cleanup:** `/proc` scan27 entries (2 vanished/denied), no active
+cargo/rustc/rustdoc/clippy process or referenced incremental session. Removed665
+stale `debug/incremental/*/s-*` directories, retaining9630 newest-per-crate and1072
+additional sessions touched within2h; no deps/build/fingerprint removal.
+Unlinked incremental allocated footprint5,191,536,640 bytes; observed filesystem
+available-space gain4,506,730,496 bytes (not conflated with shared/reflink physical
+reclamation). Removed the two owned `/tmp/201b-review-corrections` and
+`/tmp/201b-review-verifier` roots, allocated footprint32,350,208 bytes.
+Detailed paths/process scan/measurements: `review-corrections/cleanup.json`.
+
 ### File List
 
-Tracked inventories: initial42 paths in `landing-tracked-file-list.stdout`; final43, including the authorized FKCS fingerprint, in `landing-tracked-file-list-final.stdout`. Grouped implementation inventory:
+Historical original-L1 inventories: initial42 paths in `landing-tracked-file-list.stdout`; final43 in `landing-tracked-file-list-final.stdout`. These are not the correction-pass inventory. Original grouped implementation inventory:
 
 - `Cargo.lock`; `.config/nextest.toml`; `xtask/{kloc.toml,test-budgets.toml,fkcs-baseline.toml}`.
 - `crates/maos-bin/src/{admission.rs,env_contract.rs,installed_spirits.rs,lib.rs,main.rs,yank_policy.rs}`; `crates/maos-bin/tests/{cohort_daemon_smoke_13_5c.rs,yank_policy_20_1b.rs}`.
@@ -357,11 +612,23 @@ Tracked inventories: initial42 paths in `landing-tracked-file-list.stdout`; fina
 - `crates/maos-spirit-cli/{Cargo.toml,src/bin/maos-spirit.rs,src/lib.rs,src/vet.rs,src/yank.rs,tests/vet_lifecycle_20_1b.rs}`; `crates/maos-cli/tests/spirit_install_20_1.rs`.
 - `tests/harness/{registry_20_1.rs,registry_trust_20_1b.rs}`; `tests/coverage-matrix.yaml`; `docs/adr/ADR-056-fr37-vetting-machinery.md`.
 - This story; `_bmad-output/implementation-artifacts/{deferred-work.md,sprint-status.yaml}`; the landing-1 evidence tree and branch-only `ci/ci-20-1b-verify.yml`.
+- The correction calibration additionally couples `xtask/tests/check_test_budget_proven_red.rs`'s two live total-budget assertions to1440; this is test-only, with no xtask production KLOC growth.
 
 No `crates/maos-kernel-core/`, `.github/` or `xtask/src/` file is in the owned diff. External xtask renderer changes are committed 20-2 drivers, not attributed to this file list.
 
+Correction-pass targets additionally/again edited:
+- Registry Cargo/security, `src/{bin/server.rs,server.rs,handlers/deprecate.rs,install.rs,storage.rs,yank.rs,yank_auth.rs}` and `tests/{yank_auth_20_1b.rs,yank_cadence_20_1b.rs,fr59_yank_propagation_within_5min_test.rs}`.
+- Bin `src/{admission.rs,env_contract.rs,main.rs,operator_door.rs,yank_policy.rs}`; `tests/{yank_policy_20_1b.rs,installed_spirit_dispatch_20_1.rs,one_daemon_one_door_16_1.rs,erasure_inventory_20_11.rs}` and the `support/{shell_world_16_2.rs,worker_revoke_root.rs}` mocks.
+- `crates/maos-audit/src/lib.rs`; compliance `src/vetting/{mod.rs,attestation.rs,keyring.rs}`; `crates/maos-spirit-cli/src/yank.rs`; `crates/maos-cli/tests/spirit_install_20_1.rs`; shared `tests/harness/registry_trust_20_1b.rs`.
+- Coupled KLOC/FKCS/budget records, coverage matrix, ADR-056, this story/tracker/deferred ledger, historical plant-label corrections, branch-only recipe and `landing-1/review-corrections/` evidence. Neither declared FKCS admission file is edited by this pass.
+
 ### Change Log
 
-- Operator `f1b` scope and Main's kernel-last AC8 split recorded; F5 choices remain priced PROPOSED D-rows.
+- At the original L1 handoff, operator `f1b` scope and Main's kernel-last AC8 split were recorded while F5 choices remained priced PROPOSED D-rows; superseded by the dated `f5rows` entry below.
 - Implemented exact vetting/real CLI lifecycle, authenticated authorized mutations, immutable installs/yank refusal, durable signed yank propagation, typed policy requests/live observations and publisher-separated principal spill identity.
-- Added genuine before/plant/final evidence, real cadence budget enrollment, current citations/pins and documented server/keyring/transport limits; no status flip or kernel landing claimed.
+- Added partially-edited-tree before assertions and restored runtime plants, real cadence budget enrollment, citations/pins and documented server/keyring/transport limits; these were not clean-commit baseline runs. No status flip or kernel landing claimed.
+- 2026-11-07 (`f5rows`): recorded RULED A/A/A root/TLS/development choices and AC15
+  ceilings registry6637/aggregate197958, D02 A auxiliary bounds, dependency/deny/
+  no-default-feature constraints. Records only; implementation waits for the
+  landing-1 review/corrections and explicit `CARGO HANDOFF AC15`; no cargo run.
+- 2026-11-07 (Main L1 correction handoff at62faff63): implemented P1-P18/security F1-F5 and ruled D1-D5, including durable/releasable pins, immutable publication, safe evidence renewal, explicit vetted-door package/deployed-byte checks, production principal identity/erasure, authenticated scoped withdrawals/cursors and prompt no-source boot/network cancellation. Recorded real before/plants and applicability limits; AC15 and final KQ1 remain unimplemented here.

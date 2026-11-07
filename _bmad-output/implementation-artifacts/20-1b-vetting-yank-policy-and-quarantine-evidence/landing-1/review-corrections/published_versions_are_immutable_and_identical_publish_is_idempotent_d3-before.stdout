@@ -1,0 +1,11 @@
+
+running 1 test
+test published_versions_are_immutable_and_identical_publish_is_idempotent_d3 ... FAILED
+
+failures:
+
+failures:
+    published_versions_are_immutable_and_identical_publish_is_idempotent_d3
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.04s
+

@@ -266,9 +266,9 @@ fn the_committed_register_parses() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let budgets = load_budgets(root).expect("xtask/test-budgets.toml parses");
     assert_eq!(budgets.default_seconds, 30.0);
-    // 18-0 AC5 (ruling R3): calibrated on five CI junits, 300 -> 800; E19 wave-2 (19-2/19-3/19-6
-    // T3 vectors) re-calibrated on hosted run 40955589411: 800 -> 1100.
-    assert_eq!(budgets.total_seconds, 1100.0);
+    // 20-1b/Main ruling2026-11-07: ceil(hosted42336032162 sum1151.8 *1.25).
+    // Local post-boot-fix sum880.766 is recorded, not substituted for CI max.
+    assert_eq!(budgets.total_seconds, 1440.0);
 }
 
 #[test]
@@ -285,7 +285,7 @@ fn hosted_1_model_currency_calibration_changes_only_its_binary_budget() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let mut budgets = load_budgets(root).expect("real register");
     assert_eq!(budgets.default_seconds, 30.0);
-    assert_eq!(budgets.total_seconds, 1100.0);
+    assert_eq!(budgets.total_seconds, 1440.0);
     budgets.exceptions.retain(|row| row.binary == BINARY);
     assert_eq!(budgets.exceptions.len(), 1);
     assert_eq!(

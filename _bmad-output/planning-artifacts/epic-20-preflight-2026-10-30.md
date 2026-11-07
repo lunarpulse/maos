@@ -82,6 +82,23 @@ Q4: `passed=true`, **`alarm=true`**, aggregate **192,778**, `over_budget=[]`. A 
 | maos-control | 1,496 | 1,791 | **295** | E19 1,539 / 43 | 1 authenticated install / 8–9 control contracts unpriced. K:484; E19:43; R:43. |
 | Aggregate | **192,778** | hardfail **192,779** | **0 added lines** (fails at `>=`) | ~192,935 / **~157 nominal** | Alarm **158,608**, exceeded by **34,170**. Aggregate grants must accompany net growth even where a crate has numeric room. K:705-718. |
 
+**20-1b AC15 envelope supersession — `f5rows`, 2026-11-07:** operator rules
+D-20-1b-01/02/03 A/A/A and grants registry6637 /aggregate197958 for a second
+kernel-free pass. From formatted L1 registry4627/aggregate195738, D02 A ×3
+upper allowances are registry2010 and aggregate2220; cli+40/bin+15/spirit-cli+15
+forecasts yield auxiliary bounds6549/35467/981 (+120/+45/+45). Earlier budget
+tables remain historical; grants are not exact pins or renewed reservations.
+Remeasure external drift at handoff; no source/pin/kernel/status update here.
+The ruled trust root is a canonical-URI-bound configured registry signing key,
+never the response alone. Ruled transport is leaf/server rustls with supplied
+cert-chain/key paths, hostname/platform-WebPKI verification and optional operator CA.
+Ruled HTTP exception requires literal loopback and explicit dev opt-in at both
+server and install, keeping mutation signatures/publisher pins; no HTTPS downgrade.
+The rustls edge requires deny-compatible crate versions, existing-lock ring/aws-lc
+feature review and no no-default-features leakage. Implementation/cargo waits for
+L1 review/corrections and Main's **`CARGO HANDOFF AC15`**; no new proof is claimed.
+
+
 ### 1.3 Story forecasts: historical estimate is not a measured grant
 
 | Remaining story | E20's explicit forecast (production tokei unless noted) | HEAD re-price / capacity conclusion |

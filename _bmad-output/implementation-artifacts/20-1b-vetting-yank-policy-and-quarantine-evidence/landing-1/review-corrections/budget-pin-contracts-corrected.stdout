@@ -1,0 +1,19 @@
+
+running 14 tests
+test a_non_finite_or_negative_junit_time_is_refused ... ok
+test an_empty_report_cannot_pass ... ok
+test a_binary_under_its_budget_is_green ... ok
+test a_planted_31_second_test_in_an_unbudgeted_binary_reds ... ok
+test a_stale_exception_reds ... ok
+test the_budget_is_the_sum_of_test_times_not_the_span ... ok
+test an_exception_with_reason_and_owner_raises_only_its_binary ... ok
+test the_suite_total_is_budgeted ... ok
+test hosted_1_model_currency_calibration_changes_only_its_binary_budget ... ok
+test the_committed_register_parses ... ok
+test a_binary_listed_twice_is_refused ... ok
+test an_exception_without_owner_or_not_above_default_is_refused ... ok
+test an_expensive_row_with_an_empty_job_reason_or_owner_is_refused ... ok
+test a_non_finite_or_non_positive_budget_is_refused ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

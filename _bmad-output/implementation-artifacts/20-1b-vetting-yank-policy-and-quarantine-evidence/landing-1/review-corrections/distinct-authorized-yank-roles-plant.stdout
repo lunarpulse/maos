@@ -1,0 +1,11 @@
+
+running 1 test
+test signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13 ... FAILED
+
+failures:
+
+failures:
+    signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.35s
+

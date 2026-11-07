@@ -1,0 +1,6 @@
+::error::check-test-budget: FAIL — 1 finding(s):
+- maos-iac::participant_recall_17_8 took 30.730 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+
+check-test-budget: FAIL — 1 finding(s):
+- maos-iac::participant_recall_17_8 took 30.730 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+

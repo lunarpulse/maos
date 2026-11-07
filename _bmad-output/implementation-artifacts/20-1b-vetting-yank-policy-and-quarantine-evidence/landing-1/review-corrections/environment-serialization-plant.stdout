@@ -1,0 +1,11 @@
+
+running 1 test
+test every_registry_auth_test_holds_the_shared_environment_mutex_p15 ... FAILED
+
+failures:
+
+failures:
+    every_registry_auth_test_holds_the_shared_environment_mutex_p15
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s
+

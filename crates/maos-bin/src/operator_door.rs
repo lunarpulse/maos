@@ -42,6 +42,15 @@ use maos_control::{
     UpgradePolicyRequest, COMMAND_QUEUED, COMMAND_STARTED,
 };
 
+/// Explicit package evidence resolved before a manifest becomes a temp snapshot.
+#[derive(Clone, Copy, Default)]
+pub struct UpgradeVetting<'a> {
+    pub package: Option<&'a maos_domain::ports::registry::SignedPackage>,
+    pub source_manifest: Option<&'a Path>,
+    pub attestation: Option<&'a str>,
+    pub vetter_keyring: Option<&'a str>,
+}
+
 /// Bin-private composition-root operations the LIB-side port cannot reach.
 ///
 /// D-16-1-N: `run_uninstall_cascade`, `append_lifecycle_journal`,
@@ -79,8 +88,7 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         &self,
         spirit_id: &str,
         target_manifest: &Path,
-        attestation: Option<&str>,
-        vetter_keyring: Option<&str>,
+        evidence: UpgradeVetting<'_>,
     ) -> Result<(), String>;
 
     /// `migration_plan::upgrade_with_plan_guard` over the daemon's real
@@ -91,8 +99,7 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         target_manifest: &Path,
         original_target: &Path,
         policy: maos_kernel_core::lifecycle::UpgradePolicy,
-        attestation: Option<&str>,
-        vetter_keyring: Option<&str>,
+        evidence: UpgradeVetting<'_>,
     ) -> Result<serde_json::Value, UpgradeFailure>;
 
     /// `migration_plan::create_plan` — resolve, validate, hash and persist a
@@ -1247,18 +1254,37 @@ impl DoorInner {
                 };
             }
         }
+        #[cfg(feature = "network")]
+        let package = match maos_manifest::parse_manifest_trust_tier(&target) {
+            Ok(maos_domain::ports::registry::TrustTier::PublicVetted) => {
+                match maos_registry::install::installed_upgrade_target(spirit_id, &target_path) {
+                    Ok(package) => Some(package),
+                    Err(error) => {
+                        return OperatorOutcome::Invalid {
+                            code: "vetting_precondition_failed".into(),
+                            detail: error.to_string(),
+                        }
+                    }
+                }
+            }
+            Ok(_) => None,
+            Err(error) => return Self::target_unparseable(error.to_string()),
+        };
+        #[cfg(not(feature = "network"))]
+        let package: Option<maos_domain::ports::registry::SignedPackage> = None;
         let snapshot = match ManifestSnapshot::new(&target) {
             Ok(snapshot) => snapshot,
             Err(error) => return Self::target_unparseable(error.to_string()),
         };
+        let evidence = UpgradeVetting {
+            package: package.as_ref(),
+            source_manifest: Some(&target_path),
+            attestation,
+            vetter_keyring,
+        };
         if let Err(rejection) = self
             .private_ops
-            .enforce_vetted_upgrade_precondition(
-                spirit_id,
-                &snapshot.0,
-                attestation,
-                vetter_keyring,
-            )
+            .enforce_vetted_upgrade_precondition(spirit_id, &snapshot.0, evidence)
             .await
         {
             return OperatorOutcome::Invalid {
@@ -1347,8 +1373,7 @@ impl DoorInner {
                 &snapshot.0,
                 &target_path,
                 kernel_policy,
-                attestation,
-                vetter_keyring,
+                evidence,
             )
             .await;
         self.successor_manifest_slot.take();
@@ -1565,7 +1590,7 @@ impl DoorInner {
         let target_path = PathBuf::from(target_manifest);
         if let Err(rejection) = self
             .private_ops
-            .enforce_vetted_upgrade_precondition(spirit_id, &target_path, None, None)
+            .enforce_vetted_upgrade_precondition(spirit_id, &target_path, UpgradeVetting::default())
             .await
         {
             // The one-shot printed the verdict and exited 2; over the door the

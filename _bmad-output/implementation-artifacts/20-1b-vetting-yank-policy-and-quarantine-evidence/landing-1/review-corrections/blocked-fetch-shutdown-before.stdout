@@ -1,0 +1,11 @@
+
+running 1 test
+test blocked_registry_fetch_does_not_block_shutdown_or_boot ... FAILED
+
+failures:
+
+failures:
+    blocked_registry_fetch_does_not_block_shutdown_or_boot
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 23 filtered out; finished in 3.02s
+

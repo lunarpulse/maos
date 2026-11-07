@@ -1,0 +1,11 @@
+
+running 1 test
+test registry_bound_principal_is_counted_and_erased_on_uninstall_p3 ... FAILED
+
+failures:
+
+failures:
+    registry_bound_principal_is_counted_and_erased_on_uninstall_p3
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.81s
+

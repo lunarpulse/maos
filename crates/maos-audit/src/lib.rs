@@ -2076,34 +2076,39 @@ pub fn private_tier_principal_row_count(memory_root: &Path) -> Result<u64, Audit
     count_private_principals(memory_root, None, &[]).map(|(total, _)| total)
 }
 
-/// Include this stable owner's orphan namespaces and the known subjects in ANY
-/// owner. Other stable owners' unrelated principals are outside this uninstall.
-pub fn private_tier_principal_row_count_for_spirit(
+/// Include every explicit stable owner (legacy and publisher-bound) plus known
+/// subjects in any owner, counting each value only once.
+pub fn private_tier_principal_row_count_for_owners(
     memory_root: &Path,
-    spirit: &str,
+    owners: &[&str],
     subjects: &[String],
 ) -> Result<u64, AuditError> {
-    private_tier_principal_row_counts_for_spirit(memory_root, spirit, subjects, &[])
+    private_tier_principal_row_counts_for_owners(memory_root, owners, subjects, &[])
         .map(|(total, _)| total)
 }
 
 /// Return (scoped values, values in held principal namespaces) in one walk.
 /// Namespace/identity metadata, never payload readability, attributes held rows.
-pub fn private_tier_principal_row_counts_for_spirit(
+pub fn private_tier_principal_row_counts_for_owners(
     memory_root: &Path,
-    spirit: &str,
+    owners: &[&str],
     subjects: &[String],
     held_principals: &[String],
 ) -> Result<(u64, u64), AuditError> {
-    count_private_principals(memory_root, Some((spirit, subjects)), held_principals)
+    count_private_principals(memory_root, Some((owners, subjects)), held_principals)
 }
 
 fn count_private_principals(
     memory_root: &Path,
-    scope: Option<(&str, &[String])>,
+    scope: Option<(&[&str], &[String])>,
     held_principals: &[String],
 ) -> Result<(u64, u64), AuditError> {
-    let scoped_owner = scope.map(|(spirit, _)| format!("id-{}", hex::encode(spirit)));
+    let scoped_owners = scope.map(|(owners, _)| {
+        owners
+            .iter()
+            .map(|owner| format!("id-{}", hex::encode(owner)))
+            .collect::<Vec<_>>()
+    });
     let subjects = scope.map(|(_, subjects)| {
         subjects
             .iter()
@@ -2135,9 +2140,9 @@ fn count_private_principals(
         } else {
             name
         };
-        let foreign = scoped_owner
+        let foreign = scoped_owners
             .as_ref()
-            .is_some_and(|expected| owner.starts_with("id-") && &owner != expected);
+            .is_some_and(|expected| owner.starts_with("id-") && !expected.contains(&owner));
         for namespace_dir in std::fs::read_dir(spirit_dir.path())? {
             let namespace_dir = namespace_dir?;
             if !namespace_dir.file_type()?.is_dir() {

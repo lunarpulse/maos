@@ -29,9 +29,12 @@ pub fn run(args: YankArgs) -> anyhow::Result<()> {
     reason.authorization = Some(
         maos_registry::yank_auth::YankAuthorization::sign(
             &seed,
-            name,
-            version,
-            &reason.summary,
+            maos_registry::yank_auth::YankScope {
+                name,
+                version,
+                reason: &reason.summary,
+                registry_uri: &args.registry_uri,
+            },
             origin,
             args.vetter_key_id.unwrap_or_default(),
             maos_registry::yank_auth::now_unix_ms().map_err(anyhow::Error::msg)?,

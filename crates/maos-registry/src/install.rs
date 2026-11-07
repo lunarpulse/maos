@@ -59,19 +59,6 @@ pub fn install(
     let config = resolve_config()?;
     let client = McpSpiritRegistryClient::http(uri.to_owned(), config.clone())?;
     let id = SpiritId::from(id);
-    if let Some(entry) = client
-        .yanks_since(0)?
-        .entries
-        .into_iter()
-        .find(|entry| entry.spirit_id == id && entry.version == version)
-    {
-        return Err(maos_domain::ports::registry::RegistryError::Yanked {
-            spirit_id: id.as_str().into(),
-            version: version.into(),
-            reason: entry.reason,
-        }
-        .into());
-    }
     let manifest = client.manifest(&id, version)?;
     let artifact = client.artifact(&id, version)?;
     if manifest.spirit_id != id
@@ -108,6 +95,38 @@ pub fn install(
     // Signature verification is mandatory even when a remote manifest declares local.
     if !crate::admission::verify_publisher_sig(&pkg) {
         return Err(crate::admission::AdmissionError::PublisherSignatureInvalid.into());
+    }
+    // Authenticate every present withdrawal for this exact package before
+    // persistence. Feed omission still requires AC15's authenticated transport.
+    if let Some(entry) = client
+        .yanks_since(0)?
+        .entries
+        .into_iter()
+        .find(|entry| entry.spirit_id == pkg.spirit_id && entry.version == pkg.version)
+    {
+        let vetters: Option<maos_compliance::VetterKeyring> = keyring
+            .map(|path| -> Result<_, Error> { Ok(serde_cbor::from_slice(&std::fs::read(path)?)?) })
+            .transpose()?;
+        let root = if vetters.is_some() {
+            Some(maos_domain::audit_key::derive_audit_public_key(
+                &maos_domain::audit_key::load_audit_key_seed(&None)?,
+            ))
+        } else {
+            None
+        };
+        crate::yank_auth::verify_entry(
+            &entry,
+            &pkg.publisher_pubkey,
+            vetters.as_ref().zip(root.as_ref()),
+            uri,
+            crate::yank_auth::now_unix_ms()?,
+        )?;
+        return Err(maos_domain::ports::registry::RegistryError::Yanked {
+            spirit_id: pkg.spirit_id.as_str().into(),
+            version: pkg.version.clone(),
+            reason: entry.reason,
+        }
+        .into());
     }
     let mut promotion = None;
     let decision = match (attestation, keyring) {
@@ -160,40 +179,115 @@ pub(crate) fn check_identity(document: &toml::Value, id: &str, version: &str) ->
     Ok(())
 }
 
+/// A registry subject is the signed package AND its deployed bytes, not a
+/// neighboring metadata file. Local manifests without sidecars remain local.
+pub fn signed_package_at(name: &str, manifest_path: &Path) -> Result<Option<SignedPackage>, Error> {
+    let directory = manifest_path
+        .parent()
+        .ok_or("manifest has no package directory")?;
+    let bytes = match std::fs::read(directory.join("signed_package.json")) {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
+    let pkg: SignedPackage = serde_json::from_slice(&bytes)?;
+    if pkg.spirit_id.as_str() != name {
+        return Err("installed package name differs".into());
+    }
+    verify_deployed_package(&pkg, manifest_path)?;
+    Ok(Some(pkg))
+}
+
+/// Validate an explicit immutable subject against its original deployed files.
+/// A temporary manifest snapshot is never a package-identity lookup location.
+pub fn verify_deployed_package(pkg: &SignedPackage, manifest_path: &Path) -> Result<(), Error> {
+    fn matches(path: &Path, expected: &[u8]) -> std::io::Result<bool> {
+        use std::io::Read;
+        let mut file = std::fs::File::open(path)?;
+        let mut buffer = [0; 8192];
+        for chunk in expected.chunks(buffer.len()) {
+            file.read_exact(&mut buffer[..chunk.len()])?;
+            if &buffer[..chunk.len()] != chunk {
+                return Ok(false);
+            }
+        }
+        Ok(file.read(&mut buffer[..1])? == 0)
+    }
+    let directory = manifest_path.parent().ok_or("package has no directory")?;
+    crate::storage::path_segment(&pkg.version)?;
+    if !crate::admission::verify_publisher_sig(pkg) {
+        return Err("installed publisher signature is invalid".into());
+    }
+    if !matches(manifest_path, &pkg.manifest_toml)?
+        || !matches(&directory.join("artifact.bin"), &pkg.artifact_bytes)?
+    {
+        return Err("installed manifest or artifact differs from signed bytes".into());
+    }
+    let document: toml::Value = toml::from_str(std::str::from_utf8(&pkg.manifest_toml)?)?;
+    check_identity(&document, pkg.spirit_id.as_str(), &pkg.version)?;
+    let manifest = maos_manifest::ManifestDocument::parse(&pkg.manifest_toml)?;
+    if let Some(artifact) = manifest.class_section()?.and_then(|class| class.artifact) {
+        if !matches(&directory.join(artifact), &pkg.artifact_bytes)? {
+            return Err("materialized component differs from signed bytes".into());
+        }
+    }
+    Ok(())
+}
+
+/// Only an inventory-owned target supplies a vetted upgrade subject.
+pub fn installed_upgrade_target(name: &str, manifest: &Path) -> Result<SignedPackage, Error> {
+    let canonical = std::fs::canonicalize(manifest)?;
+    for (id, installed) in LocalFsRegistryStorage::default_installed_manifests()? {
+        if id == name && std::fs::canonicalize(&installed)? == canonical {
+            return signed_package_at(name, &installed)?
+                .ok_or("installed upgrade target lacks signed package".into());
+        }
+    }
+    Err("vetted upgrade target is not an installed registry package".into())
+}
+
+/// One identity format shared by admission and uninstall's erasure scope.
+pub fn publisher_storage_identity(name: &str, publisher: &[u8; 32]) -> String {
+    use sha2::Digest;
+    fn append_hex(out: &mut String, bytes: &[u8]) {
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        for byte in bytes {
+            out.push(HEX[(byte >> 4) as usize] as char);
+            out.push(HEX[(byte & 15) as usize] as char);
+        }
+    }
+    let mut identity = String::with_capacity(if name.len() <= 93 {
+        name.len() + 33
+    } else {
+        65
+    });
+    if name.len() <= 93 {
+        identity.push_str(name);
+    } else {
+        append_hex(&mut identity, &sha2::Sha256::digest(name.as_bytes())[..16]);
+    }
+    identity.push(':');
+    append_hex(&mut identity, &sha2::Sha256::digest(publisher)[..16]);
+    identity
+}
+
 /// Recheck the actual installed package at each boot, not merely its inventory
 /// entry. Only return manifest bytes whose publisher, claim and component agree.
 pub fn verify_installed(name: &str, manifest_path: &Path) -> Result<String, Error> {
     let directory = manifest_path.parent().ok_or("install has no directory")?;
-    let pkg: SignedPackage =
-        serde_json::from_slice(&std::fs::read(directory.join("signed_package.json"))?)?;
-    crate::storage::path_segment(&pkg.version)?;
-    if pkg.spirit_id.as_str() != name || !crate::admission::verify_publisher_sig(&pkg) {
-        return Err("installed publisher signature or identity is invalid".into());
-    }
-    if std::fs::read(manifest_path)? != pkg.manifest_toml
-        || std::fs::read(directory.join("artifact.bin"))? != pkg.artifact_bytes
-    {
-        return Err("installed manifest or artifact differs from signed bytes".into());
-    }
-    let text = std::str::from_utf8(&pkg.manifest_toml)?;
-    let document: toml::Value = toml::from_str(text)?;
-    check_identity(&document, name, &pkg.version)?;
-    let manifest = maos_manifest::ManifestDocument::parse(&pkg.manifest_toml)?;
-    if let Some(class) = manifest.class_section()? {
-        if let Some(artifact) = class.artifact {
-            if std::fs::read(directory.join(artifact))? != pkg.artifact_bytes {
-                return Err("materialized component differs from signed bytes".into());
-            }
-        }
-    }
+    let pkg =
+        signed_package_at(name, manifest_path)?.ok_or("installed signed package is absent")?;
     let mut fields =
         maos_compliance::runtime_context::extract_manifest_fingerprint_fields(&pkg.manifest_toml);
-    let promotion_path = directory.join("vetting.json");
-    if fields.trust_tier == TrustTier::PublicVetted && !promotion_path.exists() {
+    let promotion = match std::fs::read(directory.join("vetting.json")) {
+        Ok(bytes) => Some(serde_json::from_slice::<InstalledVetting>(&bytes)?),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(e.into()),
+    };
+    if fields.trust_tier == TrustTier::PublicVetted && promotion.is_none() {
         return Err("installed public-vetted package lacks promotion evidence".into());
     }
-    if promotion_path.exists() {
-        let promotion: InstalledVetting = serde_json::from_slice(&std::fs::read(promotion_path)?)?;
+    if let Some(promotion) = promotion {
         let seed = maos_domain::audit_key::load_audit_key_seed(&None)?;
         let root = maos_domain::audit_key::derive_audit_public_key(&seed);
         promotion.verify(&pkg, &root, crate::yank_auth::now_unix_ms()?)?;
