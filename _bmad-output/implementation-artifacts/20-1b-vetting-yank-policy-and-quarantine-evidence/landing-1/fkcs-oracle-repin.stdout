@@ -1,0 +1,16 @@
+
+running 11 tests
+test diff_oracle_derives_kernel_unchanged_and_ignores_self_reported_flags ... ok
+test diff_oracle_ignores_forged_self_report_even_when_it_claims_red ... ok
+test diff_oracle_reports_kernel_unchanged_for_identical_surfaces ... ok
+test disposition_inline_parser_extracts_phase_keys_and_rejects_malformed_stanzas ... ok
+test oracle_fault_injections_red_kernel_unchanged_around_a_stable_base ... ok
+test phase_disposition_inherits_downward_and_resolves_the_blocking_window ... ok
+test read_disposition_extracts_exactly_the_check_fkcs_stanza ... ok
+test frozen_baseline_files_carry_real_public_surfaces_not_synthetic_tokens ... ok
+test every_declared_admission_file_reds_a_one_byte_mutation ... ok
+test frozen_baseline_reconciles_live_triple_and_rejects_src_line_drift ... ok
+test frozen_snapshot_and_current_kernel_baselines_are_independently_valid ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+

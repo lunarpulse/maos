@@ -1,0 +1,11 @@
+--- /tmp/201b-plants/ac9.rs	2026-11-06 21:53:38.230309699 +0000
++++ crates/maos-bin/src/yank_policy.rs	2026-11-06 22:43:26.190504576 +0000
+@@ -105,7 +105,7 @@
+             .values()
+             .cloned()
+             .collect();
+-        for spirit in spirits {
++        for spirit in spirits.into_iter().take(0) {
+             if spirit.current_state() != ScbLifecycleState::Running {
+                 continue;
+             }

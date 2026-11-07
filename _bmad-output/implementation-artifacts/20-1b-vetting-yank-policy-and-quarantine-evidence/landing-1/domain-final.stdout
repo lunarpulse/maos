@@ -1,0 +1,344 @@
+
+running 281 tests
+test cost::tests::btreemap_deterministic_order ... ok
+test cost::tests::cost_accumulation_is_linear_before_division ... ok
+test cost::tests::cost_attribution_payload_round_trip ... ok
+test cost::tests::forward_read_tolerance_unmodeled_dimension ... ok
+test cost::tests::golden_cost_vector_oracle ... ok
+test cost::tests::no_task_ref_in_payload ... ok
+test cost::tests::pricing_lookup ... ok
+test cost::tests::principal_ref_ambiguous_no_members ... ok
+test cost::tests::principal_ref_unattributed_serde ... ok
+test distillation::tests::digst_payload_serde_round_trip ... ok
+test distillation::tests::distillation_error_audit_chain_missing_display ... ok
+test distillation::tests::distillation_error_distinguishes_variants ... ok
+test distillation::tests::request_new_accepts_valid ... ok
+test distillation::tests::request_new_rejects_depth_zero ... ok
+test distillation::tests::receipt_serde_round_trip ... ok
+test distillation::tests::request_new_rejects_empty_source ... ok
+test frame::tests::decision_dispatch_3_1_shape_backward_compat ... ok
+test frame::tests::decision_dispatch_3_3_shape_round_trip ... ok
+test frame::tests::epistemic_halt_payload_rejects_empty_halt_id ... ok
+test frame::tests::epistemic_halt_payload_3_1_shape_backward_compat ... ok
+test frame::tests::epistemic_halt_payload_rejects_nan_threshold ... ok
+test frame::tests::epistemic_halt_payload_rejects_nan_value ... ok
+test frame::tests::halt_policy_override_valid_f32_parses_at_serde_layer ... ok
+test frame::tests::frame_address_serde_round_trip ... ok
+test frame::tests::iac_frame_consent_request_serde_round_trip ... ok
+test frame::tests::iac_frame_decision_dispatch_serde_round_trip ... ok
+test frame::tests::iac_frame_intent_lineage_serde_default_backward_compat ... ok
+test frame::tests::iac_frame_epistemic_halt_serde_round_trip ... ok
+test frame::tests::iac_frame_intent_lineage_serde_round_trip_non_empty ... ok
+test frame::tests::iac_frame_retract_serde_round_trip ... ok
+test frame::tests::iac_frame_task_complete_serde_round_trip ... ok
+test frame::tests::posture_preferences_3_1_shape_backward_compat ... ok
+test frame::tests::iac_frame_task_assign_serde_round_trip ... ok
+test frame::tests::posture_preferences_default_has_empty_overrides ... ok
+test frame::tests::iac_frame_telemetry_event_serde_round_trip ... ok
+test frame::tests::posture_preferences_3_2_shape_round_trip ... ok
+test frame::tests::posture_preferences_serde_round_trip ... ok
+test governance::tests::erasure_class_lineage_ids ... ok
+test governance::tests::governance_event_kind_tagged ... ok
+test governance::tests::abi_extension_proposal_round_trip ... ok
+test governance::tests::ratification_status_serde_snake_case ... ok
+test governance::tests::model_provenance_event_round_trip_and_tagged ... ok
+test governance::tests::model_provenance_payload_has_zero_claim_instance_ids ... ok
+test governance::tests::shared_schema_id_key_contract ... ok
+test halt::tests::halt_continuity_error_display ... ok
+test halt::tests::halt_id_new_empty_returns_error ... ok
+test halt::tests::halt_id_new_nonempty_works ... ok
+test halt::tests::halt_id_serde_round_trip ... ok
+test halt::tests::halt_receipt_new_constructs_invocation_time_receipt ... ok
+test halt::tests::halt_receipt_serde_round_trip ... ok
+test halt::tests::halt_receipt_with_resolution_fills_post_resolution_fields ... ok
+test halt::tests::halt_state_serde_round_trip ... ok
+test halt::tests::invoke_halt_error_display ... ok
+test halt::tests::output_marker_override_for_constructs_valid_marker ... ok
+test halt::tests::output_marker_override_for_rejects_empty_policy_ref ... ok
+test halt::tests::output_marker_override_for_rejects_whitespace_only_policy_ref ... ok
+test halt::tests::resolution_authorized_override_rejects_empty ... ok
+test halt::tests::output_marker_serde_round_trip ... ok
+test halt::tests::resolution_authorized_override_rejects_whitespace_only ... ok
+test halt::tests::resolution_deserialize_accepts_populated_payloads ... ok
+test halt::tests::resolution_deserialize_rejects_empty_text ... ok
+test halt::tests::resolution_deserialize_rejects_whitespace_operator_policy_ref ... ok
+test halt::tests::resolution_kind_label_accepted_halt ... ok
+test halt::tests::resolution_kind_label_provided_context ... ok
+test halt::tests::resolution_kind_label_authorized_override ... ok
+test halt::tests::resolution_provided_context_rejects_empty ... ok
+test halt::tests::resolution_provided_context_rejects_whitespace_only ... ok
+test halt::tests::resolution_serde_round_trip_accepted_halt ... ok
+test hot_swap::tests::emigrator_missing_display ... ok
+test halt::tests::resolution_serde_round_trip_provided_context ... ok
+test halt::tests::resolution_validate_accepts_populated_and_unit_variants ... ok
+test hot_swap::tests::hot_swap_result_new_rejects_pid_zero ... ok
+test hot_swap::tests::invalid_expected_schema_version_is_distinct_from_snapshot_and_migrator_errors ... ok
+test hot_swap::tests::migrator_error_not_implemented_display ... ok
+test halt::tests::resolution_validate_rejects_struct_literal_empty_text ... ok
+test iac_bus_types::tests::eintent_lineage_broken_display ... ok
+test iac_bus_types::tests::eintent_lineage_broken_spirit_drafted ... ok
+test invariants::i10::tests::journal_entry_construction ... ok
+test invariants::i10::tests::journal_entry_backward_compat_deser ... ok
+test invariants::i10::tests::in_flight_entry_roundtrip ... ok
+test invariants::i10::tests::journal_entry_with_tier_roundtrips ... ok
+test invariants::i10::tests::lifecycle_event_non_exhaustive_match ... ok
+test invariants::i10::tests::lifecycle_event_provider_switched_discriminant ... ok
+test invariants::i10::tests::lifecycle_event_provider_switched_serde_roundtrip ... ok
+test invariants::i10::tests::lifecycle_event_revoked_discriminant ... ok
+test invariants::i10::tests::lifecycle_event_revoked_serde_roundtrip ... ok
+test invariants::i10::tests::lifecycle_event_silent_failure_suspect_serde_roundtrip ... ok
+test invariants::i10::tests::lifecycle_event_stalled_serde_roundtrip ... ok
+test halt::tests::resolution_serde_round_trip_authorized_override ... ok
+test invariants::i10::tests::lifecycle_event_upgrade_discriminant ... ok
+test host_grant::tests::request_above_grant_fails_closed_no_downgrade ... ok
+test hot_swap::tests::hot_swap_result_new_happy_path ... ok
+test invariants::i10::tests::provider_switched_payload_roundtrip ... ok
+test hot_swap::tests::hot_swap_verb_exhaustiveness ... ok
+test invariants::i12::tests::working_memory_digest_refs ... ok
+test invariants::i13::tests::allowed_promotion_set ... ok
+test invariants::i13::tests::intent_lineage_default_is_empty ... ok
+test halt::tests::resolution_validate_rejects_struct_literal_whitespace_operator_policy_ref ... ok
+test halt::tests::termination_kind_revocation_terminated_as_str ... ok
+test invariants::i14::tests::halt_continuity_variants ... ok
+test invariants::i1::tests::capability_token_exists ... ok
+test invariants::i1::tests::capability_token_is_non_exhaustive ... ok
+test invariants::i1::tests::invariant_i1_marker_is_zst ... ok
+test invariants::i1::tests::mcp_call_scope_serde_round_trip ... ok
+test invariants::i2::tests::log_before_deliver_roundtrip ... ok
+test host_grant::tests::grant_permits_requested_tier_at_or_below_ceiling ... ok
+test invariants::i3::tests::frame_origin_discriminants_stable ... ok
+test invariants::i4::tests::approval_decision_construction ... ok
+test invariants::i10::tests::lifecycle_event_crash_serde_roundtrip ... ok
+test invariants::i6::tests::hot_swap_state_discriminants ... ok
+test invariants::i7::tests::scalar_tap_event_construction ... ok
+test invariants::i7::tests::telemetry_topic_creation ... ok
+test halt::tests::termination_kind_revocation_terminated_serde_roundtrip ... ok
+test invariants::i10::tests::lifecycle_event_upgrade_serde_roundtrip ... ok
+test invariants::i11::tests::digest_ref_depth ... ok
+test invariants::i5::tests::namespace_key_typed_scope ... ok
+test invariants::i8::tests::is_canonical_accepts_reference_fleet_shapes ... ok
+test invariants::i8::tests::is_canonical_rejects_typo_class ... ok
+test host_grant::tests::no_matching_grant_fails_closed ... ok
+test hot_swap::tests::halt_continuity_violation_wraps_inner_error ... ok
+test invariants::i8::tests::parse_round_trips_canonical_and_rejects_non_canonical ... ok
+test invariants::i13::tests::intent_lineage_is_empty_returns_true_for_empty_lineage ... ok
+test invariants::i9::tests::abi_to_operational_round_trip ... ok
+test invariants::i9::tests::display_format ... ok
+test invariants::i9::tests::kernel_caching_shape ... ok
+test invariants::i8::tests::intent_allowlist_membership ... ok
+test invariants::i9::tests::sandbox_tier_consts ... ok
+test invariants::i9::tests::sandbox_tier_default_is_t2 ... ok
+test invariants::i9::tests::to_abi_rejects_out_of_range ... ok
+test invariants::i9::tests::try_from_manifest_str ... ok
+test invariants::i9::tests::try_from_u8_rejects_out_of_range ... ok
+test invariants::i9::tests::try_from_u8_valid ... ok
+test lifecycle::tests::lifecycle_error_already_loaded_display_contains_spirit_id ... ok
+test lifecycle::tests::lifecycle_receipt_new_with_none_offset ... ok
+test lifecycle::tests::lifecycle_receipt_rejects_pid_zero ... ok
+test lifecycle::tests::lifecycle_verb_variant_exhaustiveness ... ok
+test lifecycle::tests::spirit_lifecycle_state_is_runnable ... ok
+test lifecycle::tests::spirit_lifecycle_state_is_terminal ... ok
+test lifecycle::tests::spirit_lifecycle_state_serde_round_trip ... ok
+test log_recall::tests::capability_denial_is_typed_and_contains_no_caller_identity ... ok
+test log_recall::tests::cross_wall_refusal_outcomes_are_machine_distinct ... ok
+test log_recall::tests::cross_wall_request_rejects_noncanonical_team ... ok
+test log_recall::tests::cross_wall_request_validates_team_and_preserves_filter ... ok
+test log_recall::tests::filter_default_sets_max_limit ... ok
+test log_recall::tests::filter_new_clamps_limit ... ok
+test log_recall::tests::log_recall_cursor_round_trip ... ok
+test log_recall::tests::log_recall_error_distinguishes_variants ... ok
+test log_recall::tests::log_recall_error_scope_violation_carries_fields ... ok
+test log_recall::tests::log_fetch_response_serde_round_trip ... ok
+test memory::tests::memory_error_display_collective ... ok
+test log_recall::tests::log_recall_page_serde_round_trip ... ok
+test memory::tests::memory_error_display_invalid_key ... ok
+test memory::tests::forget_receipt_preserves_old_wire_shape_and_reports_typed_gaps ... ok
+test memory::tests::memory_error_display_key_traversal ... ok
+test memory::tests::memory_tier_discriminants_are_distinct ... ok
+test memory::tests::memory_error_from_io ... ok
+test memory::tests::memory_tier_serde_round_trip ... ok
+test memory::tests::memory_value_kind_blob ... ok
+test memory::tests::memory_value_kind_json ... ok
+test memory::tests::memory_value_kind_markdown ... ok
+test memory::tests::memory_value_kind_text ... ok
+test memory::tests::memory_value_serde_round_trip_json ... ok
+test memory::tests::memory_value_serde_round_trip_markdown ... ok
+test memory::tests::namespace_kind_labels_are_distinct ... ok
+test memory::tests::namespace_principal_rejects_colon_in_principal_id ... ok
+test memory::tests::namespace_principal_rejects_colon_in_schema ... ok
+test memory::tests::namespace_principal_rejects_control_char ... ok
+test memory::tests::namespace_principal_rejects_empty_principal_id ... ok
+test memory::tests::namespace_principal_rejects_empty_schema ... ok
+test memory::tests::namespace_principal_rejects_nul ... ok
+test memory::tests::namespace_principal_round_trips ... ok
+test memory::tests::principal_key_new_rejects_colon_in_principal_id ... ok
+test memory::tests::principal_key_new_rejects_empty_principal_id ... ok
+test memory::tests::principal_key_new_rejects_empty_schema ... ok
+test memory::tests::principal_key_new_round_trips ... ok
+test notification::tests::anomaly_flagged_accepts_boundary_confidence ... ok
+test memory::tests::principal_matching_respects_unicode_and_punctuation_bridges ... ok
+test notification::tests::anomaly_flagged_accepts_valid_input ... ok
+test notification::tests::anomaly_flagged_rejects_empty_summary ... ok
+test notification::tests::anomaly_flagged_rejects_nan_confidence ... ok
+test notification::tests::anomaly_flagged_rejects_out_of_range_confidence ... ok
+test notification::tests::anomaly_flagged_rejects_whitespace_only_summary ... ok
+test orchestrator::tests::instruction_id_serde_round_trip ... ok
+test orchestrator::tests::instruction_new_rejects_whitespace_only_goal ... ok
+test orchestrator::tests::instruction_new_accepts_nonempty_goal ... ok
+test orchestrator::tests::instruction_new_rejects_empty_goal ... ok
+test ports::capability::tests::cap_error_distinguishes_variants ... ok
+test orchestrator::tests::instruction_serde_round_trip ... ok
+test ports::crypto::tests::crypto_error_distinguishes_variants ... ok
+test ports::crypto::tests::crypto_provider_is_object_safe ... ok
+test ports::identity_assertion::tests::authenticated_principal_is_trait_object_safe_payload ... ok
+test ports::mcp::tests::mcp_attribution_serde_round_trip ... ok
+test ports::mcp::tests::mcp_error_display ... ok
+test ports::mcp::tests::mcp_request_serde_round_trip ... ok
+test ports::mcp::tests::mcp_response_serde_round_trip ... ok
+test ports::mcp::tests::mcp_transport_id_serde_round_trip ... ok
+test ports::policy_decision::tests::policy_decision_error_has_typed_variants ... ok
+test ports::policy_decision::tests::policy_decision_port_is_object_safe ... ok
+test ports::policy_decision::tests::policy_verdict_only_has_allow_and_deny ... ok
+test ports::registry::tests::publish_receipt_serde_roundtrip ... ok
+test ports::registry::tests::registry_error_display ... ok
+test ports::registry::tests::registry_error_is_non_exhaustive ... ok
+test ports::registry::tests::search_query_defaults ... ok
+test ports::registry::tests::search_query_deser_defaults ... ok
+test ports::registry::tests::search_query_limit_clamped_to_200 ... ok
+test ports::registry::tests::search_query_limit_minimum_1 ... ok
+test ports::registry::tests::search_query_serde_roundtrip ... ok
+test ports::registry::tests::signed_artifact_serde_roundtrip ... ok
+test ports::registry::tests::signed_manifest_serde_roundtrip ... ok
+test ports::registry::tests::yank_entry_serde_roundtrip ... ok
+test ports::registry::tests::signed_package_serde_roundtrip ... ok
+test region::tests::canonicalize_accepts_hyphenated_and_digits ... ok
+test ports::registry::tests::yank_list_serde_roundtrip ... ok
+test ports::registry::tests::yank_reason_serde_roundtrip ... ok
+test region::tests::canonicalize_accepts_simple_lowercase ... ok
+test region::tests::canonicalize_lowercases_so_two_spellings_key_identically ... ok
+test region::tests::canonicalize_rejects_disallowed_ascii ... ok
+test ports::task::tests::task_assignment_record_construction ... ok
+test ports::registry::tests::yank_receipt_serde_roundtrip ... ok
+test region::tests::canonicalize_rejects_non_ascii_and_homoglyphs ... ok
+test region::tests::canonicalize_rejects_too_long ... ok
+test region::tests::canonicalize_rejects_too_short ... ok
+test region::tests::canonicalize_trims_surrounding_whitespace ... ok
+test region::tests::canonicalize_is_idempotent ... ok
+test region::tests::home_from_env_resolves_and_canonicalizes ... ok
+test region::tests::region_error_variants_are_distinct ... ok
+test region::tests::resolve_home_env_overrides_disk ... ok
+test reserved_namespaces::tests::reserved_are_unique_and_nonempty ... ok
+test reserved_namespaces::tests::reserved_do_not_collide_with_current_variants ... ok
+test revocation::tests::crl_directory_defaults_to_xdg_data_home ... ok
+test region::tests::encoding_id_is_frozen ... ok
+test revocation::tests::crl_directory_falls_back_to_home_data_tree ... ok
+test revocation::tests::crl_directory_prefers_explicit_override ... ok
+test revocation::tests::crl_id_display_hex ... ok
+test revocation::tests::registry_client_trait_object_safe ... ok
+test revocation::tests::crl_id_is_the_sha256_of_recursively_key_sorted_entries ... ok
+test revocation::tests::revocation_action_as_str_roundtrip ... ok
+test revocation::tests::revocation_action_default_is_terminate_immediately ... ok
+test revocation::tests::revocation_entry_new_rejects_empty_spirit_class ... ok
+test revocation::tests::revocation_entry_new_rejects_invalid_spirit_class ... ok
+test revocation::tests::revocation_origin_as_str_roundtrip ... ok
+test revocation::tests::revocation_origin_serde_roundtrip ... ok
+test revocation::tests::semver_range_contains_in_range ... ok
+test revocation::tests::semver_range_contains_out_of_range ... ok
+test revocation::tests::semver_range_exact_match ... ok
+test revocation::tests::semver_range_malformed_returns_err ... ok
+test revocation::tests::semver_range_wildcard ... ok
+test revocation::tests::signed_revocation_list_new_rejects_empty_entries ... ok
+test revocation::tests::signed_revocation_list_new_rejects_wrong_schema_version ... ok
+test sandbox::tests::container_runtime_kind_as_str ... ok
+test sandbox::tests::container_runtime_kind_serde_roundtrip ... ok
+test sandbox::tests::image_attestation_id_display_hex ... ok
+test sandbox::tests::t3_error_display ... ok
+test sandbox::tests::t3_image_attestation_new_happy_path ... ok
+test sandbox::tests::sandbox_inspect_report_serde_roundtrip ... ok
+test sandbox::tests::t3_image_attestation_new_rejects_empty_entries ... ok
+test sandbox::tests::t3_image_attestation_new_rejects_multiple_defaults ... ok
+test sandbox::tests::t3_image_attestation_new_rejects_wrong_schema_version ... ok
+test sandbox::tests::t3_image_attestation_new_rejects_zero_pubkey ... ok
+test sandbox::tests::t3_image_attestation_new_rejects_zero_signature ... ok
+test sandbox::tests::t3_image_entry_new_happy_path ... ok
+test sandbox::tests::t3_image_entry_new_rejects_empty_uri ... ok
+test sandbox::tests::t3_image_entry_new_rejects_zero_sha ... ok
+test self_telemetry::tests::resolution_kind_label_serde_round_trip ... ok
+test self_telemetry::tests::empty_report_json_snapshot ... ok
+test self_telemetry::tests::self_telemetry_error_display_backend_unavailable ... ok
+test self_telemetry::tests::self_telemetry_error_display_unknown ... ok
+test self_telemetry::tests::self_telemetry_error_display_window_invalid ... ok
+test supervision::tests::child_exit_status_signaled_debug ... ok
+test supervision::tests::crash_cause_voluntary_str ... ok
+test supervision::tests::fault_cause_signaled_by_kernel_str ... ok
+test self_telemetry::tests::self_telemetry_report_serde_round_trip ... ok
+test supervision::tests::null_replica_resolver_always_none ... ok
+test supervision::tests::on_crash_action_default_is_nack ... ok
+test supervision::tests::on_crash_action_display ... ok
+test supervision::tests::on_crash_action_serde_roundtrip_kebab_case ... ok
+test supervision::tests::trait_object_safety_replica_resolver ... ok
+test supervision::tests::trait_object_safety_subprocess_supervisor ... ok
+test team::tests::accepts_canonical_team_ids ... ok
+test team::tests::rejects_noncanonical_instead_of_normalizing ... ok
+test team::tests::serde_reuses_constructor_validation ... ok
+
+test result: ok. 281 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 5 tests
+test consent_expiry_is_strict_and_open_ended_never_expires ... ok
+test full_consent_envelope_json_is_byte_identical_to_pre_17_8_golden ... ok
+test consent_recall_policy_decodes_unknown_values_to_withheld ... ok
+test consent_withheld_display_names_only_the_frame ... ok
+test granter_binding_compares_spirit_and_host_never_role ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 11 tests
+test completion_requires_available_exited_payload ... ok
+test cid_parser_and_cgroup_identity_are_exact ... ok
+test decoding_boundaries_and_pidfd_authority ... ok
+test exit_record_rejects_each_cross_field_inconsistency ... ok
+test invalid_runtime_exit_codes_are_truncated_without_invented_code_or_signal ... ok
+test payload_classification_obeys_oom_authority_and_fallback ... ok
+test inspect_parser_requires_all_typed_state_fields_and_terminality_is_exact ... ok
+test pidfile_parser_accepts_only_positive_i32_decimal ... ok
+test exit_record_serializes_exact_six_keys_for_success_fallback_unavailable_and_residue ... ok
+test unavailable_state_is_always_truncated_even_with_clean_runtime_client ... ok
+test wait_status_decode_is_terminal_only ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test dns_label_and_total_lengths_are_bounded ... ok
+test invalid_authorities_are_refused_on_both_boundaries ... ok
+test manifest_requires_a_port_while_bare_grants_mean_https ... ok
+test serde_uses_the_same_strict_grammar_and_canonical_output ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test principal_matching_is_token_bounded_not_substring_bounded ... ok
+test legacy_erased_json_defaults_requests_and_notice_round_trips ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test concurrent_initializers_publish_one_complete_control_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 5 tests
+test identifier_scopes_are_exact_on_every_field ... ok
+test fs_subtree_fails_closed_on_ambiguous_components ... ok
+test fs_subtree_is_lexical_component_containment ... ok
+test net_https_is_exact_bytes ... ok
+test unit_variants_by_kind_and_variants_never_cross ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,14 @@
+
+running 9 tests
+test yanked_install_is_refused_before_persistence_ac16 ... ok
+test built_in_shell_names_are_reserved_before_admission ... ok
+test install_refuses_registry_rust_inproc_before_persisting ... ok
+test materialization_failure_never_activates_a_partial_install ... ok
+test wrong_publisher_key_and_claim_signature_are_refused ... ok
+test offline_install_persists_remote_origin_and_rejects_tampering ... ok
+test independently_keyed_server_is_verified_and_wrong_key_never_persists ... ok
+test installed_version_is_immutable_ac14 ... ok
+test configured_org_key_requires_a_valid_server_tier_signature ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+

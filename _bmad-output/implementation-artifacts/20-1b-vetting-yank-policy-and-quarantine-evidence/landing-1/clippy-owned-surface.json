@@ -1,0 +1,260 @@
+[
+  [
+    "crates/maos-bin/tests/yank_policy_20_1b.rs",
+    377,
+    "clippy::needless_borrow",
+    "this expression creates a reference which is immediately dereferenced by the compiler"
+  ],
+  [
+    "crates/maos-compliance/src/vetting/mod.rs",
+    309,
+    "clippy::too_many_arguments",
+    "this function has too many arguments (8/7)"
+  ],
+  [
+    "crates/maos-compliance/tests/evaluator_latency_test.rs",
+    6,
+    "clippy::doc_lazy_continuation",
+    "doc list item without indentation"
+  ],
+  [
+    "crates/maos-registry/src/admission.rs",
+    437,
+    "clippy::derivable_impls",
+    "this `impl` can be derived"
+  ],
+  [
+    "crates/maos-registry/src/admission.rs",
+    554,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/admission.rs",
+    556,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/admission.rs",
+    792,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/admission.rs",
+    794,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/admission.rs",
+    911,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/admission.rs",
+    913,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/admission.rs",
+    1156,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/admission.rs",
+    1158,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/client.rs",
+    179,
+    "unused_variables",
+    "unused variable: `server_sig`"
+  ],
+  [
+    "crates/maos-registry/src/client.rs",
+    261,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/client.rs",
+    263,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/client.rs",
+    265,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/compliance_verify.rs",
+    129,
+    "deprecated",
+    "use of deprecated function `maos_compliance::builder::seeded_keypair`: TEST/CORPUS/SMOKE ONLY \u2014 never use in production admission"
+  ],
+  [
+    "crates/maos-registry/src/fixture_replay.rs",
+    6,
+    "unused_imports",
+    "unused import: `std::sync::Mutex`"
+  ],
+  [
+    "crates/maos-registry/src/fixture_replay.rs",
+    9,
+    "unused_imports",
+    "unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`"
+  ],
+  [
+    "crates/maos-registry/src/fixture_replay.rs",
+    10,
+    "unused_imports",
+    "unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`"
+  ],
+  [
+    "crates/maos-registry/src/handlers/manifest.rs",
+    9,
+    "unused_imports",
+    "unused import: `SignedManifest`"
+  ],
+  [
+    "crates/maos-registry/src/handlers/manifest.rs",
+    16,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/handlers/manifest.rs",
+    18,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/handlers/manifest.rs",
+    20,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/src/operations.rs",
+    44,
+    "clippy::manual_clamp",
+    "clamp-like pattern without using clamp function"
+  ],
+  [
+    "crates/maos-registry/src/origin.rs",
+    21,
+    "clippy::derivable_impls",
+    "this `impl` can be derived"
+  ],
+  [
+    "crates/maos-registry/src/server.rs",
+    589,
+    "unused_imports",
+    "unused imports: `ComplianceClaimEnvelope` and `SigningAlg`"
+  ],
+  [
+    "crates/maos-registry/src/server.rs",
+    590,
+    "unused_imports",
+    "unused imports: `Read` and `Write`"
+  ],
+  [
+    "crates/maos-registry/src/server.rs",
+    591,
+    "unused_imports",
+    "unused import: `std::net::TcpStream`"
+  ],
+  [
+    "crates/maos-registry/src/server.rs",
+    592,
+    "unused_imports",
+    "unused import: `std::time::Duration`"
+  ],
+  [
+    "crates/maos-registry/src/server.rs",
+    594,
+    "dead_code",
+    "function `temp_storage` is never used"
+  ],
+  [
+    "crates/maos-registry/src/storage.rs",
+    731,
+    "clippy::manual_clamp",
+    "clamp-like pattern without using clamp function"
+  ],
+  [
+    "crates/maos-registry/src/storage.rs",
+    938,
+    "clippy::redundant_closure",
+    "redundant closure"
+  ],
+  [
+    "crates/maos-registry/tests/fr59_yank_propagation_within_5min_test.rs",
+    16,
+    "dead_code",
+    "field `clock_ns` is never read"
+  ],
+  [
+    "crates/maos-registry/tests/runtime_drift_test.rs",
+    47,
+    "deprecated",
+    "use of deprecated function `maos_compliance::builder::seeded_keypair`: TEST/CORPUS/SMOKE ONLY \u2014 never use in production admission"
+  ],
+  [
+    "crates/maos-registry/tests/runtime_drift_test.rs",
+    55,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/tests/runtime_drift_test.rs",
+    57,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-registry/tests/search_lock_contention_test.rs",
+    3,
+    "unused_imports",
+    "unused imports: `AtomicUsize` and `Ordering`"
+  ],
+  [
+    "crates/maos-registry/tests/search_lock_contention_test.rs",
+    4,
+    "unused_imports",
+    "unused import: `std::sync::Arc`"
+  ],
+  [
+    "crates/maos-registry/tests/search_lock_contention_test.rs",
+    7,
+    "unused_imports",
+    "unused imports: `SearchResultItem` and `YankEntry`"
+  ],
+  [
+    "crates/maos-spirit-cli/src/publish.rs",
+    125,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-spirit-cli/src/publish.rs",
+    127,
+    "clippy::needless_borrows_for_generic_args",
+    "the borrowed expression implements the required traits"
+  ],
+  [
+    "crates/maos-spirit-cli/src/signing.rs",
+    27,
+    "dead_code",
+    "constant `MAX_MANIFEST_FILE_SIZE` is never used"
+  ]
+]

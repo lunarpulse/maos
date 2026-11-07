@@ -1,0 +1,9 @@
+
+running 4 tests
+test first_publisher_pin_is_typed_and_survives_restart_ac10 ... ok
+test daemon_cursor_restart_does_not_replay_journalled_yanks_ac7 ... ok
+test unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17 ... ok
+test publisher_and_enrolled_vetter_yanks_are_signed_labelled_and_restart_safe_ac7 ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+

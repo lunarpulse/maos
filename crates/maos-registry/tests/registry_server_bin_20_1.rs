@@ -1,5 +1,7 @@
 #[path = "../../../tests/harness/registry_20_1.rs"]
 mod support;
+#[path = "../../../tests/harness/registry_trust_20_1b.rs"]
+mod trust;
 use maos_domain::ports::registry::SpiritRegistryClient;
 use support::*;
 
@@ -10,20 +12,7 @@ fn standalone_server_roundtrip_isolates_root_and_exits_cleanly() {
         &scratch,
         std::path::Path::new(env!("CARGO_BIN_EXE_maos-registry-server")),
     );
-    let pkg = maos_domain::ports::registry::SignedPackage::new(
-        "root-witness".into(),
-        "0.1.0".into(),
-        b"name = \"root-witness\"\nversion = \"0.1.0\"\ntrust_tier = \"local\"\n".to_vec(),
-        b"artifact".to_vec(),
-        [0; 64],
-        [0; 32],
-        maos_spirit_abi::compliance::ComplianceClaimEnvelope {
-            signature: [0; 64],
-            attester_pubkey: [0; 32],
-            claim_bytes: vec![],
-            signing_alg: maos_spirit_abi::compliance::SigningAlg::Ed25519,
-        },
-    );
+    let pkg = trust::package("root-witness", "0.1.0", &trust::PUBLISHER);
     let client = maos_registry::McpSpiritRegistryClient::http(
         format!("http://{}/mcp", server.addr),
         Default::default(),

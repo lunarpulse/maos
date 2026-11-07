@@ -1,0 +1,82 @@
+[
+  {
+    "ac": "ac6",
+    "backup_sha256": "7510cf64844c889508f358c05956f557609682044fcc28aff7e90338c8a0cb4e",
+    "command": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac6.rs crates/maos-compliance/src/vetting/mod.rs && cmp /tmp/201b-plants/ac6.rs crates/maos-compliance/src/vetting/mod.rs && touch crates/maos-compliance/src/vetting/mod.rs"
+    ],
+    "exit_code": 0
+  },
+  {
+    "ac": "ac7",
+    "backup_sha256": "e952854c6f0e23e0764d6b7d6c3a1780f6681159f9d4836d3b7492015aaae38c",
+    "command": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac7.rs crates/maos-registry/src/handlers/deprecate.rs && cmp /tmp/201b-plants/ac7.rs crates/maos-registry/src/handlers/deprecate.rs && touch crates/maos-registry/src/handlers/deprecate.rs"
+    ],
+    "exit_code": 0
+  },
+  {
+    "ac": "ac8",
+    "backup_sha256": "f8e707b3a9a7647b25730d960559d8e23987754685c6b52e627baafecd8132e5",
+    "command": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac8.rs crates/maos-registry/src/yank.rs && cmp /tmp/201b-plants/ac8.rs crates/maos-registry/src/yank.rs && touch crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0
+  },
+  {
+    "ac": "ac9",
+    "backup_sha256": "189ff7d1b07453d68ad42e24f5a2a8356b498102ab3bcbcdb5703f2345c26bca",
+    "command": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac9.rs crates/maos-bin/src/yank_policy.rs && cmp /tmp/201b-plants/ac9.rs crates/maos-bin/src/yank_policy.rs && touch crates/maos-bin/src/yank_policy.rs"
+    ],
+    "exit_code": 0
+  },
+  {
+    "ac": "ac10",
+    "backup_sha256": "af245e10ca8d9ff97733c0930b9acbb6cdca75448eaa13cecc00fa19c80b1cf0",
+    "command": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac10.rs crates/maos-bin/src/admission.rs && cmp /tmp/201b-plants/ac10.rs crates/maos-bin/src/admission.rs && touch crates/maos-bin/src/admission.rs"
+    ],
+    "exit_code": 0
+  },
+  {
+    "ac": "ac14",
+    "backup_sha256": "a1b37a265375f2893caf9bf0ece8e01cbc4670be24090c52a8ce85a9af7743d0",
+    "command": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac14.rs crates/maos-registry/src/storage.rs && cmp /tmp/201b-plants/ac14.rs crates/maos-registry/src/storage.rs && touch crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0
+  },
+  {
+    "ac": "ac16",
+    "backup_sha256": "b7ef33d84261996de11d66e65c1cd76718c1d746f2e441c36c577233d6ec180a",
+    "command": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac16.rs crates/maos-registry/src/install.rs && cmp /tmp/201b-plants/ac16.rs crates/maos-registry/src/install.rs && touch crates/maos-registry/src/install.rs"
+    ],
+    "exit_code": 0
+  },
+  {
+    "ac": "ac17",
+    "backup_sha256": "f748c83141d77b6e42b171cebef24901ff46e6945e955932d042d2f033f066e0",
+    "command": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac17.rs crates/maos-registry/src/handlers/publish.rs && cmp /tmp/201b-plants/ac17.rs crates/maos-registry/src/handlers/publish.rs && touch crates/maos-registry/src/handlers/publish.rs"
+    ],
+    "exit_code": 0
+  }
+]

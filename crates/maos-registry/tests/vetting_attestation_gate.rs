@@ -171,6 +171,8 @@ fn revoke_attestation_in(kr: &mut VetterKeyring, pkg: &SignedPackage, effective_
 fn attestation_for(pkg: &SignedPackage, issued: u64, expires: u64) -> VettingAttestation {
     let claim = VettingClaim {
         manifest_hash: manifest_hash_of(pkg),
+        artifact_sha256: <sha2::Sha256 as sha2::Digest>::digest(&pkg.artifact_bytes).into(),
+        publisher_pubkey: pkg.publisher_pubkey,
         spirit_id: pkg.spirit_id.as_str().to_string(),
         spirit_version: pkg.version.clone(),
         from_tier: TrustTier::PublicUntrusted,
@@ -285,6 +287,8 @@ fn leg5_upgrade_flap_control() {
         &VETTER_SEED,
         &VettingClaim {
             manifest_hash: manifest_hash_of(&v1),
+            artifact_sha256: <sha2::Sha256 as sha2::Digest>::digest(&v2.artifact_bytes).into(),
+            publisher_pubkey: v2.publisher_pubkey,
             spirit_id: v2.spirit_id.as_str().into(),
             spirit_version: v2.version.clone(),
             from_tier: TrustTier::PublicUntrusted,
@@ -401,4 +405,57 @@ fn fkcs_off_surface_refusal_precedes_a_valid_attestation() {
         matches!(&err, AdmissionError::OffFrozenSurface { .. }),
         "admit_spirit must refuse the same package the same way, got {err:?}"
     );
+}
+
+#[test]
+fn artifact_swap_is_refused_ac6() {
+    swapped_subject_is_refused(false);
+}
+#[test]
+fn publisher_swap_is_refused_ac6() {
+    swapped_subject_is_refused(true);
+}
+
+fn swapped_subject_is_refused(swap_publisher: bool) {
+    use ring::signature::{Ed25519KeyPair, KeyPair};
+    use sha2::Digest;
+    let original = signed_vetted_pkg("vetted", "0.1.0");
+    let att = attestation_for(&original, 500, 2000);
+    let mut changed = original.clone();
+    let key = Ed25519KeyPair::from_seed_unchecked(&if swap_publisher {
+        [0x56; 32]
+    } else {
+        [0x55; 32]
+    })
+    .unwrap();
+    if swap_publisher {
+        changed.publisher_pubkey = key.public_key().as_ref().try_into().unwrap();
+        changed.compliance_envelope.attester_pubkey = changed.publisher_pubkey;
+        changed.compliance_envelope.signature = key
+            .sign(&changed.compliance_envelope.claim_bytes)
+            .as_ref()
+            .try_into()
+            .unwrap();
+    } else {
+        changed.artifact_bytes = b"another validly publisher-signed artifact".to_vec();
+    }
+    let mut digest = sha2::Sha256::new();
+    digest.update((changed.manifest_toml.len() as u64).to_le_bytes());
+    digest.update(&changed.manifest_toml);
+    digest.update((changed.artifact_bytes.len() as u64).to_le_bytes());
+    digest.update(&changed.artifact_bytes);
+    changed.signature = key.sign(&digest.finalize()).as_ref().try_into().unwrap();
+    let error = admit_spirit_with_attestation(
+        &changed,
+        &cfg(),
+        Some(&att),
+        &enrolled_keyring(100),
+        &ed_pub(&OP_SEED),
+        1000,
+    )
+    .expect_err("a valid attestation must not authorize swapped bytes or publisher");
+    assert!(matches!(
+        error,
+        AdmissionError::VettingAttestationRejected(_)
+    ));
 }

@@ -59,6 +59,7 @@ pub struct SpiritRegistryServer {
     org_pubkey: Option<[u8; 32]>,
     /// Story 7.2 — Ed25519 signing key for server-side tier attestation.
     server_signing_key: Option<[u8; 32]>,
+    vetters: Option<Arc<(maos_compliance::VetterKeyring, [u8; 32])>>,
 }
 
 impl SpiritRegistryServer {
@@ -73,12 +74,23 @@ impl SpiritRegistryServer {
             listen_addr,
             org_pubkey,
             server_signing_key: None,
+            vetters: None,
         }
     }
 
     /// Story 7.2 — attach an Ed25519 signing key for server-side tier attestation.
     pub fn with_server_signing_key(mut self, key: [u8; 32]) -> Self {
         self.server_signing_key = Some(key);
+        self
+    }
+
+    /// Operator-root anchored lifecycle journal authorizing vetter withdrawals.
+    pub fn with_vetter_keyring(
+        mut self,
+        keyring: maos_compliance::VetterKeyring,
+        root: [u8; 32],
+    ) -> Self {
+        self.vetters = Some(Arc::new((keyring, root)));
         self
     }
 
@@ -112,12 +124,13 @@ impl SpiritRegistryServer {
             .local_addr()
             .map_err(|e| format!("local_addr: {e}"))?;
         if !addr.ip().is_loopback() {
-            return Err("unauthenticated development registry requires a loopback bind (20-1b owns mutation authentication)".into());
+            return Err("development registry requires a loopback bind; authenticated first-contact/TLS policy awaits AC15 ruling".into());
         }
         listener.set_nonblocking(true).map_err(|e| e.to_string())?;
         eprintln!("maos-registry: listening on {addr}");
         let storage = self.storage;
         let server_signing_key = self.server_signing_key;
+        let vetters = self.vetters;
         let _ = &self.org_pubkey;
         let mut handles: Vec<(TcpStream, thread::JoinHandle<()>)> =
             Vec::with_capacity(MAX_CONNECTIONS);
@@ -137,10 +150,13 @@ impl SpiritRegistryServer {
                     }
                     let cancel = stream.try_clone().map_err(|e| e.to_string())?;
                     let s = Arc::clone(&storage);
+                    let vetters = vetters.clone();
                     handles.push((
                         cancel,
                         thread::spawn(move || {
-                            if let Err(error) = handle_connection(s, server_signing_key, stream) {
+                            if let Err(error) =
+                                handle_connection(s, server_signing_key, vetters, stream)
+                            {
                                 eprintln!("maos-registry: connection error: {error}");
                             }
                         }),
@@ -172,6 +188,8 @@ pub struct RegistryServerArgs {
     pub bind: Option<String>,
     pub root: Option<std::path::PathBuf>,
     pub signing_key: Option<std::path::PathBuf>,
+    pub vetter_keyring: Option<std::path::PathBuf>,
+    pub operator_root: Option<String>,
 }
 
 impl RegistryServerArgs {
@@ -184,6 +202,8 @@ impl RegistryServerArgs {
                 "--bind" => result.bind = Some(value),
                 "--root" => result.root = Some(value.into()),
                 "--signing-key" => result.signing_key = Some(value.into()),
+                "--vetter-keyring" => result.vetter_keyring = Some(value.into()),
+                "--operator-root" => result.operator_root = Some(value),
                 _ => return Err(format!("unknown registry flag {flag}")),
             }
         }
@@ -210,6 +230,21 @@ impl RegistryServerArgs {
                 .map_err(|_| "signing key must be a 32-byte hex seed")?;
             server = server.with_server_signing_key(seed);
         }
+        match (self.vetter_keyring, self.operator_root) {
+            (Some(path), Some(root)) => {
+                let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+                let keyring = serde_cbor::from_slice(&bytes).map_err(|e| e.to_string())?;
+                let root = hex::decode(root)
+                    .map_err(|e| e.to_string())?
+                    .try_into()
+                    .map_err(|_| "operator root must be 32 bytes")?;
+                server = server.with_vetter_keyring(keyring, root);
+            }
+            (None, None) => {}
+            _ => {
+                return Err("--vetter-keyring and --operator-root must be supplied together".into())
+            }
+        }
         Ok(server)
     }
 }
@@ -218,6 +253,7 @@ impl RegistryServerArgs {
 fn handle_connection(
     storage: Arc<dyn RegistryStorage>,
     server_signing_key: Option<[u8; 32]>,
+    vetters: Option<Arc<(maos_compliance::VetterKeyring, [u8; 32])>>,
     mut stream: TcpStream,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let deadline = std::time::Instant::now() + REQUEST_DEADLINE;
@@ -300,7 +336,11 @@ fn handle_connection(
             "registry.deprecate" => {
                 let args: DeprecateArgs = serde_json::from_value(params.clone())
                     .map_err(|e| format!("invalid params: {e}"))?;
-                handlers::deprecate::handle_deprecate(&storage, &args)
+                handlers::deprecate::handle_deprecate(
+                    &storage,
+                    &args,
+                    vetters.as_deref().map(|(keyring, root)| (keyring, root)),
+                )
             }
             "registry.yanks_since" => {
                 let args: YanksSinceArgs = serde_json::from_value(params.clone())

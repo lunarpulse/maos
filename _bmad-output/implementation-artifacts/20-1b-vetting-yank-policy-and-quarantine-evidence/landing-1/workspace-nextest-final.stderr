@@ -1,0 +1,7 @@
+error: error reading metadata from argument --binaries-metadata
+
+Caused by:
+  error deserializing metadata file `/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/workspace-binaries-metadata.stdout`
+
+Caused by:
+  missing field `rust-binaries` at line 1 column 1032631

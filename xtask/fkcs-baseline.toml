@@ -44,9 +44,21 @@ ratifier = "Lunarpulse"
 # 9b66a40a2d25e4c8fabca5d3cd6185d8eade65c1de8989480d8dd107fd2451d6 ->
 # 5b3fe85c6abdbf45ea73b57edae6f427d1e4b445b6ae9c4ac24ba5a77798a4f4.
 # No kernel source, frozen tag, file set, or admission behavior changed.
+# RE-PINNED — 20-1b-vetting-yank-policy-and-quarantine L1, Main adjudication:
+# deliberate declared-files diff is one production argument:
+# &pkg.manifest_toml -> VettingSubject::from(pkg), plus two test claim fields.
+# The same package's exact manifest is supplied with its artifact/publisher;
+# frozen_surface_gate and maos-skill admission are unchanged. Existing
+# off-surface/admission negative controls remain unchanged and passing.
+# 5b3fe85c6abdbf45ea73b57edae6f427d1e4b445b6ae9c4ac24ba5a77798a4f4 ->
+# 136c579d6a2ae4804d0f57864cec8c583363b563e2f063a870f6ae6f38256a46.
+# This re-pin PRECEDES the bmad-code-review round. That review must explicitly
+# re-examine the argument hunk and this pin; no independent review is claimed.
+# Code, this fingerprint and exact kloc/kernel pin sets travel together in
+# Main's landing commit. No kernel source/frozen tag/declared file-set change.
 [admission_baseline]
 files = [
     "crates/maos-registry/src/admission.rs",
     "crates/maos-skill/src/admission.rs",
 ]
-sha256 = "5b3fe85c6abdbf45ea73b57edae6f427d1e4b445b6ae9c4ac24ba5a77798a4f4"
+sha256 = "136c579d6a2ae4804d0f57864cec8c583363b563e2f063a870f6ae6f38256a46"

@@ -230,6 +230,8 @@ fn e2e_public_vetted_always_rejected() {
         &vetter_seed,
         &VettingClaim {
             manifest_hash,
+            artifact_sha256: <sha2::Sha256 as sha2::Digest>::digest(&pkg.artifact_bytes).into(),
+            publisher_pubkey: pkg.publisher_pubkey,
             spirit_id: "vetted-spirit".into(),
             spirit_version: "0.1.0".into(),
             from_tier: TrustTier::PublicUntrusted,

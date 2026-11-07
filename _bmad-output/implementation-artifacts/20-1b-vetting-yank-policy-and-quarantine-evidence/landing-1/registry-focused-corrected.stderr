@@ -1,0 +1,223 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:179:27
+    |
+179 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+warning: `maos-registry` (lib) generated 4 warnings (run `cargo fix --lib -p maos-registry` to apply 4 suggestions)
+warning: unused imports: `AtomicUsize` and `Ordering`
+ --> crates/maos-registry/tests/search_lock_contention_test.rs:3:25
+  |
+3 | use std::sync::atomic::{AtomicUsize, Ordering};
+  |                         ^^^^^^^^^^^  ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::sync::Arc`
+ --> crates/maos-registry/tests/search_lock_contention_test.rs:4:5
+  |
+4 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `SearchResultItem` and `YankEntry`
+ --> crates/maos-registry/tests/search_lock_contention_test.rs:7:18
+  |
+7 |     SearchQuery, SearchResultItem, SpiritId, YankEntry, YankReason,
+  |                  ^^^^^^^^^^^^^^^^            ^^^^^^^^^
+
+warning: use of deprecated function `maos_compliance::builder::seeded_keypair`: TEST/CORPUS/SMOKE ONLY — never use in production admission
+  --> crates/maos-registry/tests/runtime_drift_test.rs:47:20
+   |
+47 |     let (kp, pk) = seeded_keypair(0x150C_04A5);
+   |                    ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `ComplianceClaimEnvelope` and `SigningAlg`
+   --> crates/maos-registry/src/server.rs:576:39
+    |
+576 |     use maos_spirit_abi::compliance::{ComplianceClaimEnvelope, SigningAlg};
+    |                                       ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^
+
+warning: unused imports: `Read` and `Write`
+   --> crates/maos-registry/src/server.rs:577:19
+    |
+577 |     use std::io::{Read, Write};
+    |                   ^^^^  ^^^^^
+
+warning: unused import: `std::net::TcpStream`
+   --> crates/maos-registry/src/server.rs:578:9
+    |
+578 |     use std::net::TcpStream;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::time::Duration`
+   --> crates/maos-registry/src/server.rs:579:9
+    |
+579 |     use std::time::Duration;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: cannot find `Notify` in `sync`
+   --> crates/maos-registry/tests/yank_cadence_20_1b.rs:30:49
+    |
+ 30 |     let observer=Arc::new(Observer(tokio::sync::Notify::new()));
+    |                                                 ^^^^^^ could not find `Notify` in `sync`
+    |
+note: found an item that was configured out
+   --> /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/sync/mod.rs:469:21
+    |
+469 |     pub use notify::Notify;
+    |                     ^^^^^^
+    |
+   ::: /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/macros/cfg.rs:464:19
+    |
+464 |             #[cfg(feature = "sync")]
+    |                   ---------------- the item is gated behind the `sync` feature
+
+error[E0425]: cannot find type `Notify` in `tokio::sync`
+  --> crates/maos-registry/tests/yank_cadence_20_1b.rs:13:30
+   |
+13 | struct Observer(tokio::sync::Notify);
+   |                              ^^^^^^ not found in `tokio::sync`
+
+error[E0603]: module `sync` is private
+   --> crates/maos-registry/tests/yank_cadence_20_1b.rs:13:24
+    |
+ 13 | struct Observer(tokio::sync::Notify);
+    |                        ^^^^ private module
+    |
+note: the module `sync` is defined here
+   --> /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/lib.rs:567:5
+    |
+567 |     mod sync;
+    |     ^^^^^^^^
+
+error[E0603]: module `sync` is private
+   --> crates/maos-registry/tests/yank_cadence_20_1b.rs:30:43
+    |
+ 30 |     let observer=Arc::new(Observer(tokio::sync::Notify::new()));
+    |                                           ^^^^ private module
+    |
+note: the module `sync` is defined here
+   --> /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/lib.rs:567:5
+    |
+567 |     mod sync;
+    |     ^^^^^^^^
+
+warning: use of deprecated function `maos_compliance::builder::seeded_keypair`: TEST/CORPUS/SMOKE ONLY — never use in production admission
+   --> crates/maos-registry/src/compliance_verify.rs:129:24
+    |
+129 |         let (kp, pk) = seeded_keypair(0x150C_04A5);
+    |                        ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: field `clock_ns` is never read
+  --> crates/maos-registry/tests/fr59_yank_propagation_within_5min_test.rs:16:5
+   |
+14 | struct ControlledSource {
+   |        ---------------- field in this struct
+15 |     pending: Mutex<Vec<YankEntry>>,
+16 |     clock_ns: Arc<AtomicU64>,
+   |     ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+Some errors have detailed explanations: E0425, E0433, E0603.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `maos-registry` (test "yank_cadence_20_1b") due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...
+warning: function `temp_storage` is never used
+   --> crates/maos-registry/src/server.rs:581:8
+    |
+581 |     fn temp_storage() -> Arc<dyn RegistryStorage> {
+    |        ^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-registry` (test "runtime_drift_test") generated 1 warning
+warning: `maos-registry` (test "search_lock_contention_test") generated 3 warnings (run `cargo fix --test "search_lock_contention_test" -p maos-registry` to apply 3 suggestions)
+warning: `maos-registry` (test "fr59_yank_propagation_within_5min_test") generated 1 warning
+warning: `maos-registry` (lib test) generated 8 warnings (1 duplicate) (run `cargo fix --lib -p maos-registry --tests` to apply 5 suggestions)

@@ -10,9 +10,27 @@ use maos_domain::ports::registry::{SpiritId, YankReason};
 pub fn handle_deprecate(
     storage: &Arc<dyn RegistryStorage>,
     args: &DeprecateArgs,
+    vetters: Option<(&maos_compliance::VetterKeyring, &[u8; 32])>,
 ) -> Result<serde_json::Value, String> {
     let spirit_id = SpiritId::from(args.spirit_id.as_str());
-    let reason = YankReason::new(args.reason.clone());
+    let mut reason = YankReason::new(args.reason.clone());
+    let bytes = args
+        .authorization
+        .as_ref()
+        .ok_or("unauthenticated registry.deprecate: signed authorization required")?;
+    let auth = crate::yank_auth::decode(bytes)?;
+    let manifest = storage
+        .get_manifest(&spirit_id, &args.version)
+        .map_err(|e| e.to_string())?;
+    auth.verify(
+        &args.spirit_id,
+        &args.version,
+        &args.reason,
+        &manifest.signer_pubkey,
+        vetters,
+        crate::yank_auth::now_unix_ms()?,
+    )?;
+    reason.authorization = Some(bytes.clone());
     let receipt = storage
         .yank(&spirit_id, &args.version, &reason)
         .map_err(|e| e.to_string())?;

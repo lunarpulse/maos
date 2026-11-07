@@ -65,7 +65,7 @@ pub trait RegistryStorage: Send + Sync {
         reason: &YankReason,
     ) -> Result<YankReceipt, StorageError>;
 
-    /// List yanks since a given monotonic timestamp.
+    /// List yanks after a durable server sequence (`since_ns` is the legacy wire name).
     fn yanks_since(&self, since_ns: u64) -> Result<YankList, StorageError>;
 
     /// Story 7.2 — store a signed package with origin metadata.
@@ -223,7 +223,7 @@ impl LocalFsRegistryStorage {
         let root = Self::default_root();
         fs::create_dir_all(root.join("spirits"))?;
         let index = Self::load_index(&root);
-        let yanks = Self::load_yanks(&root);
+        let yanks = Self::load_yanks(&root)?;
         Ok(Self {
             root,
             index: Mutex::new(index),
@@ -235,7 +235,7 @@ impl LocalFsRegistryStorage {
     pub fn at_path(root: PathBuf) -> Result<Self, io::Error> {
         fs::create_dir_all(root.join("spirits"))?;
         let index = Self::load_index(&root);
-        let yanks = Self::load_yanks(&root);
+        let yanks = Self::load_yanks(&root)?;
         Ok(Self {
             root,
             index: Mutex::new(index),
@@ -351,16 +351,126 @@ impl LocalFsRegistryStorage {
         }
     }
 
+    fn mutation_lock(&self) -> Result<fs::File, StorageError> {
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(self.root.join(".mutation.lock"))
+            .map_err(|e| StorageError::Io(e.to_string()))?;
+        #[cfg(unix)]
+        rustix::fs::flock(&file, rustix::fs::FlockOperation::LockExclusive)
+            .map_err(|e| StorageError::Io(e.to_string()))?;
+        #[cfg(not(unix))]
+        return Err(StorageError::Io(
+            "registry mutation locking requires Unix".into(),
+        ));
+        Ok(file)
+    }
+
+    /// Pin across every version, including inactive installed generations.
+    fn check_publisher(
+        directory: &Path,
+        pkg: &SignedPackage,
+    ) -> Result<Option<PathBuf>, StorageError> {
+        #[derive(serde::Deserialize)]
+        struct Identity {
+            version: String,
+            publisher_pubkey: String,
+        }
+        let entries = match fs::read_dir(directory) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(StorageError::Io(e.to_string())),
+        };
+        let mut existing = None;
+        for entry in entries {
+            let entry = entry.map_err(|e| StorageError::Io(e.to_string()))?;
+            let directory = entry.path();
+            let path = directory.join("signed_package.json");
+            if !path.exists() {
+                continue;
+            }
+            // Stream past artifact/compliance bytes; ownership checks must not
+            // allocate every historical artifact just to read its publisher.
+            let stored: Identity = serde_json::from_reader(std::io::BufReader::new(
+                fs::File::open(path).map_err(|e| StorageError::Io(e.to_string()))?,
+            ))
+            .map_err(|e| StorageError::Serde(e.to_string()))?;
+            let mut publisher = [0; 32];
+            hex::decode_to_slice(&stored.publisher_pubkey, &mut publisher)
+                .map_err(|e| StorageError::Serde(e.to_string()))?;
+            if publisher != pkg.publisher_pubkey {
+                return Err(StorageError::PublisherMismatch(
+                    pkg.spirit_id.as_str().into(),
+                ));
+            }
+            if stored.version == pkg.version {
+                existing = Some(directory);
+            }
+        }
+        Ok(existing)
+    }
+
     /// Prepare every file before the atomic inventory switch. A failed install
     /// cannot replace an active generation or activate partially written bytes.
     pub(crate) fn install_package(
         &self,
         pkg: &SignedPackage,
         origin: &crate::origin::RegistryOrigin,
+        vetting: Option<&crate::install::InstalledVetting>,
     ) -> Result<(), StorageError> {
         path_segment(pkg.spirit_id.as_str())?;
         path_segment(&pkg.version)?;
+        let _serializer = INSTALLED_UNINSTALL
+            .lock()
+            .map_err(|e| StorageError::Io(e.to_string()))?;
+        let _lock = self.mutation_lock()?;
         let parent = self.root.join("installed").join(pkg.spirit_id.as_str());
+        if let Some(directory) = Self::check_publisher(&parent, pkg)? {
+            let stored: SignedPackage = serde_json::from_slice(
+                &fs::read(directory.join("signed_package.json"))
+                    .map_err(|e| StorageError::Io(e.to_string()))?,
+            )
+            .map_err(|e| StorageError::Serde(e.to_string()))?;
+            let stored_origin: crate::origin::RegistryOrigin = serde_json::from_slice(
+                &fs::read(directory.join("origin.json"))
+                    .map_err(|e| StorageError::Io(e.to_string()))?,
+            )
+            .map_err(|e| StorageError::Serde(e.to_string()))?;
+            if stored != *pkg || stored_origin != *origin {
+                return Err(StorageError::ImmutableVersion {
+                    spirit_id: pkg.spirit_id.as_str().into(),
+                    version: pkg.version.clone(),
+                });
+            }
+            let stored_vetting = match fs::read(directory.join("vetting.json")) {
+                Ok(bytes) => Some(
+                    serde_json::from_slice::<crate::install::InstalledVetting>(&bytes)
+                        .map_err(|e| StorageError::Serde(e.to_string()))?,
+                ),
+                Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+                Err(e) => return Err(StorageError::Io(e.to_string())),
+            };
+            if stored_vetting.as_ref() != vetting {
+                return Err(StorageError::ImmutableVersion {
+                    spirit_id: pkg.spirit_id.as_str().into(),
+                    version: pkg.version.clone(),
+                });
+            }
+            let relative = directory
+                .strip_prefix(self.root.join("installed"))
+                .map_err(|e| StorageError::Io(e.to_string()))?
+                .to_str()
+                .ok_or_else(|| StorageError::Io("installed generation is not UTF-8".into()))?;
+            let mut installs = Self::load_installs(&self.root)?;
+            if installs.get(pkg.spirit_id.as_str()).map(String::as_str) != Some(relative) {
+                installs.insert(pkg.spirit_id.as_str().to_owned(), relative.to_owned());
+                write_json_atomic(&self.root.join("installed-index.json"), &installs)?;
+            }
+            return Ok(());
+        }
         fs::create_dir_all(&parent).map_err(|e| StorageError::Io(e.to_string()))?;
         let generation = format!("{}-{}", pkg.version, unique_suffix());
         let directory = parent.join(&generation);
@@ -382,6 +492,9 @@ impl LocalFsRegistryStorage {
                 }
             }
             write_json_atomic(&directory.join("origin.json"), origin)?;
+            if let Some(vetting) = vetting {
+                write_json_atomic(&directory.join("vetting.json"), vetting)?;
+            }
             let mut installs = Self::load_installs(&self.root)?;
             installs.insert(
                 pkg.spirit_id.as_str().to_owned(),
@@ -422,21 +535,12 @@ impl LocalFsRegistryStorage {
         }
     }
 
-    fn load_yanks(root: &Path) -> Vec<YankEntry> {
-        let path = root.join("yanks.json");
-        if path.exists() {
-            match fs::read_to_string(&path)
-                .ok()
-                .and_then(|s| serde_json::from_str(&s).ok())
-            {
-                Some(yanks) => yanks,
-                None => {
-                    eprintln!("maos-registry: warning: failed to load yanks.json, starting with empty yank list");
-                    Vec::new()
-                }
-            }
-        } else {
-            Vec::new()
+    fn load_yanks(root: &Path) -> io::Result<Vec<YankEntry>> {
+        match fs::read(root.join("yanks.json")) {
+            Ok(bytes) => serde_json::from_slice(&bytes)
+                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e)),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
+            Err(e) => Err(e),
         }
     }
 
@@ -447,10 +551,8 @@ impl LocalFsRegistryStorage {
         write_json_atomic(&root.join("index.json"), index)
     }
 
-    fn save_yanks_data(root: &Path, yanks: &[YankEntry]) {
-        if let Ok(json) = serde_json::to_vec_pretty(yanks) {
-            let _ = fs::write(root.join("yanks.json"), &json);
-        }
+    fn save_yanks_data(root: &Path, yanks: &[YankEntry]) -> Result<(), StorageError> {
+        write_json_atomic(&root.join("yanks.json"), &yanks)
     }
 
     fn spirit_dir(&self, spirit_id: &SpiritId) -> Result<PathBuf, StorageError> {
@@ -494,6 +596,8 @@ impl RegistryStorage for LocalFsRegistryStorage {
                 "package identity mismatch".into(),
             ));
         }
+        let _lock = self.mutation_lock()?;
+        let _ = Self::check_publisher(&self.spirit_dir(spirit_id)?, pkg)?;
         fs::create_dir_all(&vdir).map_err(|e| StorageError::Io(e.to_string()))?;
         Self::write_package(&vdir, pkg)?;
 
@@ -646,39 +750,66 @@ impl RegistryStorage for LocalFsRegistryStorage {
         version: &str,
         reason: &YankReason,
     ) -> Result<YankReceipt, StorageError> {
-        let yank_id = format!("yank-{}", monotonic_now_ns());
-        let entry = YankEntry::new(
+        path_segment(spirit_id.as_str())?;
+        path_segment(version)?;
+        let _lock = self.mutation_lock()?;
+        let mut yanks = self
+            .yanks
+            .lock()
+            .map_err(|e| StorageError::Io(e.to_string()))?;
+        *yanks = Self::load_yanks(&self.root).map_err(|e| StorageError::Io(e.to_string()))?;
+        if let Some(existing) = yanks.iter().find(|e| {
+            e.spirit_id == *spirit_id
+                && e.version == version
+                && e.authorization.as_slice() == reason.authorization.as_deref().unwrap_or(&[])
+        }) {
+            return Ok(YankReceipt::new(
+                format!("yank-{}", existing.sequence),
+                spirit_id.clone(),
+                version.into(),
+            ));
+        }
+        let sequence = yanks
+            .last()
+            .map_or(0, |e| e.sequence)
+            .checked_add(1)
+            .ok_or_else(|| StorageError::Io("yank sequence exhausted".into()))?;
+        let wall = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| StorageError::Io(e.to_string()))?
+            .as_nanos() as u64;
+        let mut entry = YankEntry::new(
             spirit_id.clone(),
-            version.to_string(),
-            monotonic_now_ns(),
+            version.into(),
+            wall,
             reason.summary.clone(),
         );
-
-        let yanks_snapshot = {
-            let mut yanks = self
-                .yanks
-                .lock()
-                .map_err(|e| StorageError::Io(format!("yanks lock poisoned: {e}")))?;
-            yanks.push(entry);
-            yanks.clone()
-        };
-        Self::save_yanks_data(&self.root, &yanks_snapshot);
-
+        entry.sequence = sequence;
+        if let Some(bytes) = &reason.authorization {
+            entry.origin = Some(
+                crate::yank_auth::decode(bytes)
+                    .map_err(StorageError::Serde)?
+                    .origin,
+            );
+            entry.authorization = bytes.clone();
+        }
+        yanks.push(entry);
+        if let Err(error) = Self::save_yanks_data(&self.root, &yanks) {
+            yanks.pop();
+            return Err(error);
+        }
         Ok(YankReceipt::new(
-            yank_id,
+            format!("yank-{sequence}"),
             spirit_id.clone(),
             version.to_string(),
         ))
     }
 
     fn yanks_since(&self, since_ns: u64) -> Result<YankList, StorageError> {
-        let yanks = self
-            .yanks
-            .lock()
-            .map_err(|e| StorageError::Io(format!("yanks lock poisoned: {e}")))?;
+        let yanks = Self::load_yanks(&self.root).map_err(|e| StorageError::Io(e.to_string()))?;
         let entries: Vec<YankEntry> = yanks
             .iter()
-            .filter(|e| e.yanked_at_ns >= since_ns)
+            .filter(|e| since_ns == 0 || e.sequence > since_ns)
             .cloned()
             .collect();
         Ok(YankList::new(entries))
@@ -838,6 +969,10 @@ pub enum StorageError {
     BenchmarkNotFound { spirit_id: String, version: String },
     #[error("invalid registry path segment '{0}'")]
     InvalidSegment(String),
+    #[error("publisher key differs from pinned owner for '{0}'")]
+    PublisherMismatch(String),
+    #[error("installed version '{spirit_id}@{version}' is immutable")]
+    ImmutableVersion { spirit_id: String, version: String },
 }
 
 // ---------------------------------------------------------------------------

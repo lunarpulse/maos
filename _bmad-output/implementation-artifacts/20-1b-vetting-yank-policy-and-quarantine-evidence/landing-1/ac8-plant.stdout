@@ -1,0 +1,11 @@
+
+running 1 test
+test signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8 ... FAILED
+
+failures:
+
+failures:
+    signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.12s
+

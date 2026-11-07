@@ -1,0 +1,13 @@
+
+running 2 tests
+test yanked_install_is_refused_before_persistence_ac16 ... FAILED
+test installed_version_is_immutable_ac14 ... FAILED
+
+failures:
+
+failures:
+    installed_version_is_immutable_ac14
+    yanked_install_is_refused_before_persistence_ac16
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.35s
+

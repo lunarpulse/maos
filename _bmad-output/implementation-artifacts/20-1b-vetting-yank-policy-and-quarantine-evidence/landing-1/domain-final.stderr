@@ -1,0 +1,44 @@
+   Compiling once_cell v1.21.4
+   Compiling getrandom v0.4.2
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling tempfile v3.27.0
+   Compiling maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain)
+warning: `maos-domain` (lib test) generated 2 warnings (2 duplicates)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.12s
+     Running unittests src/lib.rs (target/debug/deps/maos_domain-9722dbbfdeacdcf6)
+     Running tests/consent_recall_17_8.rs (target/debug/deps/consent_recall_17_8-f46406159cfe1cb3)
+     Running tests/container_terminal_facts_17_7.rs (target/debug/deps/container_terminal_facts_17_7-418598b061eb8d7e)
+     Running tests/egress_destination_17_1.rs (target/debug/deps/egress_destination_17_1-c96c8fac467b883b)
+     Running tests/forget_cascade_18_6.rs (target/debug/deps/forget_cascade_18_6-3f98f48c0b7434ba)
+     Running tests/operator_door_control.rs (target/debug/deps/operator_door_control-6ff7ab25b4fff800)
+     Running tests/scope_entitles_17_11.rs (target/debug/deps/scope_entitles_17_11-8945fc7ba96f95bc)

@@ -1,0 +1,1406 @@
+[
+  {
+    "label": "baseline-kloc",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "kloc-check",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.091
+  },
+  {
+    "label": "baseline-kernel",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-kernel-baseline",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.011
+  },
+  {
+    "label": "ac14-ac16-before",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-cli",
+      "--test",
+      "spirit_install_20_1",
+      "ac1",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "seconds": 14.161
+  },
+  {
+    "label": "ac6-before",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "vetting_attestation_gate",
+      "artifact_and_publisher_swaps_are_refused_ac6",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "seconds": 22.275
+  },
+  {
+    "label": "ac6-both-before",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "vetting_attestation_gate",
+      "swap_is_refused_ac6",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "seconds": 2.137
+  },
+  {
+    "label": "affected-build-initial",
+    "args": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "-p",
+      "maos-cli",
+      "-p",
+      "maos-spirit-cli",
+      "-p",
+      "maos-registry"
+    ],
+    "exit_code": 0,
+    "seconds": 710.35
+  },
+  {
+    "label": "resume-baseline-kloc",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "kloc-check",
+      "--json"
+    ],
+    "exit_code": 1,
+    "seconds": 0.184
+  },
+  {
+    "label": "focused-initial",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "-p",
+      "maos-compliance",
+      "-p",
+      "maos-spirit-cli",
+      "--all-targets"
+    ],
+    "exit_code": 101,
+    "seconds": 488.231
+  },
+  {
+    "label": "policy-initial",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit_code": 101,
+    "seconds": 1139.199
+  },
+  {
+    "label": "auth-initial",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "seconds": 202.591
+  },
+  {
+    "label": "policy-corrected",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit_code": 101,
+    "seconds": 134.597
+  },
+  {
+    "label": "registry-focused-corrected",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--all-targets",
+      "--no-fail-fast"
+    ],
+    "exit_code": 101,
+    "seconds": 108.546
+  },
+  {
+    "label": "format-first",
+    "args": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "seconds": 3.24
+  },
+  {
+    "label": "policy-labelled-corrected",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit_code": 101,
+    "seconds": 765.444
+  },
+  {
+    "label": "fixtures-first",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "build-test-fixtures",
+      "--only",
+      "maosctl,maos-spirit,maos-registry-server"
+    ],
+    "exit_code": 0,
+    "seconds": 814.292
+  },
+  {
+    "label": "policy-shadow-repaired",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "seconds": 258.462
+  },
+  {
+    "label": "registry-focused-next",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--all-targets",
+      "--no-fail-fast"
+    ],
+    "exit_code": 101,
+    "seconds": 164.629
+  },
+  {
+    "label": "install-focused-next",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-cli",
+      "--test",
+      "spirit_install_20_1",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "seconds": 102.517
+  },
+  {
+    "label": "vet-lifecycle-first",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-spirit-cli",
+      "--test",
+      "vet_lifecycle_20_1b",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "seconds": 30.85
+  },
+  {
+    "label": "format-second",
+    "args": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "seconds": 3.216
+  },
+  {
+    "label": "formatted-measurement",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "kloc-check",
+      "--json"
+    ],
+    "exit_code": 1,
+    "seconds": 0.093
+  },
+  {
+    "label": "kernel-after-format",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-kernel-baseline",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.012
+  },
+  {
+    "label": "trust-codec-repaired",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "seconds": 43.128
+  },
+  {
+    "label": "vet-crl-codec-repaired",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-spirit-cli",
+      "--test",
+      "vet_lifecycle_20_1b",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "seconds": 16.871
+  },
+  {
+    "label": "ac6-plant-diff",
+    "args": [
+      "diff",
+      "-u",
+      "/tmp/201b-plants/ac6.rs",
+      "crates/maos-compliance/src/vetting/mod.rs"
+    ],
+    "exit_code": 1,
+    "seconds": 0.008
+  },
+  {
+    "label": "ac6-plant",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "vetting_attestation_gate",
+      "artifact_swap_is_refused_ac6",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "seconds": 20.639
+  },
+  {
+    "label": "ac6-restore",
+    "args": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac6.rs crates/maos-compliance/src/vetting/mod.rs && cmp /tmp/201b-plants/ac6.rs crates/maos-compliance/src/vetting/mod.rs && touch crates/maos-compliance/src/vetting/mod.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.009
+  },
+  {
+    "label": "ac7-plant-diff",
+    "args": [
+      "diff",
+      "-u",
+      "/tmp/201b-plants/ac7.rs",
+      "crates/maos-registry/src/handlers/deprecate.rs"
+    ],
+    "exit_code": 1,
+    "seconds": 0.004
+  },
+  {
+    "label": "ac7-plant",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "seconds": 7.894
+  },
+  {
+    "label": "ac7-restore",
+    "args": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac7.rs crates/maos-registry/src/handlers/deprecate.rs && cmp /tmp/201b-plants/ac7.rs crates/maos-registry/src/handlers/deprecate.rs && touch crates/maos-registry/src/handlers/deprecate.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.006
+  },
+  {
+    "label": "ac8-plant-diff",
+    "args": [
+      "diff",
+      "-u",
+      "/tmp/201b-plants/ac8.rs",
+      "crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 1,
+    "seconds": 0.005
+  },
+  {
+    "label": "ac8-plant",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "seconds": 117.867
+  },
+  {
+    "label": "ac8-restore",
+    "args": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac8.rs crates/maos-registry/src/yank.rs && cmp /tmp/201b-plants/ac8.rs crates/maos-registry/src/yank.rs && touch crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.016
+  },
+  {
+    "label": "ac9-plant-diff",
+    "args": [
+      "diff",
+      "-u",
+      "/tmp/201b-plants/ac9.rs",
+      "crates/maos-bin/src/yank_policy.rs"
+    ],
+    "exit_code": 1,
+    "seconds": 0.001
+  },
+  {
+    "label": "ac9-plant",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "expiry_and_vetter_revocation_observe_once_and_request_policy_ac9",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "seconds": 56.304
+  },
+  {
+    "label": "ac9-restore",
+    "args": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac9.rs crates/maos-bin/src/yank_policy.rs && cmp /tmp/201b-plants/ac9.rs crates/maos-bin/src/yank_policy.rs && touch crates/maos-bin/src/yank_policy.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.024
+  },
+  {
+    "label": "ac10-plant-diff",
+    "args": [
+      "diff",
+      "-u",
+      "/tmp/201b-plants/ac10.rs",
+      "crates/maos-bin/src/admission.rs"
+    ],
+    "exit_code": 1,
+    "seconds": 0.003
+  },
+  {
+    "label": "ac10-plant",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b",
+      "registry_publishers_cannot_share_principal_spill_ac10",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "seconds": 24.582
+  },
+  {
+    "label": "ac10-restore",
+    "args": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac10.rs crates/maos-bin/src/admission.rs && cmp /tmp/201b-plants/ac10.rs crates/maos-bin/src/admission.rs && touch crates/maos-bin/src/admission.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.007
+  },
+  {
+    "label": "ac14-plant-diff",
+    "args": [
+      "diff",
+      "-u",
+      "/tmp/201b-plants/ac14.rs",
+      "crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 1,
+    "seconds": 0.002
+  },
+  {
+    "label": "ac14-plant",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "seconds": 7.818
+  },
+  {
+    "label": "ac14-restore",
+    "args": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac14.rs crates/maos-registry/src/storage.rs && cmp /tmp/201b-plants/ac14.rs crates/maos-registry/src/storage.rs && touch crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.005
+  },
+  {
+    "label": "ac16-plant-diff",
+    "args": [
+      "diff",
+      "-u",
+      "/tmp/201b-plants/ac16.rs",
+      "crates/maos-registry/src/install.rs"
+    ],
+    "exit_code": 1,
+    "seconds": 0.001
+  },
+  {
+    "label": "ac16-plant",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "seconds": 7.145
+  },
+  {
+    "label": "ac16-restore",
+    "args": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac16.rs crates/maos-registry/src/install.rs && cmp /tmp/201b-plants/ac16.rs crates/maos-registry/src/install.rs && touch crates/maos-registry/src/install.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.006
+  },
+  {
+    "label": "ac17-plant-diff",
+    "args": [
+      "diff",
+      "-u",
+      "/tmp/201b-plants/ac17.rs",
+      "crates/maos-registry/src/handlers/publish.rs"
+    ],
+    "exit_code": 1,
+    "seconds": 0.001
+  },
+  {
+    "label": "ac17-plant",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "seconds": 7.832
+  },
+  {
+    "label": "ac17-restore",
+    "args": [
+      "bash",
+      "-c",
+      "cp /tmp/201b-plants/ac17.rs crates/maos-registry/src/handlers/publish.rs && cmp /tmp/201b-plants/ac17.rs crates/maos-registry/src/handlers/publish.rs && touch crates/maos-registry/src/handlers/publish.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.009
+  },
+  {
+    "label": "format-pre-clippy",
+    "args": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "seconds": 4.259
+  },
+  {
+    "label": "clippy-live",
+    "args": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--workspace",
+      "--all-targets",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "seconds": 1410.169
+  },
+  {
+    "label": "clippy-ratchet",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "clippy-ratchet",
+      "--input",
+      "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/clippy-live.stdout"
+    ],
+    "exit_code": 0,
+    "seconds": 0.239
+  },
+  {
+    "label": "format-final",
+    "args": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "seconds": 3.229
+  },
+  {
+    "label": "formatted-final-measurement",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "kloc-check",
+      "--json"
+    ],
+    "exit_code": 1,
+    "seconds": 0.128
+  },
+  {
+    "label": "structural-check-service-boundary",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-service-boundary",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 1.168
+  },
+  {
+    "label": "structural-check-pub-field-constructors",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-pub-field-constructors",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.257
+  },
+  {
+    "label": "structural-check-dependency-closure",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-dependency-closure",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.87
+  },
+  {
+    "label": "structural-check-env-contract",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-env-contract",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.486
+  },
+  {
+    "label": "structural-check-serde-error-handling",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-serde-error-handling",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.244
+  },
+  {
+    "label": "structural-check-exit-commands",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-exit-commands",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.55
+  },
+  {
+    "label": "structural-check-decision-register",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-decision-register",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.007
+  },
+  {
+    "label": "inactive-generation-before",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_auth_20_1b",
+      "installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16",
+      "--",
+      "--exact"
+    ],
+    "exit_code": 101,
+    "seconds": 21.67
+  },
+  {
+    "label": "fixtures-background",
+    "args": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "build-test-fixtures"
+    ],
+    "exit_code": null,
+    "seconds": 155.54,
+    "observation": "bash job bg_502 completed; 16 artifacts; asynchronous delivery omitted explicit numeric exit code; raw artifact14393 retained; superseded after the witnessed inactive-generation repair"
+  },
+  {
+    "label": "format-generation-repair",
+    "args": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "seconds": 3.241
+  },
+  {
+    "label": "fixtures-generation-repair",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "build-test-fixtures"
+    ],
+    "exit_code": 0,
+    "seconds": 43.593
+  },
+  {
+    "label": "genuine-journey-build",
+    "args": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "-p",
+      "maos-cli"
+    ],
+    "exit_code": 0,
+    "seconds": 89.408
+  },
+  {
+    "label": "registry-trust-final",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--all-targets"
+    ],
+    "exit_code": 0,
+    "seconds": 65.023
+  },
+  {
+    "label": "vet-lifecycle-final",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-spirit-cli",
+      "--test",
+      "vet_lifecycle_20_1b"
+    ],
+    "exit_code": 0,
+    "seconds": 4.406
+  },
+  {
+    "label": "policy-final",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_policy_20_1b"
+    ],
+    "exit_code": 0,
+    "seconds": 68.376
+  },
+  {
+    "label": "install-final",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-cli",
+      "--test",
+      "spirit_install_20_1"
+    ],
+    "exit_code": 0,
+    "seconds": 3.472
+  },
+  {
+    "label": "compliance-final",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-compliance",
+      "--all-targets"
+    ],
+    "exit_code": 0,
+    "seconds": 15.661
+  },
+  {
+    "label": "domain-final",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-domain",
+      "--all-targets"
+    ],
+    "exit_code": 0,
+    "seconds": 16.194
+  },
+  {
+    "label": "networkless-verbs-final",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--no-default-features",
+      "--test",
+      "verb_table_15_3"
+    ],
+    "exit_code": 0,
+    "seconds": 40.526
+  },
+  {
+    "label": "formatted-generation-measurement",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "kloc-check",
+      "--json"
+    ],
+    "exit_code": 1,
+    "seconds": 0.093
+  },
+  {
+    "label": "head-before-final-gates",
+    "args": [
+      "git",
+      "log",
+      "--oneline",
+      "-5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.007
+  },
+  {
+    "label": "clippy-final",
+    "args": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--workspace",
+      "--all-targets",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "seconds": 1048.673
+  },
+  {
+    "label": "clippy-ratchet-final",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "clippy-ratchet",
+      "--input",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/clippy-final.stdout",
+      "--json"
+    ],
+    "exit_code": 2,
+    "seconds": 0.048
+  },
+  {
+    "label": "xtask-final-build",
+    "args": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "xtask"
+    ],
+    "exit_code": 0,
+    "seconds": 115.003
+  },
+  {
+    "label": "pin-provenance-final",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "xtask",
+      "--test",
+      "d11_xtask_ceiling_ratchet",
+      "--test",
+      "check_test_budget_proven_red"
+    ],
+    "exit_code": 0,
+    "seconds": 10.161
+  },
+  {
+    "label": "final-kloc-check",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "kloc-check",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.047
+  },
+  {
+    "label": "final-check-kernel-baseline",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-kernel-baseline",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.01
+  },
+  {
+    "label": "final-check-service-boundary",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-service-boundary",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 1.153
+  },
+  {
+    "label": "final-check-pub-field-constructors",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-pub-field-constructors",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.251
+  },
+  {
+    "label": "final-check-dependency-closure",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-dependency-closure",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.453
+  },
+  {
+    "label": "final-check-env-contract",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-env-contract",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.457
+  },
+  {
+    "label": "final-check-serde-error-handling",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-serde-error-handling",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.238
+  },
+  {
+    "label": "final-check-exit-commands",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-exit-commands",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.49
+  },
+  {
+    "label": "final-check-decision-register",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-decision-register",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.006
+  },
+  {
+    "label": "final-check-test-cost",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-test-cost",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.334
+  },
+  {
+    "label": "final-check-epic-close-coherence",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-epic-close-coherence",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.021
+  },
+  {
+    "label": "final-check-dev-record-completeness",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-dev-record-completeness",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.065
+  },
+  {
+    "label": "clippy-ratchet-final-corrected",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "clippy-ratchet",
+      "--input",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/clippy-final.stdout"
+    ],
+    "exit_code": 0,
+    "seconds": 0.24
+  },
+  {
+    "label": "citation-revisions",
+    "args": [
+      "git",
+      "rev-parse",
+      "HEAD",
+      "ebf2ab03"
+    ],
+    "exit_code": 0,
+    "seconds": 0.089
+  },
+  {
+    "label": "workspace-launcher-unavailable-python",
+    "args": [
+      "python",
+      "/tmp/201b-workspace-run.py"
+    ],
+    "exit_code": 127,
+    "observation": "command not found; no cargo or workspace nextest started; corrected interpreter to /usr/bin/python3 in bg_504"
+  },
+  {
+    "label": "landing-tracked-file-list",
+    "args": [
+      "git",
+      "diff",
+      "--name-only"
+    ],
+    "exit_code": 0,
+    "seconds": 0.038
+  },
+  {
+    "label": "landing-new-file-list",
+    "args": [
+      "git",
+      "ls-files",
+      "--others",
+      "--exclude-standard"
+    ],
+    "exit_code": 0,
+    "seconds": 0.019
+  },
+  {
+    "label": "nextest-list-help",
+    "args": [
+      "cargo",
+      "nextest",
+      "list",
+      "--help"
+    ],
+    "exit_code": 0,
+    "seconds": 0.048
+  },
+  {
+    "label": "lineage-restore-baseline",
+    "args": [
+      "git",
+      "show",
+      "bdfc143041613473e7a5f564de8fe30af7c2b0f7:_bmad-output/implementation-artifacts/intent-lineage-coverage-report.md"
+    ],
+    "exit_code": 0,
+    "seconds": 0.007,
+    "stdout_sha256": "32c207588abddb398ec3f343047914aa9eab102599c0ddf953eafb89d476f5f9"
+  },
+  {
+    "label": "verifier-venv-setup",
+    "args": [
+      "/usr/bin/python3",
+      "-m",
+      "venv",
+      "/tmp/201b-verifier-venv"
+    ],
+    "exit_code": 0,
+    "seconds": 1.147
+  },
+  {
+    "label": "verifier-declared-dependencies",
+    "args": [
+      "/tmp/201b-verifier-venv/bin/python3",
+      "-m",
+      "pip",
+      "install",
+      "--no-cache-dir",
+      "--only-binary=:all:",
+      "--require-hashes",
+      "-r",
+      "tools/verify-erasure/requirements.txt"
+    ],
+    "exit_code": 0,
+    "seconds": 0.842
+  },
+  {
+    "label": "fkcs-admission-review-diff",
+    "args": [
+      "git",
+      "diff",
+      "--",
+      "crates/maos-registry/src/admission.rs",
+      "crates/maos-skill/src/admission.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.004
+  },
+  {
+    "label": "verifier-venv-preserving-system-tools",
+    "args": [
+      "/usr/bin/python3",
+      "-m",
+      "venv",
+      "--system-site-packages",
+      "/tmp/201b-verifier-venv"
+    ],
+    "exit_code": 0,
+    "seconds": 1.118
+  },
+  {
+    "label": "fkcs-oracle-repin",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "xtask",
+      "--test",
+      "fkcs_oracle"
+    ],
+    "exit_code": 0,
+    "seconds": 28.462
+  },
+  {
+    "label": "fkcs-gate-repin",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-fkcs",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 36.851
+  },
+  {
+    "label": "kloc-with-fkcs-pin",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "kloc-check",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.161
+  },
+  {
+    "label": "kernel-with-fkcs-pin",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-kernel-baseline",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.03
+  },
+  {
+    "label": "landing-tracked-file-list-final",
+    "args": [
+      "git",
+      "diff",
+      "--name-only"
+    ],
+    "exit_code": 0,
+    "seconds": 0.072
+  },
+  {
+    "label": "head-before-prepush",
+    "args": [
+      "git",
+      "log",
+      "--oneline",
+      "-5"
+    ],
+    "exit_code": 0,
+    "seconds": 0.005
+  },
+  {
+    "label": "prepush-ready-check-dev-record-completeness",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-dev-record-completeness",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.141
+  },
+  {
+    "label": "prepush-ready-check-epic-close-coherence",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-epic-close-coherence",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.024
+  },
+  {
+    "label": "prepush-ready-check-exit-commands",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-exit-commands",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.336
+  },
+  {
+    "label": "prepush-ready-check-decision-register",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-decision-register",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.008
+  },
+  {
+    "label": "prepush-once",
+    "args": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "MAOS_17_2_CGROUP_MODE=undelegated",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "prepush",
+      "--json"
+    ],
+    "exit_code": 1,
+    "seconds": 908.019,
+    "environment_prerequisite": "hash-locked declared requirements in temporary system-site-packages venv; PATH prefixed for this prescribed run",
+    "frozen_tree": true
+  },
+  {
+    "label": "handoff-record-completeness",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-dev-record-completeness",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.185
+  },
+  {
+    "label": "handoff-epic-coherence",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-epic-close-coherence",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.022
+  }
+]

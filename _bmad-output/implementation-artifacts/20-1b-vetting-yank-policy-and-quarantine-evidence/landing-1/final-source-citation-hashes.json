@@ -1,0 +1,271 @@
+{
+  "head": "bdfc143041613473e7a5f564de8fe30af7c2b0f7",
+  "phase": "after the sole remaining obsolete cursor-comment correction and before prescribed prepush; no further Rust edits planned",
+  "files": [
+    {
+      "path": "crates/maos-compliance/src/vetting/attestation.rs",
+      "sha256": "d22d251040247db8526dc7240e53f9c93cb12812c2a30a8553f21a0529a81c31",
+      "physical_lines": 281,
+      "declaration_positions": [
+        {
+          "marker": "pub struct VettingClaim",
+          "lines": [
+            105
+          ]
+        },
+        {
+          "marker": "pub artifact_sha256:",
+          "lines": [
+            110
+          ]
+        },
+        {
+          "marker": "pub publisher_pubkey:",
+          "lines": [
+            112
+          ]
+        },
+        {
+          "marker": "pub fn issue_attestation",
+          "lines": [
+            154
+          ]
+        },
+        {
+          "marker": "pub fn verify_attestation_signature",
+          "lines": [
+            171
+          ]
+        }
+      ]
+    },
+    {
+      "path": "crates/maos-compliance/src/vetting/mod.rs",
+      "sha256": "7510cf64844c889508f358c05956f557609682044fcc28aff7e90338c8a0cb4e",
+      "physical_lines": 734,
+      "declaration_positions": [
+        {
+          "marker": "pub struct VettingSubject",
+          "lines": [
+            197
+          ]
+        },
+        {
+          "marker": "pub fn verify_attestation",
+          "lines": [
+            220
+          ]
+        },
+        {
+          "marker": "pub fn evaluate_upgrade_precondition",
+          "lines": [
+            309
+          ]
+        }
+      ]
+    },
+    {
+      "path": "crates/maos-compliance/src/vetting/keyring.rs",
+      "sha256": "c7b1dfd5c1a5d95b37135985fcea1c0edde91b3ef9b49398746a34a8f0ed5294",
+      "physical_lines": 550,
+      "declaration_positions": [
+        {
+          "marker": "pub fn push_attestation_revocation",
+          "lines": [
+            157
+          ]
+        },
+        {
+          "marker": "pub fn verify_enrollment",
+          "lines": [
+            190
+          ]
+        },
+        {
+          "marker": "pub fn verify_attestation_not_revoked",
+          "lines": [
+            288
+          ]
+        },
+        {
+          "marker": "pub fn is_revoked",
+          "lines": [
+            334
+          ]
+        }
+      ]
+    },
+    {
+      "path": "crates/maos-compliance/src/vetting/terminal.rs",
+      "sha256": "cbb9a85d989a34a3232610c3099fb0923f12c9b241dd7aa8e9c7128205f444ec",
+      "physical_lines": 252,
+      "declaration_positions": [
+        {
+          "marker": "pub struct RunningSpiritObservation",
+          "lines": [
+            99
+          ]
+        },
+        {
+          "marker": "pub fn observe_running_spirit",
+          "lines": [
+            152
+          ]
+        }
+      ]
+    },
+    {
+      "path": "crates/maos-registry/src/admission.rs",
+      "sha256": "1a31ff1398dae69636de28d0c15f2c8908706373d284b02ddc274df3dd601377",
+      "physical_lines": 1399,
+      "declaration_positions": [
+        {
+          "marker": "pub fn admit_spirit_with_attestation",
+          "lines": [
+            354
+          ]
+        },
+        {
+          "marker": "pub fn verify_publisher_sig",
+          "lines": [
+            549
+          ]
+        }
+      ]
+    },
+    {
+      "path": "crates/maos-registry/src/storage.rs",
+      "sha256": "897d9473424b82b1cddb98418a4f6527cd414684ad8dc5bf91acc16253604f4e",
+      "physical_lines": 1109,
+      "declaration_positions": [
+        {
+          "marker": "pub fn at_path",
+          "lines": [
+            235
+          ]
+        },
+        {
+          "marker": "fn check_publisher",
+          "lines": [
+            373
+          ]
+        },
+        {
+          "marker": "pub(crate) fn install_package",
+          "lines": [
+            418
+          ]
+        },
+        {
+          "marker": "fn publish_with_origin(",
+          "lines": [
+            72,
+            632
+          ]
+        },
+        {
+          "marker": "fn yanks_since(",
+          "lines": [
+            69,
+            808
+          ]
+        }
+      ]
+    },
+    {
+      "path": "crates/maos-domain/src/ports/registry.rs",
+      "sha256": "2032727e2f662a15ecae4fb278c69c7b603918b1bf8cf25d0e44264a9eca02bd",
+      "physical_lines": 871,
+      "declaration_positions": [
+        {
+          "marker": "pub struct YankEntry",
+          "lines": [
+            348
+          ]
+        },
+        {
+          "marker": "pub enum YankOrigin",
+          "lines": [
+            341
+          ]
+        },
+        {
+          "marker": "pub enum RegistryError",
+          "lines": [
+            404
+          ]
+        }
+      ]
+    },
+    {
+      "path": "crates/maos-bin/src/admission.rs",
+      "sha256": "af245e10ca8d9ff97733c0930b9acbb6cdca75448eaa13cecc00fa19c80b1cf0",
+      "physical_lines": 1301,
+      "declaration_positions": [
+        {
+          "marker": "pub fn bind_registry_publisher",
+          "lines": [
+            483
+          ]
+        },
+        {
+          "marker": "pub fn bind_registry_package_at",
+          "lines": [
+            498
+          ]
+        },
+        {
+          "marker": "pub async fn load_admit_start",
+          "lines": [
+            974
+          ]
+        }
+      ]
+    },
+    {
+      "path": "crates/maos-bin/src/main.rs",
+      "sha256": "1f3c055623b8bf3550b17831faf86f1915d42c95680ca3a47b2219b82110608a",
+      "physical_lines": 17127,
+      "declaration_positions": [
+        {
+          "marker": "fn enforce_vetted_upgrade_precondition",
+          "lines": [
+            130
+          ]
+        }
+      ]
+    },
+    {
+      "path": "crates/maos-kernel-core/src/revocation/applier.rs",
+      "sha256": "40937fa2668112a6a510d8558ac446bd5fbb96d0f69bffe0c27dd4320d6b4c12",
+      "physical_lines": 255,
+      "declaration_positions": [
+        {
+          "marker": "pub async fn apply_crl",
+          "lines": [
+            73
+          ]
+        },
+        {
+          "marker": "RevocationAction::DrainThenTerminate | RevocationAction::Quarantine =>",
+          "lines": [
+            160
+          ]
+        }
+      ]
+    },
+    {
+      "path": "crates/maos-kernel-core/src/memory/private.rs",
+      "sha256": "da4fb0a30d37e0cb7a2afe8c2764af40991a62fe0cf3aebaba530dc5202179f9",
+      "physical_lines": 1320,
+      "declaration_positions": [
+        {
+          "marker": "pub fn bind_storage_identity",
+          "lines": [
+            81
+          ]
+        }
+      ]
+    }
+  ]
+}

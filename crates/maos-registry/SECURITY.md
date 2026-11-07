@@ -1,55 +1,60 @@
-# Spirit Registry Security Posture (v0.5-α)
+# Spirit Registry Security Posture
 
-## Transport Security
+## Deployment boundary
 
-The v0.5-α registry server runs **HTTP only (cleartext) on 127.0.0.1:6789**.
-Operators who need TLS MUST place an HTTPS-terminating reverse proxy
-(nginx / Caddy) in front of the registry server. Direct HTTPS support in
-the registry binary is deferred to Story 7.2 (`[registry].tls_cert_path`).
+The server remains a **loopback development listener over plaintext HTTP**.
+It rejects non-loopback listeners and enforces Host/Origin/content-type/path guards.
+Those guards are not authentication and do not establish a first-contact trust root.
+Do not expose this listener publicly or treat a reverse proxy as an implemented
+end-to-end authenticated installation path.
 
-### Recommended reverse-proxy configuration (nginx)
+Story `20-1b-vetting-yank-policy-and-quarantine` AC15 (operator `f1b`, 2026-11-06)
+requires authenticated first contact and TLS. Its D-20-1b-01/02/03 choices are
+**PROPOSED**, not silently implemented. Hostile-registry and interception refusal
+proof remains owed after that ruling. No TLS security or public deployment claim
+is made by the kernel-free landing.
 
-```nginx
-server {
-    listen 443 ssl;
-    server_name registry.example.com;
-    ssl_certificate /etc/ssl/registry.crt;
-    ssl_certificate_key /etc/ssl/registry.key;
-    location /mcp {
-        proxy_pass http://127.0.0.1:6789;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}
-```
+## Authenticated mutations
 
-## Authentication
+- `registry.publish` requires a valid Ed25519 publisher signature over the exact
+  manifest and artifact. The signed manifest identity must match the requested
+  name/version. The first publisher key owns the name across all versions;
+  another key is refused, including after a server restart.
+- `registry.deprecate` requires a signed, domain-separated yank authorization
+  binding name, version, reason, origin, signing key, vetter id and issuance time.
+  Publisher yanks verify against the stored package owner. Vetter yanks require
+  operator-root-signed enrollment predating issuance and no effective revocation.
+  Configure both `--vetter-keyring <CBOR-path>` and `--operator-root <hex-key>`;
+  neither a response-provided key nor loopback membership authorizes a vetter.
+  The server loads that keyring at startup: restart it after enrollment or key
+  revocation updates. This is not a hot-reloaded server authorization store.
+- Unsigned requests and authenticated requests from the wrong owner or an
+  unenrolled vetter refuse without changing package/yank storage.
 
-v0.5-α the server is **open** — any client that can reach the TCP port
-can invoke any registry operation. Per-operator-key authentication and
-per-op ACL are deferred to Story 7.2.
+## Installation and revocation
 
-## Per-Publisher Allowlist
+Installation verifies publisher signatures, semantic ComplianceClaims, admission
+policy and any promotion attestation before activation. An installed name/version
+cannot change package bytes, publisher, origin or promotion metadata; a different
+registry cannot overwrite it. A yanked version refuses before local persistence.
+Publisher pins are local integrity/provenance constraints, not authenticated first
+contact; AC15 remains required.
 
-v0.5-α the publisher public key for `public-untrusted` Spirits is verified
-for Ed25519 signature (self-signed envelope) but NOT cross-checked against
-an operator-configured publisher allowlist. The publisher-allowlist feature
-is deferred to v0.7 (Story 7.2 prep).
+Vetting claims bind exact manifest bytes, artifact SHA-256 and publisher key.
+`maos-spirit vet issue` signs a package claim; `vet revoke` updates the supplied
+keyring with an operator-root-signed attestation revocation list. The supplied live
+keyring path is retained with the installation so running-promotion re-evaluation
+can observe later expiry and revocation. Internal-key machinery does not establish
+an independently accredited external-vetter ecosystem.
 
-## mTLS for Client-Side Registry Calls
+Yanks retain signed publisher/vetter origins and a durable server-assigned sequence.
+The old `since_ns` wire field now means sequence; display wall time never drives the
+cursor. Cursor files are atomically persisted, without monotonic-clock remapping.
+Historical unsigned yank rows remain refusal evidence for installation but cannot
+authorize daemon effects. Old manifest-only attestations require reissuance.
 
-Registry calls at v0.5-α flow through the same `StreamableHttpTransport` as
-MCP tool calls. Operator-deployed registries use HTTPS via reverse proxy;
-mTLS client-cert authentication is added when bilateral A2A's mTLS
-infrastructure (Story 6.3) lands.
-
-## Forward-Shape Contracts
-
-- **Story 7.2**: HTTPS direct in registry binary, operator-key auth, per-op ACL,
-  air-gapped import.
-- **Story 7.3**: Full ComplianceClaim semantic evaluator (principle engine +
-  N=600 corpus) — replaces the v0.5-α structural-only verification.
-- **Story 9.4**: Operator surface + air-gapped network-namespace isolation for
-  registry-bound traffic.
-- **v0.7**: Per-publisher allowlist.
-- **v2.5**: `public-vetted` trust tier (FR37).
+`MAOS_YANK_POLICY=warn` (default) records the event. `quarantine` records a typed
+`quarantine-requested` outcome; **L1 does not claim its isolation effect**. The final
+KQ1 kernel landing supplies the sticky fence. `auto-revoke` signs an exact-version
+local CRL with origin `RegistryYank` and invokes the existing applier, preserving
+the Spirit's declared revocation action rather than implementing a second applier.

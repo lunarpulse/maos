@@ -1,0 +1,5 @@
+bdfc1430 20-2 hosted-4 fixes (brew: executable mode, formula_opt_bin, pubkey binding, strict-audit offenses)
+d84b83dd 20-2 hosted-3 fixes (brew: HOMEBREW_GIT identity, logged blocking strict audit, formula/renderer style); cargo validation and pin check pending
+96a1dce2 20-2 hosted-2 fixes (arch regular-file materialization before verify, brew git identity + formula stanza order); xtask renderer pins/cargo checks pending
+063c13cf 20-11 hosted follow-up (cached indexed INSERT + allocation offset for the perf budget, marker-scoped forget replay, portable FIFO, heavy 100k/1M vectors in their own serial binary with an owned budget exception); AC5/EC-13 open; bin 35102 iac 8625 aggregate 194934
+fd4f60f1 20-2 hosted-1 fixes (rpm reserved macro, build-essential provisioning, arch signature filename, brew plant regex, model_currency_gate budget exception owned by 20-4)

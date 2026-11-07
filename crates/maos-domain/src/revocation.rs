@@ -48,6 +48,11 @@ mod serde_sig64 {
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 f.write_str("a 64-byte array")
             }
+            fn visit_bytes<E: serde::de::Error>(self, bytes: &[u8]) -> Result<Self::Value, E> {
+                bytes
+                    .try_into()
+                    .map_err(|_| E::invalid_length(bytes.len(), &self))
+            }
             fn visit_seq<A: serde::de::SeqAccess<'de>>(
                 self,
                 mut seq: A,
@@ -63,7 +68,7 @@ mod serde_sig64 {
                 Ok(arr)
             }
         }
-        de.deserialize_tuple(64, SigVisitor)
+        de.deserialize_bytes(SigVisitor)
     }
 }
 
@@ -79,6 +84,11 @@ mod serde_pubkey32 {
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 f.write_str("a 32-byte array")
             }
+            fn visit_bytes<E: serde::de::Error>(self, bytes: &[u8]) -> Result<Self::Value, E> {
+                bytes
+                    .try_into()
+                    .map_err(|_| E::invalid_length(bytes.len(), &self))
+            }
             fn visit_seq<A: serde::de::SeqAccess<'de>>(
                 self,
                 mut seq: A,
@@ -92,7 +102,7 @@ mod serde_pubkey32 {
                 Ok(arr)
             }
         }
-        de.deserialize_tuple(32, PubkeyVisitor)
+        de.deserialize_bytes(PubkeyVisitor)
     }
 }
 

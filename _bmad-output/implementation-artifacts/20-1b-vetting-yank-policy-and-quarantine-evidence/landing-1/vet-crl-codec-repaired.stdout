@@ -1,0 +1,11 @@
+
+running 1 test
+test vet_issue_install_promote_revoke_refuses_next_admission_ac6 ... FAILED
+
+failures:
+
+failures:
+    vet_issue_install_promote_revoke_refuses_next_admission_ac6
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+

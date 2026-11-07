@@ -1,0 +1,74 @@
+[
+  {
+    "ac": "ac6",
+    "path": "crates/maos-compliance/src/vetting/mod.rs",
+    "backup": "/tmp/201b-plants/ac6.rs",
+    "seconds": 29.352,
+    "exit_code": 101,
+    "restore_exit": 0,
+    "runtime_red": true
+  },
+  {
+    "ac": "ac7",
+    "path": "crates/maos-registry/src/handlers/deprecate.rs",
+    "backup": "/tmp/201b-plants/ac7.rs",
+    "seconds": 21.887,
+    "exit_code": 101,
+    "restore_exit": 0,
+    "runtime_red": true
+  },
+  {
+    "ac": "ac8",
+    "path": "crates/maos-registry/src/yank.rs",
+    "backup": "/tmp/201b-plants/ac8.rs",
+    "seconds": 127.254,
+    "exit_code": 101,
+    "restore_exit": 0,
+    "runtime_red": true
+  },
+  {
+    "ac": "ac9",
+    "path": "crates/maos-bin/src/yank_policy.rs",
+    "backup": "/tmp/201b-plants/ac9.rs",
+    "seconds": 72.735,
+    "exit_code": 101,
+    "restore_exit": 0,
+    "runtime_red": true
+  },
+  {
+    "ac": "ac10",
+    "path": "crates/maos-bin/src/admission.rs",
+    "backup": "/tmp/201b-plants/ac10.rs",
+    "seconds": 34.684,
+    "exit_code": 101,
+    "restore_exit": 0,
+    "runtime_red": true
+  },
+  {
+    "ac": "ac14",
+    "path": "crates/maos-registry/src/storage.rs",
+    "backup": "/tmp/201b-plants/ac14.rs",
+    "seconds": 21.527,
+    "exit_code": 101,
+    "restore_exit": 0,
+    "runtime_red": true
+  },
+  {
+    "ac": "ac16",
+    "path": "crates/maos-registry/src/install.rs",
+    "backup": "/tmp/201b-plants/ac16.rs",
+    "seconds": 14.916,
+    "exit_code": 101,
+    "restore_exit": 0,
+    "runtime_red": true
+  },
+  {
+    "ac": "ac17",
+    "path": "crates/maos-registry/src/handlers/publish.rs",
+    "backup": "/tmp/201b-plants/ac17.rs",
+    "seconds": 15.95,
+    "exit_code": 101,
+    "restore_exit": 0,
+    "runtime_red": true
+  }
+]

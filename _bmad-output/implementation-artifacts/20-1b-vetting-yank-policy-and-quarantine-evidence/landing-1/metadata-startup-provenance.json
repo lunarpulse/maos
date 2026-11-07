@@ -1,0 +1,21 @@
+{
+  "cargo_selection_rejection": {
+    "label": "workspace-nextest-once",
+    "exit_code": 2,
+    "tests_executed": 0
+  },
+  "wrong_metadata_schema": {
+    "label": "workspace-nextest-final",
+    "exit_code": 96,
+    "tests_executed": 0,
+    "cause": "full list JSON lacks rust-binaries; required --list-type binaries-only"
+  },
+  "misattributed_budget": {
+    "label": "workspace-test-budget",
+    "valid_for_this_run": false,
+    "predecessor_uuid": "24d43741-bd54-4575-943f-6c2fea571c5d",
+    "predecessor_timestamp": "2026-11-05T03:06:08.336+00:00",
+    "discarded_copy": "Own stale duplicate XML removed after preserving predecessor UUID, startup errors and invalid-attribution note; never used as this landing's verification"
+  },
+  "corrected_convention": "Workspace --locked selection at metadata build; no cargo selection flags with --binaries-metadata at run; binary-only JSON required; no retry of an executed test"
+}

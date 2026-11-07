@@ -1,0 +1,32 @@
+::error::check-test-budget: FAIL — 14 finding(s):
+- butler::hallucination took 39.291 s (Σ per-test time) over 5 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-audit::gdpr_cascade_corpus_test took 46.885 s (Σ per-test time) over 2 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::butler_scene_18_4 took 41.650 s (Σ per-test time) over 10 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::erasure_uninstall_13_5b took 59.908 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::forget_floors_18_6 took 41.313 s (Σ per-test time) over 1 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::hook_pump_17_4 took 118.450 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::observer_activity_corpus_17_4 took 116.405 s (Σ per-test time) over 16 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::one_daemon_one_door_16_1 took 96.543 s (Σ per-test time) over 42 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::shell_host_16_2 took 114.523 s (Σ per-test time) over 14 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-iac::participant_recall_17_8 took 60.247 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- xtask::bin/xtask took 41.536 s (Σ per-test time) over 463 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- [[exception]] maos-bin::erasure_million_20_11 names a binary absent from the junit — stale row, delete it from xtask/test-budgets.toml
+- [[exception]] maos-registry::yank_cadence_20_1b names a binary absent from the junit — stale row, delete it from xtask/test-budgets.toml
+- suite test time 1731.403 s (Σ per-test time) exceeds total_seconds 1100.000
+
+check-test-budget: FAIL — 14 finding(s):
+- butler::hallucination took 39.291 s (Σ per-test time) over 5 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-audit::gdpr_cascade_corpus_test took 46.885 s (Σ per-test time) over 2 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::butler_scene_18_4 took 41.650 s (Σ per-test time) over 10 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::erasure_uninstall_13_5b took 59.908 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::forget_floors_18_6 took 41.313 s (Σ per-test time) over 1 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::hook_pump_17_4 took 118.450 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::observer_activity_corpus_17_4 took 116.405 s (Σ per-test time) over 16 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::one_daemon_one_door_16_1 took 96.543 s (Σ per-test time) over 42 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::shell_host_16_2 took 114.523 s (Σ per-test time) over 14 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-iac::participant_recall_17_8 took 60.247 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- xtask::bin/xtask took 41.536 s (Σ per-test time) over 463 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- [[exception]] maos-bin::erasure_million_20_11 names a binary absent from the junit — stale row, delete it from xtask/test-budgets.toml
+- [[exception]] maos-registry::yank_cadence_20_1b names a binary absent from the junit — stale row, delete it from xtask/test-budgets.toml
+- suite test time 1731.403 s (Σ per-test time) exceeds total_seconds 1100.000
+

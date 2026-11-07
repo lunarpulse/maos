@@ -1,0 +1,22 @@
+{
+  "run": {
+    "name": "nextest-run",
+    "tests": "5720",
+    "skipped": "0",
+    "failures": "1",
+    "errors": "0",
+    "uuid": "e3b670a9-2f63-4ff1-ad10-9307d33a2860",
+    "timestamp": "2026-11-07T00:50:27.972+00:00",
+    "time": "87.162"
+  },
+  "failures": [
+    {
+      "binary": "maos-bin::erasure_million_20_11",
+      "test": "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption",
+      "seconds": "42.549",
+      "failure": "<failure message=\"thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (3893759) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17\" type=\"test failure with exit code 101\">thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (3893759) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:\npending operation did not finish: op-9904522d7f735bb24cce0ed6\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n   1: core::panicking::panic_fmt\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n   2: door_scan_with_continuous_writer\n             at ./tests/erasure_million_20_11.rs:186:17\n   3: erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption\n             at ./tests/erasure_million_20_11.rs:20:5\n   4: erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption::{closure#0}\n             at ./tests/erasure_million_20_11.rs:19:76\n   5: &lt;erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption::{closure#0} as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once\n             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5\n   6: &lt;fn() -&gt; core::result::Result&lt;(), alloc::string::String&gt; as core::ops::function::FnOnce&lt;()&gt;&gt;::call_once\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.</failure>\n            ",
+      "stdout": "\nrunning 1 test\ntest ac5_million_row_pending_forget_finishes_and_repeats_without_corruption ... FAILED\n\nfailures:\n\nfailures:\n    ac5_million_row_pending_forget_finishes_and_repeats_without_corruption\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 42.54s\n\n",
+      "stderr": "EC-13 fixture rows=1000000 seed_peak_apparent_bytes=1487572544 seed_peak_allocated_bytes=1487568896\nEC-13 route rows=1000000 wall=10.00013685s response=HandlerStillRunning { operation_id: \"op-9904522d7f735bb24cce0ed6\" }\nEC-13 pending rows=1000000 operation_id=op-9904522d7f735bb24cce0ed6\n\nthread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (3893759) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:\npending operation did not finish: op-9904522d7f735bb24cce0ed6\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n   1: core::panicking::panic_fmt\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n   2: door_scan_with_continuous_writer\n             at ./tests/erasure_million_20_11.rs:186:17\n   3: erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption\n             at ./tests/erasure_million_20_11.rs:20:5\n   4: erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption::{closure#0}\n             at ./tests/erasure_million_20_11.rs:19:76\n   5: <erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption::{closure#0} as core::ops::function::FnOnce<()>>::call_once\n             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5\n   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n"
+    }
+  ]
+}

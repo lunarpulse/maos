@@ -11,6 +11,8 @@ pub mod compliance_claim;
 pub mod errors;
 pub mod publish;
 pub mod signing;
+pub mod vet;
+pub mod yank;
 
 pub use errors::CliError;
 pub use publish::{run_publish, PublishArgs};

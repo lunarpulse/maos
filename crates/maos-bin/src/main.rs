@@ -187,10 +187,25 @@ fn enforce_vetted_upgrade_precondition(
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|error| format!("system clock precedes Unix epoch: {error}"))?
         .as_millis() as u64;
+    let package_path = target_manifest_path
+        .parent()
+        .ok_or("upgrade target has no package directory")?
+        .join("signed_package.json");
+    let package: maos_domain::ports::registry::SignedPackage = serde_json::from_slice(
+        &std::fs::read(&package_path).map_err(|e| format!("read vetted upgrade package: {e}"))?,
+    )
+    .map_err(|e| format!("decode vetted upgrade package: {e}"))?;
+    if package.manifest_toml != target_manifest
+        || package.spirit_id.as_str() != spirit_id
+        || package.version != target_version
+        || !maos_registry::admission::verify_publisher_sig(&package)
+    {
+        return Err("vetted upgrade package signature or manifest mismatch".into());
+    }
 
     maos_compliance::evaluate_upgrade_precondition(
         true,
-        &target_manifest,
+        maos_compliance::vetting::VettingSubject::from(&package),
         Some(&attestation),
         &keyring,
         &operator_root,
@@ -268,82 +283,6 @@ fn spawn_siem_export_consumer(
             }
         }
     })
-}
-
-#[cfg(feature = "network")]
-/// YankObserver that writes `FrameKind::SpiritRevoked` rows to the
-/// Transparency Log so every propagated yank is auditable (Story 7.2).
-struct TlYankObserver {
-    tl: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
-}
-
-#[cfg(feature = "network")]
-impl TlYankObserver {
-    fn new(tl: Arc<maos_kernel_core::iac::TransparencyLogAdapter>) -> Self {
-        Self { tl }
-    }
-}
-
-#[cfg(feature = "network")]
-impl maos_compliance::TerminalObservationSink for TlYankObserver {
-    fn journal_terminal_observation(
-        &self,
-        observation: &maos_compliance::RunningSpiritObservation,
-    ) {
-        let payload = match serde_json::to_vec(observation) {
-            Ok(payload) => payload,
-            Err(error) => panic!(
-                "RunningSpiritObservation serialization failed before transparency logging: {error}"
-            ),
-        };
-        let _token = self.tl.insert_frame_event(
-            maos_kernel_core::iac::transparency_log::FrameKind::SpiritRevoked,
-            0,
-            None,
-            "vetting-terminal-observation",
-            &payload,
-            maos_domain::invariants::i3::FrameOrigin::Kernel,
-        );
-    }
-}
-
-#[cfg(feature = "network")]
-impl maos_registry::yank::YankObserver for TlYankObserver {
-    fn on_yank(&self, entry: &maos_domain::ports::registry::YankEntry) {
-        let payload = serde_json::json!({
-            "spirit_id": entry.spirit_id,
-            "version": entry.version,
-            "yanked_at_ns": entry.yanked_at_ns,
-            "reason": entry.reason,
-        });
-        // `insert_frame_event` returns a must-use `LogBeforeDeliver` token, not a
-        // `Result` (Story 7.3: corrected the Story 7.2 yank-observer wiring that
-        // matched it as `Result` and left maos-bin uncompilable — see Review
-        // Findings). Matches the established `let _token = ...` call-site pattern.
-        let _token = self.tl.insert_frame_event(
-            maos_kernel_core::iac::transparency_log::FrameKind::SpiritRevoked,
-            0, // kernel pid
-            None,
-            "yank-poller:remote-yank-propagated",
-            payload.to_string().as_bytes(),
-            maos_domain::invariants::i3::FrameOrigin::Kernel,
-        );
-        let detected_at_unix_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|duration| duration.as_millis() as u64)
-            .unwrap_or(0);
-        let _observation = maos_compliance::observe_running_spirit(
-            entry.spirit_id.as_str().to_owned(),
-            entry.version.clone(),
-            None,
-            &maos_compliance::TerminalInputs {
-                registry_yanked: true,
-                ..Default::default()
-            },
-            detected_at_unix_ms,
-            self,
-        );
-    }
 }
 
 #[cfg(feature = "network")]
@@ -3255,9 +3194,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //   any HTTP(S) URI      → McpSpiritRegistryClient over McpClient::StreamableHttp.
     let registry_cfg =
         maos_kernel_core::security::operator_config::RegistrySection::resolve_from_env_and_disk();
-    // Story 7.2 — yank poller shutdown flag (signaled on graceful shutdown).
-    let yank_poller_shutdown: std::sync::Arc<std::sync::atomic::AtomicBool> =
-        std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mut yank_source: Option<Arc<dyn maos_registry::yank::YankSource>> = None;
     let _registry_client: Arc<dyn maos_domain::ports::registry::SpiritRegistryClient> = {
         let env_uri = std::env::var("MAOS_REGISTRY_URI").unwrap_or_default();
         if env_uri == "stub" {
@@ -3328,33 +3265,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 org_signing_pubkey: registry_cfg.org_signing_pubkey,
                             }),
                     );
-                    // Story 7.2 — wire the 5-min yank poller (Finding D3).
-                    let poll_interval = maos_registry::yank::resolve_poll_interval();
-                    if poll_interval.as_secs() > 0 {
-                        let yank_observer =
-                            Arc::new(TlYankObserver::new(Arc::clone(&transparency_log)));
-                        let yank_poller = Arc::new(maos_registry::yank::YankPoller::new(
-                            Arc::clone(&registry_client)
-                                as Arc<dyn maos_registry::yank::YankSource>,
-                            Arc::clone(&yank_observer)
-                                as Arc<dyn maos_registry::yank::YankObserver>,
-                        ));
-                        let shutdown = Arc::clone(&yank_poller_shutdown);
-                        let _yank_poller_handle =
-                            tokio::spawn(maos_registry::yank::yank_poller_production_loop(
-                                yank_poller,
-                                shutdown,
-                                poll_interval,
-                            ));
-                        eprintln!(
-                            "maos: YankPoller wired (interval={}s, Story 7.2)",
-                            poll_interval.as_secs()
-                        );
-                    } else {
-                        eprintln!(
-                            "maos: YankPoller disabled (MAOS_REGISTRY_YANK_POLL_INTERVAL_S=0)"
-                        );
-                    }
+                    yank_source = Some(registry_client.clone());
                     registry_client as Arc<dyn maos_domain::ports::registry::SpiritRegistryClient>
                 }
                 Err(e) => {
@@ -3369,6 +3280,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     };
+    let yank_policy = std::env::var("MAOS_YANK_POLICY")
+        .unwrap_or_else(|_| "warn".into())
+        .parse::<maos_registry::yank::YankPolicy>()?;
+    let interval = maos_registry::yank::resolve_poll_interval();
+    let mut yank_poller_task = maos_bin::yank_policy::PollTask::default();
+    let has_installs =
+        !maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()?.is_empty();
+    if !interval.is_zero() && (yank_source.is_some() || has_installs) {
+        // Local promotion expiry/revocation must not depend on registry connectivity.
+        let source = yank_source
+            .unwrap_or_else(|| Arc::new(maos_registry::client::NullSpiritRegistryClient));
+        let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
+            transparency_log.clone(),
+            scheduler.clone(),
+            revocation_applier.clone(),
+            yank_policy,
+        ));
+        yank_poller_task = maos_bin::yank_policy::PollTask::start(
+            Arc::new(maos_registry::yank::YankPoller::new(source, observer)),
+            interval,
+        );
+    }
     eprintln!(
         "maos: registry uri={} tier_floor={:?} t3_public_untrusted={} allow_unsigned_local={} require_server_tier_signature={}",
         registry_cfg.uri,
@@ -5980,7 +5913,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .map_or(0, |buffer| buffer.pending_count()),
                     })
                 );
-                yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
+                yank_poller_task.shutdown().await;
                 // Story J1-DEMO — drain the cap-audit channel deterministically before
                 // exit. `audit_tx` is cloned into `CapabilityRegistryAdapter::new`
                 // (line ~2600), so dropping the local `capability` is not enough:
@@ -6247,10 +6180,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // function. `[cli_wrapper]` (gate 3) forked above, because here
             // it is a ROUTING decision to the worker path; over the door it
             // is a refusal, and `gate_manifest` owns that form.
-            let gated = maos_bin::admission::gate_manifest(&manifest_toml, &|name| {
+            let mut gated = maos_bin::admission::gate_manifest(&manifest_toml, &|name| {
                 classify_spirit(name).is_some()
             })
             .map_err(|refusal| format!("maos run: {refusal}"))?;
+            gated.bind_registry_package_at(std::path::Path::new(&run.manifest_path))?;
             if let Some(section) = &gated.providers {
                 maos_bin::admission::check_provider_pins(section, provider_catalog.get())
                     .map_err(|refusal| refusal.to_string())?;
@@ -7093,7 +7027,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 // Story 17-4 (AC2.6) — the hook pump is joined before unload.
                 hook_pump.shutdown().await;
-                yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
+                yank_poller_task.shutdown().await;
                 if let Some(supervision) = root_supervision.take() {
                     supervision.stop_and_join().await;
                 }
@@ -9786,7 +9720,7 @@ description = "smoke test spirit successor"
         } => "root-supervision-shutdown",
     };
     // Signal yank poller to exit gracefully.
-    yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
+    yank_poller_task.shutdown().await;
     cancel.cancel();
 
     // Story 5.4 — do not abandon the CRL poller. Its select loop observes
@@ -10216,9 +10150,10 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         ),
         maos_bin::admission::AdmissionRefusal,
     > {
-        let gated = maos_bin::admission::gate_manifest(&manifest_toml, &|name| {
+        let mut gated = maos_bin::admission::gate_manifest(&manifest_toml, &|name| {
             classify_spirit(name).is_some()
         })?;
+        gated.bind_registry_package_at(manifest)?;
         if let Some(section) = &gated.providers {
             maos_bin::admission::check_provider_pins(section, self.provider_catalog.get())?;
         }

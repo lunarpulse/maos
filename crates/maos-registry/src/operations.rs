@@ -98,6 +98,9 @@ pub struct DeprecateArgs {
     pub version: String,
     #[doc = "Construct via [`DeprecateArgs::new`]."]
     pub reason: String,
+    /// Signed yank request, mandatory at the mutation boundary.
+    #[serde(default)]
+    pub authorization: Option<Vec<u8>>,
 }
 
 impl DeprecateArgs {
@@ -106,6 +109,7 @@ impl DeprecateArgs {
             spirit_id,
             version,
             reason,
+            authorization: None,
         }
     }
 }

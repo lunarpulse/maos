@@ -8,6 +8,41 @@ use std::path::Path;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
+/// Promotion evidence and the operator's live keyring, retained atomically with installation.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct InstalledVetting {
+    pub attestation: maos_compliance::VettingAttestation,
+    pub keyring_path: std::path::PathBuf,
+}
+
+impl InstalledVetting {
+    pub fn verify(
+        &self,
+        pkg: &SignedPackage,
+        root: &[u8; 32],
+        now: u64,
+    ) -> Result<
+        maos_compliance::vetting::VerifiedAttestation,
+        maos_compliance::vetting::VettingRejection,
+    > {
+        let bytes = std::fs::read(&self.keyring_path).map_err(|e| {
+            maos_compliance::vetting::VettingRejection::MalformedClaim(e.to_string())
+        })?;
+        let keyring = serde_cbor::from_slice(&bytes).map_err(|e| {
+            maos_compliance::vetting::VettingRejection::MalformedClaim(e.to_string())
+        })?;
+        maos_compliance::verify_attestation(
+            &self.attestation,
+            pkg.into(),
+            &keyring,
+            root,
+            pkg.spirit_id.as_str(),
+            &pkg.version,
+            now,
+        )
+    }
+}
+
 /// Offline command entry point. Authentication is signatures, not a daemon bearer.
 pub fn install(
     spec: &str,
@@ -24,6 +59,19 @@ pub fn install(
     let config = resolve_config()?;
     let client = McpSpiritRegistryClient::http(uri.to_owned(), config.clone())?;
     let id = SpiritId::from(id);
+    if let Some(entry) = client
+        .yanks_since(0)?
+        .entries
+        .into_iter()
+        .find(|entry| entry.spirit_id == id && entry.version == version)
+    {
+        return Err(maos_domain::ports::registry::RegistryError::Yanked {
+            spirit_id: id.as_str().into(),
+            version: version.into(),
+            reason: entry.reason,
+        }
+        .into());
+    }
     let manifest = client.manifest(&id, version)?;
     let artifact = client.artifact(&id, version)?;
     if manifest.spirit_id != id
@@ -61,18 +109,24 @@ pub fn install(
     if !crate::admission::verify_publisher_sig(&pkg) {
         return Err(crate::admission::AdmissionError::PublisherSignatureInvalid.into());
     }
+    let mut promotion = None;
     let decision = match (attestation, keyring) {
         (None, None) => admit_spirit(&pkg, &op_cfg)?,
         (Some(attestation), Some(keyring)) => {
             let attestation: maos_compliance::VettingAttestation =
                 serde_cbor::from_slice(&std::fs::read(attestation)?)?;
+            let keyring_path = std::fs::canonicalize(keyring)?;
             let keyring: maos_compliance::VetterKeyring =
-                serde_cbor::from_slice(&std::fs::read(keyring)?)?;
+                serde_cbor::from_slice(&std::fs::read(&keyring_path)?)?;
             let seed = maos_domain::audit_key::load_audit_key_seed(&None)?;
             let root = maos_domain::audit_key::derive_audit_public_key(&seed);
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)?
                 .as_millis() as u64;
+            promotion = Some(InstalledVetting {
+                attestation: attestation.clone(),
+                keyring_path,
+            });
             admit_spirit_with_attestation(&pkg, &op_cfg, Some(&attestation), &keyring, &root, now)?
         }
         _ => {
@@ -85,7 +139,7 @@ pub fn install(
     let origin = RegistryOrigin::Remote {
         uri: uri.to_owned(),
     };
-    storage.install_package(&pkg, &origin)?;
+    storage.install_package(&pkg, &origin, promotion.as_ref())?;
     Ok(serde_json::json!({
         "outcome": "installed", "spirit_id": pkg.spirit_id.as_str(), "version": pkg.version,
         "manifest_bytes": pkg.manifest_toml.len(), "artifact_bytes": pkg.artifact_bytes.len(),
@@ -93,7 +147,7 @@ pub fn install(
         "sandbox_tier_floor": format!("{:?}", decision.sandbox_tier_floor), "origin": origin,
     }))
 }
-fn check_identity(document: &toml::Value, id: &str, version: &str) -> Result<(), Error> {
+pub(crate) fn check_identity(document: &toml::Value, id: &str, version: &str) -> Result<(), Error> {
     let identity = document
         .get("class")
         .or_else(|| document.get("spirit"))
@@ -132,8 +186,19 @@ pub fn verify_installed(name: &str, manifest_path: &Path) -> Result<String, Erro
             }
         }
     }
-    let fields =
+    let mut fields =
         maos_compliance::runtime_context::extract_manifest_fingerprint_fields(&pkg.manifest_toml);
+    let promotion_path = directory.join("vetting.json");
+    if fields.trust_tier == TrustTier::PublicVetted && !promotion_path.exists() {
+        return Err("installed public-vetted package lacks promotion evidence".into());
+    }
+    if promotion_path.exists() {
+        let promotion: InstalledVetting = serde_json::from_slice(&std::fs::read(promotion_path)?)?;
+        let seed = maos_domain::audit_key::load_audit_key_seed(&None)?;
+        let root = maos_domain::audit_key::derive_audit_public_key(&seed);
+        promotion.verify(&pkg, &root, crate::yank_auth::now_unix_ms()?)?;
+        fields.trust_tier = TrustTier::PublicUntrusted;
+    }
     let context = maos_compliance::RuntimeExecutionContext::from_admission(
         fields.trust_tier,
         fields.sandbox_tier,

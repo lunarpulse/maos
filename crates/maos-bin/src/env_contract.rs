@@ -12,6 +12,11 @@ pub enum EnvStability {
 
 pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     EnvVar {
+        name: "MAOS_YANK_POLICY",
+        purpose: "Registry yank policy: warn (default), quarantine request (effect final KQ1), auto-revoke",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_ONE_SHOT",
         purpose: "Legacy one-shot smoke-arm dispatch key",
         stability: EnvStability::HarnessOnly,

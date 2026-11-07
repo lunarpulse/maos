@@ -1,0 +1,11 @@
+
+running 1 test
+test expiry_and_vetter_revocation_observe_once_and_request_policy_ac9 ... FAILED
+
+failures:
+
+failures:
+    expiry_and_vetter_revocation_observe_once_and_request_policy_ac9
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.08s
+

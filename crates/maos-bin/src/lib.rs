@@ -123,6 +123,8 @@ pub mod worker_spawn;
 /// after the exit.
 #[cfg(feature = "network")]
 pub mod worker_workspace;
+#[cfg(feature = "network")]
+pub mod yank_policy;
 
 /// `[topology]` manifest parsing. In the library, not `main.rs`, so
 /// `crates/maos-bin/tests/` can execute it — an in-`src` test module is

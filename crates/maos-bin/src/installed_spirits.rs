@@ -46,7 +46,8 @@ impl InstalledSpirits {
             };
             let admission = async {
                 // Registry installs never introduce compiled-in first-party classes.
-                let gated = crate::admission::gate_manifest(&text, &|_| false)?;
+                let mut gated = crate::admission::gate_manifest(&text, &|_| false)?;
+                gated.bind_registry_package_at(&path)?;
                 if gated.spirit_id != name {
                     return Err(AdmissionRefusal::ClassBuild {
                         detail: "installed name differs from signed manifest".into(),

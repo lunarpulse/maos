@@ -1,0 +1,51 @@
+{
+  "registry": {
+    "exit_code": 0,
+    "passed": 111,
+    "failed": 0,
+    "ignored": 2,
+    "binaries": 15
+  },
+  "policy": {
+    "exit_code": 0,
+    "passed": 3,
+    "failed": 0,
+    "ignored": 0,
+    "binaries": 1
+  },
+  "install": {
+    "exit_code": 0,
+    "passed": 9,
+    "failed": 0,
+    "ignored": 0,
+    "binaries": 1
+  },
+  "vet_lifecycle": {
+    "exit_code": 0,
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "binaries": 1
+  },
+  "compliance": {
+    "exit_code": 0,
+    "passed": 62,
+    "failed": 0,
+    "ignored": 0,
+    "binaries": 4
+  },
+  "domain": {
+    "exit_code": 0,
+    "passed": 309,
+    "failed": 0,
+    "ignored": 0,
+    "binaries": 7
+  },
+  "networkless": {
+    "exit_code": 0,
+    "passed": 7,
+    "failed": 0,
+    "ignored": 0,
+    "binaries": 1
+  }
+}

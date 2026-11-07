@@ -1,0 +1,11 @@
+
+running 1 test
+test installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16 ... FAILED
+
+failures:
+
+failures:
+    installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.45s
+

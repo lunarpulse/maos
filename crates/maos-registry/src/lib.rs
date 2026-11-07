@@ -36,6 +36,7 @@ pub mod origin;
 pub mod server;
 pub mod storage;
 pub mod yank;
+pub mod yank_auth;
 
 pub use client::McpSpiritRegistryClient;
 pub use maos_domain::ports::registry::TrustTier;

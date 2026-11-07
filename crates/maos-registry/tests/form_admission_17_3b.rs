@@ -169,6 +169,8 @@ fn attestation_for(pkg: &SignedPackage) -> VettingAttestation {
         &VETTER_SEED,
         &VettingClaim {
             manifest_hash,
+            artifact_sha256: sha2::Sha256::digest(&pkg.artifact_bytes).into(),
+            publisher_pubkey: pkg.publisher_pubkey,
             spirit_id: pkg.spirit_id.as_str().into(),
             spirit_version: pkg.version.clone(),
             from_tier: TrustTier::PublicUntrusted,

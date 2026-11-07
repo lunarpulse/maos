@@ -1,0 +1,36 @@
+{
+  "run": {
+    "name": "nextest-run",
+    "tests": "5720",
+    "skipped": "0",
+    "failures": "4",
+    "errors": "0",
+    "uuid": "faf653c8-419b-459c-94bf-845333158f1c",
+    "timestamp": "2026-11-07T00:20:43.285+00:00",
+    "time": "800.057"
+  },
+  "console_summary": "5720 tests run: 5716 passed (1 slow), 4 failed, 138 skipped",
+  "exit_code": 100,
+  "budget": {
+    "gate": "check-test-budget",
+    "passed": true,
+    "junit": "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/workspace-junit.xml",
+    "binaries": 613,
+    "total_span_seconds": 800.0450069904327,
+    "total_sum_seconds": 799.9169999999992,
+    "findings": []
+  },
+  "landing_witnesses": {
+    "tests": 30,
+    "failures": 0
+  },
+  "kernel_lib": {
+    "passed": 253,
+    "exit_code": 0
+  },
+  "classification": {
+    "own_fixed": "FKCS admission fingerprint updated under Main adjudication; oracle11/11 and gate green; review explicitly still pending",
+    "environment": "two declared cryptography prerequisite omissions, not flakes; pinned requirements installed before independently prescribed prepush",
+    "timing": "unchanged20-11 million pending-operation observation; rule10 owner20-7 at deferred-work.md:1468; no standalone retry"
+  }
+}

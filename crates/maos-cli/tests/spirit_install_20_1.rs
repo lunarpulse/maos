@@ -302,3 +302,120 @@ fn built_in_shell_names_are_reserved_before_admission() {
         assert!(String::from_utf8_lossy(&output.stderr).contains("reserved"));
     }
 }
+
+#[test]
+fn installed_version_is_immutable_ac14() {
+    let scratch = Scratch::new();
+    let first = InProcessServer::start(&scratch);
+    let manifest = example(&scratch);
+    assert!(
+        publish(&scratch, &sibling("maos-spirit"), &first.addr, &manifest)
+            .status
+            .success()
+    );
+    assert!(install(&scratch, &first.addr).status.success());
+    let installed = installed_version(&scratch);
+    let index = scratch
+        .0
+        .join("home/.local/share/maos/registry/installed-index.json");
+    let original_index = std::fs::read(&index).unwrap();
+    let original_package = std::fs::read(installed.join("signed_package.json")).unwrap();
+    let original_origin = std::fs::read(installed.join("origin.json")).unwrap();
+    let other = Scratch::new();
+    let second = InProcessServer::start(&other);
+    let artifact = scratch.0.join("changed.wasm");
+    std::fs::write(&artifact, b"replacement under the same publisher key").unwrap();
+    for (index, addr) in [&first.addr, &second.addr].into_iter().enumerate() {
+        if index == 1 {
+            std::fs::write(scratch.0.join("publisher.key"), "54".repeat(32)).unwrap();
+        }
+        let result = publish_artifact(
+            &scratch,
+            &sibling("maos-spirit"),
+            addr,
+            &manifest,
+            &artifact,
+            &scratch.0.join("publisher.key"),
+        );
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let result = install(&scratch, addr);
+        assert!(
+            !result.status.success(),
+            "same-key or different-registry replacement must fail"
+        );
+        let diagnostic = String::from_utf8_lossy(&result.stderr);
+        assert!(
+            diagnostic.contains(if index == 0 {
+                "immutable"
+            } else {
+                "publisher key differs"
+            }),
+            "{diagnostic}"
+        );
+        assert_eq!(
+            std::fs::read(
+                scratch
+                    .0
+                    .join("home/.local/share/maos/registry/installed-index.json")
+            )
+            .unwrap(),
+            original_index
+        );
+        assert_eq!(
+            std::fs::read(installed.join("signed_package.json")).unwrap(),
+            original_package
+        );
+        assert_eq!(
+            std::fs::read(installed.join("origin.json")).unwrap(),
+            original_origin
+        );
+    }
+}
+
+#[test]
+fn yanked_install_is_refused_before_persistence_ac16() {
+    let scratch = Scratch::new();
+    let server = InProcessServer::start(&scratch);
+    assert!(publish(
+        &scratch,
+        &sibling("maos-spirit"),
+        &server.addr,
+        &example(&scratch)
+    )
+    .status
+    .success());
+    let authorization = maos_registry::yank_auth::YankAuthorization::sign(
+        &[0x53; 32],
+        "example-spirit-ts",
+        "0.1.0",
+        "withdrawn",
+        maos_domain::ports::registry::YankOrigin::Publisher,
+        String::new(),
+        10,
+    )
+    .unwrap();
+    let response = rpc(
+        &server.addr,
+        "registry.deprecate",
+        serde_json::json!({
+            "spirit_id": "example-spirit-ts", "version": "0.1.0", "reason": "withdrawn",
+            "authorization": authorization,
+        }),
+    );
+    assert!(response.get("result").is_some(), "{response}");
+    let result = install(&scratch, &server.addr);
+    assert!(!result.status.success(), "yanked version must not install");
+    assert!(String::from_utf8_lossy(&result.stderr).contains("yanked"));
+    assert!(!scratch
+        .0
+        .join("home/.local/share/maos/registry/installed")
+        .exists());
+    assert!(!scratch
+        .0
+        .join("home/.local/share/maos/registry/installed-index.json")
+        .exists());
+}

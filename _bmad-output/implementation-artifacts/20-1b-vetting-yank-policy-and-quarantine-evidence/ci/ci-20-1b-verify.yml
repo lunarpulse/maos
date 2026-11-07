@@ -1,0 +1,78 @@
+name: ci-20-1b-verify
+# Operator-controlled verification branch only; never install this workflow on main.
+# Authored, NOT executed locally or hosted. F5 and final KQ1 effects are NOT proved here.
+on:
+  push:
+    branches: ['ci/20-1b-verify']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Final kernel-free landing tree (default pushed SHA)
+        required: false
+permissions:
+  contents: read
+env:
+  CARGO_TERM_COLOR: never
+jobs:
+  kernel-free-trust:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: verify-20-1b-${{ matrix.image }}
+      - name: Build actual harness-resolved fixtures then genuine journey binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          cargo build --locked -p xtask
+          env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR="$PWD/xtask" \
+            target/debug/xtask build-test-fixtures --only maosctl,maos-spirit,maos-registry-server \
+            2>&1 | tee evidence/fixtures.log
+          cargo build --locked -p maos-bin -p maos-cli
+          cargo metadata --locked --format-version 1 > evidence/cargo-metadata.json
+          cargo nextest list --locked -p maos-bin -p maos-registry -p maos-spirit-cli \
+            --list-type binaries-only --message-format json > evidence/binaries-metadata.json
+      - name: Thirty concrete kernel-free witnesses using the recorded metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo nextest run \
+            --cargo-metadata evidence/cargo-metadata.json \
+            --binaries-metadata evidence/binaries-metadata.json \
+            --profile ci --test-threads 1 --no-fail-fast --no-capture \
+            -E 'binary(yank_auth_20_1b) | binary(yank_cadence_20_1b) | binary(vetting_attestation_gate) | binary(yank_policy_20_1b) | binary(spirit_install_20_1) | binary(vet_lifecycle_20_1b)' \
+            2>&1 | tee evidence/contracts.log
+          cp target/nextest/ci/junit.xml evidence/junit.xml
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 30 \
+            --required-test unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17 \
+            --required-test publisher_and_vetter_yank_verbs_authenticate_ac7 \
+            --required-test signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8 \
+            --required-test registry_publishers_cannot_share_principal_spill_ac10 \
+            --required-test installed_version_is_immutable_ac14 \
+            --required-test yanked_install_is_refused_before_persistence_ac16 evidence/contracts.log
+      - name: Kernel baseline is unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR="$PWD/xtask" \
+            target/debug/xtask check-kernel-baseline --json | tee evidence/kernel.json
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: trust-20-1b-${{ matrix.image }}
+          path: evidence

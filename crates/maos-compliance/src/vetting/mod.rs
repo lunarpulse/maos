@@ -72,6 +72,11 @@ pub enum VettingRejection {
     #[error("manifest exact-hash mismatch — expected {expected}, attestation bound {bound}")]
     ManifestHashMismatch { expected: String, bound: String },
 
+    #[error("artifact exact-hash mismatch")]
+    ArtifactHashMismatch,
+    #[error("publisher key differs from vetted publisher")]
+    PublisherKeyMismatch,
+
     /// The attestation's `to_tier` is not `public-vetted`.
     #[error("vetting attestation target tier is not public-vetted (got {0:?})")]
     WrongTargetTier(TrustTier),
@@ -187,6 +192,24 @@ pub struct VerifiedAttestation {
     pub vetter_pubkey: [u8; 32],
 }
 
+/// Independently supplied package bytes and publisher, never derived from the claim.
+#[derive(Clone, Copy)]
+pub struct VettingSubject<'a> {
+    pub manifest_toml: &'a [u8],
+    pub artifact_bytes: &'a [u8],
+    pub publisher_pubkey: &'a [u8; 32],
+}
+
+impl<'a> From<&'a maos_domain::ports::registry::SignedPackage> for VettingSubject<'a> {
+    fn from(pkg: &'a maos_domain::ports::registry::SignedPackage) -> Self {
+        Self {
+            manifest_toml: &pkg.manifest_toml,
+            artifact_bytes: &pkg.artifact_bytes,
+            publisher_pubkey: &pkg.publisher_pubkey,
+        }
+    }
+}
+
 /// Verify a [`VettingAttestation`] end-to-end against the package manifest and
 /// the operator vetter keyring, at wall-clock `now_unix_ms`.
 ///
@@ -196,7 +219,7 @@ pub struct VerifiedAttestation {
 /// [`VettingRejection`].
 pub fn verify_attestation(
     att: &VettingAttestation,
-    manifest_toml: &[u8],
+    subject: VettingSubject<'_>,
     keyring: &keyring::VetterKeyring,
     expected_operator_root: &[u8; 32],
     expected_spirit_id: &str,
@@ -205,12 +228,18 @@ pub fn verify_attestation(
 ) -> Result<VerifiedAttestation, VettingRejection> {
     let claim = verify_attestation_signature(att)?;
 
-    let expected = sha256(manifest_toml);
+    let expected = sha256(subject.manifest_toml);
     if expected != claim.manifest_hash {
         return Err(VettingRejection::ManifestHashMismatch {
             expected: hex::encode(expected),
             bound: hex::encode(claim.manifest_hash),
         });
+    }
+    if sha256(subject.artifact_bytes) != claim.artifact_sha256 {
+        return Err(VettingRejection::ArtifactHashMismatch);
+    }
+    if *subject.publisher_pubkey != claim.publisher_pubkey {
+        return Err(VettingRejection::PublisherKeyMismatch);
     }
     if claim.to_tier != TrustTier::PublicVetted {
         return Err(VettingRejection::WrongTargetTier(claim.to_tier));
@@ -279,7 +308,7 @@ pub fn verify_attestation(
 /// governs the vetter re-issue workflow, not whether the flap fires.
 pub fn evaluate_upgrade_precondition(
     target_is_public_vetted: bool,
-    target_manifest_toml: &[u8],
+    subject: VettingSubject<'_>,
     target_attestation: Option<&VettingAttestation>,
     keyring: &keyring::VetterKeyring,
     expected_operator_root: &[u8; 32],
@@ -293,7 +322,7 @@ pub fn evaluate_upgrade_precondition(
     let attestation = target_attestation.ok_or(VettingRejection::UpgradeAttestationMissing)?;
     verify_attestation(
         attestation,
-        target_manifest_toml,
+        subject,
         keyring,
         expected_operator_root,
         target_spirit_id,
@@ -345,6 +374,14 @@ mod chain_tests {
 
     const MANIFEST: &[u8] = b"[spirit]\nname = \"vetted\"\nversion = \"0.1.0\"\n";
 
+    fn subject(manifest: &[u8]) -> VettingSubject<'_> {
+        VettingSubject {
+            manifest_toml: manifest,
+            artifact_bytes: b"",
+            publisher_pubkey: &[0; 32],
+        }
+    }
+
     fn op_seed() -> [u8; 32] {
         [0x11; 32]
     }
@@ -355,6 +392,8 @@ mod chain_tests {
     fn claim(manifest: &[u8], issued: u64, expires: u64) -> VettingClaim {
         VettingClaim {
             manifest_hash: sha256(manifest),
+            artifact_sha256: sha256(b""),
+            publisher_pubkey: [0; 32],
             spirit_id: "vetted".into(),
             spirit_version: "0.1.0".into(),
             from_tier: TrustTier::PublicUntrusted,
@@ -395,7 +434,7 @@ mod chain_tests {
         let keyring = keyring_with_enrollment(100);
         verify_attestation(
             &attestation,
-            MANIFEST,
+            subject(MANIFEST),
             &keyring,
             &ed25519_pubkey(&op_seed()),
             &claim.spirit_id,
@@ -410,7 +449,7 @@ mod chain_tests {
         let kr = keyring_with_enrollment(100);
         let verified = verify_attestation(
             &att,
-            MANIFEST,
+            subject(MANIFEST),
             &kr,
             &ed25519_pubkey(&op_seed()),
             "vetted",
@@ -430,7 +469,7 @@ mod chain_tests {
         let other = b"[spirit]\nname = \"other\"\n";
         let err = verify_attestation(
             &att,
-            other,
+            subject(other),
             &kr,
             &ed25519_pubkey(&op_seed()),
             "vetted",
@@ -447,7 +486,7 @@ mod chain_tests {
         let kr = keyring_with_enrollment(100);
         let err = verify_attestation(
             &att,
-            MANIFEST,
+            subject(MANIFEST),
             &kr,
             &ed25519_pubkey(&op_seed()),
             "vetted",
@@ -464,7 +503,7 @@ mod chain_tests {
         let kr = VetterKeyring::new(ed25519_pubkey(&op_seed())); // no enrollment
         let err = verify_attestation(
             &att,
-            MANIFEST,
+            subject(MANIFEST),
             &kr,
             &ed25519_pubkey(&op_seed()),
             "vetted",
@@ -481,7 +520,7 @@ mod chain_tests {
         let kr = keyring_with_enrollment(600); // enrolled AFTER issuance
         let err = verify_attestation(
             &att,
-            MANIFEST,
+            subject(MANIFEST),
             &kr,
             &ed25519_pubkey(&op_seed()),
             "vetted",
@@ -503,7 +542,7 @@ mod chain_tests {
         let kr = keyring_with_enrollment(100);
         let err = verify_attestation(
             &att,
-            MANIFEST,
+            subject(MANIFEST),
             &kr,
             &ed25519_pubkey(&op_seed()),
             "vetted",
@@ -525,7 +564,7 @@ mod chain_tests {
         assert_eq!(
             evaluate_upgrade_precondition(
                 false,
-                MANIFEST_V2,
+                subject(MANIFEST_V2),
                 None,
                 &kr,
                 &ed25519_pubkey(&op_seed()),
@@ -543,7 +582,7 @@ mod chain_tests {
         assert_eq!(
             evaluate_upgrade_precondition(
                 true,
-                MANIFEST_V2,
+                subject(MANIFEST_V2),
                 None,
                 &kr,
                 &ed25519_pubkey(&op_seed()),
@@ -563,7 +602,7 @@ mod chain_tests {
         let kr = keyring_with_enrollment(100);
         let err = evaluate_upgrade_precondition(
             true,
-            MANIFEST_V2,
+            subject(MANIFEST_V2),
             Some(&old_att),
             &kr,
             &ed25519_pubkey(&op_seed()),
@@ -584,7 +623,7 @@ mod chain_tests {
         assert_eq!(
             evaluate_upgrade_precondition(
                 true,
-                MANIFEST_V2,
+                subject(MANIFEST_V2),
                 Some(&new_att),
                 &kr,
                 &ed25519_pubkey(&op_seed()),
@@ -634,7 +673,7 @@ mod chain_tests {
         assert!(matches!(
             verify_attestation(
                 &attestation,
-                MANIFEST,
+                subject(MANIFEST),
                 &keyring,
                 &ed25519_pubkey(&op_seed()),
                 "other",
@@ -681,7 +720,7 @@ mod chain_tests {
         assert_eq!(
             verify_attestation(
                 &attestation,
-                MANIFEST,
+                subject(MANIFEST),
                 &keyring,
                 &ed25519_pubkey(&op_seed()),
                 "vetted",

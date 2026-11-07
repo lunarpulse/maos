@@ -1,0 +1,21 @@
+{
+  "authority": "Main orchestrator adjudication: exact caller argument plus two test claim fields only; unchanged negative controls; provenance explicitly before bmad-code-review; pin sets travel together",
+  "old": "5b3fe85c6abdbf45ea73b57edae6f427d1e4b445b6ae9c4ac24ba5a77798a4f4",
+  "new": "136c579d6a2ae4804d0f57864cec8c583363b563e2f063a870f6ae6f38256a46",
+  "independent_algorithm": "sha256(each declared UTF8 relative path, NUL, content length as u64 LE, raw content), existing canonical file order",
+  "files": [
+    {
+      "path": "crates/maos-registry/src/admission.rs",
+      "sha256": "1a31ff1398dae69636de28d0c15f2c8908706373d284b02ddc274df3dd601377",
+      "bytes": 55598
+    },
+    {
+      "path": "crates/maos-skill/src/admission.rs",
+      "sha256": "ee718a1e0dd6749cc8e3f2b7a542476fdca9b39d113877e1f6061aa9dfb62c66",
+      "bytes": 17024
+    }
+  ],
+  "review_state": "AUTHORIZED PRE-REVIEW REPIN; independent bmad-code-review must explicitly re-examine caller hunk and fingerprint; not represented as completed independent review",
+  "unchanged": "frozen tag/commit, two declared paths, frozen_surface_gate, maos-skill admission, kernel pins/source",
+  "diff_evidence": "fkcs-admission-review-diff.stdout"
+}

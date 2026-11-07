@@ -1,0 +1,190 @@
+[
+  {
+    "label": "kernel-lib-final",
+    "args": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-kernel-core",
+      "--lib"
+    ],
+    "exit_code": 0,
+    "seconds": 85.429
+  },
+  {
+    "label": "genuine-journey-before-workspace",
+    "args": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "-p",
+      "maos-cli"
+    ],
+    "exit_code": 0,
+    "seconds": 1.424
+  },
+  {
+    "label": "workspace-cargo-metadata",
+    "args": [
+      "cargo",
+      "metadata",
+      "--locked",
+      "--format-version",
+      "1"
+    ],
+    "exit_code": 0,
+    "seconds": 0.434
+  },
+  {
+    "label": "workspace-binaries-metadata",
+    "args": [
+      "cargo",
+      "nextest",
+      "list",
+      "--locked",
+      "--workspace",
+      "--message-format",
+      "json"
+    ],
+    "exit_code": 0,
+    "seconds": 810.876
+  },
+  {
+    "label": "workspace-nextest-once",
+    "args": [
+      "cargo",
+      "nextest",
+      "run",
+      "--workspace",
+      "--locked",
+      "--no-fail-fast",
+      "--profile",
+      "ci",
+      "--test-threads",
+      "1",
+      "--cargo-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/workspace-cargo-metadata.stdout",
+      "--binaries-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/workspace-binaries-metadata.stdout"
+    ],
+    "exit_code": 2,
+    "seconds": 0.124,
+    "observation": "CLI refusal, incompatible cargo selection flags with binaries metadata; ZERO tests executed"
+  },
+  {
+    "label": "workspace-test-budget",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-test-budget",
+      "--junit",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/workspace-junit.xml",
+      "--json"
+    ],
+    "exit_code": 1,
+    "seconds": 0.052,
+    "observation": "INVALID attribution: predecessor UUID24d43741-bd54-4575-943f-6c2fea571c5d copied after CLI refusal; NOT this run's evidence; own stale XML duplicate discarded; metadata-startup-provenance.json preserves diagnosis"
+  },
+  {
+    "label": "workspace-nextest-final",
+    "args": [
+      "cargo",
+      "nextest",
+      "run",
+      "--no-fail-fast",
+      "--profile",
+      "ci",
+      "--test-threads",
+      "1",
+      "--cargo-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/workspace-cargo-metadata.stdout",
+      "--binaries-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/workspace-binaries-metadata.stdout"
+    ],
+    "exit_code": 96,
+    "seconds": 0.049,
+    "observation": "Metadata schema startup failure96 (full list is not binaries-only metadata); ZERO tests executed"
+  },
+  {
+    "label": "format-final-cursor-comment",
+    "args": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "seconds": 2.908
+  },
+  {
+    "label": "fixtures-final-source",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "build-test-fixtures"
+    ],
+    "exit_code": 0,
+    "seconds": 24.775
+  },
+  {
+    "label": "genuine-journey-final-source",
+    "args": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "-p",
+      "maos-cli"
+    ],
+    "exit_code": 0,
+    "seconds": 18.22
+  },
+  {
+    "label": "workspace-binaries-only-metadata",
+    "args": [
+      "cargo",
+      "nextest",
+      "list",
+      "--locked",
+      "--workspace",
+      "--list-type",
+      "binaries-only",
+      "--message-format",
+      "json"
+    ],
+    "exit_code": 0,
+    "seconds": 252.45
+  },
+  {
+    "label": "workspace-nextest-execution",
+    "args": [
+      "cargo",
+      "nextest",
+      "run",
+      "--no-fail-fast",
+      "--profile",
+      "ci",
+      "--test-threads",
+      "1",
+      "--cargo-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/workspace-cargo-metadata.stdout",
+      "--binaries-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/workspace-binaries-only-metadata.stdout"
+    ],
+    "exit_code": 100,
+    "seconds": 801.319
+  },
+  {
+    "label": "workspace-budget-execution",
+    "args": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-test-budget",
+      "--junit",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/workspace-junit.xml",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.017
+  }
+]

@@ -475,9 +475,59 @@ pub struct GatedManifest {
     /// The raw text, kept for the model-provenance gate, which parses its own
     /// section out of the whole document, and for the FR11 archive record.
     pub manifest_toml: String,
+    /// Local names stay bare; registry subjects include publisher-bound identity.
+    pub storage_identity: String,
 }
 
 impl GatedManifest {
+    pub fn bind_registry_publisher(&mut self, publisher: &[u8; 32]) {
+        use sha2::Digest;
+        let name = if self.spirit_id.len() <= 93 {
+            self.spirit_id.clone()
+        } else {
+            hex::encode(&sha2::Sha256::digest(self.spirit_id.as_bytes())[..16])
+        };
+        self.storage_identity = format!(
+            "{name}:{}",
+            hex::encode(&sha2::Sha256::digest(publisher)[..16])
+        );
+    }
+
+    /// A signed registry/import sidecar opts into publisher-bound storage.
+    /// Ordinary local manifests without a package retain their bare identity.
+    pub fn bind_registry_package_at(&mut self, manifest: &Path) -> Result<(), AdmissionRefusal> {
+        let path = manifest
+            .parent()
+            .ok_or_else(|| AdmissionRefusal::Admission {
+                detail: "manifest has no package parent".into(),
+            })?
+            .join("signed_package.json");
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) => {
+                return Err(AdmissionRefusal::Admission {
+                    detail: e.to_string(),
+                })
+            }
+        };
+        let pkg: maos_domain::ports::registry::SignedPackage = serde_json::from_slice(&bytes)
+            .map_err(|e| AdmissionRefusal::Admission {
+                detail: e.to_string(),
+            })?;
+        if pkg.manifest_toml != self.manifest_toml.as_bytes()
+            || pkg.spirit_id.as_str() != self.spirit_id
+            || pkg.version != self.class_section.version
+            || !maos_registry::admission::verify_publisher_sig(&pkg)
+        {
+            return Err(AdmissionRefusal::Admission {
+                detail: "registry package identity or signature mismatch".into(),
+            });
+        }
+        self.bind_registry_publisher(&pkg.publisher_pubkey);
+        Ok(())
+    }
+
     /// The bundle the scheduler stores in the SCB.
     pub fn bundle(&self) -> SpiritManifestBundle {
         SpiritManifestBundle {
@@ -740,6 +790,7 @@ pub fn gate_manifest(
 
     Ok(GatedManifest {
         spirit_id: class_section.name.clone(),
+        storage_identity: class_section.name.clone(),
         class_section,
         sandbox_cfg,
         resource_caps,
@@ -978,7 +1029,10 @@ pub async fn load_admit_start(
     on_loaded(pid);
 
     // FR31: bind before admission/start; a rejected binding rolls the load back.
-    if let Err(error) = deps.memory.bind_storage_identity(pid, &spirit_id) {
+    if let Err(error) = deps
+        .memory
+        .bind_storage_identity(pid, &gated.storage_identity)
+    {
         rollback(deps, pid, &spirit_id).await;
         return Err(AdmissionRefusal::Load {
             detail: error.to_string(),

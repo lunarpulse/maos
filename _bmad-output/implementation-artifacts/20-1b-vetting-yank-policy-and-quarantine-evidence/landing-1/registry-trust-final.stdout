@@ -1,0 +1,188 @@
+
+running 56 tests
+test admission::tests::local_unsigned_rejected_when_policy_strict ... ok
+test admission::tests::local_unsigned_allowed_when_policy_permits ... ok
+test admission::tests::provenance_absent_admits_when_not_required_ac11 ... ok
+test admission::tests::org_internal_signature_requires_org_key ... ok
+test admission::tests::provenance_absent_but_required_rejects_catalogued ... ok
+test admission::tests::org_internal_signature_mismatch_rejects ... ok
+test admission::tests::org_internal_signature_matches_admits ... ok
+test admission::tests::provenance_free_text_lineage_rejects_malformed ... ok
+test admission::tests::strictest_of_resolves_all_combinations ... ok
+test admission::tests::public_untrusted_with_t3_floor_returns_t3_sandbox ... ok
+test admission::tests::provenance_present_valid_returns_record_with_content_hash ... ok
+test admission::tests::provenance_stale_rejects ... ok
+test admission::tests::provenance_content_hash_is_deterministic ... ok
+test admission::tests::strictest_of_resolves_correctly_local_vs_public_untrusted ... ok
+test admission::tests::public_vetted_tier_always_rejects ... ok
+test fixture_replay::tests::fixture_empty_queue_returns_transport_error ... ok
+test fixture_replay::tests::fixture_errors_propagate ... ok
+test fixture_replay::tests::fixture_records_calls ... ok
+test fixture_replay::tests::fixture_search_returns_queued_response ... ok
+test compliance_verify::tests::tampered_signature_is_rejected_via_delegation ... ok
+test admission::tests::wrapper_delegates_non_vetted_tiers ... ok
+test http::tests::later_resolved_address_is_tried_after_connection_refusal ... ok
+test operations::tests::artifact_args_serde_roundtrip ... ok
+test operations::tests::manifest_args_serde_roundtrip ... ok
+test admission::tests::public_untrusted_with_fingerprint_drift_rejects ... ok
+test server::tests::server_handles_search ... ignored, requires server to be running on a port — tested via end-to-end test
+test server::tests::server_handles_unknown_method ... ignored, requires server to be running on a port — tested via end-to-end test
+test compliance_verify::tests::fingerprint_mismatch_is_rejected_via_delegation ... ok
+test operations::tests::search_args_defaults ... ok
+test import::tests::missing_signed_package_json_rejects ... ok
+test admission::tests::public_untrusted_with_valid_envelope_admits ... ok
+test operations::tests::deprecate_args_serde_roundtrip ... ok
+test operations::tests::search_args_serde_roundtrip ... ok
+test admission::tests::public_untrusted_with_tampered_envelope_rejects ... ok
+test operations::tests::operation_serialization_is_snake_case ... ok
+test operations::tests::yanks_since_args_serde_roundtrip ... ok
+test yank::tests::policy_outcomes_are_distinct_ac8 ... ok
+test yank::tests::sequence_does_not_depend_on_display_time ... ok
+test yank::tests::repeated_source_does_not_replay_journal_rows ... ok
+test import::tests::divergent_manifest_rejects ... ok
+test import::tests::extract_and_verify_consistent_bundle ... ok
+test admission::tests::vetted_without_attestation_is_deferred ... ok
+test admission::tests::attestation_promotes_public_untrusted_before_strictest_of ... ok
+test admission::tests::vetted_with_unenrolled_vetter_is_rejected ... ok
+test admission::tests::vetted_promotion_preserves_compliance_envelope_verification ... ok
+test storage::tests::absent_install_inventory_does_not_create_a_store ... ok
+test admission::tests::vetted_with_expired_attestation_is_rejected ... ok
+test storage::tests::version_not_found_error ... ok
+test admission::tests::vetted_with_forged_attestation_signature_is_rejected ... ok
+test admission::tests::vetted_with_valid_attestation_admits ... ok
+test storage::tests::search_finds_spirit_by_name ... ok
+test storage::tests::put_and_get_manifest ... ok
+test storage::tests::put_and_get_artifact ... ok
+test storage::tests::search_excludes_yanked_by_default ... ok
+test storage::tests::search_includes_yanked_when_requested ... ok
+test storage::tests::yanks_since_returns_filtered_entries ... ok
+
+test result: ok. 54 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test structural_fkcs_reads_refuse_every_evasion_shape ... ok
+test structural_class_reads_have_the_named_typed_outcomes ... ok
+test rust_inproc_is_refused_before_every_admission_tier ... ok
+test wasm_component_uses_t2_at_each_admission_tier ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test fr59_301s_violates ... ok
+test fr59_300s_boundary_passes ... ok
+test fr59_poll_interval_resolver_clamps_correctly ... ok
+test fr59_yank_propagates_within_5min_window ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 9 tests
+test missing_signed_package_rejects ... ok
+test divergent_manifest_rejects ... ok
+test extract_bundle_happy_path ... ok
+test admit_spirit_public_untrusted_without_sig_fails ... ok
+test admit_spirit_local_unsigned_passes ... ok
+test verify_consistent_bundle_ok ... ok
+test origin_roundtrips_through_storage ... ok
+test publish_with_origin_persists_origin_file ... ok
+test published_origin_persists_without_origin_file ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 11 tests
+test sibling_provenance_refuses_an_unrecorded_executable ... ok
+test registry_inbox_is_not_an_operator_install ... ok
+test index_persistence_failure_cannot_return_a_receipt ... ok
+test connection_population_is_bounded ... ok
+test header_bytes_and_count_are_bounded ... ok
+test traversal_publish_is_an_rpc_error_without_escape_files ... ok
+test malformed_tools_call_has_a_json_rpc_error ... ok
+test sigterm_cancels_an_active_trickling_connection ... ok
+test browser_and_rebinding_requests_cannot_publish ... ok
+test server_tier_floor_uses_admission_policy_ordering ... ok
+test trickling_request_has_an_absolute_deadline ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.11s
+
+
+running 4 tests
+test unauthenticated_development_server_refuses_non_loopback_bind ... ok
+test standalone_population_rejection_has_complete_http_framing ... ok
+test standalone_server_roundtrip_isolates_root_and_exits_cleanly ... ok
+test standalone_rejections_have_complete_http_framing_and_clean_eof ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.13s
+
+
+running 5 tests
+test honest_claim_with_matching_runtime_override_admits ... ok
+test crypto_provider_drift_rejects_naming_field ... ok
+test provider_endpoint_drift_rejects_naming_field ... ok
+test manifest_matching_envelope_still_admits ... ok
+test trust_tier_drift_rejects_naming_field ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test search_acquires_yanks_lock_once ... ok
+test yank_visibility_preserved_after_contention_fix ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+
+running 2 tests
+test review_p5_index_recovery_error_is_returned_not_only_logged ... ok
+test review_p5_partial_generation_delete_restores_the_complete_preimage ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+
+running 9 tests
+test leg7_four_cause_distinguishability ... ok
+test fkcs_off_surface_refusal_precedes_a_valid_attestation ... ok
+test leg4_forged_vetter_key_refused ... ok
+test leg2_forged_signature_refused ... ok
+test artifact_swap_is_refused_ac6 ... ok
+test leg3_expired_attestation_refused ... ok
+test publisher_swap_is_refused_ac6 ... ok
+test leg1_round_trip_issue_promote_revoke ... ok
+test leg5_upgrade_flap_control ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test signed_revocation_lists_roundtrip_cbor_and_reject_wrong_byte_lengths ... ok
+test first_publisher_pin_is_typed_and_survives_restart_ac10 ... ok
+test daemon_cursor_restart_does_not_replay_journalled_yanks_ac7 ... ok
+test unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17 ... ok
+test publisher_and_enrolled_vetter_yanks_are_signed_labelled_and_restart_safe_ac7 ... ok
+test installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16 ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+
+
+running 1 test
+test signed_yank_crosses_real_server_at_30_second_floor_ac7 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.52s
+

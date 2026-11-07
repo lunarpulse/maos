@@ -1,0 +1,44 @@
+[
+  {
+    "name": "maos-bin::yank_policy_20_1b",
+    "tests": "3",
+    "skipped": "0",
+    "errors": "0",
+    "failures": "0"
+  },
+  {
+    "name": "maos-cli::spirit_install_20_1",
+    "tests": "9",
+    "skipped": "0",
+    "errors": "0",
+    "failures": "0"
+  },
+  {
+    "name": "maos-registry::vetting_attestation_gate",
+    "tests": "9",
+    "skipped": "0",
+    "errors": "0",
+    "failures": "0"
+  },
+  {
+    "name": "maos-registry::yank_auth_20_1b",
+    "tests": "6",
+    "skipped": "0",
+    "errors": "0",
+    "failures": "0"
+  },
+  {
+    "name": "maos-registry::yank_cadence_20_1b",
+    "tests": "1",
+    "skipped": "0",
+    "errors": "0",
+    "failures": "0"
+  },
+  {
+    "name": "maos-spirit-cli::vet_lifecycle_20_1b",
+    "tests": "2",
+    "skipped": "0",
+    "errors": "0",
+    "failures": "0"
+  }
+]

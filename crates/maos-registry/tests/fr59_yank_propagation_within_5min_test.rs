@@ -34,7 +34,7 @@ impl YankSource for ControlledSource {
         let pending = self.pending.lock().unwrap().clone();
         let entries: Vec<YankEntry> = pending
             .into_iter()
-            .filter(|e| e.yanked_at_ns > since_ns)
+            .filter(|e| e.sequence > since_ns)
             .collect();
         Ok(YankList::new(entries))
     }
@@ -46,19 +46,22 @@ struct RecordingObserver {
 }
 
 impl YankObserver for RecordingObserver {
-    fn on_yank(&self, entry: &YankEntry) {
+    fn on_yank(&self, entry: &YankEntry) -> Result<(), RegistryError> {
         self.applied.lock().unwrap().push(entry.clone());
+        Ok(())
     }
 }
 
 fn make_yank(name: &str, version: &str, at_ns: u64) -> YankEntry {
     use maos_domain::ports::registry::SpiritId;
-    YankEntry::new(
+    let mut entry = YankEntry::new(
         SpiritId(name.into()),
         version.into(),
         at_ns,
         "fr59-test".into(),
-    )
+    );
+    entry.sequence = 1;
+    entry
 }
 
 #[test]

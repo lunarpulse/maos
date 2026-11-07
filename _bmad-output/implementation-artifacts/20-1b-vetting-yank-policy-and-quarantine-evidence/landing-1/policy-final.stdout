@@ -1,0 +1,8 @@
+
+running 3 tests
+test expiry_and_vetter_revocation_observe_once_and_request_policy_ac9 ... ok
+test registry_publishers_cannot_share_principal_spill_ac10 ... ok
+test signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+

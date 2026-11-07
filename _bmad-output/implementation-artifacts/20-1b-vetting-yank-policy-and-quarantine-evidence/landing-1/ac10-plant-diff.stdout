@@ -1,0 +1,22 @@
+--- /tmp/201b-plants/ac10.rs	2026-11-06 21:53:38.113311171 +0000
++++ crates/maos-bin/src/admission.rs	2026-11-06 22:44:32.469128726 +0000
+@@ -480,17 +480,8 @@
+ }
+ 
+ impl GatedManifest {
+-    pub fn bind_registry_publisher(&mut self, publisher: &[u8; 32]) {
+-        use sha2::Digest;
+-        let name = if self.spirit_id.len() <= 93 {
+-            self.spirit_id.clone()
+-        } else {
+-            hex::encode(&sha2::Sha256::digest(self.spirit_id.as_bytes())[..16])
+-        };
+-        self.storage_identity = format!(
+-            "{name}:{}",
+-            hex::encode(&sha2::Sha256::digest(publisher)[..16])
+-        );
++    pub fn bind_registry_publisher(&mut self, _publisher: &[u8; 32]) {
++        self.storage_identity = self.spirit_id.clone();
+     }
+ 
+     /// A signed registry/import sidecar opts into publisher-bound storage.

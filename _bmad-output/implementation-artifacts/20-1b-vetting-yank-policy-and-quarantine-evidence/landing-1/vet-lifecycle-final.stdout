@@ -1,0 +1,7 @@
+
+running 2 tests
+test publisher_and_vetter_yank_verbs_authenticate_ac7 ... ok
+test vet_issue_install_promote_revoke_refuses_next_admission_ac6 ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+

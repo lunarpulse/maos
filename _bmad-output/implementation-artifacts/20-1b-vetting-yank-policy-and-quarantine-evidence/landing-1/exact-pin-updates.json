@@ -1,0 +1,37 @@
+{
+  "maos-bin": {
+    "old_pin": 35102,
+    "new_pin": 35422,
+    "driver": "publisher-bound admission identity, live promotion observation, signed yank policy and joined poller; rebased D02 A ceiling35837"
+  },
+  "maos-domain": {
+    "old_pin": 10107,
+    "new_pin": 10137,
+    "driver": "signed yank provenance/sequence plus exact CBOR CRL fixed-byte decoding; rebased D02 A ceiling10167"
+  },
+  "maos-registry": {
+    "old_pin": 4412,
+    "new_pin": 4627,
+    "driver": "authenticated mutations, first-key ownership, immutable installed generations, yank refusal and durable signed sequences/cursors; obsolete clock remapping deleted; rebased D02 A ceiling5207; identical inactive version reuses its original immutable generation"
+  },
+  "maos-spirit-cli": {
+    "old_pin": 755,
+    "new_pin": 936,
+    "driver": "vet issue/revoke and publisher/vetter yank verbs; rebased D02 A ceiling1895"
+  },
+  "maos-compliance": {
+    "old_pin": 2117,
+    "new_pin": 2070,
+    "driver": "measured2032 -> 2070; exact artifact/publisher binding and independent subject; lower old reserved pin2117 to exact2070; rebased D02 A ceiling2122"
+  },
+  "xtask": {
+    "old_pin": 44676,
+    "new_pin": 44696,
+    "driver": "EXTERNAL DRIVER ONLY: 20-2-deb-airgap-docker-and-formula-corrections hosted-3 d84b83dd render_packages.rs aligned multiline %w checksum arrays, Main confirmed ceiling44920; no20-1b xtask Rust growth"
+  },
+  "_aggregate_hardfail": {
+    "old_pin": 194935,
+    "new_pin": 195739,
+    "driver": "measured aggregate195738 +1; resume pin194934 plus external20-2 xtask20 plus own L1 784; rebased aggregate ceiling197774; kernel unchanged"
+  }
+}

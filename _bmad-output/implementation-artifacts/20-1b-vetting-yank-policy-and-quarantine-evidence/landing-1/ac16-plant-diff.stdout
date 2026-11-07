@@ -1,0 +1,22 @@
+--- /tmp/201b-plants/ac16.rs	2026-11-06 21:53:39.773290276 +0000
++++ crates/maos-registry/src/install.rs	2026-11-06 22:45:26.237794659 +0000
+@@ -59,19 +59,6 @@
+     let config = resolve_config()?;
+     let client = McpSpiritRegistryClient::http(uri.to_owned(), config.clone())?;
+     let id = SpiritId::from(id);
+-    if let Some(entry) = client
+-        .yanks_since(0)?
+-        .entries
+-        .into_iter()
+-        .find(|entry| entry.spirit_id == id && entry.version == version)
+-    {
+-        return Err(maos_domain::ports::registry::RegistryError::Yanked {
+-            spirit_id: id.as_str().into(),
+-            version: version.into(),
+-            reason: entry.reason,
+-        }
+-        .into());
+-    }
+     let manifest = client.manifest(&id, version)?;
+     let artifact = client.artifact(&id, version)?;
+     if manifest.spirit_id != id

@@ -1,0 +1,15 @@
+
+running 3 tests
+test expiry_and_vetter_revocation_observe_once_and_request_policy_ac9 ... FAILED
+test registry_publishers_cannot_share_principal_spill_ac10 ... FAILED
+test signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8 ... FAILED
+
+failures:
+
+failures:
+    expiry_and_vetter_revocation_observe_once_and_request_policy_ac9
+    registry_publishers_cannot_share_principal_spill_ac10
+    signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.77s
+

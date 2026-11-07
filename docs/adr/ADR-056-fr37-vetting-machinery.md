@@ -21,7 +21,15 @@ Two similarly named trust-tier types have different authority and must not be co
 
 `public-vetted` lives entirely on Axis A. Adding `PublicVetted` to the Axis-B kernel enum is forbidden. This preserves zero kernel-core delta and keeps registry policy out of the runtime sandbox floor.
 
-The new `maos-compliance::vetting` module defines `VettingAttestation`, an Ed25519-signed envelope shaped like `ComplianceClaimEnvelope`: `signature[64]`, `vetter_pubkey[32]`, canonical-CBOR `claim_bytes`, and `signing_alg`. Its inner `VettingClaim` binds `sha256(manifest_toml)` over the exact manifest bytes, not a canonicalized manifest form; `from_tier`; `to_tier = public-vetted`; `vetter_key_id`; `issued_at`; `expires_at`; `RevocationSemantics`; and optional `SuccessorPolicy` (`ExactOnly` or `ReissueRequiredWithExpeditedReview`).
+The `maos-compliance::vetting` module defines `VettingAttestation`, an Ed25519-signed
+envelope shaped like `ComplianceClaimEnvelope`: `signature[64]`, `vetter_pubkey[32]`,
+canonical-CBOR `claim_bytes`, and `signing_alg`. Its inner `VettingClaim` binds
+`sha256(manifest_toml)` over the exact bytes, `artifact_sha256`, the publisher public
+key, Spirit name/version, the tier transition, vetter key id, issuance/expiry,
+revocation semantics and optional successor policy. Verification receives these
+package inputs independently through `VettingSubject`; it never derives the expected
+artifact or publisher from the claim it is checking. Old manifest-only attestations
+must be reissued; missing binding fields fail decoding rather than receiving defaults.
 
 ### 2. Admission promotion is attestation-conditional
 
@@ -31,7 +39,9 @@ This is not a registry mutation. The attestation is the evidence that authorizes
 
 ### 3. Verification follows the operator-root chain
 
-`verify_attestation` verifies, in order: the attestation signature; the exact manifest hash; the public-vetted target tier; expiry; vetter-key enrollment predating issuance; and revocation. A structurally valid attestation signed by an un-enrolled key is refused.
+`verify_attestation` verifies the attestation signature; exact manifest and artifact
+hashes; publisher key; promotion tiers and validity; target identity; operator-root
+enrollment predating issuance; and revocation. An un-enrolled or revoked key refuses.
 
 Vetter-key enrollment, rotation, and revocation are `VetterKeyEvent` artifacts with their own operator-root signatures under the §7.3 audit root. They are distinct from the unsigned `maos_domain::governance::VetterKeyPayload`; that name collision is not an authority shortcut. Issuance, verification, revocation, and these lifecycle events are journaled.
 
@@ -92,11 +102,13 @@ The FKCS conformance review that discharged decision D8 (`epic-14-preflight-deci
   refuse), extracted `verify_public_untrusted_baseline`, and inlined equivalent branches. None of it can escalate a
   package — the manifest tier is author-controlled and origin/floor are unchanged — and every path still refuses
   `[fkcs]` off-surface declarations first.
-- **The attestation binds the manifest, not the artifact.** `VettingClaim` binds `sha256(manifest_toml)`,
-  `spirit_id` and version (§1); neither `artifact_bytes` nor the publisher key is covered, and the publisher
-  signature and ComplianceClaim envelope are self-attested at the public-untrusted tier. A holder of a valid
-  attestation for manifest M can therefore pair M with different artifact bytes under a fresh publisher key and
-  reach `effective_tier: PublicVetted`. This is a vetting-design gap, not an FKCS violation. **Owner:
-  `20-1-registry-client-install-verb-vetter-and-yank`** (it ships `maos-spirit vet issue`, the first producer of
-  attestations): bind `artifact_sha256` (and the publisher key) into `VettingClaim` and `verify_attestation` —
-  a golden-byte-pin change and an amendment to §1 — before any attestation is issued outside tests.
+- **Historical manifest-only gap, superseded by Story 20-1b L1 (2026-11-06).**
+  The original claim bound neither artifact bytes nor publisher key. The new
+  required bindings and golden CBOR pin close that shape before the author-facing
+  issuer is enabled. Independent artifact and publisher swap controls live in
+  `crates/maos-registry/tests/vetting_attestation_gate.rs`
+  (`artifact_swap_is_refused_ac6`, `publisher_swap_is_refused_ac6`).
+  The issuer and operator-root-signed attestation-revocation-list writer live in
+  `maos-spirit-cli`; `vet issue`/`vet revoke` do not enroll a vetter implicitly.
+  Running expiry/revocation uses the yank cadence and preserves cause labels.
+  Quarantine requests in L1 do not claim the final KQ1 isolation effect.

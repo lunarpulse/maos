@@ -1,5 +1,7 @@
 #[path = "../../../tests/harness/registry_20_1.rs"]
 mod support;
+#[path = "../../../tests/harness/registry_trust_20_1b.rs"]
+mod trust;
 use maos_domain::ports::registry::{SearchQuery, SignedPackage, SpiritId};
 use maos_registry::storage::{LocalFsRegistryStorage, RegistryStorage};
 use std::io::{Read, Write};
@@ -264,7 +266,13 @@ fn server_tier_floor_uses_admission_policy_ordering() {
     ];
     for (rank, (text, tier)) in tiers.iter().enumerate() {
         let mut pkg = package("tiers", &rank.to_string());
-        pkg.manifest_toml = format!("trust_tier = \"{text}\"\n").into_bytes();
+        // A real authenticated publication still isolates all sixteen tier/floor combinations.
+        pkg.manifest_toml = format!(
+            "[spirit]\nname = \"tiers\"\nversion = {:?}\ntrust_tier = \"{text}\"\n",
+            rank.to_string()
+        )
+        .into_bytes();
+        trust::sign(&mut pkg, &trust::PUBLISHER);
         assert!(rpc(
             &server.addr,
             "registry.publish",

@@ -1,0 +1,11 @@
+--- /tmp/201b-plants/ac14.rs	2026-11-06 22:34:22.569550408 +0000
++++ crates/maos-registry/src/storage.rs	2026-11-06 22:45:11.158890804 +0000
+@@ -428,7 +428,7 @@
+             .map_err(|e| StorageError::Io(e.to_string()))?;
+         let _lock = self.mutation_lock()?;
+         let parent = self.root.join("installed").join(pkg.spirit_id.as_str());
+-        if let Some(directory) = Self::check_publisher(&parent, pkg)? {
++        if let Some(directory) = None::<PathBuf> {
+             let stored: SignedPackage = serde_json::from_slice(
+                 &fs::read(directory.join("signed_package.json"))
+                     .map_err(|e| StorageError::Io(e.to_string()))?,

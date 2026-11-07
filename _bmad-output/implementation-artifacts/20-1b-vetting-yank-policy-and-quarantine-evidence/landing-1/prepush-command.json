@@ -1,0 +1,21 @@
+{
+  "args": [
+    "env",
+    "-u",
+    "CI",
+    "-u",
+    "GITHUB_ACTIONS",
+    "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+    "MAOS_17_2_CGROUP_MODE=undelegated",
+    "/mnt/build/cargo-maos/debug/xtask",
+    "prepush",
+    "--json"
+  ],
+  "exit_code": 1,
+  "seconds": 908.019,
+  "started": "2026-11-07T00:48:22.582949+00:00",
+  "ended": "2026-11-07T01:03:30.602483+00:00",
+  "tracked_writes_by_agent": "none while prepush runs",
+  "main_freeze": "acknowledged before launch",
+  "verifier_prerequisite": "hash-locked declared requirements in temporary system-site-packages venv; PATH prefixed for this prescribed run"
+}

@@ -88,6 +88,12 @@ seconds = 78
 reason = "20-11 real 100k/1M disk/WAL writer, completion and marker-scoped replay vectors, isolated from shell_host_16_2: hosted run42224167600/artifact13507273876 measured5.646+56.675=62.321 s; R3 observed Σ x1.25=77.90125 rounds up to78 s. The unchanged25% wall oracle and10 s route/observation deadlines remain independent and blocking; this finite exception does not waive AC5."
 owner = "20-11-erasure-inventory-closure"
 
+[[exception]]
+binary = "maos-registry::yank_cadence_20_1b"
+seconds = 39
+reason = "AC7 requires one real-server production poll at the unchanged 30-second clamp floor, isolated in its own binary and serial group. Local first exercised sample 30.57 s (landing-1/registry-focused-next.stdout), x1.25 rounds up to39; not a widened failure budget."
+owner = "20-1b-vetting-yank-policy-and-quarantine"
+
 # --- Expensive tests (ignored in the default run) ---------------------------
 
 [[expensive]]

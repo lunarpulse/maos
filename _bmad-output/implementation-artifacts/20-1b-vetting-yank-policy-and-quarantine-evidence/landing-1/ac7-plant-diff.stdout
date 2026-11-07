@@ -1,0 +1,28 @@
+--- /tmp/201b-plants/ac7.rs	2026-11-06 21:53:39.768290338 +0000
++++ crates/maos-registry/src/handlers/deprecate.rs	2026-11-06 22:40:54.201165229 +0000
+@@ -14,23 +14,8 @@
+ ) -> Result<serde_json::Value, String> {
+     let spirit_id = SpiritId::from(args.spirit_id.as_str());
+     let mut reason = YankReason::new(args.reason.clone());
+-    let bytes = args
+-        .authorization
+-        .as_ref()
+-        .ok_or("unauthenticated registry.deprecate: signed authorization required")?;
+-    let auth = crate::yank_auth::decode(bytes)?;
+-    let manifest = storage
+-        .get_manifest(&spirit_id, &args.version)
+-        .map_err(|e| e.to_string())?;
+-    auth.verify(
+-        &args.spirit_id,
+-        &args.version,
+-        &args.reason,
+-        &manifest.signer_pubkey,
+-        vetters,
+-        crate::yank_auth::now_unix_ms()?,
+-    )?;
+-    reason.authorization = Some(bytes.clone());
++    let _ = vetters;
++    reason.authorization = args.authorization.clone();
+     let receipt = storage
+         .yank(&spirit_id, &args.version, &reason)
+         .map_err(|e| e.to_string())?;

@@ -1,0 +1,87 @@
+{
+  "command": {
+    "args": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "MAOS_17_2_CGROUP_MODE=undelegated",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "prepush",
+      "--json"
+    ],
+    "exit_code": 1,
+    "seconds": 908.019,
+    "started": "2026-11-07T00:48:22.582949+00:00",
+    "ended": "2026-11-07T01:03:30.602483+00:00",
+    "tracked_writes_by_agent": "none while prepush runs",
+    "main_freeze": "acknowledged before launch",
+    "verifier_prerequisite": "hash-locked declared requirements in temporary system-site-packages venv; PATH prefixed for this prescribed run"
+  },
+  "status_counts": {
+    "pass": 83,
+    "skip": 7,
+    "red": 1,
+    "advisory": 1
+  },
+  "workspace_run": {
+    "name": "nextest-run",
+    "tests": "5720",
+    "skipped": "0",
+    "failures": "1",
+    "errors": "0",
+    "uuid": "e3b670a9-2f63-4ff1-ad10-9307d33a2860",
+    "timestamp": "2026-11-07T00:50:27.972+00:00",
+    "time": "87.162"
+  },
+  "workspace_passed": 5719,
+  "landing_cases": 30,
+  "landing_failures": 0,
+  "failure_classification": "sole unchanged20-11 million pending-operation timing/observation family; owner20-7, source and deadlines unchanged",
+  "budget_findings": [
+    {
+      "binary": "maos-bin::erasure_uninstall_13_5b",
+      "observed_sum_seconds": 31.429,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "maos-bin::hook_pump_17_4",
+      "observed_sum_seconds": 30.782,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "maos-bin::one_daemon_one_door_16_1",
+      "observed_sum_seconds": 36.376,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "maos-iac::participant_recall_17_8",
+      "observed_sum_seconds": 40.208,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "xtask::bin/xtask",
+      "observed_sum_seconds": 30.811,
+      "budget_seconds": 30.0
+    },
+    {
+      "scope": "suite",
+      "observed_sum_seconds": 1102.92,
+      "budget_seconds": 1100.0
+    }
+  ],
+  "other_required_stage_statuses": {
+    "check-kernel-baseline": "pass",
+    "kloc-check": "pass",
+    "binary-size": "pass",
+    "fmt": "pass",
+    "cargo-deny": "pass",
+    "kernel-core-lib": "pass",
+    "workspace-doc": "pass",
+    "tracked-tree": "pass"
+  },
+  "hosted_capabilities": "T3/rootless/delegated/netns/TLS interception proof not claimed; capability skip diagnostics preserved in raw prepush.json",
+  "retry": "none; one prescribed prepush; standalone run retained independently"
+}

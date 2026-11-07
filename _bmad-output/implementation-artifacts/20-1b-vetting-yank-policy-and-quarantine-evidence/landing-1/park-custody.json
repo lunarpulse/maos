@@ -1,0 +1,7 @@
+{
+  "manifest_sha256": "24b34ffddad46ab735228fec4114ef7e06b455ec75a4d4a9bc960d54a3f626bc",
+  "copy": "park-MANIFEST.txt",
+  "main_ruling": "Freeze acknowledged; archive may be deleted at final cleanup after verification, first copy MANIFEST into landing evidence; explicit freeze release required",
+  "status": "Main-authorized /tmp/201b-wip archive deleted AFTER prescribed verification; copied park-MANIFEST.txt remains with matching SHA256; reapplied worktree is source of truth",
+  "cleanup_evidence": "cleanup.json"
+}

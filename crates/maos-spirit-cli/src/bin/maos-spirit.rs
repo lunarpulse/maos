@@ -22,6 +22,10 @@ struct Cli {
 enum Command {
     /// Publish a signed Spirit package to a registry.
     Publish(PublishArgsCli),
+    /// Issue or revoke exact-artifact vetting attestations.
+    Vet(maos_spirit_cli::vet::VetArgs),
+    /// Withdraw a release as its publisher or an enrolled vetter.
+    Yank(maos_spirit_cli::yank::YankArgs),
     /// Validate a Spirit package locally without publishing (v0.7+).
     Validate(StubArgs),
     /// Inspect a published Spirit's metadata (v0.7+).
@@ -98,6 +102,8 @@ async fn main() {
                     .unwrap_or(1)
             }
         },
+        Command::Vet(args) => report_result(maos_spirit_cli::vet::run(args)),
+        Command::Yank(args) => report_result(maos_spirit_cli::yank::run(args)),
         Command::Validate(_) => {
             eprintln!("maos-spirit validate: not yet implemented (v0.7+)");
             1
@@ -108,4 +114,14 @@ async fn main() {
         }
     };
     std::process::exit(exit);
+}
+
+fn report_result(result: anyhow::Result<()>) -> i32 {
+    match result {
+        Ok(()) => 0,
+        Err(error) => {
+            eprintln!("maos-spirit: {error:#}");
+            1
+        }
+    }
 }

@@ -116,6 +116,13 @@ impl InProcessServer {
         Self::start_signed(scratch, None)
     }
     pub fn start_signed(scratch: &Scratch, key: Option<[u8; 32]>) -> Self {
+        Self::start_config(scratch, key, None)
+    }
+    pub fn start_config(
+        scratch: &Scratch,
+        key: Option<[u8; 32]>,
+        vetters: Option<(maos_compliance::VetterKeyring, [u8; 32])>,
+    ) -> Self {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap().to_string();
         let storage =
@@ -128,6 +135,11 @@ impl InProcessServer {
         );
         let server = if let Some(key) = key {
             server.with_server_signing_key(key)
+        } else {
+            server
+        };
+        let server = if let Some((keyring, root)) = vetters {
+            server.with_vetter_keyring(keyring, root)
         } else {
             server
         };

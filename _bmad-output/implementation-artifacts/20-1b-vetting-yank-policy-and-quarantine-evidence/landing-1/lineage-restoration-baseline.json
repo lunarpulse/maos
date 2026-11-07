@@ -1,0 +1,8 @@
+{
+  "path": "_bmad-output/implementation-artifacts/intent-lineage-coverage-report.md",
+  "baseline_commit": "bdfc143041613473e7a5f564de8fe30af7c2b0f7",
+  "sha256": "32c207588abddb398ec3f343047914aa9eab102599c0ddf953eafb89d476f5f9",
+  "initial_owned_diff_included_report": false,
+  "initial_untracked_list_included_report": false,
+  "restore_authority": "story task T10: restore generated report if verification modifies it; Main acknowledged frozen tracked tree"
+}

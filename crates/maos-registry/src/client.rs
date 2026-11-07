@@ -84,7 +84,7 @@ impl McpSpiritRegistryClient {
         self
     }
 
-    /// Fetch yanks since a given monotonic timestamp.
+    /// Fetch yanks after a durable server sequence (`since_ns` is the wire field name).
     /// Not part of the `SpiritRegistryClient` trait — used internally by YankPoller.
     pub fn yanks_since(&self, since_ns: u64) -> Result<YankList, RegistryError> {
         let args = serde_json::json!({"since_ns": since_ns});
@@ -234,13 +234,22 @@ impl SpiritRegistryClient for McpSpiritRegistryClient {
 
     fn deprecate(
         &self,
-        _spirit_id: &SpiritId,
-        _version: &str,
-        _reason: &YankReason,
+        spirit_id: &SpiritId,
+        version: &str,
+        reason: &YankReason,
     ) -> Result<YankReceipt, RegistryError> {
-        Err(RegistryError::Transport(
-            "deprecate not implemented on MCP client".into(),
-        ))
+        let args = serde_json::json!({
+            "spirit_id": spirit_id.as_str(), "version": version,
+            "reason": reason.summary, "authorization": reason.authorization,
+        });
+        let resp = self
+            .mcp_client
+            .call(&self.registry_server_name, "registry.deprecate", args)
+            .map_err(map_mcp_err)?;
+        if resp.is_error {
+            return Err(decode_typed_error(&resp.content));
+        }
+        serde_json::from_value(resp.content).map_err(|e| RegistryError::Transport(e.to_string()))
     }
 }
 

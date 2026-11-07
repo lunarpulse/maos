@@ -1,0 +1,11 @@
+--- /tmp/201b-plants/ac8.rs	2026-11-06 21:53:39.786290112 +0000
++++ crates/maos-registry/src/yank.rs	2026-11-06 22:41:10.720980130 +0000
+@@ -77,7 +77,7 @@
+     pub fn outcome(self) -> YankPolicyOutcome {
+         match self {
+             Self::Warn => YankPolicyOutcome::Warned,
+-            Self::Quarantine => YankPolicyOutcome::QuarantineRequested,
++            Self::Quarantine => YankPolicyOutcome::Warned,
+             Self::AutoRevoke => YankPolicyOutcome::AutoRevokeRequested,
+         }
+     }

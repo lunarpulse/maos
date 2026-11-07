@@ -1,0 +1,106 @@
+{
+  "focused": {
+    "registry": {
+      "exit_code": 0,
+      "passed": 111,
+      "failed": 0,
+      "ignored": 2,
+      "binaries": 15
+    },
+    "policy": {
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "binaries": 1
+    },
+    "install": {
+      "exit_code": 0,
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "binaries": 1
+    },
+    "vet_lifecycle": {
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "binaries": 1
+    },
+    "compliance": {
+      "exit_code": 0,
+      "passed": 62,
+      "failed": 0,
+      "ignored": 0,
+      "binaries": 4
+    },
+    "domain": {
+      "exit_code": 0,
+      "passed": 309,
+      "failed": 0,
+      "ignored": 0,
+      "binaries": 7
+    },
+    "networkless": {
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "binaries": 1
+    }
+  },
+  "kernel_lib": {
+    "passed": 253,
+    "exit_code": 0
+  },
+  "clippy": {
+    "command_exit": 0,
+    "ratchet_exit": 0,
+    "occurrences": 1319,
+    "source_distinct": 865,
+    "unchanged_baseline": [
+      1383,
+      897
+    ]
+  },
+  "plants": {
+    "runtime_red": 8,
+    "all_restore_exit_zero": true
+  },
+  "standalone_workspace": {
+    "uuid": "faf653c8-419b-459c-94bf-845333158f1c",
+    "exit_code": 100,
+    "run": 5720,
+    "passed": 5716,
+    "failed": 4,
+    "console_skipped": 138,
+    "budget_exit": 0,
+    "budget_sum_seconds": 799.917
+  },
+  "prescribed_prepush": {
+    "exit_code": 1,
+    "seconds": 908.019,
+    "uuid": "e3b670a9-2f63-4ff1-ad10-9307d33a2860",
+    "passed": 5719,
+    "failed": 1,
+    "records": {
+      "pass": 83,
+      "skip": 7,
+      "red": 1,
+      "advisory": 1
+    },
+    "budget_findings": 6
+  },
+  "landing_witness_cases_per_actual_run": 30,
+  "landing_witness_failures_per_actual_run": 0,
+  "kernel_source_delta": 0,
+  "independent_review": "pending; authorized pre-review FKCS repin must be explicit review focus",
+  "blocked": "F5 D-20-1b-01/02/03 PROPOSED; no root/TLS/interception implementation/proof",
+  "cleanup": {
+    "sessions": 182,
+    "incremental_allocated_bytes_removed": 2616016896,
+    "scratch_allocated_bytes_removed": 30552064,
+    "target_filesystem_available_delta_bytes": 1962065920
+  }
+}

@@ -1,0 +1,21 @@
+
+running 1 test
+test installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16 ... FAILED
+
+failures:
+
+---- installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16 stdout ----
+maos-registry: listening on 127.0.0.1:35519
+
+thread 'installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16' (3646644) panicked at crates/maos-registry/tests/yank_auth_20_1b.rs:255:5:
+assertion `left == right` failed
+  left: [123, 34, 105, 109, 109, 117, 116, 97, 98, 108, 101, 34, 58, 34, 105, 109, 109, 117, 116, 97, 98, 108, 101, 47, 49, 46, 48, 46, 49, 45, 51, 54, 52, 54, 54, 52, 51, 45, 56, 34, 125]
+ right: [123, 34, 105, 109, 109, 117, 116, 97, 98, 108, 101, 34, 58, 34, 105, 109, 109, 117, 116, 97, 98, 108, 101, 47, 49, 46, 48, 46, 48, 45, 51, 54, 52, 54, 54, 52, 51, 45, 50, 34, 125]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.60s
+

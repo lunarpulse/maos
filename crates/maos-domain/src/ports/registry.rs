@@ -300,11 +300,17 @@ impl PublishReceipt {
 pub struct YankReason {
     #[doc = "Construct via [`YankReason::new`]."]
     pub summary: String,
+    /// Signed yank request CBOR, verified by the registry before mutation.
+    #[serde(default)]
+    pub authorization: Option<Vec<u8>>,
 }
 
 impl YankReason {
     pub fn new(summary: String) -> Self {
-        Self { summary }
+        Self {
+            summary,
+            authorization: None,
+        }
     }
 }
 
@@ -329,6 +335,14 @@ impl YankReceipt {
     }
 }
 
+/// Authenticated actor responsible for a registry withdrawal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum YankOrigin {
+    Publisher,
+    Vetter,
+}
+
 /// A single yank entry in the registry's yank list.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct YankEntry {
@@ -336,10 +350,19 @@ pub struct YankEntry {
     pub spirit_id: SpiritId,
     #[doc = "Construct via [`YankEntry::new`]."]
     pub version: String,
-    #[doc = "Construct via [`YankEntry::new`] — monotonic nanosecond timestamp."]
+    #[doc = "Construct via [`YankEntry::new`] — UNIX wall-clock nanoseconds, display-only."]
     pub yanked_at_ns: u64,
     #[doc = "Construct via [`YankEntry::new`]."]
     pub reason: String,
+    /// Durable server-assigned sequence; timestamps are display-only.
+    #[serde(default)]
+    pub sequence: u64,
+    /// Authenticated publisher/vetter origin, never an operator CRL.
+    #[serde(default)]
+    pub origin: Option<YankOrigin>,
+    /// Original signed request, reverified before daemon effects.
+    #[serde(default)]
+    pub authorization: Vec<u8>,
 }
 
 impl YankEntry {
@@ -349,6 +372,9 @@ impl YankEntry {
             version,
             yanked_at_ns,
             reason,
+            sequence: 0,
+            origin: None,
+            authorization: Vec::new(),
         }
     }
 }
