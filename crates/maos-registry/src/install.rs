@@ -86,8 +86,8 @@ pub fn install(
     let op_cfg = AdmissionConfig {
         tier_floor: config.tier_floor,
         registry_origin_tier: manifest.server_reported_tier.unwrap_or(TrustTier::Local),
-        t3_for_public_untrusted: false,
-        allow_unsigned_local: true,
+        t3_for_public_untrusted: config.t3_for_public_untrusted,
+        allow_unsigned_local: config.allow_unsigned_local,
         org_signing_pubkey: config.org_signing_pubkey,
         runtime_provider_endpoint: None,
         runtime_crypto_provider: None,
@@ -310,13 +310,16 @@ pub fn verify_installed(name: &str, manifest_path: &Path) -> Result<String, Erro
 
 /// Same [registry] keys and env precedence as the daemon, with fail-closed parsing.
 pub fn operator_config() -> Result<RegistryClientConfig, Error> {
-    let path = std::path::PathBuf::from(std::env::var("HOME")?).join(".config/maos/operator.toml");
-    let disk: toml::Value = match std::fs::read_to_string(path) {
-        Ok(text) => toml::from_str(&text)?,
+    let path = std::env::var_os("HOME")
+        .filter(|home| !home.is_empty())
+        .map(|home| std::path::PathBuf::from(home).join(".config/maos/operator.toml"));
+    let disk: toml::Value = match path.map(std::fs::read_to_string).transpose() {
+        Ok(Some(text)) => toml::from_str(&text)?,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             toml::Value::Table(Default::default())
         }
         Err(e) => return Err(e.into()),
+        Ok(None) => toml::Value::Table(Default::default()),
     };
     let value = |env: &str, key: &str| -> Result<Option<String>, Error> {
         if let Some(value) = std::env::var_os(env) {
@@ -344,7 +347,8 @@ pub fn operator_config() -> Result<RegistryClientConfig, Error> {
     };
     let org_signing_pubkey = value("MAOS_REGISTRY_ORG_SIGNING_PUBKEY", "org_signing_pubkey")?
         .map(|v| -> Result<[u8; 32], Error> {
-            Ok(hex::decode(v)?
+            Ok(hex::decode(v)
+                .map_err(|_| "org signing key must be 32-byte hex")?
                 .try_into()
                 .map_err(|_| "org signing key must be 32 bytes")?)
         })
@@ -360,7 +364,26 @@ pub fn operator_config() -> Result<RegistryClientConfig, Error> {
         "false" | "0" => false,
         _ => return Err("invalid require_server_tier_signature boolean".into()),
     };
+    let boolean = |env: &str, key: &str, default: bool| -> Result<bool, Error> {
+        match value(env, key)?.as_deref() {
+            None => Ok(default),
+            Some("true" | "1") => Ok(true),
+            Some("false" | "0") => Ok(false),
+            Some(_) => Err(format!("invalid registry {key} boolean").into()),
+        }
+    };
     Ok(RegistryClientConfig {
+        uri: value("MAOS_REGISTRY_URI", "uri")?.unwrap_or_default(),
+        t3_for_public_untrusted: boolean(
+            "MAOS_REGISTRY_T3_FOR_PUBLIC_UNTRUSTED",
+            "t3_for_public_untrusted",
+            false,
+        )?,
+        allow_unsigned_local: boolean(
+            "MAOS_REGISTRY_ALLOW_UNSIGNED_LOCAL",
+            "allow_unsigned_local",
+            true,
+        )?,
         tier_floor,
         require_server_tier_signature: required || org_signing_pubkey.is_some(),
         org_signing_pubkey,

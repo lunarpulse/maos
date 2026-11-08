@@ -1,0 +1,19 @@
+
+running 7 tests
+test accepted_registry_sockets_are_blocking_before_clone_p2 ... ok
+test clone_failure_cannot_exit_the_registry_accept_loop_f3 ... ok
+test daemon_registry_policy_has_one_fail_closed_reader_d1_p10 ... ok
+test registry_accept_errors_have_backoff_f3 ... ok
+test registry_bodies_do_not_preallocate_declared_lengths_f2 ... ok
+test registry_poller_starts_after_shared_installed_boot_admission_f9 ... ok
+test registry_tls_features_are_explicit_not_transitive_defaults_d2 ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+
+running 2 tests
+test executable_typescript_registry_example_has_both_development_optins_p1 ... ok
+test registry_workflows_explicitly_select_server_mode_and_client_development_optin ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+

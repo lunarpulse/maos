@@ -1,0 +1,22 @@
+--- restored/crates/maos-registry/src/storage.rs
++++ planted/crates/maos-registry/src/storage.rs
+@@ -1017,16 +1017,16 @@
+     fn yanks_since(&self, since_ns: u64) -> Result<YankList, StorageError> {
+         let yanks = Self::load_yanks(&self.root).map_err(|e| StorageError::Io(e.to_string()))?;
+         let head = yanks.last().map_or(0, |entry| entry.sequence);
+-        let start = yanks.partition_point(|entry| entry.sequence <= since_ns);
++        let start = 0;
+         // Never truncate a successful signed complete-head response. Pagination
+         // needs authenticated range semantics; oversized deltas fail closed.
+-        if yanks.len() - start > 4096 {
++        if false && yanks.len() - start > 4096 {
+             return Err(StorageError::Io(
+                 "yank delta exceeds 4096 entries; operator-assisted resynchronization required".into()
+             ));
+         }
+         let mut list = YankList::new(yanks.into_iter().skip(start).collect());
+-        list.head = Some(head);
++        list.head = None;
+         Ok(list)
+     }
+ 

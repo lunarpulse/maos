@@ -1,0 +1,2096 @@
+[
+  {
+    "label": "baseline-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "p1-workflow-optin-before",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "xtask",
+      "--test",
+      "registry_workflow_security_20_1b",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 125.149
+  },
+  {
+    "label": "p1-workflow-optins-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/.github/workflows/discipline.yml",
+      "/tmp/201b-ac15-corrections/plants/p1-workflow-optins.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.027
+  },
+  {
+    "label": "d2-no-default-feature-tree-before",
+    "command": [
+      "cargo",
+      "tree",
+      "-p",
+      "maos-bin",
+      "--no-default-features",
+      "-e",
+      "features"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 7.198
+  },
+  {
+    "label": "p1-workflow-optin-plant",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "xtask",
+      "--test",
+      "registry_workflow_security_20_1b",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 1.077
+  },
+  {
+    "label": "p1-workflow-optins-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/p1-workflow-optins.saved",
+      "/home/lunarpulse/dev_ws/.github/workflows/discipline.yml"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.102
+  },
+  {
+    "label": "p1-workflow-optins-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/p1-workflow-optins.saved",
+      "/home/lunarpulse/dev_ws/.github/workflows/discipline.yml"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "p1-workflow-optins-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/.github/workflows/discipline.yml"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "p1-workflow-optin-final",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "xtask",
+      "--test",
+      "registry_workflow_security_20_1b"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.27
+  },
+  {
+    "label": "p2-f3-d1-f9-structural-before",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "xtask",
+      "--test",
+      "registry_socket_security_20_1b",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 4.202
+  },
+  {
+    "label": "p3-p7-p8-p9-p11-d4-security-before",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--lib",
+      "security::review_tests",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 16.093
+  },
+  {
+    "label": "d1-p10-daemon-config-before",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-bin",
+      "--test",
+      "registry_config_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 74.145
+  },
+  {
+    "label": "d2-no-default-feature-tree-after",
+    "command": [
+      "cargo",
+      "tree",
+      "-p",
+      "maos-bin",
+      "--no-default-features",
+      "-e",
+      "features"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.559
+  },
+  {
+    "label": "d2-no-default-normal-feature-tree-after",
+    "command": [
+      "cargo",
+      "tree",
+      "-p",
+      "maos-bin",
+      "--no-default-features",
+      "-e",
+      "normal,features"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.159
+  },
+  {
+    "label": "p4-teardown-order-before",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-bin",
+      "--test",
+      "root_shutdown_unload_16_3",
+      "--",
+      "--exact",
+      "every_audit_sender_release_joins_the_yank_owner",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 21.031
+  },
+  {
+    "label": "p6-synthetic-audit-before",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_audit_structure_20_1b",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 2.335
+  },
+  {
+    "label": "p3-p5-signed-view-before",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--test",
+      "registry_tls_20_1b",
+      "--",
+      "signed_",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 7.431
+  },
+  {
+    "label": "d3-f5-poller-rollback-before",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--lib",
+      "authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 2.936
+  },
+  {
+    "label": "p7-f4-http-before",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--lib",
+      "http::tests",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 3.979
+  },
+  {
+    "label": "f1-f2-live-limits-before",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--test",
+      "registry_limits_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 72.467
+  },
+  {
+    "label": "p7-f4-http-fixed",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--lib",
+      "http::tests",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 13.335
+  },
+  {
+    "label": "f1-f2-live-limits-fixed",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--test",
+      "registry_limits_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 8.047
+  },
+  {
+    "label": "f6-storage-before",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_query_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 2.481
+  },
+  {
+    "label": "f6-handler-before",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_query_20_1b",
+      "large_history_small_delta",
+      "--",
+      "--exact",
+      "large_history_small_delta_uses_storage_lower_bound_f6",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 9.093
+  },
+  {
+    "label": "p6-synthetic-audit-fixed",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_audit_structure_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 96.511
+  },
+  {
+    "label": "p4-p6-root-inventory-fixed",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-bin",
+      "--test",
+      "root_shutdown_unload_16_3",
+      "every_audit_sender_release_joins_the_yank_owner",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 4.929
+  },
+  {
+    "label": "f1-incomplete-tls-handshake-before",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--test",
+      "registry_tls_20_1b",
+      "incomplete_tls_handshake",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 188.673
+  },
+  {
+    "label": "f1-incomplete-tls-handshake-before-runtime",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--test",
+      "registry_tls_20_1b",
+      "incomplete_tls_handshake",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 47.63
+  },
+  {
+    "label": "p3-p5-f1-signed-transport-fixed",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--test",
+      "registry_tls_20_1b",
+      "--",
+      "--nocapture",
+      "tls::signed_",
+      "tls::bad_signature_byte",
+      "tls::tls_admission",
+      "tls::incomplete_tls"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 53.378
+  },
+  {
+    "label": "p2-f3-d1-f9-source-fixed",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "xtask",
+      "--test",
+      "registry_socket_security_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": null,
+    "status": "timeout",
+    "timeout_seconds": 300,
+    "note": "subprocess.TimeoutExpired observed; prior helper did not preserve partial stdout/stderr or a process exit code. /proc scan afterwards found no cargo, rustc or selected test process. Not recorded as a test assertion failure or a pass."
+  },
+  {
+    "label": "review-predicates-main-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-main.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.242
+  },
+  {
+    "label": "review-predicates-security-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-security.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.003
+  },
+  {
+    "label": "review-predicates-http-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-http.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-server-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-server.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.003
+  },
+  {
+    "label": "review-predicates-client-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/client.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-client.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.003
+  },
+  {
+    "label": "review-predicates-yank-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/yank.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-yank.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.014
+  },
+  {
+    "label": "review-predicates-storage-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/storage.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-storage.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.02
+  },
+  {
+    "label": "review-predicates-handler-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/handlers/yanks_since.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-handler.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.003
+  },
+  {
+    "label": "review-predicates-feature-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/crates/maos-fkcs/Cargo.toml",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-feature.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-main-diff",
+    "command": [
+      "diff",
+      "-u",
+      "--label",
+      "restored/crates/maos-bin/src/main.rs",
+      "--label",
+      "planted/crates/maos-bin/src/main.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-main.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.015
+  },
+  {
+    "label": "review-predicates-security-diff",
+    "command": [
+      "diff",
+      "-u",
+      "--label",
+      "restored/crates/maos-registry/src/security.rs",
+      "--label",
+      "planted/crates/maos-registry/src/security.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-security.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.006
+  },
+  {
+    "label": "review-predicates-http-diff",
+    "command": [
+      "diff",
+      "-u",
+      "--label",
+      "restored/crates/maos-registry/src/http.rs",
+      "--label",
+      "planted/crates/maos-registry/src/http.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-http.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-server-diff",
+    "command": [
+      "diff",
+      "-u",
+      "--label",
+      "restored/crates/maos-registry/src/server.rs",
+      "--label",
+      "planted/crates/maos-registry/src/server.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-server.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.004
+  },
+  {
+    "label": "review-predicates-client-diff",
+    "command": [
+      "diff",
+      "-u",
+      "--label",
+      "restored/crates/maos-registry/src/client.rs",
+      "--label",
+      "planted/crates/maos-registry/src/client.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-client.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/client.rs"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.004
+  },
+  {
+    "label": "review-predicates-yank-diff",
+    "command": [
+      "diff",
+      "-u",
+      "--label",
+      "restored/crates/maos-registry/src/yank.rs",
+      "--label",
+      "planted/crates/maos-registry/src/yank.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-yank.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.004
+  },
+  {
+    "label": "review-predicates-storage-diff",
+    "command": [
+      "diff",
+      "-u",
+      "--label",
+      "restored/crates/maos-registry/src/storage.rs",
+      "--label",
+      "planted/crates/maos-registry/src/storage.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-storage.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.004
+  },
+  {
+    "label": "review-predicates-handler-diff",
+    "command": [
+      "diff",
+      "-u",
+      "--label",
+      "restored/crates/maos-registry/src/handlers/yanks_since.rs",
+      "--label",
+      "planted/crates/maos-registry/src/handlers/yanks_since.rs",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-handler.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/handlers/yanks_since.rs"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.004
+  },
+  {
+    "label": "review-predicates-feature-diff",
+    "command": [
+      "diff",
+      "-u",
+      "--label",
+      "restored/crates/maos-fkcs/Cargo.toml",
+      "--label",
+      "planted/crates/maos-fkcs/Cargo.toml",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-feature.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-fkcs/Cargo.toml"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.004
+  },
+  {
+    "label": "review-predicates-registry-lib-plant",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--lib",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 119.8
+  },
+  {
+    "label": "review-predicates-transport-plant",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--test",
+      "registry_tls_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture",
+      "tls::signed_",
+      "tls::bad_signature_byte",
+      "tls::private_",
+      "tls::malformed_private",
+      "tls::tls_admission",
+      "tls::incomplete_tls"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 152.115
+  },
+  {
+    "label": "review-predicates-bounded-server-plant",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--test",
+      "registry_limits_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 38.764
+  },
+  {
+    "label": "review-predicates-yank-query-plant",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-registry",
+      "--test",
+      "yank_query_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 51.2
+  },
+  {
+    "label": "review-predicates-source-contracts-plant",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "xtask",
+      "--test",
+      "registry_socket_security_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 284.159
+  },
+  {
+    "label": "review-predicates-daemon-order-plant",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-bin",
+      "--test",
+      "root_shutdown_unload_16_3",
+      "--test",
+      "registry_config_20_1b",
+      "--",
+      "every_audit_sender_release_joins_the_yank_owner",
+      "daemon_",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 274.552
+  },
+  {
+    "label": "review-predicates-root-order-plant",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-bin",
+      "--test",
+      "root_shutdown_unload_16_3",
+      "every_audit_sender_release_joins_the_yank_owner",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 2.089
+  },
+  {
+    "label": "review-predicates-macro-reader-plant",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "xtask",
+      "--test",
+      "registry_socket_security_20_1b",
+      "daemon_registry_policy_has_one_fail_closed_reader_d1_p10",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 114.916
+  },
+  {
+    "label": "review-predicates-main-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-main.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.089
+  },
+  {
+    "label": "review-predicates-main-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-main.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-main-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-security-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-security.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-security-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-security.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "review-predicates-security-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-http-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-http.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.003
+  },
+  {
+    "label": "review-predicates-http-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-http.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "review-predicates-http-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-server-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-server.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-server-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-server.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "review-predicates-server-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-client-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-client.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/client.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-client-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-client.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/client.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "review-predicates-client-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/client.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-yank-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-yank.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-yank-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-yank.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "review-predicates-yank-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/yank.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-storage-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-storage.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-storage-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-storage.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "review-predicates-storage-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/storage.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-handler-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-handler.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/handlers/yanks_since.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-handler-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-handler.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/handlers/yanks_since.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "review-predicates-handler-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/handlers/yanks_since.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-feature-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-feature.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-fkcs/Cargo.toml"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-predicates-feature-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/review-predicates-feature.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-fkcs/Cargo.toml"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "review-predicates-feature-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/crates/maos-fkcs/Cargo.toml"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-ast-guard-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/tests/support/yank_audit.rs",
+      "/tmp/201b-ac15-corrections/plants/review-ast-guard.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.007
+  },
+  {
+    "label": "review-ast-guard-diff",
+    "command": [
+      "diff",
+      "-u",
+      "/tmp/201b-ac15-corrections/plants/review-ast-guard.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/tests/support/yank_audit.rs"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.004
+  },
+  {
+    "label": "review-ast-guard-plant",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-bin",
+      "--test",
+      "yank_audit_structure_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 277.408
+  },
+  {
+    "label": "review-ast-guard-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/review-ast-guard.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/tests/support/yank_audit.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.005
+  },
+  {
+    "label": "review-ast-guard-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/review-ast-guard.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/tests/support/yank_audit.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-ast-guard-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/tests/support/yank_audit.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-zero-test-selector-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/tests/root_shutdown_unload_16_3.rs",
+      "/tmp/201b-ac15-corrections/plants/review-zero-test-selector.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-zero-test-selector-diff",
+    "command": [
+      "diff",
+      "-u",
+      "/tmp/201b-ac15-corrections/plants/review-zero-test-selector.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/tests/root_shutdown_unload_16_3.rs"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.004
+  },
+  {
+    "label": "review-zero-test-selector-plant",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "maos-bin",
+      "--test",
+      "root_shutdown_unload_16_3",
+      "cohort::declared_capable_cohort_worker_prerequisite_never_green_skips",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 19.474
+  },
+  {
+    "label": "review-zero-test-selector-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/review-zero-test-selector.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/tests/root_shutdown_unload_16_3.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.037
+  },
+  {
+    "label": "review-zero-test-selector-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/review-zero-test-selector.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/tests/root_shutdown_unload_16_3.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "review-zero-test-selector-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/crates/maos-bin/tests/root_shutdown_unload_16_3.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "correction-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.19
+  },
+  {
+    "label": "correction-clippy-initial",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "-p",
+      "maos-cli",
+      "-p",
+      "maos-bin",
+      "-p",
+      "maos-fkcs",
+      "-p",
+      "maos-shell",
+      "-p",
+      "xtask",
+      "--all-targets",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 734.987
+  },
+  {
+    "label": "f1-development-population-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "registry_server_bin_20_1",
+      "standalone_population_rejection_has_complete_http_framing",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 15.818
+  },
+  {
+    "label": "review-development-overflow-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs",
+      "/tmp/201b-ac15-corrections/plants/review-development-overflow.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.011
+  },
+  {
+    "label": "review-development-overflow-diff",
+    "command": [
+      "diff",
+      "-u",
+      "/tmp/201b-ac15-corrections/plants/review-development-overflow.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-development-overflow-plant",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "registry_server_bin_20_1",
+      "standalone_population_rejection_has_complete_http_framing",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 25.776
+  },
+  {
+    "label": "review-development-overflow-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/review-development-overflow.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-development-overflow-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/review-development-overflow.saved",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "review-development-overflow-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "correction-final-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.01
+  },
+  {
+    "label": "review-development-overflow-fixed",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "--test",
+      "registry_server_bin_20_1",
+      "standalone_population_rejection_has_complete_http_framing",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 6.829
+  },
+  {
+    "label": "correction-build-xtask",
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "xtask"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 142.662
+  },
+  {
+    "label": "correction-kloc-measured",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "kloc-check",
+      "--json"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.055
+  },
+  {
+    "label": "p1-executable-example-before",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "xtask",
+      "--test",
+      "registry_workflow_security_20_1b",
+      "executable_typescript_registry_example_has_both_development_optins_p1",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 29.049
+  },
+  {
+    "label": "review-example-client-optin-save",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/examples/example-spirit-ts/README.md",
+      "/tmp/201b-ac15-corrections/plants/review-example-client-optin.saved"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.005
+  },
+  {
+    "label": "review-example-client-optin-diff",
+    "command": [
+      "diff",
+      "-u",
+      "/tmp/201b-ac15-corrections/plants/review-example-client-optin.saved",
+      "/home/lunarpulse/dev_ws/examples/example-spirit-ts/README.md"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.003
+  },
+  {
+    "label": "review-example-client-optin-plant",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "xtask",
+      "--test",
+      "registry_workflow_security_20_1b",
+      "executable_typescript_registry_example_has_both_development_optins_p1",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 8.321
+  },
+  {
+    "label": "review-example-client-optin-copyback",
+    "command": [
+      "cp",
+      "/tmp/201b-ac15-corrections/plants/review-example-client-optin.saved",
+      "/home/lunarpulse/dev_ws/examples/example-spirit-ts/README.md"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "review-example-client-optin-cmp",
+    "command": [
+      "cmp",
+      "/tmp/201b-ac15-corrections/plants/review-example-client-optin.saved",
+      "/home/lunarpulse/dev_ws/examples/example-spirit-ts/README.md"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.001
+  },
+  {
+    "label": "review-example-client-optin-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/examples/example-spirit-ts/README.md"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.002
+  },
+  {
+    "label": "correction-post-example-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.053
+  },
+  {
+    "label": "correction-source-workflow-guards-final",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "xtask",
+      "--test",
+      "registry_workflow_security_20_1b",
+      "--test",
+      "registry_socket_security_20_1b",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 4.33
+  },
+  {
+    "label": "correction-no-default-build",
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--no-default-features"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 105.295
+  },
+  {
+    "label": "correction-no-default-verbs",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--no-default-features",
+      "--test",
+      "verb_table_15_3",
+      "--",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 84.132
+  },
+  {
+    "label": "correction-no-default-normal-tree",
+    "command": [
+      "cargo",
+      "tree",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "--no-default-features",
+      "-e",
+      "features,normal"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.978
+  },
+  {
+    "label": "correction-cargo-deny",
+    "command": [
+      "cargo",
+      "deny",
+      "check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.992
+  },
+  {
+    "label": "correction-kloc-exact",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "kloc-check",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.125
+  },
+  {
+    "label": "correction-journey-source-touch",
+    "command": [
+      "touch",
+      "crates/maos-bin/src/main.rs",
+      "crates/maos-cli/src/main.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.009
+  },
+  {
+    "label": "correction-fixtures",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "build-test-fixtures",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 195.221
+  },
+  {
+    "label": "correction-cargo-metadata",
+    "command": [
+      "cargo",
+      "metadata",
+      "--locked",
+      "--format-version",
+      "1"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.441
+  },
+  {
+    "label": "correction-workspace-binaries-metadata",
+    "command": [
+      "cargo",
+      "nextest",
+      "list",
+      "--locked",
+      "--workspace",
+      "--list-type",
+      "binaries-only",
+      "--message-format",
+      "json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1665.579
+  },
+  {
+    "label": "correction-genuine-default-binaries",
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "maos-bin",
+      "-p",
+      "maos-cli",
+      "-p",
+      "maos-registry",
+      "-p",
+      "maos-spirit-cli",
+      "-p",
+      "xtask"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 41.763
+  },
+  {
+    "label": "correction-focused-list",
+    "command": [
+      "cargo",
+      "nextest",
+      "list",
+      "--cargo-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/correction-cargo-metadata.stdout",
+      "--binaries-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/correction-workspace-binaries-metadata.stdout",
+      "--message-format",
+      "json",
+      "-E",
+      "package(maos-registry) | package(maos-cli) | package(maos-spirit-cli) | package(maos-domain) | package(maos-fkcs) | package(maos-shell) | binary(yank_policy_20_1b) | binary(registry_config_20_1b) | binary(yank_audit_structure_20_1b) | binary(root_shutdown_unload_16_3) | binary(installed_spirit_dispatch_20_1) | binary(registry_socket_security_20_1b) | binary(registry_workflow_security_20_1b) | binary(fkcs_oracle) | test(=vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9) | test(=registry_bound_principal_is_counted_and_erased_on_uninstall_p3)"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.441
+  },
+  {
+    "label": "correction-focused-final",
+    "command": [
+      "cargo",
+      "nextest",
+      "run",
+      "--cargo-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/correction-cargo-metadata.stdout",
+      "--binaries-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/correction-workspace-binaries-metadata.stdout",
+      "--profile",
+      "ci",
+      "--test-threads",
+      "1",
+      "--no-fail-fast",
+      "--no-capture",
+      "-E",
+      "package(maos-registry) | package(maos-cli) | package(maos-spirit-cli) | package(maos-domain) | package(maos-fkcs) | package(maos-shell) | binary(yank_policy_20_1b) | binary(registry_config_20_1b) | binary(yank_audit_structure_20_1b) | binary(root_shutdown_unload_16_3) | binary(installed_spirit_dispatch_20_1) | binary(registry_socket_security_20_1b) | binary(registry_workflow_security_20_1b) | binary(fkcs_oracle) | test(=vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9) | test(=registry_bound_principal_is_counted_and_erased_on_uninstall_p3)"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 101.688
+  },
+  {
+    "label": "correction-focused-junit-copy",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/target/nextest/ci/junit.xml",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/focused-final-junit.xml"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.009
+  },
+  {
+    "label": "correction-workspace-once",
+    "command": [
+      "cargo",
+      "nextest",
+      "run",
+      "--cargo-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/correction-cargo-metadata.stdout",
+      "--binaries-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/correction-workspace-binaries-metadata.stdout",
+      "--profile",
+      "ci",
+      "--retries",
+      "0",
+      "--no-fail-fast",
+      "--status-level",
+      "all"
+    ],
+    "exit_code": 100,
+    "elapsed_seconds": 95.617
+  },
+  {
+    "label": "correction-workspace-junit-copy",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/target/nextest/ci/junit.xml",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/workspace-once-junit.xml"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.052
+  },
+  {
+    "label": "correction-workspace-test-budget",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-test-budget",
+      "--junit",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/workspace-once-junit.xml",
+      "--json"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.263
+  },
+  {
+    "label": "correction-verifier-venv",
+    "command": [
+      "/usr/bin/python3",
+      "-m",
+      "venv",
+      "--system-site-packages",
+      "/tmp/201b-ac15-corrections/verifier"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.414
+  },
+  {
+    "label": "correction-verifier-provision",
+    "command": [
+      "/tmp/201b-ac15-corrections/verifier/bin/python3",
+      "-m",
+      "pip",
+      "install",
+      "--no-cache-dir",
+      "--only-binary=:all:",
+      "--require-hashes",
+      "-r",
+      "tools/verify-erasure/requirements.txt"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.143
+  },
+  {
+    "label": "correction-clippy-final",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "maos-registry",
+      "-p",
+      "maos-cli",
+      "-p",
+      "maos-bin",
+      "-p",
+      "maos-fkcs",
+      "-p",
+      "maos-shell",
+      "-p",
+      "xtask",
+      "--all-targets",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 833.144
+  },
+  {
+    "label": "correction-final-gate-head-log",
+    "command": [
+      "git",
+      "log",
+      "--oneline",
+      "-8"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.022
+  },
+  {
+    "label": "correction-final-tracked-inventory",
+    "command": [
+      "git",
+      "diff",
+      "--name-only"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.032
+  },
+  {
+    "label": "correction-clippy-changed-lines",
+    "command": [
+      "git",
+      "diff",
+      "--no-ext-diff",
+      "--unified=0",
+      "--",
+      "crates/maos-registry",
+      "crates/maos-bin",
+      "crates/maos-domain",
+      "crates/maos-cli",
+      "crates/maos-fkcs",
+      "crates/maos-shell",
+      "xtask/tests"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.02
+  },
+  {
+    "label": "correction-hosted-final-selector-list",
+    "command": [
+      "cargo",
+      "nextest",
+      "list",
+      "--cargo-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/correction-cargo-metadata.stdout",
+      "--binaries-metadata",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/correction-workspace-binaries-metadata.stdout",
+      "--message-format",
+      "json",
+      "-E",
+      "binary(yank_auth_20_1b) | binary(yank_cadence_20_1b) |\n                binary(vetting_attestation_gate) | binary(yank_policy_20_1b) |\n                binary(spirit_install_20_1) | binary(vet_lifecycle_20_1b) |\n                binary(installed_spirit_dispatch_20_1) | binary(registry_tls_20_1b) |\n                binary(registry_limits_20_1b) | binary(yank_query_20_1b) |\n                binary(registry_config_20_1b) | binary(yank_audit_structure_20_1b) |\n                binary(root_shutdown_unload_16_3) | binary(registry_server_bin_20_1) |\n                test(/^security::review_tests::/) | test(/^http::tests::/) |\n                test(=yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5) |\n                test(=vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9) |\n                test(=registry_bound_principal_is_counted_and_erased_on_uninstall_p3)"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.83
+  },
+  {
+    "label": "correction-final-check-kernel-baseline",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-kernel-baseline",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.133
+  },
+  {
+    "label": "correction-final-check-fkcs",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-fkcs",
+      "--json"
+    ],
+    "exit_code": null,
+    "elapsed_seconds": 900.063,
+    "status": "timeout",
+    "timeout_seconds": 900
+  },
+  {
+    "label": "correction-final-check-exit-commands",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-exit-commands",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.33
+  },
+  {
+    "label": "correction-final-check-decision-register",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-decision-register",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.009
+  },
+  {
+    "label": "correction-final-check-serde-error-handling",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-serde-error-handling",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.296
+  },
+  {
+    "label": "correction-final-check-test-cost",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-test-cost",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.347
+  },
+  {
+    "label": "correction-final-check-env-contract",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-env-contract",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.468
+  },
+  {
+    "label": "correction-final-check-service-boundary",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-service-boundary",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.167
+  },
+  {
+    "label": "correction-final-check-composition-root-completeness",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-composition-root-completeness",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.042
+  },
+  {
+    "label": "correction-final-check-pub-field-constructors",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-pub-field-constructors",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.253
+  },
+  {
+    "label": "correction-final-check-dependency-closure",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-dependency-closure",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.622
+  },
+  {
+    "label": "correction-final-check-coverage-matrix-completeness",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-coverage-matrix-completeness",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.015
+  },
+  {
+    "label": "correction-final-check-epic-close-coherence",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-epic-close-coherence",
+      "--json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.024
+  },
+  {
+    "label": "correction-source-inventory-hashes-before-prepush",
+    "command": [
+      "sha256sum",
+      "--",
+      ".github/workflows/discipline.yml",
+      "Cargo.lock",
+      "_bmad-output/implementation-artifacts/20-1a-registry-publish-install-exit-path-evidence/ci/ci-20-1a-verify.yml",
+      "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/ci/ci-20-1b-verify.yml",
+      "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine.md",
+      "_bmad-output/implementation-artifacts/deferred-work.md",
+      "_bmad-output/implementation-artifacts/sprint-status.yaml",
+      "_bmad-output/planning-artifacts/epic-20-preflight-2026-10-30.md",
+      "crates/maos-bin/Cargo.toml",
+      "crates/maos-bin/src/main.rs",
+      "crates/maos-bin/tests/registry_config_20_1b.rs",
+      "crates/maos-bin/tests/root_shutdown_unload_16_3.rs",
+      "crates/maos-bin/tests/support/yank_audit.rs",
+      "crates/maos-bin/tests/yank_audit_structure_20_1b.rs",
+      "crates/maos-cli/Cargo.toml",
+      "crates/maos-domain/src/ports/registry.rs",
+      "crates/maos-fkcs/Cargo.toml",
+      "crates/maos-registry/SECURITY.md",
+      "crates/maos-registry/src/client.rs",
+      "crates/maos-registry/src/handlers/yanks_since.rs",
+      "crates/maos-registry/src/http.rs",
+      "crates/maos-registry/src/install.rs",
+      "crates/maos-registry/src/security.rs",
+      "crates/maos-registry/src/server.rs",
+      "crates/maos-registry/src/storage.rs",
+      "crates/maos-registry/src/yank.rs",
+      "crates/maos-registry/tests/registry_limits_20_1b.rs",
+      "crates/maos-registry/tests/registry_security_20_1a.rs",
+      "crates/maos-registry/tests/registry_tls_20_1b.rs",
+      "crates/maos-registry/tests/yank_query_20_1b.rs",
+      "crates/maos-shell/Cargo.toml",
+      "examples/example-spirit-ts/README.md",
+      "tests/harness/registry_20_1.rs",
+      "xtask/kloc.toml",
+      "xtask/tests/registry_socket_security_20_1b.rs",
+      "xtask/tests/registry_workflow_security_20_1b.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.01
+  },
+  {
+    "label": "correction-prepush-once",
+    "command": [
+      "env",
+      "-u",
+      "CI",
+      "-u",
+      "GITHUB_ACTIONS",
+      "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+      "MAOS_17_2_CGROUP_MODE=undelegated",
+      "/mnt/build/cargo-maos/debug/xtask",
+      "prepush",
+      "--json"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 3518.903
+  },
+  {
+    "label": "correction-prepush-junit-copy",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/target/nextest/default/junit.xml",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/prepush-once-junit.xml"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.011
+  },
+  {
+    "label": "correction-prepush-test-budget",
+    "command": [
+      "/mnt/build/cargo-maos/debug/xtask",
+      "check-test-budget",
+      "--junit",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/prepush-once-junit.xml",
+      "--json"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 0.059
+  },
+  {
+    "label": "correction-cleanup",
+    "command": [
+      "/usr/bin/python3",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections/cleanup-script.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 66.309
+  },
+  {
+    "label": "correction-source-inventory-hashes-final",
+    "command": [
+      "sha256sum",
+      "--",
+      ".github/workflows/discipline.yml",
+      "Cargo.lock",
+      "_bmad-output/implementation-artifacts/20-1a-registry-publish-install-exit-path-evidence/ci/ci-20-1a-verify.yml",
+      "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/ci/ci-20-1b-verify.yml",
+      "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine.md",
+      "_bmad-output/implementation-artifacts/deferred-work.md",
+      "_bmad-output/implementation-artifacts/sprint-status.yaml",
+      "_bmad-output/planning-artifacts/epic-20-preflight-2026-10-30.md",
+      "crates/maos-bin/Cargo.toml",
+      "crates/maos-bin/src/main.rs",
+      "crates/maos-bin/tests/registry_config_20_1b.rs",
+      "crates/maos-bin/tests/root_shutdown_unload_16_3.rs",
+      "crates/maos-bin/tests/support/yank_audit.rs",
+      "crates/maos-bin/tests/yank_audit_structure_20_1b.rs",
+      "crates/maos-cli/Cargo.toml",
+      "crates/maos-domain/src/ports/registry.rs",
+      "crates/maos-fkcs/Cargo.toml",
+      "crates/maos-registry/SECURITY.md",
+      "crates/maos-registry/src/client.rs",
+      "crates/maos-registry/src/handlers/yanks_since.rs",
+      "crates/maos-registry/src/http.rs",
+      "crates/maos-registry/src/install.rs",
+      "crates/maos-registry/src/security.rs",
+      "crates/maos-registry/src/server.rs",
+      "crates/maos-registry/src/storage.rs",
+      "crates/maos-registry/src/yank.rs",
+      "crates/maos-registry/tests/registry_limits_20_1b.rs",
+      "crates/maos-registry/tests/registry_security_20_1a.rs",
+      "crates/maos-registry/tests/registry_tls_20_1b.rs",
+      "crates/maos-registry/tests/yank_query_20_1b.rs",
+      "crates/maos-shell/Cargo.toml",
+      "examples/example-spirit-ts/README.md",
+      "tests/harness/registry_20_1.rs",
+      "xtask/kloc.toml",
+      "xtask/tests/registry_socket_security_20_1b.rs",
+      "xtask/tests/registry_workflow_security_20_1b.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.027
+  }
+]

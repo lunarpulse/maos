@@ -1,0 +1,14 @@
+{
+  "compiler_processes": [],
+  "incremental_references": [],
+  "permission_denied": [
+    "1/cwd",
+    "1/exe",
+    "1/fd",
+    "1/maps",
+    "7/cwd",
+    "7/exe",
+    "7/fd",
+    "7/maps"
+  ]
+}

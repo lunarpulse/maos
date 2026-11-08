@@ -1,0 +1,127 @@
+--- restored/crates/maos-bin/src/main.rs
++++ planted/crates/maos-bin/src/main.rs
+@@ -3246,8 +3246,46 @@
+         registry_cfg.tier_floor,
+         registry_cfg.t3_for_public_untrusted,
+         registry_cfg.allow_unsigned_local,
+-        registry_cfg.require_server_tier_signature
++        maos_kernel_core::security::operator_config::RegistrySection::resolve_from_env_and_disk().require_server_tier_signature
+     );
++    let mut yank_poller_task = {
++        let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
++            transparency_log.clone(),
++            scheduler.clone(),
++            revocation_applier.clone(),
++            yank_policy,
++            registry_cfg.uri.clone(),
++        ));
++        eprintln!(
++            "maos: yank cadence={}s policy={} registry-fetch={}",
++            interval.as_secs(),
++            match yank_policy {
++                maos_registry::yank::YankPolicy::Warn => "warn",
++                maos_registry::yank::YankPolicy::Quarantine => "quarantine",
++                maos_registry::yank::YankPolicy::AutoRevoke => "auto-revoke",
++            },
++            if yank_source.is_some() {
++                "enabled"
++            } else {
++                "disabled"
++            }
++        );
++        if yank_policy == maos_registry::yank::YankPolicy::Quarantine {
++            eprintln!("maos: quarantine requested only (effect lands with KQ1; not claimed in L1)");
++        }
++        if let Some(source) = yank_source {
++            maos_bin::yank_policy::PollTask::start(
++                Arc::new(maos_registry::yank::YankPoller::new(
++                    source,
++                    observer,
++                    registry_cfg.uri.clone(),
++                )),
++                interval,
++            )
++        } else {
++            maos_bin::yank_policy::PollTask::start_local(observer, interval)
++        }
++    };
+ 
+     // Story 5.4 — UpgradeOrchestrator constructed at composition root. The
+     // factory creates a new concrete Spirit for every successor manifest;
+@@ -4297,44 +4335,6 @@
+         )
+         .await,
+     );
+-    let mut yank_poller_task = {
+-        let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
+-            transparency_log.clone(),
+-            scheduler.clone(),
+-            revocation_applier.clone(),
+-            yank_policy,
+-            registry_cfg.uri.clone(),
+-        ));
+-        eprintln!(
+-            "maos: yank cadence={}s policy={} registry-fetch={}",
+-            interval.as_secs(),
+-            match yank_policy {
+-                maos_registry::yank::YankPolicy::Warn => "warn",
+-                maos_registry::yank::YankPolicy::Quarantine => "quarantine",
+-                maos_registry::yank::YankPolicy::AutoRevoke => "auto-revoke",
+-            },
+-            if yank_source.is_some() {
+-                "enabled"
+-            } else {
+-                "disabled"
+-            }
+-        );
+-        if yank_policy == maos_registry::yank::YankPolicy::Quarantine {
+-            eprintln!("maos: quarantine requested only (effect lands with KQ1; not claimed in L1)");
+-        }
+-        if let Some(source) = yank_source {
+-            maos_bin::yank_policy::PollTask::start(
+-                Arc::new(maos_registry::yank::YankPoller::new(
+-                    source,
+-                    observer,
+-                    registry_cfg.uri.clone(),
+-                )),
+-                interval,
+-            )
+-        } else {
+-            maos_bin::yank_policy::PollTask::start_local(observer, interval)
+-        }
+-    };
+     // Story 8.14a — kernel-rendered shell dispatch.
+     if shell_mode {
+         if let Some(mode) = inference_mode_value.as_deref() {
+@@ -6104,7 +6104,6 @@
+                 }
+                 // Story 17-4 (AC2.6) — the hook pump is joined before unload.
+                 hook_pump.shutdown().await;
+-                yank_poller_task.shutdown().await;
+                 if let Some(supervision) = root_supervision.take() {
+                     supervision.stop_and_join().await;
+                 }
+@@ -6115,6 +6114,7 @@
+                 )
+                 .await;
+                 unload_report.render(&mut std::io::stderr());
++                yank_poller_task.shutdown().await;
+                 drop(audit_tx);
+                 drop(inference);
+                 drop(capability);
+@@ -9283,7 +9283,6 @@
+             }
+             // Story 17-4 (AC2.6) — the hook pump is joined before the unload.
+             hook_pump.shutdown().await;
+-            yank_poller_task.shutdown().await;
+             cohort_supervision.stop_and_join().await;
+             let unload_report = maos_bin::supervision::unload_all_loaded(
+                 scheduler.as_ref(),
+@@ -9292,6 +9291,7 @@
+             )
+             .await;
+             unload_report.render(&mut std::io::stderr());
++            yank_poller_task.shutdown().await;
+             drop(audit_tx);
+             drop(inference);
+             drop(orchestrator);

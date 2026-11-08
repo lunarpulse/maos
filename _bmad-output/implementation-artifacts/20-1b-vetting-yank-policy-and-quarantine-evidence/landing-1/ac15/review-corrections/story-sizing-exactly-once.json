@@ -1,0 +1,7 @@
+{
+  "path": "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine.md",
+  "occurrences": 1,
+  "old_prefix": "kloc_grant: \"",
+  "new_prefix": "kloc_grant: \"AC15 INDEPENDENT-REVIEW CORRECTIONS at9e8c7737, 2026-11-08: Main D-20-1b-09..13; existing ceilings registry7081/cli6549/bin35671/spirit-cli984/aggregate198621 retained; additional domain correction ceiling10155 = exact10137+18 authorized for D3/F5, no kernel draw. Exact after cargo fmt --all / canonical kloc-check: registry6151/bin35586/domain10144/cli6429/spirit-cli942/compliance2077/audit8179/xtask44696; aggregate197451, strict hardfail197452; delta487 = registry483 + domain7 - bin3. All within ruled ceilings; no renewed capacity or source-shrink claim for legacy CLI reserve. Operator D5 confirms exact6429 and forfeits427 from6856; preflight/tracker carry disposition. D4 replaces public roots with configured CA; otherwise bundled Mozilla, not platform. D2 registry edges isolated; frozen kernel/A2A TLS remains in whole no-default graph under Main honest-record fallback. Kernel26841/21042 and external20-2 xtask44696 d84b83dd unchanged. Audit8179/ceiling8204 and separate20-11 ceiling8261/remaining82 unchanged. | HISTORICAL AC15 IMPLEMENTATION: ",
+  "measurement": "correction-kloc-measured.stdout"
+}

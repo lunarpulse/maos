@@ -43,14 +43,15 @@ jobs:
           export XDG_DATA_HOME="$HOME/.local/share"
           export XDG_CONFIG_HOME="$HOME/.config"
           export XDG_RUNTIME_DIR="$scratch/run"
-          mkdir -p "$HOME" "$XDG_RUNTIME_DIR"
+          mkdir -p "$HOME/.config/maos" "$XDG_RUNTIME_DIR"
+          printf '[registry]\ndevelopment_http = true\n' > "$HOME/.config/maos/operator.toml"
           cleanup() {
             if [ -n "${server_pid:-}" ]; then kill -TERM "$server_pid" 2>/dev/null || true; wait "$server_pid" || true; fi
             rm -rf "$scratch"
           }
           trap cleanup EXIT
           maosctl install --from-local ./dist --verify-only
-          maos-registry-server --bind 127.0.0.1:6789 --root "$scratch/registry" > registry.log 2>&1 &
+          maos-registry-server --dev-http --bind 127.0.0.1:6789 --root "$scratch/registry" > registry.log 2>&1 &
           server_pid=$!
           ready=0
           for i in $(seq 1 50); do
@@ -83,8 +84,9 @@ jobs:
           target="$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
           scratch="$(mktemp -d)"
           export HOME="$scratch/home" XDG_DATA_HOME="$scratch/home/.local/share" MAOS_HOME="$scratch/home/.maos"
-          mkdir -p "$HOME"
-          dist/maos-registry-server --bind 127.0.0.1:6789 --root "$scratch/registry" > component-registry.log 2>&1 &
+          mkdir -p "$HOME/.config/maos"
+          printf '[registry]\ndevelopment_http = true\n' > "$HOME/.config/maos/operator.toml"
+          dist/maos-registry-server --dev-http --bind 127.0.0.1:6789 --root "$scratch/registry" > component-registry.log 2>&1 &
           server_pid=$!
           trap 'kill -TERM "$server_pid" 2>/dev/null || true; wait "$server_pid" || true; rm -rf "$scratch"' EXIT
           ready=0

@@ -19,6 +19,9 @@ use maos_mcp::McpClient;
 /// Operator-configurable consumer-side verification policy.
 #[derive(Debug, Clone)]
 pub struct RegistryClientConfig {
+    pub uri: String,
+    pub t3_for_public_untrusted: bool,
+    pub allow_unsigned_local: bool,
     pub tier_floor: TrustTier,
     pub require_server_tier_signature: bool,
     pub org_signing_pubkey: Option<[u8; 32]>,
@@ -28,6 +31,9 @@ pub struct RegistryClientConfig {
 impl Default for RegistryClientConfig {
     fn default() -> Self {
         Self {
+            uri: String::new(),
+            t3_for_public_untrusted: false,
+            allow_unsigned_local: true,
             tier_floor: TrustTier::Local,
             require_server_tier_signature: false,
             org_signing_pubkey: None,
@@ -100,7 +106,15 @@ impl McpSpiritRegistryClient {
         if resp.is_error {
             return Err(decode_typed_error(&resp.content));
         }
-        serde_json::from_value(resp.content).map_err(|e| RegistryError::Transport(e.to_string()))
+        let list: YankList = serde_json::from_value(resp.content)
+            .map_err(|e| RegistryError::Transport(e.to_string()))?;
+        if let Some(head) = list.head.filter(|head| *head < since_ns) {
+            return Err(RegistryError::HeadBehindCursor {
+                head,
+                cursor: since_ns,
+            });
+        }
+        Ok(list)
     }
 }
 

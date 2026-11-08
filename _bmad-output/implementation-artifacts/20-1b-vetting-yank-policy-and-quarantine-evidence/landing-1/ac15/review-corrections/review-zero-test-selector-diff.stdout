@@ -1,0 +1,11 @@
+--- /tmp/201b-ac15-corrections/plants/review-zero-test-selector.saved	2026-11-08 12:42:12.633571774 +0000
++++ /home/lunarpulse/dev_ws/crates/maos-bin/tests/root_shutdown_unload_16_3.rs	2026-11-08 12:42:16.671449891 +0000
+@@ -2210,7 +2210,7 @@
+         let name = std::any::type_name_of_val(
+             &ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains,
+         );
+-        let name = name.split_once("::").expect("test function includes its crate").1;
++        let name = "cohort::__nonexistent_v5_negative_control";
+         let output = Command::new(std::env::current_exe().expect("current test executable"))
+             .args([
+                 "--exact",

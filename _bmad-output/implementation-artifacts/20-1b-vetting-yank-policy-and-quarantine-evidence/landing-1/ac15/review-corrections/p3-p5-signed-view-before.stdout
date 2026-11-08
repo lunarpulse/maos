@@ -1,0 +1,19 @@
+
+running 8 tests
+test tls::signed_head_behind_requested_cursor_is_typed_d3_p5 ... FAILED
+test tls::signed_payload_head_must_equal_envelope_head_p3 ... FAILED
+test tls::signed_valid_duplicate_body_is_refused_p3 ... ok
+test tls::signed_valid_empty_view_with_nonzero_head_is_refused_p3 ... ok
+test tls::signed_valid_extra_entries_are_refused_p3 ... ok
+test tls::signed_valid_gap_body_is_refused_p3 ... ok
+test tls::signed_wrong_envelope_version_is_refused_p3 ... ok
+test tls::signed_wrong_request_hash_is_refused_p3 ... ok
+
+failures:
+
+failures:
+    tls::signed_head_behind_requested_cursor_is_typed_d3_p5
+    tls::signed_payload_head_must_equal_envelope_head_p3
+
+test result: FAILED. 6 passed; 2 failed; 0 ignored; 0 measured; 27 filtered out; finished in 0.81s
+

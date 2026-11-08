@@ -1,0 +1,85 @@
+--- restored/crates/maos-registry/src/server.rs
++++ planted/crates/maos-registry/src/server.rs
+@@ -15,11 +15,11 @@
+ use maos_domain::ports::registry::SignedPackage;
+ 
+ const MAX_CONNECTIONS: usize = 8;
+-const MAX_PER_SOURCE: usize = 2;
++const MAX_PER_SOURCE: usize = 8;
+ const MAX_REJECTIONS: usize = 2;
+ const METADATA_BODY_LIMIT: usize = 64 * 1024;
+ const UPLOAD_BODY_LIMIT: usize = 64 * 1024 * 1024;
+-const FIRST_BYTE_DEADLINE: std::time::Duration = std::time::Duration::from_secs(1);
++const FIRST_BYTE_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
+ const MAX_HEADER_BYTES: usize = 16 * 1024;
+ const MAX_HEADERS: usize = 64;
+ const REQUEST_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
+@@ -197,10 +197,6 @@
+             match listener.accept() {
+                 Ok((stream, peer)) => {
+                     // Accepted sockets inherit O_NONBLOCK on some supported hosts.
+-                    if let Err(error) = stream.set_nonblocking(false) {
+-                        eprintln!("maos-registry: accepted socket mode: {error}");
+-                        continue;
+-                    }
+                     let source = peer.ip().to_canonical();
+                     let (mut active, mut same_source, mut rejections) = (0, 0, 0);
+                     for (_, ip, rejected, _) in &handles {
+@@ -214,14 +210,7 @@
+                     if rejected && rejections >= MAX_REJECTIONS {
+                         continue;
+                     }
+-                    let cancel = match stream.try_clone() {
+-                        Ok(cancel) => cancel,
+-                        Err(error) => {
+-                            eprintln!("maos-registry: accepted socket clone: {error}");
+-                            thread::sleep(std::time::Duration::from_millis(50));
+-                            continue;
+-                        }
+-                    };
++                    let cancel = stream.try_clone().map_err(|error| error.to_string())?;
+                     let s = Arc::clone(&storage);
+                     let vetters = vetters.clone();
+                     let security = security.clone();
+@@ -243,7 +232,6 @@
+                 }
+                 Err(e) => {
+                     eprintln!("maos-registry: accept error: {e}");
+-                    thread::sleep(std::time::Duration::from_millis(50));
+                 }
+             }
+         }
+@@ -325,7 +313,7 @@
+                 .read_to_string(&mut text)
+                 .map_err(|e| format!("{}: {e}", path.display()))?;
+             let seed = hex::decode(text.trim())
+-                .map_err(|_| "invalid signing key hex")?
++                .map_err(|error| format!("invalid signing key hex: {error}"))?
+                 .try_into()
+                 .map_err(|_| "signing key must be a 32-byte hex seed")?;
+             server = server.with_server_signing_key(seed);
+@@ -423,13 +411,13 @@
+     };
+     let content_length = headers.content_length;
+ 
+-    if content_length > headers.body_limit {
++    if false && content_length > headers.body_limit {
+         reject_http(reader.get_mut(), "413 Payload Too Large")?;
+         return Ok(());
+     }
+ 
+     // Grow from received bytes, never reserve an untrusted declared body length.
+-    let mut body = Vec::new();
++    let mut body = vec![0u8; content_length];
+     while body.len() < content_length {
+         match reader.fill_buf() {
+             Ok([]) => {
+@@ -473,7 +461,7 @@
+     let publish = request.method == "registry.publish"
+         || (request.method == "tools/call"
+             && request.params.get("name").and_then(serde_json::Value::as_str) == Some("registry.publish"));
+-    if !publish && body.len() > METADATA_BODY_LIMIT {
++    if false && !publish && body.len() > METADATA_BODY_LIMIT {
+         reject_http(reader.get_mut(), "413 Payload Too Large")?;
+         return Ok(());
+     }

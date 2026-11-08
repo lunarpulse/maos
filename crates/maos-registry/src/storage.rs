@@ -91,6 +91,8 @@ pub trait RegistryStorage: Send + Sync {
     ) -> Result<YankReceipt, StorageError>;
 
     /// List yanks after a durable server sequence (`since_ns` is the legacy wire name).
+    /// `head` must be `Some` and describe the same complete snapshot as entries;
+    /// refuse an oversized delta rather than returning a truncated success.
     fn yanks_since(&self, since_ns: u64) -> Result<YankList, StorageError>;
 
     /// Story 7.2 — store a signed package with origin metadata.
@@ -1014,12 +1016,19 @@ impl RegistryStorage for LocalFsRegistryStorage {
 
     fn yanks_since(&self, since_ns: u64) -> Result<YankList, StorageError> {
         let yanks = Self::load_yanks(&self.root).map_err(|e| StorageError::Io(e.to_string()))?;
-        let entries: Vec<YankEntry> = yanks
-            .iter()
-            .filter(|e| since_ns == 0 || e.sequence > since_ns)
-            .cloned()
-            .collect();
-        Ok(YankList::new(entries))
+        let head = yanks.last().map_or(0, |entry| entry.sequence);
+        let start = yanks.partition_point(|entry| entry.sequence <= since_ns);
+        // Never truncate a successful signed complete-head response. Pagination
+        // needs authenticated range semantics; oversized deltas fail closed.
+        if yanks.len() - start > 4096 {
+            return Err(StorageError::Io(
+                "yank delta exceeds 4096 entries; operator-assisted resynchronization required"
+                    .into(),
+            ));
+        }
+        let mut list = YankList::new(yanks.into_iter().skip(start).collect());
+        list.head = Some(head);
+        Ok(list)
     }
 
     fn put_benchmark(

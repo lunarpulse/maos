@@ -1,0 +1,14 @@
+
+running 3 tests
+test daemon_banner_uses_the_enforced_single_reader_d1_p10 ... FAILED
+test daemon_refuses_https_without_a_root_before_polling_d1_p10 ... ok
+test daemon_refuses_registry_typo_even_without_a_uri_d1_p10_p11 ... FAILED
+
+failures:
+
+failures:
+    daemon_banner_uses_the_enforced_single_reader_d1_p10
+    daemon_refuses_registry_typo_even_without_a_uri_d1_p10_p11
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.75s
+

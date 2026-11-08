@@ -1,0 +1,17 @@
+
+running 4 tests
+test idle_first_byte_is_bounded_more_tightly_than_a_request_f1 ... FAILED
+test metadata_body_limit_is_checked_before_body_allocation_f2 ... FAILED
+test one_source_cannot_occupy_every_registry_slot_f1 ... FAILED
+test publication_hint_cannot_widen_another_rpc_body_cap_f2 ... FAILED
+
+failures:
+
+failures:
+    idle_first_byte_is_bounded_more_tightly_than_a_request_f1
+    metadata_body_limit_is_checked_before_body_allocation_f2
+    one_source_cannot_occupy_every_registry_slot_f1
+    publication_hint_cannot_widen_another_rpc_body_cap_f2
+
+test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.28s
+

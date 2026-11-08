@@ -1,0 +1,153 @@
+{
+  "baseline": "9e8c7737b0aaae730024ae66966c20106563141e",
+  "scope": "36 source/config/record paths, excluding the review-corrections run-evidence tree; Main-owned cleanup reports are untouched and unattributed",
+  "files": [
+    {
+      "path": ".github/workflows/discipline.yml",
+      "sha256": "b7ec78e5bf7e2cb9fbc067e9bb30c1dfeff23ecedb4f8d0d38356d9cd3a2d46b"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "926670e76519001528d5ae9ace04ec4630f83a77028807d22524fc96bef6bfea"
+    },
+    {
+      "path": "_bmad-output/implementation-artifacts/20-1a-registry-publish-install-exit-path-evidence/ci/ci-20-1a-verify.yml",
+      "sha256": "8c262a7a86eab4afa68b49387fae3a79d3f1ea7bf44621fd36f79c58165ba59b"
+    },
+    {
+      "path": "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/ci/ci-20-1b-verify.yml",
+      "sha256": "0b56a84632f31f1bf8b95eea30acad89c9b65915da68cb4a78d029d2500f519c"
+    },
+    {
+      "path": "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine.md",
+      "sha256": "e6096d0718c84b11d85cdcb76595d0db506d763cbeeac1b34c1c07ac91e2956c"
+    },
+    {
+      "path": "_bmad-output/implementation-artifacts/deferred-work.md",
+      "sha256": "5c7fe8d15f3ee53f7717a10b6ae56b05bc1f3c34f64b78dbe92526158b048f27"
+    },
+    {
+      "path": "_bmad-output/implementation-artifacts/sprint-status.yaml",
+      "sha256": "c7593e7c9c2e9d30f5bd0baef00557717f5328a3eb24b1253c181ab78488f145"
+    },
+    {
+      "path": "_bmad-output/planning-artifacts/epic-20-preflight-2026-10-30.md",
+      "sha256": "49426aeefb4b3c6916faf6ad1359ca69bf0dd61acaddd66e7b96692ea9cd5d92"
+    },
+    {
+      "path": "crates/maos-bin/Cargo.toml",
+      "sha256": "1189260753db556cb78a3e8751d720f5fb6d8164fc3104b75391b7ff83cb900f"
+    },
+    {
+      "path": "crates/maos-bin/src/main.rs",
+      "sha256": "44dfc8306d693e0b2c0c2a257761a79af8663b41cb55a17b19063c49ce1ba838"
+    },
+    {
+      "path": "crates/maos-bin/tests/registry_config_20_1b.rs",
+      "sha256": "83d4787538b8a65d6c0be7c1fd29421af36efb7233d841dee2d608403d5a60fe"
+    },
+    {
+      "path": "crates/maos-bin/tests/root_shutdown_unload_16_3.rs",
+      "sha256": "b90a6d5c3897bd3f4059e92280eb6b7e6b63979db0bc1d225386d25f3db02bc2"
+    },
+    {
+      "path": "crates/maos-bin/tests/support/yank_audit.rs",
+      "sha256": "c183cb0b44fefab746a9c8313cdd4b7552d7227ac2963c9b4bce22d3afe0046b"
+    },
+    {
+      "path": "crates/maos-bin/tests/yank_audit_structure_20_1b.rs",
+      "sha256": "ac6d6a8cc987a8f475fb2a44a58fe64d1f27753b7822667194443107b3a8d3a6"
+    },
+    {
+      "path": "crates/maos-cli/Cargo.toml",
+      "sha256": "b5216f2f2566e4b92f8cd6d3a766bbceb3af5d2ba88433cdcc728f77a2d793a9"
+    },
+    {
+      "path": "crates/maos-domain/src/ports/registry.rs",
+      "sha256": "20cd6ff64ce9cc7799d4a2d50c1c086057c64349b22991087fad592547689d3a"
+    },
+    {
+      "path": "crates/maos-fkcs/Cargo.toml",
+      "sha256": "674edd3907542a3cd4c0d0260d78dac5bbd17d7edd2fc7a60062764a85e32322"
+    },
+    {
+      "path": "crates/maos-registry/SECURITY.md",
+      "sha256": "d42d188cbaf142c2c736808abde7311dd8ba6072e3632034610bfeaf02aece64"
+    },
+    {
+      "path": "crates/maos-registry/src/client.rs",
+      "sha256": "01fa1d62e14432c8247b921f138e5d8009e06e87aebee9ca1ab6101284fd4816"
+    },
+    {
+      "path": "crates/maos-registry/src/handlers/yanks_since.rs",
+      "sha256": "a7a1e81e383ece19c06a4fb4ee6ff9765d7f43f1a1d4b7af568d228cfb2eb448"
+    },
+    {
+      "path": "crates/maos-registry/src/http.rs",
+      "sha256": "ddadf74d0cff14302ed914919253b2eb5f1947c94af630a37ce0e8415db955d7"
+    },
+    {
+      "path": "crates/maos-registry/src/install.rs",
+      "sha256": "678befb1529fd358884b830d28e75a500531d72627acd12e221bf231d8c6c282"
+    },
+    {
+      "path": "crates/maos-registry/src/security.rs",
+      "sha256": "c56cfdad617da5d0d6e20af4117bd3eef2bb298b370c5ee25ac167e79d079fad"
+    },
+    {
+      "path": "crates/maos-registry/src/server.rs",
+      "sha256": "ed62bf22c7a1a25b2475feb61fc91c50d1c7fa74db1fe60889af618703f53083"
+    },
+    {
+      "path": "crates/maos-registry/src/storage.rs",
+      "sha256": "b6389580bdaade9e7105babc316d0458fcfb438317e496d657d69622150750be"
+    },
+    {
+      "path": "crates/maos-registry/src/yank.rs",
+      "sha256": "4e23fcaba7a451b0907b4eb585ff98328bd7944245f00e5153e696ace70eb159"
+    },
+    {
+      "path": "crates/maos-registry/tests/registry_limits_20_1b.rs",
+      "sha256": "b5646b59129836fe352bcc39197cff111c93a819738a5d237c0325f79db6ee9a"
+    },
+    {
+      "path": "crates/maos-registry/tests/registry_security_20_1a.rs",
+      "sha256": "be6c2e43640ea075fd00b747848de640f9a950445bc571ca6dd4dbe5930a99b2"
+    },
+    {
+      "path": "crates/maos-registry/tests/registry_tls_20_1b.rs",
+      "sha256": "ea27d66d6e22ec2784e88295bce8deb15eda1b6d7dd6c3079496e208295f4ec9"
+    },
+    {
+      "path": "crates/maos-registry/tests/yank_query_20_1b.rs",
+      "sha256": "80acd91350b2217fa62933ad2bc61e059c59f617604c92dcc01f695a16aa8857"
+    },
+    {
+      "path": "crates/maos-shell/Cargo.toml",
+      "sha256": "b2db691354f7372311b48f8885a2ff9daea237858c72bcb50070ce7daf08913e"
+    },
+    {
+      "path": "examples/example-spirit-ts/README.md",
+      "sha256": "6ef55fe997b0c09438789e692be2518d0cad7055f315e74d36aea5f2b228d429"
+    },
+    {
+      "path": "tests/harness/registry_20_1.rs",
+      "sha256": "72f54eee0eba47db1b09281a250d406b3a301ef6f0a01a93de8d9807f520094a"
+    },
+    {
+      "path": "xtask/kloc.toml",
+      "sha256": "9fbdc5d96d9ea861e01472ceac9d5762daa84b67b9b2c9cbf2cb20aa7d673254"
+    },
+    {
+      "path": "xtask/tests/registry_socket_security_20_1b.rs",
+      "sha256": "18f034d9fd21e39045b5a3fb749406fde9437f74f138f3e344b960182aee67af"
+    },
+    {
+      "path": "xtask/tests/registry_workflow_security_20_1b.rs",
+      "sha256": "0ba6da13a0d14fe1eb241da35e562dbe1592f822dfe8c34e270d23ae49769a1f"
+    }
+  ],
+  "evidence_directory": "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/review-corrections",
+  "generated_at": "Final post-verification documentation/evidence notes; no Rust/manifests/lock/pins changed after the once-only prepush.",
+  "verification": "Commands and preserved JUnit refer to the same production source; later changes are documentation/evidence only."
+}

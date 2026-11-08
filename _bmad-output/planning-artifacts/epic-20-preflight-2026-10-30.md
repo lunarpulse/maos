@@ -91,12 +91,25 @@ tables remain historical; grants are not exact pins or renewed reservations.
 Remeasure external drift at handoff; no source/pin/kernel/status update here.
 The ruled trust root is a canonical-URI-bound configured registry signing key,
 never the response alone. Ruled transport is leaf/server rustls with supplied
-cert-chain/key paths, hostname/platform-WebPKI verification and optional operator CA.
+cert-chain/key paths and hostname validation; CA semantics are clarified below.
 Ruled HTTP exception requires literal loopback and explicit dev opt-in at both
 server and install, keeping mutation signatures/publisher pins; no HTTPS downgrade.
 The rustls edge requires deny-compatible crate versions, existing-lock ring/aws-lc
 feature review and no no-default-features leakage. Implementation/cargo waits for
 L1 review/corrections and Main's **`CARGO HANDOFF AC15`**; no new proof is claimed.
+
+**20-1b AC15 review rulings — 2026-11-08:** operator D5 confirms exact
+maos-cli6429 and **forfeits427** of the former6856 reserved row. This is not
+measured source deletion, free shared headroom, or a renewed grant; the historical
+CLI reservation in §1.2 is superseded. The separate rebased AC15 CLI ceiling6549
+does not restore it. D4 explicitly selects bundled Mozilla WebPKI when no CA is
+configured; a configured CA **replaces**, not extends, public roots. “Platform”
+trust-store wording above/in older records is superseded. Main's D2 fallback
+records that registry-specific TLS defaults are isolated, while frozen
+kernel/A2A dependencies still link TLS in the overall no-default binary; no
+kernel source/manifest edit is authorized by that feature-isolation correction.
+Domain's additional review-correction ceiling10155 = exact10137 +18 is authorized
+by Main for typed rollback/head delivery; aggregate ceiling198621 is unchanged.
 
 
 ### 1.3 Story forecasts: historical estimate is not a measured grant

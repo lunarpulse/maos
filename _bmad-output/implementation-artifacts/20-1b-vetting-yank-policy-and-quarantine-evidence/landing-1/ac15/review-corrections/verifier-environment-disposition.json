@@ -1,0 +1,7 @@
+{
+  "standalone_workspace": "missing cryptography backend in the original process PATH; two verifier tests failed loudly. This is an agent preparation omission, not a product regression or timing flake. Standalone is not rerun.",
+  "provision": "hash-locked tools/verify-erasure/requirements.txt, venv with system-site-packages preserves other system tools",
+  "prepush": "one separately prescribed prepush will use this PATH; its result will not erase the standalone red",
+  "venv": "/tmp/201b-ac15-corrections/verifier",
+  "temporary_PATH_prefix": "/tmp/201b-ac15-corrections/verifier/bin"
+}

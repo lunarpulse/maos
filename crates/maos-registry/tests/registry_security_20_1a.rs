@@ -289,6 +289,7 @@ fn server_tier_floor_uses_admission_policy_ordering() {
                     org_signing_pubkey: Some(key),
                     security: maos_registry::security::RegistrySecurityConfig::development_loopback(
                     ),
+                    ..Default::default()
                 },
             )
             .unwrap();

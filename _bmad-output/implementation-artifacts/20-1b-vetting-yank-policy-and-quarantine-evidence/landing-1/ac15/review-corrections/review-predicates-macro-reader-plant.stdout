@@ -1,0 +1,11 @@
+
+running 1 test
+test daemon_registry_policy_has_one_fail_closed_reader_d1_p10 ... FAILED
+
+failures:
+
+failures:
+    daemon_registry_policy_has_one_fail_closed_reader_d1_p10
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.20s
+

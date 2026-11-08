@@ -1,0 +1,83 @@
+
+running 65 tests
+test admission::tests::attestation_promotes_public_untrusted_before_strictest_of ... ok
+test admission::tests::local_unsigned_allowed_when_policy_permits ... ok
+test admission::tests::local_unsigned_rejected_when_policy_strict ... ok
+test admission::tests::org_internal_signature_matches_admits ... ok
+test admission::tests::org_internal_signature_mismatch_rejects ... ok
+test admission::tests::org_internal_signature_requires_org_key ... ok
+test admission::tests::provenance_absent_admits_when_not_required_ac11 ... ok
+test admission::tests::provenance_absent_but_required_rejects_catalogued ... ok
+test admission::tests::provenance_content_hash_is_deterministic ... ok
+test admission::tests::provenance_free_text_lineage_rejects_malformed ... ok
+test admission::tests::provenance_present_valid_returns_record_with_content_hash ... ok
+test admission::tests::provenance_stale_rejects ... ok
+test admission::tests::public_untrusted_with_fingerprint_drift_rejects ... ok
+test admission::tests::public_untrusted_with_t3_floor_returns_t3_sandbox ... ok
+test admission::tests::public_untrusted_with_tampered_envelope_rejects ... ok
+test admission::tests::public_untrusted_with_valid_envelope_admits ... ok
+test admission::tests::public_vetted_tier_always_rejects ... ok
+test admission::tests::strictest_of_resolves_all_combinations ... ok
+test admission::tests::strictest_of_resolves_correctly_local_vs_public_untrusted ... ok
+test admission::tests::vetted_promotion_preserves_compliance_envelope_verification ... ok
+test admission::tests::vetted_with_expired_attestation_is_rejected ... ok
+test admission::tests::vetted_with_forged_attestation_signature_is_rejected ... ok
+test admission::tests::vetted_with_unenrolled_vetter_is_rejected ... ok
+test admission::tests::vetted_with_valid_attestation_admits ... ok
+test admission::tests::vetted_without_attestation_is_deferred ... ok
+test admission::tests::wrapper_delegates_non_vetted_tiers ... ok
+test compliance_verify::tests::fingerprint_mismatch_is_rejected_via_delegation ... ok
+test compliance_verify::tests::tampered_signature_is_rejected_via_delegation ... ok
+test fixture_replay::tests::fixture_empty_queue_returns_transport_error ... ok
+test fixture_replay::tests::fixture_errors_propagate ... ok
+test fixture_replay::tests::fixture_records_calls ... ok
+test fixture_replay::tests::fixture_search_returns_queued_response ... ok
+test http::tests::drip_response_cannot_extend_exchange_deadline_f4 ... FAILED
+test http::tests::later_resolved_address_is_tried_after_connection_refusal ... ok
+test http::tests::unsigned_http_refusal_preserves_status_p7 ... FAILED
+test import::tests::divergent_manifest_rejects ... ok
+test import::tests::extract_and_verify_consistent_bundle ... ok
+test import::tests::missing_signed_package_json_rejects ... ok
+test operations::tests::artifact_args_serde_roundtrip ... ok
+test operations::tests::deprecate_args_serde_roundtrip ... ok
+test operations::tests::manifest_args_serde_roundtrip ... ok
+test operations::tests::operation_serialization_is_snake_case ... ok
+test operations::tests::search_args_defaults ... ok
+test operations::tests::search_args_serde_roundtrip ... ok
+test operations::tests::yanks_since_args_serde_roundtrip ... ok
+test security::review_tests::configured_ca_replaces_bundled_roots_d4 ... FAILED
+test security::review_tests::explicit_development_literal_loopback_matrix_p3 ... FAILED
+test security::review_tests::registry_hex_diagnostics_do_not_echo_input_p8 ... FAILED
+test security::review_tests::registry_typo_is_refused_p11 ... FAILED
+test security::review_tests::registry_uri_matrix_and_trailing_dns_labels_p3_p9 ... FAILED
+test security::review_tests::signed_params_less_notification_verifies_p7 ... FAILED
+test server::tests::development_default_ports_use_the_same_canonical_uri_as_clients ... ok
+test server::tests::server_handles_search ... ignored, requires server to be running on a port — tested via end-to-end test
+test server::tests::server_handles_unknown_method ... ignored, requires server to be running on a port — tested via end-to-end test
+test storage::tests::absent_install_inventory_does_not_create_a_store ... ok
+test storage::tests::put_and_get_artifact ... ok
+test storage::tests::put_and_get_manifest ... ok
+test storage::tests::search_excludes_yanked_by_default ... ok
+test storage::tests::search_finds_spirit_by_name ... ok
+test storage::tests::search_includes_yanked_when_requested ... ok
+test storage::tests::version_not_found_error ... ok
+test storage::tests::yanks_since_returns_filtered_entries ... ok
+test yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5 ... FAILED
+test yank::tests::policy_outcomes_are_distinct_ac8 ... ok
+test yank::tests::repeated_source_does_not_replay_journal_rows ... ok
+
+failures:
+
+failures:
+    http::tests::drip_response_cannot_extend_exchange_deadline_f4
+    http::tests::unsigned_http_refusal_preserves_status_p7
+    security::review_tests::configured_ca_replaces_bundled_roots_d4
+    security::review_tests::explicit_development_literal_loopback_matrix_p3
+    security::review_tests::registry_hex_diagnostics_do_not_echo_input_p8
+    security::review_tests::registry_typo_is_refused_p11
+    security::review_tests::registry_uri_matrix_and_trailing_dns_labels_p3_p9
+    security::review_tests::signed_params_less_notification_verifies_p7
+    yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5
+
+test result: FAILED. 54 passed; 9 failed; 2 ignored; 0 measured; 0 filtered out; finished in 1.03s
+

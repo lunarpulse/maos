@@ -1,0 +1,4968 @@
+
+running 1 test
+test registry_bound_principal_is_counted_and_erased_on_uninstall_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.83s
+
+
+running 1 test
+test boot_rechecks_manifest_component_publisher_and_claim ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 2.21s
+
+
+running 1 test
+test installed_component_dispatch_reports_typed_boot_refusal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.53s
+
+
+running 1 test
+test vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.78s
+
+
+running 1 test
+test daemon_banner_uses_the_enforced_single_reader_d1_p10 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.27s
+
+
+running 1 test
+test daemon_refuses_https_without_a_root_before_polling_d1_p10 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.21s
+
+
+running 1 test
+test daemon_refuses_registry_typo_even_without_a_uri_d1_p10_p11 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.21s
+
+
+running 1 test
+test ac3_operator_door_unload_stops_a_live_worker_once ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+
+running 1 test
+test ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+
+running 1 test
+test ac4_v2_butler_once_receipts_the_raised_halt_and_drains ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+
+running 1 test
+test ac4_v3_topology_once_unloads_every_loaded_spirit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+
+running 1 test
+test ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+
+running 1 test
+test ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+
+running 1 test
+test ac4_v4b_grandchild_is_stopped_with_its_worker_container ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+
+running 1 test
+test ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.23s
+
+
+running 1 test
+test cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+
+running 1 test
+test cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+
+running 1 test
+test cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+
+running 1 test
+cohort without Worker: audit drained in 20.033978ms
+test cohort::cohort_sigterm_without_worker_joins_local_yank_timer_and_drains ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.32s
+
+
+running 1 test
+test cohort::declared_capable_cohort_worker_prerequisite_never_green_skips ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.01s
+
+
+running 1 test
+test every_audit_sender_release_joins_the_yank_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.18s
+
+
+running 1 test
+planted-panic grandchild pid=999916; live after unwind=false
+test harness_owns_grandchildren_before_discovery_even_when_startup_panics ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.02s
+
+
+running 1 test
+test async_task_cannot_retain_sender_clone_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test helper_sender_move_requires_release_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test joined_qualified_drop_and_select_are_accounted_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test moving_a_drain_to_another_arm_cannot_hide_behind_equal_totals_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.18s
+
+
+running 1 test
+test parenthesized_drain_requires_join_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test qualified_drop_requires_join_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test select_drain_requires_join_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test sibling_join_does_not_authorize_another_arm_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test supervisor_stop_must_follow_join_p4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test unload_must_follow_join_p4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test wildcard_sender_binding_is_not_a_release_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test corrupt_install_does_not_hide_another_spirits_expiry_p1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.08s
+
+
+running 1 test
+test deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+
+running 1 test
+test expiry_and_vetter_revocation_observe_once_and_request_policy_ac9 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.14s
+
+
+running 1 test
+test failing_auto_revoke_retries_policy_without_repeating_observation_p12 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.07s
+
+
+running 1 test
+test no_registry_local_timer_discovers_promotion_installed_after_start_p11 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.07s
+
+
+running 1 test
+test poller_runtime_clock_and_cursor_restart_reach_expiry_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.08s
+
+
+running 1 test
+test registry_publishers_cannot_share_principal_spill_ac10 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.14s
+
+
+running 1 test
+test rejected_vetter_row_does_not_hide_later_publisher_yank_p1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.07s
+
+
+running 1 test
+test signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.21s
+
+
+running 1 test
+test uninstalled_unsigned_row_never_advances_authenticated_cursor_f1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.07s
+
+
+running 1 test
+test accessibility::tests::no_color_env_empty_string_does_not_disable_color ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test accessibility::tests::no_color_env_with_any_value_disables_color ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test accessibility::tests::no_color_wins_over_term_dumb ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test accessibility::tests::no_env_falls_through_to_auto ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test accessibility::tests::plain_flag_overrides_everything ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test accessibility::tests::plain_flag_wins_over_no_color_set ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test accessibility::tests::term_dumb_disables_color_when_no_color_unset ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test accessibility::tests::term_xterm_falls_through_to_auto ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test backup::tests::tenant_backup_round_trip_rejects_wrong_team ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.41s
+
+
+running 1 test
+test backup::tests::validate_restore_target_team_refuses_cross_team_planting ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.22s
+
+
+running 1 test
+test subcommands::tests::audit_keygen_parses ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::audit_posture_delta_parses ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::audit_query_accepts_plain_format ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::audit_query_accepts_spirit_and_format_flags ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::audit_query_capability_parses ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::audit_query_defaults_format_to_ndjson ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::audit_query_intent_contains_parses ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::audit_query_range_parses ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::audit_query_spirit_all_boots_parses ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::audit_sealed_export_parses ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::audit_subject_access_parses ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::audit_verify_bundle_parses ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::capture_tripwire_allows_hex_tl_refs ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::capture_tripwire_refuses_a_pasted_api_key ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::capture_validation_refuses_adapter_only_fs_jail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::capture_validation_refuses_the_two_host_overclaim_directions ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::capture_validation_refuses_unenforced_egress ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::capture_validation_rejects_missing_signer ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::capture_validation_requires_at_least_one_audit_ref ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::capture_validation_requires_verified_redaction ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::cost_report_reads_payload_not_intent ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::dispatch_forget_rejects_empty_principal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::dispatch_install ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::dispatch_run_hello_spirit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::dispatch_start_parses_hello_spirit_globally_with_plain ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::dispatch_stop_unload_parse_with_no_args ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::dispatch_unknown_spirit_install ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::dispatch_unknown_spirit_run ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::forget_parses_principal_and_reason ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::forget_reason_is_optional ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::install_verify_local_release_artifact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::install_verify_missing_sig_fails ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::install_verify_tampered_artifact_rejected ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::journal_run_capture_row_fails_closed_without_a_tl ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::record_capture_parses_flags ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+
+running 1 test
+test subcommands::tests::record_capture_row_round_trips_through_audit_query ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.04s
+
+
+running 1 test
+test subcommands::tests::resolve_spirit_pid_reads_from_tl ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.04s
+
+
+running 1 test
+test subcommands::tests::resolve_spirit_pid_rejects_unknown_names_with_clear_diagnostic ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.02s
+
+
+running 1 test
+test a_200_that_is_not_the_sent_decision_is_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.08s
+
+
+running 1 test
+test approve_posts_the_decision_with_a_decimal_string_nonce ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.01s
+
+
+running 1 test
+test decision_outcomes_map_to_typed_distinct_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.16s
+
+
+running 1 test
+test list_gets_the_pending_set_and_prints_it_verbatim ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.01s
+
+
+running 1 test
+test list_outcomes_map_to_typed_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.03s
+
+
+running 1 test
+test malformed_decisions_are_refused_before_the_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.02s
+
+
+running 1 test
+test reject_posts_approve_false_with_the_default_actor ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.02s
+
+
+running 1 test
+test repin_discovery_failures_map_to_typed_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.12s
+
+
+running 1 test
+test repin_routes_reach_the_d16_1_p_matrix ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.26s
+
+
+running 1 test
+test wire_shapes_are_pinned_as_literal_json ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+
+running 1 test
+test door_error_output_is_ansi_free ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test install_cascade_emits_zero_ansi_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test run_cascade_emits_zero_ansi_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test start_cascade_emits_zero_ansi_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test stop_cascade_refuses_with_exit_two_and_zero_ansi ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test unload_cascade_emits_zero_ansi_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test fr4_schema_violation_exits_two_with_diagnostic ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.06s
+
+
+running 1 test
+test ndjson_with_no_color_emits_zero_ansi_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.10s
+
+
+running 1 test
+test ndjson_with_term_dumb_emits_zero_ansi_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.11s
+
+
+running 1 test
+test plain_with_no_color_emits_zero_ansi_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.11s
+
+
+running 1 test
+test plain_with_term_dumb_emits_zero_ansi_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.11s
+
+
+running 1 test
+test unknown_spirit_exits_two_with_clear_diagnostic ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.11s
+
+
+running 1 test
+test a_dev_seed_sidecar_verifies_and_prints_its_body ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+
+running 1 test
+test a_dev_seed_signature_claiming_the_producer_exits_one ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+
+running 1 test
+test a_float_that_does_not_round_trip_verifies_byte_exact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+
+running 1 test
+test a_malformed_pubkey_refuses_without_echoing_it ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+
+running 1 test
+test a_missing_sidecar_exits_five_typed ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.01s
+
+
+running 1 test
+test a_non_utf8_pubkey_refuses_and_never_falls_back ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+
+running 1 test
+test a_producer_signature_verifies_only_against_the_producer_pubkey ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.01s
+
+
+running 1 test
+test a_sidecar_of_another_class_version_or_schema_exits_one ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.01s
+
+
+running 1 test
+test a_tampered_body_exits_one_and_prints_nothing ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+
+running 1 test
+test without_a_version_the_highest_benchmarked_version_is_read ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.01s
+
+
+running 1 test
+test cohort_sign_happy_path_and_validate_before_write ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.01s
+
+
+running 1 test
+test cohort_sign_has_no_environment_key_fallback ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test cohort_sign_refuses_a_key_absent_from_authority_keys ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test cohort_sign_refuses_output_aliasing_the_authority_key ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test a_correctly_redacted_log_reports_no_escape ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.09s
+
+
+running 1 test
+test a_digest_clause_sources_row_is_not_an_escape ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.04s
+
+
+running 1 test
+test a_stored_hex_run_is_reported_as_its_own_distinct_escape_class ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.04s
+
+
+running 1 test
+test a_stored_provider_prefix_credential_is_reported_as_a_prefix_escape ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.04s
+
+
+running 1 test
+test a_too_long_hex_run_under_clause_sources_is_still_an_escape ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.04s
+
+
+running 1 test
+test an_uppercase_hex_run_is_reported_as_an_escape ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.05s
+
+
+running 1 test
+test both_classes_in_one_row_are_reported_separately ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.05s
+
+
+running 1 test
+test overlapping_prefix_classes_are_each_reported_once ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.04s
+
+
+running 1 test
+test the_scan_never_echoes_the_offending_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.04s
+
+
+running 1 test
+test maos_cli_dep_tree_excludes_kernel_core ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+
+running 1 test
+test response_larger_than_the_client_cap_is_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+
+running 1 test
+test successful_response_must_match_its_content_length ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+
+running 1 test
+test forget_reason_is_preserved_in_the_live_door_body ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 1 test
+test serde_failure_termination_receipt_is_not_reported_as_raised ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test accepted_halt_sends_post_with_spirit_id_in_the_body ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s
+
+
+running 1 test
+test authorized_override_carries_the_policy_ref_as_rationale ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s
+
+
+running 1 test
+test invalid_ids_refused_locally_without_a_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s
+
+
+running 1 test
+test provided_context_carries_the_text_as_rationale ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s
+
+
+running 1 test
+test provided_context_without_text_refused_before_the_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s
+
+
+running 1 test
+test resolve_discovery_failures_map_to_typed_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.05s
+
+
+running 1 test
+test resolve_maps_typed_responses_to_d16_1_p_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.18s
+
+
+running 1 test
+test import_refuses_rust_inproc_form_through_the_real_binary ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test unix::list_reads_the_real_holds_table_in_process_and_spawns_nothing ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.07s
+
+
+running 1 test
+test unix::list_reports_an_empty_list_when_no_hold_is_held ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.02s
+
+
+running 1 test
+test unix::release_forwards_the_offline_one_shot_contract ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+
+running 1 test
+test load_discovery_failures_map_to_typed_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.05s
+
+
+running 1 test
+test load_maps_typed_responses_to_d16_1_p_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.13s
+
+
+running 1 test
+test load_posts_the_canonical_manifest_to_the_collection_route ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.01s
+
+
+running 1 test
+test load_refuses_a_missing_manifest_without_touching_the_door ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.01s
+
+
+running 1 test
+test empty_instruction_refused_locally_without_a_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test invalid_spirit_id_refused_locally_without_a_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test queue_discovery_failures_map_to_typed_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.05s
+
+
+running 1 test
+test queue_maps_typed_responses_to_d16_1_p_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.13s
+
+
+running 1 test
+test queue_sends_the_instruction_as_the_text_field ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test status_sends_get_and_renders_the_door_occupancy ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.03s
+
+
+running 1 test
+test an_empty_recall_is_a_success_not_a_refusal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.01s
+
+
+running 1 test
+test malformed_picks_and_recalls_are_refused_before_the_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.03s
+
+
+running 1 test
+test pick_outcomes_map_to_typed_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.12s
+
+
+running 1 test
+test pick_posts_exactly_the_option_pick_request ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.01s
+
+
+running 1 test
+test recall_and_pick_discovery_failures_map_to_typed_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.11s
+
+
+running 1 test
+test recall_and_pick_reach_the_d16_1_p_matrix ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.26s
+
+
+running 1 test
+test recall_outcomes_map_to_typed_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.04s
+
+
+running 1 test
+test recall_posts_an_empty_body_and_prints_the_recalled_set_verbatim ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.01s
+
+
+running 1 test
+test the_pick_wire_shape_is_pinned_as_literal_json ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test pause_and_resume_spawn_no_child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test pause_discovery_failures_map_to_typed_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.05s
+
+
+running 1 test
+test pause_maps_typed_responses_to_d16_1_p_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.13s
+
+
+running 1 test
+test pause_sends_bare_post_and_prints_the_door_body ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test resume_maps_typed_responses_to_d16_1_p_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.13s
+
+
+running 1 test
+test resume_sends_bare_post_and_prints_the_door_body ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test autonomous_posture_rejected_by_clap_without_a_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.01s
+
+
+running 1 test
+test invalid_spirit_id_refused_locally_without_a_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.01s
+
+
+running 1 test
+test posture_discovery_failures_map_to_typed_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.05s
+
+
+running 1 test
+test posture_maps_typed_responses_to_d16_1_p_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.13s
+
+
+running 1 test
+test posture_sends_the_shifted_value_in_the_json_body ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.02s
+
+
+running 1 test
+test release_pubkey_prints_exact_lowercase_embedded_key ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test import_maps_typed_responses_to_d16_1_p_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.14s
+
+
+running 1 test
+test import_missing_file_refused_locally ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.01s
+
+
+running 1 test
+test import_sends_the_crl_bytes_verbatim ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.01s
+
+
+running 1 test
+test list_sends_get_and_renders_the_door_crl_id ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.01s
+
+
+running 1 test
+test revocations_discovery_failures_map_to_typed_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.05s
+
+
+running 1 test
+test invalid_token_ids_refused_locally_without_a_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.02s
+
+
+running 1 test
+test repeated_revoke_maps_409_revoked_to_exit_1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test revoke_discovery_failures_map_to_typed_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.05s
+
+
+running 1 test
+test revoke_maps_typed_responses_to_d16_1_p_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.13s
+
+
+running 1 test
+test revoke_sends_bare_post_to_the_token_route ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test unknown_token_maps_404_to_exit_1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test sealed_export_prints_the_base_key_when_no_region_resolves ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.05s
+
+
+running 1 test
+test sealed_export_prints_the_region_key_it_actually_signed_with ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.05s
+
+
+running 1 test
+test stdout_mode_export_prints_its_pubkey_to_stderr_and_keeps_stdout_pure ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.05s
+
+
+running 1 test
+test trajectory_export_prints_the_region_key_it_actually_signed_with ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.05s
+
+
+running 1 test
+test verify_bundle_derives_the_region_key_from_a_base_seed ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.05s
+
+
+running 1 test
+test verify_bundle_requires_exactly_one_key_source ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.06s
+
+
+running 1 test
+test verify_bundle_seed_path_refuses_a_region_tampered_bundle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.05s
+
+
+running 1 test
+test admission_view_keeps_revision_entries_and_refuses_ambiguous_skill_ids ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.20s
+
+
+running 1 test
+test authored_decision_journals_before_materializing_and_saving ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.18s
+
+
+running 1 test
+test busy_timeout_5000_blocks_then_succeeds_green ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.15s
+
+
+running 1 test
+test busy_timeout_zero_reds_immediately_under_contention ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.15s
+
+
+running 1 test
+test discovered_skill_is_approvable_end_to_end ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.16s
+
+
+running 1 test
+test double_journal_guard_keyed_on_target_capability ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.16s
+
+
+running 1 test
+test journal_failure_and_materialization_preflight_refusal_mutate_nothing ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.15s
+
+
+running 1 test
+test no_silent_loss_when_journal_write_fails ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+
+running 1 test
+test queue_save_failure_never_reports_a_committed_decision_as_success ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.15s
+
+
+running 1 test
+test unknown_or_corrupt_payload_queue_is_never_rebuilt_or_overwritten ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.14s
+
+
+running 1 test
+test discovered_skill_entry_path_is_never_fabricated ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.16s
+
+
+running 1 test
+test discovered_skill_entry_path_is_package_shipped_9_7_boundary ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.14s
+
+
+running 1 test
+test discovered_skill_with_no_tl_row_is_pending ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.14s
+
+
+running 1 test
+test plain_approve_with_no_re_enqueue_keeps_entry_decided ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.16s
+
+
+running 1 test
+test re_enqueue_after_reject_demotes_decided_entry_to_pending ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.16s
+
+
+running 1 test
+test reconcile_pending_proven_red_set_equality ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.17s
+
+
+running 1 test
+test corrupt_v2_offline_show_and_decide_leave_payload_bytes_untouched ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.16s
+
+
+running 1 test
+test list_preserves_custom_discovery_roots_over_the_door ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+
+
+running 1 test
+test list_show_approve_and_reject_use_the_same_authenticated_door ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.02s
+
+
+running 1 test
+test offline_decision_retains_exclusive_liveness_lock_until_journal_and_queue_finish ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.19s
+
+
+running 1 test
+test refused_connection_uses_offline_only_while_the_home_lock_is_free ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.19s
+
+
+running 1 test
+test rejected_bearer_never_falls_back_to_offline_queue_mutation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.02s
+
+
+running 1 test
+test built_in_shell_names_are_reserved_before_admission ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.20s
+
+
+running 1 test
+test configured_org_key_requires_a_valid_server_tier_signature ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.50s
+
+
+running 1 test
+test independently_keyed_server_is_verified_and_wrong_key_never_persists ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.40s
+
+
+running 1 test
+test install_refuses_registry_rust_inproc_before_persisting ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.25s
+
+
+running 1 test
+test installed_version_is_immutable_ac14 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.25s
+
+
+running 1 test
+test materialization_failure_never_activates_a_partial_install ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.25s
+
+
+running 1 test
+test offline_install_persists_remote_origin_and_rejects_tampering ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.35s
+
+
+running 1 test
+test wrong_publisher_key_and_claim_signature_are_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.25s
+
+
+running 1 test
+test yanked_install_is_refused_before_persistence_ac16 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.30s
+
+
+running 1 test
+test an_unknown_policy_is_refused_locally_without_a_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.01s
+
+
+running 1 test
+test attestation_and_keyring_travel_in_the_body ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.01s
+
+
+running 1 test
+test cold_swap_reaches_the_door_and_its_outcomes_map_to_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.06s
+
+
+running 1 test
+test from_and_candidates_require_plan_locally ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.02s
+
+
+running 1 test
+test manifest_not_found_refused_locally ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.01s
+
+
+running 1 test
+test migrator_policy_reaches_the_door_and_its_outcomes_map_to_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.03s
+
+
+running 1 test
+test plan_mode_carries_create_plan_from_and_absolute_candidates ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.02s
+
+
+running 1 test
+test upgrade_discovery_failures_map_to_typed_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.06s
+
+
+running 1 test
+test upgrade_maps_typed_responses_to_d16_1_p_exits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.15s
+
+
+running 1 test
+test upgrade_sends_absolute_manifest_and_default_policy ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.01s
+
+
+running 1 test
+test a_seed_and_the_seeds_own_derived_pubkey_are_one_root ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.10s
+
+
+running 1 test
+test an_empty_host_tag_is_refused_at_export ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.05s
+
+
+running 1 test
+test an_unstamped_half_is_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.10s
+
+
+running 1 test
+test disjoint_logs_are_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.10s
+
+
+running 1 test
+test one_base_seed_under_two_claimed_regions_is_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.11s
+
+
+running 1 test
+test one_root_signing_both_halves_is_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.11s
+
+
+running 1 test
+test the_python_twin_verifies_a_host_stamped_bundle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.01s
+
+
+running 1 test
+test the_python_twin_verifies_the_committed_non_ascii_tier2_bundle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.01s
+
+
+running 1 test
+test the_two_host_receipt_is_written_and_verifies_under_the_operator_key ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.11s
+
+
+running 1 test
+test two_hosts_with_independent_roots_reconcile_on_the_shared_frame_id ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.15s
+
+
+running 1 test
+test uninstall_forwards_erased_held_not_found_and_failed_codes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+test cost::tests::btreemap_deterministic_order ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test cost::tests::cost_accumulation_is_linear_before_division ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test cost::tests::cost_attribution_payload_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test cost::tests::forward_read_tolerance_unmodeled_dimension ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test cost::tests::golden_cost_vector_oracle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test cost::tests::no_task_ref_in_payload ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test cost::tests::pricing_lookup ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test cost::tests::principal_ref_ambiguous_no_members ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test cost::tests::principal_ref_unattributed_serde ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test distillation::tests::digst_payload_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test distillation::tests::distillation_error_audit_chain_missing_display ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test distillation::tests::distillation_error_distinguishes_variants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test distillation::tests::receipt_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test distillation::tests::request_new_accepts_valid ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test distillation::tests::request_new_rejects_depth_zero ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test distillation::tests::request_new_rejects_empty_source ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::decision_dispatch_3_1_shape_backward_compat ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::decision_dispatch_3_3_shape_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::epistemic_halt_payload_3_1_shape_backward_compat ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::epistemic_halt_payload_rejects_empty_halt_id ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::epistemic_halt_payload_rejects_nan_threshold ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::epistemic_halt_payload_rejects_nan_value ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::frame_address_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::halt_policy_override_valid_f32_parses_at_serde_layer ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::iac_frame_consent_request_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::iac_frame_decision_dispatch_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::iac_frame_epistemic_halt_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::iac_frame_intent_lineage_serde_default_backward_compat ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::iac_frame_intent_lineage_serde_round_trip_non_empty ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::iac_frame_retract_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::iac_frame_task_assign_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::iac_frame_task_complete_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::iac_frame_telemetry_event_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::posture_preferences_3_1_shape_backward_compat ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::posture_preferences_3_2_shape_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::posture_preferences_default_has_empty_overrides ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test frame::tests::posture_preferences_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test governance::tests::abi_extension_proposal_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test governance::tests::erasure_class_lineage_ids ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test governance::tests::governance_event_kind_tagged ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test governance::tests::model_provenance_event_round_trip_and_tagged ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test governance::tests::model_provenance_payload_has_zero_claim_instance_ids ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test governance::tests::ratification_status_serde_snake_case ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test governance::tests::shared_schema_id_key_contract ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::halt_continuity_error_display ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::halt_id_new_empty_returns_error ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::halt_id_new_nonempty_works ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::halt_id_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::halt_receipt_new_constructs_invocation_time_receipt ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::halt_receipt_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::halt_receipt_with_resolution_fills_post_resolution_fields ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::halt_state_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::invoke_halt_error_display ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::output_marker_override_for_constructs_valid_marker ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::output_marker_override_for_rejects_empty_policy_ref ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::output_marker_override_for_rejects_whitespace_only_policy_ref ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::output_marker_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_authorized_override_rejects_empty ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_authorized_override_rejects_whitespace_only ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_deserialize_accepts_populated_payloads ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_deserialize_rejects_empty_text ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_deserialize_rejects_whitespace_operator_policy_ref ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_kind_label_accepted_halt ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_kind_label_authorized_override ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_kind_label_provided_context ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_provided_context_rejects_empty ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_provided_context_rejects_whitespace_only ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_serde_round_trip_accepted_halt ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_serde_round_trip_authorized_override ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_serde_round_trip_provided_context ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_validate_accepts_populated_and_unit_variants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_validate_rejects_struct_literal_empty_text ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::resolution_validate_rejects_struct_literal_whitespace_operator_policy_ref ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::termination_kind_revocation_terminated_as_str ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt::tests::termination_kind_revocation_terminated_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test host_grant::tests::grant_permits_requested_tier_at_or_below_ceiling ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test host_grant::tests::no_matching_grant_fails_closed ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test host_grant::tests::request_above_grant_fails_closed_no_downgrade ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test hot_swap::tests::emigrator_missing_display ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test hot_swap::tests::halt_continuity_violation_wraps_inner_error ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test hot_swap::tests::hot_swap_result_new_happy_path ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test hot_swap::tests::hot_swap_result_new_rejects_pid_zero ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test hot_swap::tests::hot_swap_verb_exhaustiveness ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test hot_swap::tests::invalid_expected_schema_version_is_distinct_from_snapshot_and_migrator_errors ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test hot_swap::tests::migrator_error_not_implemented_display ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test iac_bus_types::tests::eintent_lineage_broken_display ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test iac_bus_types::tests::eintent_lineage_broken_spirit_drafted ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::in_flight_entry_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::journal_entry_backward_compat_deser ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::journal_entry_construction ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::journal_entry_with_tier_roundtrips ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::lifecycle_event_crash_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::lifecycle_event_non_exhaustive_match ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::lifecycle_event_provider_switched_discriminant ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::lifecycle_event_provider_switched_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::lifecycle_event_revoked_discriminant ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::lifecycle_event_revoked_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::lifecycle_event_silent_failure_suspect_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::lifecycle_event_stalled_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::lifecycle_event_upgrade_discriminant ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::lifecycle_event_upgrade_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i10::tests::provider_switched_payload_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i11::tests::digest_ref_depth ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i12::tests::working_memory_digest_refs ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i13::tests::allowed_promotion_set ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i13::tests::intent_lineage_default_is_empty ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i13::tests::intent_lineage_is_empty_returns_true_for_empty_lineage ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i14::tests::halt_continuity_variants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i1::tests::capability_token_exists ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i1::tests::capability_token_is_non_exhaustive ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i1::tests::invariant_i1_marker_is_zst ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i1::tests::mcp_call_scope_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i2::tests::log_before_deliver_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i3::tests::frame_origin_discriminants_stable ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i4::tests::approval_decision_construction ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i5::tests::namespace_key_typed_scope ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i6::tests::hot_swap_state_discriminants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i7::tests::scalar_tap_event_construction ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i7::tests::telemetry_topic_creation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i8::tests::intent_allowlist_membership ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i8::tests::is_canonical_accepts_reference_fleet_shapes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i8::tests::is_canonical_rejects_typo_class ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i8::tests::parse_round_trips_canonical_and_rejects_non_canonical ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i9::tests::abi_to_operational_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i9::tests::display_format ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i9::tests::kernel_caching_shape ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i9::tests::sandbox_tier_consts ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i9::tests::sandbox_tier_default_is_t2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i9::tests::to_abi_rejects_out_of_range ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i9::tests::try_from_manifest_str ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i9::tests::try_from_u8_rejects_out_of_range ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test invariants::i9::tests::try_from_u8_valid ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test lifecycle::tests::lifecycle_error_already_loaded_display_contains_spirit_id ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test lifecycle::tests::lifecycle_receipt_new_with_none_offset ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test lifecycle::tests::lifecycle_receipt_rejects_pid_zero ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test lifecycle::tests::lifecycle_verb_variant_exhaustiveness ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test lifecycle::tests::spirit_lifecycle_state_is_runnable ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test lifecycle::tests::spirit_lifecycle_state_is_terminal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test lifecycle::tests::spirit_lifecycle_state_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test log_recall::tests::capability_denial_is_typed_and_contains_no_caller_identity ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test log_recall::tests::cross_wall_refusal_outcomes_are_machine_distinct ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test log_recall::tests::cross_wall_request_rejects_noncanonical_team ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test log_recall::tests::cross_wall_request_validates_team_and_preserves_filter ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test log_recall::tests::filter_default_sets_max_limit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test log_recall::tests::filter_new_clamps_limit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test log_recall::tests::log_fetch_response_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test log_recall::tests::log_recall_cursor_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test log_recall::tests::log_recall_error_distinguishes_variants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test log_recall::tests::log_recall_error_scope_violation_carries_fields ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test log_recall::tests::log_recall_page_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::forget_receipt_preserves_old_wire_shape_and_reports_typed_gaps ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::memory_error_display_collective ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::memory_error_display_invalid_key ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::memory_error_display_key_traversal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::memory_error_from_io ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::memory_tier_discriminants_are_distinct ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::memory_tier_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::memory_value_kind_blob ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::memory_value_kind_json ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::memory_value_kind_markdown ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::memory_value_kind_text ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::memory_value_serde_round_trip_json ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::memory_value_serde_round_trip_markdown ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::namespace_kind_labels_are_distinct ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::namespace_principal_rejects_colon_in_principal_id ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::namespace_principal_rejects_colon_in_schema ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::namespace_principal_rejects_control_char ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::namespace_principal_rejects_empty_principal_id ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::namespace_principal_rejects_empty_schema ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::namespace_principal_rejects_nul ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::namespace_principal_round_trips ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::principal_key_new_rejects_colon_in_principal_id ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::principal_key_new_rejects_empty_principal_id ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::principal_key_new_rejects_empty_schema ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::principal_key_new_round_trips ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test memory::tests::principal_matching_respects_unicode_and_punctuation_bridges ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test notification::tests::anomaly_flagged_accepts_boundary_confidence ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test notification::tests::anomaly_flagged_accepts_valid_input ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test notification::tests::anomaly_flagged_rejects_empty_summary ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test notification::tests::anomaly_flagged_rejects_nan_confidence ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test notification::tests::anomaly_flagged_rejects_out_of_range_confidence ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test notification::tests::anomaly_flagged_rejects_whitespace_only_summary ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test orchestrator::tests::instruction_id_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test orchestrator::tests::instruction_new_accepts_nonempty_goal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test orchestrator::tests::instruction_new_rejects_empty_goal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test orchestrator::tests::instruction_new_rejects_whitespace_only_goal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test orchestrator::tests::instruction_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::capability::tests::cap_error_distinguishes_variants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::crypto::tests::crypto_error_distinguishes_variants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::crypto::tests::crypto_provider_is_object_safe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::identity_assertion::tests::authenticated_principal_is_trait_object_safe_payload ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::mcp::tests::mcp_attribution_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::mcp::tests::mcp_error_display ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::mcp::tests::mcp_request_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::mcp::tests::mcp_response_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::mcp::tests::mcp_transport_id_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::policy_decision::tests::policy_decision_error_has_typed_variants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::policy_decision::tests::policy_decision_port_is_object_safe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::policy_decision::tests::policy_verdict_only_has_allow_and_deny ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::publish_receipt_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::registry_error_display ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::registry_error_is_non_exhaustive ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::search_query_defaults ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::search_query_deser_defaults ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::search_query_limit_clamped_to_200 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::search_query_limit_minimum_1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::search_query_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::signed_artifact_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::signed_manifest_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::signed_package_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::yank_entry_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::yank_list_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::yank_reason_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::registry::tests::yank_receipt_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test ports::task::tests::task_assignment_record_construction ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test region::tests::canonicalize_accepts_hyphenated_and_digits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test region::tests::canonicalize_accepts_simple_lowercase ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test region::tests::canonicalize_is_idempotent ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test region::tests::canonicalize_lowercases_so_two_spellings_key_identically ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test region::tests::canonicalize_rejects_disallowed_ascii ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test region::tests::canonicalize_rejects_non_ascii_and_homoglyphs ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test region::tests::canonicalize_rejects_too_long ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test region::tests::canonicalize_rejects_too_short ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test region::tests::canonicalize_trims_surrounding_whitespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test region::tests::encoding_id_is_frozen ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test region::tests::home_from_env_resolves_and_canonicalizes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test region::tests::region_error_variants_are_distinct ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test region::tests::resolve_home_env_overrides_disk ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test reserved_namespaces::tests::reserved_are_unique_and_nonempty ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test reserved_namespaces::tests::reserved_do_not_collide_with_current_variants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::crl_directory_defaults_to_xdg_data_home ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::crl_directory_falls_back_to_home_data_tree ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::crl_directory_prefers_explicit_override ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::crl_id_display_hex ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::crl_id_is_the_sha256_of_recursively_key_sorted_entries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::registry_client_trait_object_safe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::revocation_action_as_str_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::revocation_action_default_is_terminate_immediately ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::revocation_entry_new_rejects_empty_spirit_class ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::revocation_entry_new_rejects_invalid_spirit_class ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::revocation_origin_as_str_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::revocation_origin_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::semver_range_contains_in_range ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::semver_range_contains_out_of_range ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::semver_range_exact_match ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::semver_range_malformed_returns_err ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::semver_range_wildcard ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::signed_revocation_list_new_rejects_empty_entries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test revocation::tests::signed_revocation_list_new_rejects_wrong_schema_version ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::container_runtime_kind_as_str ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::container_runtime_kind_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::image_attestation_id_display_hex ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::sandbox_inspect_report_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::t3_error_display ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::t3_image_attestation_new_happy_path ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::t3_image_attestation_new_rejects_empty_entries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::t3_image_attestation_new_rejects_multiple_defaults ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::t3_image_attestation_new_rejects_wrong_schema_version ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::t3_image_attestation_new_rejects_zero_pubkey ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::t3_image_attestation_new_rejects_zero_signature ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::t3_image_entry_new_happy_path ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::t3_image_entry_new_rejects_empty_uri ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test sandbox::tests::t3_image_entry_new_rejects_zero_sha ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test self_telemetry::tests::empty_report_json_snapshot ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test self_telemetry::tests::resolution_kind_label_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test self_telemetry::tests::self_telemetry_error_display_backend_unavailable ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test self_telemetry::tests::self_telemetry_error_display_unknown ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test self_telemetry::tests::self_telemetry_error_display_window_invalid ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test self_telemetry::tests::self_telemetry_report_serde_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test supervision::tests::child_exit_status_signaled_debug ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test supervision::tests::crash_cause_voluntary_str ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test supervision::tests::fault_cause_signaled_by_kernel_str ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test supervision::tests::null_replica_resolver_always_none ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test supervision::tests::on_crash_action_default_is_nack ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test supervision::tests::on_crash_action_display ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test supervision::tests::on_crash_action_serde_roundtrip_kebab_case ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test supervision::tests::trait_object_safety_replica_resolver ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test supervision::tests::trait_object_safety_subprocess_supervisor ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test team::tests::accepts_canonical_team_ids ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test team::tests::rejects_noncanonical_instead_of_normalizing ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test team::tests::serde_reuses_constructor_validation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s
+
+
+running 1 test
+test consent_expiry_is_strict_and_open_ended_never_expires ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test consent_recall_policy_decodes_unknown_values_to_withheld ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test consent_withheld_display_names_only_the_frame ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test full_consent_envelope_json_is_byte_identical_to_pre_17_8_golden ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test granter_binding_compares_spirit_and_host_never_role ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test cid_parser_and_cgroup_identity_are_exact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test completion_requires_available_exited_payload ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test decoding_boundaries_and_pidfd_authority ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test exit_record_rejects_each_cross_field_inconsistency ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test exit_record_serializes_exact_six_keys_for_success_fallback_unavailable_and_residue ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test inspect_parser_requires_all_typed_state_fields_and_terminality_is_exact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test invalid_runtime_exit_codes_are_truncated_without_invented_code_or_signal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test payload_classification_obeys_oom_authority_and_fallback ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test pidfile_parser_accepts_only_positive_i32_decimal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test unavailable_state_is_always_truncated_even_with_clean_runtime_client ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test wait_status_decode_is_terminal_only ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test dns_label_and_total_lengths_are_bounded ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test invalid_authorities_are_refused_on_both_boundaries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test manifest_requires_a_port_while_bare_grants_mean_https ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test serde_uses_the_same_strict_grammar_and_canonical_output ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test legacy_erased_json_defaults_requests_and_notice_round_trips ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+
+running 1 test
+test principal_matching_is_token_bounded_not_substring_bounded ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+
+running 1 test
+test concurrent_initializers_publish_one_complete_control_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 1 test
+test fs_subtree_fails_closed_on_ambiguous_components ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test fs_subtree_is_lexical_component_containment ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test identifier_scopes_are_exact_on_every_field ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test net_https_is_exact_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test unit_variants_by_kind_and_variants_never_cross ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test always_admit_blind_harness_proves_the_rejection_is_not_canned ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test cohort_all_freeze_axes_red_hits_per_spirit_floor_but_fails_aggregate_floor ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test cohort_checklist_is_itemized_across_categories_not_a_flat_bucket ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test cohort_green_reconciles_every_spirit_and_clears_the_aggregate_floor ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test cohort_one_freeze_axis_red_drops_reconciled_count_while_admission_holds ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test cohort_with_negative_control_scores_below_floor_and_fails_aggregate ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test empty_cohort_is_na_never_a_vacuous_pass ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test journaled_flag_requires_a_returned_decision_receipt_not_only_the_enqueue_row ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test negative_control_rejects_at_real_admit_spirit_while_conformance_proxy_admits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::attestation_promotes_public_untrusted_before_strictest_of ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::local_unsigned_allowed_when_policy_permits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::local_unsigned_rejected_when_policy_strict ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::org_internal_signature_matches_admits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::org_internal_signature_mismatch_rejects ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::org_internal_signature_requires_org_key ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::provenance_absent_admits_when_not_required_ac11 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::provenance_absent_but_required_rejects_catalogued ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::provenance_content_hash_is_deterministic ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::provenance_free_text_lineage_rejects_malformed ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::provenance_present_valid_returns_record_with_content_hash ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::provenance_stale_rejects ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::public_untrusted_with_fingerprint_drift_rejects ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::public_untrusted_with_t3_floor_returns_t3_sandbox ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::public_untrusted_with_tampered_envelope_rejects ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::public_untrusted_with_valid_envelope_admits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::public_vetted_tier_always_rejects ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::strictest_of_resolves_all_combinations ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::strictest_of_resolves_correctly_local_vs_public_untrusted ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::vetted_promotion_preserves_compliance_envelope_verification ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::vetted_with_expired_attestation_is_rejected ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::vetted_with_forged_attestation_signature_is_rejected ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::vetted_with_unenrolled_vetter_is_rejected ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::vetted_with_valid_attestation_admits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::vetted_without_attestation_is_deferred ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test admission::tests::wrapper_delegates_non_vetted_tiers ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test compliance_verify::tests::fingerprint_mismatch_is_rejected_via_delegation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test compliance_verify::tests::tampered_signature_is_rejected_via_delegation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test fixture_replay::tests::fixture_empty_queue_returns_transport_error ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test fixture_replay::tests::fixture_errors_propagate ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test fixture_replay::tests::fixture_records_calls ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test fixture_replay::tests::fixture_search_returns_queued_response ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test http::tests::drip_response_cannot_extend_exchange_deadline_f4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.24s
+
+
+running 1 test
+test http::tests::later_resolved_address_is_tried_after_connection_refusal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test http::tests::unsigned_http_refusal_preserves_status_p7 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test import::tests::divergent_manifest_rejects ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test import::tests::extract_and_verify_consistent_bundle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test import::tests::missing_signed_package_json_rejects ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test operations::tests::artifact_args_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test operations::tests::deprecate_args_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test operations::tests::manifest_args_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test operations::tests::operation_serialization_is_snake_case ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test operations::tests::search_args_defaults ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test operations::tests::search_args_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test operations::tests::yanks_since_args_serde_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test security::review_tests::configured_ca_replaces_bundled_roots_d4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test security::review_tests::explicit_development_literal_loopback_matrix_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test security::review_tests::registry_hex_diagnostics_do_not_echo_input_p8 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test security::review_tests::registry_typo_is_refused_p11 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test security::review_tests::registry_uri_matrix_and_trailing_dns_labels_p3_p9 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test security::review_tests::signed_params_less_notification_verifies_p7 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test server::tests::development_default_ports_use_the_same_canonical_uri_as_clients ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test storage::tests::absent_install_inventory_does_not_create_a_store ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test storage::tests::put_and_get_artifact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.02s
+
+
+running 1 test
+test storage::tests::put_and_get_manifest ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.01s
+
+
+running 1 test
+test storage::tests::search_excludes_yanked_by_default ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.02s
+
+
+running 1 test
+test storage::tests::search_finds_spirit_by_name ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.01s
+
+
+running 1 test
+test storage::tests::search_includes_yanked_when_requested ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.02s
+
+
+running 1 test
+test storage::tests::version_not_found_error ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test storage::tests::yanks_since_returns_filtered_entries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.02s
+
+
+running 1 test
+test yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test yank::tests::policy_outcomes_are_distinct_ac8 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test yank::tests::repeated_source_does_not_replay_journal_rows ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+
+running 1 test
+test rust_inproc_is_refused_before_every_admission_tier ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test structural_class_reads_have_the_named_typed_outcomes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test structural_fkcs_reads_refuse_every_evasion_shape ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test wasm_component_uses_t2_at_each_admission_tier ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test fr59_300s_boundary_passes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test fr59_301s_violates ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test fr59_poll_interval_resolver_clamps_correctly ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test fr59_yank_propagates_within_5min_window ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test admit_spirit_local_unsigned_passes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test admit_spirit_public_untrusted_without_sig_fails ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test divergent_manifest_rejects ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test extract_bundle_happy_path ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test missing_signed_package_rejects ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test origin_roundtrips_through_storage ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test publish_with_origin_persists_origin_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test published_origin_persists_without_origin_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test verify_consistent_bundle_ok ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test idle_first_byte_is_bounded_more_tightly_than_a_request_f1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 1.05s
+
+
+running 1 test
+test metadata_body_limit_is_checked_before_body_allocation_f2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.05s
+
+
+running 1 test
+test one_source_cannot_occupy_every_registry_slot_f1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.05s
+
+
+running 1 test
+test publication_hint_cannot_widen_another_rpc_body_cap_f2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.10s
+
+
+running 1 test
+test browser_and_rebinding_requests_cannot_publish ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.30s
+
+
+running 1 test
+test connection_population_is_bounded ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.66s
+
+
+running 1 test
+test header_bytes_and_count_are_bounded ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.15s
+
+
+running 1 test
+test index_persistence_failure_cannot_return_a_receipt ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.01s
+
+
+running 1 test
+test malformed_tools_call_has_a_json_rpc_error ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.10s
+
+
+running 1 test
+test registry_inbox_is_not_an_operator_install ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.01s
+
+
+running 1 test
+test server_tier_floor_uses_admission_policy_ordering ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 1.05s
+
+
+running 1 test
+test sibling_provenance_refuses_an_unrecorded_executable ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test sigterm_cancels_an_active_trickling_connection ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.15s
+
+
+running 1 test
+test traversal_publish_is_an_rpc_error_without_escape_files ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.15s
+
+
+running 1 test
+test trickling_request_has_an_absolute_deadline ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 5.11s
+
+
+running 1 test
+test standalone_population_rejection_has_complete_http_framing ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.66s
+
+
+running 1 test
+test standalone_rejections_have_complete_http_framing_and_clean_eof ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 10.95s
+
+
+running 1 test
+test standalone_server_roundtrip_isolates_root_and_exits_cleanly ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.15s
+
+
+running 1 test
+test unauthenticated_development_server_refuses_non_loopback_bind ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test http_install_requires_explicit_development_opt_in_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+
+running 1 test
+test server_requires_tls_or_explicit_loopback_development_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+
+running 1 test
+test tls::bad_signature_byte_is_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::cli_omitted_yank_or_unauthenticated_head_refuses_before_persistence_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.49s
+
+
+running 1 test
+test tls::cli_tls_install_authenticates_before_persistence_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.27s
+
+
+running 1 test
+test tls::cli_tls_yanked_version_is_refused_before_persistence_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.31s
+
+
+running 1 test
+test tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.12s
+
+
+running 1 test
+test tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.06s
+
+
+running 1 test
+test tls::configured_root_and_ca_authenticate_real_registry_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.52s
+
+
+running 1 test
+test tls::configured_root_is_bound_to_canonical_uri_before_contact_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.07s
+
+
+running 1 test
+test tls::envelope_incomplete_head_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::envelope_missing_head_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::envelope_missing_signature_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::envelope_stripped_yank_entry_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::envelope_wrong_nonce_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::envelope_wrong_uri_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::handshake_failure_never_attempts_plaintext_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+
+running 1 test
+test tls::hostile_registry_wrong_configured_root_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::https_redirect_never_downgrades_to_http_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.05s
+
+
+running 1 test
+test tls::https_requires_configured_root_not_response_supplied_key_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+
+running 1 test
+test tls::incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 1.16s
+
+
+running 1 test
+test tls::interception_expired_certificate_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.17s
+
+
+running 1 test
+test tls::interception_untrusted_ca_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.17s
+
+
+running 1 test
+test tls::interception_wrong_host_certificate_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.16s
+
+
+running 1 test
+test tls::loopback_development_requires_both_sides_and_keeps_yank_signatures_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.17s
+
+
+running 1 test
+test tls::malformed_private_seed_diagnostic_never_echoes_key_bytes_p8 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+
+running 1 test
+test tls::private_key_custody_refuses_group_or_world_access_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+
+running 1 test
+test tls::private_key_custody_refuses_seed_inside_package_store_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+
+running 1 test
+test tls::private_seed_custody_refuses_0644_and_0440_p12 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+
+running 1 test
+test tls::private_tls_key_inside_package_store_is_refused_p12 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+
+running 1 test
+test tls::server_rejects_client_without_dev_handshake_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.07s
+
+
+running 1 test
+test tls::signed_head_behind_requested_cursor_is_typed_d3_p5 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.06s
+
+
+running 1 test
+test tls::signed_payload_head_must_equal_envelope_head_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::signed_valid_duplicate_body_is_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::signed_valid_empty_view_with_nonzero_head_is_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::signed_valid_extra_entries_are_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::signed_valid_gap_body_is_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::signed_wrong_envelope_version_is_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::signed_wrong_request_hash_is_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test tls::tls_admission_refusal_is_encrypted_http_503_f1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.11s
+
+
+running 1 test
+test crypto_provider_drift_rejects_naming_field ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test honest_claim_with_matching_runtime_override_admits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test manifest_matching_envelope_still_admits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test provider_endpoint_drift_rejects_naming_field ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test trust_tier_drift_rejects_naming_field ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+
+running 1 test
+test search_acquires_yanks_lock_once ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.02s
+
+
+running 1 test
+test yank_visibility_preserved_after_contention_fix ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.02s
+
+
+running 1 test
+test review_p5_index_recovery_error_is_returned_not_only_logged ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.02s
+
+
+running 1 test
+test review_p5_partial_generation_delete_restores_the_complete_preimage ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.04s
+
+
+running 1 test
+test artifact_swap_is_refused_ac6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test fkcs_off_surface_refusal_precedes_a_valid_attestation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test leg1_round_trip_issue_promote_revoke ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test leg2_forged_signature_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test leg3_expired_attestation_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test leg4_forged_vetter_key_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test leg5_upgrade_flap_control ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test leg7_four_cause_distinguishability ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+test publisher_swap_is_refused_ac6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+
+running 1 test
+attestation-role-v2 digest=ed90ab034721310c37f470f76ca76ebc46ef28e5b8baa75f9021c2fcf1d6e05d signature=6fefa599ad64fff04d885e9cdef44d621477d1925e6bfda013fa621f32d838a34e9db53c3a2149c4d2ccc90553f6700356c944fd72701d730740e25504384a0f
+test attestation_rejects_unscoped_digest_signature_review_f5 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.01s
+
+
+running 1 test
+test blocked_registry_fetch_does_not_block_shutdown_or_boot ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 3.00s
+
+
+running 1 test
+test cursor_from_another_registry_is_replayed_from_zero_p2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.01s
+
+
+running 1 test
+test daemon_cursor_restart_does_not_replay_journalled_yanks_ac7 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.25s
+
+
+running 1 test
+test every_registry_auth_test_holds_the_shared_environment_mutex_p15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+
+running 1 test
+test expired_signed_yank_request_cannot_mutate_registry_f4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.15s
+
+
+running 1 test
+test first_publisher_pin_is_typed_and_survives_restart_ac10 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.03s
+
+
+running 1 test
+test install_refuses_present_yank_with_unpinned_authority_f2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.25s
+
+
+running 1 test
+test installed_publisher_and_version_pins_survive_uninstall_d2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 1.00s
+
+
+running 1 test
+test installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 1.00s
+
+
+running 1 test
+key-event-role-v2 digest=372e12a4a5ed9710beeae3313e641c18ca40cadf0a13b88921c2f0d2e5df1966 signature=4ae51f6ab49fc78f68632334a3cfd3351ae98598c2281d7ed20898ce1028501ed086c542be4cfd23dbe567848d25827494ec99dffc0d89b411946ec73ed58100
+test keyring_event_rejects_unscoped_digest_signature_review_f5 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+
+running 1 test
+test legacy_inactive_version_pins_are_migrated_before_uninstall_d2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.60s
+
+
+running 1 test
+test local_reevaluation_failure_does_not_prevent_fetch_p1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+
+running 1 test
+test missing_home_never_selects_shared_temporary_cursor_p14 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+
+running 1 test
+test only_explicit_operator_release_allows_repin_after_uninstall_d2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.65s
+
+
+running 1 test
+test published_versions_are_immutable_and_identical_publish_is_idempotent_d3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.01s
+
+
+running 1 test
+test publisher_and_enrolled_vetter_yanks_are_signed_labelled_and_restart_safe_ac7 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.50s
+
+
+running 1 test
+test renewed_promotion_replaces_only_evidence_for_identical_package_d4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.40s
+
+
+running 1 test
+test signed_nonce_cannot_be_reused_for_another_withdrawal_f4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.25s
+
+
+running 1 test
+test signed_revocation_lists_roundtrip_cbor_and_reject_wrong_byte_lengths ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+
+running 1 test
+test signed_yank_cannot_be_replayed_to_another_registry_f4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.25s
+
+
+running 1 test
+test signed_yank_resigning_does_not_append_duplicate_rows_p13 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.30s
+
+
+running 1 test
+test signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.35s
+
+
+running 1 test
+test uninstall_waits_for_cross_process_mutation_lock_p8 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.55s
+
+
+running 1 test
+test unreadable_promotion_is_not_treated_as_absent_p17 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.25s
+
+
+running 1 test
+test unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.40s
+
+
+running 1 test
+test unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+
+running 1 test
+role=maos.registry.deprecate.publisher.v2 preimage=8c78246d616f732e72656769737472792e6465707265636174652e7075626c69736865722e763202781a687474703a2f2f3132372e302e302e313a32303130312f6d637090182a182a182a182a182a182a182a182a182a182a182a182a182a182a182a182a1a000493e066766563746f7265312e302e306977697468647261776e697075626c6973686572982018f80c18cc18dc18e418ae181c0718ae1820188a182a18df189918a31018ae18420718e01830186f18a0182318611018b01868182718bb18b818d0667665747465721903e8 signature=54e6a1fe48b2562a344b8bdca238fc9870172a2eb2ba3839a92145502a8ec1ccff3c9b6b43c723d998d7d7f06c46e6063046464c0b3bff7fb067e8ab496c220e
+role=maos.registry.deprecate.vetter.v2 preimage=8c78216d616f732e72656769737472792e6465707265636174652e7665747465722e763202781a687474703a2f2f3132372e302e302e313a32303130312f6d637090182a182a182a182a182a182a182a182a182a182a182a182a182a182a182a182a1a000493e066766563746f7265312e302e306977697468647261776e6676657474657298201718cb187918fb182b1841182018f218b118ec186518e41819188d186e0818b2188e1881183f18eb0118e418a4001883189b188518e11880188018ce667665747465721903e8 signature=21cf834d7bc511aef3eb5f8ece357e07047dfce29c0f1c395c4fb0290a07f716cbd4b76f5745f5944353f3b5905c2357d9cca655f2a3acf963f83443ceec5005
+test v2_role_nonce_audience_and_lifetime_vectors_reject_rebinding_f4_f5 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.01s
+
+
+running 1 test
+test verified_cursor_is_persisted_before_later_transient_failure_p2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.02s
+
+
+running 1 test
+test yank_authorization_allows_bounded_clock_skew_p10 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+
+running 1 test
+test zero_interval_cannot_silently_disable_local_vetting_p11 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+
+running 1 test
+test signed_yank_crosses_real_server_at_30_second_floor_ac7 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.11s
+
+
+running 1 test
+test filtered_snapshot_keeps_its_authenticated_complete_head_f6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.03s
+
+
+running 1 test
+test large_delta_is_refused_instead_of_returning_an_incomplete_signed_head_f6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.03s
+
+
+running 1 test
+test large_history_small_delta_uses_storage_lower_bound_f6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.03s
+
+
+running 1 test
+test init_creates_a_home_that_does_not_exist ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.02s
+
+
+running 1 test
+test init_creates_config_and_dirs ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.02s
+
+
+running 1 test
+test init_does_not_rewrite_an_existing_control_json ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.02s
+
+
+running 1 test
+test init_is_idempotent ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.02s
+
+
+running 1 test
+test init_mints_control_json_on_an_already_initialised_home ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.03s
+
+
+running 1 test
+test init_mints_control_json_with_custody ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.02s
+
+
+running 1 test
+test a_failed_raise_is_an_error_line_and_the_shell_keeps_serving ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+
+running 1 test
+test an_oversized_clarification_is_refused_before_it_reaches_the_host ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.06s
+
+
+running 1 test
+test at_directive_is_refused_while_a_halt_is_pending ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.04s
+
+
+running 1 test
+test butler_pick_is_refused_typed_and_dispatches_nothing ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+
+running 1 test
+test context_arriving_late_is_waited_for_and_used ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.42s
+
+
+running 1 test
+test context_never_arriving_renders_not_delivered_and_never_proceeds ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 5.01s
+
+
+running 1 test
+test door_path_resolution_renders_unprompted_within_ticks ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.10s
+
+
+running 1 test
+test every_repl_line_flows_through_the_output_writer ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+
+running 1 test
+test halt_already_resolved_is_printed_and_the_winner_still_renders ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.12s
+
+
+running 1 test
+test halt_line_prints_only_after_the_kernel_accepted_the_halt ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+
+running 1 test
+test late_clarification_names_the_halt_and_kind ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.04s
+
+
+running 1 test
+test overridden_proceeds_without_context ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.10s
+
+
+running 1 test
+test terminated_renders_turn_abandoned_and_dispatches_nothing ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.10s
+
+
+running 1 test
+test typed_clarification_resolves_then_the_spirit_proceeds_with_the_context ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.12s
+
+
+running 1 test
+test dispatch_directive_ambiguous_halt ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test dispatch_directive_well_specified_no_halt ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test parse_at_line_tab_separator ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test shell_parse_at_line_variations ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 1 test
+test publish::tests::parse_tier_accepts_public_vetted ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test publish::tests::parse_tier_accepts_three_valid_tiers ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test publish::tests::parse_tier_rejects_unknown ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test publish::tests::resolve_registry_uri_rejects_whitespace_only ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test publish::tests::resolve_registry_uri_trims_whitespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test publish::tests::tier_to_cli_string_round_trips ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test signing::tests::base64_with_padding_decodes_correctly ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test signing::tests::base64_without_padding_fails ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test signing::tests::derive_keypair_round_trips_signature ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test signing::tests::extract_spirit_id_and_version_parses_minimal_manifest ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test signing::tests::extract_spirit_id_prefers_spirit_id_over_name ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test signing::tests::hex_seed_loads ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test signing::tests::hex_seed_with_prefix_and_whitespace_loads ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test publish_multimegabyte_component_to_standalone_binary ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 2.82s
+
+
+running 1 test
+test publish_real_address_returns_receipt_and_manifest ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.15s
+
+
+running 1 test
+test accepts_public_vetted_via_parse_tier ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+
+running 1 test
+test rejects_tier_mismatch_with_manifest ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+
+running 1 test
+test rejects_unknown_tier_via_parse_tier ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+
+running 1 test
+test publisher_and_vetter_yank_verbs_authenticate_ac7 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.25s
+
+
+running 1 test
+test vet_issue_install_promote_revoke_refuses_next_admission_ac6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.40s
+
+
+running 1 test
+test diff_oracle_derives_kernel_unchanged_and_ignores_self_reported_flags ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test diff_oracle_ignores_forged_self_report_even_when_it_claims_red ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test diff_oracle_reports_kernel_unchanged_for_identical_surfaces ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test disposition_inline_parser_extracts_phase_keys_and_rejects_malformed_stanzas ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test every_declared_admission_file_reds_a_one_byte_mutation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.01s
+
+
+running 1 test
+test frozen_baseline_files_carry_real_public_surfaces_not_synthetic_tokens ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test frozen_baseline_reconciles_live_triple_and_rejects_src_line_drift ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.12s
+
+
+running 1 test
+test frozen_snapshot_and_current_kernel_baselines_are_independently_valid ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.14s
+
+
+running 1 test
+test oracle_fault_injections_red_kernel_unchanged_around_a_stable_base ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test phase_disposition_inherits_downward_and_resolves_the_blocking_window ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test read_disposition_extracts_exactly_the_check_fkcs_stanza ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+
+running 1 test
+test accepted_registry_sockets_are_blocking_before_clone_p2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s
+
+
+running 1 test
+test clone_failure_cannot_exit_the_registry_accept_loop_f3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s
+
+
+running 1 test
+test daemon_registry_policy_has_one_fail_closed_reader_d1_p10 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.19s
+
+
+running 1 test
+test registry_accept_errors_have_backoff_f3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s
+
+
+running 1 test
+test registry_bodies_do_not_preallocate_declared_lengths_f2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s
+
+
+running 1 test
+test registry_poller_starts_after_shared_installed_boot_admission_f9 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.19s
+
+
+running 1 test
+test registry_tls_features_are_explicit_not_transitive_defaults_d2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.01s
+
+
+running 1 test
+test executable_typescript_registry_example_has_both_development_optins_p1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+
+running 1 test
+test registry_workflows_explicitly_select_server_mode_and_client_development_optin ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.05s
+

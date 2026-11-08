@@ -1,0 +1,10 @@
+{
+  "probe": [
+    "ps",
+    "-eo",
+    "pid,ppid,etime,stat,comm,args"
+  ],
+  "exit_code": 0,
+  "compiler_processes": [],
+  "stderr": ""
+}

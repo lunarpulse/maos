@@ -61,7 +61,7 @@ pub fn rpc(addr: &str, method: &str, params: serde_json::Value) -> serde_json::V
     .unwrap();
     write!(
         stream,
-        "POST /mcp HTTP/1.1\r\nHost: {addr}\r\nX-Maos-Registry-Development: true\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "POST /mcp HTTP/1.1\r\nHost: {addr}\r\nMcp-Name: {method}\r\nX-Maos-Registry-Development: true\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
     )
     .unwrap();

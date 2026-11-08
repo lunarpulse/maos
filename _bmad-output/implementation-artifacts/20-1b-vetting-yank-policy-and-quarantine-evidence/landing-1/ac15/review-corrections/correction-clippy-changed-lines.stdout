@@ -1,0 +1,1509 @@
+diff --git a/crates/maos-bin/Cargo.toml b/crates/maos-bin/Cargo.toml
+index 91a21c06..a6fa9fc6 100644
+--- a/crates/maos-bin/Cargo.toml
++++ b/crates/maos-bin/Cargo.toml
+@@ -19,0 +20 @@ network = [
++    "maos-cli/tls",
+@@ -47 +48 @@ ulid = "1.1"
+-maos-cli = { path = "../maos-cli" }
++maos-cli = { path = "../maos-cli", default-features = false }
+@@ -134,0 +136 @@ syn = { version = "2.0", features = ["full", "visit"] }
++proc-macro2 = "1"
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index b7574a21..20db6cfa 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -3197 +3197 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+-        maos_kernel_core::security::operator_config::RegistrySection::resolve_from_env_and_disk();
++        maos_registry::install::operator_config().map_err(|error| error.to_string())?;
+@@ -3200,2 +3200 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+-        let env_uri = std::env::var("MAOS_REGISTRY_URI").unwrap_or_default();
+-        if env_uri == "stub" {
++        if registry_cfg.uri == "stub" {
+@@ -3232,2 +3230,0 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+-            let config =
+-                maos_registry::install::operator_config().map_err(|error| error.to_string())?;
+@@ -3236 +3233 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+-                config,
++                registry_cfg.clone(),
+@@ -3246,38 +3242,0 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+-    let mut yank_poller_task = {
+-        let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
+-            transparency_log.clone(),
+-            scheduler.clone(),
+-            revocation_applier.clone(),
+-            yank_policy,
+-            registry_cfg.uri.clone(),
+-        ));
+-        eprintln!(
+-            "maos: yank cadence={}s policy={} registry-fetch={}",
+-            interval.as_secs(),
+-            match yank_policy {
+-                maos_registry::yank::YankPolicy::Warn => "warn",
+-                maos_registry::yank::YankPolicy::Quarantine => "quarantine",
+-                maos_registry::yank::YankPolicy::AutoRevoke => "auto-revoke",
+-            },
+-            if yank_source.is_some() {
+-                "enabled"
+-            } else {
+-                "disabled"
+-            }
+-        );
+-        if yank_policy == maos_registry::yank::YankPolicy::Quarantine {
+-            eprintln!("maos: quarantine requested only (effect lands with KQ1; not claimed in L1)");
+-        }
+-        if let Some(source) = yank_source {
+-            maos_bin::yank_policy::PollTask::start(
+-                Arc::new(maos_registry::yank::YankPoller::new(
+-                    source,
+-                    observer,
+-                    registry_cfg.uri.clone(),
+-                )),
+-                interval,
+-            )
+-        } else {
+-            maos_bin::yank_policy::PollTask::start_local(observer, interval)
+-        }
+-    };
+@@ -4340,0 +4300,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
++    let mut yank_poller_task = {
++        let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
++            transparency_log.clone(),
++            scheduler.clone(),
++            revocation_applier.clone(),
++            yank_policy,
++            registry_cfg.uri.clone(),
++        ));
++        eprintln!(
++            "maos: yank cadence={}s policy={} registry-fetch={}",
++            interval.as_secs(),
++            match yank_policy {
++                maos_registry::yank::YankPolicy::Warn => "warn",
++                maos_registry::yank::YankPolicy::Quarantine => "quarantine",
++                maos_registry::yank::YankPolicy::AutoRevoke => "auto-revoke",
++            },
++            if yank_source.is_some() {
++                "enabled"
++            } else {
++                "disabled"
++            }
++        );
++        if yank_policy == maos_registry::yank::YankPolicy::Quarantine {
++            eprintln!("maos: quarantine requested only (effect lands with KQ1; not claimed in L1)");
++        }
++        if let Some(source) = yank_source {
++            maos_bin::yank_policy::PollTask::start(
++                Arc::new(maos_registry::yank::YankPoller::new(
++                    source,
++                    observer,
++                    registry_cfg.uri.clone(),
++                )),
++                interval,
++            )
++        } else {
++            maos_bin::yank_policy::PollTask::start_local(observer, interval)
++        }
++    };
+@@ -6109,0 +6107 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
++                yank_poller_task.shutdown().await;
+@@ -6120 +6117,0 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+-                yank_poller_task.shutdown().await;
+@@ -9288,0 +9286 @@ description = "smoke test spirit successor"
++            yank_poller_task.shutdown().await;
+@@ -9297 +9294,0 @@ description = "smoke test spirit successor"
+-            yank_poller_task.shutdown().await;
+diff --git a/crates/maos-bin/tests/root_shutdown_unload_16_3.rs b/crates/maos-bin/tests/root_shutdown_unload_16_3.rs
+index dc50a836..e855bb92 100644
+--- a/crates/maos-bin/tests/root_shutdown_unload_16_3.rs
++++ b/crates/maos-bin/tests/root_shutdown_unload_16_3.rs
+@@ -63,0 +64,3 @@ mod t3_substrate;
++#[path = "support/yank_audit.rs"]
++mod yank_audit;
++
+@@ -65 +67,0 @@ mod t3_substrate;
+-/// Parent-block state is inherited, but a join in a sibling branch is not.
+@@ -68,91 +69,0 @@ fn every_audit_sender_release_joins_the_yank_owner() {
+-    use syn::visit::Visit;
+-
+-    #[derive(Default)]
+-    struct AuditReleases {
+-        joined: bool,
+-        releases: usize,
+-        drains: usize,
+-    }
+-    fn is_yank_join(statement: &syn::Stmt) -> bool {
+-        let syn::Stmt::Expr(syn::Expr::Await(awaited), _) = statement else {
+-            return false;
+-        };
+-        let syn::Expr::MethodCall(call) = awaited.base.as_ref() else {
+-            return false;
+-        };
+-        matches!(call.receiver.as_ref(), syn::Expr::Path(path)
+-            if path.path.is_ident("yank_poller_task"))
+-            && call.method == "shutdown"
+-            && call.args.is_empty()
+-    }
+-    fn is_writer(expression: &syn::Expr) -> bool {
+-        match expression {
+-            syn::Expr::Path(path) => path.path.is_ident("audit_writer"),
+-            syn::Expr::Reference(reference) => is_writer(&reference.expr),
+-            _ => false,
+-        }
+-    }
+-    impl<'ast> Visit<'ast> for AuditReleases {
+-        fn visit_block(&mut self, block: &'ast syn::Block) {
+-            let inherited = self.joined;
+-            for statement in &block.stmts {
+-                self.visit_stmt(statement);
+-                self.joined |= is_yank_join(statement);
+-            }
+-            self.joined = inherited;
+-        }
+-        fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+-            if matches!(call.func.as_ref(), syn::Expr::Path(path)
+-                if path.path.is_ident("drop"))
+-                && call.args.len() == 1
+-                && matches!(call.args.first(), Some(syn::Expr::Path(path))
+-                    if path.path.is_ident("audit_tx"))
+-            {
+-                assert!(
+-                    self.joined,
+-                    "audit_tx release without a prior yank-owner join in its teardown scope"
+-                );
+-                self.releases += 1;
+-            }
+-            syn::visit::visit_expr_call(self, call);
+-        }
+-        fn visit_expr_await(&mut self, awaited: &'ast syn::ExprAwait) {
+-            if is_writer(&awaited.base)
+-                || matches!(awaited.base.as_ref(), syn::Expr::Call(call)
+-                    if call.args.iter().any(is_writer))
+-            {
+-                assert!(
+-                    self.joined,
+-                    "audit writer drain without a prior yank-owner join"
+-                );
+-                self.drains += 1;
+-            }
+-            syn::visit::visit_expr_await(self, awaited);
+-        }
+-        fn visit_stmt_macro(&mut self, statement: &'ast syn::StmtMacro) {
+-            if statement.mac.path.is_ident("release_audit_tx_holders") {
+-                self.joined = true;
+-            }
+-            syn::visit::visit_stmt_macro(self, statement);
+-        }
+-        fn visit_item_macro(&mut self, statement: &'ast syn::ItemMacro) {
+-            if statement
+-                .ident
+-                .as_ref()
+-                .is_some_and(|ident| ident == "release_audit_tx_holders")
+-            {
+-                let compact: String = statement
+-                    .mac
+-                    .tokens
+-                    .to_string()
+-                    .split_whitespace()
+-                    .collect();
+-                assert!(
+-                    compact.contains("yank_poller_task.shutdown().await;drop(audit_tx);"),
+-                    "the shared audit-release macro must join before releasing its sender"
+-                );
+-                self.releases += 1;
+-            }
+-            syn::visit::visit_item_macro(self, statement);
+-        }
+-    }
+@@ -160,7 +71,2 @@ fn every_audit_sender_release_joins_the_yank_owner() {
+-    let file = syn::parse_file(source).expect("composition root remains valid Rust");
+-    let mut audit = AuditReleases::default();
+-    audit.visit_file(&file);
+-    assert!(
+-        audit.releases >= 7,
+-        "all seven existing audit release sites must be audited"
+-    );
++    let audit = yank_audit::inspect(source);
++    assert!(audit.errors.is_empty(), "{audit:?}");
+@@ -168,10 +74,2 @@ fn every_audit_sender_release_joins_the_yank_owner() {
+-        audit.drains >= 11,
+-        "all eleven existing audit writer drains must be audited"
+-    );
+-    assert_eq!(
+-        audit.releases,
+-        source
+-            .lines()
+-            .filter(|line| line.trim() == "drop(audit_tx);")
+-            .count(),
+-        "a new macro or release shape needs an explicit AST audit"
++        audit.has_expected_main_arms(),
++        "root teardown arms changed: {audit:?}"
+@@ -2314,0 +2213,6 @@ mod cohort {
++        let name =
++            std::any::type_name_of_val(&ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains);
++        let name = name
++            .split_once("::")
++            .expect("test function includes its crate")
++            .1;
+@@ -2316,5 +2220 @@ mod cohort {
+-            .args([
+-                "--exact",
+-                "cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains",
+-                "--nocapture",
+-            ])
++            .args(["--exact", name, "--nocapture"])
+@@ -2325,0 +2226,5 @@ mod cohort {
++        let stdout = String::from_utf8_lossy(&output.stdout);
++        assert!(
++            stdout.lines().any(|line| line == "running 1 test"),
++            "negative control must select exactly one real test: {stdout}"
++        );
+diff --git a/crates/maos-cli/Cargo.toml b/crates/maos-cli/Cargo.toml
+index 9a5bf695..dc83655a 100644
+--- a/crates/maos-cli/Cargo.toml
++++ b/crates/maos-cli/Cargo.toml
+@@ -17,0 +18,4 @@ path = "src/lib.rs"
++[features]
++default = ["tls"]
++tls = ["maos-registry/tls"]
++
+@@ -23 +27 @@ maos-domain = { path = "../maos-domain" }  # Story 9.1 FR44 — audit key loader
+-maos-registry = { path = "../maos-registry" }
++maos-registry = { path = "../maos-registry", default-features = false }
+diff --git a/crates/maos-domain/src/ports/registry.rs b/crates/maos-domain/src/ports/registry.rs
+index 410376fc..7ef55931 100644
+--- a/crates/maos-domain/src/ports/registry.rs
++++ b/crates/maos-domain/src/ports/registry.rs
+@@ -386,0 +387,3 @@ pub struct YankList {
++    /// Authenticated complete server head, when supplied by the registry protocol.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub head: Option<u64>,
+@@ -391 +394,4 @@ impl YankList {
+-        Self { entries }
++        Self {
++            entries,
++            head: None,
++        }
+@@ -438,0 +445,3 @@ pub enum RegistryError {
++    #[error("registry history rollback: authenticated head {head} is behind cursor {cursor}; cursor unchanged, operator intervention required")]
++    HeadBehindCursor { head: u64, cursor: u64 },
++
+diff --git a/crates/maos-fkcs/Cargo.toml b/crates/maos-fkcs/Cargo.toml
+index 7429959c..b4f1d2d6 100644
+--- a/crates/maos-fkcs/Cargo.toml
++++ b/crates/maos-fkcs/Cargo.toml
+@@ -12 +12 @@ maos-domain = { path = "../maos-domain" }
+-maos-registry = { path = "../maos-registry" }
++maos-registry = { path = "../maos-registry", default-features = false }
+diff --git a/crates/maos-registry/SECURITY.md b/crates/maos-registry/SECURITY.md
+index c6b15e7e..7acfc1c9 100644
+--- a/crates/maos-registry/SECURITY.md
++++ b/crates/maos-registry/SECURITY.md
+@@ -6,3 +6,4 @@ Production uses **rustls TLS plus a separately configured Ed25519 registry root*
+-The leaf uses bundled WebPKI roots, optionally extended with an operator CA, and
+-verifies the certificate hostname and validity. Neither a response-supplied key
+-nor a valid certificate by itself authorizes registry metadata.
++Without `ca_certificate`, transport uses bundled Mozilla WebPKI roots, **not the
++platform trust store**. A configured CA **replaces** those roots; it is not
++additive. Hostname and validity checks remain mandatory. Neither a
++response-supplied key nor a valid certificate alone authorizes registry metadata.
+@@ -15,0 +17,6 @@ TLS permits a non-loopback bind; it does not introduce anonymous mutation access
++The library `with_tls` entry point also checks private-key ownership/mode.
++Package-store exclusion is enforced by `RegistryServerArgs::build`; callers
++composing generic storage directly must enforce that deployment boundary.
++`with_server_signing_key` accepts already-provisioned bytes, not a file: its
++caller owns custody. One registry seed currently signs domain-separated response
++and tier-attestation preimages; those roles are not independent key rotations.
+@@ -25,0 +33,5 @@ directories; a relative CA path is opened relative to the invoking process.
++CLI and daemon use one fail-closed reader, including when no URI is set: malformed
++TOML, unknown registry keys and invalid keys do not silently become a null client.
++An organization signing key implies the signature requirement in both enforcement
++and the daemon banner. An environment URI cannot move an HTTPS pin away from its
++exact TOML-configured URI.
+@@ -45 +57,15 @@ and real CLI persistence oracles. The branch-only hosted recipe is authored but
+-not executed; hosted interception and macOS compilation remain unverified.
++not executed; hosted interception, live public-CA exclusion, and native macOS
++runtime/compilation remain unverified.
++
++The blocking server admits at most eight request workers and two per source IP,
++plus two bounded TLS-aware refusal workers. Excess refusal capacity closes the
++connection; it never sends plaintext to a TLS peer. TLS/first-byte reads have a
++one-second absolute deadline, request reads/writes separate five-second bounds.
++Metadata requests are capped at 64 KiB; publications at 64 MiB. Uploads larger
++than the metadata cap require `Mcp-Name: registry.publish` (SDK/legacy leaf callers
++supply it); the parsed operation is checked again, so a forged hint cannot widen
++another RPC's cap. Bodies grow only from received bytes. Client DNS, connect,
++TLS, writes and reads share one 30-second absolute exchange deadline. At most
++eight libc DNS workers may outlive their caller; they retain no daemon owners.
++Unsigned non-2xx responses remain refusals with their HTTP status, not trusted
++successes. Success responses still require their configured-root envelope.
+@@ -113 +139 @@ row atomically with fsync, and reset on obsolete/corrupt/foreign-registry state.
+-Gaps/overshoots trigger a journaled history resync, never trusted advancement.
++Sequence gaps within a non-rollback view request history resync, never trusted advancement.
+@@ -118,0 +145,13 @@ head contiguously from the requested cursor; no unsigned head advances trust.
++An authenticated head behind the requested/durable cursor is typed
++`HeadBehindCursor`, visible on stderr, and leaves the cursor unchanged; it never
++silently restarts at zero. Stop the daemon and verify the restored registry's
++identity/history out of band before recovery. Restore an appropriate previously
++verified cursor checkpoint, or explicitly archive `MAOS_REGISTRY_YANK_CURSOR_PATH`
++(default `$HOME/.local/share/maos/registry/yank_cursor.json`) to authorize a full
++rescan. Do not synthesize a cursor at the current head to skip withdrawals.
++Cursor files are URI-bound, not signing-key-bound or authenticated at rest.
++The storage query lower-bounds the requested sequence in one durable snapshot.
++More than 4096 returned rows is an explicit error, never a truncated signed
++success. Complete backfill beyond that cap needs a verified checkpoint or a
++paged authenticated-range protocol; automatic pagination is not supplied.
++Journal deserialization still reads the complete atomic JSON file per query.
+@@ -125,0 +165 @@ not started for a null source; cancellation does not await synchronous network I
++Shared fallible installed-boot admission completes before starting that owner.
+@@ -128 +168,2 @@ than silently disabling expiry. Shell/worker/oneshot drains join timer/poller
+-owners before the audit writer, so no poller retains the audit channel at drain.
++owners before supervisor stop, unload and audit drain. A portable AST guard checks
++all seven release sites and eleven named drain arms, including the shared macro.
+diff --git a/crates/maos-registry/src/client.rs b/crates/maos-registry/src/client.rs
+index a6d6720d..ae380f8c 100644
+--- a/crates/maos-registry/src/client.rs
++++ b/crates/maos-registry/src/client.rs
+@@ -21,0 +22,3 @@ pub struct RegistryClientConfig {
++    pub uri: String,
++    pub t3_for_public_untrusted: bool,
++    pub allow_unsigned_local: bool,
+@@ -30,0 +34,3 @@ impl Default for RegistryClientConfig {
++            uri: String::new(),
++            t3_for_public_untrusted: false,
++            allow_unsigned_local: true,
+@@ -103 +109,9 @@ impl McpSpiritRegistryClient {
+-        serde_json::from_value(resp.content).map_err(|e| RegistryError::Transport(e.to_string()))
++        let list: YankList = serde_json::from_value(resp.content)
++            .map_err(|e| RegistryError::Transport(e.to_string()))?;
++        if let Some(head) = list.head.filter(|head| *head < since_ns) {
++            return Err(RegistryError::HeadBehindCursor {
++                head,
++                cursor: since_ns,
++            });
++        }
++        Ok(list)
+diff --git a/crates/maos-registry/src/handlers/yanks_since.rs b/crates/maos-registry/src/handlers/yanks_since.rs
+index 0677610d..06196e35 100644
+--- a/crates/maos-registry/src/handlers/yanks_since.rs
++++ b/crates/maos-registry/src/handlers/yanks_since.rs
+@@ -14,9 +14,7 @@ pub fn handle_yanks_since(
+-    let mut list = storage.yanks_since(0).map_err(|e| e.to_string())?;
+-    let head = list.entries.last().map_or(0, |entry| entry.sequence);
+-    list.entries.retain(|entry| entry.sequence > args.since_ns);
+-    let mut value = serde_json::to_value(list).map_err(|e| format!("serialize error: {e}"))?;
+-    value
+-        .as_object_mut()
+-        .ok_or("invalid yank response")?
+-        .insert("head".into(), head.into());
+-    Ok(value)
++    let list = storage
++        .yanks_since(args.since_ns)
++        .map_err(|e| e.to_string())?;
++    if list.head.is_none() {
++        return Err("registry storage omitted the complete yank head".into());
++    }
++    serde_json::to_value(list).map_err(|e| format!("serialize error: {e}"))
+diff --git a/crates/maos-registry/src/http.rs b/crates/maos-registry/src/http.rs
+index c2ad4be4..dfda4c58 100644
+--- a/crates/maos-registry/src/http.rs
++++ b/crates/maos-registry/src/http.rs
+@@ -2,0 +3 @@
++use crate::server::DeadlineStream;
+@@ -11,0 +13 @@ pub struct RegistryHttp {
++    exchange_timeout: Duration,
+@@ -50,0 +53 @@ impl RegistryHttp {
++            exchange_timeout: Duration::from_secs(30),
+@@ -83,0 +87 @@ impl IoSubsystemPort for RegistryHttp {
++        let deadline = std::time::Instant::now() + self.exchange_timeout;
+@@ -95,5 +99,10 @@ impl IoSubsystemPort for RegistryHttp {
+-        let timeout = Duration::from_secs(30);
+-        let addresses = (host, port).to_socket_addrs().map_err(transport)?;
+-        let stream = connect_addresses(addresses, timeout).map_err(transport)?;
+-        stream.set_read_timeout(Some(timeout)).map_err(transport)?;
+-        stream.set_write_timeout(Some(timeout)).map_err(transport)?;
++        let stream = if let Ok(ip) = host.parse::<std::net::IpAddr>() {
++            connect_addresses([std::net::SocketAddr::new(ip, port)], deadline)
++        } else {
++            connect_addresses(
++                resolve_addresses(host, port, deadline).map_err(transport)?,
++                deadline,
++            )
++        }
++        .map_err(transport)?;
++        let stream = DeadlineStream::new(stream, deadline);
+@@ -124,0 +134,11 @@ impl IoSubsystemPort for RegistryHttp {
++        // Legacy direct RPC callers lack Streamable HTTP's normal routing hint.
++        if !headers
++            .iter()
++            .any(|(name, _)| name.eq_ignore_ascii_case("mcp-name"))
++            && crate::security::request_route(body)
++                .is_ok_and(|route| route.method == "registry.publish")
++        {
++            stream
++                .write_all(b"Mcp-Name: registry.publish\r\n")
++                .map_err(transport)?;
++        }
+@@ -188,3 +208,22 @@ impl IoSubsystemPort for RegistryHttp {
+-        let mut response_body = vec![0; length];
+-        reader.read_exact(&mut response_body).map_err(transport)?;
+-        if let Some(key) = &self.security.signing_pubkey {
++        if !(200..300).contains(&status) && length > 64 * 1024 {
++            return Err(IoError::Decode(
++                "registry refusal body exceeds 64 KiB".into(),
++            ));
++        }
++        let mut response_body = Vec::new();
++        while response_body.len() < length {
++            let available = reader.fill_buf().map_err(transport)?;
++            let size = available.len().min(length - response_body.len());
++            if size == 0 {
++                return Err(IoError::Decode("truncated HTTP body".into()));
++            }
++            response_body.extend_from_slice(&available[..size]);
++            reader.consume(size);
++        }
++        // Refusals have no success envelope; preserve their typed HTTP status.
++        if let Some(key) = self
++            .security
++            .signing_pubkey
++            .as_ref()
++            .filter(|_| (200..300).contains(&status))
++        {
+@@ -209 +248 @@ enum HttpStream {
+-    Plain(TcpStream),
++    Plain(DeadlineStream),
+@@ -211 +250 @@ enum HttpStream {
+-    Tls(Box<rustls::StreamOwned<rustls::ClientConnection, TcpStream>>),
++    Tls(Box<rustls::StreamOwned<rustls::ClientConnection, DeadlineStream>>),
+@@ -240 +279 @@ fn connect_addresses(
+-    timeout: Duration,
++    deadline: std::time::Instant,
+@@ -242 +280,0 @@ fn connect_addresses(
+-    let deadline = std::time::Instant::now() + timeout;
+@@ -264,0 +303,42 @@ fn connect_addresses(
++fn resolve_addresses(
++    host: &str,
++    port: u16,
++    deadline: std::time::Instant,
++) -> std::io::Result<Vec<std::net::SocketAddr>> {
++    use std::sync::atomic::{AtomicUsize, Ordering};
++    // libc resolution cannot be cancelled. Bound detached resolver ownership,
++    // and never let a late resolver retain scheduler/audit/application state.
++    static RESOLVERS: AtomicUsize = AtomicUsize::new(0);
++    struct Permit;
++    impl Drop for Permit {
++        fn drop(&mut self) {
++            RESOLVERS.fetch_sub(1, Ordering::AcqRel);
++        }
++    }
++    RESOLVERS
++        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |active| {
++            (active < 8).then_some(active + 1)
++        })
++        .map_err(|_| std::io::Error::other("registry resolver capacity exhausted"))?;
++    let permit = Permit;
++    let host = host.to_owned();
++    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
++    std::thread::Builder::new()
++        .name("registry-resolve".into())
++        .spawn(move || {
++            let _permit = permit;
++            let result = (host.as_str(), port)
++                .to_socket_addrs()
++                .map(|addresses| addresses.collect());
++            let _ = sender.send(result);
++        })?;
++    let remaining = deadline
++        .checked_duration_since(std::time::Instant::now())
++        .ok_or_else(|| {
++            std::io::Error::new(std::io::ErrorKind::TimedOut, "registry DNS deadline")
++        })?;
++    receiver
++        .recv_timeout(remaining)
++        .map_err(|_| std::io::Error::new(std::io::ErrorKind::TimedOut, "registry DNS deadline"))?
++}
++
+@@ -285 +365,5 @@ mod tests {
+-        let stream = connect_addresses([rejected, good], Duration::from_secs(2)).unwrap();
++        let stream = connect_addresses(
++            [rejected, good],
++            std::time::Instant::now() + Duration::from_secs(2),
++        )
++        .unwrap();
+@@ -287,0 +372,88 @@ mod tests {
++
++    fn response_peer(
++        status: &str,
++        body: &'static [u8],
++        drip: bool,
++    ) -> (String, std::thread::JoinHandle<()>) {
++        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
++        let uri = format!("http://{}/mcp", listener.local_addr().unwrap());
++        let status = status.to_owned();
++        let worker = std::thread::spawn(move || {
++            let (mut stream, _) = listener.accept().unwrap();
++            let mut reader = BufReader::new(&mut stream);
++            let mut line = String::new();
++            let mut length = 0;
++            loop {
++                line.clear();
++                reader.read_line(&mut line).unwrap();
++                if line == "\r\n" {
++                    break;
++                }
++                if let Some((name, value)) = line.split_once(':') {
++                    if name.eq_ignore_ascii_case("content-length") {
++                        length = value.trim().parse::<usize>().unwrap();
++                    }
++                }
++            }
++            let mut request = vec![0; length];
++            reader.read_exact(&mut request).unwrap();
++            drop(reader);
++            write!(
++                stream,
++                "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
++                body.len()
++            )
++            .unwrap();
++            for byte in body {
++                if stream.write_all(&[*byte]).is_err() {
++                    break;
++                }
++                if drip {
++                    std::thread::sleep(Duration::from_millis(30));
++                }
++            }
++        });
++        (uri, worker)
++    }
++    #[test]
++    fn unsigned_http_refusal_preserves_status_p7() {
++        let (uri, worker) = response_peer("403 Forbidden", b"", false);
++        let client = RegistryHttp::new(
++            &uri,
++            crate::security::RegistrySecurityConfig {
++                uri: Some(uri.clone()),
++                signing_pubkey: Some([0x91; 32]),
++                development_http: true,
++                ..Default::default()
++            },
++        )
++        .unwrap();
++        let result = client.http_post_exchange(&uri, b"{}", &[], "");
++        worker.join().unwrap();
++        assert!(
++            matches!(result, Ok(HttpExchange { status: 403, .. })),
++            "{result:?}"
++        );
++    }
++    #[test]
++    fn drip_response_cannot_extend_exchange_deadline_f4() {
++        let (uri, worker) = response_peer("200 OK", b"012345678901234567890123456789", true);
++        let mut client = RegistryHttp::new(
++            &uri,
++            crate::security::RegistrySecurityConfig::development_loopback(),
++        )
++        .unwrap();
++        client.exchange_timeout = Duration::from_millis(200);
++        let started = std::time::Instant::now();
++        let result = client.http_post_exchange(&uri, b"{}", &[], "");
++        let elapsed = started.elapsed();
++        worker.join().unwrap();
++        assert!(
++            result.is_err(),
++            "drip feed outlived the total deadline: {elapsed:?}"
++        );
++        assert!(
++            elapsed < Duration::from_secs(1),
++            "deadline was not absolute: {elapsed:?}"
++        );
++    }
+diff --git a/crates/maos-registry/src/install.rs b/crates/maos-registry/src/install.rs
+index 2e0e18f2..7ea94cbe 100644
+--- a/crates/maos-registry/src/install.rs
++++ b/crates/maos-registry/src/install.rs
+@@ -89,2 +89,2 @@ pub fn install(
+-        t3_for_public_untrusted: false,
+-        allow_unsigned_local: true,
++        t3_for_public_untrusted: config.t3_for_public_untrusted,
++        allow_unsigned_local: config.allow_unsigned_local,
+@@ -313,3 +313,5 @@ pub fn operator_config() -> Result<RegistryClientConfig, Error> {
+-    let path = std::path::PathBuf::from(std::env::var("HOME")?).join(".config/maos/operator.toml");
+-    let disk: toml::Value = match std::fs::read_to_string(path) {
+-        Ok(text) => toml::from_str(&text)?,
++    let path = std::env::var_os("HOME")
++        .filter(|home| !home.is_empty())
++        .map(|home| std::path::PathBuf::from(home).join(".config/maos/operator.toml"));
++    let disk: toml::Value = match path.map(std::fs::read_to_string).transpose() {
++        Ok(Some(text)) => toml::from_str(&text)?,
+@@ -319,0 +322 @@ pub fn operator_config() -> Result<RegistryClientConfig, Error> {
++        Ok(None) => toml::Value::Table(Default::default()),
+@@ -347 +350,2 @@ pub fn operator_config() -> Result<RegistryClientConfig, Error> {
+-            Ok(hex::decode(v)?
++            Ok(hex::decode(v)
++                .map_err(|_| "org signing key must be 32-byte hex")?
+@@ -362,0 +367,8 @@ pub fn operator_config() -> Result<RegistryClientConfig, Error> {
++    let boolean = |env: &str, key: &str, default: bool| -> Result<bool, Error> {
++        match value(env, key)?.as_deref() {
++            None => Ok(default),
++            Some("true" | "1") => Ok(true),
++            Some("false" | "0") => Ok(false),
++            Some(_) => Err(format!("invalid registry {key} boolean").into()),
++        }
++    };
+@@ -363,0 +376,11 @@ pub fn operator_config() -> Result<RegistryClientConfig, Error> {
++        uri: value("MAOS_REGISTRY_URI", "uri")?.unwrap_or_default(),
++        t3_for_public_untrusted: boolean(
++            "MAOS_REGISTRY_T3_FOR_PUBLIC_UNTRUSTED",
++            "t3_for_public_untrusted",
++            false,
++        )?,
++        allow_unsigned_local: boolean(
++            "MAOS_REGISTRY_ALLOW_UNSIGNED_LOCAL",
++            "allow_unsigned_local",
++            true,
++        )?,
+diff --git a/crates/maos-registry/src/security.rs b/crates/maos-registry/src/security.rs
+index 17514760..cb367a3c 100644
+--- a/crates/maos-registry/src/security.rs
++++ b/crates/maos-registry/src/security.rs
+@@ -27,0 +28,17 @@ impl RegistrySecurityConfig {
++        if let Some(table) = value.and_then(toml::Value::as_table) {
++            const KEYS: &[&str] = &[
++                "uri",
++                "tier_floor",
++                "t3_for_public_untrusted",
++                "allow_unsigned_local",
++                "org_signing_pubkey",
++                "require_server_tier_signature",
++                "allow_force_tier_at_import",
++                "signing_pubkey",
++                "ca_certificate",
++                "development_http",
++            ];
++            if let Some(key) = table.keys().find(|key| !KEYS.contains(&key.as_str())) {
++                return Err(format!("unknown registry key {key:?}"));
++            }
++        }
+@@ -48 +65 @@ impl RegistrySecurityConfig {
+-                        .map_err(|e| e.to_string())?
++                        .map_err(|_| "registry signing_pubkey must be 32-byte hex")?
+@@ -69,0 +87,3 @@ pub fn canonical_uri(uri: &str) -> Result<url::Url, String> {
++        || url
++            .host_str()
++            .is_some_and(|host| host.ends_with('.') || host.contains(".."))
+@@ -170,3 +190,6 @@ pub(crate) fn verify_response(
+-fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(), IoError> {
+-    // Inspect only routing/cursor fields. In particular, never materialize a
+-    // second JSON Value containing a publication's potentially large artifact.
++pub(crate) struct RequestRoute<'a> {
++    pub method: &'a str,
++    pub since: Option<u64>,
++}
++/// Borrow routing fields, skipping publication payloads without a second JSON Value.
++pub(crate) fn request_route(request: &[u8]) -> Result<RequestRoute<'_>, IoError> {
+@@ -187,2 +210,2 @@ fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(),
+-        #[serde(borrow)]
+-        params: Params<'a>,
++        #[serde(default, borrow)]
++        params: Option<Params<'a>>,
+@@ -191,5 +214,10 @@ fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(),
+-    let since = if request.method == "registry.yanks_since" {
+-        request.params.since_ns
+-    } else if request.method == "tools/call" && request.params.name == Some("registry.yanks_since")
+-    {
+-        request.params.arguments.and_then(|args| args.since_ns)
++    if request.method == "tools/call" {
++        let params = request
++            .params
++            .ok_or_else(|| authentication("missing tool routing"))?;
++        Ok(RequestRoute {
++            method: params
++                .name
++                .ok_or_else(|| authentication("missing tool name"))?,
++            since: params.arguments.and_then(|arguments| arguments.since_ns),
++        })
+@@ -196,0 +225,9 @@ fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(),
++        Ok(RequestRoute {
++            method: request.method,
++            since: request.params.and_then(|params| params.since_ns),
++        })
++    }
++}
++fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(), IoError> {
++    let route = request_route(request)?;
++    if route.method != "registry.yanks_since" {
+@@ -198 +235 @@ fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(),
+-    };
++    }
+@@ -205,0 +243 @@ fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(),
++        head: u64,
+@@ -215 +253,14 @@ fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(),
+-    let mut next = since.ok_or_else(|| authentication("missing yank cursor"))?;
++    let head = head.ok_or_else(|| authentication("missing authenticated yank head"))?;
++    if list.head != head {
++        return Err(authentication(
++            "payload head differs from authenticated head",
++        ));
++    }
++    let mut next = route
++        .since
++        .ok_or_else(|| authentication("missing yank cursor"))?;
++    // A valid empty historical view is authenticated, but semantically a rollback.
++    // Preserve that distinction for the registry client's typed boundary error.
++    if next > head && list.entries.is_empty() {
++        return Ok(());
++    }
+@@ -224 +275 @@ fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(),
+-    if head != Some(next) {
++    if head != next {
+@@ -273,7 +324 @@ pub(crate) fn client_tls(
+-    let mut roots = rustls::RootCertStore::empty();
+-    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+-    if let Some(path) = ca {
+-        for certificate in certificates(path)? {
+-            roots.add(certificate).map_err(|e| e.to_string())?;
+-        }
+-    }
++    let roots = client_roots(ca)?;
+@@ -289,0 +335,12 @@ pub(crate) fn client_tls(
++fn client_roots(ca: Option<&Path>) -> Result<rustls::RootCertStore, String> {
++    let mut roots = rustls::RootCertStore::empty();
++    if let Some(path) = ca {
++        for certificate in certificates(path)? {
++            roots.add(certificate).map_err(|e| e.to_string())?;
++        }
++    } else {
++        roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
++    }
++    Ok(roots)
++}
++#[cfg(feature = "tls")]
+@@ -307,0 +365,113 @@ pub(crate) fn server_tls(
++
++#[cfg(test)]
++mod review_tests {
++    use super::*;
++
++    #[test]
++    fn registry_uri_matrix_and_trailing_dns_labels_p3_p9() {
++        for uri in [
++            "https://REGISTRY.example/mcp",
++            "https://registry.example:443/mcp",
++            "https://registry.example./mcp",
++            "https://registry..example/mcp",
++            "https://registry.example/mcp/",
++            "https://registry.example/%6dcp",
++            "https://user:password@registry.example/mcp",
++        ] {
++            assert!(
++                canonical_uri(uri).is_err(),
++                "non-canonical URI accepted: {uri}"
++            );
++        }
++    }
++
++    #[test]
++    fn explicit_development_literal_loopback_matrix_p3() {
++        for (host, allowed) in [
++            ("127.0.0.1", true),
++            ("127.0.0.2", true),
++            ("[::1]", true),
++            ("0.0.0.0", false),
++            ("[::ffff:127.0.0.1]", false),
++            ("localhost", false),
++        ] {
++            let accepted = canonical_uri(&format!("http://{host}/mcp"))
++                .is_ok_and(|uri| literal_loopback(&uri));
++            assert_eq!(accepted, allowed, "{host}");
++        }
++    }
++
++    #[test]
++    fn registry_typo_is_refused_p11() {
++        let value = toml::Value::Table(toml::map::Map::from_iter([(
++            "signing_pubky".into(),
++            toml::Value::String("typo".into()),
++        )]));
++        assert!(
++            RegistrySecurityConfig::from_operator(Some(&value)).is_err(),
++            "unknown registry security keys must not silently disappear"
++        );
++    }
++
++    #[test]
++    fn registry_hex_diagnostics_do_not_echo_input_p8() {
++        let value = toml::Value::Table(toml::map::Map::from_iter([(
++            "signing_pubkey".into(),
++            toml::Value::String("!".repeat(64)),
++        )]));
++        let error = RegistrySecurityConfig::from_operator(Some(&value)).unwrap_err();
++        assert!(
++            !error.contains('!'),
++            "hex diagnostic leaked offending input: {error}"
++        );
++    }
++
++    #[test]
++    fn signed_params_less_notification_verifies_p7() {
++        let request = br#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#;
++        let response = br#"{"jsonrpc":"2.0","id":null,"result":{}}"#;
++        let seed = [0x91; 32];
++        let pair = ring::signature::Ed25519KeyPair::from_seed_unchecked(&seed).unwrap();
++        use ring::signature::KeyPair;
++        let key: [u8; 32] = pair.public_key().as_ref().try_into().unwrap();
++        let header = sign_response(
++            "https://registry.example/mcp",
++            [7; 32],
++            request,
++            response,
++            None,
++            &seed,
++        )
++        .unwrap();
++        assert!(verify_response(
++            "https://registry.example/mcp",
++            [7; 32],
++            request,
++            response,
++            Some(&header),
++            &key
++        )
++        .is_ok());
++    }
++
++    #[cfg(feature = "tls")]
++    #[test]
++    fn configured_ca_replaces_bundled_roots_d4() {
++        let directory = tempfile::tempdir().unwrap();
++        let key = rcgen::KeyPair::generate().unwrap();
++        let mut params = rcgen::CertificateParams::new(Vec::<String>::new()).unwrap();
++        params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
++        let ca = params.self_signed(&key).unwrap();
++        let path = directory.path().join("operator-ca.pem");
++        std::fs::write(&path, ca.pem()).unwrap();
++        assert_eq!(
++            client_roots(Some(&path)).unwrap().len(),
++            1,
++            "a configured private CA must replace, not extend, bundled Mozilla roots"
++        );
++        assert_eq!(
++            client_roots(None).unwrap().len(),
++            webpki_roots::TLS_SERVER_ROOTS.len()
++        );
++    }
++}
+diff --git a/crates/maos-registry/src/server.rs b/crates/maos-registry/src/server.rs
+index 95b165a4..acfbc8d1 100644
+--- a/crates/maos-registry/src/server.rs
++++ b/crates/maos-registry/src/server.rs
+@@ -17,0 +18,5 @@ const MAX_CONNECTIONS: usize = 8;
++const MAX_PER_SOURCE: usize = 2;
++const MAX_REJECTIONS: usize = 2;
++const METADATA_BODY_LIMIT: usize = 64 * 1024;
++const UPLOAD_BODY_LIMIT: usize = 64 * 1024 * 1024;
++const FIRST_BYTE_DEADLINE: std::time::Duration = std::time::Duration::from_secs(1);
+@@ -92,0 +98,2 @@ impl SpiritRegistryServer {
++    /// Raw bytes have no file identity: direct library callers own provisioning
++    /// custody. `RegistryServerArgs::build` checks file modes and store exclusion.
+@@ -181,2 +188,3 @@ impl SpiritRegistryServer {
+-        let mut handles: Vec<(TcpStream, thread::JoinHandle<()>)> =
+-            Vec::with_capacity(MAX_CONNECTIONS);
++        // Two bounded refusal workers can finish TLS and return an encrypted 503.
++        let mut handles: Vec<(TcpStream, std::net::IpAddr, bool, thread::JoinHandle<()>)> =
++            Vec::with_capacity(MAX_CONNECTIONS + MAX_REJECTIONS);
+@@ -188 +196 @@ impl SpiritRegistryServer {
+-            handles.retain(|(_, handle)| !handle.is_finished());
++            handles.retain(|(_, _, _, handle)| !handle.is_finished());
+@@ -190,7 +198,14 @@ impl SpiritRegistryServer {
+-                Ok((mut stream, _)) => {
+-                    if handles.len() >= MAX_CONNECTIONS {
+-                        let _ =
+-                            stream.set_write_timeout(Some(std::time::Duration::from_millis(100)));
+-                        // Never answer a TLS connection with plaintext HTTP.
+-                        if security.development_http {
+-                            let _ = stream.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
++                Ok((stream, peer)) => {
++                    // Accepted sockets inherit O_NONBLOCK on some supported hosts.
++                    if let Err(error) = stream.set_nonblocking(false) {
++                        eprintln!("maos-registry: accepted socket mode: {error}");
++                        continue;
++                    }
++                    let source = peer.ip().to_canonical();
++                    let (mut active, mut same_source, mut rejections) = (0, 0, 0);
++                    for (_, ip, rejected, _) in &handles {
++                        if *rejected {
++                            rejections += 1;
++                        } else {
++                            active += 1;
++                            same_source += usize::from(*ip == source);
+@@ -197,0 +213,15 @@ impl SpiritRegistryServer {
++                    }
++                    let rejected = active >= MAX_CONNECTIONS || same_source >= MAX_PER_SOURCE;
++                    if rejected && security.development_http {
++                        // Loopback development needs no handshake/refusal worker.
++                        // Return complete 503s without consuming TLS refusal slots;
++                        // accept has one absolute 100 ms write/drain budget here.
++                        let deadline =
++                            std::time::Instant::now() + std::time::Duration::from_millis(100);
++                        let mut stream = DeadlineStream::new(stream, deadline);
++                        let _ = stream.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
++                        let _ = stream.stream.shutdown(std::net::Shutdown::Write);
++                        let _ = std::io::copy(
++                            &mut stream.take(UPLOAD_BODY_LIMIT as u64),
++                            &mut std::io::sink(),
++                        );
+@@ -200 +230,11 @@ impl SpiritRegistryServer {
+-                    let cancel = stream.try_clone().map_err(|e| e.to_string())?;
++                    if rejected && rejections >= MAX_REJECTIONS {
++                        continue;
++                    }
++                    let cancel = match stream.try_clone() {
++                        Ok(cancel) => cancel,
++                        Err(error) => {
++                            eprintln!("maos-registry: accepted socket clone: {error}");
++                            thread::sleep(std::time::Duration::from_millis(50));
++                            continue;
++                        }
++                    };
+@@ -205,0 +246,2 @@ impl SpiritRegistryServer {
++                        source,
++                        rejected,
+@@ -207,3 +249,8 @@ impl SpiritRegistryServer {
+-                            if let Err(error) =
+-                                handle_connection(s, server_signing_key, vetters, stream, security)
+-                            {
++                            if let Err(error) = handle_connection(
++                                s,
++                                server_signing_key,
++                                vetters,
++                                stream,
++                                security,
++                                rejected,
++                            ) {
+@@ -219,0 +267 @@ impl SpiritRegistryServer {
++                    thread::sleep(std::time::Duration::from_millis(50));
+@@ -224 +272 @@ impl SpiritRegistryServer {
+-        for (stream, _) in &handles {
++        for (stream, _, _, _) in &handles {
+@@ -227 +275 @@ impl SpiritRegistryServer {
+-        for (_, handle) in handles {
++        for (_, _, _, handle) in handles {
+@@ -301 +349 @@ impl RegistryServerArgs {
+-                .map_err(|e| format!("signing key hex: {e}"))?
++                .map_err(|_| "invalid signing key hex")?
+@@ -334 +382 @@ impl RegistryServerArgs {
+-                    .map_err(|e| e.to_string())?
++                    .map_err(|_| "invalid operator root hex")?
+@@ -354,0 +403 @@ fn handle_connection(
++    rejected: bool,
+@@ -361 +410 @@ fn handle_connection(
+-    let deadline = std::time::Instant::now() + REQUEST_DEADLINE;
++    let deadline = std::time::Instant::now() + FIRST_BYTE_DEADLINE;
+@@ -374,0 +424,16 @@ fn handle_connection(
++    if let Err(error) = reader.fill_buf() {
++        // An HTTP error write must not restart an incomplete TLS handshake
++        // under the longer response-write timeout.
++        if !reader.get_ref().handshake_complete() {
++            return Err(error.into());
++        }
++        reject_http(reader.get_mut(), "408 Request Timeout")?;
++        return Ok(());
++    }
++    if rejected {
++        reject_http(reader.get_mut(), "503 Service Unavailable")?;
++        return Ok(());
++    }
++    reader
++        .get_mut()
++        .set_deadline(std::time::Instant::now() + REQUEST_DEADLINE);
+@@ -384,2 +449 @@ fn handle_connection(
+-    const MAX_BODY_SIZE: usize = 64 * 1024 * 1024;
+-    if content_length > MAX_BODY_SIZE {
++    if content_length > headers.body_limit {
+@@ -390,13 +454,26 @@ fn handle_connection(
+-    // The request deadline bounds reads, not dispatch or the response write.
+-    let mut body = vec![0u8; content_length];
+-    if let Err(error) = reader.read_exact(&mut body) {
+-        let status = if matches!(
+-            error.kind(),
+-            std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+-        ) {
+-            "408 Request Timeout"
+-        } else {
+-            "400 Bad Request"
+-        };
+-        reject_http(reader.get_mut(), status)?;
+-        return Ok(());
++    // Grow from received bytes, never reserve an untrusted declared body length.
++    let mut body = Vec::new();
++    while body.len() < content_length {
++        match reader.fill_buf() {
++            Ok([]) => {
++                reject_http(reader.get_mut(), "400 Bad Request")?;
++                return Ok(());
++            }
++            Ok(available) => {
++                let size = available.len().min(content_length - body.len());
++                body.extend_from_slice(&available[..size]);
++                reader.consume(size);
++            }
++            Err(error) => {
++                let status = if matches!(
++                    error.kind(),
++                    std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
++                ) {
++                    "408 Request Timeout"
++                } else {
++                    "400 Bad Request"
++                };
++                reject_http(reader.get_mut(), status)?;
++                return Ok(());
++            }
++        }
+@@ -422,0 +500,11 @@ fn handle_connection(
++    let publish = request.method == "registry.publish"
++        || (request.method == "tools/call"
++            && request
++                .params
++                .get("name")
++                .and_then(serde_json::Value::as_str)
++                == Some("registry.publish"));
++    if !publish && body.len() > METADATA_BODY_LIMIT {
++        reject_http(reader.get_mut(), "413 Payload Too Large")?;
++        return Ok(());
++    }
+@@ -556,0 +645 @@ struct RequestHeaders {
++    body_limit: usize,
+@@ -605,0 +695 @@ fn read_request_headers(
++    let mut publish_hint = None;
+@@ -620,0 +711,5 @@ fn read_request_headers(
++                body_limit: if publish_hint == Some(true) {
++                    UPLOAD_BODY_LIMIT
++                } else {
++                    METADATA_BODY_LIMIT
++                },
+@@ -661,0 +757,4 @@ fn read_request_headers(
++        } else if name.eq_ignore_ascii_case("mcp-name") {
++            if publish_hint.replace(value == "registry.publish").is_some() {
++                return Err("400 Bad Request");
++            }
+@@ -685,0 +785,7 @@ impl ServerStream {
++    fn handshake_complete(&self) -> bool {
++        match self {
++            Self::Plain(_) => true,
++            #[cfg(feature = "tls")]
++            Self::Tls(stream) => !stream.conn.is_handshaking(),
++        }
++    }
+@@ -731 +837 @@ impl Write for ServerStream {
+-struct DeadlineStream {
++pub(crate) struct DeadlineStream {
+@@ -735,0 +842,3 @@ impl DeadlineStream {
++    pub(crate) fn new(stream: TcpStream, deadline: std::time::Instant) -> Self {
++        Self { stream, deadline }
++    }
+@@ -764,5 +872,0 @@ mod tests {
+-    use crate::storage::LocalFsRegistryStorage;
+-    use maos_spirit_abi::compliance::{ComplianceClaimEnvelope, SigningAlg};
+-    use std::io::{Read, Write};
+-    use std::net::TcpStream;
+-    use std::time::Duration;
+@@ -781,20 +884,0 @@ mod tests {
+-
+-    fn temp_storage() -> Arc<dyn RegistryStorage> {
+-        let dir =
+-            std::env::temp_dir().join(format!("maos-registry-server-test-{}", std::process::id()));
+-        let _ = std::fs::remove_dir_all(&dir);
+-        let s = LocalFsRegistryStorage::at_path(dir).unwrap();
+-        Arc::new(s)
+-    }
+-
+-    #[test]
+-    #[ignore = "requires server to be running on a port — tested via end-to-end test"]
+-    fn server_handles_search() {
+-        // The real-wire test is at tests/end_to_end_test.rs (Task 16)
+-    }
+-
+-    #[test]
+-    #[ignore = "requires server to be running on a port — tested via end-to-end test"]
+-    fn server_handles_unknown_method() {
+-        // The real-wire test is at tests/end_to_end_test.rs (Task 16)
+-    }
+diff --git a/crates/maos-registry/src/storage.rs b/crates/maos-registry/src/storage.rs
+index 8d59f4fd..cf176928 100644
+--- a/crates/maos-registry/src/storage.rs
++++ b/crates/maos-registry/src/storage.rs
+@@ -93,0 +94,2 @@ pub trait RegistryStorage: Send + Sync {
++    /// `head` must be `Some` and describe the same complete snapshot as entries;
++    /// refuse an oversized delta rather than returning a truncated success.
+@@ -1017,6 +1019,13 @@ impl RegistryStorage for LocalFsRegistryStorage {
+-        let entries: Vec<YankEntry> = yanks
+-            .iter()
+-            .filter(|e| since_ns == 0 || e.sequence > since_ns)
+-            .cloned()
+-            .collect();
+-        Ok(YankList::new(entries))
++        let head = yanks.last().map_or(0, |entry| entry.sequence);
++        let start = yanks.partition_point(|entry| entry.sequence <= since_ns);
++        // Never truncate a successful signed complete-head response. Pagination
++        // needs authenticated range semantics; oversized deltas fail closed.
++        if yanks.len() - start > 4096 {
++            return Err(StorageError::Io(
++                "yank delta exceeds 4096 entries; operator-assisted resynchronization required"
++                    .into(),
++            ));
++        }
++        let mut list = YankList::new(yanks.into_iter().skip(start).collect());
++        list.head = Some(head);
++        Ok(list)
+diff --git a/crates/maos-registry/src/yank.rs b/crates/maos-registry/src/yank.rs
+index 8c05e7dd..73afac77 100644
+--- a/crates/maos-registry/src/yank.rs
++++ b/crates/maos-registry/src/yank.rs
+@@ -122,0 +123,9 @@ impl YankPoller {
++        if let Some(head) = list.head.filter(|head| *head < cache.last_seen_ns) {
++            cache.resync = false;
++            let error = RegistryError::HeadBehindCursor {
++                head,
++                cursor: cache.last_seen_ns,
++            };
++            eprintln!("yank-head-rollback: {error}");
++            return Err(error);
++        }
+@@ -339,0 +349,25 @@ mod tests {
++    fn authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5() {
++        let poller = YankPoller::new(
++            Arc::new(Source(Vec::new())),
++            Arc::new(Observer::default()),
++            "https://registry.example/mcp".into(),
++        );
++        poller.cache.lock().unwrap().last_seen_ns = 5;
++        let mut list = YankList::new(Vec::new());
++        list.head = Some(2);
++        let result = poller.apply_list(list);
++        assert!(
++            matches!(
++                result,
++                Err(RegistryError::HeadBehindCursor { head: 2, cursor: 5 })
++            ),
++            "{result:?}"
++        );
++        assert_eq!(poller.last_seen_ns(), 5);
++        assert_eq!(
++            poller.begin_poll().unwrap(),
++            5,
++            "rollback must not resync from zero"
++        );
++    }
++    #[test]
+diff --git a/crates/maos-registry/tests/registry_security_20_1a.rs b/crates/maos-registry/tests/registry_security_20_1a.rs
+index 5bc308e7..9692398d 100644
+--- a/crates/maos-registry/tests/registry_security_20_1a.rs
++++ b/crates/maos-registry/tests/registry_security_20_1a.rs
+@@ -291,0 +292 @@ fn server_tier_floor_uses_admission_policy_ordering() {
++                    ..Default::default()
+diff --git a/crates/maos-registry/tests/registry_tls_20_1b.rs b/crates/maos-registry/tests/registry_tls_20_1b.rs
+index ba5b200b..e6548128 100644
+--- a/crates/maos-registry/tests/registry_tls_20_1b.rs
++++ b/crates/maos-registry/tests/registry_tls_20_1b.rs
+@@ -48,0 +49 @@ mod tls {
++    use std::time::Duration;
+@@ -157,0 +159,73 @@ mod tls {
++    #[test]
++    #[cfg(unix)]
++    fn private_seed_custody_refuses_0644_and_0440_p12() {
++        use std::os::unix::fs::PermissionsExt;
++        for mode in [0o644, 0o440] {
++            let root = tempfile::tempdir().unwrap();
++            let seed = root.path().join("registry.seed");
++            std::fs::write(&seed, hex::encode(REGISTRY)).unwrap();
++            std::fs::set_permissions(&seed, std::fs::Permissions::from_mode(mode)).unwrap();
++            let error = maos_registry::server::RegistryServerArgs {
++                root: Some(root.path().join("packages")),
++                signing_key: Some(seed),
++                development_http: true,
++                ..Default::default()
++            }
++            .build()
++            .err()
++            .expect("seed mode must be refused");
++            assert!(error.contains("0600"), "{error}");
++        }
++    }
++    #[test]
++    fn private_tls_key_inside_package_store_is_refused_p12() {
++        let certs = Certificates::new("localhost", false);
++        let root = tempfile::tempdir().unwrap();
++        let packages = root.path().join("packages");
++        std::fs::create_dir(&packages).unwrap();
++        let key = packages.join("registry.key");
++        std::fs::copy(&certs.key, &key).unwrap();
++        let seed = root.path().join("registry.seed");
++        std::fs::write(&seed, hex::encode(REGISTRY)).unwrap();
++        #[cfg(unix)]
++        {
++            use std::os::unix::fs::PermissionsExt;
++            for path in [&key, &seed] {
++                std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
++            }
++        }
++        let error = maos_registry::server::RegistryServerArgs {
++            root: Some(packages),
++            signing_key: Some(seed),
++            tls_certificate: Some(certs.cert),
++            tls_private_key: Some(key),
++            uri: Some("https://localhost/mcp".into()),
++            ..Default::default()
++        }
++        .build()
++        .err()
++        .expect("TLS key must stay outside served storage");
++        assert!(error.contains("outside"), "{error}");
++    }
++    #[test]
++    fn malformed_private_seed_diagnostic_never_echoes_key_bytes_p8() {
++        let root = tempfile::tempdir().unwrap();
++        let seed = root.path().join("registry.seed");
++        std::fs::write(&seed, "@").unwrap();
++        #[cfg(unix)]
++        {
++            use std::os::unix::fs::PermissionsExt;
++            std::fs::set_permissions(&seed, std::fs::Permissions::from_mode(0o600)).unwrap();
++        }
++        let error = maos_registry::server::RegistryServerArgs {
++            root: Some(root.path().join("packages")),
++            signing_key: Some(seed),
++            development_http: true,
++            ..Default::default()
++        }
++        .build()
++        .err()
++        .expect("malformed private seed");
++        assert_eq!(error, "invalid signing key hex");
++        assert!(!error.contains('@'));
++    }
+@@ -301,0 +376,10 @@ mod tls {
++        let (home, output) = cli_install(
++            &server.uri,
++            &server.uri,
++            trust::public(&REGISTRY),
++            &certs.ca,
++            false,
++        );
++        assert!(!output.status.success());
++        assert!(String::from_utf8_lossy(&output.stderr).contains("certificate"));
++        assert_not_persisted(home.path());
+@@ -311,0 +396,10 @@ mod tls {
++        let (home, output) = cli_install(
++            &server.uri,
++            &server.uri,
++            trust::public(&REGISTRY),
++            &certs.ca,
++            false,
++        );
++        assert!(!output.status.success());
++        assert!(String::from_utf8_lossy(&output.stderr).contains("certificate"));
++        assert_not_persisted(home.path());
+@@ -322,0 +417,10 @@ mod tls {
++        let (home, output) = cli_install(
++            &server.uri,
++            &server.uri,
++            trust::public(&REGISTRY),
++            &certs.ca,
++            false,
++        );
++        assert!(!output.status.success());
++        assert!(String::from_utf8_lossy(&output.stderr).contains("certificate"));
++        assert_not_persisted(home.path());
+@@ -440,0 +545,9 @@ mod tls {
++        SignedGap,
++        SignedDuplicate,
++        SignedExtra,
++        SignedEmpty,
++        PayloadHeadMismatch,
++        CursorAhead,
++        WrongRequestHash,
++        WrongVersion,
++        BadSignature,
+@@ -615,0 +729,33 @@ mod tls {
++                        Attack::SignedGap
++                        | Attack::SignedDuplicate
++                        | Attack::SignedExtra
++                        | Attack::SignedEmpty
++                        | Attack::PayloadHeadMismatch
++                        | Attack::CursorAhead => {
++                            let (sequences, claimed, payload): (&[u64], u64, u64) = match attack {
++                                Attack::SignedGap => (&[2], 1, 1),
++                                Attack::SignedDuplicate => (&[1, 1], 2, 2),
++                                Attack::SignedExtra => (&[1, 2], 1, 1),
++                                Attack::SignedEmpty => (&[], 1, 1),
++                                Attack::PayloadHeadMismatch => (&[], 0, 1),
++                                Attack::CursorAhead => (&[], 2, 2),
++                                _ => unreachable!(),
++                            };
++                            let entries: Vec<_> = sequences
++                                .iter()
++                                .map(|sequence| {
++                                    let mut entry = maos_domain::ports::registry::YankEntry::new(
++                                        "tls-widget".into(),
++                                        "1.0.0".into(),
++                                        0,
++                                        "test withdrawal".into(),
++                                    );
++                                    entry.sequence = *sequence;
++                                    entry
++                                })
++                                .collect();
++                            body["result"] = serde_json::json!({"entries":entries,"head":payload});
++                            sent = fixture_bytes(&body);
++                            signed = sent.clone();
++                            head = Some(claimed);
++                        }
+@@ -618 +764,2 @@ mod tls {
+-                    let envelope = response_envelope(claimed_uri, nonce, &request, &signed, head);
++                    let envelope =
++                        response_envelope(claimed_uri, nonce, &request, &signed, head, attack);
+@@ -684,0 +832 @@ mod tls {
++        attack: Attack,
+@@ -701 +849 @@ mod tls {
+-        let claim = Claim {
++        let mut claim = Claim {
+@@ -708,0 +857,6 @@ mod tls {
++        if matches!(attack, Attack::WrongRequestHash) {
++            claim.request_sha256[0] ^= 1;
++        }
++        if matches!(attack, Attack::WrongVersion) {
++            claim.version = 2;
++        }
+@@ -717 +871,4 @@ mod tls {
+-        let signature = key.sign(&hash.finalize()).as_ref().to_vec();
++        let mut signature = key.sign(&hash.finalize()).as_ref().to_vec();
++        if matches!(attack, Attack::BadSignature) {
++            signature[0] ^= 1;
++        }
+@@ -742,0 +900,53 @@ mod tls {
++    fn signed_valid_gap_body_is_refused_p3() {
++        check_attack(Attack::SignedGap);
++    }
++    #[test]
++    fn signed_valid_duplicate_body_is_refused_p3() {
++        check_attack(Attack::SignedDuplicate);
++    }
++    #[test]
++    fn signed_valid_extra_entries_are_refused_p3() {
++        check_attack(Attack::SignedExtra);
++    }
++    #[test]
++    fn signed_valid_empty_view_with_nonzero_head_is_refused_p3() {
++        check_attack(Attack::SignedEmpty);
++    }
++    #[test]
++    fn signed_payload_head_must_equal_envelope_head_p3() {
++        check_attack(Attack::PayloadHeadMismatch);
++    }
++    #[test]
++    fn signed_wrong_request_hash_is_refused_p3() {
++        check_attack(Attack::WrongRequestHash);
++    }
++    #[test]
++    fn signed_wrong_envelope_version_is_refused_p3() {
++        check_attack(Attack::WrongVersion);
++    }
++    #[test]
++    fn bad_signature_byte_is_refused_p3() {
++        check_attack(Attack::BadSignature);
++    }
++    #[test]
++    fn signed_head_behind_requested_cursor_is_typed_d3_p5() {
++        let certs = Certificates::new("localhost", false);
++        let peer = Responder::start(&certs, Attack::CursorAhead, None);
++        let client =
++            McpSpiritRegistryClient::http(peer.uri.clone(), certs.client_config(&peer.uri))
++                .unwrap();
++        let result = client.yanks_since(5);
++        assert!(
++            matches!(
++                result,
++                Err(
++                    maos_domain::ports::registry::RegistryError::HeadBehindCursor {
++                        head: 2,
++                        cursor: 5
++                    }
++                )
++            ),
++            "{result:?}"
++        );
++    }
++    #[test]
+@@ -923,0 +1134,62 @@ mod tls {
++    #[test]
++    fn tls_admission_refusal_is_encrypted_http_503_f1() {
++        let certs = Certificates::new("localhost", false);
++        let server = Server::start(&certs, REGISTRY);
++        let client =
++            McpSpiritRegistryClient::http(server.uri.clone(), certs.client_config(&server.uri))
++                .unwrap();
++        let port = url::Url::parse(&server.uri).unwrap().port().unwrap();
++        let _first = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
++        let _second = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
++        let error = client.yanks_since(0).unwrap_err().to_string();
++        assert!(
++            error.contains("503"),
++            "TLS refusal lost its HTTP status: {error}"
++        );
++    }
++    #[test]
++    fn incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1() {
++        let certs = Certificates::new("localhost", false);
++        let server = Server::start(&certs, REGISTRY);
++        let port = url::Url::parse(&server.uri).unwrap().port().unwrap();
++        let mut idle = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
++        idle.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
++        let read = idle.read(&mut [0u8; 1]);
++        assert!(
++            matches!(read, Ok(0)),
++            "unfinished handshake was retained or answered as plaintext: {read:?}"
++        );
++    }
++    #[test]
++    #[ignore = "20-1b hosted-only public WebPKI route; explicitly enrolled in the verification branch"]
++    fn private_ca_replaces_public_webpki_for_real_public_peer_d4_f7() {
++        use maos_domain::ports::io_subsystem::IoSubsystemPort;
++        let certs = Certificates::new("localhost", false);
++        let uri = "https://github.com/mcp";
++        let mut security = certs.client_config(uri).security;
++        security.ca_certificate = None;
++        let request =
++            br#"{"jsonrpc":"2.0","id":1,"method":"registry.yanks_since","params":{"since_ns":0}}"#;
++        let control = maos_registry::http::RegistryHttp::new(uri, security.clone())
++            .unwrap()
++            .http_post_exchange(uri, request, &[("Content-Type", "application/json")], "");
++        if let Err(error) = control {
++            let message = error.to_string();
++            assert!(
++                message.contains("HTTP")
++                    || message.contains("Content-Length")
++                    || message.contains("registry response authentication"),
++                "public-WebPKI control did not reach HTTP: {message}"
++            );
++        }
++        security.ca_certificate = Some(certs.ca);
++        let error = maos_registry::http::RegistryHttp::new(uri, security)
++            .unwrap()
++            .http_post_exchange(uri, request, &[("Content-Type", "application/json")], "")
++            .unwrap_err()
++            .to_string();
++        assert!(
++            error.contains("UnknownIssuer"),
++            "configured private CA did not exclude public roots: {error}"
++        );
++    }
+diff --git a/crates/maos-shell/Cargo.toml b/crates/maos-shell/Cargo.toml
+index 4d3cd3ba..35cbd940 100644
+--- a/crates/maos-shell/Cargo.toml
++++ b/crates/maos-shell/Cargo.toml
+@@ -12 +12 @@ maos-audit = { path = "../maos-audit" }
+-maos-cli = { path = "../maos-cli" }
++maos-cli = { path = "../maos-cli", default-features = false }

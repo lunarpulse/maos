@@ -1,0 +1,11 @@
+--- restored/crates/maos-registry/src/handlers/yanks_since.rs
++++ planted/crates/maos-registry/src/handlers/yanks_since.rs
+@@ -11,7 +11,7 @@
+ ) -> Result<serde_json::Value, String> {
+     // Head and entries share one durable snapshot; a concurrent append cannot
+     // make a legitimate filtered response appear incomplete.
+-    let list = storage.yanks_since(args.since_ns).map_err(|e| e.to_string())?;
++    let list = storage.yanks_since(0).map_err(|e| e.to_string())?;
+     if list.head.is_none() {
+         return Err("registry storage omitted the complete yank head".into());
+     }

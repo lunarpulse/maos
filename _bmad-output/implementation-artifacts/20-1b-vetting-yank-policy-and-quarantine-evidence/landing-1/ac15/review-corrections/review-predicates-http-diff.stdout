@@ -1,0 +1,21 @@
+--- restored/crates/maos-registry/src/http.rs
++++ planted/crates/maos-registry/src/http.rs
+@@ -101,7 +101,7 @@
+         } else {
+             connect_addresses(resolve_addresses(host, port, deadline).map_err(transport)?, deadline)
+         }.map_err(transport)?;
+-        let stream = DeadlineStream::new(stream, deadline);
++        let stream = DeadlineStream::new(stream, std::time::Instant::now() + Duration::from_secs(30));
+         #[cfg(feature = "tls")]
+         let mut stream = if let Some(config) = &self.tls {
+             let name = rustls::pki_types::ServerName::try_from(host.to_owned())
+@@ -210,8 +210,7 @@
+             reader.consume(size);
+         }
+         // Refusals have no success envelope; preserve their typed HTTP status.
+-        if let Some(key) = self.security.signing_pubkey.as_ref()
+-            .filter(|_| (200..300).contains(&status)) {
++        if let Some(key) = self.security.signing_pubkey.as_ref() {
+             crate::security::verify_response(
+                 url,
+                 nonce,

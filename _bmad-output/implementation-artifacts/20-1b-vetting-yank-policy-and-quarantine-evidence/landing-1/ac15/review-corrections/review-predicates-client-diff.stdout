@@ -1,0 +1,11 @@
+--- restored/crates/maos-registry/src/client.rs
++++ planted/crates/maos-registry/src/client.rs
+@@ -108,7 +108,7 @@
+         }
+         let list: YankList = serde_json::from_value(resp.content)
+             .map_err(|e| RegistryError::Transport(e.to_string()))?;
+-        if let Some(head) = list.head.filter(|head| *head < since_ns) {
++        if let Some(head) = list.head.filter(|head| false && *head < since_ns) {
+             return Err(RegistryError::HeadBehindCursor { head, cursor: since_ns });
+         }
+         Ok(list)

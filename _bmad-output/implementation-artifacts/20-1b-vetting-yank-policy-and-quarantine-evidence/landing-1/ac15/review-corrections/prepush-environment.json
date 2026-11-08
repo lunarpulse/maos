@@ -1,0 +1,22 @@
+{
+  "command": [
+    "env",
+    "-u",
+    "CI",
+    "-u",
+    "GITHUB_ACTIONS",
+    "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+    "MAOS_17_2_CGROUP_MODE=undelegated",
+    "/mnt/build/cargo-maos/debug/xtask",
+    "prepush",
+    "--json"
+  ],
+  "PATH_prefix": "/tmp/201b-ac15-corrections/verifier/bin",
+  "preserved_parent_PATH": true,
+  "CI": "unset",
+  "GITHUB_ACTIONS": "unset",
+  "CARGO_TARGET_DIR_inherited": null,
+  "agent_target_override": false,
+  "command_deadline": "none; waits split into cells no longer than3000s",
+  "tracked_write_freeze": "no tracked edits while this one prepush is running"
+}

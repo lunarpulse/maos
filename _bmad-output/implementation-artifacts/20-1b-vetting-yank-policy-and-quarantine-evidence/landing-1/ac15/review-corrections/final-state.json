@@ -1,0 +1,153 @@
+{
+  "baseline": "9e8c7737b0aaae730024ae66966c20106563141e",
+  "owned_source_config_record_files": 36,
+  "final_report": "final-report.md",
+  "acceptance_table": "witnesses.md",
+  "rulings": "D-20-1b-01/02/03 A/A/A and D-20-1b-09..13 recorded; no pending F5 design ruling",
+  "measurements": {
+    "maos-registry": 6151,
+    "maos-bin": 35586,
+    "maos-domain": 10144,
+    "maos-cli": 6429,
+    "maos-spirit-cli": 942,
+    "xtask": 44696,
+    "maos-audit": 8179,
+    "aggregate": 197451,
+    "aggregate_hardfail": 197452,
+    "kernel_physical": 26841,
+    "kernel_tokei": 21042
+  },
+  "focused": {
+    "uuid": "a796a2f7-be25-4368-a940-7c4105bd0c3e",
+    "tests": 827,
+    "failures": 0,
+    "errors": 0,
+    "suites": 70,
+    "wall_seconds": 101.271,
+    "source": "focused-final-junit.xml",
+    "limitations": "T3 prerequisite-return bodies are not real live-Worker proof; hosted public-CA case ignored/not run.",
+    "testcase_sum_seconds": 101.261,
+    "sum_basis": "JUnit testcase time attributes; suite time attributes are absent, so the earlier default-zero calculation was discarded."
+  },
+  "standalone": {
+    "name": "nextest-run",
+    "tests": "5836",
+    "skipped": "0",
+    "failures": "3",
+    "errors": "0",
+    "uuid": "f6748ad2-1296-4b1c-a5ee-e387563850c1",
+    "timestamp": "2026-11-08T14:28:43.723+00:00",
+    "time": "93.736",
+    "testcase_sum_seconds": 1144.817,
+    "failed_cases": [
+      {
+        "suite": "maos-audit::erasure_review_20_11",
+        "name": "p3_p4_f4_f5_f6_f11_f12_both_verifiers_enforce_the_same_signed_contract",
+        "time": "0.050",
+        "failure": "thread 'p3_p4_f4_f5_f6_f11_f12_both_verifiers_enforce_the_same_signed_contract' (1010155) panicked at crates/maos-audit/tests/erasure_review_20_11.rs:392:9:\ndeclared verifier runner needs tools/verify-erasure/requirements.txt; missing dependency is not a skip: Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\n    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey\nModuleNotFoundError: No module named 'cryptography'\n\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      },
+      {
+        "suite": "maos-bin::erasure_inventory_20_11",
+        "name": "ac1_category_evidence_is_required_by_both_verifiers",
+        "time": "1.263",
+        "failure": "thread 'ac1_category_evidence_is_required_by_both_verifiers' (1013406) panicked at crates/maos-bin/tests/erasure_inventory_20_11.rs:292:5:\nassertion failed: Command::new(\"python3\").arg(&verifier).arg(&path).arg(&pubkey).status().expect(\"python verifier\").success()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      },
+      {
+        "suite": "maos-bin::erasure_million_20_11",
+        "name": "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption",
+        "time": "43.366",
+        "failure": "thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (1031231) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:\npending operation did not finish: op-1a279e88449a10b8a7a7be05\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      }
+    ]
+  },
+  "prepush": {
+    "exit": 1,
+    "status_counts": {
+      "pass": 83,
+      "skip": 7,
+      "red": 1,
+      "advisory": 1
+    },
+    "junit": {
+      "name": "nextest-run",
+      "tests": "5836",
+      "skipped": "0",
+      "failures": "1",
+      "errors": "0",
+      "uuid": "0e4b479b-e575-4500-8c98-3865f2ac3d5f",
+      "timestamp": "2026-11-08T16:27:56.833+00:00",
+      "time": "96.508",
+      "testcase_sum_seconds": 1136.34,
+      "failed_cases": [
+        {
+          "suite": "maos-bin::erasure_million_20_11",
+          "name": "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption",
+          "time": "45.523",
+          "failure": "thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (1183626) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:\npending operation did not finish: op-66112c0d8d0793c2ea9372f7\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+        }
+      ]
+    },
+    "budget_findings": [
+      "maos-bin::erasure_uninstall_13_5b took 32.335 s (\u03a3 per-test time) over 26 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+      "maos-bin::hook_pump_17_4 took 31.944 s (\u03a3 per-test time) over 26 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+      "maos-bin::one_daemon_one_door_16_1 took 36.041 s (\u03a3 per-test time) over 43 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+      "maos-iac::participant_recall_17_8 took 41.741 s (\u03a3 per-test time) over 29 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml"
+    ],
+    "tracked_tree_preserved": true
+  },
+  "clippy": {
+    "exit": 0,
+    "changed_primary_span_diagnostics": 0,
+    "new_message_fingerprints_vs_initial_correction_state": 0
+  },
+  "gate_results": {
+    "check-kernel-baseline": 0,
+    "check-fkcs": null,
+    "check-exit-commands": 0,
+    "check-decision-register": 0,
+    "check-serde-error-handling": 0,
+    "check-test-cost": 0,
+    "check-env-contract": 0,
+    "check-service-boundary": 0,
+    "check-composition-root-completeness": 0,
+    "check-pub-field-constructors": 0,
+    "check-dependency-closure": 0,
+    "check-coverage-matrix-completeness": 0,
+    "check-epic-close-coherence": 0
+  },
+  "exact_kloc_exit": 0,
+  "hosted_recipe": {
+    "runnable": 156,
+    "required_markers": 54,
+    "hosted_execution_claimed": false
+  },
+  "cleanup": {
+    "selected_session_count": 1529,
+    "retained_session_count": 11105,
+    "unique_removed_inode_logical_bytes": 17967899575,
+    "fully_unlinked_inode_allocated_bytes": 15100903424,
+    "filesystems": {
+      "66": {
+        "probe": "/mnt/build/cargo-maos/debug/incremental",
+        "available_before_bytes": 530841759744,
+        "available_after_bytes": 544672190464,
+        "observed_available_delta_bytes": 13830430720
+      },
+      "1048730": {
+        "probe": "/tmp/201b-ac15-corrections",
+        "available_before_bytes": 803194277888,
+        "available_after_bytes": 803193704448,
+        "observed_available_delta_bytes": -573440
+      }
+    }
+  },
+  "remaining_limits": [
+    "Full check-fkcs command timed out at900s; no completed gate result, not a credited pass",
+    "1M pending oracle and binary timing occurrences have same-line rule10 stable-runner owners; no retry or widening",
+    "Native Apple/publicCA/T3/hosted capabilities remain unverified",
+    "AC8 effect/AC11-13 final KQ1+P not claimed; no kernel edit",
+    "W1-W7 and scoped security dispositions remain explicit"
+  ],
+  "no_commit_push_or_status_flip": true,
+  "Main_freeze": "Explicitly released by the final handoff message; no further cargo/source edits by Dev201b."
+}

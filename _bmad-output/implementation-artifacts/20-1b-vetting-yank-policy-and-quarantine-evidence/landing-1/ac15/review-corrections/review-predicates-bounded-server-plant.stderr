@@ -1,0 +1,126 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:195:27
+    |
+195 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `args`
+  --> crates/maos-registry/src/handlers/yanks_since.rs:10:5
+   |
+10 |     args: &YanksSinceArgs,
+   |     ^^^^ help: if this is intentional, prefix it with an underscore: `_args`
+
+warning: unused variable: `since_ns`
+    --> crates/maos-registry/src/storage.rs:1017:27
+     |
+1017 |     fn yanks_since(&self, since_ns: u64) -> Result<YankList, StorageError> {
+     |                           ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_since_ns`
+
+warning: unused variable: `head`
+    --> crates/maos-registry/src/storage.rs:1019:13
+     |
+1019 |         let head = yanks.last().map_or(0, |entry| entry.sequence);
+     |             ^^^^ help: if this is intentional, prefix it with an underscore: `_head`
+
+warning: `maos-registry` (lib) generated 7 warnings (run `cargo fix --lib -p maos-registry` to apply 7 suggestions)
+   Compiling maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 36.38s
+     Running tests/registry_limits_20_1b.rs (target/debug/deps/registry_limits_20_1b-5080b79ada620a15)
+maos-registry: listening on 127.0.0.1:41007
+
+thread 'idle_first_byte_is_bounded_more_tightly_than_a_request_f1' (855351) panicked at crates/maos-registry/tests/registry_limits_20_1b.rs:62:5:
+idle socket kept its slot beyond the first-byte deadline: Err(Os { code: 11, kind: WouldBlock, message: "Resource temporarily unavailable" })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+maos-registry: connection error: Broken pipe (os error 32)
+maos-registry: listening on 127.0.0.1:43723
+
+thread 'metadata_body_limit_is_checked_before_body_allocation_f2' (855356) panicked at crates/maos-registry/tests/registry_limits_20_1b.rs:69:5:
+oversized metadata request was not refused from headers: HTTP/1.1 200 OK
+
+maos-registry: connection error: Connection reset by peer (os error 104)
+maos-registry: listening on 127.0.0.1:45821
+
+thread 'one_source_cannot_occupy_every_registry_slot_f1' (855359) panicked at crates/maos-registry/tests/registry_limits_20_1b.rs:54:5:
+source exceeded its admission cap: HTTP/1.1 200 OK
+
+maos-registry: connection error: Broken pipe (os error 32)
+maos-registry: connection error: Broken pipe (os error 32)
+maos-registry: listening on 127.0.0.1:43593
+
+thread 'publication_hint_cannot_widen_another_rpc_body_cap_f2' (855364) panicked at crates/maos-registry/tests/registry_limits_20_1b.rs:79:5:
+forged upload hint widened a metadata operation: HTTP/1.1 200 OK
+
+error: test failed, to rerun pass `-p maos-registry --test registry_limits_20_1b`

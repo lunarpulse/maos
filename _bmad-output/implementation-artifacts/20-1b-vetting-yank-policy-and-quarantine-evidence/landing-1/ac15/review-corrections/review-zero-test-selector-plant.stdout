@@ -1,0 +1,11 @@
+
+running 1 test
+test cohort::declared_capable_cohort_worker_prerequisite_never_green_skips ... FAILED
+
+failures:
+
+failures:
+    cohort::declared_capable_cohort_worker_prerequisite_never_green_skips
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+

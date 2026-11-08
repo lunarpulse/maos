@@ -1,0 +1,11 @@
+
+running 1 test
+test executable_typescript_registry_example_has_both_development_optins_p1 ... FAILED
+
+failures:
+
+failures:
+    executable_typescript_registry_example_has_both_development_optins_p1
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+

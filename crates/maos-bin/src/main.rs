@@ -3194,11 +3194,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //                           fall through to Null with a warning.
     //   any HTTP(S) URI      → McpSpiritRegistryClient over McpClient::StreamableHttp.
     let registry_cfg =
-        maos_kernel_core::security::operator_config::RegistrySection::resolve_from_env_and_disk();
+        maos_registry::install::operator_config().map_err(|error| error.to_string())?;
     let mut yank_source: Option<Arc<dyn maos_registry::yank::YankSource>> = None;
     let _registry_client: Arc<dyn maos_domain::ports::registry::SpiritRegistryClient> = {
-        let env_uri = std::env::var("MAOS_REGISTRY_URI").unwrap_or_default();
-        if env_uri == "stub" {
+        if registry_cfg.uri == "stub" {
             #[cfg(feature = "fixture_replay")]
             {
                 use maos_registry::fixture_replay::FixtureReplaySpiritRegistryClient;
@@ -3229,11 +3228,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             // Registry trust is independent of the general MCP bearer transport.
             // Use the same operator-pinned TLS/envelope leaf as offline install.
-            let config =
-                maos_registry::install::operator_config().map_err(|error| error.to_string())?;
             let registry_client = Arc::new(maos_registry::McpSpiritRegistryClient::http(
                 registry_cfg.uri.clone(),
-                config,
+                registry_cfg.clone(),
             )?);
             yank_source = Some(registry_client.clone());
             registry_client as Arc<dyn maos_domain::ports::registry::SpiritRegistryClient>
@@ -3243,44 +3240,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| "warn".into())
         .parse::<maos_registry::yank::YankPolicy>()?;
     let interval = maos_registry::yank::resolve_poll_interval()?;
-    let mut yank_poller_task = {
-        let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
-            transparency_log.clone(),
-            scheduler.clone(),
-            revocation_applier.clone(),
-            yank_policy,
-            registry_cfg.uri.clone(),
-        ));
-        eprintln!(
-            "maos: yank cadence={}s policy={} registry-fetch={}",
-            interval.as_secs(),
-            match yank_policy {
-                maos_registry::yank::YankPolicy::Warn => "warn",
-                maos_registry::yank::YankPolicy::Quarantine => "quarantine",
-                maos_registry::yank::YankPolicy::AutoRevoke => "auto-revoke",
-            },
-            if yank_source.is_some() {
-                "enabled"
-            } else {
-                "disabled"
-            }
-        );
-        if yank_policy == maos_registry::yank::YankPolicy::Quarantine {
-            eprintln!("maos: quarantine requested only (effect lands with KQ1; not claimed in L1)");
-        }
-        if let Some(source) = yank_source {
-            maos_bin::yank_policy::PollTask::start(
-                Arc::new(maos_registry::yank::YankPoller::new(
-                    source,
-                    observer,
-                    registry_cfg.uri.clone(),
-                )),
-                interval,
-            )
-        } else {
-            maos_bin::yank_policy::PollTask::start_local(observer, interval)
-        }
-    };
     eprintln!(
         "maos: registry uri={} tier_floor={:?} t3_public_untrusted={} allow_unsigned_local={} require_server_tier_signature={}",
         registry_cfg.uri,
@@ -4338,6 +4297,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await,
     );
+    let mut yank_poller_task = {
+        let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
+            transparency_log.clone(),
+            scheduler.clone(),
+            revocation_applier.clone(),
+            yank_policy,
+            registry_cfg.uri.clone(),
+        ));
+        eprintln!(
+            "maos: yank cadence={}s policy={} registry-fetch={}",
+            interval.as_secs(),
+            match yank_policy {
+                maos_registry::yank::YankPolicy::Warn => "warn",
+                maos_registry::yank::YankPolicy::Quarantine => "quarantine",
+                maos_registry::yank::YankPolicy::AutoRevoke => "auto-revoke",
+            },
+            if yank_source.is_some() {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+        if yank_policy == maos_registry::yank::YankPolicy::Quarantine {
+            eprintln!("maos: quarantine requested only (effect lands with KQ1; not claimed in L1)");
+        }
+        if let Some(source) = yank_source {
+            maos_bin::yank_policy::PollTask::start(
+                Arc::new(maos_registry::yank::YankPoller::new(
+                    source,
+                    observer,
+                    registry_cfg.uri.clone(),
+                )),
+                interval,
+            )
+        } else {
+            maos_bin::yank_policy::PollTask::start_local(observer, interval)
+        }
+    };
     // Story 8.14a — kernel-rendered shell dispatch.
     if shell_mode {
         if let Some(mode) = inference_mode_value.as_deref() {
@@ -6107,6 +6104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 // Story 17-4 (AC2.6) — the hook pump is joined before unload.
                 hook_pump.shutdown().await;
+                yank_poller_task.shutdown().await;
                 if let Some(supervision) = root_supervision.take() {
                     supervision.stop_and_join().await;
                 }
@@ -6117,7 +6115,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .await;
                 unload_report.render(&mut std::io::stderr());
-                yank_poller_task.shutdown().await;
                 drop(audit_tx);
                 drop(inference);
                 drop(capability);
@@ -9286,6 +9283,7 @@ description = "smoke test spirit successor"
             }
             // Story 17-4 (AC2.6) — the hook pump is joined before the unload.
             hook_pump.shutdown().await;
+            yank_poller_task.shutdown().await;
             cohort_supervision.stop_and_join().await;
             let unload_report = maos_bin::supervision::unload_all_loaded(
                 scheduler.as_ref(),
@@ -9294,7 +9292,6 @@ description = "smoke test spirit successor"
             )
             .await;
             unload_report.render(&mut std::io::stderr());
-            yank_poller_task.shutdown().await;
             drop(audit_tx);
             drop(inference);
             drop(orchestrator);

@@ -15,6 +15,11 @@ use crate::storage::RegistryStorage;
 use maos_domain::ports::registry::SignedPackage;
 
 const MAX_CONNECTIONS: usize = 8;
+const MAX_PER_SOURCE: usize = 2;
+const MAX_REJECTIONS: usize = 2;
+const METADATA_BODY_LIMIT: usize = 64 * 1024;
+const UPLOAD_BODY_LIMIT: usize = 64 * 1024 * 1024;
+const FIRST_BYTE_DEADLINE: std::time::Duration = std::time::Duration::from_secs(1);
 const MAX_HEADER_BYTES: usize = 16 * 1024;
 const MAX_HEADERS: usize = 64;
 const REQUEST_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
@@ -90,6 +95,8 @@ impl SpiritRegistryServer {
     }
 
     /// Story 7.2 — attach an Ed25519 signing key for server-side tier attestation.
+    /// Raw bytes have no file identity: direct library callers own provisioning
+    /// custody. `RegistryServerArgs::build` checks file modes and store exclusion.
     pub fn with_server_signing_key(mut self, key: [u8; 32]) -> Self {
         self.server_signing_key = Some(key);
         self
@@ -178,35 +185,75 @@ impl SpiritRegistryServer {
         let server_signing_key = self.server_signing_key;
         let vetters = self.vetters;
         let _ = &self.org_pubkey;
-        let mut handles: Vec<(TcpStream, thread::JoinHandle<()>)> =
-            Vec::with_capacity(MAX_CONNECTIONS);
+        // Two bounded refusal workers can finish TLS and return an encrypted 503.
+        let mut handles: Vec<(TcpStream, std::net::IpAddr, bool, thread::JoinHandle<()>)> =
+            Vec::with_capacity(MAX_CONNECTIONS + MAX_REJECTIONS);
 
         loop {
             if shutdown.load(Ordering::SeqCst) {
                 break;
             }
-            handles.retain(|(_, handle)| !handle.is_finished());
+            handles.retain(|(_, _, _, handle)| !handle.is_finished());
             match listener.accept() {
-                Ok((mut stream, _)) => {
-                    if handles.len() >= MAX_CONNECTIONS {
-                        let _ =
-                            stream.set_write_timeout(Some(std::time::Duration::from_millis(100)));
-                        // Never answer a TLS connection with plaintext HTTP.
-                        if security.development_http {
-                            let _ = stream.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-                        }
+                Ok((stream, peer)) => {
+                    // Accepted sockets inherit O_NONBLOCK on some supported hosts.
+                    if let Err(error) = stream.set_nonblocking(false) {
+                        eprintln!("maos-registry: accepted socket mode: {error}");
                         continue;
                     }
-                    let cancel = stream.try_clone().map_err(|e| e.to_string())?;
+                    let source = peer.ip().to_canonical();
+                    let (mut active, mut same_source, mut rejections) = (0, 0, 0);
+                    for (_, ip, rejected, _) in &handles {
+                        if *rejected {
+                            rejections += 1;
+                        } else {
+                            active += 1;
+                            same_source += usize::from(*ip == source);
+                        }
+                    }
+                    let rejected = active >= MAX_CONNECTIONS || same_source >= MAX_PER_SOURCE;
+                    if rejected && security.development_http {
+                        // Loopback development needs no handshake/refusal worker.
+                        // Return complete 503s without consuming TLS refusal slots;
+                        // accept has one absolute 100 ms write/drain budget here.
+                        let deadline =
+                            std::time::Instant::now() + std::time::Duration::from_millis(100);
+                        let mut stream = DeadlineStream::new(stream, deadline);
+                        let _ = stream.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                        let _ = stream.stream.shutdown(std::net::Shutdown::Write);
+                        let _ = std::io::copy(
+                            &mut stream.take(UPLOAD_BODY_LIMIT as u64),
+                            &mut std::io::sink(),
+                        );
+                        continue;
+                    }
+                    if rejected && rejections >= MAX_REJECTIONS {
+                        continue;
+                    }
+                    let cancel = match stream.try_clone() {
+                        Ok(cancel) => cancel,
+                        Err(error) => {
+                            eprintln!("maos-registry: accepted socket clone: {error}");
+                            thread::sleep(std::time::Duration::from_millis(50));
+                            continue;
+                        }
+                    };
                     let s = Arc::clone(&storage);
                     let vetters = vetters.clone();
                     let security = security.clone();
                     handles.push((
                         cancel,
+                        source,
+                        rejected,
                         thread::spawn(move || {
-                            if let Err(error) =
-                                handle_connection(s, server_signing_key, vetters, stream, security)
-                            {
+                            if let Err(error) = handle_connection(
+                                s,
+                                server_signing_key,
+                                vetters,
+                                stream,
+                                security,
+                                rejected,
+                            ) {
                                 eprintln!("maos-registry: connection error: {error}");
                             }
                         }),
@@ -217,14 +264,15 @@ impl SpiritRegistryServer {
                 }
                 Err(e) => {
                     eprintln!("maos-registry: accept error: {e}");
+                    thread::sleep(std::time::Duration::from_millis(50));
                 }
             }
         }
 
-        for (stream, _) in &handles {
+        for (stream, _, _, _) in &handles {
             let _ = stream.shutdown(std::net::Shutdown::Both);
         }
-        for (_, handle) in handles {
+        for (_, _, _, handle) in handles {
             let _ = handle.join();
         }
 
@@ -298,7 +346,7 @@ impl RegistryServerArgs {
                 .read_to_string(&mut text)
                 .map_err(|e| format!("{}: {e}", path.display()))?;
             let seed = hex::decode(text.trim())
-                .map_err(|e| format!("signing key hex: {e}"))?
+                .map_err(|_| "invalid signing key hex")?
                 .try_into()
                 .map_err(|_| "signing key must be a 32-byte hex seed")?;
             server = server.with_server_signing_key(seed);
@@ -331,7 +379,7 @@ impl RegistryServerArgs {
                 let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
                 let keyring = serde_cbor::from_slice(&bytes).map_err(|e| e.to_string())?;
                 let root = hex::decode(root)
-                    .map_err(|e| e.to_string())?
+                    .map_err(|_| "invalid operator root hex")?
                     .try_into()
                     .map_err(|_| "operator root must be 32 bytes")?;
                 server = server.with_vetter_keyring(keyring, root);
@@ -352,13 +400,14 @@ fn handle_connection(
     vetters: Option<Arc<(maos_compliance::VetterKeyring, [u8; 32])>>,
     stream: TcpStream,
     security: ServerSecurity,
+    rejected: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let registry_uri = security
         .uri
         .as_deref()
         .ok_or("missing registry canonical URI")?;
     let endpoint = crate::security::canonical_uri(registry_uri)?;
-    let deadline = std::time::Instant::now() + REQUEST_DEADLINE;
+    let deadline = std::time::Instant::now() + FIRST_BYTE_DEADLINE;
     let stream = DeadlineStream { stream, deadline };
     #[cfg(feature = "tls")]
     let stream = if let Some(config) = security.tls {
@@ -372,6 +421,22 @@ fn handle_connection(
     #[cfg(not(feature = "tls"))]
     let stream = ServerStream::Plain(stream);
     let mut reader = BufReader::new(stream);
+    if let Err(error) = reader.fill_buf() {
+        // An HTTP error write must not restart an incomplete TLS handshake
+        // under the longer response-write timeout.
+        if !reader.get_ref().handshake_complete() {
+            return Err(error.into());
+        }
+        reject_http(reader.get_mut(), "408 Request Timeout")?;
+        return Ok(());
+    }
+    if rejected {
+        reject_http(reader.get_mut(), "503 Service Unavailable")?;
+        return Ok(());
+    }
+    reader
+        .get_mut()
+        .set_deadline(std::time::Instant::now() + REQUEST_DEADLINE);
     let headers = match read_request_headers(&mut reader, &endpoint, security.development_http) {
         Ok(headers) => headers,
         Err(status) => {
@@ -381,25 +446,37 @@ fn handle_connection(
     };
     let content_length = headers.content_length;
 
-    const MAX_BODY_SIZE: usize = 64 * 1024 * 1024;
-    if content_length > MAX_BODY_SIZE {
+    if content_length > headers.body_limit {
         reject_http(reader.get_mut(), "413 Payload Too Large")?;
         return Ok(());
     }
 
-    // The request deadline bounds reads, not dispatch or the response write.
-    let mut body = vec![0u8; content_length];
-    if let Err(error) = reader.read_exact(&mut body) {
-        let status = if matches!(
-            error.kind(),
-            std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
-        ) {
-            "408 Request Timeout"
-        } else {
-            "400 Bad Request"
-        };
-        reject_http(reader.get_mut(), status)?;
-        return Ok(());
+    // Grow from received bytes, never reserve an untrusted declared body length.
+    let mut body = Vec::new();
+    while body.len() < content_length {
+        match reader.fill_buf() {
+            Ok([]) => {
+                reject_http(reader.get_mut(), "400 Bad Request")?;
+                return Ok(());
+            }
+            Ok(available) => {
+                let size = available.len().min(content_length - body.len());
+                body.extend_from_slice(&available[..size]);
+                reader.consume(size);
+            }
+            Err(error) => {
+                let status = if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+                ) {
+                    "408 Request Timeout"
+                } else {
+                    "400 Bad Request"
+                };
+                reject_http(reader.get_mut(), status)?;
+                return Ok(());
+            }
+        }
     }
 
     // Parse JSON-RPC request
@@ -420,6 +497,17 @@ fn handle_connection(
             return Ok(());
         }
     };
+    let publish = request.method == "registry.publish"
+        || (request.method == "tools/call"
+            && request
+                .params
+                .get("name")
+                .and_then(serde_json::Value::as_str)
+                == Some("registry.publish"));
+    if !publish && body.len() > METADATA_BODY_LIMIT {
+        reject_http(reader.get_mut(), "413 Payload Too Large")?;
+        return Ok(());
+    }
 
     let handle_result = |method: &str,
                          params: &serde_json::Value|
@@ -554,6 +642,7 @@ fn respond_http(
 
 struct RequestHeaders {
     content_length: usize,
+    body_limit: usize,
     nonce: Option<[u8; 32]>,
 }
 fn read_request_headers(
@@ -603,6 +692,7 @@ fn read_request_headers(
     let mut length = None;
     let mut nonce = None;
     let mut development_opt_in = false;
+    let mut publish_hint = None;
     for _ in 0..=MAX_HEADERS {
         next_line(&mut line)?;
         if line == "\r\n" {
@@ -618,6 +708,11 @@ fn read_request_headers(
             return Ok(RequestHeaders {
                 content_length: length.ok_or("411 Length Required")?,
                 nonce,
+                body_limit: if publish_hint == Some(true) {
+                    UPLOAD_BODY_LIMIT
+                } else {
+                    METADATA_BODY_LIMIT
+                },
             });
         }
         let (name, value) = line.trim_end().split_once(':').ok_or("400 Bad Request")?;
@@ -659,6 +754,10 @@ fn read_request_headers(
             }
         } else if name.eq_ignore_ascii_case("transfer-encoding") {
             return Err("400 Bad Request");
+        } else if name.eq_ignore_ascii_case("mcp-name") {
+            if publish_hint.replace(value == "registry.publish").is_some() {
+                return Err("400 Bad Request");
+            }
         } else if name.eq_ignore_ascii_case(crate::security::NONCE_HEADER) {
             let decoded = hex::decode(value).map_err(|_| "400 Bad Request")?;
             if nonce
@@ -683,6 +782,13 @@ enum ServerStream {
     Tls(Box<rustls::StreamOwned<rustls::ServerConnection, DeadlineStream>>),
 }
 impl ServerStream {
+    fn handshake_complete(&self) -> bool {
+        match self {
+            Self::Plain(_) => true,
+            #[cfg(feature = "tls")]
+            Self::Tls(stream) => !stream.conn.is_handshaking(),
+        }
+    }
     fn socket(&mut self) -> &mut DeadlineStream {
         match self {
             Self::Plain(stream) => stream,
@@ -728,11 +834,14 @@ impl Write for ServerStream {
     }
 }
 
-struct DeadlineStream {
+pub(crate) struct DeadlineStream {
     stream: TcpStream,
     deadline: std::time::Instant,
 }
 impl DeadlineStream {
+    pub(crate) fn new(stream: TcpStream, deadline: std::time::Instant) -> Self {
+        Self { stream, deadline }
+    }
     fn remaining(&self) -> std::io::Result<std::time::Duration> {
         self.deadline
             .checked_duration_since(std::time::Instant::now())
@@ -761,11 +870,6 @@ impl Write for DeadlineStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::LocalFsRegistryStorage;
-    use maos_spirit_abi::compliance::{ComplianceClaimEnvelope, SigningAlg};
-    use std::io::{Read, Write};
-    use std::net::TcpStream;
-    use std::time::Duration;
 
     #[test]
     fn development_default_ports_use_the_same_canonical_uri_as_clients() {
@@ -777,25 +881,5 @@ mod tests {
             development_uri((std::net::Ipv6Addr::LOCALHOST, 80).into()).unwrap(),
             "http://[::1]/mcp"
         );
-    }
-
-    fn temp_storage() -> Arc<dyn RegistryStorage> {
-        let dir =
-            std::env::temp_dir().join(format!("maos-registry-server-test-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        let s = LocalFsRegistryStorage::at_path(dir).unwrap();
-        Arc::new(s)
-    }
-
-    #[test]
-    #[ignore = "requires server to be running on a port — tested via end-to-end test"]
-    fn server_handles_search() {
-        // The real-wire test is at tests/end_to_end_test.rs (Task 16)
-    }
-
-    #[test]
-    #[ignore = "requires server to be running on a port — tested via end-to-end test"]
-    fn server_handles_unknown_method() {
-        // The real-wire test is at tests/end_to_end_test.rs (Task 16)
     }
 }

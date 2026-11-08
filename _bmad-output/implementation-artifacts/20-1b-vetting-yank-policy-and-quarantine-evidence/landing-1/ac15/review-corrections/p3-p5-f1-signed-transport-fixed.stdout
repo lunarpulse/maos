@@ -1,0 +1,16 @@
+
+running 11 tests
+test tls::signed_head_behind_requested_cursor_is_typed_d3_p5 ... ok
+test tls::tls_admission_refusal_is_encrypted_http_503_f1 ... ok
+test tls::signed_valid_empty_view_with_nonzero_head_is_refused_p3 ... ok
+test tls::signed_valid_duplicate_body_is_refused_p3 ... ok
+test tls::signed_valid_extra_entries_are_refused_p3 ... ok
+test tls::signed_wrong_request_hash_is_refused_p3 ... ok
+test tls::bad_signature_byte_is_refused_p3 ... ok
+test tls::signed_wrong_envelope_version_is_refused_p3 ... ok
+test tls::signed_payload_head_must_equal_envelope_head_p3 ... ok
+test tls::signed_valid_gap_body_is_refused_p3 ... ok
+test tls::incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1 ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 1.18s
+

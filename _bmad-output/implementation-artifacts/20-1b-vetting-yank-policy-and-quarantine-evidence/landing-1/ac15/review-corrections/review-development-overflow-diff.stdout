@@ -1,0 +1,11 @@
+--- /tmp/201b-ac15-corrections/plants/review-development-overflow.saved	2026-11-08 13:03:46.048125200 +0000
++++ /home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs	2026-11-08 13:03:51.427740383 +0000
+@@ -212,7 +212,7 @@
+                         }
+                     }
+                     let rejected = active >= MAX_CONNECTIONS || same_source >= MAX_PER_SOURCE;
+-                    if rejected && security.development_http {
++                    if false && rejected && security.development_http {
+                         // Loopback development needs no handshake/refusal worker.
+                         // Return complete 503s without consuming TLS refusal slots;
+                         // accept has one absolute 100 ms write/drain budget here.

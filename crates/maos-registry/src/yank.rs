@@ -120,6 +120,15 @@ impl YankPoller {
             .cache
             .lock()
             .map_err(|e| RegistryError::Transport(e.to_string()))?;
+        if let Some(head) = list.head.filter(|head| *head < cache.last_seen_ns) {
+            cache.resync = false;
+            let error = RegistryError::HeadBehindCursor {
+                head,
+                cursor: cache.last_seen_ns,
+            };
+            eprintln!("yank-head-rollback: {error}");
+            return Err(error);
+        }
         cache.resync = false;
         let mut count = 0;
         let mut expected = cache.last_seen_ns.checked_add(1);
@@ -335,6 +344,31 @@ mod tests {
         let mut entry = YankEntry::new("vetted".into(), "1.0.0".into(), 0, "withdrawn".into());
         entry.sequence = sequence;
         entry
+    }
+    #[test]
+    fn authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5() {
+        let poller = YankPoller::new(
+            Arc::new(Source(Vec::new())),
+            Arc::new(Observer::default()),
+            "https://registry.example/mcp".into(),
+        );
+        poller.cache.lock().unwrap().last_seen_ns = 5;
+        let mut list = YankList::new(Vec::new());
+        list.head = Some(2);
+        let result = poller.apply_list(list);
+        assert!(
+            matches!(
+                result,
+                Err(RegistryError::HeadBehindCursor { head: 2, cursor: 5 })
+            ),
+            "{result:?}"
+        );
+        assert_eq!(poller.last_seen_ns(), 5);
+        assert_eq!(
+            poller.begin_poll().unwrap(),
+            5,
+            "rollback must not resync from zero"
+        );
     }
     #[test]
     fn repeated_source_does_not_replay_journal_rows() {

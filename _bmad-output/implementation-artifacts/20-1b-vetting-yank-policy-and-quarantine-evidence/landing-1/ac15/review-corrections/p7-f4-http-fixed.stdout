@@ -1,0 +1,8 @@
+
+running 3 tests
+test http::tests::drip_response_cannot_extend_exchange_deadline_f4 ... ok
+test http::tests::later_resolved_address_is_tried_after_connection_refusal ... ok
+test http::tests::unsigned_http_refusal_preserves_status_p7 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.24s
+

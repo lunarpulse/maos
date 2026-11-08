@@ -1,0 +1,30 @@
+
+running 11 tests
+test async_task_cannot_retain_sender_clone_p6 ... FAILED
+test helper_sender_move_requires_release_p6 ... FAILED
+test joined_qualified_drop_and_select_are_accounted_p6 ... ok
+test moving_a_drain_to_another_arm_cannot_hide_behind_equal_totals_p6 ... FAILED
+test parenthesized_drain_requires_join_p6 ... FAILED
+test qualified_drop_requires_join_p6 ... FAILED
+test select_drain_requires_join_p6 ... FAILED
+test sibling_join_does_not_authorize_another_arm_p6 ... FAILED
+test supervisor_stop_must_follow_join_p4 ... FAILED
+test unload_must_follow_join_p4 ... FAILED
+test wildcard_sender_binding_is_not_a_release_p6 ... FAILED
+
+failures:
+
+failures:
+    async_task_cannot_retain_sender_clone_p6
+    helper_sender_move_requires_release_p6
+    moving_a_drain_to_another_arm_cannot_hide_behind_equal_totals_p6
+    parenthesized_drain_requires_join_p6
+    qualified_drop_requires_join_p6
+    select_drain_requires_join_p6
+    sibling_join_does_not_authorize_another_arm_p6
+    supervisor_stop_must_follow_join_p4
+    unload_must_follow_join_p4
+    wildcard_sender_binding_is_not_a_release_p6
+
+test result: FAILED. 1 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+

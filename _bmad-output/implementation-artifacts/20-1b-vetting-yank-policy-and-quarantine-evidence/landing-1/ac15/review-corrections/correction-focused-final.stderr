@@ -1,0 +1,1781 @@
+warning: ignoring --test-threads because --no-capture is specified
+────────────
+ Nextest run ID a796a2f7-be25-4368-a940-7c4105bd0c3e with nextest profile: ci
+    Starting 827 tests across 680 binaries (5146 tests and 1 binary skipped, including 1 binary via profile.default.default-filter)
+       START [         ] (  1/827) maos-bin::erasure_inventory_20_11 registry_bound_principal_is_counted_and_erased_on_uninstall_p3
+        PASS [   0.829s] (  1/827) maos-bin::erasure_inventory_20_11 registry_bound_principal_is_counted_and_erased_on_uninstall_p3
+       START [         ] (  2/827) maos-bin::installed_spirit_dispatch_20_1 boot_rechecks_manifest_component_publisher_and_claim
+maos-registry: listening on 127.0.0.1:37783
+maos-registry: listening on 127.0.0.1:38035
+maos-registry: listening on 127.0.0.1:46355
+maos-registry: listening on 127.0.0.1:38911
+        PASS [   2.214s] (  2/827) maos-bin::installed_spirit_dispatch_20_1 boot_rechecks_manifest_component_publisher_and_claim
+       START [         ] (  3/827) maos-bin::installed_spirit_dispatch_20_1 installed_component_dispatch_reports_typed_boot_refusal
+        PASS [   0.532s] (  3/827) maos-bin::installed_spirit_dispatch_20_1 installed_component_dispatch_reports_typed_boot_refusal
+       START [         ] (  4/827) maos-bin::one_daemon_one_door_16_1 vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9
+        PASS [   0.784s] (  4/827) maos-bin::one_daemon_one_door_16_1 vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9
+       START [         ] (  5/827) maos-bin::registry_config_20_1b daemon_banner_uses_the_enforced_single_reader_d1_p10
+        PASS [   0.274s] (  5/827) maos-bin::registry_config_20_1b daemon_banner_uses_the_enforced_single_reader_d1_p10
+       START [         ] (  6/827) maos-bin::registry_config_20_1b daemon_refuses_https_without_a_root_before_polling_d1_p10
+        PASS [   0.211s] (  6/827) maos-bin::registry_config_20_1b daemon_refuses_https_without_a_root_before_polling_d1_p10
+       START [         ] (  7/827) maos-bin::registry_config_20_1b daemon_refuses_registry_typo_even_without_a_uri_d1_p10_p11
+        PASS [   0.208s] (  7/827) maos-bin::registry_config_20_1b daemon_refuses_registry_typo_even_without_a_uri_d1_p10_p11
+       START [         ] (  8/827) maos-bin::root_shutdown_unload_16_3 ac3_operator_door_unload_stops_a_live_worker_once
+SKIP: T3 root unload live Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env
+        PASS [   0.004s] (  8/827) maos-bin::root_shutdown_unload_16_3 ac3_operator_door_unload_stops_a_live_worker_once
+       START [         ] (  9/827) maos-bin::root_shutdown_unload_16_3 ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm
+SKIP: T3 root shutdown serving Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env
+        PASS [   0.003s] (  9/827) maos-bin::root_shutdown_unload_16_3 ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm
+       START [         ] ( 10/827) maos-bin::root_shutdown_unload_16_3 ac4_v2_butler_once_receipts_the_raised_halt_and_drains
+SKIP: T3 root shutdown one-shot Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env
+        PASS [   0.003s] ( 10/827) maos-bin::root_shutdown_unload_16_3 ac4_v2_butler_once_receipts_the_raised_halt_and_drains
+       START [         ] ( 11/827) maos-bin::root_shutdown_unload_16_3 ac4_v3_topology_once_unloads_every_loaded_spirit
+SKIP: T3 root shutdown topology Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env
+        PASS [   0.003s] ( 11/827) maos-bin::root_shutdown_unload_16_3 ac4_v3_topology_once_unloads_every_loaded_spirit
+       START [         ] ( 12/827) maos-bin::root_shutdown_unload_16_3 ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker
+SKIP: T3 root shutdown interrupted topology Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env
+        PASS [   0.003s] ( 12/827) maos-bin::root_shutdown_unload_16_3 ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker
+       START [         ] ( 13/827) maos-bin::root_shutdown_unload_16_3 ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan
+SKIP: T3 root shutdown standalone Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env
+        PASS [   0.003s] ( 13/827) maos-bin::root_shutdown_unload_16_3 ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan
+       START [         ] ( 14/827) maos-bin::root_shutdown_unload_16_3 ac4_v4b_grandchild_is_stopped_with_its_worker_container
+SKIP: T3 root shutdown descendant Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env
+        PASS [   0.003s] ( 14/827) maos-bin::root_shutdown_unload_16_3 ac4_v4b_grandchild_is_stopped_with_its_worker_container
+       START [         ] ( 15/827) maos-bin::root_shutdown_unload_16_3 ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15
+        PASS [   0.229s] ( 15/827) maos-bin::root_shutdown_unload_16_3 ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15
+       START [         ] ( 16/827) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains
+SKIP: T3 cohort root shutdown Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env
+        PASS [   0.003s] ( 16/827) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains
+       START [         ] ( 17/827) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown
+SKIP: T3 cohort root startup shutdown Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env
+        PASS [   0.003s] ( 17/827) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown
+       START [         ] ( 18/827) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants
+SKIP: T3 cohort root descendant Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env
+        PASS [   0.003s] ( 18/827) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants
+       START [         ] ( 19/827) maos-bin::root_shutdown_unload_16_3 cohort::cohort_sigterm_without_worker_joins_local_yank_timer_and_drains
+        PASS [   0.326s] ( 19/827) maos-bin::root_shutdown_unload_16_3 cohort::cohort_sigterm_without_worker_joins_local_yank_timer_and_drains
+       START [         ] ( 20/827) maos-bin::root_shutdown_unload_16_3 cohort::declared_capable_cohort_worker_prerequisite_never_green_skips
+        PASS [   0.009s] ( 20/827) maos-bin::root_shutdown_unload_16_3 cohort::declared_capable_cohort_worker_prerequisite_never_green_skips
+       START [         ] ( 21/827) maos-bin::root_shutdown_unload_16_3 every_audit_sender_release_joins_the_yank_owner
+        PASS [   0.185s] ( 21/827) maos-bin::root_shutdown_unload_16_3 every_audit_sender_release_joins_the_yank_owner
+       START [         ] ( 22/827) maos-bin::root_shutdown_unload_16_3 harness_owns_grandchildren_before_discovery_even_when_startup_panics
+
+thread 'harness_owns_grandchildren_before_discovery_even_when_startup_panics' (999912) panicked at crates/maos-bin/tests/root_shutdown_unload_16_3.rs:754:13:
+planted panic after spawn, before grandchild discovery
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        PASS [   0.027s] ( 22/827) maos-bin::root_shutdown_unload_16_3 harness_owns_grandchildren_before_discovery_even_when_startup_panics
+       START [         ] ( 23/827) maos-bin::yank_audit_structure_20_1b async_task_cannot_retain_sender_clone_p6
+        PASS [   0.003s] ( 23/827) maos-bin::yank_audit_structure_20_1b async_task_cannot_retain_sender_clone_p6
+       START [         ] ( 24/827) maos-bin::yank_audit_structure_20_1b helper_sender_move_requires_release_p6
+        PASS [   0.002s] ( 24/827) maos-bin::yank_audit_structure_20_1b helper_sender_move_requires_release_p6
+       START [         ] ( 25/827) maos-bin::yank_audit_structure_20_1b joined_qualified_drop_and_select_are_accounted_p6
+        PASS [   0.003s] ( 25/827) maos-bin::yank_audit_structure_20_1b joined_qualified_drop_and_select_are_accounted_p6
+       START [         ] ( 26/827) maos-bin::yank_audit_structure_20_1b moving_a_drain_to_another_arm_cannot_hide_behind_equal_totals_p6
+        PASS [   0.188s] ( 26/827) maos-bin::yank_audit_structure_20_1b moving_a_drain_to_another_arm_cannot_hide_behind_equal_totals_p6
+       START [         ] ( 27/827) maos-bin::yank_audit_structure_20_1b parenthesized_drain_requires_join_p6
+        PASS [   0.003s] ( 27/827) maos-bin::yank_audit_structure_20_1b parenthesized_drain_requires_join_p6
+       START [         ] ( 28/827) maos-bin::yank_audit_structure_20_1b qualified_drop_requires_join_p6
+        PASS [   0.002s] ( 28/827) maos-bin::yank_audit_structure_20_1b qualified_drop_requires_join_p6
+       START [         ] ( 29/827) maos-bin::yank_audit_structure_20_1b select_drain_requires_join_p6
+        PASS [   0.002s] ( 29/827) maos-bin::yank_audit_structure_20_1b select_drain_requires_join_p6
+       START [         ] ( 30/827) maos-bin::yank_audit_structure_20_1b sibling_join_does_not_authorize_another_arm_p6
+        PASS [   0.003s] ( 30/827) maos-bin::yank_audit_structure_20_1b sibling_join_does_not_authorize_another_arm_p6
+       START [         ] ( 31/827) maos-bin::yank_audit_structure_20_1b supervisor_stop_must_follow_join_p4
+        PASS [   0.003s] ( 31/827) maos-bin::yank_audit_structure_20_1b supervisor_stop_must_follow_join_p4
+       START [         ] ( 32/827) maos-bin::yank_audit_structure_20_1b unload_must_follow_join_p4
+        PASS [   0.003s] ( 32/827) maos-bin::yank_audit_structure_20_1b unload_must_follow_join_p4
+       START [         ] ( 33/827) maos-bin::yank_audit_structure_20_1b wildcard_sender_binding_is_not_a_release_p6
+        PASS [   0.003s] ( 33/827) maos-bin::yank_audit_structure_20_1b wildcard_sender_binding_is_not_a_release_p6
+       START [         ] ( 34/827) maos-bin::yank_policy_20_1b corrupt_install_does_not_hide_another_spirits_expiry_p1
+        PASS [   0.088s] ( 34/827) maos-bin::yank_policy_20_1b corrupt_install_does_not_hide_another_spirits_expiry_p1
+       START [         ] ( 35/827) maos-bin::yank_policy_20_1b deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9
+        PASS [   0.007s] ( 35/827) maos-bin::yank_policy_20_1b deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9
+       START [         ] ( 36/827) maos-bin::yank_policy_20_1b expiry_and_vetter_revocation_observe_once_and_request_policy_ac9
+        PASS [   0.145s] ( 36/827) maos-bin::yank_policy_20_1b expiry_and_vetter_revocation_observe_once_and_request_policy_ac9
+       START [         ] ( 37/827) maos-bin::yank_policy_20_1b failing_auto_revoke_retries_policy_without_repeating_observation_p12
+
+thread '<unnamed>' (999965) panicked at crates/maos-bin/tests/yank_policy_20_1b.rs:539:13:
+test-only poisoned assignment state rejects CRL application
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        PASS [   0.072s] ( 37/827) maos-bin::yank_policy_20_1b failing_auto_revoke_retries_policy_without_repeating_observation_p12
+       START [         ] ( 38/827) maos-bin::yank_policy_20_1b no_registry_local_timer_discovers_promotion_installed_after_start_p11
+        PASS [   0.070s] ( 38/827) maos-bin::yank_policy_20_1b no_registry_local_timer_discovers_promotion_installed_after_start_p11
+       START [         ] ( 39/827) maos-bin::yank_policy_20_1b poller_runtime_clock_and_cursor_restart_reach_expiry_p6
+        PASS [   0.087s] ( 39/827) maos-bin::yank_policy_20_1b poller_runtime_clock_and_cursor_restart_reach_expiry_p6
+       START [         ] ( 40/827) maos-bin::yank_policy_20_1b registry_publishers_cannot_share_principal_spill_ac10
+        PASS [   0.140s] ( 40/827) maos-bin::yank_policy_20_1b registry_publishers_cannot_share_principal_spill_ac10
+       START [         ] ( 41/827) maos-bin::yank_policy_20_1b rejected_vetter_row_does_not_hide_later_publisher_yank_p1
+        PASS [   0.071s] ( 41/827) maos-bin::yank_policy_20_1b rejected_vetter_row_does_not_hide_later_publisher_yank_p1
+       START [         ] ( 42/827) maos-bin::yank_policy_20_1b signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8
+        PASS [   0.216s] ( 42/827) maos-bin::yank_policy_20_1b signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8
+       START [         ] ( 43/827) maos-bin::yank_policy_20_1b uninstalled_unsigned_row_never_advances_authenticated_cursor_f1
+        PASS [   0.069s] ( 43/827) maos-bin::yank_policy_20_1b uninstalled_unsigned_row_never_advances_authenticated_cursor_f1
+       START [         ] ( 44/827) maos-cli accessibility::tests::no_color_env_empty_string_does_not_disable_color
+        PASS [   0.003s] ( 44/827) maos-cli accessibility::tests::no_color_env_empty_string_does_not_disable_color
+       START [         ] ( 45/827) maos-cli accessibility::tests::no_color_env_with_any_value_disables_color
+        PASS [   0.003s] ( 45/827) maos-cli accessibility::tests::no_color_env_with_any_value_disables_color
+       START [         ] ( 46/827) maos-cli accessibility::tests::no_color_wins_over_term_dumb
+        PASS [   0.002s] ( 46/827) maos-cli accessibility::tests::no_color_wins_over_term_dumb
+       START [         ] ( 47/827) maos-cli accessibility::tests::no_env_falls_through_to_auto
+        PASS [   0.003s] ( 47/827) maos-cli accessibility::tests::no_env_falls_through_to_auto
+       START [         ] ( 48/827) maos-cli accessibility::tests::plain_flag_overrides_everything
+        PASS [   0.003s] ( 48/827) maos-cli accessibility::tests::plain_flag_overrides_everything
+       START [         ] ( 49/827) maos-cli accessibility::tests::plain_flag_wins_over_no_color_set
+        PASS [   0.003s] ( 49/827) maos-cli accessibility::tests::plain_flag_wins_over_no_color_set
+       START [         ] ( 50/827) maos-cli accessibility::tests::term_dumb_disables_color_when_no_color_unset
+        PASS [   0.003s] ( 50/827) maos-cli accessibility::tests::term_dumb_disables_color_when_no_color_unset
+       START [         ] ( 51/827) maos-cli accessibility::tests::term_xterm_falls_through_to_auto
+        PASS [   0.003s] ( 51/827) maos-cli accessibility::tests::term_xterm_falls_through_to_auto
+       START [         ] ( 52/827) maos-cli backup::tests::tenant_backup_round_trip_rejects_wrong_team
+        PASS [   0.418s] ( 52/827) maos-cli backup::tests::tenant_backup_round_trip_rejects_wrong_team
+       START [         ] ( 53/827) maos-cli backup::tests::validate_restore_target_team_refuses_cross_team_planting
+        PASS [   0.225s] ( 53/827) maos-cli backup::tests::validate_restore_target_team_refuses_cross_team_planting
+       START [         ] ( 54/827) maos-cli subcommands::tests::audit_keygen_parses
+        PASS [   0.004s] ( 54/827) maos-cli subcommands::tests::audit_keygen_parses
+       START [         ] ( 55/827) maos-cli subcommands::tests::audit_posture_delta_parses
+        PASS [   0.004s] ( 55/827) maos-cli subcommands::tests::audit_posture_delta_parses
+       START [         ] ( 56/827) maos-cli subcommands::tests::audit_query_accepts_plain_format
+        PASS [   0.003s] ( 56/827) maos-cli subcommands::tests::audit_query_accepts_plain_format
+       START [         ] ( 57/827) maos-cli subcommands::tests::audit_query_accepts_spirit_and_format_flags
+        PASS [   0.003s] ( 57/827) maos-cli subcommands::tests::audit_query_accepts_spirit_and_format_flags
+       START [         ] ( 58/827) maos-cli subcommands::tests::audit_query_capability_parses
+        PASS [   0.004s] ( 58/827) maos-cli subcommands::tests::audit_query_capability_parses
+       START [         ] ( 59/827) maos-cli subcommands::tests::audit_query_defaults_format_to_ndjson
+        PASS [   0.004s] ( 59/827) maos-cli subcommands::tests::audit_query_defaults_format_to_ndjson
+       START [         ] ( 60/827) maos-cli subcommands::tests::audit_query_intent_contains_parses
+        PASS [   0.006s] ( 60/827) maos-cli subcommands::tests::audit_query_intent_contains_parses
+       START [         ] ( 61/827) maos-cli subcommands::tests::audit_query_range_parses
+        PASS [   0.003s] ( 61/827) maos-cli subcommands::tests::audit_query_range_parses
+       START [         ] ( 62/827) maos-cli subcommands::tests::audit_query_spirit_all_boots_parses
+        PASS [   0.004s] ( 62/827) maos-cli subcommands::tests::audit_query_spirit_all_boots_parses
+       START [         ] ( 63/827) maos-cli subcommands::tests::audit_sealed_export_parses
+        PASS [   0.004s] ( 63/827) maos-cli subcommands::tests::audit_sealed_export_parses
+       START [         ] ( 64/827) maos-cli subcommands::tests::audit_subject_access_parses
+        PASS [   0.004s] ( 64/827) maos-cli subcommands::tests::audit_subject_access_parses
+       START [         ] ( 65/827) maos-cli subcommands::tests::audit_verify_bundle_parses
+        PASS [   0.003s] ( 65/827) maos-cli subcommands::tests::audit_verify_bundle_parses
+       START [         ] ( 66/827) maos-cli subcommands::tests::capture_tripwire_allows_hex_tl_refs
+        PASS [   0.003s] ( 66/827) maos-cli subcommands::tests::capture_tripwire_allows_hex_tl_refs
+       START [         ] ( 67/827) maos-cli subcommands::tests::capture_tripwire_refuses_a_pasted_api_key
+        PASS [   0.003s] ( 67/827) maos-cli subcommands::tests::capture_tripwire_refuses_a_pasted_api_key
+       START [         ] ( 68/827) maos-cli subcommands::tests::capture_validation_refuses_adapter_only_fs_jail
+        PASS [   0.004s] ( 68/827) maos-cli subcommands::tests::capture_validation_refuses_adapter_only_fs_jail
+       START [         ] ( 69/827) maos-cli subcommands::tests::capture_validation_refuses_the_two_host_overclaim_directions
+        PASS [   0.004s] ( 69/827) maos-cli subcommands::tests::capture_validation_refuses_the_two_host_overclaim_directions
+       START [         ] ( 70/827) maos-cli subcommands::tests::capture_validation_refuses_unenforced_egress
+        PASS [   0.003s] ( 70/827) maos-cli subcommands::tests::capture_validation_refuses_unenforced_egress
+       START [         ] ( 71/827) maos-cli subcommands::tests::capture_validation_rejects_missing_signer
+        PASS [   0.003s] ( 71/827) maos-cli subcommands::tests::capture_validation_rejects_missing_signer
+       START [         ] ( 72/827) maos-cli subcommands::tests::capture_validation_requires_at_least_one_audit_ref
+        PASS [   0.003s] ( 72/827) maos-cli subcommands::tests::capture_validation_requires_at_least_one_audit_ref
+       START [         ] ( 73/827) maos-cli subcommands::tests::capture_validation_requires_verified_redaction
+        PASS [   0.003s] ( 73/827) maos-cli subcommands::tests::capture_validation_requires_verified_redaction
+       START [         ] ( 74/827) maos-cli subcommands::tests::cost_report_reads_payload_not_intent
+        PASS [   0.003s] ( 74/827) maos-cli subcommands::tests::cost_report_reads_payload_not_intent
+       START [         ] ( 75/827) maos-cli subcommands::tests::dispatch_forget_rejects_empty_principal
+maosctl: forget requires a non-empty --principal
+        PASS [   0.003s] ( 75/827) maos-cli subcommands::tests::dispatch_forget_rejects_empty_principal
+       START [         ] ( 76/827) maos-cli subcommands::tests::dispatch_install
+        PASS [   0.004s] ( 76/827) maos-cli subcommands::tests::dispatch_install
+       START [         ] ( 77/827) maos-cli subcommands::tests::dispatch_run_hello_spirit
+        PASS [   0.003s] ( 77/827) maos-cli subcommands::tests::dispatch_run_hello_spirit
+       START [         ] ( 78/827) maos-cli subcommands::tests::dispatch_start_parses_hello_spirit_globally_with_plain
+        PASS [   0.004s] ( 78/827) maos-cli subcommands::tests::dispatch_start_parses_hello_spirit_globally_with_plain
+       START [         ] ( 79/827) maos-cli subcommands::tests::dispatch_stop_unload_parse_with_no_args
+        PASS [   0.004s] ( 79/827) maos-cli subcommands::tests::dispatch_stop_unload_parse_with_no_args
+       START [         ] ( 80/827) maos-cli subcommands::tests::dispatch_unknown_spirit_install
+maosctl: unknown spirit 'nonexistent-spirit' — only 'hello-spirit' is available at v0.1-α
+        PASS [   0.003s] ( 80/827) maos-cli subcommands::tests::dispatch_unknown_spirit_install
+       START [         ] ( 81/827) maos-cli subcommands::tests::dispatch_unknown_spirit_run
+maosctl: unknown spirit 'nonexistent-spirit' — only 'hello-spirit' is available at v0.1-α
+        PASS [   0.003s] ( 81/827) maos-cli subcommands::tests::dispatch_unknown_spirit_run
+       START [         ] ( 82/827) maos-cli subcommands::tests::forget_parses_principal_and_reason
+        PASS [   0.003s] ( 82/827) maos-cli subcommands::tests::forget_parses_principal_and_reason
+       START [         ] ( 83/827) maos-cli subcommands::tests::forget_reason_is_optional
+        PASS [   0.003s] ( 83/827) maos-cli subcommands::tests::forget_reason_is_optional
+       START [         ] ( 84/827) maos-cli subcommands::tests::install_verify_local_release_artifact
+maosctl: verification passed for 1 file(s)
+  ✓ maos-linux-amd64 (fd17a5d93679300e)
+        PASS [   0.003s] ( 84/827) maos-cli subcommands::tests::install_verify_local_release_artifact
+       START [         ] ( 85/827) maos-cli subcommands::tests::install_verify_missing_sig_fails
+maosctl: cannot read /tmp/.tmpVaIQ7e/SHA256SUMS.sig: No such file or directory (os error 2)
+        PASS [   0.003s] ( 85/827) maos-cli subcommands::tests::install_verify_missing_sig_fails
+       START [         ] ( 86/827) maos-cli subcommands::tests::install_verify_tampered_artifact_rejected
+maosctl: release verification FAILED: SHA256 mismatch for maos-linux-amd64: expected fd17a5d93679300e79cf1b5a0ffd0409408e11ccb8c5a212a561e430a5c949f4, got 3109af4bf22dace5fa33b410c9f2e40dc1eed214d6c2b9ea0848a17f187ef661
+        PASS [   0.003s] ( 86/827) maos-cli subcommands::tests::install_verify_tampered_artifact_rejected
+       START [         ] ( 87/827) maos-cli subcommands::tests::journal_run_capture_row_fails_closed_without_a_tl
+        PASS [   0.003s] ( 87/827) maos-cli subcommands::tests::journal_run_capture_row_fails_closed_without_a_tl
+       START [         ] ( 88/827) maos-cli subcommands::tests::record_capture_parses_flags
+        PASS [   0.004s] ( 88/827) maos-cli subcommands::tests::record_capture_parses_flags
+       START [         ] ( 89/827) maos-cli subcommands::tests::record_capture_row_round_trips_through_audit_query
+        PASS [   0.046s] ( 89/827) maos-cli subcommands::tests::record_capture_row_round_trips_through_audit_query
+       START [         ] ( 90/827) maos-cli subcommands::tests::resolve_spirit_pid_reads_from_tl
+        PASS [   0.044s] ( 90/827) maos-cli subcommands::tests::resolve_spirit_pid_reads_from_tl
+       START [         ] ( 91/827) maos-cli subcommands::tests::resolve_spirit_pid_rejects_unknown_names_with_clear_diagnostic
+        PASS [   0.024s] ( 91/827) maos-cli subcommands::tests::resolve_spirit_pid_rejects_unknown_names_with_clear_diagnostic
+       START [         ] ( 92/827) maos-cli::a2a_repin_19_7 a_200_that_is_not_the_sent_decision_is_refused
+        PASS [   0.080s] ( 92/827) maos-cli::a2a_repin_19_7 a_200_that_is_not_the_sent_decision_is_refused
+       START [         ] ( 93/827) maos-cli::a2a_repin_19_7 approve_posts_the_decision_with_a_decimal_string_nonce
+        PASS [   0.016s] ( 93/827) maos-cli::a2a_repin_19_7 approve_posts_the_decision_with_a_decimal_string_nonce
+       START [         ] ( 94/827) maos-cli::a2a_repin_19_7 decision_outcomes_map_to_typed_distinct_exits
+        PASS [   0.159s] ( 94/827) maos-cli::a2a_repin_19_7 decision_outcomes_map_to_typed_distinct_exits
+       START [         ] ( 95/827) maos-cli::a2a_repin_19_7 list_gets_the_pending_set_and_prints_it_verbatim
+        PASS [   0.016s] ( 95/827) maos-cli::a2a_repin_19_7 list_gets_the_pending_set_and_prints_it_verbatim
+       START [         ] ( 96/827) maos-cli::a2a_repin_19_7 list_outcomes_map_to_typed_exits
+        PASS [   0.030s] ( 96/827) maos-cli::a2a_repin_19_7 list_outcomes_map_to_typed_exits
+       START [         ] ( 97/827) maos-cli::a2a_repin_19_7 malformed_decisions_are_refused_before_the_round_trip
+        PASS [   0.024s] ( 97/827) maos-cli::a2a_repin_19_7 malformed_decisions_are_refused_before_the_round_trip
+       START [         ] ( 98/827) maos-cli::a2a_repin_19_7 reject_posts_approve_false_with_the_default_actor
+        PASS [   0.018s] ( 98/827) maos-cli::a2a_repin_19_7 reject_posts_approve_false_with_the_default_actor
+       START [         ] ( 99/827) maos-cli::a2a_repin_19_7 repin_discovery_failures_map_to_typed_exits
+        PASS [   0.119s] ( 99/827) maos-cli::a2a_repin_19_7 repin_discovery_failures_map_to_typed_exits
+       START [         ] (100/827) maos-cli::a2a_repin_19_7 repin_routes_reach_the_d16_1_p_matrix
+        PASS [   0.259s] (100/827) maos-cli::a2a_repin_19_7 repin_routes_reach_the_d16_1_p_matrix
+       START [         ] (101/827) maos-cli::a2a_repin_19_7 wire_shapes_are_pinned_as_literal_json
+        PASS [   0.003s] (101/827) maos-cli::a2a_repin_19_7 wire_shapes_are_pinned_as_literal_json
+       START [         ] (102/827) maos-cli::accessibility_test door_error_output_is_ansi_free
+        PASS [   0.015s] (102/827) maos-cli::accessibility_test door_error_output_is_ansi_free
+       START [         ] (103/827) maos-cli::accessibility_test install_cascade_emits_zero_ansi_bytes
+        PASS [   0.009s] (103/827) maos-cli::accessibility_test install_cascade_emits_zero_ansi_bytes
+       START [         ] (104/827) maos-cli::accessibility_test run_cascade_emits_zero_ansi_bytes
+        PASS [   0.009s] (104/827) maos-cli::accessibility_test run_cascade_emits_zero_ansi_bytes
+       START [         ] (105/827) maos-cli::accessibility_test start_cascade_emits_zero_ansi_bytes
+        PASS [   0.008s] (105/827) maos-cli::accessibility_test start_cascade_emits_zero_ansi_bytes
+       START [         ] (106/827) maos-cli::accessibility_test stop_cascade_refuses_with_exit_two_and_zero_ansi
+        PASS [   0.007s] (106/827) maos-cli::accessibility_test stop_cascade_refuses_with_exit_two_and_zero_ansi
+       START [         ] (107/827) maos-cli::accessibility_test unload_cascade_emits_zero_ansi_bytes
+        PASS [   0.008s] (107/827) maos-cli::accessibility_test unload_cascade_emits_zero_ansi_bytes
+       START [         ] (108/827) maos-cli::audit_no_color_test fr4_schema_violation_exits_two_with_diagnostic
+        PASS [   0.067s] (108/827) maos-cli::audit_no_color_test fr4_schema_violation_exits_two_with_diagnostic
+       START [         ] (109/827) maos-cli::audit_no_color_test ndjson_with_no_color_emits_zero_ansi_bytes
+        PASS [   0.108s] (109/827) maos-cli::audit_no_color_test ndjson_with_no_color_emits_zero_ansi_bytes
+       START [         ] (110/827) maos-cli::audit_no_color_test ndjson_with_term_dumb_emits_zero_ansi_bytes
+        PASS [   0.110s] (110/827) maos-cli::audit_no_color_test ndjson_with_term_dumb_emits_zero_ansi_bytes
+       START [         ] (111/827) maos-cli::audit_no_color_test plain_with_no_color_emits_zero_ansi_bytes
+        PASS [   0.109s] (111/827) maos-cli::audit_no_color_test plain_with_no_color_emits_zero_ansi_bytes
+       START [         ] (112/827) maos-cli::audit_no_color_test plain_with_term_dumb_emits_zero_ansi_bytes
+        PASS [   0.110s] (112/827) maos-cli::audit_no_color_test plain_with_term_dumb_emits_zero_ansi_bytes
+       START [         ] (113/827) maos-cli::audit_no_color_test unknown_spirit_exits_two_with_clear_diagnostic
+        PASS [   0.110s] (113/827) maos-cli::audit_no_color_test unknown_spirit_exits_two_with_clear_diagnostic
+       START [         ] (114/827) maos-cli::benchmark_sidecar_18_2 a_dev_seed_sidecar_verifies_and_prints_its_body
+        PASS [   0.007s] (114/827) maos-cli::benchmark_sidecar_18_2 a_dev_seed_sidecar_verifies_and_prints_its_body
+       START [         ] (115/827) maos-cli::benchmark_sidecar_18_2 a_dev_seed_signature_claiming_the_producer_exits_one
+        PASS [   0.006s] (115/827) maos-cli::benchmark_sidecar_18_2 a_dev_seed_signature_claiming_the_producer_exits_one
+       START [         ] (116/827) maos-cli::benchmark_sidecar_18_2 a_float_that_does_not_round_trip_verifies_byte_exact
+        PASS [   0.006s] (116/827) maos-cli::benchmark_sidecar_18_2 a_float_that_does_not_round_trip_verifies_byte_exact
+       START [         ] (117/827) maos-cli::benchmark_sidecar_18_2 a_malformed_pubkey_refuses_without_echoing_it
+        PASS [   0.005s] (117/827) maos-cli::benchmark_sidecar_18_2 a_malformed_pubkey_refuses_without_echoing_it
+       START [         ] (118/827) maos-cli::benchmark_sidecar_18_2 a_missing_sidecar_exits_five_typed
+        PASS [   0.009s] (118/827) maos-cli::benchmark_sidecar_18_2 a_missing_sidecar_exits_five_typed
+       START [         ] (119/827) maos-cli::benchmark_sidecar_18_2 a_non_utf8_pubkey_refuses_and_never_falls_back
+        PASS [   0.006s] (119/827) maos-cli::benchmark_sidecar_18_2 a_non_utf8_pubkey_refuses_and_never_falls_back
+       START [         ] (120/827) maos-cli::benchmark_sidecar_18_2 a_producer_signature_verifies_only_against_the_producer_pubkey
+        PASS [   0.009s] (120/827) maos-cli::benchmark_sidecar_18_2 a_producer_signature_verifies_only_against_the_producer_pubkey
+       START [         ] (121/827) maos-cli::benchmark_sidecar_18_2 a_sidecar_of_another_class_version_or_schema_exits_one
+        PASS [   0.012s] (121/827) maos-cli::benchmark_sidecar_18_2 a_sidecar_of_another_class_version_or_schema_exits_one
+       START [         ] (122/827) maos-cli::benchmark_sidecar_18_2 a_tampered_body_exits_one_and_prints_nothing
+        PASS [   0.006s] (122/827) maos-cli::benchmark_sidecar_18_2 a_tampered_body_exits_one_and_prints_nothing
+       START [         ] (123/827) maos-cli::benchmark_sidecar_18_2 without_a_version_the_highest_benchmarked_version_is_read
+        PASS [   0.009s] (123/827) maos-cli::benchmark_sidecar_18_2 without_a_version_the_highest_benchmarked_version_is_read
+       START [         ] (124/827) maos-cli::cohort_sign_2e cohort_sign_happy_path_and_validate_before_write
+        PASS [   0.013s] (124/827) maos-cli::cohort_sign_2e cohort_sign_happy_path_and_validate_before_write
+       START [         ] (125/827) maos-cli::cohort_sign_2e cohort_sign_has_no_environment_key_fallback
+        PASS [   0.005s] (125/827) maos-cli::cohort_sign_2e cohort_sign_has_no_environment_key_fallback
+       START [         ] (126/827) maos-cli::cohort_sign_2e cohort_sign_refuses_a_key_absent_from_authority_keys
+        PASS [   0.006s] (126/827) maos-cli::cohort_sign_2e cohort_sign_refuses_a_key_absent_from_authority_keys
+       START [         ] (127/827) maos-cli::cohort_sign_2e cohort_sign_refuses_output_aliasing_the_authority_key
+        PASS [   0.007s] (127/827) maos-cli::cohort_sign_2e cohort_sign_refuses_output_aliasing_the_authority_key
+       START [         ] (128/827) maos-cli::credential_posture_2c a_correctly_redacted_log_reports_no_escape
+        PASS [   0.093s] (128/827) maos-cli::credential_posture_2c a_correctly_redacted_log_reports_no_escape
+       START [         ] (129/827) maos-cli::credential_posture_2c a_digest_clause_sources_row_is_not_an_escape
+        PASS [   0.047s] (129/827) maos-cli::credential_posture_2c a_digest_clause_sources_row_is_not_an_escape
+       START [         ] (130/827) maos-cli::credential_posture_2c a_stored_hex_run_is_reported_as_its_own_distinct_escape_class
+        PASS [   0.047s] (130/827) maos-cli::credential_posture_2c a_stored_hex_run_is_reported_as_its_own_distinct_escape_class
+       START [         ] (131/827) maos-cli::credential_posture_2c a_stored_provider_prefix_credential_is_reported_as_a_prefix_escape
+        PASS [   0.048s] (131/827) maos-cli::credential_posture_2c a_stored_provider_prefix_credential_is_reported_as_a_prefix_escape
+       START [         ] (132/827) maos-cli::credential_posture_2c a_too_long_hex_run_under_clause_sources_is_still_an_escape
+        PASS [   0.047s] (132/827) maos-cli::credential_posture_2c a_too_long_hex_run_under_clause_sources_is_still_an_escape
+       START [         ] (133/827) maos-cli::credential_posture_2c an_uppercase_hex_run_is_reported_as_an_escape
+        PASS [   0.049s] (133/827) maos-cli::credential_posture_2c an_uppercase_hex_run_is_reported_as_an_escape
+       START [         ] (134/827) maos-cli::credential_posture_2c both_classes_in_one_row_are_reported_separately
+        PASS [   0.048s] (134/827) maos-cli::credential_posture_2c both_classes_in_one_row_are_reported_separately
+       START [         ] (135/827) maos-cli::credential_posture_2c overlapping_prefix_classes_are_each_reported_once
+        PASS [   0.048s] (135/827) maos-cli::credential_posture_2c overlapping_prefix_classes_are_each_reported_once
+       START [         ] (136/827) maos-cli::credential_posture_2c the_scan_never_echoes_the_offending_bytes
+        PASS [   0.047s] (136/827) maos-cli::credential_posture_2c the_scan_never_echoes_the_offending_bytes
+       START [         ] (137/827) maos-cli::dep_kernel_core_free_test maos_cli_dep_tree_excludes_kernel_core
+        PASS [   0.447s] (137/827) maos-cli::dep_kernel_core_free_test maos_cli_dep_tree_excludes_kernel_core
+       START [         ] (138/827) maos-cli::door_response_framing response_larger_than_the_client_cap_is_refused
+        PASS [   0.005s] (138/827) maos-cli::door_response_framing response_larger_than_the_client_cap_is_refused
+       START [         ] (139/827) maos-cli::door_response_framing successful_response_must_match_its_content_length
+        PASS [   0.003s] (139/827) maos-cli::door_response_framing successful_response_must_match_its_content_length
+       START [         ] (140/827) maos-cli::forget_reason_test forget_reason_is_preserved_in_the_live_door_body
+        PASS [   0.021s] (140/827) maos-cli::forget_reason_test forget_reason_is_preserved_in_the_live_door_body
+       START [         ] (141/827) maos-cli::halt_record_16_5 serde_failure_termination_receipt_is_not_reported_as_raised
+        PASS [   0.003s] (141/827) maos-cli::halt_record_16_5 serde_failure_termination_receipt_is_not_reported_as_raised
+       START [         ] (142/827) maos-cli::halt_resolve_test accepted_halt_sends_post_with_spirit_id_in_the_body
+        PASS [   0.016s] (142/827) maos-cli::halt_resolve_test accepted_halt_sends_post_with_spirit_id_in_the_body
+       START [         ] (143/827) maos-cli::halt_resolve_test authorized_override_carries_the_policy_ref_as_rationale
+        PASS [   0.016s] (143/827) maos-cli::halt_resolve_test authorized_override_carries_the_policy_ref_as_rationale
+       START [         ] (144/827) maos-cli::halt_resolve_test invalid_ids_refused_locally_without_a_round_trip
+        PASS [   0.018s] (144/827) maos-cli::halt_resolve_test invalid_ids_refused_locally_without_a_round_trip
+       START [         ] (145/827) maos-cli::halt_resolve_test provided_context_carries_the_text_as_rationale
+        PASS [   0.016s] (145/827) maos-cli::halt_resolve_test provided_context_carries_the_text_as_rationale
+       START [         ] (146/827) maos-cli::halt_resolve_test provided_context_without_text_refused_before_the_round_trip
+        PASS [   0.016s] (146/827) maos-cli::halt_resolve_test provided_context_without_text_refused_before_the_round_trip
+       START [         ] (147/827) maos-cli::halt_resolve_test resolve_discovery_failures_map_to_typed_exits
+        PASS [   0.057s] (147/827) maos-cli::halt_resolve_test resolve_discovery_failures_map_to_typed_exits
+       START [         ] (148/827) maos-cli::halt_resolve_test resolve_maps_typed_responses_to_d16_1_p_exits
+        PASS [   0.181s] (148/827) maos-cli::halt_resolve_test resolve_maps_typed_responses_to_d16_1_p_exits
+       START [         ] (149/827) maos-cli::import_rust_inproc_refusal_17_3b import_refuses_rust_inproc_form_through_the_real_binary
+        PASS [   0.006s] (149/827) maos-cli::import_rust_inproc_refusal_17_3b import_refuses_rust_inproc_form_through_the_real_binary
+       START [         ] (150/827) maos-cli::legal_hold_cli_13_5b unix::list_reads_the_real_holds_table_in_process_and_spawns_nothing
+        PASS [   0.069s] (150/827) maos-cli::legal_hold_cli_13_5b unix::list_reads_the_real_holds_table_in_process_and_spawns_nothing
+       START [         ] (151/827) maos-cli::legal_hold_cli_13_5b unix::list_reports_an_empty_list_when_no_hold_is_held
+        PASS [   0.027s] (151/827) maos-cli::legal_hold_cli_13_5b unix::list_reports_an_empty_list_when_no_hold_is_held
+       START [         ] (152/827) maos-cli::legal_hold_cli_13_5b unix::release_forwards_the_offline_one_shot_contract
+        PASS [   0.006s] (152/827) maos-cli::legal_hold_cli_13_5b unix::release_forwards_the_offline_one_shot_contract
+       START [         ] (153/827) maos-cli::load_test load_discovery_failures_map_to_typed_exits
+        PASS [   0.056s] (153/827) maos-cli::load_test load_discovery_failures_map_to_typed_exits
+       START [         ] (154/827) maos-cli::load_test load_maps_typed_responses_to_d16_1_p_exits
+        PASS [   0.134s] (154/827) maos-cli::load_test load_maps_typed_responses_to_d16_1_p_exits
+       START [         ] (155/827) maos-cli::load_test load_posts_the_canonical_manifest_to_the_collection_route
+        PASS [   0.017s] (155/827) maos-cli::load_test load_posts_the_canonical_manifest_to_the_collection_route
+       START [         ] (156/827) maos-cli::load_test load_refuses_a_missing_manifest_without_touching_the_door
+        PASS [   0.016s] (156/827) maos-cli::load_test load_refuses_a_missing_manifest_without_touching_the_door
+       START [         ] (157/827) maos-cli::orchestrator_queue_test empty_instruction_refused_locally_without_a_round_trip
+        PASS [   0.017s] (157/827) maos-cli::orchestrator_queue_test empty_instruction_refused_locally_without_a_round_trip
+       START [         ] (158/827) maos-cli::orchestrator_queue_test invalid_spirit_id_refused_locally_without_a_round_trip
+        PASS [   0.017s] (158/827) maos-cli::orchestrator_queue_test invalid_spirit_id_refused_locally_without_a_round_trip
+       START [         ] (159/827) maos-cli::orchestrator_queue_test queue_discovery_failures_map_to_typed_exits
+        PASS [   0.057s] (159/827) maos-cli::orchestrator_queue_test queue_discovery_failures_map_to_typed_exits
+       START [         ] (160/827) maos-cli::orchestrator_queue_test queue_maps_typed_responses_to_d16_1_p_exits
+        PASS [   0.135s] (160/827) maos-cli::orchestrator_queue_test queue_maps_typed_responses_to_d16_1_p_exits
+       START [         ] (161/827) maos-cli::orchestrator_queue_test queue_sends_the_instruction_as_the_text_field
+        PASS [   0.016s] (161/827) maos-cli::orchestrator_queue_test queue_sends_the_instruction_as_the_text_field
+       START [         ] (162/827) maos-cli::orchestrator_queue_test status_sends_get_and_renders_the_door_occupancy
+        PASS [   0.033s] (162/827) maos-cli::orchestrator_queue_test status_sends_get_and_renders_the_door_occupancy
+       START [         ] (163/827) maos-cli::orchestrator_recall_pick_19_2 an_empty_recall_is_a_success_not_a_refusal
+        PASS [   0.016s] (163/827) maos-cli::orchestrator_recall_pick_19_2 an_empty_recall_is_a_success_not_a_refusal
+       START [         ] (164/827) maos-cli::orchestrator_recall_pick_19_2 malformed_picks_and_recalls_are_refused_before_the_round_trip
+        PASS [   0.034s] (164/827) maos-cli::orchestrator_recall_pick_19_2 malformed_picks_and_recalls_are_refused_before_the_round_trip
+       START [         ] (165/827) maos-cli::orchestrator_recall_pick_19_2 pick_outcomes_map_to_typed_exits
+        PASS [   0.120s] (165/827) maos-cli::orchestrator_recall_pick_19_2 pick_outcomes_map_to_typed_exits
+       START [         ] (166/827) maos-cli::orchestrator_recall_pick_19_2 pick_posts_exactly_the_option_pick_request
+        PASS [   0.016s] (166/827) maos-cli::orchestrator_recall_pick_19_2 pick_posts_exactly_the_option_pick_request
+       START [         ] (167/827) maos-cli::orchestrator_recall_pick_19_2 recall_and_pick_discovery_failures_map_to_typed_exits
+        PASS [   0.108s] (167/827) maos-cli::orchestrator_recall_pick_19_2 recall_and_pick_discovery_failures_map_to_typed_exits
+       START [         ] (168/827) maos-cli::orchestrator_recall_pick_19_2 recall_and_pick_reach_the_d16_1_p_matrix
+        PASS [   0.263s] (168/827) maos-cli::orchestrator_recall_pick_19_2 recall_and_pick_reach_the_d16_1_p_matrix
+       START [         ] (169/827) maos-cli::orchestrator_recall_pick_19_2 recall_outcomes_map_to_typed_exits
+        PASS [   0.042s] (169/827) maos-cli::orchestrator_recall_pick_19_2 recall_outcomes_map_to_typed_exits
+       START [         ] (170/827) maos-cli::orchestrator_recall_pick_19_2 recall_posts_an_empty_body_and_prints_the_recalled_set_verbatim
+        PASS [   0.015s] (170/827) maos-cli::orchestrator_recall_pick_19_2 recall_posts_an_empty_body_and_prints_the_recalled_set_verbatim
+       START [         ] (171/827) maos-cli::orchestrator_recall_pick_19_2 the_pick_wire_shape_is_pinned_as_literal_json
+        PASS [   0.003s] (171/827) maos-cli::orchestrator_recall_pick_19_2 the_pick_wire_shape_is_pinned_as_literal_json
+       START [         ] (172/827) maos-cli::pause_resume_test pause_and_resume_spawn_no_child_process
+        PASS [   0.018s] (172/827) maos-cli::pause_resume_test pause_and_resume_spawn_no_child_process
+       START [         ] (173/827) maos-cli::pause_resume_test pause_discovery_failures_map_to_typed_exits
+        PASS [   0.057s] (173/827) maos-cli::pause_resume_test pause_discovery_failures_map_to_typed_exits
+       START [         ] (174/827) maos-cli::pause_resume_test pause_maps_typed_responses_to_d16_1_p_exits
+        PASS [   0.129s] (174/827) maos-cli::pause_resume_test pause_maps_typed_responses_to_d16_1_p_exits
+       START [         ] (175/827) maos-cli::pause_resume_test pause_sends_bare_post_and_prints_the_door_body
+        PASS [   0.016s] (175/827) maos-cli::pause_resume_test pause_sends_bare_post_and_prints_the_door_body
+       START [         ] (176/827) maos-cli::pause_resume_test resume_maps_typed_responses_to_d16_1_p_exits
+        PASS [   0.130s] (176/827) maos-cli::pause_resume_test resume_maps_typed_responses_to_d16_1_p_exits
+       START [         ] (177/827) maos-cli::pause_resume_test resume_sends_bare_post_and_prints_the_door_body
+        PASS [   0.016s] (177/827) maos-cli::pause_resume_test resume_sends_bare_post_and_prints_the_door_body
+       START [         ] (178/827) maos-cli::posture_shift_test autonomous_posture_rejected_by_clap_without_a_round_trip
+        PASS [   0.016s] (178/827) maos-cli::posture_shift_test autonomous_posture_rejected_by_clap_without_a_round_trip
+       START [         ] (179/827) maos-cli::posture_shift_test invalid_spirit_id_refused_locally_without_a_round_trip
+        PASS [   0.015s] (179/827) maos-cli::posture_shift_test invalid_spirit_id_refused_locally_without_a_round_trip
+       START [         ] (180/827) maos-cli::posture_shift_test posture_discovery_failures_map_to_typed_exits
+        PASS [   0.055s] (180/827) maos-cli::posture_shift_test posture_discovery_failures_map_to_typed_exits
+       START [         ] (181/827) maos-cli::posture_shift_test posture_maps_typed_responses_to_d16_1_p_exits
+        PASS [   0.134s] (181/827) maos-cli::posture_shift_test posture_maps_typed_responses_to_d16_1_p_exits
+       START [         ] (182/827) maos-cli::posture_shift_test posture_sends_the_shifted_value_in_the_json_body
+        PASS [   0.018s] (182/827) maos-cli::posture_shift_test posture_sends_the_shifted_value_in_the_json_body
+       START [         ] (183/827) maos-cli::release_pubkey release_pubkey_prints_exact_lowercase_embedded_key
+        PASS [   0.005s] (183/827) maos-cli::release_pubkey release_pubkey_prints_exact_lowercase_embedded_key
+       START [         ] (184/827) maos-cli::revocations_import_test import_maps_typed_responses_to_d16_1_p_exits
+        PASS [   0.140s] (184/827) maos-cli::revocations_import_test import_maps_typed_responses_to_d16_1_p_exits
+       START [         ] (185/827) maos-cli::revocations_import_test import_missing_file_refused_locally
+        PASS [   0.015s] (185/827) maos-cli::revocations_import_test import_missing_file_refused_locally
+       START [         ] (186/827) maos-cli::revocations_import_test import_sends_the_crl_bytes_verbatim
+        PASS [   0.016s] (186/827) maos-cli::revocations_import_test import_sends_the_crl_bytes_verbatim
+       START [         ] (187/827) maos-cli::revocations_import_test list_sends_get_and_renders_the_door_crl_id
+        PASS [   0.016s] (187/827) maos-cli::revocations_import_test list_sends_get_and_renders_the_door_crl_id
+       START [         ] (188/827) maos-cli::revocations_import_test revocations_discovery_failures_map_to_typed_exits
+        PASS [   0.053s] (188/827) maos-cli::revocations_import_test revocations_discovery_failures_map_to_typed_exits
+       START [         ] (189/827) maos-cli::revoke_token_test invalid_token_ids_refused_locally_without_a_round_trip
+        PASS [   0.021s] (189/827) maos-cli::revoke_token_test invalid_token_ids_refused_locally_without_a_round_trip
+       START [         ] (190/827) maos-cli::revoke_token_test repeated_revoke_maps_409_revoked_to_exit_1
+        PASS [   0.015s] (190/827) maos-cli::revoke_token_test repeated_revoke_maps_409_revoked_to_exit_1
+       START [         ] (191/827) maos-cli::revoke_token_test revoke_discovery_failures_map_to_typed_exits
+        PASS [   0.056s] (191/827) maos-cli::revoke_token_test revoke_discovery_failures_map_to_typed_exits
+       START [         ] (192/827) maos-cli::revoke_token_test revoke_maps_typed_responses_to_d16_1_p_exits
+        PASS [   0.129s] (192/827) maos-cli::revoke_token_test revoke_maps_typed_responses_to_d16_1_p_exits
+       START [         ] (193/827) maos-cli::revoke_token_test revoke_sends_bare_post_to_the_token_route
+        PASS [   0.015s] (193/827) maos-cli::revoke_token_test revoke_sends_bare_post_to_the_token_route
+       START [         ] (194/827) maos-cli::revoke_token_test unknown_token_maps_404_to_exit_1
+        PASS [   0.016s] (194/827) maos-cli::revoke_token_test unknown_token_maps_404_to_exit_1
+       START [         ] (195/827) maos-cli::signing_identity_2c sealed_export_prints_the_base_key_when_no_region_resolves
+        PASS [   0.050s] (195/827) maos-cli::signing_identity_2c sealed_export_prints_the_base_key_when_no_region_resolves
+       START [         ] (196/827) maos-cli::signing_identity_2c sealed_export_prints_the_region_key_it_actually_signed_with
+        PASS [   0.050s] (196/827) maos-cli::signing_identity_2c sealed_export_prints_the_region_key_it_actually_signed_with
+       START [         ] (197/827) maos-cli::signing_identity_2c stdout_mode_export_prints_its_pubkey_to_stderr_and_keeps_stdout_pure
+        PASS [   0.048s] (197/827) maos-cli::signing_identity_2c stdout_mode_export_prints_its_pubkey_to_stderr_and_keeps_stdout_pure
+       START [         ] (198/827) maos-cli::signing_identity_2c trajectory_export_prints_the_region_key_it_actually_signed_with
+        PASS [   0.051s] (198/827) maos-cli::signing_identity_2c trajectory_export_prints_the_region_key_it_actually_signed_with
+       START [         ] (199/827) maos-cli::signing_identity_2c verify_bundle_derives_the_region_key_from_a_base_seed
+        PASS [   0.053s] (199/827) maos-cli::signing_identity_2c verify_bundle_derives_the_region_key_from_a_base_seed
+       START [         ] (200/827) maos-cli::signing_identity_2c verify_bundle_requires_exactly_one_key_source
+        PASS [   0.060s] (200/827) maos-cli::signing_identity_2c verify_bundle_requires_exactly_one_key_source
+       START [         ] (201/827) maos-cli::signing_identity_2c verify_bundle_seed_path_refuses_a_region_tampered_bundle
+        PASS [   0.050s] (201/827) maos-cli::signing_identity_2c verify_bundle_seed_path_refuses_a_region_tampered_bundle
+       START [         ] (202/827) maos-cli::skill_queue_integration_test admission_view_keeps_revision_entries_and_refuses_ambiguous_skill_ids
+        PASS [   0.201s] (202/827) maos-cli::skill_queue_integration_test admission_view_keeps_revision_entries_and_refuses_ambiguous_skill_ids
+       START [         ] (203/827) maos-cli::skill_queue_integration_test authored_decision_journals_before_materializing_and_saving
+        PASS [   0.180s] (203/827) maos-cli::skill_queue_integration_test authored_decision_journals_before_materializing_and_saving
+       START [         ] (204/827) maos-cli::skill_queue_integration_test busy_timeout_5000_blocks_then_succeeds_green
+        PASS [   0.156s] (204/827) maos-cli::skill_queue_integration_test busy_timeout_5000_blocks_then_succeeds_green
+       START [         ] (205/827) maos-cli::skill_queue_integration_test busy_timeout_zero_reds_immediately_under_contention
+        PASS [   0.149s] (205/827) maos-cli::skill_queue_integration_test busy_timeout_zero_reds_immediately_under_contention
+       START [         ] (206/827) maos-cli::skill_queue_integration_test discovered_skill_is_approvable_end_to_end
+        PASS [   0.164s] (206/827) maos-cli::skill_queue_integration_test discovered_skill_is_approvable_end_to_end
+       START [         ] (207/827) maos-cli::skill_queue_integration_test double_journal_guard_keyed_on_target_capability
+        PASS [   0.166s] (207/827) maos-cli::skill_queue_integration_test double_journal_guard_keyed_on_target_capability
+       START [         ] (208/827) maos-cli::skill_queue_integration_test journal_failure_and_materialization_preflight_refusal_mutate_nothing
+        PASS [   0.154s] (208/827) maos-cli::skill_queue_integration_test journal_failure_and_materialization_preflight_refusal_mutate_nothing
+       START [         ] (209/827) maos-cli::skill_queue_integration_test no_silent_loss_when_journal_write_fails
+        PASS [   0.003s] (209/827) maos-cli::skill_queue_integration_test no_silent_loss_when_journal_write_fails
+       START [         ] (210/827) maos-cli::skill_queue_integration_test queue_save_failure_never_reports_a_committed_decision_as_success
+        PASS [   0.150s] (210/827) maos-cli::skill_queue_integration_test queue_save_failure_never_reports_a_committed_decision_as_success
+       START [         ] (211/827) maos-cli::skill_queue_integration_test unknown_or_corrupt_payload_queue_is_never_rebuilt_or_overwritten
+        PASS [   0.146s] (211/827) maos-cli::skill_queue_integration_test unknown_or_corrupt_payload_queue_is_never_rebuilt_or_overwritten
+       START [         ] (212/827) maos-cli::skill_queue_reconcile_test discovered_skill_entry_path_is_never_fabricated
+        PASS [   0.167s] (212/827) maos-cli::skill_queue_reconcile_test discovered_skill_entry_path_is_never_fabricated
+       START [         ] (213/827) maos-cli::skill_queue_reconcile_test discovered_skill_entry_path_is_package_shipped_9_7_boundary
+        PASS [   0.145s] (213/827) maos-cli::skill_queue_reconcile_test discovered_skill_entry_path_is_package_shipped_9_7_boundary
+       START [         ] (214/827) maos-cli::skill_queue_reconcile_test discovered_skill_with_no_tl_row_is_pending
+        PASS [   0.146s] (214/827) maos-cli::skill_queue_reconcile_test discovered_skill_with_no_tl_row_is_pending
+       START [         ] (215/827) maos-cli::skill_queue_reconcile_test plain_approve_with_no_re_enqueue_keeps_entry_decided
+        PASS [   0.167s] (215/827) maos-cli::skill_queue_reconcile_test plain_approve_with_no_re_enqueue_keeps_entry_decided
+       START [         ] (216/827) maos-cli::skill_queue_reconcile_test re_enqueue_after_reject_demotes_decided_entry_to_pending
+        PASS [   0.159s] (216/827) maos-cli::skill_queue_reconcile_test re_enqueue_after_reject_demotes_decided_entry_to_pending
+       START [         ] (217/827) maos-cli::skill_queue_reconcile_test reconcile_pending_proven_red_set_equality
+        PASS [   0.171s] (217/827) maos-cli::skill_queue_reconcile_test reconcile_pending_proven_red_set_equality
+       START [         ] (218/827) maos-cli::skills_door_18_7 corrupt_v2_offline_show_and_decide_leave_payload_bytes_untouched
+        PASS [   0.163s] (218/827) maos-cli::skills_door_18_7 corrupt_v2_offline_show_and_decide_leave_payload_bytes_untouched
+       START [         ] (219/827) maos-cli::skills_door_18_7 list_preserves_custom_discovery_roots_over_the_door
+        PASS [   0.016s] (219/827) maos-cli::skills_door_18_7 list_preserves_custom_discovery_roots_over_the_door
+       START [         ] (220/827) maos-cli::skills_door_18_7 list_show_approve_and_reject_use_the_same_authenticated_door
+        PASS [   0.022s] (220/827) maos-cli::skills_door_18_7 list_show_approve_and_reject_use_the_same_authenticated_door
+       START [         ] (221/827) maos-cli::skills_door_18_7 offline_decision_retains_exclusive_liveness_lock_until_journal_and_queue_finish
+        PASS [   0.192s] (221/827) maos-cli::skills_door_18_7 offline_decision_retains_exclusive_liveness_lock_until_journal_and_queue_finish
+       START [         ] (222/827) maos-cli::skills_door_18_7 refused_connection_uses_offline_only_while_the_home_lock_is_free
+        PASS [   0.189s] (222/827) maos-cli::skills_door_18_7 refused_connection_uses_offline_only_while_the_home_lock_is_free
+       START [         ] (223/827) maos-cli::skills_door_18_7 rejected_bearer_never_falls_back_to_offline_queue_mutation
+        PASS [   0.027s] (223/827) maos-cli::skills_door_18_7 rejected_bearer_never_falls_back_to_offline_queue_mutation
+       START [         ] (224/827) maos-cli::spirit_install_20_1 built_in_shell_names_are_reserved_before_admission
+maos-registry: listening on 127.0.0.1:42725
+maos-registry: listening on 127.0.0.1:42127
+        PASS [   0.206s] (224/827) maos-cli::spirit_install_20_1 built_in_shell_names_are_reserved_before_admission
+       START [         ] (225/827) maos-cli::spirit_install_20_1 configured_org_key_requires_a_valid_server_tier_signature
+maos-registry: listening on 127.0.0.1:41715
+maos-registry: listening on 127.0.0.1:35287
+        PASS [   0.507s] (225/827) maos-cli::spirit_install_20_1 configured_org_key_requires_a_valid_server_tier_signature
+       START [         ] (226/827) maos-cli::spirit_install_20_1 independently_keyed_server_is_verified_and_wrong_key_never_persists
+maos-registry: listening on 127.0.0.1:35913
+maos-registry: listening on 127.0.0.1:34473
+        PASS [   0.407s] (226/827) maos-cli::spirit_install_20_1 independently_keyed_server_is_verified_and_wrong_key_never_persists
+       START [         ] (227/827) maos-cli::spirit_install_20_1 install_refuses_registry_rust_inproc_before_persisting
+maos-registry: listening on 127.0.0.1:33077
+        PASS [   0.255s] (227/827) maos-cli::spirit_install_20_1 install_refuses_registry_rust_inproc_before_persisting
+       START [         ] (228/827) maos-cli::spirit_install_20_1 installed_version_is_immutable_ac14
+maos-registry: listening on 127.0.0.1:41707
+maos-registry: listening on 127.0.0.1:46083
+maos-registry: listening on 127.0.0.1:36647
+maos-registry: listening on 127.0.0.1:38317
+maos-registry: listening on 127.0.0.1:40459
+        PASS [   1.257s] (228/827) maos-cli::spirit_install_20_1 installed_version_is_immutable_ac14
+       START [         ] (229/827) maos-cli::spirit_install_20_1 materialization_failure_never_activates_a_partial_install
+maos-registry: listening on 127.0.0.1:37699
+        PASS [   0.255s] (229/827) maos-cli::spirit_install_20_1 materialization_failure_never_activates_a_partial_install
+       START [         ] (230/827) maos-cli::spirit_install_20_1 offline_install_persists_remote_origin_and_rejects_tampering
+maos-registry: listening on 127.0.0.1:37757
+        PASS [   0.355s] (230/827) maos-cli::spirit_install_20_1 offline_install_persists_remote_origin_and_rejects_tampering
+       START [         ] (231/827) maos-cli::spirit_install_20_1 wrong_publisher_key_and_claim_signature_are_refused
+maos-registry: listening on 127.0.0.1:43051
+        PASS [   0.255s] (231/827) maos-cli::spirit_install_20_1 wrong_publisher_key_and_claim_signature_are_refused
+       START [         ] (232/827) maos-cli::spirit_install_20_1 yanked_install_is_refused_before_persistence_ac16
+maos-registry: listening on 127.0.0.1:45675
+        PASS [   0.305s] (232/827) maos-cli::spirit_install_20_1 yanked_install_is_refused_before_persistence_ac16
+       START [         ] (233/827) maos-cli::spirit_upgrade_test an_unknown_policy_is_refused_locally_without_a_round_trip
+        PASS [   0.018s] (233/827) maos-cli::spirit_upgrade_test an_unknown_policy_is_refused_locally_without_a_round_trip
+       START [         ] (234/827) maos-cli::spirit_upgrade_test attestation_and_keyring_travel_in_the_body
+        PASS [   0.017s] (234/827) maos-cli::spirit_upgrade_test attestation_and_keyring_travel_in_the_body
+       START [         ] (235/827) maos-cli::spirit_upgrade_test cold_swap_reaches_the_door_and_its_outcomes_map_to_exits
+        PASS [   0.062s] (235/827) maos-cli::spirit_upgrade_test cold_swap_reaches_the_door_and_its_outcomes_map_to_exits
+       START [         ] (236/827) maos-cli::spirit_upgrade_test from_and_candidates_require_plan_locally
+        PASS [   0.020s] (236/827) maos-cli::spirit_upgrade_test from_and_candidates_require_plan_locally
+       START [         ] (237/827) maos-cli::spirit_upgrade_test manifest_not_found_refused_locally
+        PASS [   0.015s] (237/827) maos-cli::spirit_upgrade_test manifest_not_found_refused_locally
+       START [         ] (238/827) maos-cli::spirit_upgrade_test migrator_policy_reaches_the_door_and_its_outcomes_map_to_exits
+        PASS [   0.031s] (238/827) maos-cli::spirit_upgrade_test migrator_policy_reaches_the_door_and_its_outcomes_map_to_exits
+       START [         ] (239/827) maos-cli::spirit_upgrade_test plan_mode_carries_create_plan_from_and_absolute_candidates
+        PASS [   0.018s] (239/827) maos-cli::spirit_upgrade_test plan_mode_carries_create_plan_from_and_absolute_candidates
+       START [         ] (240/827) maos-cli::spirit_upgrade_test upgrade_discovery_failures_map_to_typed_exits
+        PASS [   0.061s] (240/827) maos-cli::spirit_upgrade_test upgrade_discovery_failures_map_to_typed_exits
+       START [         ] (241/827) maos-cli::spirit_upgrade_test upgrade_maps_typed_responses_to_d16_1_p_exits
+        PASS [   0.149s] (241/827) maos-cli::spirit_upgrade_test upgrade_maps_typed_responses_to_d16_1_p_exits
+       START [         ] (242/827) maos-cli::spirit_upgrade_test upgrade_sends_absolute_manifest_and_default_policy
+        PASS [   0.016s] (242/827) maos-cli::spirit_upgrade_test upgrade_sends_absolute_manifest_and_default_policy
+       START [         ] (243/827) maos-cli::two_host_reconcile_2c a_seed_and_the_seeds_own_derived_pubkey_are_one_root
+        PASS [   0.107s] (243/827) maos-cli::two_host_reconcile_2c a_seed_and_the_seeds_own_derived_pubkey_are_one_root
+       START [         ] (244/827) maos-cli::two_host_reconcile_2c an_empty_host_tag_is_refused_at_export
+        PASS [   0.058s] (244/827) maos-cli::two_host_reconcile_2c an_empty_host_tag_is_refused_at_export
+       START [         ] (245/827) maos-cli::two_host_reconcile_2c an_unstamped_half_is_refused
+        PASS [   0.106s] (245/827) maos-cli::two_host_reconcile_2c an_unstamped_half_is_refused
+       START [         ] (246/827) maos-cli::two_host_reconcile_2c disjoint_logs_are_refused
+        PASS [   0.107s] (246/827) maos-cli::two_host_reconcile_2c disjoint_logs_are_refused
+       START [         ] (247/827) maos-cli::two_host_reconcile_2c one_base_seed_under_two_claimed_regions_is_refused
+        PASS [   0.113s] (247/827) maos-cli::two_host_reconcile_2c one_base_seed_under_two_claimed_regions_is_refused
+       START [         ] (248/827) maos-cli::two_host_reconcile_2c one_root_signing_both_halves_is_refused
+        PASS [   0.112s] (248/827) maos-cli::two_host_reconcile_2c one_root_signing_both_halves_is_refused
+       START [         ] (249/827) maos-cli::two_host_reconcile_2c the_python_twin_verifies_a_host_stamped_bundle
+SKIP: Python Ed25519 backend for tools/verify-audit-bundle/verify.py (pip install cryptography)
+        PASS [   0.017s] (249/827) maos-cli::two_host_reconcile_2c the_python_twin_verifies_a_host_stamped_bundle
+       START [         ] (250/827) maos-cli::two_host_reconcile_2c the_python_twin_verifies_the_committed_non_ascii_tier2_bundle
+SKIP: Python Ed25519 backend for tools/verify-audit-bundle/verify.py (pip install cryptography)
+        PASS [   0.010s] (250/827) maos-cli::two_host_reconcile_2c the_python_twin_verifies_the_committed_non_ascii_tier2_bundle
+       START [         ] (251/827) maos-cli::two_host_reconcile_2c the_two_host_receipt_is_written_and_verifies_under_the_operator_key
+        PASS [   0.108s] (251/827) maos-cli::two_host_reconcile_2c the_two_host_receipt_is_written_and_verifies_under_the_operator_key
+       START [         ] (252/827) maos-cli::two_host_reconcile_2c two_hosts_with_independent_roots_reconcile_on_the_shared_frame_id
+        PASS [   0.156s] (252/827) maos-cli::two_host_reconcile_2c two_hosts_with_independent_roots_reconcile_on_the_shared_frame_id
+       START [         ] (253/827) maos-cli::uninstall_exit_codes_13_5b uninstall_forwards_erased_held_not_found_and_failed_codes
+        PASS [   0.015s] (253/827) maos-cli::uninstall_exit_codes_13_5b uninstall_forwards_erased_held_not_found_and_failed_codes
+       START [         ] (254/827) maos-domain cost::tests::btreemap_deterministic_order
+        PASS [   0.003s] (254/827) maos-domain cost::tests::btreemap_deterministic_order
+       START [         ] (255/827) maos-domain cost::tests::cost_accumulation_is_linear_before_division
+        PASS [   0.003s] (255/827) maos-domain cost::tests::cost_accumulation_is_linear_before_division
+       START [         ] (256/827) maos-domain cost::tests::cost_attribution_payload_round_trip
+        PASS [   0.003s] (256/827) maos-domain cost::tests::cost_attribution_payload_round_trip
+       START [         ] (257/827) maos-domain cost::tests::forward_read_tolerance_unmodeled_dimension
+        PASS [   0.003s] (257/827) maos-domain cost::tests::forward_read_tolerance_unmodeled_dimension
+       START [         ] (258/827) maos-domain cost::tests::golden_cost_vector_oracle
+        PASS [   0.003s] (258/827) maos-domain cost::tests::golden_cost_vector_oracle
+       START [         ] (259/827) maos-domain cost::tests::no_task_ref_in_payload
+        PASS [   0.003s] (259/827) maos-domain cost::tests::no_task_ref_in_payload
+       START [         ] (260/827) maos-domain cost::tests::pricing_lookup
+        PASS [   0.003s] (260/827) maos-domain cost::tests::pricing_lookup
+       START [         ] (261/827) maos-domain cost::tests::principal_ref_ambiguous_no_members
+        PASS [   0.003s] (261/827) maos-domain cost::tests::principal_ref_ambiguous_no_members
+       START [         ] (262/827) maos-domain cost::tests::principal_ref_unattributed_serde
+        PASS [   0.003s] (262/827) maos-domain cost::tests::principal_ref_unattributed_serde
+       START [         ] (263/827) maos-domain distillation::tests::digst_payload_serde_round_trip
+        PASS [   0.003s] (263/827) maos-domain distillation::tests::digst_payload_serde_round_trip
+       START [         ] (264/827) maos-domain distillation::tests::distillation_error_audit_chain_missing_display
+        PASS [   0.003s] (264/827) maos-domain distillation::tests::distillation_error_audit_chain_missing_display
+       START [         ] (265/827) maos-domain distillation::tests::distillation_error_distinguishes_variants
+        PASS [   0.003s] (265/827) maos-domain distillation::tests::distillation_error_distinguishes_variants
+       START [         ] (266/827) maos-domain distillation::tests::receipt_serde_round_trip
+        PASS [   0.003s] (266/827) maos-domain distillation::tests::receipt_serde_round_trip
+       START [         ] (267/827) maos-domain distillation::tests::request_new_accepts_valid
+        PASS [   0.002s] (267/827) maos-domain distillation::tests::request_new_accepts_valid
+       START [         ] (268/827) maos-domain distillation::tests::request_new_rejects_depth_zero
+        PASS [   0.003s] (268/827) maos-domain distillation::tests::request_new_rejects_depth_zero
+       START [         ] (269/827) maos-domain distillation::tests::request_new_rejects_empty_source
+        PASS [   0.003s] (269/827) maos-domain distillation::tests::request_new_rejects_empty_source
+       START [         ] (270/827) maos-domain frame::tests::decision_dispatch_3_1_shape_backward_compat
+        PASS [   0.003s] (270/827) maos-domain frame::tests::decision_dispatch_3_1_shape_backward_compat
+       START [         ] (271/827) maos-domain frame::tests::decision_dispatch_3_3_shape_round_trip
+        PASS [   0.003s] (271/827) maos-domain frame::tests::decision_dispatch_3_3_shape_round_trip
+       START [         ] (272/827) maos-domain frame::tests::epistemic_halt_payload_3_1_shape_backward_compat
+        PASS [   0.002s] (272/827) maos-domain frame::tests::epistemic_halt_payload_3_1_shape_backward_compat
+       START [         ] (273/827) maos-domain frame::tests::epistemic_halt_payload_rejects_empty_halt_id
+        PASS [   0.002s] (273/827) maos-domain frame::tests::epistemic_halt_payload_rejects_empty_halt_id
+       START [         ] (274/827) maos-domain frame::tests::epistemic_halt_payload_rejects_nan_threshold
+        PASS [   0.003s] (274/827) maos-domain frame::tests::epistemic_halt_payload_rejects_nan_threshold
+       START [         ] (275/827) maos-domain frame::tests::epistemic_halt_payload_rejects_nan_value
+        PASS [   0.002s] (275/827) maos-domain frame::tests::epistemic_halt_payload_rejects_nan_value
+       START [         ] (276/827) maos-domain frame::tests::frame_address_serde_round_trip
+        PASS [   0.003s] (276/827) maos-domain frame::tests::frame_address_serde_round_trip
+       START [         ] (277/827) maos-domain frame::tests::halt_policy_override_valid_f32_parses_at_serde_layer
+        PASS [   0.002s] (277/827) maos-domain frame::tests::halt_policy_override_valid_f32_parses_at_serde_layer
+       START [         ] (278/827) maos-domain frame::tests::iac_frame_consent_request_serde_round_trip
+        PASS [   0.003s] (278/827) maos-domain frame::tests::iac_frame_consent_request_serde_round_trip
+       START [         ] (279/827) maos-domain frame::tests::iac_frame_decision_dispatch_serde_round_trip
+        PASS [   0.003s] (279/827) maos-domain frame::tests::iac_frame_decision_dispatch_serde_round_trip
+       START [         ] (280/827) maos-domain frame::tests::iac_frame_epistemic_halt_serde_round_trip
+        PASS [   0.003s] (280/827) maos-domain frame::tests::iac_frame_epistemic_halt_serde_round_trip
+       START [         ] (281/827) maos-domain frame::tests::iac_frame_intent_lineage_serde_default_backward_compat
+        PASS [   0.003s] (281/827) maos-domain frame::tests::iac_frame_intent_lineage_serde_default_backward_compat
+       START [         ] (282/827) maos-domain frame::tests::iac_frame_intent_lineage_serde_round_trip_non_empty
+        PASS [   0.002s] (282/827) maos-domain frame::tests::iac_frame_intent_lineage_serde_round_trip_non_empty
+       START [         ] (283/827) maos-domain frame::tests::iac_frame_retract_serde_round_trip
+        PASS [   0.003s] (283/827) maos-domain frame::tests::iac_frame_retract_serde_round_trip
+       START [         ] (284/827) maos-domain frame::tests::iac_frame_task_assign_serde_round_trip
+        PASS [   0.003s] (284/827) maos-domain frame::tests::iac_frame_task_assign_serde_round_trip
+       START [         ] (285/827) maos-domain frame::tests::iac_frame_task_complete_serde_round_trip
+        PASS [   0.003s] (285/827) maos-domain frame::tests::iac_frame_task_complete_serde_round_trip
+       START [         ] (286/827) maos-domain frame::tests::iac_frame_telemetry_event_serde_round_trip
+        PASS [   0.002s] (286/827) maos-domain frame::tests::iac_frame_telemetry_event_serde_round_trip
+       START [         ] (287/827) maos-domain frame::tests::posture_preferences_3_1_shape_backward_compat
+        PASS [   0.002s] (287/827) maos-domain frame::tests::posture_preferences_3_1_shape_backward_compat
+       START [         ] (288/827) maos-domain frame::tests::posture_preferences_3_2_shape_round_trip
+        PASS [   0.003s] (288/827) maos-domain frame::tests::posture_preferences_3_2_shape_round_trip
+       START [         ] (289/827) maos-domain frame::tests::posture_preferences_default_has_empty_overrides
+        PASS [   0.003s] (289/827) maos-domain frame::tests::posture_preferences_default_has_empty_overrides
+       START [         ] (290/827) maos-domain frame::tests::posture_preferences_serde_round_trip
+        PASS [   0.003s] (290/827) maos-domain frame::tests::posture_preferences_serde_round_trip
+       START [         ] (291/827) maos-domain governance::tests::abi_extension_proposal_round_trip
+        PASS [   0.003s] (291/827) maos-domain governance::tests::abi_extension_proposal_round_trip
+       START [         ] (292/827) maos-domain governance::tests::erasure_class_lineage_ids
+        PASS [   0.003s] (292/827) maos-domain governance::tests::erasure_class_lineage_ids
+       START [         ] (293/827) maos-domain governance::tests::governance_event_kind_tagged
+        PASS [   0.003s] (293/827) maos-domain governance::tests::governance_event_kind_tagged
+       START [         ] (294/827) maos-domain governance::tests::model_provenance_event_round_trip_and_tagged
+        PASS [   0.003s] (294/827) maos-domain governance::tests::model_provenance_event_round_trip_and_tagged
+       START [         ] (295/827) maos-domain governance::tests::model_provenance_payload_has_zero_claim_instance_ids
+        PASS [   0.003s] (295/827) maos-domain governance::tests::model_provenance_payload_has_zero_claim_instance_ids
+       START [         ] (296/827) maos-domain governance::tests::ratification_status_serde_snake_case
+        PASS [   0.002s] (296/827) maos-domain governance::tests::ratification_status_serde_snake_case
+       START [         ] (297/827) maos-domain governance::tests::shared_schema_id_key_contract
+        PASS [   0.003s] (297/827) maos-domain governance::tests::shared_schema_id_key_contract
+       START [         ] (298/827) maos-domain halt::tests::halt_continuity_error_display
+        PASS [   0.002s] (298/827) maos-domain halt::tests::halt_continuity_error_display
+       START [         ] (299/827) maos-domain halt::tests::halt_id_new_empty_returns_error
+        PASS [   0.003s] (299/827) maos-domain halt::tests::halt_id_new_empty_returns_error
+       START [         ] (300/827) maos-domain halt::tests::halt_id_new_nonempty_works
+        PASS [   0.003s] (300/827) maos-domain halt::tests::halt_id_new_nonempty_works
+       START [         ] (301/827) maos-domain halt::tests::halt_id_serde_round_trip
+        PASS [   0.003s] (301/827) maos-domain halt::tests::halt_id_serde_round_trip
+       START [         ] (302/827) maos-domain halt::tests::halt_receipt_new_constructs_invocation_time_receipt
+        PASS [   0.003s] (302/827) maos-domain halt::tests::halt_receipt_new_constructs_invocation_time_receipt
+       START [         ] (303/827) maos-domain halt::tests::halt_receipt_serde_round_trip
+        PASS [   0.003s] (303/827) maos-domain halt::tests::halt_receipt_serde_round_trip
+       START [         ] (304/827) maos-domain halt::tests::halt_receipt_with_resolution_fills_post_resolution_fields
+        PASS [   0.003s] (304/827) maos-domain halt::tests::halt_receipt_with_resolution_fills_post_resolution_fields
+       START [         ] (305/827) maos-domain halt::tests::halt_state_serde_round_trip
+        PASS [   0.003s] (305/827) maos-domain halt::tests::halt_state_serde_round_trip
+       START [         ] (306/827) maos-domain halt::tests::invoke_halt_error_display
+        PASS [   0.003s] (306/827) maos-domain halt::tests::invoke_halt_error_display
+       START [         ] (307/827) maos-domain halt::tests::output_marker_override_for_constructs_valid_marker
+        PASS [   0.003s] (307/827) maos-domain halt::tests::output_marker_override_for_constructs_valid_marker
+       START [         ] (308/827) maos-domain halt::tests::output_marker_override_for_rejects_empty_policy_ref
+        PASS [   0.003s] (308/827) maos-domain halt::tests::output_marker_override_for_rejects_empty_policy_ref
+       START [         ] (309/827) maos-domain halt::tests::output_marker_override_for_rejects_whitespace_only_policy_ref
+        PASS [   0.002s] (309/827) maos-domain halt::tests::output_marker_override_for_rejects_whitespace_only_policy_ref
+       START [         ] (310/827) maos-domain halt::tests::output_marker_serde_round_trip
+        PASS [   0.002s] (310/827) maos-domain halt::tests::output_marker_serde_round_trip
+       START [         ] (311/827) maos-domain halt::tests::resolution_authorized_override_rejects_empty
+        PASS [   0.003s] (311/827) maos-domain halt::tests::resolution_authorized_override_rejects_empty
+       START [         ] (312/827) maos-domain halt::tests::resolution_authorized_override_rejects_whitespace_only
+        PASS [   0.003s] (312/827) maos-domain halt::tests::resolution_authorized_override_rejects_whitespace_only
+       START [         ] (313/827) maos-domain halt::tests::resolution_deserialize_accepts_populated_payloads
+        PASS [   0.003s] (313/827) maos-domain halt::tests::resolution_deserialize_accepts_populated_payloads
+       START [         ] (314/827) maos-domain halt::tests::resolution_deserialize_rejects_empty_text
+        PASS [   0.003s] (314/827) maos-domain halt::tests::resolution_deserialize_rejects_empty_text
+       START [         ] (315/827) maos-domain halt::tests::resolution_deserialize_rejects_whitespace_operator_policy_ref
+        PASS [   0.003s] (315/827) maos-domain halt::tests::resolution_deserialize_rejects_whitespace_operator_policy_ref
+       START [         ] (316/827) maos-domain halt::tests::resolution_kind_label_accepted_halt
+        PASS [   0.003s] (316/827) maos-domain halt::tests::resolution_kind_label_accepted_halt
+       START [         ] (317/827) maos-domain halt::tests::resolution_kind_label_authorized_override
+        PASS [   0.003s] (317/827) maos-domain halt::tests::resolution_kind_label_authorized_override
+       START [         ] (318/827) maos-domain halt::tests::resolution_kind_label_provided_context
+        PASS [   0.003s] (318/827) maos-domain halt::tests::resolution_kind_label_provided_context
+       START [         ] (319/827) maos-domain halt::tests::resolution_provided_context_rejects_empty
+        PASS [   0.004s] (319/827) maos-domain halt::tests::resolution_provided_context_rejects_empty
+       START [         ] (320/827) maos-domain halt::tests::resolution_provided_context_rejects_whitespace_only
+        PASS [   0.003s] (320/827) maos-domain halt::tests::resolution_provided_context_rejects_whitespace_only
+       START [         ] (321/827) maos-domain halt::tests::resolution_serde_round_trip_accepted_halt
+        PASS [   0.003s] (321/827) maos-domain halt::tests::resolution_serde_round_trip_accepted_halt
+       START [         ] (322/827) maos-domain halt::tests::resolution_serde_round_trip_authorized_override
+        PASS [   0.003s] (322/827) maos-domain halt::tests::resolution_serde_round_trip_authorized_override
+       START [         ] (323/827) maos-domain halt::tests::resolution_serde_round_trip_provided_context
+        PASS [   0.003s] (323/827) maos-domain halt::tests::resolution_serde_round_trip_provided_context
+       START [         ] (324/827) maos-domain halt::tests::resolution_validate_accepts_populated_and_unit_variants
+        PASS [   0.003s] (324/827) maos-domain halt::tests::resolution_validate_accepts_populated_and_unit_variants
+       START [         ] (325/827) maos-domain halt::tests::resolution_validate_rejects_struct_literal_empty_text
+        PASS [   0.003s] (325/827) maos-domain halt::tests::resolution_validate_rejects_struct_literal_empty_text
+       START [         ] (326/827) maos-domain halt::tests::resolution_validate_rejects_struct_literal_whitespace_operator_policy_ref
+        PASS [   0.003s] (326/827) maos-domain halt::tests::resolution_validate_rejects_struct_literal_whitespace_operator_policy_ref
+       START [         ] (327/827) maos-domain halt::tests::termination_kind_revocation_terminated_as_str
+        PASS [   0.003s] (327/827) maos-domain halt::tests::termination_kind_revocation_terminated_as_str
+       START [         ] (328/827) maos-domain halt::tests::termination_kind_revocation_terminated_serde_roundtrip
+        PASS [   0.003s] (328/827) maos-domain halt::tests::termination_kind_revocation_terminated_serde_roundtrip
+       START [         ] (329/827) maos-domain host_grant::tests::grant_permits_requested_tier_at_or_below_ceiling
+        PASS [   0.003s] (329/827) maos-domain host_grant::tests::grant_permits_requested_tier_at_or_below_ceiling
+       START [         ] (330/827) maos-domain host_grant::tests::no_matching_grant_fails_closed
+        PASS [   0.003s] (330/827) maos-domain host_grant::tests::no_matching_grant_fails_closed
+       START [         ] (331/827) maos-domain host_grant::tests::request_above_grant_fails_closed_no_downgrade
+        PASS [   0.003s] (331/827) maos-domain host_grant::tests::request_above_grant_fails_closed_no_downgrade
+       START [         ] (332/827) maos-domain hot_swap::tests::emigrator_missing_display
+        PASS [   0.003s] (332/827) maos-domain hot_swap::tests::emigrator_missing_display
+       START [         ] (333/827) maos-domain hot_swap::tests::halt_continuity_violation_wraps_inner_error
+        PASS [   0.003s] (333/827) maos-domain hot_swap::tests::halt_continuity_violation_wraps_inner_error
+       START [         ] (334/827) maos-domain hot_swap::tests::hot_swap_result_new_happy_path
+        PASS [   0.002s] (334/827) maos-domain hot_swap::tests::hot_swap_result_new_happy_path
+       START [         ] (335/827) maos-domain hot_swap::tests::hot_swap_result_new_rejects_pid_zero
+        PASS [   0.002s] (335/827) maos-domain hot_swap::tests::hot_swap_result_new_rejects_pid_zero
+       START [         ] (336/827) maos-domain hot_swap::tests::hot_swap_verb_exhaustiveness
+        PASS [   0.002s] (336/827) maos-domain hot_swap::tests::hot_swap_verb_exhaustiveness
+       START [         ] (337/827) maos-domain hot_swap::tests::invalid_expected_schema_version_is_distinct_from_snapshot_and_migrator_errors
+        PASS [   0.002s] (337/827) maos-domain hot_swap::tests::invalid_expected_schema_version_is_distinct_from_snapshot_and_migrator_errors
+       START [         ] (338/827) maos-domain hot_swap::tests::migrator_error_not_implemented_display
+        PASS [   0.003s] (338/827) maos-domain hot_swap::tests::migrator_error_not_implemented_display
+       START [         ] (339/827) maos-domain iac_bus_types::tests::eintent_lineage_broken_display
+        PASS [   0.002s] (339/827) maos-domain iac_bus_types::tests::eintent_lineage_broken_display
+       START [         ] (340/827) maos-domain iac_bus_types::tests::eintent_lineage_broken_spirit_drafted
+        PASS [   0.003s] (340/827) maos-domain iac_bus_types::tests::eintent_lineage_broken_spirit_drafted
+       START [         ] (341/827) maos-domain invariants::i10::tests::in_flight_entry_roundtrip
+        PASS [   0.003s] (341/827) maos-domain invariants::i10::tests::in_flight_entry_roundtrip
+       START [         ] (342/827) maos-domain invariants::i10::tests::journal_entry_backward_compat_deser
+        PASS [   0.003s] (342/827) maos-domain invariants::i10::tests::journal_entry_backward_compat_deser
+       START [         ] (343/827) maos-domain invariants::i10::tests::journal_entry_construction
+        PASS [   0.003s] (343/827) maos-domain invariants::i10::tests::journal_entry_construction
+       START [         ] (344/827) maos-domain invariants::i10::tests::journal_entry_with_tier_roundtrips
+        PASS [   0.003s] (344/827) maos-domain invariants::i10::tests::journal_entry_with_tier_roundtrips
+       START [         ] (345/827) maos-domain invariants::i10::tests::lifecycle_event_crash_serde_roundtrip
+        PASS [   0.003s] (345/827) maos-domain invariants::i10::tests::lifecycle_event_crash_serde_roundtrip
+       START [         ] (346/827) maos-domain invariants::i10::tests::lifecycle_event_non_exhaustive_match
+        PASS [   0.003s] (346/827) maos-domain invariants::i10::tests::lifecycle_event_non_exhaustive_match
+       START [         ] (347/827) maos-domain invariants::i10::tests::lifecycle_event_provider_switched_discriminant
+        PASS [   0.003s] (347/827) maos-domain invariants::i10::tests::lifecycle_event_provider_switched_discriminant
+       START [         ] (348/827) maos-domain invariants::i10::tests::lifecycle_event_provider_switched_serde_roundtrip
+        PASS [   0.003s] (348/827) maos-domain invariants::i10::tests::lifecycle_event_provider_switched_serde_roundtrip
+       START [         ] (349/827) maos-domain invariants::i10::tests::lifecycle_event_revoked_discriminant
+        PASS [   0.003s] (349/827) maos-domain invariants::i10::tests::lifecycle_event_revoked_discriminant
+       START [         ] (350/827) maos-domain invariants::i10::tests::lifecycle_event_revoked_serde_roundtrip
+        PASS [   0.002s] (350/827) maos-domain invariants::i10::tests::lifecycle_event_revoked_serde_roundtrip
+       START [         ] (351/827) maos-domain invariants::i10::tests::lifecycle_event_silent_failure_suspect_serde_roundtrip
+        PASS [   0.003s] (351/827) maos-domain invariants::i10::tests::lifecycle_event_silent_failure_suspect_serde_roundtrip
+       START [         ] (352/827) maos-domain invariants::i10::tests::lifecycle_event_stalled_serde_roundtrip
+        PASS [   0.003s] (352/827) maos-domain invariants::i10::tests::lifecycle_event_stalled_serde_roundtrip
+       START [         ] (353/827) maos-domain invariants::i10::tests::lifecycle_event_upgrade_discriminant
+        PASS [   0.003s] (353/827) maos-domain invariants::i10::tests::lifecycle_event_upgrade_discriminant
+       START [         ] (354/827) maos-domain invariants::i10::tests::lifecycle_event_upgrade_serde_roundtrip
+        PASS [   0.003s] (354/827) maos-domain invariants::i10::tests::lifecycle_event_upgrade_serde_roundtrip
+       START [         ] (355/827) maos-domain invariants::i10::tests::provider_switched_payload_roundtrip
+        PASS [   0.002s] (355/827) maos-domain invariants::i10::tests::provider_switched_payload_roundtrip
+       START [         ] (356/827) maos-domain invariants::i11::tests::digest_ref_depth
+        PASS [   0.003s] (356/827) maos-domain invariants::i11::tests::digest_ref_depth
+       START [         ] (357/827) maos-domain invariants::i12::tests::working_memory_digest_refs
+        PASS [   0.003s] (357/827) maos-domain invariants::i12::tests::working_memory_digest_refs
+       START [         ] (358/827) maos-domain invariants::i13::tests::allowed_promotion_set
+        PASS [   0.003s] (358/827) maos-domain invariants::i13::tests::allowed_promotion_set
+       START [         ] (359/827) maos-domain invariants::i13::tests::intent_lineage_default_is_empty
+        PASS [   0.003s] (359/827) maos-domain invariants::i13::tests::intent_lineage_default_is_empty
+       START [         ] (360/827) maos-domain invariants::i13::tests::intent_lineage_is_empty_returns_true_for_empty_lineage
+        PASS [   0.002s] (360/827) maos-domain invariants::i13::tests::intent_lineage_is_empty_returns_true_for_empty_lineage
+       START [         ] (361/827) maos-domain invariants::i14::tests::halt_continuity_variants
+        PASS [   0.002s] (361/827) maos-domain invariants::i14::tests::halt_continuity_variants
+       START [         ] (362/827) maos-domain invariants::i1::tests::capability_token_exists
+        PASS [   0.003s] (362/827) maos-domain invariants::i1::tests::capability_token_exists
+       START [         ] (363/827) maos-domain invariants::i1::tests::capability_token_is_non_exhaustive
+        PASS [   0.003s] (363/827) maos-domain invariants::i1::tests::capability_token_is_non_exhaustive
+       START [         ] (364/827) maos-domain invariants::i1::tests::invariant_i1_marker_is_zst
+        PASS [   0.003s] (364/827) maos-domain invariants::i1::tests::invariant_i1_marker_is_zst
+       START [         ] (365/827) maos-domain invariants::i1::tests::mcp_call_scope_serde_round_trip
+        PASS [   0.003s] (365/827) maos-domain invariants::i1::tests::mcp_call_scope_serde_round_trip
+       START [         ] (366/827) maos-domain invariants::i2::tests::log_before_deliver_roundtrip
+        PASS [   0.003s] (366/827) maos-domain invariants::i2::tests::log_before_deliver_roundtrip
+       START [         ] (367/827) maos-domain invariants::i3::tests::frame_origin_discriminants_stable
+        PASS [   0.003s] (367/827) maos-domain invariants::i3::tests::frame_origin_discriminants_stable
+       START [         ] (368/827) maos-domain invariants::i4::tests::approval_decision_construction
+        PASS [   0.003s] (368/827) maos-domain invariants::i4::tests::approval_decision_construction
+       START [         ] (369/827) maos-domain invariants::i5::tests::namespace_key_typed_scope
+        PASS [   0.002s] (369/827) maos-domain invariants::i5::tests::namespace_key_typed_scope
+       START [         ] (370/827) maos-domain invariants::i6::tests::hot_swap_state_discriminants
+        PASS [   0.002s] (370/827) maos-domain invariants::i6::tests::hot_swap_state_discriminants
+       START [         ] (371/827) maos-domain invariants::i7::tests::scalar_tap_event_construction
+        PASS [   0.002s] (371/827) maos-domain invariants::i7::tests::scalar_tap_event_construction
+       START [         ] (372/827) maos-domain invariants::i7::tests::telemetry_topic_creation
+        PASS [   0.002s] (372/827) maos-domain invariants::i7::tests::telemetry_topic_creation
+       START [         ] (373/827) maos-domain invariants::i8::tests::intent_allowlist_membership
+        PASS [   0.002s] (373/827) maos-domain invariants::i8::tests::intent_allowlist_membership
+       START [         ] (374/827) maos-domain invariants::i8::tests::is_canonical_accepts_reference_fleet_shapes
+        PASS [   0.003s] (374/827) maos-domain invariants::i8::tests::is_canonical_accepts_reference_fleet_shapes
+       START [         ] (375/827) maos-domain invariants::i8::tests::is_canonical_rejects_typo_class
+        PASS [   0.003s] (375/827) maos-domain invariants::i8::tests::is_canonical_rejects_typo_class
+       START [         ] (376/827) maos-domain invariants::i8::tests::parse_round_trips_canonical_and_rejects_non_canonical
+        PASS [   0.003s] (376/827) maos-domain invariants::i8::tests::parse_round_trips_canonical_and_rejects_non_canonical
+       START [         ] (377/827) maos-domain invariants::i9::tests::abi_to_operational_round_trip
+        PASS [   0.002s] (377/827) maos-domain invariants::i9::tests::abi_to_operational_round_trip
+       START [         ] (378/827) maos-domain invariants::i9::tests::display_format
+        PASS [   0.002s] (378/827) maos-domain invariants::i9::tests::display_format
+       START [         ] (379/827) maos-domain invariants::i9::tests::kernel_caching_shape
+        PASS [   0.003s] (379/827) maos-domain invariants::i9::tests::kernel_caching_shape
+       START [         ] (380/827) maos-domain invariants::i9::tests::sandbox_tier_consts
+        PASS [   0.002s] (380/827) maos-domain invariants::i9::tests::sandbox_tier_consts
+       START [         ] (381/827) maos-domain invariants::i9::tests::sandbox_tier_default_is_t2
+        PASS [   0.003s] (381/827) maos-domain invariants::i9::tests::sandbox_tier_default_is_t2
+       START [         ] (382/827) maos-domain invariants::i9::tests::to_abi_rejects_out_of_range
+        PASS [   0.003s] (382/827) maos-domain invariants::i9::tests::to_abi_rejects_out_of_range
+       START [         ] (383/827) maos-domain invariants::i9::tests::try_from_manifest_str
+        PASS [   0.003s] (383/827) maos-domain invariants::i9::tests::try_from_manifest_str
+       START [         ] (384/827) maos-domain invariants::i9::tests::try_from_u8_rejects_out_of_range
+        PASS [   0.003s] (384/827) maos-domain invariants::i9::tests::try_from_u8_rejects_out_of_range
+       START [         ] (385/827) maos-domain invariants::i9::tests::try_from_u8_valid
+        PASS [   0.003s] (385/827) maos-domain invariants::i9::tests::try_from_u8_valid
+       START [         ] (386/827) maos-domain lifecycle::tests::lifecycle_error_already_loaded_display_contains_spirit_id
+        PASS [   0.003s] (386/827) maos-domain lifecycle::tests::lifecycle_error_already_loaded_display_contains_spirit_id
+       START [         ] (387/827) maos-domain lifecycle::tests::lifecycle_receipt_new_with_none_offset
+        PASS [   0.003s] (387/827) maos-domain lifecycle::tests::lifecycle_receipt_new_with_none_offset
+       START [         ] (388/827) maos-domain lifecycle::tests::lifecycle_receipt_rejects_pid_zero
+        PASS [   0.003s] (388/827) maos-domain lifecycle::tests::lifecycle_receipt_rejects_pid_zero
+       START [         ] (389/827) maos-domain lifecycle::tests::lifecycle_verb_variant_exhaustiveness
+        PASS [   0.003s] (389/827) maos-domain lifecycle::tests::lifecycle_verb_variant_exhaustiveness
+       START [         ] (390/827) maos-domain lifecycle::tests::spirit_lifecycle_state_is_runnable
+        PASS [   0.003s] (390/827) maos-domain lifecycle::tests::spirit_lifecycle_state_is_runnable
+       START [         ] (391/827) maos-domain lifecycle::tests::spirit_lifecycle_state_is_terminal
+        PASS [   0.003s] (391/827) maos-domain lifecycle::tests::spirit_lifecycle_state_is_terminal
+       START [         ] (392/827) maos-domain lifecycle::tests::spirit_lifecycle_state_serde_round_trip
+        PASS [   0.002s] (392/827) maos-domain lifecycle::tests::spirit_lifecycle_state_serde_round_trip
+       START [         ] (393/827) maos-domain log_recall::tests::capability_denial_is_typed_and_contains_no_caller_identity
+        PASS [   0.002s] (393/827) maos-domain log_recall::tests::capability_denial_is_typed_and_contains_no_caller_identity
+       START [         ] (394/827) maos-domain log_recall::tests::cross_wall_refusal_outcomes_are_machine_distinct
+        PASS [   0.003s] (394/827) maos-domain log_recall::tests::cross_wall_refusal_outcomes_are_machine_distinct
+       START [         ] (395/827) maos-domain log_recall::tests::cross_wall_request_rejects_noncanonical_team
+        PASS [   0.003s] (395/827) maos-domain log_recall::tests::cross_wall_request_rejects_noncanonical_team
+       START [         ] (396/827) maos-domain log_recall::tests::cross_wall_request_validates_team_and_preserves_filter
+        PASS [   0.003s] (396/827) maos-domain log_recall::tests::cross_wall_request_validates_team_and_preserves_filter
+       START [         ] (397/827) maos-domain log_recall::tests::filter_default_sets_max_limit
+        PASS [   0.003s] (397/827) maos-domain log_recall::tests::filter_default_sets_max_limit
+       START [         ] (398/827) maos-domain log_recall::tests::filter_new_clamps_limit
+        PASS [   0.002s] (398/827) maos-domain log_recall::tests::filter_new_clamps_limit
+       START [         ] (399/827) maos-domain log_recall::tests::log_fetch_response_serde_round_trip
+        PASS [   0.002s] (399/827) maos-domain log_recall::tests::log_fetch_response_serde_round_trip
+       START [         ] (400/827) maos-domain log_recall::tests::log_recall_cursor_round_trip
+        PASS [   0.003s] (400/827) maos-domain log_recall::tests::log_recall_cursor_round_trip
+       START [         ] (401/827) maos-domain log_recall::tests::log_recall_error_distinguishes_variants
+        PASS [   0.003s] (401/827) maos-domain log_recall::tests::log_recall_error_distinguishes_variants
+       START [         ] (402/827) maos-domain log_recall::tests::log_recall_error_scope_violation_carries_fields
+        PASS [   0.003s] (402/827) maos-domain log_recall::tests::log_recall_error_scope_violation_carries_fields
+       START [         ] (403/827) maos-domain log_recall::tests::log_recall_page_serde_round_trip
+        PASS [   0.003s] (403/827) maos-domain log_recall::tests::log_recall_page_serde_round_trip
+       START [         ] (404/827) maos-domain memory::tests::forget_receipt_preserves_old_wire_shape_and_reports_typed_gaps
+        PASS [   0.003s] (404/827) maos-domain memory::tests::forget_receipt_preserves_old_wire_shape_and_reports_typed_gaps
+       START [         ] (405/827) maos-domain memory::tests::memory_error_display_collective
+        PASS [   0.003s] (405/827) maos-domain memory::tests::memory_error_display_collective
+       START [         ] (406/827) maos-domain memory::tests::memory_error_display_invalid_key
+        PASS [   0.003s] (406/827) maos-domain memory::tests::memory_error_display_invalid_key
+       START [         ] (407/827) maos-domain memory::tests::memory_error_display_key_traversal
+        PASS [   0.003s] (407/827) maos-domain memory::tests::memory_error_display_key_traversal
+       START [         ] (408/827) maos-domain memory::tests::memory_error_from_io
+        PASS [   0.003s] (408/827) maos-domain memory::tests::memory_error_from_io
+       START [         ] (409/827) maos-domain memory::tests::memory_tier_discriminants_are_distinct
+        PASS [   0.003s] (409/827) maos-domain memory::tests::memory_tier_discriminants_are_distinct
+       START [         ] (410/827) maos-domain memory::tests::memory_tier_serde_round_trip
+        PASS [   0.003s] (410/827) maos-domain memory::tests::memory_tier_serde_round_trip
+       START [         ] (411/827) maos-domain memory::tests::memory_value_kind_blob
+        PASS [   0.003s] (411/827) maos-domain memory::tests::memory_value_kind_blob
+       START [         ] (412/827) maos-domain memory::tests::memory_value_kind_json
+        PASS [   0.002s] (412/827) maos-domain memory::tests::memory_value_kind_json
+       START [         ] (413/827) maos-domain memory::tests::memory_value_kind_markdown
+        PASS [   0.003s] (413/827) maos-domain memory::tests::memory_value_kind_markdown
+       START [         ] (414/827) maos-domain memory::tests::memory_value_kind_text
+        PASS [   0.002s] (414/827) maos-domain memory::tests::memory_value_kind_text
+       START [         ] (415/827) maos-domain memory::tests::memory_value_serde_round_trip_json
+        PASS [   0.003s] (415/827) maos-domain memory::tests::memory_value_serde_round_trip_json
+       START [         ] (416/827) maos-domain memory::tests::memory_value_serde_round_trip_markdown
+        PASS [   0.003s] (416/827) maos-domain memory::tests::memory_value_serde_round_trip_markdown
+       START [         ] (417/827) maos-domain memory::tests::namespace_kind_labels_are_distinct
+        PASS [   0.003s] (417/827) maos-domain memory::tests::namespace_kind_labels_are_distinct
+       START [         ] (418/827) maos-domain memory::tests::namespace_principal_rejects_colon_in_principal_id
+        PASS [   0.002s] (418/827) maos-domain memory::tests::namespace_principal_rejects_colon_in_principal_id
+       START [         ] (419/827) maos-domain memory::tests::namespace_principal_rejects_colon_in_schema
+        PASS [   0.003s] (419/827) maos-domain memory::tests::namespace_principal_rejects_colon_in_schema
+       START [         ] (420/827) maos-domain memory::tests::namespace_principal_rejects_control_char
+        PASS [   0.003s] (420/827) maos-domain memory::tests::namespace_principal_rejects_control_char
+       START [         ] (421/827) maos-domain memory::tests::namespace_principal_rejects_empty_principal_id
+        PASS [   0.003s] (421/827) maos-domain memory::tests::namespace_principal_rejects_empty_principal_id
+       START [         ] (422/827) maos-domain memory::tests::namespace_principal_rejects_empty_schema
+        PASS [   0.003s] (422/827) maos-domain memory::tests::namespace_principal_rejects_empty_schema
+       START [         ] (423/827) maos-domain memory::tests::namespace_principal_rejects_nul
+        PASS [   0.003s] (423/827) maos-domain memory::tests::namespace_principal_rejects_nul
+       START [         ] (424/827) maos-domain memory::tests::namespace_principal_round_trips
+        PASS [   0.003s] (424/827) maos-domain memory::tests::namespace_principal_round_trips
+       START [         ] (425/827) maos-domain memory::tests::principal_key_new_rejects_colon_in_principal_id
+        PASS [   0.003s] (425/827) maos-domain memory::tests::principal_key_new_rejects_colon_in_principal_id
+       START [         ] (426/827) maos-domain memory::tests::principal_key_new_rejects_empty_principal_id
+        PASS [   0.003s] (426/827) maos-domain memory::tests::principal_key_new_rejects_empty_principal_id
+       START [         ] (427/827) maos-domain memory::tests::principal_key_new_rejects_empty_schema
+        PASS [   0.003s] (427/827) maos-domain memory::tests::principal_key_new_rejects_empty_schema
+       START [         ] (428/827) maos-domain memory::tests::principal_key_new_round_trips
+        PASS [   0.003s] (428/827) maos-domain memory::tests::principal_key_new_round_trips
+       START [         ] (429/827) maos-domain memory::tests::principal_matching_respects_unicode_and_punctuation_bridges
+        PASS [   0.002s] (429/827) maos-domain memory::tests::principal_matching_respects_unicode_and_punctuation_bridges
+       START [         ] (430/827) maos-domain notification::tests::anomaly_flagged_accepts_boundary_confidence
+        PASS [   0.003s] (430/827) maos-domain notification::tests::anomaly_flagged_accepts_boundary_confidence
+       START [         ] (431/827) maos-domain notification::tests::anomaly_flagged_accepts_valid_input
+        PASS [   0.003s] (431/827) maos-domain notification::tests::anomaly_flagged_accepts_valid_input
+       START [         ] (432/827) maos-domain notification::tests::anomaly_flagged_rejects_empty_summary
+        PASS [   0.003s] (432/827) maos-domain notification::tests::anomaly_flagged_rejects_empty_summary
+       START [         ] (433/827) maos-domain notification::tests::anomaly_flagged_rejects_nan_confidence
+        PASS [   0.003s] (433/827) maos-domain notification::tests::anomaly_flagged_rejects_nan_confidence
+       START [         ] (434/827) maos-domain notification::tests::anomaly_flagged_rejects_out_of_range_confidence
+        PASS [   0.003s] (434/827) maos-domain notification::tests::anomaly_flagged_rejects_out_of_range_confidence
+       START [         ] (435/827) maos-domain notification::tests::anomaly_flagged_rejects_whitespace_only_summary
+        PASS [   0.003s] (435/827) maos-domain notification::tests::anomaly_flagged_rejects_whitespace_only_summary
+       START [         ] (436/827) maos-domain orchestrator::tests::instruction_id_serde_round_trip
+        PASS [   0.003s] (436/827) maos-domain orchestrator::tests::instruction_id_serde_round_trip
+       START [         ] (437/827) maos-domain orchestrator::tests::instruction_new_accepts_nonempty_goal
+        PASS [   0.003s] (437/827) maos-domain orchestrator::tests::instruction_new_accepts_nonempty_goal
+       START [         ] (438/827) maos-domain orchestrator::tests::instruction_new_rejects_empty_goal
+        PASS [   0.003s] (438/827) maos-domain orchestrator::tests::instruction_new_rejects_empty_goal
+       START [         ] (439/827) maos-domain orchestrator::tests::instruction_new_rejects_whitespace_only_goal
+        PASS [   0.002s] (439/827) maos-domain orchestrator::tests::instruction_new_rejects_whitespace_only_goal
+       START [         ] (440/827) maos-domain orchestrator::tests::instruction_serde_round_trip
+        PASS [   0.002s] (440/827) maos-domain orchestrator::tests::instruction_serde_round_trip
+       START [         ] (441/827) maos-domain ports::capability::tests::cap_error_distinguishes_variants
+        PASS [   0.002s] (441/827) maos-domain ports::capability::tests::cap_error_distinguishes_variants
+       START [         ] (442/827) maos-domain ports::crypto::tests::crypto_error_distinguishes_variants
+        PASS [   0.003s] (442/827) maos-domain ports::crypto::tests::crypto_error_distinguishes_variants
+       START [         ] (443/827) maos-domain ports::crypto::tests::crypto_provider_is_object_safe
+        PASS [   0.003s] (443/827) maos-domain ports::crypto::tests::crypto_provider_is_object_safe
+       START [         ] (444/827) maos-domain ports::identity_assertion::tests::authenticated_principal_is_trait_object_safe_payload
+        PASS [   0.003s] (444/827) maos-domain ports::identity_assertion::tests::authenticated_principal_is_trait_object_safe_payload
+       START [         ] (445/827) maos-domain ports::mcp::tests::mcp_attribution_serde_round_trip
+        PASS [   0.003s] (445/827) maos-domain ports::mcp::tests::mcp_attribution_serde_round_trip
+       START [         ] (446/827) maos-domain ports::mcp::tests::mcp_error_display
+        PASS [   0.003s] (446/827) maos-domain ports::mcp::tests::mcp_error_display
+       START [         ] (447/827) maos-domain ports::mcp::tests::mcp_request_serde_round_trip
+        PASS [   0.003s] (447/827) maos-domain ports::mcp::tests::mcp_request_serde_round_trip
+       START [         ] (448/827) maos-domain ports::mcp::tests::mcp_response_serde_round_trip
+        PASS [   0.002s] (448/827) maos-domain ports::mcp::tests::mcp_response_serde_round_trip
+       START [         ] (449/827) maos-domain ports::mcp::tests::mcp_transport_id_serde_round_trip
+        PASS [   0.003s] (449/827) maos-domain ports::mcp::tests::mcp_transport_id_serde_round_trip
+       START [         ] (450/827) maos-domain ports::policy_decision::tests::policy_decision_error_has_typed_variants
+        PASS [   0.003s] (450/827) maos-domain ports::policy_decision::tests::policy_decision_error_has_typed_variants
+       START [         ] (451/827) maos-domain ports::policy_decision::tests::policy_decision_port_is_object_safe
+        PASS [   0.003s] (451/827) maos-domain ports::policy_decision::tests::policy_decision_port_is_object_safe
+       START [         ] (452/827) maos-domain ports::policy_decision::tests::policy_verdict_only_has_allow_and_deny
+        PASS [   0.003s] (452/827) maos-domain ports::policy_decision::tests::policy_verdict_only_has_allow_and_deny
+       START [         ] (453/827) maos-domain ports::registry::tests::publish_receipt_serde_roundtrip
+        PASS [   0.003s] (453/827) maos-domain ports::registry::tests::publish_receipt_serde_roundtrip
+       START [         ] (454/827) maos-domain ports::registry::tests::registry_error_display
+        PASS [   0.003s] (454/827) maos-domain ports::registry::tests::registry_error_display
+       START [         ] (455/827) maos-domain ports::registry::tests::registry_error_is_non_exhaustive
+        PASS [   0.003s] (455/827) maos-domain ports::registry::tests::registry_error_is_non_exhaustive
+       START [         ] (456/827) maos-domain ports::registry::tests::search_query_defaults
+        PASS [   0.003s] (456/827) maos-domain ports::registry::tests::search_query_defaults
+       START [         ] (457/827) maos-domain ports::registry::tests::search_query_deser_defaults
+        PASS [   0.003s] (457/827) maos-domain ports::registry::tests::search_query_deser_defaults
+       START [         ] (458/827) maos-domain ports::registry::tests::search_query_limit_clamped_to_200
+        PASS [   0.003s] (458/827) maos-domain ports::registry::tests::search_query_limit_clamped_to_200
+       START [         ] (459/827) maos-domain ports::registry::tests::search_query_limit_minimum_1
+        PASS [   0.003s] (459/827) maos-domain ports::registry::tests::search_query_limit_minimum_1
+       START [         ] (460/827) maos-domain ports::registry::tests::search_query_serde_roundtrip
+        PASS [   0.002s] (460/827) maos-domain ports::registry::tests::search_query_serde_roundtrip
+       START [         ] (461/827) maos-domain ports::registry::tests::signed_artifact_serde_roundtrip
+        PASS [   0.003s] (461/827) maos-domain ports::registry::tests::signed_artifact_serde_roundtrip
+       START [         ] (462/827) maos-domain ports::registry::tests::signed_manifest_serde_roundtrip
+        PASS [   0.003s] (462/827) maos-domain ports::registry::tests::signed_manifest_serde_roundtrip
+       START [         ] (463/827) maos-domain ports::registry::tests::signed_package_serde_roundtrip
+        PASS [   0.003s] (463/827) maos-domain ports::registry::tests::signed_package_serde_roundtrip
+       START [         ] (464/827) maos-domain ports::registry::tests::yank_entry_serde_roundtrip
+        PASS [   0.003s] (464/827) maos-domain ports::registry::tests::yank_entry_serde_roundtrip
+       START [         ] (465/827) maos-domain ports::registry::tests::yank_list_serde_roundtrip
+        PASS [   0.003s] (465/827) maos-domain ports::registry::tests::yank_list_serde_roundtrip
+       START [         ] (466/827) maos-domain ports::registry::tests::yank_reason_serde_roundtrip
+        PASS [   0.003s] (466/827) maos-domain ports::registry::tests::yank_reason_serde_roundtrip
+       START [         ] (467/827) maos-domain ports::registry::tests::yank_receipt_serde_roundtrip
+        PASS [   0.003s] (467/827) maos-domain ports::registry::tests::yank_receipt_serde_roundtrip
+       START [         ] (468/827) maos-domain ports::task::tests::task_assignment_record_construction
+        PASS [   0.002s] (468/827) maos-domain ports::task::tests::task_assignment_record_construction
+       START [         ] (469/827) maos-domain region::tests::canonicalize_accepts_hyphenated_and_digits
+        PASS [   0.002s] (469/827) maos-domain region::tests::canonicalize_accepts_hyphenated_and_digits
+       START [         ] (470/827) maos-domain region::tests::canonicalize_accepts_simple_lowercase
+        PASS [   0.003s] (470/827) maos-domain region::tests::canonicalize_accepts_simple_lowercase
+       START [         ] (471/827) maos-domain region::tests::canonicalize_is_idempotent
+        PASS [   0.003s] (471/827) maos-domain region::tests::canonicalize_is_idempotent
+       START [         ] (472/827) maos-domain region::tests::canonicalize_lowercases_so_two_spellings_key_identically
+        PASS [   0.003s] (472/827) maos-domain region::tests::canonicalize_lowercases_so_two_spellings_key_identically
+       START [         ] (473/827) maos-domain region::tests::canonicalize_rejects_disallowed_ascii
+        PASS [   0.003s] (473/827) maos-domain region::tests::canonicalize_rejects_disallowed_ascii
+       START [         ] (474/827) maos-domain region::tests::canonicalize_rejects_non_ascii_and_homoglyphs
+        PASS [   0.003s] (474/827) maos-domain region::tests::canonicalize_rejects_non_ascii_and_homoglyphs
+       START [         ] (475/827) maos-domain region::tests::canonicalize_rejects_too_long
+        PASS [   0.003s] (475/827) maos-domain region::tests::canonicalize_rejects_too_long
+       START [         ] (476/827) maos-domain region::tests::canonicalize_rejects_too_short
+        PASS [   0.003s] (476/827) maos-domain region::tests::canonicalize_rejects_too_short
+       START [         ] (477/827) maos-domain region::tests::canonicalize_trims_surrounding_whitespace
+        PASS [   0.003s] (477/827) maos-domain region::tests::canonicalize_trims_surrounding_whitespace
+       START [         ] (478/827) maos-domain region::tests::encoding_id_is_frozen
+        PASS [   0.003s] (478/827) maos-domain region::tests::encoding_id_is_frozen
+       START [         ] (479/827) maos-domain region::tests::home_from_env_resolves_and_canonicalizes
+        PASS [   0.003s] (479/827) maos-domain region::tests::home_from_env_resolves_and_canonicalizes
+       START [         ] (480/827) maos-domain region::tests::region_error_variants_are_distinct
+        PASS [   0.003s] (480/827) maos-domain region::tests::region_error_variants_are_distinct
+       START [         ] (481/827) maos-domain region::tests::resolve_home_env_overrides_disk
+        PASS [   0.002s] (481/827) maos-domain region::tests::resolve_home_env_overrides_disk
+       START [         ] (482/827) maos-domain reserved_namespaces::tests::reserved_are_unique_and_nonempty
+        PASS [   0.003s] (482/827) maos-domain reserved_namespaces::tests::reserved_are_unique_and_nonempty
+       START [         ] (483/827) maos-domain reserved_namespaces::tests::reserved_do_not_collide_with_current_variants
+        PASS [   0.003s] (483/827) maos-domain reserved_namespaces::tests::reserved_do_not_collide_with_current_variants
+       START [         ] (484/827) maos-domain revocation::tests::crl_directory_defaults_to_xdg_data_home
+        PASS [   0.003s] (484/827) maos-domain revocation::tests::crl_directory_defaults_to_xdg_data_home
+       START [         ] (485/827) maos-domain revocation::tests::crl_directory_falls_back_to_home_data_tree
+        PASS [   0.003s] (485/827) maos-domain revocation::tests::crl_directory_falls_back_to_home_data_tree
+       START [         ] (486/827) maos-domain revocation::tests::crl_directory_prefers_explicit_override
+        PASS [   0.003s] (486/827) maos-domain revocation::tests::crl_directory_prefers_explicit_override
+       START [         ] (487/827) maos-domain revocation::tests::crl_id_display_hex
+        PASS [   0.003s] (487/827) maos-domain revocation::tests::crl_id_display_hex
+       START [         ] (488/827) maos-domain revocation::tests::crl_id_is_the_sha256_of_recursively_key_sorted_entries
+        PASS [   0.003s] (488/827) maos-domain revocation::tests::crl_id_is_the_sha256_of_recursively_key_sorted_entries
+       START [         ] (489/827) maos-domain revocation::tests::registry_client_trait_object_safe
+        PASS [   0.003s] (489/827) maos-domain revocation::tests::registry_client_trait_object_safe
+       START [         ] (490/827) maos-domain revocation::tests::revocation_action_as_str_roundtrip
+        PASS [   0.003s] (490/827) maos-domain revocation::tests::revocation_action_as_str_roundtrip
+       START [         ] (491/827) maos-domain revocation::tests::revocation_action_default_is_terminate_immediately
+        PASS [   0.003s] (491/827) maos-domain revocation::tests::revocation_action_default_is_terminate_immediately
+       START [         ] (492/827) maos-domain revocation::tests::revocation_entry_new_rejects_empty_spirit_class
+        PASS [   0.003s] (492/827) maos-domain revocation::tests::revocation_entry_new_rejects_empty_spirit_class
+       START [         ] (493/827) maos-domain revocation::tests::revocation_entry_new_rejects_invalid_spirit_class
+        PASS [   0.003s] (493/827) maos-domain revocation::tests::revocation_entry_new_rejects_invalid_spirit_class
+       START [         ] (494/827) maos-domain revocation::tests::revocation_origin_as_str_roundtrip
+        PASS [   0.003s] (494/827) maos-domain revocation::tests::revocation_origin_as_str_roundtrip
+       START [         ] (495/827) maos-domain revocation::tests::revocation_origin_serde_roundtrip
+        PASS [   0.003s] (495/827) maos-domain revocation::tests::revocation_origin_serde_roundtrip
+       START [         ] (496/827) maos-domain revocation::tests::semver_range_contains_in_range
+        PASS [   0.003s] (496/827) maos-domain revocation::tests::semver_range_contains_in_range
+       START [         ] (497/827) maos-domain revocation::tests::semver_range_contains_out_of_range
+        PASS [   0.003s] (497/827) maos-domain revocation::tests::semver_range_contains_out_of_range
+       START [         ] (498/827) maos-domain revocation::tests::semver_range_exact_match
+        PASS [   0.003s] (498/827) maos-domain revocation::tests::semver_range_exact_match
+       START [         ] (499/827) maos-domain revocation::tests::semver_range_malformed_returns_err
+        PASS [   0.003s] (499/827) maos-domain revocation::tests::semver_range_malformed_returns_err
+       START [         ] (500/827) maos-domain revocation::tests::semver_range_wildcard
+        PASS [   0.003s] (500/827) maos-domain revocation::tests::semver_range_wildcard
+       START [         ] (501/827) maos-domain revocation::tests::signed_revocation_list_new_rejects_empty_entries
+        PASS [   0.003s] (501/827) maos-domain revocation::tests::signed_revocation_list_new_rejects_empty_entries
+       START [         ] (502/827) maos-domain revocation::tests::signed_revocation_list_new_rejects_wrong_schema_version
+        PASS [   0.003s] (502/827) maos-domain revocation::tests::signed_revocation_list_new_rejects_wrong_schema_version
+       START [         ] (503/827) maos-domain sandbox::tests::container_runtime_kind_as_str
+        PASS [   0.002s] (503/827) maos-domain sandbox::tests::container_runtime_kind_as_str
+       START [         ] (504/827) maos-domain sandbox::tests::container_runtime_kind_serde_roundtrip
+        PASS [   0.003s] (504/827) maos-domain sandbox::tests::container_runtime_kind_serde_roundtrip
+       START [         ] (505/827) maos-domain sandbox::tests::image_attestation_id_display_hex
+        PASS [   0.003s] (505/827) maos-domain sandbox::tests::image_attestation_id_display_hex
+       START [         ] (506/827) maos-domain sandbox::tests::sandbox_inspect_report_serde_roundtrip
+        PASS [   0.003s] (506/827) maos-domain sandbox::tests::sandbox_inspect_report_serde_roundtrip
+       START [         ] (507/827) maos-domain sandbox::tests::t3_error_display
+        PASS [   0.003s] (507/827) maos-domain sandbox::tests::t3_error_display
+       START [         ] (508/827) maos-domain sandbox::tests::t3_image_attestation_new_happy_path
+        PASS [   0.002s] (508/827) maos-domain sandbox::tests::t3_image_attestation_new_happy_path
+       START [         ] (509/827) maos-domain sandbox::tests::t3_image_attestation_new_rejects_empty_entries
+        PASS [   0.002s] (509/827) maos-domain sandbox::tests::t3_image_attestation_new_rejects_empty_entries
+       START [         ] (510/827) maos-domain sandbox::tests::t3_image_attestation_new_rejects_multiple_defaults
+        PASS [   0.003s] (510/827) maos-domain sandbox::tests::t3_image_attestation_new_rejects_multiple_defaults
+       START [         ] (511/827) maos-domain sandbox::tests::t3_image_attestation_new_rejects_wrong_schema_version
+        PASS [   0.003s] (511/827) maos-domain sandbox::tests::t3_image_attestation_new_rejects_wrong_schema_version
+       START [         ] (512/827) maos-domain sandbox::tests::t3_image_attestation_new_rejects_zero_pubkey
+        PASS [   0.003s] (512/827) maos-domain sandbox::tests::t3_image_attestation_new_rejects_zero_pubkey
+       START [         ] (513/827) maos-domain sandbox::tests::t3_image_attestation_new_rejects_zero_signature
+        PASS [   0.003s] (513/827) maos-domain sandbox::tests::t3_image_attestation_new_rejects_zero_signature
+       START [         ] (514/827) maos-domain sandbox::tests::t3_image_entry_new_happy_path
+        PASS [   0.003s] (514/827) maos-domain sandbox::tests::t3_image_entry_new_happy_path
+       START [         ] (515/827) maos-domain sandbox::tests::t3_image_entry_new_rejects_empty_uri
+        PASS [   0.003s] (515/827) maos-domain sandbox::tests::t3_image_entry_new_rejects_empty_uri
+       START [         ] (516/827) maos-domain sandbox::tests::t3_image_entry_new_rejects_zero_sha
+        PASS [   0.003s] (516/827) maos-domain sandbox::tests::t3_image_entry_new_rejects_zero_sha
+       START [         ] (517/827) maos-domain self_telemetry::tests::empty_report_json_snapshot
+        PASS [   0.003s] (517/827) maos-domain self_telemetry::tests::empty_report_json_snapshot
+       START [         ] (518/827) maos-domain self_telemetry::tests::resolution_kind_label_serde_round_trip
+        PASS [   0.002s] (518/827) maos-domain self_telemetry::tests::resolution_kind_label_serde_round_trip
+       START [         ] (519/827) maos-domain self_telemetry::tests::self_telemetry_error_display_backend_unavailable
+        PASS [   0.003s] (519/827) maos-domain self_telemetry::tests::self_telemetry_error_display_backend_unavailable
+       START [         ] (520/827) maos-domain self_telemetry::tests::self_telemetry_error_display_unknown
+        PASS [   0.002s] (520/827) maos-domain self_telemetry::tests::self_telemetry_error_display_unknown
+       START [         ] (521/827) maos-domain self_telemetry::tests::self_telemetry_error_display_window_invalid
+        PASS [   0.003s] (521/827) maos-domain self_telemetry::tests::self_telemetry_error_display_window_invalid
+       START [         ] (522/827) maos-domain self_telemetry::tests::self_telemetry_report_serde_round_trip
+        PASS [   0.002s] (522/827) maos-domain self_telemetry::tests::self_telemetry_report_serde_round_trip
+       START [         ] (523/827) maos-domain supervision::tests::child_exit_status_signaled_debug
+        PASS [   0.003s] (523/827) maos-domain supervision::tests::child_exit_status_signaled_debug
+       START [         ] (524/827) maos-domain supervision::tests::crash_cause_voluntary_str
+        PASS [   0.003s] (524/827) maos-domain supervision::tests::crash_cause_voluntary_str
+       START [         ] (525/827) maos-domain supervision::tests::fault_cause_signaled_by_kernel_str
+        PASS [   0.003s] (525/827) maos-domain supervision::tests::fault_cause_signaled_by_kernel_str
+       START [         ] (526/827) maos-domain supervision::tests::null_replica_resolver_always_none
+        PASS [   0.003s] (526/827) maos-domain supervision::tests::null_replica_resolver_always_none
+       START [         ] (527/827) maos-domain supervision::tests::on_crash_action_default_is_nack
+        PASS [   0.003s] (527/827) maos-domain supervision::tests::on_crash_action_default_is_nack
+       START [         ] (528/827) maos-domain supervision::tests::on_crash_action_display
+        PASS [   0.003s] (528/827) maos-domain supervision::tests::on_crash_action_display
+       START [         ] (529/827) maos-domain supervision::tests::on_crash_action_serde_roundtrip_kebab_case
+        PASS [   0.003s] (529/827) maos-domain supervision::tests::on_crash_action_serde_roundtrip_kebab_case
+       START [         ] (530/827) maos-domain supervision::tests::trait_object_safety_replica_resolver
+        PASS [   0.003s] (530/827) maos-domain supervision::tests::trait_object_safety_replica_resolver
+       START [         ] (531/827) maos-domain supervision::tests::trait_object_safety_subprocess_supervisor
+        PASS [   0.003s] (531/827) maos-domain supervision::tests::trait_object_safety_subprocess_supervisor
+       START [         ] (532/827) maos-domain team::tests::accepts_canonical_team_ids
+        PASS [   0.003s] (532/827) maos-domain team::tests::accepts_canonical_team_ids
+       START [         ] (533/827) maos-domain team::tests::rejects_noncanonical_instead_of_normalizing
+        PASS [   0.003s] (533/827) maos-domain team::tests::rejects_noncanonical_instead_of_normalizing
+       START [         ] (534/827) maos-domain team::tests::serde_reuses_constructor_validation
+        PASS [   0.002s] (534/827) maos-domain team::tests::serde_reuses_constructor_validation
+       START [         ] (535/827) maos-domain::consent_recall_17_8 consent_expiry_is_strict_and_open_ended_never_expires
+        PASS [   0.003s] (535/827) maos-domain::consent_recall_17_8 consent_expiry_is_strict_and_open_ended_never_expires
+       START [         ] (536/827) maos-domain::consent_recall_17_8 consent_recall_policy_decodes_unknown_values_to_withheld
+        PASS [   0.003s] (536/827) maos-domain::consent_recall_17_8 consent_recall_policy_decodes_unknown_values_to_withheld
+       START [         ] (537/827) maos-domain::consent_recall_17_8 consent_withheld_display_names_only_the_frame
+        PASS [   0.003s] (537/827) maos-domain::consent_recall_17_8 consent_withheld_display_names_only_the_frame
+       START [         ] (538/827) maos-domain::consent_recall_17_8 full_consent_envelope_json_is_byte_identical_to_pre_17_8_golden
+        PASS [   0.003s] (538/827) maos-domain::consent_recall_17_8 full_consent_envelope_json_is_byte_identical_to_pre_17_8_golden
+       START [         ] (539/827) maos-domain::consent_recall_17_8 granter_binding_compares_spirit_and_host_never_role
+        PASS [   0.003s] (539/827) maos-domain::consent_recall_17_8 granter_binding_compares_spirit_and_host_never_role
+       START [         ] (540/827) maos-domain::container_terminal_facts_17_7 cid_parser_and_cgroup_identity_are_exact
+        PASS [   0.003s] (540/827) maos-domain::container_terminal_facts_17_7 cid_parser_and_cgroup_identity_are_exact
+       START [         ] (541/827) maos-domain::container_terminal_facts_17_7 completion_requires_available_exited_payload
+        PASS [   0.003s] (541/827) maos-domain::container_terminal_facts_17_7 completion_requires_available_exited_payload
+       START [         ] (542/827) maos-domain::container_terminal_facts_17_7 decoding_boundaries_and_pidfd_authority
+        PASS [   0.003s] (542/827) maos-domain::container_terminal_facts_17_7 decoding_boundaries_and_pidfd_authority
+       START [         ] (543/827) maos-domain::container_terminal_facts_17_7 exit_record_rejects_each_cross_field_inconsistency
+        PASS [   0.003s] (543/827) maos-domain::container_terminal_facts_17_7 exit_record_rejects_each_cross_field_inconsistency
+       START [         ] (544/827) maos-domain::container_terminal_facts_17_7 exit_record_serializes_exact_six_keys_for_success_fallback_unavailable_and_residue
+        PASS [   0.002s] (544/827) maos-domain::container_terminal_facts_17_7 exit_record_serializes_exact_six_keys_for_success_fallback_unavailable_and_residue
+       START [         ] (545/827) maos-domain::container_terminal_facts_17_7 inspect_parser_requires_all_typed_state_fields_and_terminality_is_exact
+        PASS [   0.003s] (545/827) maos-domain::container_terminal_facts_17_7 inspect_parser_requires_all_typed_state_fields_and_terminality_is_exact
+       START [         ] (546/827) maos-domain::container_terminal_facts_17_7 invalid_runtime_exit_codes_are_truncated_without_invented_code_or_signal
+        PASS [   0.003s] (546/827) maos-domain::container_terminal_facts_17_7 invalid_runtime_exit_codes_are_truncated_without_invented_code_or_signal
+       START [         ] (547/827) maos-domain::container_terminal_facts_17_7 payload_classification_obeys_oom_authority_and_fallback
+        PASS [   0.003s] (547/827) maos-domain::container_terminal_facts_17_7 payload_classification_obeys_oom_authority_and_fallback
+       START [         ] (548/827) maos-domain::container_terminal_facts_17_7 pidfile_parser_accepts_only_positive_i32_decimal
+        PASS [   0.003s] (548/827) maos-domain::container_terminal_facts_17_7 pidfile_parser_accepts_only_positive_i32_decimal
+       START [         ] (549/827) maos-domain::container_terminal_facts_17_7 unavailable_state_is_always_truncated_even_with_clean_runtime_client
+        PASS [   0.003s] (549/827) maos-domain::container_terminal_facts_17_7 unavailable_state_is_always_truncated_even_with_clean_runtime_client
+       START [         ] (550/827) maos-domain::container_terminal_facts_17_7 wait_status_decode_is_terminal_only
+        PASS [   0.003s] (550/827) maos-domain::container_terminal_facts_17_7 wait_status_decode_is_terminal_only
+       START [         ] (551/827) maos-domain::egress_destination_17_1 dns_label_and_total_lengths_are_bounded
+        PASS [   0.004s] (551/827) maos-domain::egress_destination_17_1 dns_label_and_total_lengths_are_bounded
+       START [         ] (552/827) maos-domain::egress_destination_17_1 invalid_authorities_are_refused_on_both_boundaries
+        PASS [   0.003s] (552/827) maos-domain::egress_destination_17_1 invalid_authorities_are_refused_on_both_boundaries
+       START [         ] (553/827) maos-domain::egress_destination_17_1 manifest_requires_a_port_while_bare_grants_mean_https
+        PASS [   0.003s] (553/827) maos-domain::egress_destination_17_1 manifest_requires_a_port_while_bare_grants_mean_https
+       START [         ] (554/827) maos-domain::egress_destination_17_1 serde_uses_the_same_strict_grammar_and_canonical_output
+        PASS [   0.002s] (554/827) maos-domain::egress_destination_17_1 serde_uses_the_same_strict_grammar_and_canonical_output
+       START [         ] (555/827) maos-domain::forget_cascade_18_6 legacy_erased_json_defaults_requests_and_notice_round_trips
+        PASS [   0.003s] (555/827) maos-domain::forget_cascade_18_6 legacy_erased_json_defaults_requests_and_notice_round_trips
+       START [         ] (556/827) maos-domain::forget_cascade_18_6 principal_matching_is_token_bounded_not_substring_bounded
+        PASS [   0.003s] (556/827) maos-domain::forget_cascade_18_6 principal_matching_is_token_bounded_not_substring_bounded
+       START [         ] (557/827) maos-domain::operator_door_control concurrent_initializers_publish_one_complete_control_file
+        PASS [   0.026s] (557/827) maos-domain::operator_door_control concurrent_initializers_publish_one_complete_control_file
+       START [         ] (558/827) maos-domain::scope_entitles_17_11 fs_subtree_fails_closed_on_ambiguous_components
+        PASS [   0.003s] (558/827) maos-domain::scope_entitles_17_11 fs_subtree_fails_closed_on_ambiguous_components
+       START [         ] (559/827) maos-domain::scope_entitles_17_11 fs_subtree_is_lexical_component_containment
+        PASS [   0.003s] (559/827) maos-domain::scope_entitles_17_11 fs_subtree_is_lexical_component_containment
+       START [         ] (560/827) maos-domain::scope_entitles_17_11 identifier_scopes_are_exact_on_every_field
+        PASS [   0.003s] (560/827) maos-domain::scope_entitles_17_11 identifier_scopes_are_exact_on_every_field
+       START [         ] (561/827) maos-domain::scope_entitles_17_11 net_https_is_exact_bytes
+        PASS [   0.003s] (561/827) maos-domain::scope_entitles_17_11 net_https_is_exact_bytes
+       START [         ] (562/827) maos-domain::scope_entitles_17_11 unit_variants_by_kind_and_variants_never_cross
+        PASS [   0.002s] (562/827) maos-domain::scope_entitles_17_11 unit_variants_by_kind_and_variants_never_cross
+       START [         ] (563/827) maos-fkcs::fkcs_contract always_admit_blind_harness_proves_the_rejection_is_not_canned
+        PASS [   0.004s] (563/827) maos-fkcs::fkcs_contract always_admit_blind_harness_proves_the_rejection_is_not_canned
+       START [         ] (564/827) maos-fkcs::fkcs_contract cohort_all_freeze_axes_red_hits_per_spirit_floor_but_fails_aggregate_floor
+        PASS [   0.003s] (564/827) maos-fkcs::fkcs_contract cohort_all_freeze_axes_red_hits_per_spirit_floor_but_fails_aggregate_floor
+       START [         ] (565/827) maos-fkcs::fkcs_contract cohort_checklist_is_itemized_across_categories_not_a_flat_bucket
+        PASS [   0.003s] (565/827) maos-fkcs::fkcs_contract cohort_checklist_is_itemized_across_categories_not_a_flat_bucket
+       START [         ] (566/827) maos-fkcs::fkcs_contract cohort_green_reconciles_every_spirit_and_clears_the_aggregate_floor
+        PASS [   0.003s] (566/827) maos-fkcs::fkcs_contract cohort_green_reconciles_every_spirit_and_clears_the_aggregate_floor
+       START [         ] (567/827) maos-fkcs::fkcs_contract cohort_one_freeze_axis_red_drops_reconciled_count_while_admission_holds
+        PASS [   0.003s] (567/827) maos-fkcs::fkcs_contract cohort_one_freeze_axis_red_drops_reconciled_count_while_admission_holds
+       START [         ] (568/827) maos-fkcs::fkcs_contract cohort_with_negative_control_scores_below_floor_and_fails_aggregate
+        PASS [   0.003s] (568/827) maos-fkcs::fkcs_contract cohort_with_negative_control_scores_below_floor_and_fails_aggregate
+       START [         ] (569/827) maos-fkcs::fkcs_contract empty_cohort_is_na_never_a_vacuous_pass
+        PASS [   0.003s] (569/827) maos-fkcs::fkcs_contract empty_cohort_is_na_never_a_vacuous_pass
+       START [         ] (570/827) maos-fkcs::fkcs_contract journaled_flag_requires_a_returned_decision_receipt_not_only_the_enqueue_row
+        PASS [   0.003s] (570/827) maos-fkcs::fkcs_contract journaled_flag_requires_a_returned_decision_receipt_not_only_the_enqueue_row
+       START [         ] (571/827) maos-fkcs::fkcs_contract negative_control_rejects_at_real_admit_spirit_while_conformance_proxy_admits
+        PASS [   0.003s] (571/827) maos-fkcs::fkcs_contract negative_control_rejects_at_real_admit_spirit_while_conformance_proxy_admits
+       START [         ] (572/827) maos-registry admission::tests::attestation_promotes_public_untrusted_before_strictest_of
+        PASS [   0.006s] (572/827) maos-registry admission::tests::attestation_promotes_public_untrusted_before_strictest_of
+       START [         ] (573/827) maos-registry admission::tests::local_unsigned_allowed_when_policy_permits
+        PASS [   0.003s] (573/827) maos-registry admission::tests::local_unsigned_allowed_when_policy_permits
+       START [         ] (574/827) maos-registry admission::tests::local_unsigned_rejected_when_policy_strict
+        PASS [   0.003s] (574/827) maos-registry admission::tests::local_unsigned_rejected_when_policy_strict
+       START [         ] (575/827) maos-registry admission::tests::org_internal_signature_matches_admits
+        PASS [   0.003s] (575/827) maos-registry admission::tests::org_internal_signature_matches_admits
+       START [         ] (576/827) maos-registry admission::tests::org_internal_signature_mismatch_rejects
+        PASS [   0.003s] (576/827) maos-registry admission::tests::org_internal_signature_mismatch_rejects
+       START [         ] (577/827) maos-registry admission::tests::org_internal_signature_requires_org_key
+        PASS [   0.003s] (577/827) maos-registry admission::tests::org_internal_signature_requires_org_key
+       START [         ] (578/827) maos-registry admission::tests::provenance_absent_admits_when_not_required_ac11
+        PASS [   0.003s] (578/827) maos-registry admission::tests::provenance_absent_admits_when_not_required_ac11
+       START [         ] (579/827) maos-registry admission::tests::provenance_absent_but_required_rejects_catalogued
+        PASS [   0.003s] (579/827) maos-registry admission::tests::provenance_absent_but_required_rejects_catalogued
+       START [         ] (580/827) maos-registry admission::tests::provenance_content_hash_is_deterministic
+        PASS [   0.003s] (580/827) maos-registry admission::tests::provenance_content_hash_is_deterministic
+       START [         ] (581/827) maos-registry admission::tests::provenance_free_text_lineage_rejects_malformed
+        PASS [   0.003s] (581/827) maos-registry admission::tests::provenance_free_text_lineage_rejects_malformed
+       START [         ] (582/827) maos-registry admission::tests::provenance_present_valid_returns_record_with_content_hash
+        PASS [   0.003s] (582/827) maos-registry admission::tests::provenance_present_valid_returns_record_with_content_hash
+       START [         ] (583/827) maos-registry admission::tests::provenance_stale_rejects
+        PASS [   0.003s] (583/827) maos-registry admission::tests::provenance_stale_rejects
+       START [         ] (584/827) maos-registry admission::tests::public_untrusted_with_fingerprint_drift_rejects
+        PASS [   0.004s] (584/827) maos-registry admission::tests::public_untrusted_with_fingerprint_drift_rejects
+       START [         ] (585/827) maos-registry admission::tests::public_untrusted_with_t3_floor_returns_t3_sandbox
+        PASS [   0.003s] (585/827) maos-registry admission::tests::public_untrusted_with_t3_floor_returns_t3_sandbox
+       START [         ] (586/827) maos-registry admission::tests::public_untrusted_with_tampered_envelope_rejects
+        PASS [   0.004s] (586/827) maos-registry admission::tests::public_untrusted_with_tampered_envelope_rejects
+       START [         ] (587/827) maos-registry admission::tests::public_untrusted_with_valid_envelope_admits
+        PASS [   0.004s] (587/827) maos-registry admission::tests::public_untrusted_with_valid_envelope_admits
+       START [         ] (588/827) maos-registry admission::tests::public_vetted_tier_always_rejects
+        PASS [   0.003s] (588/827) maos-registry admission::tests::public_vetted_tier_always_rejects
+       START [         ] (589/827) maos-registry admission::tests::strictest_of_resolves_all_combinations
+        PASS [   0.003s] (589/827) maos-registry admission::tests::strictest_of_resolves_all_combinations
+       START [         ] (590/827) maos-registry admission::tests::strictest_of_resolves_correctly_local_vs_public_untrusted
+        PASS [   0.003s] (590/827) maos-registry admission::tests::strictest_of_resolves_correctly_local_vs_public_untrusted
+       START [         ] (591/827) maos-registry admission::tests::vetted_promotion_preserves_compliance_envelope_verification
+        PASS [   0.004s] (591/827) maos-registry admission::tests::vetted_promotion_preserves_compliance_envelope_verification
+       START [         ] (592/827) maos-registry admission::tests::vetted_with_expired_attestation_is_rejected
+        PASS [   0.005s] (592/827) maos-registry admission::tests::vetted_with_expired_attestation_is_rejected
+       START [         ] (593/827) maos-registry admission::tests::vetted_with_forged_attestation_signature_is_rejected
+        PASS [   0.004s] (593/827) maos-registry admission::tests::vetted_with_forged_attestation_signature_is_rejected
+       START [         ] (594/827) maos-registry admission::tests::vetted_with_unenrolled_vetter_is_rejected
+        PASS [   0.004s] (594/827) maos-registry admission::tests::vetted_with_unenrolled_vetter_is_rejected
+       START [         ] (595/827) maos-registry admission::tests::vetted_with_valid_attestation_admits
+        PASS [   0.005s] (595/827) maos-registry admission::tests::vetted_with_valid_attestation_admits
+       START [         ] (596/827) maos-registry admission::tests::vetted_without_attestation_is_deferred
+        PASS [   0.004s] (596/827) maos-registry admission::tests::vetted_without_attestation_is_deferred
+       START [         ] (597/827) maos-registry admission::tests::wrapper_delegates_non_vetted_tiers
+        PASS [   0.003s] (597/827) maos-registry admission::tests::wrapper_delegates_non_vetted_tiers
+       START [         ] (598/827) maos-registry compliance_verify::tests::fingerprint_mismatch_is_rejected_via_delegation
+        PASS [   0.004s] (598/827) maos-registry compliance_verify::tests::fingerprint_mismatch_is_rejected_via_delegation
+       START [         ] (599/827) maos-registry compliance_verify::tests::tampered_signature_is_rejected_via_delegation
+        PASS [   0.003s] (599/827) maos-registry compliance_verify::tests::tampered_signature_is_rejected_via_delegation
+       START [         ] (600/827) maos-registry fixture_replay::tests::fixture_empty_queue_returns_transport_error
+        PASS [   0.003s] (600/827) maos-registry fixture_replay::tests::fixture_empty_queue_returns_transport_error
+       START [         ] (601/827) maos-registry fixture_replay::tests::fixture_errors_propagate
+        PASS [   0.003s] (601/827) maos-registry fixture_replay::tests::fixture_errors_propagate
+       START [         ] (602/827) maos-registry fixture_replay::tests::fixture_records_calls
+        PASS [   0.003s] (602/827) maos-registry fixture_replay::tests::fixture_records_calls
+       START [         ] (603/827) maos-registry fixture_replay::tests::fixture_search_returns_queued_response
+        PASS [   0.003s] (603/827) maos-registry fixture_replay::tests::fixture_search_returns_queued_response
+       START [         ] (604/827) maos-registry http::tests::drip_response_cannot_extend_exchange_deadline_f4
+        PASS [   0.244s] (604/827) maos-registry http::tests::drip_response_cannot_extend_exchange_deadline_f4
+       START [         ] (605/827) maos-registry http::tests::later_resolved_address_is_tried_after_connection_refusal
+        PASS [   0.003s] (605/827) maos-registry http::tests::later_resolved_address_is_tried_after_connection_refusal
+       START [         ] (606/827) maos-registry http::tests::unsigned_http_refusal_preserves_status_p7
+        PASS [   0.003s] (606/827) maos-registry http::tests::unsigned_http_refusal_preserves_status_p7
+       START [         ] (607/827) maos-registry import::tests::divergent_manifest_rejects
+        PASS [   0.003s] (607/827) maos-registry import::tests::divergent_manifest_rejects
+       START [         ] (608/827) maos-registry import::tests::extract_and_verify_consistent_bundle
+        PASS [   0.003s] (608/827) maos-registry import::tests::extract_and_verify_consistent_bundle
+       START [         ] (609/827) maos-registry import::tests::missing_signed_package_json_rejects
+        PASS [   0.003s] (609/827) maos-registry import::tests::missing_signed_package_json_rejects
+       START [         ] (610/827) maos-registry operations::tests::artifact_args_serde_roundtrip
+        PASS [   0.003s] (610/827) maos-registry operations::tests::artifact_args_serde_roundtrip
+       START [         ] (611/827) maos-registry operations::tests::deprecate_args_serde_roundtrip
+        PASS [   0.003s] (611/827) maos-registry operations::tests::deprecate_args_serde_roundtrip
+       START [         ] (612/827) maos-registry operations::tests::manifest_args_serde_roundtrip
+        PASS [   0.002s] (612/827) maos-registry operations::tests::manifest_args_serde_roundtrip
+       START [         ] (613/827) maos-registry operations::tests::operation_serialization_is_snake_case
+        PASS [   0.003s] (613/827) maos-registry operations::tests::operation_serialization_is_snake_case
+       START [         ] (614/827) maos-registry operations::tests::search_args_defaults
+        PASS [   0.003s] (614/827) maos-registry operations::tests::search_args_defaults
+       START [         ] (615/827) maos-registry operations::tests::search_args_serde_roundtrip
+        PASS [   0.003s] (615/827) maos-registry operations::tests::search_args_serde_roundtrip
+       START [         ] (616/827) maos-registry operations::tests::yanks_since_args_serde_roundtrip
+        PASS [   0.003s] (616/827) maos-registry operations::tests::yanks_since_args_serde_roundtrip
+       START [         ] (617/827) maos-registry security::review_tests::configured_ca_replaces_bundled_roots_d4
+        PASS [   0.004s] (617/827) maos-registry security::review_tests::configured_ca_replaces_bundled_roots_d4
+       START [         ] (618/827) maos-registry security::review_tests::explicit_development_literal_loopback_matrix_p3
+        PASS [   0.003s] (618/827) maos-registry security::review_tests::explicit_development_literal_loopback_matrix_p3
+       START [         ] (619/827) maos-registry security::review_tests::registry_hex_diagnostics_do_not_echo_input_p8
+        PASS [   0.003s] (619/827) maos-registry security::review_tests::registry_hex_diagnostics_do_not_echo_input_p8
+       START [         ] (620/827) maos-registry security::review_tests::registry_typo_is_refused_p11
+        PASS [   0.003s] (620/827) maos-registry security::review_tests::registry_typo_is_refused_p11
+       START [         ] (621/827) maos-registry security::review_tests::registry_uri_matrix_and_trailing_dns_labels_p3_p9
+        PASS [   0.003s] (621/827) maos-registry security::review_tests::registry_uri_matrix_and_trailing_dns_labels_p3_p9
+       START [         ] (622/827) maos-registry security::review_tests::signed_params_less_notification_verifies_p7
+        PASS [   0.004s] (622/827) maos-registry security::review_tests::signed_params_less_notification_verifies_p7
+       START [         ] (623/827) maos-registry server::tests::development_default_ports_use_the_same_canonical_uri_as_clients
+        PASS [   0.003s] (623/827) maos-registry server::tests::development_default_ports_use_the_same_canonical_uri_as_clients
+       START [         ] (624/827) maos-registry storage::tests::absent_install_inventory_does_not_create_a_store
+        PASS [   0.003s] (624/827) maos-registry storage::tests::absent_install_inventory_does_not_create_a_store
+       START [         ] (625/827) maos-registry storage::tests::put_and_get_artifact
+        PASS [   0.021s] (625/827) maos-registry storage::tests::put_and_get_artifact
+       START [         ] (626/827) maos-registry storage::tests::put_and_get_manifest
+        PASS [   0.016s] (626/827) maos-registry storage::tests::put_and_get_manifest
+       START [         ] (627/827) maos-registry storage::tests::search_excludes_yanked_by_default
+        PASS [   0.021s] (627/827) maos-registry storage::tests::search_excludes_yanked_by_default
+       START [         ] (628/827) maos-registry storage::tests::search_finds_spirit_by_name
+        PASS [   0.016s] (628/827) maos-registry storage::tests::search_finds_spirit_by_name
+       START [         ] (629/827) maos-registry storage::tests::search_includes_yanked_when_requested
+        PASS [   0.020s] (629/827) maos-registry storage::tests::search_includes_yanked_when_requested
+       START [         ] (630/827) maos-registry storage::tests::version_not_found_error
+        PASS [   0.003s] (630/827) maos-registry storage::tests::version_not_found_error
+       START [         ] (631/827) maos-registry storage::tests::yanks_since_returns_filtered_entries
+        PASS [   0.021s] (631/827) maos-registry storage::tests::yanks_since_returns_filtered_entries
+       START [         ] (632/827) maos-registry yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5
+yank-head-rollback: registry history rollback: authenticated head 2 is behind cursor 5; cursor unchanged, operator intervention required
+        PASS [   0.003s] (632/827) maos-registry yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5
+       START [         ] (633/827) maos-registry yank::tests::policy_outcomes_are_distinct_ac8
+        PASS [   0.003s] (633/827) maos-registry yank::tests::policy_outcomes_are_distinct_ac8
+       START [         ] (634/827) maos-registry yank::tests::repeated_source_does_not_replay_journal_rows
+        PASS [   0.003s] (634/827) maos-registry yank::tests::repeated_source_does_not_replay_journal_rows
+       START [         ] (635/827) maos-registry::form_admission_17_3b rust_inproc_is_refused_before_every_admission_tier
+        PASS [   0.006s] (635/827) maos-registry::form_admission_17_3b rust_inproc_is_refused_before_every_admission_tier
+       START [         ] (636/827) maos-registry::form_admission_17_3b structural_class_reads_have_the_named_typed_outcomes
+        PASS [   0.004s] (636/827) maos-registry::form_admission_17_3b structural_class_reads_have_the_named_typed_outcomes
+       START [         ] (637/827) maos-registry::form_admission_17_3b structural_fkcs_reads_refuse_every_evasion_shape
+        PASS [   0.005s] (637/827) maos-registry::form_admission_17_3b structural_fkcs_reads_refuse_every_evasion_shape
+       START [         ] (638/827) maos-registry::form_admission_17_3b wasm_component_uses_t2_at_each_admission_tier
+        PASS [   0.007s] (638/827) maos-registry::form_admission_17_3b wasm_component_uses_t2_at_each_admission_tier
+       START [         ] (639/827) maos-registry::fr59_yank_propagation_within_5min_test fr59_300s_boundary_passes
+        PASS [   0.003s] (639/827) maos-registry::fr59_yank_propagation_within_5min_test fr59_300s_boundary_passes
+       START [         ] (640/827) maos-registry::fr59_yank_propagation_within_5min_test fr59_301s_violates
+        PASS [   0.003s] (640/827) maos-registry::fr59_yank_propagation_within_5min_test fr59_301s_violates
+       START [         ] (641/827) maos-registry::fr59_yank_propagation_within_5min_test fr59_poll_interval_resolver_clamps_correctly
+        PASS [   0.003s] (641/827) maos-registry::fr59_yank_propagation_within_5min_test fr59_poll_interval_resolver_clamps_correctly
+       START [         ] (642/827) maos-registry::fr59_yank_propagation_within_5min_test fr59_yank_propagates_within_5min_window
+        PASS [   0.002s] (642/827) maos-registry::fr59_yank_propagation_within_5min_test fr59_yank_propagates_within_5min_window
+       START [         ] (643/827) maos-registry::import_air_gap_test admit_spirit_local_unsigned_passes
+        PASS [   0.004s] (643/827) maos-registry::import_air_gap_test admit_spirit_local_unsigned_passes
+       START [         ] (644/827) maos-registry::import_air_gap_test admit_spirit_public_untrusted_without_sig_fails
+        PASS [   0.003s] (644/827) maos-registry::import_air_gap_test admit_spirit_public_untrusted_without_sig_fails
+       START [         ] (645/827) maos-registry::import_air_gap_test divergent_manifest_rejects
+        PASS [   0.003s] (645/827) maos-registry::import_air_gap_test divergent_manifest_rejects
+       START [         ] (646/827) maos-registry::import_air_gap_test extract_bundle_happy_path
+        PASS [   0.003s] (646/827) maos-registry::import_air_gap_test extract_bundle_happy_path
+       START [         ] (647/827) maos-registry::import_air_gap_test missing_signed_package_rejects
+        PASS [   0.003s] (647/827) maos-registry::import_air_gap_test missing_signed_package_rejects
+       START [         ] (648/827) maos-registry::import_air_gap_test origin_roundtrips_through_storage
+        PASS [   0.004s] (648/827) maos-registry::import_air_gap_test origin_roundtrips_through_storage
+       START [         ] (649/827) maos-registry::import_air_gap_test publish_with_origin_persists_origin_file
+        PASS [   0.003s] (649/827) maos-registry::import_air_gap_test publish_with_origin_persists_origin_file
+       START [         ] (650/827) maos-registry::import_air_gap_test published_origin_persists_without_origin_file
+        PASS [   0.003s] (650/827) maos-registry::import_air_gap_test published_origin_persists_without_origin_file
+       START [         ] (651/827) maos-registry::import_air_gap_test verify_consistent_bundle_ok
+        PASS [   0.003s] (651/827) maos-registry::import_air_gap_test verify_consistent_bundle_ok
+       START [         ] (652/827) maos-registry::registry_limits_20_1b idle_first_byte_is_bounded_more_tightly_than_a_request_f1
+maos-registry: listening on 127.0.0.1:46709
+maos-registry: connection error: Transport endpoint is not connected (os error 107)
+        PASS [   1.055s] (652/827) maos-registry::registry_limits_20_1b idle_first_byte_is_bounded_more_tightly_than_a_request_f1
+       START [         ] (653/827) maos-registry::registry_limits_20_1b metadata_body_limit_is_checked_before_body_allocation_f2
+maos-registry: listening on 127.0.0.1:36901
+        PASS [   0.054s] (653/827) maos-registry::registry_limits_20_1b metadata_body_limit_is_checked_before_body_allocation_f2
+       START [         ] (654/827) maos-registry::registry_limits_20_1b one_source_cannot_occupy_every_registry_slot_f1
+maos-registry: listening on 127.0.0.1:45309
+maos-registry: connection error: Broken pipe (os error 32)
+maos-registry: connection error: Broken pipe (os error 32)
+        PASS [   0.054s] (654/827) maos-registry::registry_limits_20_1b one_source_cannot_occupy_every_registry_slot_f1
+       START [         ] (655/827) maos-registry::registry_limits_20_1b publication_hint_cannot_widen_another_rpc_body_cap_f2
+maos-registry: listening on 127.0.0.1:41041
+maos-registry: connection error: Connection reset by peer (os error 104)
+        PASS [   0.104s] (655/827) maos-registry::registry_limits_20_1b publication_hint_cannot_widen_another_rpc_body_cap_f2
+       START [         ] (656/827) maos-registry::registry_security_20_1a browser_and_rebinding_requests_cannot_publish
+maos-registry: listening on 127.0.0.1:39673
+        PASS [   0.305s] (656/827) maos-registry::registry_security_20_1a browser_and_rebinding_requests_cannot_publish
+       START [         ] (657/827) maos-registry::registry_security_20_1a connection_population_is_bounded
+maos-registry: listening on 127.0.0.1:41245
+maos-registry: connection error: Broken pipe (os error 32)
+maos-registry: connection error: Broken pipe (os error 32)
+        PASS [   0.663s] (657/827) maos-registry::registry_security_20_1a connection_population_is_bounded
+       START [         ] (658/827) maos-registry::registry_security_20_1a header_bytes_and_count_are_bounded
+maos-registry: listening on 127.0.0.1:40389
+        PASS [   0.154s] (658/827) maos-registry::registry_security_20_1a header_bytes_and_count_are_bounded
+       START [         ] (659/827) maos-registry::registry_security_20_1a index_persistence_failure_cannot_return_a_receipt
+        PASS [   0.016s] (659/827) maos-registry::registry_security_20_1a index_persistence_failure_cannot_return_a_receipt
+       START [         ] (660/827) maos-registry::registry_security_20_1a malformed_tools_call_has_a_json_rpc_error
+maos-registry: listening on 127.0.0.1:33009
+        PASS [   0.104s] (660/827) maos-registry::registry_security_20_1a malformed_tools_call_has_a_json_rpc_error
+       START [         ] (661/827) maos-registry::registry_security_20_1a registry_inbox_is_not_an_operator_install
+        PASS [   0.017s] (661/827) maos-registry::registry_security_20_1a registry_inbox_is_not_an_operator_install
+       START [         ] (662/827) maos-registry::registry_security_20_1a server_tier_floor_uses_admission_policy_ordering
+maos-registry: listening on 127.0.0.1:42487
+        PASS [   1.057s] (662/827) maos-registry::registry_security_20_1a server_tier_floor_uses_admission_policy_ordering
+       START [         ] (663/827) maos-registry::registry_security_20_1a sibling_provenance_refuses_an_unrecorded_executable
+
+thread 'sibling_provenance_refuses_an_unrecorded_executable' (1002159) panicked at crates/maos-registry/tests/../../../tests/harness/fixtures.rs:57:5:
+test fixture missing — no `unrecorded-registry-20-1a` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); provision with `cargo run -p xtask -- build-test-fixtures --only unrecorded-registry-20-1a`; build fixtures first: `cargo run -p xtask -- build-test-fixtures`
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        PASS [   0.004s] (663/827) maos-registry::registry_security_20_1a sibling_provenance_refuses_an_unrecorded_executable
+       START [         ] (664/827) maos-registry::registry_security_20_1a sigterm_cancels_an_active_trickling_connection
+        PASS [   0.156s] (664/827) maos-registry::registry_security_20_1a sigterm_cancels_an_active_trickling_connection
+       START [         ] (665/827) maos-registry::registry_security_20_1a traversal_publish_is_an_rpc_error_without_escape_files
+maos-registry: listening on 127.0.0.1:44687
+        PASS [   0.154s] (665/827) maos-registry::registry_security_20_1a traversal_publish_is_an_rpc_error_without_escape_files
+       START [         ] (666/827) maos-registry::registry_security_20_1a trickling_request_has_an_absolute_deadline
+maos-registry: listening on 127.0.0.1:37163
+        PASS [   5.110s] (666/827) maos-registry::registry_security_20_1a trickling_request_has_an_absolute_deadline
+       START [         ] (667/827) maos-registry::registry_server_bin_20_1 standalone_population_rejection_has_complete_http_framing
+        PASS [   0.665s] (667/827) maos-registry::registry_server_bin_20_1 standalone_population_rejection_has_complete_http_framing
+       START [         ] (668/827) maos-registry::registry_server_bin_20_1 standalone_rejections_have_complete_http_framing_and_clean_eof
+        PASS [  10.957s] (668/827) maos-registry::registry_server_bin_20_1 standalone_rejections_have_complete_http_framing_and_clean_eof
+       START [         ] (669/827) maos-registry::registry_server_bin_20_1 standalone_server_roundtrip_isolates_root_and_exits_cleanly
+        PASS [   0.156s] (669/827) maos-registry::registry_server_bin_20_1 standalone_server_roundtrip_isolates_root_and_exits_cleanly
+       START [         ] (670/827) maos-registry::registry_server_bin_20_1 unauthenticated_development_server_refuses_non_loopback_bind
+        PASS [   0.005s] (670/827) maos-registry::registry_server_bin_20_1 unauthenticated_development_server_refuses_non_loopback_bind
+       START [         ] (671/827) maos-registry::registry_tls_20_1b http_install_requires_explicit_development_opt_in_ac15
+        PASS [   0.004s] (671/827) maos-registry::registry_tls_20_1b http_install_requires_explicit_development_opt_in_ac15
+       START [         ] (672/827) maos-registry::registry_tls_20_1b server_requires_tls_or_explicit_loopback_development_ac15
+        PASS [   0.003s] (672/827) maos-registry::registry_tls_20_1b server_requires_tls_or_explicit_loopback_development_ac15
+       START [         ] (673/827) maos-registry::registry_tls_20_1b tls::bad_signature_byte_is_refused_p3
+        PASS [   0.116s] (673/827) maos-registry::registry_tls_20_1b tls::bad_signature_byte_is_refused_p3
+       START [         ] (674/827) maos-registry::registry_tls_20_1b tls::cli_omitted_yank_or_unauthenticated_head_refuses_before_persistence_ac15
+        PASS [   0.491s] (674/827) maos-registry::registry_tls_20_1b tls::cli_omitted_yank_or_unauthenticated_head_refuses_before_persistence_ac15
+       START [         ] (675/827) maos-registry::registry_tls_20_1b tls::cli_tls_install_authenticates_before_persistence_ac15
+maos-registry: listening on 127.0.0.1:33373
+        PASS [   0.269s] (675/827) maos-registry::registry_tls_20_1b tls::cli_tls_install_authenticates_before_persistence_ac15
+       START [         ] (676/827) maos-registry::registry_tls_20_1b tls::cli_tls_yanked_version_is_refused_before_persistence_ac15
+maos-registry: listening on 127.0.0.1:37401
+        PASS [   0.316s] (676/827) maos-registry::registry_tls_20_1b tls::cli_tls_yanked_version_is_refused_before_persistence_ac15
+       START [         ] (677/827) maos-registry::registry_tls_20_1b tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15
+maos-registry: listening on 127.0.0.1:38221
+        PASS [   0.124s] (677/827) maos-registry::registry_tls_20_1b tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15
+       START [         ] (678/827) maos-registry::registry_tls_20_1b tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15
+maos-registry: listening on 127.0.0.1:44129
+        PASS [   0.068s] (678/827) maos-registry::registry_tls_20_1b tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15
+       START [         ] (679/827) maos-registry::registry_tls_20_1b tls::configured_root_and_ca_authenticate_real_registry_ac15
+maos-registry: listening on 127.0.0.1:33333
+        PASS [   0.519s] (679/827) maos-registry::registry_tls_20_1b tls::configured_root_and_ca_authenticate_real_registry_ac15
+       START [         ] (680/827) maos-registry::registry_tls_20_1b tls::configured_root_is_bound_to_canonical_uri_before_contact_ac15
+maos-registry: listening on 127.0.0.1:43549
+        PASS [   0.072s] (680/827) maos-registry::registry_tls_20_1b tls::configured_root_is_bound_to_canonical_uri_before_contact_ac15
+       START [         ] (681/827) maos-registry::registry_tls_20_1b tls::envelope_incomplete_head_is_refused_ac15
+        PASS [   0.114s] (681/827) maos-registry::registry_tls_20_1b tls::envelope_incomplete_head_is_refused_ac15
+       START [         ] (682/827) maos-registry::registry_tls_20_1b tls::envelope_missing_head_is_refused_ac15
+        PASS [   0.114s] (682/827) maos-registry::registry_tls_20_1b tls::envelope_missing_head_is_refused_ac15
+       START [         ] (683/827) maos-registry::registry_tls_20_1b tls::envelope_missing_signature_is_refused_ac15
+        PASS [   0.114s] (683/827) maos-registry::registry_tls_20_1b tls::envelope_missing_signature_is_refused_ac15
+       START [         ] (684/827) maos-registry::registry_tls_20_1b tls::envelope_stripped_yank_entry_is_refused_ac15
+        PASS [   0.117s] (684/827) maos-registry::registry_tls_20_1b tls::envelope_stripped_yank_entry_is_refused_ac15
+       START [         ] (685/827) maos-registry::registry_tls_20_1b tls::envelope_wrong_nonce_is_refused_ac15
+        PASS [   0.114s] (685/827) maos-registry::registry_tls_20_1b tls::envelope_wrong_nonce_is_refused_ac15
+       START [         ] (686/827) maos-registry::registry_tls_20_1b tls::envelope_wrong_uri_is_refused_ac15
+        PASS [   0.114s] (686/827) maos-registry::registry_tls_20_1b tls::envelope_wrong_uri_is_refused_ac15
+       START [         ] (687/827) maos-registry::registry_tls_20_1b tls::handshake_failure_never_attempts_plaintext_ac15
+        PASS [   0.005s] (687/827) maos-registry::registry_tls_20_1b tls::handshake_failure_never_attempts_plaintext_ac15
+       START [         ] (688/827) maos-registry::registry_tls_20_1b tls::hostile_registry_wrong_configured_root_is_refused_ac15
+maos-registry: listening on 127.0.0.1:41351
+        PASS [   0.116s] (688/827) maos-registry::registry_tls_20_1b tls::hostile_registry_wrong_configured_root_is_refused_ac15
+       START [         ] (689/827) maos-registry::registry_tls_20_1b tls::https_redirect_never_downgrades_to_http_ac15
+        PASS [   0.058s] (689/827) maos-registry::registry_tls_20_1b tls::https_redirect_never_downgrades_to_http_ac15
+       START [         ] (690/827) maos-registry::registry_tls_20_1b tls::https_requires_configured_root_not_response_supplied_key_ac15
+        PASS [   0.003s] (690/827) maos-registry::registry_tls_20_1b tls::https_requires_configured_root_not_response_supplied_key_ac15
+       START [         ] (691/827) maos-registry::registry_tls_20_1b tls::incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1
+maos-registry: listening on 127.0.0.1:34977
+maos-registry: connection error: Resource temporarily unavailable (os error 11)
+        PASS [   1.167s] (691/827) maos-registry::registry_tls_20_1b tls::incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1
+       START [         ] (692/827) maos-registry::registry_tls_20_1b tls::interception_expired_certificate_is_refused_ac15
+maos-registry: listening on 127.0.0.1:42207
+maos-registry: connection error: received fatal alert: CertificateExpired
+maos-registry: connection error: received fatal alert: CertificateExpired
+        PASS [   0.171s] (692/827) maos-registry::registry_tls_20_1b tls::interception_expired_certificate_is_refused_ac15
+       START [         ] (693/827) maos-registry::registry_tls_20_1b tls::interception_untrusted_ca_is_refused_ac15
+maos-registry: listening on 127.0.0.1:37355
+maos-registry: connection error: received fatal alert: DecryptError
+maos-registry: connection error: received fatal alert: DecryptError
+        PASS [   0.172s] (693/827) maos-registry::registry_tls_20_1b tls::interception_untrusted_ca_is_refused_ac15
+       START [         ] (694/827) maos-registry::registry_tls_20_1b tls::interception_wrong_host_certificate_is_refused_ac15
+maos-registry: listening on 127.0.0.1:35959
+maos-registry: connection error: received fatal alert: BadCertificate
+maos-registry: connection error: received fatal alert: BadCertificate
+        PASS [   0.166s] (694/827) maos-registry::registry_tls_20_1b tls::interception_wrong_host_certificate_is_refused_ac15
+       START [         ] (695/827) maos-registry::registry_tls_20_1b tls::loopback_development_requires_both_sides_and_keeps_yank_signatures_ac15
+maos-registry: listening on 127.0.0.1:43001
+        PASS [   0.169s] (695/827) maos-registry::registry_tls_20_1b tls::loopback_development_requires_both_sides_and_keeps_yank_signatures_ac15
+       START [         ] (696/827) maos-registry::registry_tls_20_1b tls::malformed_private_seed_diagnostic_never_echoes_key_bytes_p8
+        PASS [   0.003s] (696/827) maos-registry::registry_tls_20_1b tls::malformed_private_seed_diagnostic_never_echoes_key_bytes_p8
+       START [         ] (697/827) maos-registry::registry_tls_20_1b tls::private_key_custody_refuses_group_or_world_access_ac15
+        PASS [   0.004s] (697/827) maos-registry::registry_tls_20_1b tls::private_key_custody_refuses_group_or_world_access_ac15
+       START [         ] (698/827) maos-registry::registry_tls_20_1b tls::private_key_custody_refuses_seed_inside_package_store_ac15
+        PASS [   0.004s] (698/827) maos-registry::registry_tls_20_1b tls::private_key_custody_refuses_seed_inside_package_store_ac15
+       START [         ] (699/827) maos-registry::registry_tls_20_1b tls::private_seed_custody_refuses_0644_and_0440_p12
+        PASS [   0.003s] (699/827) maos-registry::registry_tls_20_1b tls::private_seed_custody_refuses_0644_and_0440_p12
+       START [         ] (700/827) maos-registry::registry_tls_20_1b tls::private_tls_key_inside_package_store_is_refused_p12
+        PASS [   0.003s] (700/827) maos-registry::registry_tls_20_1b tls::private_tls_key_inside_package_store_is_refused_p12
+       START [         ] (701/827) maos-registry::registry_tls_20_1b tls::server_rejects_client_without_dev_handshake_ac15
+maos-registry: listening on 127.0.0.1:38389
+        PASS [   0.070s] (701/827) maos-registry::registry_tls_20_1b tls::server_rejects_client_without_dev_handshake_ac15
+       START [         ] (702/827) maos-registry::registry_tls_20_1b tls::signed_head_behind_requested_cursor_is_typed_d3_p5
+        PASS [   0.060s] (702/827) maos-registry::registry_tls_20_1b tls::signed_head_behind_requested_cursor_is_typed_d3_p5
+       START [         ] (703/827) maos-registry::registry_tls_20_1b tls::signed_payload_head_must_equal_envelope_head_p3
+        PASS [   0.112s] (703/827) maos-registry::registry_tls_20_1b tls::signed_payload_head_must_equal_envelope_head_p3
+       START [         ] (704/827) maos-registry::registry_tls_20_1b tls::signed_valid_duplicate_body_is_refused_p3
+        PASS [   0.118s] (704/827) maos-registry::registry_tls_20_1b tls::signed_valid_duplicate_body_is_refused_p3
+       START [         ] (705/827) maos-registry::registry_tls_20_1b tls::signed_valid_empty_view_with_nonzero_head_is_refused_p3
+        PASS [   0.116s] (705/827) maos-registry::registry_tls_20_1b tls::signed_valid_empty_view_with_nonzero_head_is_refused_p3
+       START [         ] (706/827) maos-registry::registry_tls_20_1b tls::signed_valid_extra_entries_are_refused_p3
+        PASS [   0.116s] (706/827) maos-registry::registry_tls_20_1b tls::signed_valid_extra_entries_are_refused_p3
+       START [         ] (707/827) maos-registry::registry_tls_20_1b tls::signed_valid_gap_body_is_refused_p3
+        PASS [   0.115s] (707/827) maos-registry::registry_tls_20_1b tls::signed_valid_gap_body_is_refused_p3
+       START [         ] (708/827) maos-registry::registry_tls_20_1b tls::signed_wrong_envelope_version_is_refused_p3
+        PASS [   0.114s] (708/827) maos-registry::registry_tls_20_1b tls::signed_wrong_envelope_version_is_refused_p3
+       START [         ] (709/827) maos-registry::registry_tls_20_1b tls::signed_wrong_request_hash_is_refused_p3
+        PASS [   0.117s] (709/827) maos-registry::registry_tls_20_1b tls::signed_wrong_request_hash_is_refused_p3
+       START [         ] (710/827) maos-registry::registry_tls_20_1b tls::tls_admission_refusal_is_encrypted_http_503_f1
+maos-registry: listening on 127.0.0.1:39221
+maos-registry: connection error: unexpected end of file
+maos-registry: connection error: unexpected end of file
+        PASS [   0.116s] (710/827) maos-registry::registry_tls_20_1b tls::tls_admission_refusal_is_encrypted_http_503_f1
+       START [         ] (711/827) maos-registry::runtime_drift_test crypto_provider_drift_rejects_naming_field
+        PASS [   0.006s] (711/827) maos-registry::runtime_drift_test crypto_provider_drift_rejects_naming_field
+       START [         ] (712/827) maos-registry::runtime_drift_test honest_claim_with_matching_runtime_override_admits
+        PASS [   0.004s] (712/827) maos-registry::runtime_drift_test honest_claim_with_matching_runtime_override_admits
+       START [         ] (713/827) maos-registry::runtime_drift_test manifest_matching_envelope_still_admits
+        PASS [   0.004s] (713/827) maos-registry::runtime_drift_test manifest_matching_envelope_still_admits
+       START [         ] (714/827) maos-registry::runtime_drift_test provider_endpoint_drift_rejects_naming_field
+        PASS [   0.004s] (714/827) maos-registry::runtime_drift_test provider_endpoint_drift_rejects_naming_field
+       START [         ] (715/827) maos-registry::runtime_drift_test trust_tier_drift_rejects_naming_field
+        PASS [   0.004s] (715/827) maos-registry::runtime_drift_test trust_tier_drift_rejects_naming_field
+       START [         ] (716/827) maos-registry::search_lock_contention_test search_acquires_yanks_lock_once
+        PASS [   0.020s] (716/827) maos-registry::search_lock_contention_test search_acquires_yanks_lock_once
+       START [         ] (717/827) maos-registry::search_lock_contention_test yank_visibility_preserved_after_contention_fix
+        PASS [   0.018s] (717/827) maos-registry::search_lock_contention_test yank_visibility_preserved_after_contention_fix
+       START [         ] (718/827) maos-registry::uninstall_review_20_11 review_p5_index_recovery_error_is_returned_not_only_logged
+        PASS [   0.020s] (718/827) maos-registry::uninstall_review_20_11 review_p5_index_recovery_error_is_returned_not_only_logged
+       START [         ] (719/827) maos-registry::uninstall_review_20_11 review_p5_partial_generation_delete_restores_the_complete_preimage
+        PASS [   0.040s] (719/827) maos-registry::uninstall_review_20_11 review_p5_partial_generation_delete_restores_the_complete_preimage
+       START [         ] (720/827) maos-registry::vetting_attestation_gate artifact_swap_is_refused_ac6
+        PASS [   0.008s] (720/827) maos-registry::vetting_attestation_gate artifact_swap_is_refused_ac6
+       START [         ] (721/827) maos-registry::vetting_attestation_gate fkcs_off_surface_refusal_precedes_a_valid_attestation
+        PASS [   0.004s] (721/827) maos-registry::vetting_attestation_gate fkcs_off_surface_refusal_precedes_a_valid_attestation
+       START [         ] (722/827) maos-registry::vetting_attestation_gate leg1_round_trip_issue_promote_revoke
+        PASS [   0.006s] (722/827) maos-registry::vetting_attestation_gate leg1_round_trip_issue_promote_revoke
+       START [         ] (723/827) maos-registry::vetting_attestation_gate leg2_forged_signature_refused
+        PASS [   0.005s] (723/827) maos-registry::vetting_attestation_gate leg2_forged_signature_refused
+       START [         ] (724/827) maos-registry::vetting_attestation_gate leg3_expired_attestation_refused
+        PASS [   0.005s] (724/827) maos-registry::vetting_attestation_gate leg3_expired_attestation_refused
+       START [         ] (725/827) maos-registry::vetting_attestation_gate leg4_forged_vetter_key_refused
+        PASS [   0.005s] (725/827) maos-registry::vetting_attestation_gate leg4_forged_vetter_key_refused
+       START [         ] (726/827) maos-registry::vetting_attestation_gate leg5_upgrade_flap_control
+        PASS [   0.006s] (726/827) maos-registry::vetting_attestation_gate leg5_upgrade_flap_control
+       START [         ] (727/827) maos-registry::vetting_attestation_gate leg7_four_cause_distinguishability
+        PASS [   0.003s] (727/827) maos-registry::vetting_attestation_gate leg7_four_cause_distinguishability
+       START [         ] (728/827) maos-registry::vetting_attestation_gate publisher_swap_is_refused_ac6
+        PASS [   0.005s] (728/827) maos-registry::vetting_attestation_gate publisher_swap_is_refused_ac6
+       START [         ] (729/827) maos-registry::yank_auth_20_1b attestation_rejects_unscoped_digest_signature_review_f5
+        PASS [   0.010s] (729/827) maos-registry::yank_auth_20_1b attestation_rejects_unscoped_digest_signature_review_f5
+       START [         ] (730/827) maos-registry::yank_auth_20_1b blocked_registry_fetch_does_not_block_shutdown_or_boot
+        PASS [   3.005s] (730/827) maos-registry::yank_auth_20_1b blocked_registry_fetch_does_not_block_shutdown_or_boot
+       START [         ] (731/827) maos-registry::yank_auth_20_1b cursor_from_another_registry_is_replayed_from_zero_p2
+yank cursor obsolete or for another registry; replaying signed history
+        PASS [   0.017s] (731/827) maos-registry::yank_auth_20_1b cursor_from_another_registry_is_replayed_from_zero_p2
+       START [         ] (732/827) maos-registry::yank_auth_20_1b daemon_cursor_restart_does_not_replay_journalled_yanks_ac7
+maos-registry: listening on 127.0.0.1:42749
+        PASS [   0.255s] (732/827) maos-registry::yank_auth_20_1b daemon_cursor_restart_does_not_replay_journalled_yanks_ac7
+       START [         ] (733/827) maos-registry::yank_auth_20_1b every_registry_auth_test_holds_the_shared_environment_mutex_p15
+        PASS [   0.004s] (733/827) maos-registry::yank_auth_20_1b every_registry_auth_test_holds_the_shared_environment_mutex_p15
+       START [         ] (734/827) maos-registry::yank_auth_20_1b expired_signed_yank_request_cannot_mutate_registry_f4
+maos-registry: listening on 127.0.0.1:41109
+        PASS [   0.155s] (734/827) maos-registry::yank_auth_20_1b expired_signed_yank_request_cannot_mutate_registry_f4
+       START [         ] (735/827) maos-registry::yank_auth_20_1b first_publisher_pin_is_typed_and_survives_restart_ac10
+        PASS [   0.029s] (735/827) maos-registry::yank_auth_20_1b first_publisher_pin_is_typed_and_survives_restart_ac10
+       START [         ] (736/827) maos-registry::yank_auth_20_1b install_refuses_present_yank_with_unpinned_authority_f2
+maos-registry: listening on 127.0.0.1:44405
+        PASS [   0.255s] (736/827) maos-registry::yank_auth_20_1b install_refuses_present_yank_with_unpinned_authority_f2
+       START [         ] (737/827) maos-registry::yank_auth_20_1b installed_publisher_and_version_pins_survive_uninstall_d2
+maos-registry: listening on 127.0.0.1:33349
+maos-registry: listening on 127.0.0.1:45375
+maos-registry: listening on 127.0.0.1:38471
+maos-registry: listening on 127.0.0.1:39075
+        PASS [   1.008s] (737/827) maos-registry::yank_auth_20_1b installed_publisher_and_version_pins_survive_uninstall_d2
+       START [         ] (738/827) maos-registry::yank_auth_20_1b installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16
+maos-registry: listening on 127.0.0.1:40925
+        PASS [   1.008s] (738/827) maos-registry::yank_auth_20_1b installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16
+       START [         ] (739/827) maos-registry::yank_auth_20_1b keyring_event_rejects_unscoped_digest_signature_review_f5
+        PASS [   0.005s] (739/827) maos-registry::yank_auth_20_1b keyring_event_rejects_unscoped_digest_signature_review_f5
+       START [         ] (740/827) maos-registry::yank_auth_20_1b legacy_inactive_version_pins_are_migrated_before_uninstall_d2
+maos-registry: listening on 127.0.0.1:44759
+        PASS [   0.606s] (740/827) maos-registry::yank_auth_20_1b legacy_inactive_version_pins_are_migrated_before_uninstall_d2
+       START [         ] (741/827) maos-registry::yank_auth_20_1b local_reevaluation_failure_does_not_prevent_fetch_p1
+local vetting re-evaluation failed; still fetching yanks: registry transport error: one corrupt local promotion
+        PASS [   0.003s] (741/827) maos-registry::yank_auth_20_1b local_reevaluation_failure_does_not_prevent_fetch_p1
+       START [         ] (742/827) maos-registry::yank_auth_20_1b missing_home_never_selects_shared_temporary_cursor_p14
+        PASS [   0.003s] (742/827) maos-registry::yank_auth_20_1b missing_home_never_selects_shared_temporary_cursor_p14
+       START [         ] (743/827) maos-registry::yank_auth_20_1b only_explicit_operator_release_allows_repin_after_uninstall_d2
+maos-registry: listening on 127.0.0.1:42539
+maos-registry: listening on 127.0.0.1:32797
+        PASS [   0.656s] (743/827) maos-registry::yank_auth_20_1b only_explicit_operator_release_allows_repin_after_uninstall_d2
+       START [         ] (744/827) maos-registry::yank_auth_20_1b published_versions_are_immutable_and_identical_publish_is_idempotent_d3
+        PASS [   0.016s] (744/827) maos-registry::yank_auth_20_1b published_versions_are_immutable_and_identical_publish_is_idempotent_d3
+       START [         ] (745/827) maos-registry::yank_auth_20_1b publisher_and_enrolled_vetter_yanks_are_signed_labelled_and_restart_safe_ac7
+maos-registry: listening on 127.0.0.1:40033
+maos-registry: listening on 127.0.0.1:33185
+        PASS [   0.507s] (745/827) maos-registry::yank_auth_20_1b publisher_and_enrolled_vetter_yanks_are_signed_labelled_and_restart_safe_ac7
+       START [         ] (746/827) maos-registry::yank_auth_20_1b renewed_promotion_replaces_only_evidence_for_identical_package_d4
+maos-registry: listening on 127.0.0.1:35023
+        PASS [   0.406s] (746/827) maos-registry::yank_auth_20_1b renewed_promotion_replaces_only_evidence_for_identical_package_d4
+       START [         ] (747/827) maos-registry::yank_auth_20_1b signed_nonce_cannot_be_reused_for_another_withdrawal_f4
+maos-registry: listening on 127.0.0.1:38027
+        PASS [   0.256s] (747/827) maos-registry::yank_auth_20_1b signed_nonce_cannot_be_reused_for_another_withdrawal_f4
+       START [         ] (748/827) maos-registry::yank_auth_20_1b signed_revocation_lists_roundtrip_cbor_and_reject_wrong_byte_lengths
+        PASS [   0.004s] (748/827) maos-registry::yank_auth_20_1b signed_revocation_lists_roundtrip_cbor_and_reject_wrong_byte_lengths
+       START [         ] (749/827) maos-registry::yank_auth_20_1b signed_yank_cannot_be_replayed_to_another_registry_f4
+maos-registry: listening on 127.0.0.1:44045
+maos-registry: listening on 127.0.0.1:46579
+        PASS [   0.255s] (749/827) maos-registry::yank_auth_20_1b signed_yank_cannot_be_replayed_to_another_registry_f4
+       START [         ] (750/827) maos-registry::yank_auth_20_1b signed_yank_resigning_does_not_append_duplicate_rows_p13
+maos-registry: listening on 127.0.0.1:44555
+        PASS [   0.306s] (750/827) maos-registry::yank_auth_20_1b signed_yank_resigning_does_not_append_duplicate_rows_p13
+       START [         ] (751/827) maos-registry::yank_auth_20_1b signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13
+maos-registry: listening on 127.0.0.1:40803
+        PASS [   0.357s] (751/827) maos-registry::yank_auth_20_1b signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13
+       START [         ] (752/827) maos-registry::yank_auth_20_1b uninstall_waits_for_cross_process_mutation_lock_p8
+maos-registry: listening on 127.0.0.1:43603
+        PASS [   0.556s] (752/827) maos-registry::yank_auth_20_1b uninstall_waits_for_cross_process_mutation_lock_p8
+       START [         ] (753/827) maos-registry::yank_auth_20_1b unreadable_promotion_is_not_treated_as_absent_p17
+maos-registry: listening on 127.0.0.1:43305
+        PASS [   0.256s] (753/827) maos-registry::yank_auth_20_1b unreadable_promotion_is_not_treated_as_absent_p17
+       START [         ] (754/827) maos-registry::yank_auth_20_1b unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17
+maos-registry: listening on 127.0.0.1:38651
+        PASS [   0.405s] (754/827) maos-registry::yank_auth_20_1b unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17
+       START [         ] (755/827) maos-registry::yank_auth_20_1b unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2
+yank-rejected sequence=18446744073709551615: yank-sequence-anomaly: expected Some(1), got 18446744073709551615
+        PASS [   0.004s] (755/827) maos-registry::yank_auth_20_1b unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2
+       START [         ] (756/827) maos-registry::yank_auth_20_1b v2_role_nonce_audience_and_lifetime_vectors_reject_rebinding_f4_f5
+        PASS [   0.009s] (756/827) maos-registry::yank_auth_20_1b v2_role_nonce_audience_and_lifetime_vectors_reject_rebinding_f4_f5
+       START [         ] (757/827) maos-registry::yank_auth_20_1b verified_cursor_is_persisted_before_later_transient_failure_p2
+        PASS [   0.022s] (757/827) maos-registry::yank_auth_20_1b verified_cursor_is_persisted_before_later_transient_failure_p2
+       START [         ] (758/827) maos-registry::yank_auth_20_1b yank_authorization_allows_bounded_clock_skew_p10
+        PASS [   0.004s] (758/827) maos-registry::yank_auth_20_1b yank_authorization_allows_bounded_clock_skew_p10
+       START [         ] (759/827) maos-registry::yank_auth_20_1b zero_interval_cannot_silently_disable_local_vetting_p11
+        PASS [   0.003s] (759/827) maos-registry::yank_auth_20_1b zero_interval_cannot_silently_disable_local_vetting_p11
+       START [         ] (760/827) maos-registry::yank_cadence_20_1b signed_yank_crosses_real_server_at_30_second_floor_ac7
+        SLOW [> 30.000s] (───────) maos-registry::yank_cadence_20_1b signed_yank_crosses_real_server_at_30_second_floor_ac7
+        PASS [  30.120s] (760/827) maos-registry::yank_cadence_20_1b signed_yank_crosses_real_server_at_30_second_floor_ac7
+       START [         ] (761/827) maos-registry::yank_query_20_1b filtered_snapshot_keeps_its_authenticated_complete_head_f6
+        PASS [   0.033s] (761/827) maos-registry::yank_query_20_1b filtered_snapshot_keeps_its_authenticated_complete_head_f6
+       START [         ] (762/827) maos-registry::yank_query_20_1b large_delta_is_refused_instead_of_returning_an_incomplete_signed_head_f6
+        PASS [   0.033s] (762/827) maos-registry::yank_query_20_1b large_delta_is_refused_instead_of_returning_an_incomplete_signed_head_f6
+       START [         ] (763/827) maos-registry::yank_query_20_1b large_history_small_delta_uses_storage_lower_bound_f6
+        PASS [   0.032s] (763/827) maos-registry::yank_query_20_1b large_history_small_delta_uses_storage_lower_bound_f6
+       START [         ] (764/827) maos-shell::init_test init_creates_a_home_that_does_not_exist
+        PASS [   0.028s] (764/827) maos-shell::init_test init_creates_a_home_that_does_not_exist
+       START [         ] (765/827) maos-shell::init_test init_creates_config_and_dirs
+        PASS [   0.021s] (765/827) maos-shell::init_test init_creates_config_and_dirs
+       START [         ] (766/827) maos-shell::init_test init_does_not_rewrite_an_existing_control_json
+        PASS [   0.026s] (766/827) maos-shell::init_test init_does_not_rewrite_an_existing_control_json
+       START [         ] (767/827) maos-shell::init_test init_is_idempotent
+        PASS [   0.025s] (767/827) maos-shell::init_test init_is_idempotent
+       START [         ] (768/827) maos-shell::init_test init_mints_control_json_on_an_already_initialised_home
+        PASS [   0.036s] (768/827) maos-shell::init_test init_mints_control_json_on_an_already_initialised_home
+       START [         ] (769/827) maos-shell::init_test init_mints_control_json_with_custody
+        PASS [   0.018s] (769/827) maos-shell::init_test init_mints_control_json_with_custody
+       START [         ] (770/827) maos-shell::shell_halt_repl_16_2 a_failed_raise_is_an_error_line_and_the_shell_keeps_serving
+        PASS [   0.004s] (770/827) maos-shell::shell_halt_repl_16_2 a_failed_raise_is_an_error_line_and_the_shell_keeps_serving
+       START [         ] (771/827) maos-shell::shell_halt_repl_16_2 an_oversized_clarification_is_refused_before_it_reaches_the_host
+        PASS [   0.064s] (771/827) maos-shell::shell_halt_repl_16_2 an_oversized_clarification_is_refused_before_it_reaches_the_host
+       START [         ] (772/827) maos-shell::shell_halt_repl_16_2 at_directive_is_refused_while_a_halt_is_pending
+        PASS [   0.043s] (772/827) maos-shell::shell_halt_repl_16_2 at_directive_is_refused_while_a_halt_is_pending
+       START [         ] (773/827) maos-shell::shell_halt_repl_16_2 butler_pick_is_refused_typed_and_dispatches_nothing
+        PASS [   0.003s] (773/827) maos-shell::shell_halt_repl_16_2 butler_pick_is_refused_typed_and_dispatches_nothing
+       START [         ] (774/827) maos-shell::shell_halt_repl_16_2 context_arriving_late_is_waited_for_and_used
+        PASS [   0.423s] (774/827) maos-shell::shell_halt_repl_16_2 context_arriving_late_is_waited_for_and_used
+       START [         ] (775/827) maos-shell::shell_halt_repl_16_2 context_never_arriving_renders_not_delivered_and_never_proceeds
+        PASS [   5.017s] (775/827) maos-shell::shell_halt_repl_16_2 context_never_arriving_renders_not_delivered_and_never_proceeds
+       START [         ] (776/827) maos-shell::shell_halt_repl_16_2 door_path_resolution_renders_unprompted_within_ticks
+        PASS [   0.103s] (776/827) maos-shell::shell_halt_repl_16_2 door_path_resolution_renders_unprompted_within_ticks
+       START [         ] (777/827) maos-shell::shell_halt_repl_16_2 every_repl_line_flows_through_the_output_writer
+        PASS [   0.003s] (777/827) maos-shell::shell_halt_repl_16_2 every_repl_line_flows_through_the_output_writer
+       START [         ] (778/827) maos-shell::shell_halt_repl_16_2 halt_already_resolved_is_printed_and_the_winner_still_renders
+        PASS [   0.123s] (778/827) maos-shell::shell_halt_repl_16_2 halt_already_resolved_is_printed_and_the_winner_still_renders
+       START [         ] (779/827) maos-shell::shell_halt_repl_16_2 halt_line_prints_only_after_the_kernel_accepted_the_halt
+        PASS [   0.003s] (779/827) maos-shell::shell_halt_repl_16_2 halt_line_prints_only_after_the_kernel_accepted_the_halt
+       START [         ] (780/827) maos-shell::shell_halt_repl_16_2 late_clarification_names_the_halt_and_kind
+        PASS [   0.043s] (780/827) maos-shell::shell_halt_repl_16_2 late_clarification_names_the_halt_and_kind
+       START [         ] (781/827) maos-shell::shell_halt_repl_16_2 overridden_proceeds_without_context
+        PASS [   0.103s] (781/827) maos-shell::shell_halt_repl_16_2 overridden_proceeds_without_context
+       START [         ] (782/827) maos-shell::shell_halt_repl_16_2 terminated_renders_turn_abandoned_and_dispatches_nothing
+        PASS [   0.103s] (782/827) maos-shell::shell_halt_repl_16_2 terminated_renders_turn_abandoned_and_dispatches_nothing
+       START [         ] (783/827) maos-shell::shell_halt_repl_16_2 typed_clarification_resolves_then_the_spirit_proceeds_with_the_context
+        PASS [   0.124s] (783/827) maos-shell::shell_halt_repl_16_2 typed_clarification_resolves_then_the_spirit_proceeds_with_the_context
+       START [         ] (784/827) maos-shell::shell_test dispatch_directive_ambiguous_halt
+        PASS [   0.006s] (784/827) maos-shell::shell_test dispatch_directive_ambiguous_halt
+       START [         ] (785/827) maos-shell::shell_test dispatch_directive_well_specified_no_halt
+        PASS [   0.003s] (785/827) maos-shell::shell_test dispatch_directive_well_specified_no_halt
+       START [         ] (786/827) maos-shell::shell_test parse_at_line_tab_separator
+        PASS [   0.003s] (786/827) maos-shell::shell_test parse_at_line_tab_separator
+       START [         ] (787/827) maos-shell::shell_test shell_parse_at_line_variations
+        PASS [   0.003s] (787/827) maos-shell::shell_test shell_parse_at_line_variations
+       START [         ] (788/827) maos-spirit-cli publish::tests::parse_tier_accepts_public_vetted
+        PASS [   0.005s] (788/827) maos-spirit-cli publish::tests::parse_tier_accepts_public_vetted
+       START [         ] (789/827) maos-spirit-cli publish::tests::parse_tier_accepts_three_valid_tiers
+        PASS [   0.003s] (789/827) maos-spirit-cli publish::tests::parse_tier_accepts_three_valid_tiers
+       START [         ] (790/827) maos-spirit-cli publish::tests::parse_tier_rejects_unknown
+        PASS [   0.003s] (790/827) maos-spirit-cli publish::tests::parse_tier_rejects_unknown
+       START [         ] (791/827) maos-spirit-cli publish::tests::resolve_registry_uri_rejects_whitespace_only
+        PASS [   0.003s] (791/827) maos-spirit-cli publish::tests::resolve_registry_uri_rejects_whitespace_only
+       START [         ] (792/827) maos-spirit-cli publish::tests::resolve_registry_uri_trims_whitespace
+        PASS [   0.002s] (792/827) maos-spirit-cli publish::tests::resolve_registry_uri_trims_whitespace
+       START [         ] (793/827) maos-spirit-cli publish::tests::tier_to_cli_string_round_trips
+        PASS [   0.003s] (793/827) maos-spirit-cli publish::tests::tier_to_cli_string_round_trips
+       START [         ] (794/827) maos-spirit-cli signing::tests::base64_with_padding_decodes_correctly
+        PASS [   0.002s] (794/827) maos-spirit-cli signing::tests::base64_with_padding_decodes_correctly
+       START [         ] (795/827) maos-spirit-cli signing::tests::base64_without_padding_fails
+        PASS [   0.002s] (795/827) maos-spirit-cli signing::tests::base64_without_padding_fails
+       START [         ] (796/827) maos-spirit-cli signing::tests::derive_keypair_round_trips_signature
+        PASS [   0.003s] (796/827) maos-spirit-cli signing::tests::derive_keypair_round_trips_signature
+       START [         ] (797/827) maos-spirit-cli signing::tests::extract_spirit_id_and_version_parses_minimal_manifest
+        PASS [   0.003s] (797/827) maos-spirit-cli signing::tests::extract_spirit_id_and_version_parses_minimal_manifest
+       START [         ] (798/827) maos-spirit-cli signing::tests::extract_spirit_id_prefers_spirit_id_over_name
+        PASS [   0.003s] (798/827) maos-spirit-cli signing::tests::extract_spirit_id_prefers_spirit_id_over_name
+       START [         ] (799/827) maos-spirit-cli signing::tests::hex_seed_loads
+        PASS [   0.003s] (799/827) maos-spirit-cli signing::tests::hex_seed_loads
+       START [         ] (800/827) maos-spirit-cli signing::tests::hex_seed_with_prefix_and_whitespace_loads
+        PASS [   0.003s] (800/827) maos-spirit-cli signing::tests::hex_seed_with_prefix_and_whitespace_loads
+       START [         ] (801/827) maos-spirit-cli::publish_live_20_1 publish_multimegabyte_component_to_standalone_binary
+        PASS [   2.825s] (801/827) maos-spirit-cli::publish_live_20_1 publish_multimegabyte_component_to_standalone_binary
+       START [         ] (802/827) maos-spirit-cli::publish_live_20_1 publish_real_address_returns_receipt_and_manifest
+maos-registry: listening on 127.0.0.1:39505
+        PASS [   0.161s] (802/827) maos-spirit-cli::publish_live_20_1 publish_real_address_returns_receipt_and_manifest
+       START [         ] (803/827) maos-spirit-cli::publish_tier_validation_test accepts_public_vetted_via_parse_tier
+        PASS [   0.006s] (803/827) maos-spirit-cli::publish_tier_validation_test accepts_public_vetted_via_parse_tier
+       START [         ] (804/827) maos-spirit-cli::publish_tier_validation_test rejects_tier_mismatch_with_manifest
+        PASS [   0.004s] (804/827) maos-spirit-cli::publish_tier_validation_test rejects_tier_mismatch_with_manifest
+       START [         ] (805/827) maos-spirit-cli::publish_tier_validation_test rejects_unknown_tier_via_parse_tier
+        PASS [   0.002s] (805/827) maos-spirit-cli::publish_tier_validation_test rejects_unknown_tier_via_parse_tier
+       START [         ] (806/827) maos-spirit-cli::vet_lifecycle_20_1b publisher_and_vetter_yank_verbs_authenticate_ac7
+maos-registry: listening on 127.0.0.1:44871
+        PASS [   0.263s] (806/827) maos-spirit-cli::vet_lifecycle_20_1b publisher_and_vetter_yank_verbs_authenticate_ac7
+       START [         ] (807/827) maos-spirit-cli::vet_lifecycle_20_1b vet_issue_install_promote_revoke_refuses_next_admission_ac6
+maos-registry: listening on 127.0.0.1:44825
+        PASS [   0.406s] (807/827) maos-spirit-cli::vet_lifecycle_20_1b vet_issue_install_promote_revoke_refuses_next_admission_ac6
+       START [         ] (808/827) xtask::fkcs_oracle diff_oracle_derives_kernel_unchanged_and_ignores_self_reported_flags
+        PASS [   0.007s] (808/827) xtask::fkcs_oracle diff_oracle_derives_kernel_unchanged_and_ignores_self_reported_flags
+       START [         ] (809/827) xtask::fkcs_oracle diff_oracle_ignores_forged_self_report_even_when_it_claims_red
+        PASS [   0.003s] (809/827) xtask::fkcs_oracle diff_oracle_ignores_forged_self_report_even_when_it_claims_red
+       START [         ] (810/827) xtask::fkcs_oracle diff_oracle_reports_kernel_unchanged_for_identical_surfaces
+        PASS [   0.002s] (810/827) xtask::fkcs_oracle diff_oracle_reports_kernel_unchanged_for_identical_surfaces
+       START [         ] (811/827) xtask::fkcs_oracle disposition_inline_parser_extracts_phase_keys_and_rejects_malformed_stanzas
+        PASS [   0.003s] (811/827) xtask::fkcs_oracle disposition_inline_parser_extracts_phase_keys_and_rejects_malformed_stanzas
+       START [         ] (812/827) xtask::fkcs_oracle every_declared_admission_file_reds_a_one_byte_mutation
+        PASS [   0.010s] (812/827) xtask::fkcs_oracle every_declared_admission_file_reds_a_one_byte_mutation
+       START [         ] (813/827) xtask::fkcs_oracle frozen_baseline_files_carry_real_public_surfaces_not_synthetic_tokens
+        PASS [   0.004s] (813/827) xtask::fkcs_oracle frozen_baseline_files_carry_real_public_surfaces_not_synthetic_tokens
+       START [         ] (814/827) xtask::fkcs_oracle frozen_baseline_reconciles_live_triple_and_rejects_src_line_drift
+        PASS [   0.125s] (814/827) xtask::fkcs_oracle frozen_baseline_reconciles_live_triple_and_rejects_src_line_drift
+       START [         ] (815/827) xtask::fkcs_oracle frozen_snapshot_and_current_kernel_baselines_are_independently_valid
+        PASS [   0.139s] (815/827) xtask::fkcs_oracle frozen_snapshot_and_current_kernel_baselines_are_independently_valid
+       START [         ] (816/827) xtask::fkcs_oracle oracle_fault_injections_red_kernel_unchanged_around_a_stable_base
+        PASS [   0.003s] (816/827) xtask::fkcs_oracle oracle_fault_injections_red_kernel_unchanged_around_a_stable_base
+       START [         ] (817/827) xtask::fkcs_oracle phase_disposition_inherits_downward_and_resolves_the_blocking_window
+        PASS [   0.003s] (817/827) xtask::fkcs_oracle phase_disposition_inherits_downward_and_resolves_the_blocking_window
+       START [         ] (818/827) xtask::fkcs_oracle read_disposition_extracts_exactly_the_check_fkcs_stanza
+        PASS [   0.003s] (818/827) xtask::fkcs_oracle read_disposition_extracts_exactly_the_check_fkcs_stanza
+       START [         ] (819/827) xtask::registry_socket_security_20_1b accepted_registry_sockets_are_blocking_before_clone_p2
+        PASS [   0.021s] (819/827) xtask::registry_socket_security_20_1b accepted_registry_sockets_are_blocking_before_clone_p2
+       START [         ] (820/827) xtask::registry_socket_security_20_1b clone_failure_cannot_exit_the_registry_accept_loop_f3
+        PASS [   0.016s] (820/827) xtask::registry_socket_security_20_1b clone_failure_cannot_exit_the_registry_accept_loop_f3
+       START [         ] (821/827) xtask::registry_socket_security_20_1b daemon_registry_policy_has_one_fail_closed_reader_d1_p10
+        PASS [   0.191s] (821/827) xtask::registry_socket_security_20_1b daemon_registry_policy_has_one_fail_closed_reader_d1_p10
+       START [         ] (822/827) xtask::registry_socket_security_20_1b registry_accept_errors_have_backoff_f3
+        PASS [   0.015s] (822/827) xtask::registry_socket_security_20_1b registry_accept_errors_have_backoff_f3
+       START [         ] (823/827) xtask::registry_socket_security_20_1b registry_bodies_do_not_preallocate_declared_lengths_f2
+        PASS [   0.015s] (823/827) xtask::registry_socket_security_20_1b registry_bodies_do_not_preallocate_declared_lengths_f2
+       START [         ] (824/827) xtask::registry_socket_security_20_1b registry_poller_starts_after_shared_installed_boot_admission_f9
+        PASS [   0.192s] (824/827) xtask::registry_socket_security_20_1b registry_poller_starts_after_shared_installed_boot_admission_f9
+       START [         ] (825/827) xtask::registry_socket_security_20_1b registry_tls_features_are_explicit_not_transitive_defaults_d2
+        PASS [   0.011s] (825/827) xtask::registry_socket_security_20_1b registry_tls_features_are_explicit_not_transitive_defaults_d2
+       START [         ] (826/827) xtask::registry_workflow_security_20_1b executable_typescript_registry_example_has_both_development_optins_p1
+        PASS [   0.006s] (826/827) xtask::registry_workflow_security_20_1b executable_typescript_registry_example_has_both_development_optins_p1
+       START [         ] (827/827) xtask::registry_workflow_security_20_1b registry_workflows_explicitly_select_server_mode_and_client_development_optin
+        PASS [   0.052s] (827/827) xtask::registry_workflow_security_20_1b registry_workflows_explicitly_select_server_mode_and_client_development_optin
+────────────
+     Summary [ 101.271s] 827 tests run: 827 passed (1 slow), 5146 skipped

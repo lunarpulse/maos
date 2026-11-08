@@ -1,0 +1,161 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+   Compiling maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `ComplianceClaimEnvelope` and `SigningAlg`
+   --> crates/maos-registry/src/server.rs:827:39
+    |
+827 |     use maos_spirit_abi::compliance::{ComplianceClaimEnvelope, SigningAlg};
+    |                                       ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^
+
+warning: unused imports: `Read` and `Write`
+   --> crates/maos-registry/src/server.rs:828:19
+    |
+828 |     use std::io::{Read, Write};
+    |                   ^^^^  ^^^^^
+
+warning: unused import: `std::net::TcpStream`
+   --> crates/maos-registry/src/server.rs:829:9
+    |
+829 |     use std::net::TcpStream;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::time::Duration`
+   --> crates/maos-registry/src/server.rs:830:9
+    |
+830 |     use std::time::Duration;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `maos_compliance::builder::seeded_keypair`: TEST/CORPUS/SMOKE ONLY — never use in production admission
+   --> crates/maos-registry/src/compliance_verify.rs:129:24
+    |
+129 |         let (kp, pk) = seeded_keypair(0x150C_04A5);
+    |                        ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:195:27
+    |
+195 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `args`
+  --> crates/maos-registry/src/handlers/yanks_since.rs:10:5
+   |
+10 |     args: &YanksSinceArgs,
+   |     ^^^^ help: if this is intentional, prefix it with an underscore: `_args`
+
+warning: unused variable: `since_ns`
+    --> crates/maos-registry/src/storage.rs:1017:27
+     |
+1017 |     fn yanks_since(&self, since_ns: u64) -> Result<YankList, StorageError> {
+     |                           ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_since_ns`
+
+warning: unused variable: `head`
+    --> crates/maos-registry/src/storage.rs:1019:13
+     |
+1019 |         let head = yanks.last().map_or(0, |entry| entry.sequence);
+     |             ^^^^ help: if this is intentional, prefix it with an underscore: `_head`
+
+warning: function `temp_storage` is never used
+   --> crates/maos-registry/src/server.rs:844:8
+    |
+844 |     fn temp_storage() -> Arc<dyn RegistryStorage> {
+    |        ^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-registry` (lib test) generated 11 warnings (run `cargo fix --lib -p maos-registry --tests` to apply 9 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 58s
+     Running unittests src/lib.rs (target/debug/deps/maos_registry-d146bf9103543655)
+
+thread 'http::tests::drip_response_cannot_extend_exchange_deadline_f4' (853783) panicked at crates/maos-registry/src/http.rs:391:9:
+drip feed outlived the total deadline: 872.56522ms
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'http::tests::unsigned_http_refusal_preserves_status_p7' (853786) panicked at crates/maos-registry/src/http.rs:380:9:
+Err(Transport("registry response authentication: missing signed envelope/head"))
+
+thread 'security::review_tests::configured_ca_replaces_bundled_roots_d4' (853798) panicked at crates/maos-registry/src/security.rs:418:9:
+assertion `left == right` failed: a configured private CA must replace, not extend, bundled Mozilla roots
+  left: 119
+ right: 1
+
+thread 'security::review_tests::explicit_development_literal_loopback_matrix_p3' (853799) panicked at crates/maos-registry/src/security.rs:374:13:
+assertion `left == right` failed: 0.0.0.0
+  left: true
+ right: false
+
+thread 'security::review_tests::registry_hex_diagnostics_do_not_echo_input_p8' (853800) panicked at crates/maos-registry/src/security.rs:393:9:
+hex diagnostic leaked offending input: registry signing_pubkey hex: Invalid character '!' at position 0
+
+thread 'security::review_tests::registry_typo_is_refused_p11' (853801) panicked at crates/maos-registry/src/security.rs:383:9:
+unknown registry security keys must not silently disappear
+
+thread 'security::review_tests::registry_uri_matrix_and_trailing_dns_labels_p3_p9' (853802) panicked at crates/maos-registry/src/security.rs:362:13:
+non-canonical URI accepted: https://registry.example./mcp
+
+thread 'security::review_tests::signed_params_less_notification_verifies_p7' (853803) panicked at crates/maos-registry/src/security.rs:405:9:
+assertion failed: verify_response("https://registry.example/mcp", [7; 32], request, response,
+        Some(&header), &key).is_ok()
+
+thread 'yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5' (853814) panicked at crates/maos-registry/src/yank.rs:353:9:
+Ok(0)
+error: test failed, to rerun pass `-p maos-registry --lib`

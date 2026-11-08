@@ -7,7 +7,7 @@ context_commit: a4c00897
 baseline_commit: a4c00897
 security_sensitive: true
 kernel_grant: "L1 KERNEL-FREE, RULED Main 2026-11-06: AC8 quarantine effect joins final row R (AC11-AC13 KQ1+P); no KQ0 substitute. Rebase prior measured prototype +78 physical/+68 tokei onto ebf2ab03 and current unchanged26841/21042: forecast26919/21110; D02 A x2 ceilings26997/21178, below shared STOP21250 tokei. No prototype rerun or kernel change claimed in L1. Historical superseded grant: ◆ FLAG-Winston RULED 2026-11-01/02 (ask rows201, operator): row R = KQ1 sticky quarantine (D-20-1-02 A) + P poller edge-trigger (D-20-1-03 A), measured by reverted prototype +78 physical / +68 tokei from HEAD 26801 / 21011 (+40 / +40 of it is the rustfmt churn any `revocation/applier.rs` edit pays, control `fmt0`). Granted ceilings: kernel <= 26957 physical / 21147 tokei. This grant is computed from HEAD 26801 / 21011 and lands in THIS story only (20-1a is kernel-free). INTERACTION with 20-7 row R = K1w + K2r (+40 / +31 measured; ceiling 26881 / 21073, also computed from HEAD 26801 / 21011): if both land, the second to land MUST re-base; cumulative measured tokei +68 +31 => expected 21110; cumulative tokei ceilings MUST NOT exceed 21209 (= 791 under the ADR-069 22000 alarm); STOP otherwise. Room per ADR-069: docs/adr/ADR-069-kernel-core-envelope-through-v1.md:35-46."
-kloc_grant: "AC15 CARGO HANDOFF c656a6e7: orchestrator-adjudicated rebase, D02 A, disclosed to the operator; same granted increments2010/120/45/45 aggregate2220 on correction pins5071/6429/35626/939/196401. Ceilings registry7081/cli6549/bin35671/spirit-cli984/aggregate198621. Exact after cargo fmt --all and canonical kloc-check: registry5668/bin35589/cli6429/spirit-cli942/compliance2077/audit8179/domain10137/xtask44696; aggregate196964, strict hardfail196965; own delta563 = registry597 + spirit-cli3 - bin37. Kernel26841/21042 unchanged. Audit correction ceiling8204 and separate20-11 ceiling8261 unchanged; no renewed L1 capacity. | HISTORICAL L1 REVIEW CORRECTIONS (Main, 2026-11-07): existing L1 ceilings bin35837/registry5207/spirit-cli1895/compliance2122/domain10167/aggregate197774; additional P3 audit ceiling8204 =8174+30 under D02 A x3 forecast, separate20-11 ceiling8261 unchanged. Formatted correction pins bin35626/registry5071/spirit-cli939/compliance2077/audit8179/domain10137/xtask44696, aggregate196401 and strict hardfail196402; correction delta663, kernel0. Old AC15 absolute/auxiliary bounds below require Main re-base at the explicit handoff; not a source of L1 capacity. | HISTORICAL AC15 GRANT RECORD: RULED operator f5rows 2026-11-07: D-20-1b-01/02/03 A/A/A; AC15 second kernel-free pass AFTER L1 review/corrections and explicit Main CARGO HANDOFF AC15. Registry ceiling6637; aggregate ceiling197958. From last formatted L1 registry4627/aggregate195738, new unmeasured x3 allowances2010/2220; cli+40/bin+15/spirit-cli+15 forecasts x3 give auxiliary per-pass bounds6549/35467/981 from6429/35422/936. Remeasure intervening external drift under D02 A, do not renew unused L1 allowances. Compliance2122/domain10167/external xtask44920 unchanged. Rustls leaf/server dependency edge granted subject to cargo-deny permitted versions, existing-lock ring/aws-lc feature review, and no no-default-features leak. Operator-supplied cert/key paths; configured canonical-URI signing root; explicit both-end literal-loopback dev HTTP only; never HTTPS downgrade. RECORDS ONLY: exact pins remain registry4627/bin35422/cli6429/spirit-cli936/compliance2070/domain10137/xtask44696, aggregate195738/hardfail195739; kernel26841/21042 unchanged; no dependency/source/pin/status change or new verification. Historical L1 grant, superseded for AC15: L1 REBASE, operator f1b/Main 2026-11-06, D02 A x3 unmeasured kernel-free forecast: current external baseline bin35102, registry4412, spirit-cli755, compliance2032 measured (old reserved pin2117), domain10107, aggregate194954 including external20-2 xtask20. Forecast upper increments245/265/380/30/20; ceilings bin35837, registry5207, spirit-cli1895, compliance2122, domain10167, aggregate197774. Exact formatted L1 pins bin35422/registry4627/spirit-cli936/compliance2070/domain10137/xtask44696; aggregate195738, hardfail195739. xtask44676 -> 44696 is external20-2 hosted-3 d84b83dd, authorized ceiling44920, not own Rust growth. CLI6429 unchanged, existing6666 ceiling/reserved6856 pin unchanged. No kernel/audit/iac growth by L1; F5 prices remain PROPOSED D-20-1b-01/02/03 and are not granted. These are shared ceilings, not reservations; remeasure future competing draws. Historical superseded grant: RULED 2026-11-01/02 (ask rows201; D02 A; D-20-1-11 A). One-key ceilings (STOP above; aggregate hardfail = measured + 1 at landing): kernel <= 26957 / 21147 (row R, this story); maos-registry <= 5163; maos-spirit-cli <= 2043; maos-cli <= 6666 (above its 6382 STOP; inside the reserved 6856 pin because install logic lives in maos-registry, D-20-1-05 A); maos-bin <= 34410; maos-shell <= 728; maos-compliance <= 2122; maos-domain <= 10153; xtask <= 42920; aggregate <= 193768. Each ceiling is shared with 20-1a; the kernel row is 20-1b's alone."
+kloc_grant: "AC15 INDEPENDENT-REVIEW CORRECTIONS at9e8c7737, 2026-11-08: Main D-20-1b-09..13; existing ceilings registry7081/cli6549/bin35671/spirit-cli984/aggregate198621 retained; additional domain correction ceiling10155 = exact10137+18 authorized for D3/F5, no kernel draw. Exact after cargo fmt --all / canonical kloc-check: registry6151/bin35586/domain10144/cli6429/spirit-cli942/compliance2077/audit8179/xtask44696; aggregate197451, strict hardfail197452; delta487 = registry483 + domain7 - bin3. All within ruled ceilings; no renewed capacity or source-shrink claim for legacy CLI reserve. Operator D5 confirms exact6429 and forfeits427 from6856; preflight/tracker carry disposition. D4 replaces public roots with configured CA; otherwise bundled Mozilla, not platform. D2 registry edges isolated; frozen kernel/A2A TLS remains in whole no-default graph under Main honest-record fallback. Kernel26841/21042 and external20-2 xtask44696 d84b83dd unchanged. Audit8179/ceiling8204 and separate20-11 ceiling8261/remaining82 unchanged. | HISTORICAL AC15 IMPLEMENTATION: AC15 CARGO HANDOFF c656a6e7: orchestrator-adjudicated rebase, D02 A, disclosed to the operator; same granted increments2010/120/45/45 aggregate2220 on correction pins5071/6429/35626/939/196401. Ceilings registry7081/cli6549/bin35671/spirit-cli984/aggregate198621. Exact after cargo fmt --all and canonical kloc-check: registry5668/bin35589/cli6429/spirit-cli942/compliance2077/audit8179/domain10137/xtask44696; aggregate196964, strict hardfail196965; own delta563 = registry597 + spirit-cli3 - bin37. Kernel26841/21042 unchanged. Audit correction ceiling8204 and separate20-11 ceiling8261 unchanged; no renewed L1 capacity. | HISTORICAL L1 REVIEW CORRECTIONS (Main, 2026-11-07): existing L1 ceilings bin35837/registry5207/spirit-cli1895/compliance2122/domain10167/aggregate197774; additional P3 audit ceiling8204 =8174+30 under D02 A x3 forecast, separate20-11 ceiling8261 unchanged. Formatted correction pins bin35626/registry5071/spirit-cli939/compliance2077/audit8179/domain10137/xtask44696, aggregate196401 and strict hardfail196402; correction delta663, kernel0. Old AC15 absolute/auxiliary bounds below require Main re-base at the explicit handoff; not a source of L1 capacity. | HISTORICAL AC15 GRANT RECORD: RULED operator f5rows 2026-11-07: D-20-1b-01/02/03 A/A/A; AC15 second kernel-free pass AFTER L1 review/corrections and explicit Main CARGO HANDOFF AC15. Registry ceiling6637; aggregate ceiling197958. From last formatted L1 registry4627/aggregate195738, new unmeasured x3 allowances2010/2220; cli+40/bin+15/spirit-cli+15 forecasts x3 give auxiliary per-pass bounds6549/35467/981 from6429/35422/936. Remeasure intervening external drift under D02 A, do not renew unused L1 allowances. Compliance2122/domain10167/external xtask44920 unchanged. Rustls leaf/server dependency edge granted subject to cargo-deny permitted versions, existing-lock ring/aws-lc feature review, and no no-default-features leak. Operator-supplied cert/key paths; configured canonical-URI signing root; explicit both-end literal-loopback dev HTTP only; never HTTPS downgrade. RECORDS ONLY: exact pins remain registry4627/bin35422/cli6429/spirit-cli936/compliance2070/domain10137/xtask44696, aggregate195738/hardfail195739; kernel26841/21042 unchanged; no dependency/source/pin/status change or new verification. Historical L1 grant, superseded for AC15: L1 REBASE, operator f1b/Main 2026-11-06, D02 A x3 unmeasured kernel-free forecast: current external baseline bin35102, registry4412, spirit-cli755, compliance2032 measured (old reserved pin2117), domain10107, aggregate194954 including external20-2 xtask20. Forecast upper increments245/265/380/30/20; ceilings bin35837, registry5207, spirit-cli1895, compliance2122, domain10167, aggregate197774. Exact formatted L1 pins bin35422/registry4627/spirit-cli936/compliance2070/domain10137/xtask44696; aggregate195738, hardfail195739. xtask44676 -> 44696 is external20-2 hosted-3 d84b83dd, authorized ceiling44920, not own Rust growth. CLI6429 unchanged, existing6666 ceiling/reserved6856 pin unchanged. No kernel/audit/iac growth by L1; F5 prices remain PROPOSED D-20-1b-01/02/03 and are not granted. These are shared ceilings, not reservations; remeasure future competing draws. Historical superseded grant: RULED 2026-11-01/02 (ask rows201; D02 A; D-20-1-11 A). One-key ceilings (STOP above; aggregate hardfail = measured + 1 at landing): kernel <= 26957 / 21147 (row R, this story); maos-registry <= 5163; maos-spirit-cli <= 2043; maos-cli <= 6666 (above its 6382 STOP; inside the reserved 6856 pin because install logic lives in maos-registry, D-20-1-05 A); maos-bin <= 34410; maos-shell <= 728; maos-compliance <= 2122; maos-domain <= 10153; xtask <= 42920; aggregate <= 193768. Each ceiling is shared with 20-1a; the kernel row is 20-1b's alone."
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:57-71`): a kernel FLAG-Winston grant (D-20-1-02/03), signatures and supply-chain trust (AC6, AC7, AC10), cross-Spirit isolation (AC11). Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC6/AC7/AC10/AC11, Test Infrastructure on glm-5.3 (standing policy)."
 ---
 
@@ -95,7 +95,7 @@ kernel26841 physical /21042 tokei is unchanged.
 | ID | Choice and options | Recommendation, price and envelope consequence | Status |
 |---|---|---|---|
 | D-20-1b-01 | First-contact root: **A** explicit registry signing public key in operator config, bound to canonical registry URI, with registry-signed artifact/publisher metadata; **B** TOFU only after mandatory out-of-band fingerprint confirmation; **C** operator-distributed signed root bundle with expiry and rotation. A response-supplied key alone is never a root. | **A**: no interactive trust race, unattended installs are deterministic. A: registry +100…180, cli +0…10; ×3 allowance +540/+30. B: registry +150…260, cli +30…60; +780/+180. C: registry +220…380, domain +20…40; +1140/+120. All kernel 0. Existing tier-only signature is insufficient: it does not bind artifact or publisher. | RULED A — operator `f5rows`, 2026-11-07; `CARGO HANDOFF AC15` fulfilled atc656a6e7; implemented in second kernel-free pass |
-| D-20-1b-02 | Authenticated TLS/key custody: **A** rustls in the leaf HTTP transport and registry server; explicit certificate chain and private-key files supplied by path, platform/WebPKI trust with optional operator CA, hostname verification; **B** external TLS terminator with registry accessible only through a separately authenticated local upstream. | **A**: end-to-end refusal can be witnessed in owned binaries without assuming a correctly configured proxy. Registry +240…420, bin/cli +0…15 each; ×3 allowance +1260/+45/+45; dependency/lock/deny review required. B: registry +100…180 plus deployment/harness work; +540 allowance, but upstream authentication must be designed rather than treating loopback as authentication. Key files live outside the package/inventory store, operator-owned 0600; certificate chain may be 0644. No generated production key or trust material is silently installed. All kernel 0. | RULED A — operator `f5rows`, 2026-11-07; `CARGO HANDOFF AC15` fulfilled atc656a6e7; implemented in second kernel-free pass |
+| D-20-1b-02 | Authenticated TLS/key custody: **A** rustls in the leaf HTTP transport and registry server; explicit certificate chain and private-key files supplied by path, hostname validation and bundled Mozilla WebPKI without a configured CA; a configured CA replaces public roots (D-20-1b-12); **B** external TLS terminator with registry accessible only through a separately authenticated local upstream. | **A**: end-to-end refusal can be witnessed in owned binaries without assuming a correctly configured proxy. Registry +240…420, bin/cli +0…15 each; ×3 allowance +1260/+45/+45; dependency/lock/deny review required. B: registry +100…180 plus deployment/harness work; +540 allowance, but upstream authentication must be designed rather than treating loopback as authentication. Key files live outside the package/inventory store, operator-owned 0600; certificate chain may be 0644. No generated production key or trust material is silently installed. All kernel 0. | RULED A — operator `f5rows`, 2026-11-07; `CARGO HANDOFF AC15` fulfilled atc656a6e7; implemented in second kernel-free pass |
 | D-20-1b-03 | Loopback/development: **A** require explicit development-mode opt-in at both server and install; permit HTTP only for literal loopback addresses, keep mutation signatures and publisher pins; **B** TLS everywhere including loopback with operator-created test CA. Never downgrade HTTPS after failure. | **A**: retains executable local fixture workflows while preventing production URI downgrade. Registry +35…70, cli +5…15, spirit-cli +5…15; ×3 allowances +210/+45/+45. B: registry +10…25, CLI 0, more fixture certificate custody. A is an explicit exception, not authenticated transport evidence; F5 production hostile-registry/interception witnesses must use TLS and the configured root. All kernel 0. | RULED A — operator `f5rows`, 2026-11-07; `CARGO HANDOFF AC15` fulfilled atc656a6e7; implemented in second kernel-free pass |
 
 **Granted A/A/A AC15 envelope (`f5rows`, 2026-11-07):** registry6637 and
@@ -122,9 +122,24 @@ At the eventual handoff rebase only observed external drift per D02 A.
 
 The preceding `f5rows` stage was records-only. Main's `CARGO HANDOFF AC15` at
 `c656a6e7` now fulfils that hold, with the explicitly adjudicated rebase above.
-Current implementation, real hostile/TLS refusal controls and limits are in the
-AC15 Dev Agent Record and `landing-1/ac15/`; independent security review is not claimed.
+Implementation and refusal controls are in the AC15 Dev Agent Record and
+`landing-1/ac15/`. Main's independent AC15 review is saved under
+`landing-1/ac15/review/`; the subsequent correction pass is not its own re-review.
 
+
+### AC15 independent-review correction rulings — 2026-11-08
+
+Baseline `9e8c7737b0aaae730024ae66966c20106563141e`; Main holds HEAD/tree
+writes until this agent explicitly releases the freeze. Review identifiers D1–D5
+below belong to `landing-1/ac15/review/triage.md`, not the older L1 review.
+
+| ID | Ruled choice and correction boundary | Authority / price |
+|---|---|---|
+| D-20-1b-09 | Review D1 A: fail-closed daemon; CLI and daemon share one strict reader and banner. Reject unknown keys even without a URI. HTTPS env-URI overrides cannot change the TOML-bound pin. | RULED A by Main; existing registry7081/bin35671/aggregate198621 ceilings, no kernel draw. |
+| D-20-1b-10 | Review D2 A for registry edges: explicit forwarded TLS features, no default TLS through CLI/FKCS/shell. The overall no-default binary still has pre-existing frozen kernel/A2A TLS dependencies; withdraw the former “no rustls edge” claim rather than edit the frozen kernel. | Main explicitly permits honest-record fallback if total TLS removal is impossible. Manifest/test-only feature isolation; CLI code stays6429. A genuinely TLS-free whole graph needs a separately priced frozen-kernel/network-feature change, not a silent L1 edit. |
+| D-20-1b-11 | Review D3 A: authenticated head below requested/durable cursor is typed `HeadBehindCursor`, visible and unchanged; never silently reset to0. Signing-key-bound cursor generations remain deferred. | RULED A by Main; separately authorized domain ceiling10155 = exact10137 +18, disclosed review-correction draw, inside aggregate198621. No kernel code change. |
+| D-20-1b-12 | Review D4 A: configured CA replaces public roots; absent CA uses bundled Mozilla WebPKI, not platform roots. Ed25519 URI-bound envelope remains the metadata root. | Explicit operator ruling relayed by Main; existing registry envelope. Supersedes the earlier “platform/optional additive CA” wording. |
+| D-20-1b-13 | Review D5: confirm exact CLI6429 and explicitly forfeit427 of the former6856 reservation. The427 is neither source shrinkage nor a transferable/renewed story allowance. | Explicit operator confirmation relayed by Main; recorded in tracker and Epic20 preflight as well as this story. AC15 ceiling6549 is separate from that forfeited legacy reserve. |
 
 ## Acceptance Criteria
 
@@ -690,8 +705,10 @@ together; old-count tests are dynamically coupled, with no new hardcoded count.
 **Observed focused verification:** TLS26/26 (3.329s), actual TLS publication
 positive0, final default-port unit0; affected CLI48/48 +install9/9 and SpiritCLI13/13;
 registry security/server/auth binaries pass, including31 auth cases. Final
-no-default production check0 and verb table7/7; normal dependency tree has no
-rustls edge. `cargo deny check`0; affected clippy0 with zero new warning fingerprints
+no-default production check0 and verb table7/7. The earlier “normal dependency
+tree has no rustls edge” interpretation was **wrong**: the saved tree contains it.
+The AC15 review correction below isolates registry feature edges and discloses the
+remaining frozen kernel/A2A links. `cargo deny check`0; affected clippy0 with zero new warning fingerprints
 against the preceding final workspace evidence, plus final registry clippy0.
 No warning-free-workspace claim. The pre-pin measurement red is retained, not
 misrepresented as a gate pass.
@@ -792,6 +809,137 @@ deferred dispositions, AC15 evidence and the branch-only recipe; root-shutdown
 regression controls and the existing discipline profile-count guard. CLI source
 and kernel/FKCS declared admission files are intentionally unchanged.
 
+### AC15 independent-review corrections — baseline `9e8c7737` (2026-11-08)
+
+Dev201b / openai-codex/gpt-6.1-sol. This record supersedes the preceding
+AC15 implementation's correctness/coverage claims where the independent review
+found a gap; it does not rewrite its historical before/plant observations.
+Authoritative review: `landing-1/ac15/review/triage.md` and `security.md`.
+Current exact commands, exits, restored plants and acceptance-name:line table:
+`landing-1/ac15/review-corrections/{commands.json,witnesses.md}`.
+
+**Implemented P1–P12 / security corrections:** actual discipline/verification
+invocations and the executable TypeScript example explicitly opt in on both
+development endpoints. Accepted sockets are reset to blocking; per-connection
+clone failures no longer kill the listener and accept failures back off. Bounded
+global/per-source admission, TLS-aware refusal workers, a tighter initial
+handshake/first-byte bound and received-byte body growth replace eager allocation
+and unbounded idle occupancy. Metadata is64KiB, publication64MiB; parsed routing
+rechecks the upload hint. The discovered development overflow framing regression
+has its own real red/plant and a bounded100ms dev-only refusal/drain fix.
+HTTP uses a total30s deadline, bounded DNS workers and bounded response bodies;
+unsigned non-2xx remains a refusal status, while success still authenticates.
+
+One strict operator-config reader drives behavior and the banner, validates
+registry keys even without a URI and starts the poller only after installed boot
+admission. Standalone/cohort joins now precede supervisor stop and unload.
+Ownership-aware AST controls cover qualified/parenthesized/select drops and
+drains, helper/task moves, sibling scopes and exact named7-release/11-drain
+coverage. The declared-capability negative control requires one actual child
+test; it cannot green-pass a zero-test selector. Signed-valid malformed views
+exercise head/sequence/request/signature guards independently of body hashes.
+Configured CA replaces bundled roots; missing CA uses Mozilla, not platform
+roots. Key hex errors are sanitized, custody vectors include0440 and store
+placement, and interception witnesses now exercise the real CLI before persistence.
+Queries use their lower bound, preserve the snapshot head and refuse a delta
+over4096 rather than sign an incomplete successful response.
+
+**Rulings/limits:** D-20-1b-09..13 record D1..D5. Typed `HeadBehindCursor`
+does not mutate or reset the cursor; optional `YankList.head` consumes7 of Main's
+18-line domain correction grant. Registry-specific TLS feature leaks are removed,
+but frozen kernel/A2A rustls remains in the no-default graph under Main's explicit
+honest-record fallback; the preceding whole-graph TLS-free claim is withdrawn.
+CLI remains exactly6429 and forfeits427 of its legacy reserve. W1–W7 and remaining
+F6/F8/F10/F11 have explicit owned dispositions in deferred-work.md, not false
+completion claims. AC8 quarantine EFFECT and AC11–AC13 remain final KQ1 + P;
+no kernel source/manifest or declared FKCS admission file is edited here.
+The inherited `verify_attestation` input hunk/two claim fields at136c579d… remains
+an explicit re-review focus; this pass does not re-pin or assert semantic change.
+
+| Exact tokei pin | At9e8c7737 | Correction | Final | Ruled ceiling |
+|---|---:|---:|---:|---:|
+| maos-registry | 5668 | +483 | 6151 | 7081 |
+| maos-bin | 35589 | -3 | 35586 | 35671 |
+| maos-domain | 10137 | +7 | 10144 | 10155 |
+| maos-cli | 6429 | 0 | 6429 | 6549; legacy427 forfeited |
+| maos-spirit-cli | 942 | 0 | 942 | 984 |
+| Aggregate | 196964 | +487 | 197451 | 198621 |
+
+After fmt, coupled live story-arrow histories and strict hardfail197452 are
+re-pinned exactly; `correction-kloc-exact` exits0. Kernel remains26841 physical /
+21042 tokei,95 files/set hash unchanged. Audit8179 stays below correction8204;
+20-11's separate8261 ceiling has82 remaining, not the old87. Xtask44696 is unchanged
+in this pass, including external20-2 hosted-3 d84b83dd's20-line renderer draw.
+
+**Observed focused/affected checks:**827/827 focused cases pass, UUID
+`a796a2f7-be25-4368-a940-7c4105bd0c3e`,101.271s wall/101.261s testcase sum.
+All current plants were restored by copy-back+cmp+touch, each0. Actual no-default
+build0, verb contract7/7, cargo-deny0, affected default binaries0; fixture builder
+preceded a genuine default binary build and one reused metadata generation.
+Final affected all-target clippy0, no primary diagnostic intersects changed/new
+source spans and no new message fingerprint versus the recorded initial
+correction-state clippy; that comparison is not a fabricated clean-baseline run.
+Twelve final structural gates plus exact KLOC pass. The separate check-fkcs
+attempt reaches the agent's900s command deadline with empty captured output and
+no process exit result; it is not credited as a surface-gate pass. A real process
+scan afterwards finds no remaining cargo/rustc/rustdoc/xtask child.
+
+**One standalone workspace, not retried:**5836 run/5833 pass/3 fail, exit100,
+UUID`f6748ad2-1296-4b1c-a5ee-e387563850c1`,1144.817s testcase sum (<1440).
+Two20-11 verifier cases fail because the agent omitted the pinned cryptography
+environment from that run; this is preparation error, not product/timing-flake
+attribution. The1M pending oracle separately fails43.366s at its unchanged bound.
+Six30s binary-sum advisories have same-line rule10 owners20-7; no exception,
+timeout/assertion or per-binary budget is widened. Hash-locked verifier wheels
+are provisioned for the separately prescribed prepush; they do not retire the
+standalone red. Full same-run JUnit/summary/budget output are retained.
+
+**Hosted proof boundary:** the branch-only recipe resolves156 nonignored
+contracts and54 required markers from actual metadata, plus one separately
+enrolled ignored public-WebPKI exclusion control. It authors native Apple runtime,
+the actual signed T3 substrate, no-default/verb and actual epic20-exit jobs.
+All these hosted/native-capability legs remain unverified, not inferred from
+Linux source checks or locally returning T3 prerequisites. Main's reported
+42464850336 before-state is accepted without rerunning it to confirm failure.
+
+**Once-only prescribed prepush:** exit1 in3518.903s, split into bounded wait
+cells without stopping/restarting the command or writing tracked files while it
+ran. Its92 records are83 pass,7 explicit skips,1 red workspace leg and1 timing
+advisory; tracked-tree preservation passes. Fresh JUnit
+UUID`0e4b479b-e575-4500-8c98-3865f2ac3d5f` has5836 run/5835 pass and only the
+existing1M pending case fails45.523s. The two verifier cases pass with the
+hash-locked environment; the earlier standalone preparation errors remain
+recorded. Sum1136.340 stays below1440; four unchanged30s binary-sum advisories
+have same-line20-7 rule10 dispositions. No second prepush or per-binary widening.
+Root-shutdown15 cases sum1.504s, installed-dispatch2 sum4.440s, TLS40 sum5.832s,
+limits4 sum1.276s and real cadence30.141s (<39s exception). T3 body prerequisites
+still limit live-Worker proof despite green harness counts. The post-run budget
+command only analyzes the copied same-run JUnit, not another test execution.
+Exact command/report/JUnit/budget observations are retained in the correction
+evidence directory; only documentation/evidence notes change after this run.
+
+**Cleanup:** guarded `/proc`/fd/maps scan finds no visible compiler/xtask process;
+PID1/7 custody links are permission-denied and recorded, not asserted inspected.
+The script removes1529 old inactive `s-*` sessions, retaining11105 sessions,
+newest per crate-cache/feature, every descendant touched within2h and any open
+reference. It removes own `/tmp/201b-ac15-corrections`, including its verifier
+venv and restored-plant scratch; never deps/build/fingerprint or lockfiles.
+Observed build-filesystem available space increases13,830,430,720 bytes.
+Fully-unlinked inode allocation accounting is15,100,903,424 bytes; unique removed
+inode logical size17,967,899,575. The scratch filesystem's observed delta is
+-573,440 bytes, not claimed as freed. Reflink/shared activity attribution limits,
+exact candidates and the reproducible script are in
+`review-corrections/{cleanup.json,cleanup-plan.json,cleanup-script.py}`.
+Main-owned cleanup reports remain intact and unattributed.
+
+**Current handoff boundary:** production corrections and local scoped witnesses
+are complete, with no kernel landing or hosted pass claimed. The incomplete
+check-fkcs command result, stable-runner1M/budget occurrences and hosted/native
+legs remain explicitly open evidence limits, not green substitutes or waived
+assertions. The inherited admission hunk remains a re-review focus. Final owned
+paths/hashes and consolidated evidence are in `source-inventory.json` and
+`final-report.md` under this correction directory. No commit/push/status flip.
+
 ### File List
 
 Historical original-L1 inventories: initial42 paths in `landing-tracked-file-list.stdout`; final43 in `landing-tracked-file-list-final.stdout`. These are not the correction-pass inventory. Original grouped implementation inventory:
@@ -806,13 +954,22 @@ Historical original-L1 inventories: initial42 paths in `landing-tracked-file-lis
 - This story; `_bmad-output/implementation-artifacts/{deferred-work.md,sprint-status.yaml}`; the landing-1 evidence tree and branch-only `ci/ci-20-1b-verify.yml`.
 - The correction calibration additionally couples `xtask/tests/check_test_budget_proven_red.rs`'s two live total-budget assertions to1440; this is test-only, with no xtask production KLOC growth.
 
-No `crates/maos-kernel-core/`, `.github/` or `xtask/src/` file is in the owned diff. External xtask renderer changes are committed 20-2 drivers, not attributed to this file list.
+The preceding historical L1/AC15 implementation inventories exclude kernel, `.github/` and xtask production edits. The current AC15 independent-review correction **does** fix the actual `.github/workflows/discipline.yml` development invocations for P1; it installs no branch verification workflow on main. Kernel and `xtask/src/` remain untouched. External xtask renderer changes are committed20-2 drivers, not attributed here.
 
 Correction-pass targets additionally/again edited:
 - Registry Cargo/security, `src/{bin/server.rs,server.rs,handlers/deprecate.rs,install.rs,storage.rs,yank.rs,yank_auth.rs}` and `tests/{yank_auth_20_1b.rs,yank_cadence_20_1b.rs,fr59_yank_propagation_within_5min_test.rs}`.
 - Bin `src/{admission.rs,env_contract.rs,main.rs,operator_door.rs,yank_policy.rs}`; `tests/{yank_policy_20_1b.rs,installed_spirit_dispatch_20_1.rs,one_daemon_one_door_16_1.rs,erasure_inventory_20_11.rs}` and the `support/{shell_world_16_2.rs,worker_revoke_root.rs}` mocks.
 - `crates/maos-audit/src/lib.rs`; compliance `src/vetting/{mod.rs,attestation.rs,keyring.rs}`; `crates/maos-spirit-cli/src/yank.rs`; `crates/maos-cli/tests/spirit_install_20_1.rs`; shared `tests/harness/registry_trust_20_1b.rs`.
 - Coupled KLOC/FKCS/budget records, coverage matrix, ADR-056, this story/tracker/deferred ledger, historical plant-label corrections, branch-only recipe and `landing-1/review-corrections/` evidence. Neither declared FKCS admission file is edited by this pass.
+
+Current AC15 independent-review correction inventory (36 source/config/record paths;
+exact paths/hashes in `landing-1/ac15/review-corrections/source-inventory.json`):
+- Root/leaf manifests and Cargo.lock: bin, CLI, FKCS, shell; domain registry port.
+- Registry `src/{client.rs,http.rs,install.rs,security.rs,server.rs,storage.rs,yank.rs,handlers/yanks_since.rs}`, SECURITY.md and four changed/new registry integration files.
+- Bin main, root-shutdown integration, new registry-config/AST integration tests and `tests/support/yank_audit.rs`.
+- New xtask registry socket/workflow source-contract integration tests; shared registry harness.
+- Actual discipline workflow, old20-1a branch recipe and current20-1b branch recipe; TypeScript example README.
+- Coupled KLOC rows; story, tracker, deferred ledger and epic20 preflight rulings.
 
 ### Change Log
 
@@ -825,3 +982,4 @@ Correction-pass targets additionally/again edited:
   landing-1 review/corrections and explicit `CARGO HANDOFF AC15`; no cargo run.
 - 2026-11-07 (Main L1 correction handoff at62faff63): implemented P1-P18/security F1-F5 and ruled D1-D5, including durable/releasable pins, immutable publication, safe evidence renewal, explicit vetted-door package/deployed-byte checks, production principal identity/erasure, authenticated scoped withdrawals/cursors and prompt no-source boot/network cancellation. Recorded real before/plants and applicability limits; AC15 and final KQ1 remain unimplemented here.
 - 2026-11-08 (Dev201b, openai-codex/gpt-6.1-sol; Main AC15 handoff atc656a6e7): implemented ruled A/A/A URI-bound root/rustls/explicit dev mode and authenticated complete response heads; fixed hosted42418118608 cohort audit-owner regression with real no-T3 before/plant and AST/declared-capability controls. Exact aggregate196964/hardfail196965, kernel unchanged. One standalone workspace100 and one prepush1 are honestly recorded, not retried; independent/hosted review remains Main-owned. Cleanup and full acceptance/source/command evidence are under `landing-1/ac15/`.
+- 2026-11-08 (Dev201b; independent AC15 review baseline9e8c7737): implemented P1–P12 and scoped security corrections/D1–D5, recorded W dispositions and correction witnesses, forfeited legacy CLI reserve, and re-pinned registry6151/bin35586/domain10144/aggregate197451 (hardfail197452). Exact kernel hash unchanged; no KQ1 effect claimed. Current detailed verification/limitations are in the correction Dev Agent Record and review-corrections evidence; no status flip or commit.

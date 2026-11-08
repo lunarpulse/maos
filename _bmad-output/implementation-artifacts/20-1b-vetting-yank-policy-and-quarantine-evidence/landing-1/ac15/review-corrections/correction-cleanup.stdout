@@ -1,0 +1,22 @@
+{
+  "selected_session_count": 1529,
+  "retained_session_count": 11105,
+  "unique_removed_inode_logical_bytes": 17967899575,
+  "fully_unlinked_inode_allocated_bytes": 15100903424,
+  "retained_hardlinked_inode_count": 209115,
+  "filesystems": {
+    "66": {
+      "probe": "/mnt/build/cargo-maos/debug/incremental",
+      "available_before_bytes": 530841759744,
+      "available_after_bytes": 544672190464,
+      "observed_available_delta_bytes": 13830430720
+    },
+    "1048730": {
+      "probe": "/tmp/201b-ac15-corrections",
+      "available_before_bytes": 803194277888,
+      "available_after_bytes": 803193704448,
+      "observed_available_delta_bytes": -573440
+    }
+  },
+  "elapsed_seconds": 66.218
+}

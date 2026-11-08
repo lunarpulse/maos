@@ -1,0 +1,11 @@
+
+running 1 test
+test every_audit_sender_release_joins_the_yank_owner ... FAILED
+
+failures:
+
+failures:
+    every_audit_sender_release_joins_the_yank_owner
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.17s
+

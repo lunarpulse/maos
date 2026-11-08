@@ -3,9 +3,10 @@
 ## Deployment boundary
 
 Production uses **rustls TLS plus a separately configured Ed25519 registry root**.
-The leaf uses bundled WebPKI roots, optionally extended with an operator CA, and
-verifies the certificate hostname and validity. Neither a response-supplied key
-nor a valid certificate by itself authorizes registry metadata.
+Without `ca_certificate`, transport uses bundled Mozilla WebPKI roots, **not the
+platform trust store**. A configured CA **replaces** those roots; it is not
+additive. Hostname and validity checks remain mandatory. Neither a
+response-supplied key nor a valid certificate alone authorizes registry metadata.
 
 Provision the registry signing key out of band. The server reads its 32-byte hex
 seed from `--signing-key`; supply the certificate chain with `--tls-cert`, its
@@ -13,6 +14,12 @@ private key with `--tls-key`, and the canonical external HTTPS `/mcp` URI with
 `--uri`. Keep key files operator-owned, mode0600, outside packages and the registry
 store. Certificate/key and vetter authorization changes require a server restart.
 TLS permits a non-loopback bind; it does not introduce anonymous mutation access.
+The library `with_tls` entry point also checks private-key ownership/mode.
+Package-store exclusion is enforced by `RegistryServerArgs::build`; callers
+composing generic storage directly must enforce that deployment boundary.
+`with_server_signing_key` accepts already-provisioned bytes, not a file: its
+caller owns custody. One registry seed currently signs domain-separated response
+and tier-attestation preimages; those roles are not independent key rotations.
 
 Installers, producers and daemon pollers share `$HOME/.config/maos/operator.toml`:
 `[registry].uri` is the exact canonical registry URI, `signing_pubkey` is the
@@ -23,6 +30,11 @@ HTTPS without a configured root refuses before contact; there is no TOFU,
 response-key bootstrap, redirect following or HTTPS-to-HTTP fallback.
 Use absolute operator-controlled CA paths for consistent CLI/daemon working
 directories; a relative CA path is opened relative to the invoking process.
+CLI and daemon use one fail-closed reader, including when no URI is set: malformed
+TOML, unknown registry keys and invalid keys do not silently become a null client.
+An organization signing key implies the signature requirement in both enforcement
+and the daemon banner. An environment URI cannot move an HTTPS pin away from its
+exact TOML-configured URI.
 This is a forward installation guarantee, not retroactive authentication of
 earlier unsigned HTTP installs. Noncanonical legacy origins are not silently
 rewritten: use explicit operator uninstall/reinstall when migrating them, with
@@ -42,7 +54,23 @@ never turns plaintext HTTP into confidential transport.
 AC15 local witnesses use freshly rcgen-generated test CA/leaf keys, real TLS,
 wrong-root/URI refusal, wrong-host/expired/untrusted certificates, plaintext traps,
 and real CLI persistence oracles. The branch-only hosted recipe is authored but
-not executed; hosted interception and macOS compilation remain unverified.
+not executed; hosted interception, live public-CA exclusion, and native macOS
+runtime/compilation remain unverified.
+
+The blocking server admits at most eight request workers and two per source IP,
+plus two bounded TLS-aware refusal workers. Excess TLS refusal capacity closes
+the connection; it never sends plaintext to a TLS peer. Explicit development HTTP
+instead attempts a complete refusal/drain within one absolute 100ms inline budget.
+TLS/first-byte reads have a one-second absolute deadline; request reads/writes
+have separate five-second bounds.
+Metadata requests are capped at 64 KiB; publications at 64 MiB. Uploads larger
+than the metadata cap require `Mcp-Name: registry.publish` (SDK/legacy leaf callers
+supply it); the parsed operation is checked again, so a forged hint cannot widen
+another RPC's cap. Bodies grow only from received bytes. Client DNS, connect,
+TLS, writes and reads share one 30-second absolute exchange deadline. At most
+eight libc DNS workers may outlive their caller; they retain no daemon owners.
+Unsigned non-2xx responses remain refusals with their HTTP status, not trusted
+successes. Success responses still require their configured-root envelope.
 
 ## Authenticated mutations
 
@@ -110,12 +138,25 @@ Yanks retain signed publisher/vetter origins and a durable server-assigned seque
 The old `since_ns` wire field now means sequence; display wall time never drives the
 cursor. Schema-2 cursor files bind the exact registry URI, persist each verified
 row atomically with fsync, and reset on obsolete/corrupt/foreign-registry state.
-Gaps/overshoots trigger a journaled history resync, never trusted advancement.
+Sequence gaps within a non-rollback view request history resync, never trusted advancement.
 Permanent rejected rows are journaled; only a verified row advances the frontier.
 Unknown uninstalled publishers never acknowledge a cursor. Signed response envelopes
 bind a fresh256-bit request nonce, exact request/response SHA-256, canonical URI and
 complete durable yank head from one snapshot. Incremental lists must reach that
 head contiguously from the requested cursor; no unsigned head advances trust.
+An authenticated head behind the requested/durable cursor is typed
+`HeadBehindCursor`, visible on stderr, and leaves the cursor unchanged; it never
+silently restarts at zero. Stop the daemon and verify the restored registry's
+identity/history out of band before recovery. Restore an appropriate previously
+verified cursor checkpoint, or explicitly archive `MAOS_REGISTRY_YANK_CURSOR_PATH`
+(default `$HOME/.local/share/maos/registry/yank_cursor.json`) to authorize a full
+rescan. Do not synthesize a cursor at the current head to skip withdrawals.
+Cursor files are URI-bound, not signing-key-bound or authenticated at rest.
+The storage query lower-bounds the requested sequence in one durable snapshot.
+More than 4096 returned rows is an explicit error, never a truncated signed
+success. Complete backfill beyond that cap needs a verified checkpoint or a
+paged authenticated-range protocol; automatic pagination is not supplied.
+Journal deserialization still reads the complete atomic JSON file per query.
 This prevents network replay/omission, not a configured signing authority lying,
 its signing-key compromise, or a fresh client's detection of an authority-signed
 rollback. Neither an unset HOME nor an empty explicit cursor path selects `/tmp`.
@@ -123,9 +164,11 @@ rollback. Neither an unset HOME nor an empty explicit cursor path selects `/tmp`
 Running-promotion reevaluation has an independent local timer even without a
 registry source, including installs appearing after boot. The remote poller is
 not started for a null source; cancellation does not await synchronous network I/O.
+Shared fallible installed-boot admission completes before starting that owner.
 The cadence defaults to 300 seconds and clamps to 30..300; zero is refused rather
 than silently disabling expiry. Shell/worker/oneshot drains join timer/poller
-owners before the audit writer, so no poller retains the audit channel at drain.
+owners before supervisor stop, unload and audit drain. A portable AST guard checks
+all seven release sites and eleven named drain arms, including the shared macro.
 
 `MAOS_YANK_POLICY=warn` (default) records the event. `quarantine` records a typed
 `quarantine-requested` outcome; **L1 does not claim its isolation effect**. The final

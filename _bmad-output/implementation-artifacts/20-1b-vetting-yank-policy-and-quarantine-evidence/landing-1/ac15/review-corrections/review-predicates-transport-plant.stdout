@@ -1,0 +1,42 @@
+
+running 17 tests
+test tls::bad_signature_byte_is_refused_p3 ... FAILED
+test tls::incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1 ... FAILED
+test tls::malformed_private_seed_diagnostic_never_echoes_key_bytes_p8 ... FAILED
+test tls::private_ca_replaces_public_webpki_for_real_public_peer_d4_f7 ... ignored, 20-1b hosted-only public WebPKI route; explicitly enrolled in the verification branch
+test tls::private_key_custody_refuses_group_or_world_access_ac15 ... FAILED
+test tls::private_key_custody_refuses_seed_inside_package_store_ac15 ... FAILED
+test tls::private_seed_custody_refuses_0644_and_0440_p12 ... FAILED
+test tls::private_tls_key_inside_package_store_is_refused_p12 ... FAILED
+test tls::signed_head_behind_requested_cursor_is_typed_d3_p5 ... FAILED
+test tls::signed_payload_head_must_equal_envelope_head_p3 ... FAILED
+test tls::signed_valid_duplicate_body_is_refused_p3 ... FAILED
+test tls::signed_valid_empty_view_with_nonzero_head_is_refused_p3 ... FAILED
+test tls::signed_valid_extra_entries_are_refused_p3 ... FAILED
+test tls::signed_valid_gap_body_is_refused_p3 ... FAILED
+test tls::signed_wrong_envelope_version_is_refused_p3 ... FAILED
+test tls::signed_wrong_request_hash_is_refused_p3 ... FAILED
+test tls::tls_admission_refusal_is_encrypted_http_503_f1 ... FAILED
+
+failures:
+
+failures:
+    tls::bad_signature_byte_is_refused_p3
+    tls::incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1
+    tls::malformed_private_seed_diagnostic_never_echoes_key_bytes_p8
+    tls::private_key_custody_refuses_group_or_world_access_ac15
+    tls::private_key_custody_refuses_seed_inside_package_store_ac15
+    tls::private_seed_custody_refuses_0644_and_0440_p12
+    tls::private_tls_key_inside_package_store_is_refused_p12
+    tls::signed_head_behind_requested_cursor_is_typed_d3_p5
+    tls::signed_payload_head_must_equal_envelope_head_p3
+    tls::signed_valid_duplicate_body_is_refused_p3
+    tls::signed_valid_empty_view_with_nonzero_head_is_refused_p3
+    tls::signed_valid_extra_entries_are_refused_p3
+    tls::signed_valid_gap_body_is_refused_p3
+    tls::signed_wrong_envelope_version_is_refused_p3
+    tls::signed_wrong_request_hash_is_refused_p3
+    tls::tls_admission_refusal_is_encrypted_http_503_f1
+
+test result: FAILED. 0 passed; 16 failed; 1 ignored; 0 measured; 24 filtered out; finished in 3.24s
+

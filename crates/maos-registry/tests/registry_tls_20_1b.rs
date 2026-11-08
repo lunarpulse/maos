@@ -46,6 +46,7 @@ mod tls {
     use std::io::{Read, Write};
     use std::path::PathBuf;
     use std::sync::atomic::Ordering;
+    use std::time::Duration;
 
     const REGISTRY: [u8; 32] = [0x91; 32];
     struct Certificates {
@@ -154,6 +155,79 @@ mod tls {
             args.build().is_err(),
             "private signing seed inside the package store was accepted"
         );
+    }
+    #[test]
+    #[cfg(unix)]
+    fn private_seed_custody_refuses_0644_and_0440_p12() {
+        use std::os::unix::fs::PermissionsExt;
+        for mode in [0o644, 0o440] {
+            let root = tempfile::tempdir().unwrap();
+            let seed = root.path().join("registry.seed");
+            std::fs::write(&seed, hex::encode(REGISTRY)).unwrap();
+            std::fs::set_permissions(&seed, std::fs::Permissions::from_mode(mode)).unwrap();
+            let error = maos_registry::server::RegistryServerArgs {
+                root: Some(root.path().join("packages")),
+                signing_key: Some(seed),
+                development_http: true,
+                ..Default::default()
+            }
+            .build()
+            .err()
+            .expect("seed mode must be refused");
+            assert!(error.contains("0600"), "{error}");
+        }
+    }
+    #[test]
+    fn private_tls_key_inside_package_store_is_refused_p12() {
+        let certs = Certificates::new("localhost", false);
+        let root = tempfile::tempdir().unwrap();
+        let packages = root.path().join("packages");
+        std::fs::create_dir(&packages).unwrap();
+        let key = packages.join("registry.key");
+        std::fs::copy(&certs.key, &key).unwrap();
+        let seed = root.path().join("registry.seed");
+        std::fs::write(&seed, hex::encode(REGISTRY)).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            for path in [&key, &seed] {
+                std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            }
+        }
+        let error = maos_registry::server::RegistryServerArgs {
+            root: Some(packages),
+            signing_key: Some(seed),
+            tls_certificate: Some(certs.cert),
+            tls_private_key: Some(key),
+            uri: Some("https://localhost/mcp".into()),
+            ..Default::default()
+        }
+        .build()
+        .err()
+        .expect("TLS key must stay outside served storage");
+        assert!(error.contains("outside"), "{error}");
+    }
+    #[test]
+    fn malformed_private_seed_diagnostic_never_echoes_key_bytes_p8() {
+        let root = tempfile::tempdir().unwrap();
+        let seed = root.path().join("registry.seed");
+        std::fs::write(&seed, "@").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&seed, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        let error = maos_registry::server::RegistryServerArgs {
+            root: Some(root.path().join("packages")),
+            signing_key: Some(seed),
+            development_http: true,
+            ..Default::default()
+        }
+        .build()
+        .err()
+        .expect("malformed private seed");
+        assert_eq!(error, "invalid signing key hex");
+        assert!(!error.contains('@'));
     }
     struct Server {
         uri: String,
@@ -299,6 +373,16 @@ mod tls {
                 .unwrap();
         let error = client.yanks_since(0).unwrap_err().to_string();
         assert!(error.contains("certificate"), "{error}");
+        let (home, output) = cli_install(
+            &server.uri,
+            &server.uri,
+            trust::public(&REGISTRY),
+            &certs.ca,
+            false,
+        );
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("certificate"));
+        assert_not_persisted(home.path());
     }
     #[test]
     fn interception_expired_certificate_is_refused_ac15() {
@@ -309,6 +393,16 @@ mod tls {
                 .unwrap();
         let error = client.yanks_since(0).unwrap_err().to_string();
         assert!(error.contains("certificate"), "{error}");
+        let (home, output) = cli_install(
+            &server.uri,
+            &server.uri,
+            trust::public(&REGISTRY),
+            &certs.ca,
+            false,
+        );
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("certificate"));
+        assert_not_persisted(home.path());
     }
     #[test]
     fn interception_untrusted_ca_is_refused_ac15() {
@@ -320,6 +414,16 @@ mod tls {
                 .unwrap();
         let error = client.yanks_since(0).unwrap_err().to_string();
         assert!(error.contains("certificate"), "{error}");
+        let (home, output) = cli_install(
+            &server.uri,
+            &server.uri,
+            trust::public(&REGISTRY),
+            &certs.ca,
+            false,
+        );
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("certificate"));
+        assert_not_persisted(home.path());
     }
 
     fn cli_install(
@@ -438,6 +542,15 @@ mod tls {
         InstallStrip,
         InstallMissingEnvelope,
         InstallMissingHead,
+        SignedGap,
+        SignedDuplicate,
+        SignedExtra,
+        SignedEmpty,
+        PayloadHeadMismatch,
+        CursorAhead,
+        WrongRequestHash,
+        WrongVersion,
+        BadSignature,
     }
     struct Responder {
         uri: String,
@@ -613,9 +726,43 @@ mod tls {
                             body["result"]["entries"] = serde_json::json!([]);
                             sent = fixture_bytes(&body);
                         }
+                        Attack::SignedGap
+                        | Attack::SignedDuplicate
+                        | Attack::SignedExtra
+                        | Attack::SignedEmpty
+                        | Attack::PayloadHeadMismatch
+                        | Attack::CursorAhead => {
+                            let (sequences, claimed, payload): (&[u64], u64, u64) = match attack {
+                                Attack::SignedGap => (&[2], 1, 1),
+                                Attack::SignedDuplicate => (&[1, 1], 2, 2),
+                                Attack::SignedExtra => (&[1, 2], 1, 1),
+                                Attack::SignedEmpty => (&[], 1, 1),
+                                Attack::PayloadHeadMismatch => (&[], 0, 1),
+                                Attack::CursorAhead => (&[], 2, 2),
+                                _ => unreachable!(),
+                            };
+                            let entries: Vec<_> = sequences
+                                .iter()
+                                .map(|sequence| {
+                                    let mut entry = maos_domain::ports::registry::YankEntry::new(
+                                        "tls-widget".into(),
+                                        "1.0.0".into(),
+                                        0,
+                                        "test withdrawal".into(),
+                                    );
+                                    entry.sequence = *sequence;
+                                    entry
+                                })
+                                .collect();
+                            body["result"] = serde_json::json!({"entries":entries,"head":payload});
+                            sent = fixture_bytes(&body);
+                            signed = sent.clone();
+                            head = Some(claimed);
+                        }
                         _ => {}
                     }
-                    let envelope = response_envelope(claimed_uri, nonce, &request, &signed, head);
+                    let envelope =
+                        response_envelope(claimed_uri, nonce, &request, &signed, head, attack);
                     let status = if matches!(attack, Attack::Redirect) {
                         "302 Found"
                     } else {
@@ -682,6 +829,7 @@ mod tls {
         request: &[u8],
         response: &[u8],
         yank_head: Option<u64>,
+        attack: Attack,
     ) -> String {
         use sha2::{Digest, Sha256};
         #[derive(serde::Serialize)]
@@ -698,7 +846,7 @@ mod tls {
             claim: Claim<'a>,
             signature: Vec<u8>,
         }
-        let claim = Claim {
+        let mut claim = Claim {
             version: 1,
             uri,
             nonce,
@@ -706,6 +854,12 @@ mod tls {
             response_sha256: Sha256::digest(response).into(),
             yank_head,
         };
+        if matches!(attack, Attack::WrongRequestHash) {
+            claim.request_sha256[0] ^= 1;
+        }
+        if matches!(attack, Attack::WrongVersion) {
+            claim.version = 2;
+        }
         let encoded = match serde_cbor::to_vec(&claim) {
             Ok(value) => value,
             Err(e) => panic!("{e}"),
@@ -714,7 +868,10 @@ mod tls {
         hash.update(b"maos.registry.response.v1\0");
         hash.update(encoded);
         let key = ring::signature::Ed25519KeyPair::from_seed_unchecked(&REGISTRY).unwrap();
-        let signature = key.sign(&hash.finalize()).as_ref().to_vec();
+        let mut signature = key.sign(&hash.finalize()).as_ref().to_vec();
+        if matches!(attack, Attack::BadSignature) {
+            signature[0] ^= 1;
+        }
         match serde_cbor::to_vec(&Envelope { claim, signature }) {
             Ok(value) => hex::encode(value),
             Err(e) => panic!("{e}"),
@@ -738,6 +895,59 @@ mod tls {
                 assert!(result.unwrap_err().to_string().contains("authentication"));
             }
         }
+    }
+    #[test]
+    fn signed_valid_gap_body_is_refused_p3() {
+        check_attack(Attack::SignedGap);
+    }
+    #[test]
+    fn signed_valid_duplicate_body_is_refused_p3() {
+        check_attack(Attack::SignedDuplicate);
+    }
+    #[test]
+    fn signed_valid_extra_entries_are_refused_p3() {
+        check_attack(Attack::SignedExtra);
+    }
+    #[test]
+    fn signed_valid_empty_view_with_nonzero_head_is_refused_p3() {
+        check_attack(Attack::SignedEmpty);
+    }
+    #[test]
+    fn signed_payload_head_must_equal_envelope_head_p3() {
+        check_attack(Attack::PayloadHeadMismatch);
+    }
+    #[test]
+    fn signed_wrong_request_hash_is_refused_p3() {
+        check_attack(Attack::WrongRequestHash);
+    }
+    #[test]
+    fn signed_wrong_envelope_version_is_refused_p3() {
+        check_attack(Attack::WrongVersion);
+    }
+    #[test]
+    fn bad_signature_byte_is_refused_p3() {
+        check_attack(Attack::BadSignature);
+    }
+    #[test]
+    fn signed_head_behind_requested_cursor_is_typed_d3_p5() {
+        let certs = Certificates::new("localhost", false);
+        let peer = Responder::start(&certs, Attack::CursorAhead, None);
+        let client =
+            McpSpiritRegistryClient::http(peer.uri.clone(), certs.client_config(&peer.uri))
+                .unwrap();
+        let result = client.yanks_since(5);
+        assert!(
+            matches!(
+                result,
+                Err(
+                    maos_domain::ports::registry::RegistryError::HeadBehindCursor {
+                        head: 2,
+                        cursor: 5
+                    }
+                )
+            ),
+            "{result:?}"
+        );
     }
     #[test]
     fn envelope_missing_signature_is_refused_ac15() {
@@ -919,6 +1129,68 @@ mod tls {
             listener.accept().unwrap_err().kind(),
             std::io::ErrorKind::WouldBlock,
             "TLS failure triggered a second/plaintext connection"
+        );
+    }
+    #[test]
+    fn tls_admission_refusal_is_encrypted_http_503_f1() {
+        let certs = Certificates::new("localhost", false);
+        let server = Server::start(&certs, REGISTRY);
+        let client =
+            McpSpiritRegistryClient::http(server.uri.clone(), certs.client_config(&server.uri))
+                .unwrap();
+        let port = url::Url::parse(&server.uri).unwrap().port().unwrap();
+        let _first = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+        let _second = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+        let error = client.yanks_since(0).unwrap_err().to_string();
+        assert!(
+            error.contains("503"),
+            "TLS refusal lost its HTTP status: {error}"
+        );
+    }
+    #[test]
+    fn incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1() {
+        let certs = Certificates::new("localhost", false);
+        let server = Server::start(&certs, REGISTRY);
+        let port = url::Url::parse(&server.uri).unwrap().port().unwrap();
+        let mut idle = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+        idle.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        let read = idle.read(&mut [0u8; 1]);
+        assert!(
+            matches!(read, Ok(0)),
+            "unfinished handshake was retained or answered as plaintext: {read:?}"
+        );
+    }
+    #[test]
+    #[ignore = "20-1b hosted-only public WebPKI route; explicitly enrolled in the verification branch"]
+    fn private_ca_replaces_public_webpki_for_real_public_peer_d4_f7() {
+        use maos_domain::ports::io_subsystem::IoSubsystemPort;
+        let certs = Certificates::new("localhost", false);
+        let uri = "https://github.com/mcp";
+        let mut security = certs.client_config(uri).security;
+        security.ca_certificate = None;
+        let request =
+            br#"{"jsonrpc":"2.0","id":1,"method":"registry.yanks_since","params":{"since_ns":0}}"#;
+        let control = maos_registry::http::RegistryHttp::new(uri, security.clone())
+            .unwrap()
+            .http_post_exchange(uri, request, &[("Content-Type", "application/json")], "");
+        if let Err(error) = control {
+            let message = error.to_string();
+            assert!(
+                message.contains("HTTP")
+                    || message.contains("Content-Length")
+                    || message.contains("registry response authentication"),
+                "public-WebPKI control did not reach HTTP: {message}"
+            );
+        }
+        security.ca_certificate = Some(certs.ca);
+        let error = maos_registry::http::RegistryHttp::new(uri, security)
+            .unwrap()
+            .http_post_exchange(uri, request, &[("Content-Type", "application/json")], "")
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("UnknownIssuer"),
+            "configured private CA did not exclude public roots: {error}"
         );
     }
 }

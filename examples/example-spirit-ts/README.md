@@ -28,10 +28,15 @@ that JavaScript into `dist/spirit.wasm`; the component imports no
 
 The checked-in tier is `public-untrusted` (`--tier=public_untrusted` on the author
 CLI). Start a development registry with
-`maos-registry-server --bind 127.0.0.1:6789 --root <throwaway-directory>`, then,
-from this example directory:
+`maos-registry-server --dev-http --bind 127.0.0.1:6789 --root <throwaway-directory>`.
+From this example directory, use a disposable client home rather than weakening
+your production operator configuration:
 
 ```bash
+export HOME="$(mktemp -d)"
+export XDG_DATA_HOME="$HOME/.local/share" XDG_CONFIG_HOME="$HOME/.config"
+mkdir -p "$XDG_CONFIG_HOME/maos"
+printf '[registry]\ndevelopment_http = true\n' > "$XDG_CONFIG_HOME/maos/operator.toml"
 maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted \
   --manifest manifest.toml --artifact dist/spirit.wasm --signing-key <publisher-key-file>
 maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
@@ -58,15 +63,20 @@ signed bytes. A modified install gets a typed `admission_refused` outcome.
 `hello-spirit` and `butler` are reserved shell names and cannot be installed.
 
 The development HTTP endpoint accepts only JSON `POST /mcp` requests with a
-loopback Host and, when present, a loopback Origin. It bounds headers to 16 KiB /
-64 fields, active connections to eight, and request I/O to an absolute five
-seconds; shutdown cancels active sockets before draining workers. These browser
-and resource guards are not mutation authentication.
+loopback Host and, when present, a matching Origin. It bounds headers to 16 KiB /
+64 fields, request workers to eight/two per source, TLS/first-byte reads to one
+second and request reads/writes to separate five-second absolute bounds.
+Metadata bodies are capped at 64 KiB and publications at 64 MiB; the SDK supplies
+the publication routing hint. Shutdown cancels active sockets before joining
+workers. Browser/resource guards are not mutation authentication.
 
-This registry is loopback-only development infrastructure. Mutation authentication,
-publisher-name pinning and signed yanks remain owned by story 20-1b; do not expose
-it through a public listener or proxy. This proves the mechanism, not independent
-third-party authorship or an accredited vetter ecosystem.
+This **recipe** is loopback-only development, not authenticated/confidential
+first contact. The production registry supports configured URI-bound signing
+roots and TLS; see [registry security](../../crates/maos-registry/SECURITY.md).
+Mutation signatures, publisher-name pins and signed yanks still apply in dev
+mode. No independent third-party authorship or accredited-vetter ecosystem is
+claimed. Keep the disposable home for the launch steps below, then remove it
+after stopping your development processes.
 
 
 ## Governed launch

@@ -1,0 +1,21 @@
+{
+  "completed_passes": 12,
+  "exact_kloc_exit": 0,
+  "results": {
+    "check-kernel-baseline": 0,
+    "check-fkcs": null,
+    "check-exit-commands": 0,
+    "check-decision-register": 0,
+    "check-serde-error-handling": 0,
+    "check-test-cost": 0,
+    "check-env-contract": 0,
+    "check-service-boundary": 0,
+    "check-composition-root-completeness": 0,
+    "check-pub-field-constructors": 0,
+    "check-dependency-closure": 0,
+    "check-coverage-matrix-completeness": 0,
+    "check-epic-close-coherence": 0
+  },
+  "fkcs": "900s agent command timeout; no process exit/no gate report, not credited as pass; not rerun",
+  "head_log": "correction-final-gate-head-log.stdout"
+}

@@ -1,0 +1,12 @@
+{
+  "uuid": "a796a2f7-be25-4368-a940-7c4105bd0c3e",
+  "tests": 827,
+  "failures": 0,
+  "errors": 0,
+  "suites": 70,
+  "wall_seconds": 101.271,
+  "source": "focused-final-junit.xml",
+  "limitations": "T3 prerequisite-return bodies are not real live-Worker proof; hosted public-CA case ignored/not run.",
+  "testcase_sum_seconds": 101.261,
+  "sum_basis": "JUnit testcase time attributes; suite time attributes are absent, so the earlier default-zero calculation was discarded."
+}

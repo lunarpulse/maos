@@ -1,0 +1,21 @@
+
+running 6 tests
+test security::review_tests::registry_typo_is_refused_p11 ... FAILED
+test security::review_tests::registry_hex_diagnostics_do_not_echo_input_p8 ... FAILED
+test security::review_tests::registry_uri_matrix_and_trailing_dns_labels_p3_p9 ... FAILED
+test security::review_tests::explicit_development_literal_loopback_matrix_p3 ... FAILED
+test security::review_tests::configured_ca_replaces_bundled_roots_d4 ... FAILED
+test security::review_tests::signed_params_less_notification_verifies_p7 ... FAILED
+
+failures:
+
+failures:
+    security::review_tests::configured_ca_replaces_bundled_roots_d4
+    security::review_tests::explicit_development_literal_loopback_matrix_p3
+    security::review_tests::registry_hex_diagnostics_do_not_echo_input_p8
+    security::review_tests::registry_typo_is_refused_p11
+    security::review_tests::registry_uri_matrix_and_trailing_dns_labels_p3_p9
+    security::review_tests::signed_params_less_notification_verifies_p7
+
+test result: FAILED. 0 passed; 6 failed; 0 ignored; 0 measured; 56 filtered out; finished in 0.00s
+

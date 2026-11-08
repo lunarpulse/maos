@@ -9,7 +9,7 @@ description = "MAOS shell — J0 evaluator surface (init, REPL, audit query)"
 
 [dependencies]
 maos-audit = { path = "../maos-audit" }
-maos-cli = { path = "../maos-cli" }
+maos-cli = { path = "../maos-cli", default-features = false }
 maos-director-surface = { path = "../maos-director-surface" }
 maos-domain = { path = "../maos-domain" }
 maos-kernel-core = { path = "../maos-kernel-core" }

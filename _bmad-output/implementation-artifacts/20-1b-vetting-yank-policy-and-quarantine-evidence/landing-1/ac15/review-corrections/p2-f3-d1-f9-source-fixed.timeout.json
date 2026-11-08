@@ -1,0 +1,18 @@
+{
+  "label": "p2-f3-d1-f9-source-fixed",
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "xtask",
+    "--test",
+    "registry_socket_security_20_1b",
+    "--",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "exit_code": null,
+  "status": "timeout",
+  "timeout_seconds": 300,
+  "note": "subprocess.TimeoutExpired observed; prior helper did not preserve partial stdout/stderr or a process exit code. /proc scan afterwards found no cargo, rustc or selected test process. Not recorded as a test assertion failure or a pass."
+}

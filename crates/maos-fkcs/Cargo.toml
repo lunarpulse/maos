@@ -9,7 +9,7 @@ description = "Frozen-Kernel Conformance Suite infrastructure harness"
 
 [dependencies]
 maos-domain = { path = "../maos-domain" }
-maos-registry = { path = "../maos-registry" }
+maos-registry = { path = "../maos-registry", default-features = false }
 maos-skill = { path = "../maos-skill" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
 serde = { version = "1.0", features = ["derive"] }

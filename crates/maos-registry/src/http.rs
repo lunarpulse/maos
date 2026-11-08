@@ -1,5 +1,6 @@
 //! Admission-time blocking HTTP/TLS leaf; no kernel or asynchronous network stack.
 //! Production authenticates both WebPKI transport and an operator-pinned registry.
+use crate::server::DeadlineStream;
 use maos_domain::ports::io_subsystem::{HttpExchange, IoError, IoSubsystemPort};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
@@ -9,6 +10,7 @@ pub struct RegistryHttp {
     uri: String,
     url: url::Url,
     security: crate::security::RegistrySecurityConfig,
+    exchange_timeout: Duration,
     #[cfg(feature = "tls")]
     tls: Option<std::sync::Arc<rustls::ClientConfig>>,
 }
@@ -48,6 +50,7 @@ impl RegistryHttp {
             uri: uri.into(),
             url,
             security,
+            exchange_timeout: Duration::from_secs(30),
             #[cfg(feature = "tls")]
             tls,
         })
@@ -81,6 +84,7 @@ impl IoSubsystemPort for RegistryHttp {
         if url != self.uri {
             return Err(IoError::InvalidUrl("registry endpoint changed".into()));
         }
+        let deadline = std::time::Instant::now() + self.exchange_timeout;
         let authority = &self.url[url::Position::BeforeHost..url::Position::AfterPort];
         let host = self
             .url
@@ -92,11 +96,16 @@ impl IoSubsystemPort for RegistryHttp {
             .port_or_known_default()
             .ok_or_else(|| IoError::InvalidUrl("missing port".into()))?;
         let path = self.url.path();
-        let timeout = Duration::from_secs(30);
-        let addresses = (host, port).to_socket_addrs().map_err(transport)?;
-        let stream = connect_addresses(addresses, timeout).map_err(transport)?;
-        stream.set_read_timeout(Some(timeout)).map_err(transport)?;
-        stream.set_write_timeout(Some(timeout)).map_err(transport)?;
+        let stream = if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+            connect_addresses([std::net::SocketAddr::new(ip, port)], deadline)
+        } else {
+            connect_addresses(
+                resolve_addresses(host, port, deadline).map_err(transport)?,
+                deadline,
+            )
+        }
+        .map_err(transport)?;
+        let stream = DeadlineStream::new(stream, deadline);
         #[cfg(feature = "tls")]
         let mut stream = if let Some(config) = &self.tls {
             let name = rustls::pki_types::ServerName::try_from(host.to_owned())
@@ -120,6 +129,17 @@ impl IoSubsystemPort for RegistryHttp {
         .map_err(transport)?;
         if self.url.scheme() == "http" {
             write!(stream, "{}: true\r\n", crate::security::DEVELOPMENT_HEADER)
+                .map_err(transport)?;
+        }
+        // Legacy direct RPC callers lack Streamable HTTP's normal routing hint.
+        if !headers
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case("mcp-name"))
+            && crate::security::request_route(body)
+                .is_ok_and(|route| route.method == "registry.publish")
+        {
+            stream
+                .write_all(b"Mcp-Name: registry.publish\r\n")
                 .map_err(transport)?;
         }
         for (name, value) in headers {
@@ -185,9 +205,28 @@ impl IoSubsystemPort for RegistryHttp {
         if length > 64 * 1024 * 1024 {
             return Err(IoError::Decode("registry response exceeds 64 MiB".into()));
         }
-        let mut response_body = vec![0; length];
-        reader.read_exact(&mut response_body).map_err(transport)?;
-        if let Some(key) = &self.security.signing_pubkey {
+        if !(200..300).contains(&status) && length > 64 * 1024 {
+            return Err(IoError::Decode(
+                "registry refusal body exceeds 64 KiB".into(),
+            ));
+        }
+        let mut response_body = Vec::new();
+        while response_body.len() < length {
+            let available = reader.fill_buf().map_err(transport)?;
+            let size = available.len().min(length - response_body.len());
+            if size == 0 {
+                return Err(IoError::Decode("truncated HTTP body".into()));
+            }
+            response_body.extend_from_slice(&available[..size]);
+            reader.consume(size);
+        }
+        // Refusals have no success envelope; preserve their typed HTTP status.
+        if let Some(key) = self
+            .security
+            .signing_pubkey
+            .as_ref()
+            .filter(|_| (200..300).contains(&status))
+        {
             crate::security::verify_response(
                 url,
                 nonce,
@@ -206,9 +245,9 @@ impl IoSubsystemPort for RegistryHttp {
 }
 
 enum HttpStream {
-    Plain(TcpStream),
+    Plain(DeadlineStream),
     #[cfg(feature = "tls")]
-    Tls(Box<rustls::StreamOwned<rustls::ClientConnection, TcpStream>>),
+    Tls(Box<rustls::StreamOwned<rustls::ClientConnection, DeadlineStream>>),
 }
 impl Read for HttpStream {
     fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
@@ -237,9 +276,8 @@ impl Write for HttpStream {
 }
 fn connect_addresses(
     addresses: impl IntoIterator<Item = std::net::SocketAddr>,
-    timeout: Duration,
+    deadline: std::time::Instant,
 ) -> std::io::Result<TcpStream> {
-    let deadline = std::time::Instant::now() + timeout;
     let mut last = std::io::Error::new(
         std::io::ErrorKind::AddrNotAvailable,
         "endpoint has no address",
@@ -262,6 +300,48 @@ fn connect_addresses(
     Err(last)
 }
 
+fn resolve_addresses(
+    host: &str,
+    port: u16,
+    deadline: std::time::Instant,
+) -> std::io::Result<Vec<std::net::SocketAddr>> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    // libc resolution cannot be cancelled. Bound detached resolver ownership,
+    // and never let a late resolver retain scheduler/audit/application state.
+    static RESOLVERS: AtomicUsize = AtomicUsize::new(0);
+    struct Permit;
+    impl Drop for Permit {
+        fn drop(&mut self) {
+            RESOLVERS.fetch_sub(1, Ordering::AcqRel);
+        }
+    }
+    RESOLVERS
+        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |active| {
+            (active < 8).then_some(active + 1)
+        })
+        .map_err(|_| std::io::Error::other("registry resolver capacity exhausted"))?;
+    let permit = Permit;
+    let host = host.to_owned();
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    std::thread::Builder::new()
+        .name("registry-resolve".into())
+        .spawn(move || {
+            let _permit = permit;
+            let result = (host.as_str(), port)
+                .to_socket_addrs()
+                .map(|addresses| addresses.collect());
+            let _ = sender.send(result);
+        })?;
+    let remaining = deadline
+        .checked_duration_since(std::time::Instant::now())
+        .ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::TimedOut, "registry DNS deadline")
+        })?;
+    receiver
+        .recv_timeout(remaining)
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::TimedOut, "registry DNS deadline"))?
+}
+
 fn transport(error: std::io::Error) -> IoError {
     IoError::Transport(error.to_string())
 }
@@ -282,7 +362,99 @@ mod tests {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let good = listener.local_addr().unwrap();
         let rejected = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
-        let stream = connect_addresses([rejected, good], Duration::from_secs(2)).unwrap();
+        let stream = connect_addresses(
+            [rejected, good],
+            std::time::Instant::now() + Duration::from_secs(2),
+        )
+        .unwrap();
         assert_eq!(stream.peer_addr().unwrap(), good);
+    }
+
+    fn response_peer(
+        status: &str,
+        body: &'static [u8],
+        drip: bool,
+    ) -> (String, std::thread::JoinHandle<()>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let uri = format!("http://{}/mcp", listener.local_addr().unwrap());
+        let status = status.to_owned();
+        let worker = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(&mut stream);
+            let mut line = String::new();
+            let mut length = 0;
+            loop {
+                line.clear();
+                reader.read_line(&mut line).unwrap();
+                if line == "\r\n" {
+                    break;
+                }
+                if let Some((name, value)) = line.split_once(':') {
+                    if name.eq_ignore_ascii_case("content-length") {
+                        length = value.trim().parse::<usize>().unwrap();
+                    }
+                }
+            }
+            let mut request = vec![0; length];
+            reader.read_exact(&mut request).unwrap();
+            drop(reader);
+            write!(
+                stream,
+                "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            )
+            .unwrap();
+            for byte in body {
+                if stream.write_all(&[*byte]).is_err() {
+                    break;
+                }
+                if drip {
+                    std::thread::sleep(Duration::from_millis(30));
+                }
+            }
+        });
+        (uri, worker)
+    }
+    #[test]
+    fn unsigned_http_refusal_preserves_status_p7() {
+        let (uri, worker) = response_peer("403 Forbidden", b"", false);
+        let client = RegistryHttp::new(
+            &uri,
+            crate::security::RegistrySecurityConfig {
+                uri: Some(uri.clone()),
+                signing_pubkey: Some([0x91; 32]),
+                development_http: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let result = client.http_post_exchange(&uri, b"{}", &[], "");
+        worker.join().unwrap();
+        assert!(
+            matches!(result, Ok(HttpExchange { status: 403, .. })),
+            "{result:?}"
+        );
+    }
+    #[test]
+    fn drip_response_cannot_extend_exchange_deadline_f4() {
+        let (uri, worker) = response_peer("200 OK", b"012345678901234567890123456789", true);
+        let mut client = RegistryHttp::new(
+            &uri,
+            crate::security::RegistrySecurityConfig::development_loopback(),
+        )
+        .unwrap();
+        client.exchange_timeout = Duration::from_millis(200);
+        let started = std::time::Instant::now();
+        let result = client.http_post_exchange(&uri, b"{}", &[], "");
+        let elapsed = started.elapsed();
+        worker.join().unwrap();
+        assert!(
+            result.is_err(),
+            "drip feed outlived the total deadline: {elapsed:?}"
+        );
+        assert!(
+            elapsed < Duration::from_secs(1),
+            "deadline was not absolute: {elapsed:?}"
+        );
     }
 }

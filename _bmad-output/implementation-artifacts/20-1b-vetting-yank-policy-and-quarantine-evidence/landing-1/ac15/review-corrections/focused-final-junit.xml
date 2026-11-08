@@ -1,0 +1,970 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="827" skipped="0" failures="0" errors="0" uuid="a796a2f7-be25-4368-a940-7c4105bd0c3e" timestamp="2026-11-08T14:10:51.958+00:00" time="101.271">
+    <testsuite name="maos-bin::erasure_inventory_20_11" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="registry_bound_principal_is_counted_and_erased_on_uninstall_p3" classname="maos-bin::erasure_inventory_20_11" timestamp="2026-11-08T14:10:51.963+00:00" time="0.829"/>
+    </testsuite>
+    <testsuite name="maos-bin::installed_spirit_dispatch_20_1" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="boot_rechecks_manifest_component_publisher_and_claim" classname="maos-bin::installed_spirit_dispatch_20_1" timestamp="2026-11-08T14:10:52.793+00:00" time="2.214"/>
+        <testcase name="installed_component_dispatch_reports_typed_boot_refusal" classname="maos-bin::installed_spirit_dispatch_20_1" timestamp="2026-11-08T14:10:55.007+00:00" time="0.532"/>
+    </testsuite>
+    <testsuite name="maos-bin::one_daemon_one_door_16_1" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9" classname="maos-bin::one_daemon_one_door_16_1" timestamp="2026-11-08T14:10:55.540+00:00" time="0.784"/>
+    </testsuite>
+    <testsuite name="maos-bin::registry_config_20_1b" tests="3" skipped="0" errors="0" failures="0">
+        <testcase name="daemon_banner_uses_the_enforced_single_reader_d1_p10" classname="maos-bin::registry_config_20_1b" timestamp="2026-11-08T14:10:56.324+00:00" time="0.274"/>
+        <testcase name="daemon_refuses_https_without_a_root_before_polling_d1_p10" classname="maos-bin::registry_config_20_1b" timestamp="2026-11-08T14:10:56.598+00:00" time="0.211"/>
+        <testcase name="daemon_refuses_registry_typo_even_without_a_uri_d1_p10_p11" classname="maos-bin::registry_config_20_1b" timestamp="2026-11-08T14:10:56.809+00:00" time="0.208"/>
+    </testsuite>
+    <testsuite name="maos-bin::root_shutdown_unload_16_3" tests="15" skipped="0" errors="0" failures="0">
+        <testcase name="ac3_operator_door_unload_stops_a_live_worker_once" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.018+00:00" time="0.004"/>
+        <testcase name="ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.022+00:00" time="0.003"/>
+        <testcase name="ac4_v2_butler_once_receipts_the_raised_halt_and_drains" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.025+00:00" time="0.003"/>
+        <testcase name="ac4_v3_topology_once_unloads_every_loaded_spirit" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.028+00:00" time="0.003"/>
+        <testcase name="ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.030+00:00" time="0.003"/>
+        <testcase name="ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.033+00:00" time="0.003"/>
+        <testcase name="ac4_v4b_grandchild_is_stopped_with_its_worker_container" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.036+00:00" time="0.003"/>
+        <testcase name="ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.039+00:00" time="0.229"/>
+        <testcase name="cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.268+00:00" time="0.003"/>
+        <testcase name="cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.271+00:00" time="0.003"/>
+        <testcase name="cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.274+00:00" time="0.003"/>
+        <testcase name="cohort::cohort_sigterm_without_worker_joins_local_yank_timer_and_drains" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.277+00:00" time="0.326"/>
+        <testcase name="cohort::declared_capable_cohort_worker_prerequisite_never_green_skips" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.603+00:00" time="0.009"/>
+        <testcase name="every_audit_sender_release_joins_the_yank_owner" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.612+00:00" time="0.185"/>
+        <testcase name="harness_owns_grandchildren_before_discovery_even_when_startup_panics" classname="maos-bin::root_shutdown_unload_16_3" timestamp="2026-11-08T14:10:57.797+00:00" time="0.027"/>
+    </testsuite>
+    <testsuite name="maos-bin::yank_audit_structure_20_1b" tests="11" skipped="0" errors="0" failures="0">
+        <testcase name="async_task_cannot_retain_sender_clone_p6" classname="maos-bin::yank_audit_structure_20_1b" timestamp="2026-11-08T14:10:57.825+00:00" time="0.003"/>
+        <testcase name="helper_sender_move_requires_release_p6" classname="maos-bin::yank_audit_structure_20_1b" timestamp="2026-11-08T14:10:57.828+00:00" time="0.002"/>
+        <testcase name="joined_qualified_drop_and_select_are_accounted_p6" classname="maos-bin::yank_audit_structure_20_1b" timestamp="2026-11-08T14:10:57.830+00:00" time="0.003"/>
+        <testcase name="moving_a_drain_to_another_arm_cannot_hide_behind_equal_totals_p6" classname="maos-bin::yank_audit_structure_20_1b" timestamp="2026-11-08T14:10:57.833+00:00" time="0.188"/>
+        <testcase name="parenthesized_drain_requires_join_p6" classname="maos-bin::yank_audit_structure_20_1b" timestamp="2026-11-08T14:10:58.021+00:00" time="0.003"/>
+        <testcase name="qualified_drop_requires_join_p6" classname="maos-bin::yank_audit_structure_20_1b" timestamp="2026-11-08T14:10:58.023+00:00" time="0.002"/>
+        <testcase name="select_drain_requires_join_p6" classname="maos-bin::yank_audit_structure_20_1b" timestamp="2026-11-08T14:10:58.026+00:00" time="0.002"/>
+        <testcase name="sibling_join_does_not_authorize_another_arm_p6" classname="maos-bin::yank_audit_structure_20_1b" timestamp="2026-11-08T14:10:58.028+00:00" time="0.003"/>
+        <testcase name="supervisor_stop_must_follow_join_p4" classname="maos-bin::yank_audit_structure_20_1b" timestamp="2026-11-08T14:10:58.031+00:00" time="0.003"/>
+        <testcase name="unload_must_follow_join_p4" classname="maos-bin::yank_audit_structure_20_1b" timestamp="2026-11-08T14:10:58.034+00:00" time="0.003"/>
+        <testcase name="wildcard_sender_binding_is_not_a_release_p6" classname="maos-bin::yank_audit_structure_20_1b" timestamp="2026-11-08T14:10:58.037+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-bin::yank_policy_20_1b" tests="10" skipped="0" errors="0" failures="0">
+        <testcase name="corrupt_install_does_not_hide_another_spirits_expiry_p1" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-08T14:10:58.040+00:00" time="0.088"/>
+        <testcase name="deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-08T14:10:58.127+00:00" time="0.007"/>
+        <testcase name="expiry_and_vetter_revocation_observe_once_and_request_policy_ac9" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-08T14:10:58.134+00:00" time="0.145"/>
+        <testcase name="failing_auto_revoke_retries_policy_without_repeating_observation_p12" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-08T14:10:58.279+00:00" time="0.072"/>
+        <testcase name="no_registry_local_timer_discovers_promotion_installed_after_start_p11" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-08T14:10:58.352+00:00" time="0.070"/>
+        <testcase name="poller_runtime_clock_and_cursor_restart_reach_expiry_p6" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-08T14:10:58.422+00:00" time="0.087"/>
+        <testcase name="registry_publishers_cannot_share_principal_spill_ac10" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-08T14:10:58.509+00:00" time="0.140"/>
+        <testcase name="rejected_vetter_row_does_not_hide_later_publisher_yank_p1" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-08T14:10:58.649+00:00" time="0.071"/>
+        <testcase name="signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-08T14:10:58.721+00:00" time="0.216"/>
+        <testcase name="uninstalled_unsigned_row_never_advances_authenticated_cursor_f1" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-08T14:10:58.936+00:00" time="0.069"/>
+    </testsuite>
+    <testsuite name="maos-cli" tests="48" skipped="0" errors="0" failures="0">
+        <testcase name="accessibility::tests::no_color_env_empty_string_does_not_disable_color" classname="maos-cli" timestamp="2026-11-08T14:10:59.006+00:00" time="0.003"/>
+        <testcase name="accessibility::tests::no_color_env_with_any_value_disables_color" classname="maos-cli" timestamp="2026-11-08T14:10:59.009+00:00" time="0.003"/>
+        <testcase name="accessibility::tests::no_color_wins_over_term_dumb" classname="maos-cli" timestamp="2026-11-08T14:10:59.012+00:00" time="0.002"/>
+        <testcase name="accessibility::tests::no_env_falls_through_to_auto" classname="maos-cli" timestamp="2026-11-08T14:10:59.014+00:00" time="0.003"/>
+        <testcase name="accessibility::tests::plain_flag_overrides_everything" classname="maos-cli" timestamp="2026-11-08T14:10:59.017+00:00" time="0.003"/>
+        <testcase name="accessibility::tests::plain_flag_wins_over_no_color_set" classname="maos-cli" timestamp="2026-11-08T14:10:59.020+00:00" time="0.003"/>
+        <testcase name="accessibility::tests::term_dumb_disables_color_when_no_color_unset" classname="maos-cli" timestamp="2026-11-08T14:10:59.023+00:00" time="0.003"/>
+        <testcase name="accessibility::tests::term_xterm_falls_through_to_auto" classname="maos-cli" timestamp="2026-11-08T14:10:59.026+00:00" time="0.003"/>
+        <testcase name="backup::tests::tenant_backup_round_trip_rejects_wrong_team" classname="maos-cli" timestamp="2026-11-08T14:10:59.029+00:00" time="0.418"/>
+        <testcase name="backup::tests::validate_restore_target_team_refuses_cross_team_planting" classname="maos-cli" timestamp="2026-11-08T14:10:59.447+00:00" time="0.225"/>
+        <testcase name="subcommands::tests::audit_keygen_parses" classname="maos-cli" timestamp="2026-11-08T14:10:59.672+00:00" time="0.004"/>
+        <testcase name="subcommands::tests::audit_posture_delta_parses" classname="maos-cli" timestamp="2026-11-08T14:10:59.676+00:00" time="0.004"/>
+        <testcase name="subcommands::tests::audit_query_accepts_plain_format" classname="maos-cli" timestamp="2026-11-08T14:10:59.680+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::audit_query_accepts_spirit_and_format_flags" classname="maos-cli" timestamp="2026-11-08T14:10:59.683+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::audit_query_capability_parses" classname="maos-cli" timestamp="2026-11-08T14:10:59.686+00:00" time="0.004"/>
+        <testcase name="subcommands::tests::audit_query_defaults_format_to_ndjson" classname="maos-cli" timestamp="2026-11-08T14:10:59.690+00:00" time="0.004"/>
+        <testcase name="subcommands::tests::audit_query_intent_contains_parses" classname="maos-cli" timestamp="2026-11-08T14:10:59.694+00:00" time="0.006"/>
+        <testcase name="subcommands::tests::audit_query_range_parses" classname="maos-cli" timestamp="2026-11-08T14:10:59.700+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::audit_query_spirit_all_boots_parses" classname="maos-cli" timestamp="2026-11-08T14:10:59.703+00:00" time="0.004"/>
+        <testcase name="subcommands::tests::audit_sealed_export_parses" classname="maos-cli" timestamp="2026-11-08T14:10:59.707+00:00" time="0.004"/>
+        <testcase name="subcommands::tests::audit_subject_access_parses" classname="maos-cli" timestamp="2026-11-08T14:10:59.711+00:00" time="0.004"/>
+        <testcase name="subcommands::tests::audit_verify_bundle_parses" classname="maos-cli" timestamp="2026-11-08T14:10:59.714+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::capture_tripwire_allows_hex_tl_refs" classname="maos-cli" timestamp="2026-11-08T14:10:59.718+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::capture_tripwire_refuses_a_pasted_api_key" classname="maos-cli" timestamp="2026-11-08T14:10:59.721+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::capture_validation_refuses_adapter_only_fs_jail" classname="maos-cli" timestamp="2026-11-08T14:10:59.724+00:00" time="0.004"/>
+        <testcase name="subcommands::tests::capture_validation_refuses_the_two_host_overclaim_directions" classname="maos-cli" timestamp="2026-11-08T14:10:59.727+00:00" time="0.004"/>
+        <testcase name="subcommands::tests::capture_validation_refuses_unenforced_egress" classname="maos-cli" timestamp="2026-11-08T14:10:59.731+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::capture_validation_rejects_missing_signer" classname="maos-cli" timestamp="2026-11-08T14:10:59.734+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::capture_validation_requires_at_least_one_audit_ref" classname="maos-cli" timestamp="2026-11-08T14:10:59.736+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::capture_validation_requires_verified_redaction" classname="maos-cli" timestamp="2026-11-08T14:10:59.739+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::cost_report_reads_payload_not_intent" classname="maos-cli" timestamp="2026-11-08T14:10:59.742+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::dispatch_forget_rejects_empty_principal" classname="maos-cli" timestamp="2026-11-08T14:10:59.745+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::dispatch_install" classname="maos-cli" timestamp="2026-11-08T14:10:59.748+00:00" time="0.004"/>
+        <testcase name="subcommands::tests::dispatch_run_hello_spirit" classname="maos-cli" timestamp="2026-11-08T14:10:59.751+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::dispatch_start_parses_hello_spirit_globally_with_plain" classname="maos-cli" timestamp="2026-11-08T14:10:59.755+00:00" time="0.004"/>
+        <testcase name="subcommands::tests::dispatch_stop_unload_parse_with_no_args" classname="maos-cli" timestamp="2026-11-08T14:10:59.759+00:00" time="0.004"/>
+        <testcase name="subcommands::tests::dispatch_unknown_spirit_install" classname="maos-cli" timestamp="2026-11-08T14:10:59.763+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::dispatch_unknown_spirit_run" classname="maos-cli" timestamp="2026-11-08T14:10:59.766+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::forget_parses_principal_and_reason" classname="maos-cli" timestamp="2026-11-08T14:10:59.769+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::forget_reason_is_optional" classname="maos-cli" timestamp="2026-11-08T14:10:59.773+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::install_verify_local_release_artifact" classname="maos-cli" timestamp="2026-11-08T14:10:59.776+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::install_verify_missing_sig_fails" classname="maos-cli" timestamp="2026-11-08T14:10:59.779+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::install_verify_tampered_artifact_rejected" classname="maos-cli" timestamp="2026-11-08T14:10:59.783+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::journal_run_capture_row_fails_closed_without_a_tl" classname="maos-cli" timestamp="2026-11-08T14:10:59.786+00:00" time="0.003"/>
+        <testcase name="subcommands::tests::record_capture_parses_flags" classname="maos-cli" timestamp="2026-11-08T14:10:59.789+00:00" time="0.004"/>
+        <testcase name="subcommands::tests::record_capture_row_round_trips_through_audit_query" classname="maos-cli" timestamp="2026-11-08T14:10:59.793+00:00" time="0.046"/>
+        <testcase name="subcommands::tests::resolve_spirit_pid_reads_from_tl" classname="maos-cli" timestamp="2026-11-08T14:10:59.839+00:00" time="0.044"/>
+        <testcase name="subcommands::tests::resolve_spirit_pid_rejects_unknown_names_with_clear_diagnostic" classname="maos-cli" timestamp="2026-11-08T14:10:59.883+00:00" time="0.024"/>
+    </testsuite>
+    <testsuite name="maos-cli::a2a_repin_19_7" tests="10" skipped="0" errors="0" failures="0">
+        <testcase name="a_200_that_is_not_the_sent_decision_is_refused" classname="maos-cli::a2a_repin_19_7" timestamp="2026-11-08T14:10:59.906+00:00" time="0.080"/>
+        <testcase name="approve_posts_the_decision_with_a_decimal_string_nonce" classname="maos-cli::a2a_repin_19_7" timestamp="2026-11-08T14:10:59.987+00:00" time="0.016"/>
+        <testcase name="decision_outcomes_map_to_typed_distinct_exits" classname="maos-cli::a2a_repin_19_7" timestamp="2026-11-08T14:11:00.003+00:00" time="0.159"/>
+        <testcase name="list_gets_the_pending_set_and_prints_it_verbatim" classname="maos-cli::a2a_repin_19_7" timestamp="2026-11-08T14:11:00.162+00:00" time="0.016"/>
+        <testcase name="list_outcomes_map_to_typed_exits" classname="maos-cli::a2a_repin_19_7" timestamp="2026-11-08T14:11:00.178+00:00" time="0.030"/>
+        <testcase name="malformed_decisions_are_refused_before_the_round_trip" classname="maos-cli::a2a_repin_19_7" timestamp="2026-11-08T14:11:00.208+00:00" time="0.024"/>
+        <testcase name="reject_posts_approve_false_with_the_default_actor" classname="maos-cli::a2a_repin_19_7" timestamp="2026-11-08T14:11:00.232+00:00" time="0.018"/>
+        <testcase name="repin_discovery_failures_map_to_typed_exits" classname="maos-cli::a2a_repin_19_7" timestamp="2026-11-08T14:11:00.250+00:00" time="0.119"/>
+        <testcase name="repin_routes_reach_the_d16_1_p_matrix" classname="maos-cli::a2a_repin_19_7" timestamp="2026-11-08T14:11:00.370+00:00" time="0.259"/>
+        <testcase name="wire_shapes_are_pinned_as_literal_json" classname="maos-cli::a2a_repin_19_7" timestamp="2026-11-08T14:11:00.629+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-cli::accessibility_test" tests="6" skipped="0" errors="0" failures="0">
+        <testcase name="door_error_output_is_ansi_free" classname="maos-cli::accessibility_test" timestamp="2026-11-08T14:11:00.632+00:00" time="0.015"/>
+        <testcase name="install_cascade_emits_zero_ansi_bytes" classname="maos-cli::accessibility_test" timestamp="2026-11-08T14:11:00.646+00:00" time="0.009"/>
+        <testcase name="run_cascade_emits_zero_ansi_bytes" classname="maos-cli::accessibility_test" timestamp="2026-11-08T14:11:00.655+00:00" time="0.009"/>
+        <testcase name="start_cascade_emits_zero_ansi_bytes" classname="maos-cli::accessibility_test" timestamp="2026-11-08T14:11:00.664+00:00" time="0.008"/>
+        <testcase name="stop_cascade_refuses_with_exit_two_and_zero_ansi" classname="maos-cli::accessibility_test" timestamp="2026-11-08T14:11:00.673+00:00" time="0.007"/>
+        <testcase name="unload_cascade_emits_zero_ansi_bytes" classname="maos-cli::accessibility_test" timestamp="2026-11-08T14:11:00.680+00:00" time="0.008"/>
+    </testsuite>
+    <testsuite name="maos-cli::audit_no_color_test" tests="6" skipped="0" errors="0" failures="0">
+        <testcase name="fr4_schema_violation_exits_two_with_diagnostic" classname="maos-cli::audit_no_color_test" timestamp="2026-11-08T14:11:00.687+00:00" time="0.067"/>
+        <testcase name="ndjson_with_no_color_emits_zero_ansi_bytes" classname="maos-cli::audit_no_color_test" timestamp="2026-11-08T14:11:00.755+00:00" time="0.108"/>
+        <testcase name="ndjson_with_term_dumb_emits_zero_ansi_bytes" classname="maos-cli::audit_no_color_test" timestamp="2026-11-08T14:11:00.863+00:00" time="0.110"/>
+        <testcase name="plain_with_no_color_emits_zero_ansi_bytes" classname="maos-cli::audit_no_color_test" timestamp="2026-11-08T14:11:00.972+00:00" time="0.109"/>
+        <testcase name="plain_with_term_dumb_emits_zero_ansi_bytes" classname="maos-cli::audit_no_color_test" timestamp="2026-11-08T14:11:01.082+00:00" time="0.110"/>
+        <testcase name="unknown_spirit_exits_two_with_clear_diagnostic" classname="maos-cli::audit_no_color_test" timestamp="2026-11-08T14:11:01.192+00:00" time="0.110"/>
+    </testsuite>
+    <testsuite name="maos-cli::benchmark_sidecar_18_2" tests="10" skipped="0" errors="0" failures="0">
+        <testcase name="a_dev_seed_sidecar_verifies_and_prints_its_body" classname="maos-cli::benchmark_sidecar_18_2" timestamp="2026-11-08T14:11:01.302+00:00" time="0.007"/>
+        <testcase name="a_dev_seed_signature_claiming_the_producer_exits_one" classname="maos-cli::benchmark_sidecar_18_2" timestamp="2026-11-08T14:11:01.309+00:00" time="0.006"/>
+        <testcase name="a_float_that_does_not_round_trip_verifies_byte_exact" classname="maos-cli::benchmark_sidecar_18_2" timestamp="2026-11-08T14:11:01.315+00:00" time="0.006"/>
+        <testcase name="a_malformed_pubkey_refuses_without_echoing_it" classname="maos-cli::benchmark_sidecar_18_2" timestamp="2026-11-08T14:11:01.321+00:00" time="0.005"/>
+        <testcase name="a_missing_sidecar_exits_five_typed" classname="maos-cli::benchmark_sidecar_18_2" timestamp="2026-11-08T14:11:01.327+00:00" time="0.009"/>
+        <testcase name="a_non_utf8_pubkey_refuses_and_never_falls_back" classname="maos-cli::benchmark_sidecar_18_2" timestamp="2026-11-08T14:11:01.335+00:00" time="0.006"/>
+        <testcase name="a_producer_signature_verifies_only_against_the_producer_pubkey" classname="maos-cli::benchmark_sidecar_18_2" timestamp="2026-11-08T14:11:01.341+00:00" time="0.009"/>
+        <testcase name="a_sidecar_of_another_class_version_or_schema_exits_one" classname="maos-cli::benchmark_sidecar_18_2" timestamp="2026-11-08T14:11:01.350+00:00" time="0.012"/>
+        <testcase name="a_tampered_body_exits_one_and_prints_nothing" classname="maos-cli::benchmark_sidecar_18_2" timestamp="2026-11-08T14:11:01.362+00:00" time="0.006"/>
+        <testcase name="without_a_version_the_highest_benchmarked_version_is_read" classname="maos-cli::benchmark_sidecar_18_2" timestamp="2026-11-08T14:11:01.368+00:00" time="0.009"/>
+    </testsuite>
+    <testsuite name="maos-cli::cohort_sign_2e" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="cohort_sign_happy_path_and_validate_before_write" classname="maos-cli::cohort_sign_2e" timestamp="2026-11-08T14:11:01.376+00:00" time="0.013"/>
+        <testcase name="cohort_sign_has_no_environment_key_fallback" classname="maos-cli::cohort_sign_2e" timestamp="2026-11-08T14:11:01.390+00:00" time="0.005"/>
+        <testcase name="cohort_sign_refuses_a_key_absent_from_authority_keys" classname="maos-cli::cohort_sign_2e" timestamp="2026-11-08T14:11:01.394+00:00" time="0.006"/>
+        <testcase name="cohort_sign_refuses_output_aliasing_the_authority_key" classname="maos-cli::cohort_sign_2e" timestamp="2026-11-08T14:11:01.400+00:00" time="0.007"/>
+    </testsuite>
+    <testsuite name="maos-cli::credential_posture_2c" tests="9" skipped="0" errors="0" failures="0">
+        <testcase name="a_correctly_redacted_log_reports_no_escape" classname="maos-cli::credential_posture_2c" timestamp="2026-11-08T14:11:01.407+00:00" time="0.093"/>
+        <testcase name="a_digest_clause_sources_row_is_not_an_escape" classname="maos-cli::credential_posture_2c" timestamp="2026-11-08T14:11:01.500+00:00" time="0.047"/>
+        <testcase name="a_stored_hex_run_is_reported_as_its_own_distinct_escape_class" classname="maos-cli::credential_posture_2c" timestamp="2026-11-08T14:11:01.548+00:00" time="0.047"/>
+        <testcase name="a_stored_provider_prefix_credential_is_reported_as_a_prefix_escape" classname="maos-cli::credential_posture_2c" timestamp="2026-11-08T14:11:01.595+00:00" time="0.048"/>
+        <testcase name="a_too_long_hex_run_under_clause_sources_is_still_an_escape" classname="maos-cli::credential_posture_2c" timestamp="2026-11-08T14:11:01.643+00:00" time="0.047"/>
+        <testcase name="an_uppercase_hex_run_is_reported_as_an_escape" classname="maos-cli::credential_posture_2c" timestamp="2026-11-08T14:11:01.690+00:00" time="0.049"/>
+        <testcase name="both_classes_in_one_row_are_reported_separately" classname="maos-cli::credential_posture_2c" timestamp="2026-11-08T14:11:01.739+00:00" time="0.048"/>
+        <testcase name="overlapping_prefix_classes_are_each_reported_once" classname="maos-cli::credential_posture_2c" timestamp="2026-11-08T14:11:01.787+00:00" time="0.048"/>
+        <testcase name="the_scan_never_echoes_the_offending_bytes" classname="maos-cli::credential_posture_2c" timestamp="2026-11-08T14:11:01.835+00:00" time="0.047"/>
+    </testsuite>
+    <testsuite name="maos-cli::dep_kernel_core_free_test" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="maos_cli_dep_tree_excludes_kernel_core" classname="maos-cli::dep_kernel_core_free_test" timestamp="2026-11-08T14:11:01.882+00:00" time="0.447"/>
+    </testsuite>
+    <testsuite name="maos-cli::door_response_framing" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="response_larger_than_the_client_cap_is_refused" classname="maos-cli::door_response_framing" timestamp="2026-11-08T14:11:02.329+00:00" time="0.005"/>
+        <testcase name="successful_response_must_match_its_content_length" classname="maos-cli::door_response_framing" timestamp="2026-11-08T14:11:02.334+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-cli::forget_reason_test" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="forget_reason_is_preserved_in_the_live_door_body" classname="maos-cli::forget_reason_test" timestamp="2026-11-08T14:11:02.337+00:00" time="0.021"/>
+    </testsuite>
+    <testsuite name="maos-cli::halt_record_16_5" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="serde_failure_termination_receipt_is_not_reported_as_raised" classname="maos-cli::halt_record_16_5" timestamp="2026-11-08T14:11:02.358+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-cli::halt_resolve_test" tests="7" skipped="0" errors="0" failures="0">
+        <testcase name="accepted_halt_sends_post_with_spirit_id_in_the_body" classname="maos-cli::halt_resolve_test" timestamp="2026-11-08T14:11:02.361+00:00" time="0.016"/>
+        <testcase name="authorized_override_carries_the_policy_ref_as_rationale" classname="maos-cli::halt_resolve_test" timestamp="2026-11-08T14:11:02.377+00:00" time="0.016"/>
+        <testcase name="invalid_ids_refused_locally_without_a_round_trip" classname="maos-cli::halt_resolve_test" timestamp="2026-11-08T14:11:02.393+00:00" time="0.018"/>
+        <testcase name="provided_context_carries_the_text_as_rationale" classname="maos-cli::halt_resolve_test" timestamp="2026-11-08T14:11:02.411+00:00" time="0.016"/>
+        <testcase name="provided_context_without_text_refused_before_the_round_trip" classname="maos-cli::halt_resolve_test" timestamp="2026-11-08T14:11:02.427+00:00" time="0.016"/>
+        <testcase name="resolve_discovery_failures_map_to_typed_exits" classname="maos-cli::halt_resolve_test" timestamp="2026-11-08T14:11:02.443+00:00" time="0.057"/>
+        <testcase name="resolve_maps_typed_responses_to_d16_1_p_exits" classname="maos-cli::halt_resolve_test" timestamp="2026-11-08T14:11:02.500+00:00" time="0.181"/>
+    </testsuite>
+    <testsuite name="maos-cli::import_rust_inproc_refusal_17_3b" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="import_refuses_rust_inproc_form_through_the_real_binary" classname="maos-cli::import_rust_inproc_refusal_17_3b" timestamp="2026-11-08T14:11:02.681+00:00" time="0.006"/>
+    </testsuite>
+    <testsuite name="maos-cli::legal_hold_cli_13_5b" tests="3" skipped="0" errors="0" failures="0">
+        <testcase name="unix::list_reads_the_real_holds_table_in_process_and_spawns_nothing" classname="maos-cli::legal_hold_cli_13_5b" timestamp="2026-11-08T14:11:02.687+00:00" time="0.069"/>
+        <testcase name="unix::list_reports_an_empty_list_when_no_hold_is_held" classname="maos-cli::legal_hold_cli_13_5b" timestamp="2026-11-08T14:11:02.756+00:00" time="0.027"/>
+        <testcase name="unix::release_forwards_the_offline_one_shot_contract" classname="maos-cli::legal_hold_cli_13_5b" timestamp="2026-11-08T14:11:02.784+00:00" time="0.006"/>
+    </testsuite>
+    <testsuite name="maos-cli::load_test" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="load_discovery_failures_map_to_typed_exits" classname="maos-cli::load_test" timestamp="2026-11-08T14:11:02.790+00:00" time="0.056"/>
+        <testcase name="load_maps_typed_responses_to_d16_1_p_exits" classname="maos-cli::load_test" timestamp="2026-11-08T14:11:02.846+00:00" time="0.134"/>
+        <testcase name="load_posts_the_canonical_manifest_to_the_collection_route" classname="maos-cli::load_test" timestamp="2026-11-08T14:11:02.980+00:00" time="0.017"/>
+        <testcase name="load_refuses_a_missing_manifest_without_touching_the_door" classname="maos-cli::load_test" timestamp="2026-11-08T14:11:02.996+00:00" time="0.016"/>
+    </testsuite>
+    <testsuite name="maos-cli::orchestrator_queue_test" tests="6" skipped="0" errors="0" failures="0">
+        <testcase name="empty_instruction_refused_locally_without_a_round_trip" classname="maos-cli::orchestrator_queue_test" timestamp="2026-11-08T14:11:03.013+00:00" time="0.017"/>
+        <testcase name="invalid_spirit_id_refused_locally_without_a_round_trip" classname="maos-cli::orchestrator_queue_test" timestamp="2026-11-08T14:11:03.030+00:00" time="0.017"/>
+        <testcase name="queue_discovery_failures_map_to_typed_exits" classname="maos-cli::orchestrator_queue_test" timestamp="2026-11-08T14:11:03.047+00:00" time="0.057"/>
+        <testcase name="queue_maps_typed_responses_to_d16_1_p_exits" classname="maos-cli::orchestrator_queue_test" timestamp="2026-11-08T14:11:03.105+00:00" time="0.135"/>
+        <testcase name="queue_sends_the_instruction_as_the_text_field" classname="maos-cli::orchestrator_queue_test" timestamp="2026-11-08T14:11:03.240+00:00" time="0.016"/>
+        <testcase name="status_sends_get_and_renders_the_door_occupancy" classname="maos-cli::orchestrator_queue_test" timestamp="2026-11-08T14:11:03.257+00:00" time="0.033"/>
+    </testsuite>
+    <testsuite name="maos-cli::orchestrator_recall_pick_19_2" tests="9" skipped="0" errors="0" failures="0">
+        <testcase name="an_empty_recall_is_a_success_not_a_refusal" classname="maos-cli::orchestrator_recall_pick_19_2" timestamp="2026-11-08T14:11:03.289+00:00" time="0.016"/>
+        <testcase name="malformed_picks_and_recalls_are_refused_before_the_round_trip" classname="maos-cli::orchestrator_recall_pick_19_2" timestamp="2026-11-08T14:11:03.305+00:00" time="0.034"/>
+        <testcase name="pick_outcomes_map_to_typed_exits" classname="maos-cli::orchestrator_recall_pick_19_2" timestamp="2026-11-08T14:11:03.338+00:00" time="0.120"/>
+        <testcase name="pick_posts_exactly_the_option_pick_request" classname="maos-cli::orchestrator_recall_pick_19_2" timestamp="2026-11-08T14:11:03.458+00:00" time="0.016"/>
+        <testcase name="recall_and_pick_discovery_failures_map_to_typed_exits" classname="maos-cli::orchestrator_recall_pick_19_2" timestamp="2026-11-08T14:11:03.474+00:00" time="0.108"/>
+        <testcase name="recall_and_pick_reach_the_d16_1_p_matrix" classname="maos-cli::orchestrator_recall_pick_19_2" timestamp="2026-11-08T14:11:03.583+00:00" time="0.263"/>
+        <testcase name="recall_outcomes_map_to_typed_exits" classname="maos-cli::orchestrator_recall_pick_19_2" timestamp="2026-11-08T14:11:03.845+00:00" time="0.042"/>
+        <testcase name="recall_posts_an_empty_body_and_prints_the_recalled_set_verbatim" classname="maos-cli::orchestrator_recall_pick_19_2" timestamp="2026-11-08T14:11:03.887+00:00" time="0.015"/>
+        <testcase name="the_pick_wire_shape_is_pinned_as_literal_json" classname="maos-cli::orchestrator_recall_pick_19_2" timestamp="2026-11-08T14:11:03.902+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-cli::pause_resume_test" tests="6" skipped="0" errors="0" failures="0">
+        <testcase name="pause_and_resume_spawn_no_child_process" classname="maos-cli::pause_resume_test" timestamp="2026-11-08T14:11:03.905+00:00" time="0.018"/>
+        <testcase name="pause_discovery_failures_map_to_typed_exits" classname="maos-cli::pause_resume_test" timestamp="2026-11-08T14:11:03.923+00:00" time="0.057"/>
+        <testcase name="pause_maps_typed_responses_to_d16_1_p_exits" classname="maos-cli::pause_resume_test" timestamp="2026-11-08T14:11:03.980+00:00" time="0.129"/>
+        <testcase name="pause_sends_bare_post_and_prints_the_door_body" classname="maos-cli::pause_resume_test" timestamp="2026-11-08T14:11:04.109+00:00" time="0.016"/>
+        <testcase name="resume_maps_typed_responses_to_d16_1_p_exits" classname="maos-cli::pause_resume_test" timestamp="2026-11-08T14:11:04.125+00:00" time="0.130"/>
+        <testcase name="resume_sends_bare_post_and_prints_the_door_body" classname="maos-cli::pause_resume_test" timestamp="2026-11-08T14:11:04.255+00:00" time="0.016"/>
+    </testsuite>
+    <testsuite name="maos-cli::posture_shift_test" tests="5" skipped="0" errors="0" failures="0">
+        <testcase name="autonomous_posture_rejected_by_clap_without_a_round_trip" classname="maos-cli::posture_shift_test" timestamp="2026-11-08T14:11:04.271+00:00" time="0.016"/>
+        <testcase name="invalid_spirit_id_refused_locally_without_a_round_trip" classname="maos-cli::posture_shift_test" timestamp="2026-11-08T14:11:04.287+00:00" time="0.015"/>
+        <testcase name="posture_discovery_failures_map_to_typed_exits" classname="maos-cli::posture_shift_test" timestamp="2026-11-08T14:11:04.302+00:00" time="0.055"/>
+        <testcase name="posture_maps_typed_responses_to_d16_1_p_exits" classname="maos-cli::posture_shift_test" timestamp="2026-11-08T14:11:04.356+00:00" time="0.134"/>
+        <testcase name="posture_sends_the_shifted_value_in_the_json_body" classname="maos-cli::posture_shift_test" timestamp="2026-11-08T14:11:04.491+00:00" time="0.018"/>
+    </testsuite>
+    <testsuite name="maos-cli::release_pubkey" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="release_pubkey_prints_exact_lowercase_embedded_key" classname="maos-cli::release_pubkey" timestamp="2026-11-08T14:11:04.509+00:00" time="0.005"/>
+    </testsuite>
+    <testsuite name="maos-cli::revocations_import_test" tests="5" skipped="0" errors="0" failures="0">
+        <testcase name="import_maps_typed_responses_to_d16_1_p_exits" classname="maos-cli::revocations_import_test" timestamp="2026-11-08T14:11:04.514+00:00" time="0.140"/>
+        <testcase name="import_missing_file_refused_locally" classname="maos-cli::revocations_import_test" timestamp="2026-11-08T14:11:04.654+00:00" time="0.015"/>
+        <testcase name="import_sends_the_crl_bytes_verbatim" classname="maos-cli::revocations_import_test" timestamp="2026-11-08T14:11:04.669+00:00" time="0.016"/>
+        <testcase name="list_sends_get_and_renders_the_door_crl_id" classname="maos-cli::revocations_import_test" timestamp="2026-11-08T14:11:04.685+00:00" time="0.016"/>
+        <testcase name="revocations_discovery_failures_map_to_typed_exits" classname="maos-cli::revocations_import_test" timestamp="2026-11-08T14:11:04.701+00:00" time="0.053"/>
+    </testsuite>
+    <testsuite name="maos-cli::revoke_token_test" tests="6" skipped="0" errors="0" failures="0">
+        <testcase name="invalid_token_ids_refused_locally_without_a_round_trip" classname="maos-cli::revoke_token_test" timestamp="2026-11-08T14:11:04.755+00:00" time="0.021"/>
+        <testcase name="repeated_revoke_maps_409_revoked_to_exit_1" classname="maos-cli::revoke_token_test" timestamp="2026-11-08T14:11:04.776+00:00" time="0.015"/>
+        <testcase name="revoke_discovery_failures_map_to_typed_exits" classname="maos-cli::revoke_token_test" timestamp="2026-11-08T14:11:04.791+00:00" time="0.056"/>
+        <testcase name="revoke_maps_typed_responses_to_d16_1_p_exits" classname="maos-cli::revoke_token_test" timestamp="2026-11-08T14:11:04.846+00:00" time="0.129"/>
+        <testcase name="revoke_sends_bare_post_to_the_token_route" classname="maos-cli::revoke_token_test" timestamp="2026-11-08T14:11:04.975+00:00" time="0.015"/>
+        <testcase name="unknown_token_maps_404_to_exit_1" classname="maos-cli::revoke_token_test" timestamp="2026-11-08T14:11:04.990+00:00" time="0.016"/>
+    </testsuite>
+    <testsuite name="maos-cli::signing_identity_2c" tests="7" skipped="0" errors="0" failures="0">
+        <testcase name="sealed_export_prints_the_base_key_when_no_region_resolves" classname="maos-cli::signing_identity_2c" timestamp="2026-11-08T14:11:05.006+00:00" time="0.050"/>
+        <testcase name="sealed_export_prints_the_region_key_it_actually_signed_with" classname="maos-cli::signing_identity_2c" timestamp="2026-11-08T14:11:05.057+00:00" time="0.050"/>
+        <testcase name="stdout_mode_export_prints_its_pubkey_to_stderr_and_keeps_stdout_pure" classname="maos-cli::signing_identity_2c" timestamp="2026-11-08T14:11:05.107+00:00" time="0.048"/>
+        <testcase name="trajectory_export_prints_the_region_key_it_actually_signed_with" classname="maos-cli::signing_identity_2c" timestamp="2026-11-08T14:11:05.155+00:00" time="0.051"/>
+        <testcase name="verify_bundle_derives_the_region_key_from_a_base_seed" classname="maos-cli::signing_identity_2c" timestamp="2026-11-08T14:11:05.206+00:00" time="0.053"/>
+        <testcase name="verify_bundle_requires_exactly_one_key_source" classname="maos-cli::signing_identity_2c" timestamp="2026-11-08T14:11:05.260+00:00" time="0.060"/>
+        <testcase name="verify_bundle_seed_path_refuses_a_region_tampered_bundle" classname="maos-cli::signing_identity_2c" timestamp="2026-11-08T14:11:05.320+00:00" time="0.050"/>
+    </testsuite>
+    <testsuite name="maos-cli::skill_queue_integration_test" tests="10" skipped="0" errors="0" failures="0">
+        <testcase name="admission_view_keeps_revision_entries_and_refuses_ambiguous_skill_ids" classname="maos-cli::skill_queue_integration_test" timestamp="2026-11-08T14:11:05.370+00:00" time="0.201"/>
+        <testcase name="authored_decision_journals_before_materializing_and_saving" classname="maos-cli::skill_queue_integration_test" timestamp="2026-11-08T14:11:05.570+00:00" time="0.180"/>
+        <testcase name="busy_timeout_5000_blocks_then_succeeds_green" classname="maos-cli::skill_queue_integration_test" timestamp="2026-11-08T14:11:05.750+00:00" time="0.156"/>
+        <testcase name="busy_timeout_zero_reds_immediately_under_contention" classname="maos-cli::skill_queue_integration_test" timestamp="2026-11-08T14:11:05.907+00:00" time="0.149"/>
+        <testcase name="discovered_skill_is_approvable_end_to_end" classname="maos-cli::skill_queue_integration_test" timestamp="2026-11-08T14:11:06.056+00:00" time="0.164"/>
+        <testcase name="double_journal_guard_keyed_on_target_capability" classname="maos-cli::skill_queue_integration_test" timestamp="2026-11-08T14:11:06.220+00:00" time="0.166"/>
+        <testcase name="journal_failure_and_materialization_preflight_refusal_mutate_nothing" classname="maos-cli::skill_queue_integration_test" timestamp="2026-11-08T14:11:06.386+00:00" time="0.154"/>
+        <testcase name="no_silent_loss_when_journal_write_fails" classname="maos-cli::skill_queue_integration_test" timestamp="2026-11-08T14:11:06.541+00:00" time="0.003"/>
+        <testcase name="queue_save_failure_never_reports_a_committed_decision_as_success" classname="maos-cli::skill_queue_integration_test" timestamp="2026-11-08T14:11:06.544+00:00" time="0.150"/>
+        <testcase name="unknown_or_corrupt_payload_queue_is_never_rebuilt_or_overwritten" classname="maos-cli::skill_queue_integration_test" timestamp="2026-11-08T14:11:06.695+00:00" time="0.146"/>
+    </testsuite>
+    <testsuite name="maos-cli::skill_queue_reconcile_test" tests="6" skipped="0" errors="0" failures="0">
+        <testcase name="discovered_skill_entry_path_is_never_fabricated" classname="maos-cli::skill_queue_reconcile_test" timestamp="2026-11-08T14:11:06.841+00:00" time="0.167"/>
+        <testcase name="discovered_skill_entry_path_is_package_shipped_9_7_boundary" classname="maos-cli::skill_queue_reconcile_test" timestamp="2026-11-08T14:11:07.008+00:00" time="0.145"/>
+        <testcase name="discovered_skill_with_no_tl_row_is_pending" classname="maos-cli::skill_queue_reconcile_test" timestamp="2026-11-08T14:11:07.153+00:00" time="0.146"/>
+        <testcase name="plain_approve_with_no_re_enqueue_keeps_entry_decided" classname="maos-cli::skill_queue_reconcile_test" timestamp="2026-11-08T14:11:07.299+00:00" time="0.167"/>
+        <testcase name="re_enqueue_after_reject_demotes_decided_entry_to_pending" classname="maos-cli::skill_queue_reconcile_test" timestamp="2026-11-08T14:11:07.466+00:00" time="0.159"/>
+        <testcase name="reconcile_pending_proven_red_set_equality" classname="maos-cli::skill_queue_reconcile_test" timestamp="2026-11-08T14:11:07.626+00:00" time="0.171"/>
+    </testsuite>
+    <testsuite name="maos-cli::skills_door_18_7" tests="6" skipped="0" errors="0" failures="0">
+        <testcase name="corrupt_v2_offline_show_and_decide_leave_payload_bytes_untouched" classname="maos-cli::skills_door_18_7" timestamp="2026-11-08T14:11:07.796+00:00" time="0.163"/>
+        <testcase name="list_preserves_custom_discovery_roots_over_the_door" classname="maos-cli::skills_door_18_7" timestamp="2026-11-08T14:11:07.959+00:00" time="0.016"/>
+        <testcase name="list_show_approve_and_reject_use_the_same_authenticated_door" classname="maos-cli::skills_door_18_7" timestamp="2026-11-08T14:11:07.975+00:00" time="0.022"/>
+        <testcase name="offline_decision_retains_exclusive_liveness_lock_until_journal_and_queue_finish" classname="maos-cli::skills_door_18_7" timestamp="2026-11-08T14:11:07.997+00:00" time="0.192"/>
+        <testcase name="refused_connection_uses_offline_only_while_the_home_lock_is_free" classname="maos-cli::skills_door_18_7" timestamp="2026-11-08T14:11:08.189+00:00" time="0.189"/>
+        <testcase name="rejected_bearer_never_falls_back_to_offline_queue_mutation" classname="maos-cli::skills_door_18_7" timestamp="2026-11-08T14:11:08.379+00:00" time="0.027"/>
+    </testsuite>
+    <testsuite name="maos-cli::spirit_install_20_1" tests="9" skipped="0" errors="0" failures="0">
+        <testcase name="built_in_shell_names_are_reserved_before_admission" classname="maos-cli::spirit_install_20_1" timestamp="2026-11-08T14:11:08.406+00:00" time="0.206"/>
+        <testcase name="configured_org_key_requires_a_valid_server_tier_signature" classname="maos-cli::spirit_install_20_1" timestamp="2026-11-08T14:11:08.612+00:00" time="0.507"/>
+        <testcase name="independently_keyed_server_is_verified_and_wrong_key_never_persists" classname="maos-cli::spirit_install_20_1" timestamp="2026-11-08T14:11:09.119+00:00" time="0.407"/>
+        <testcase name="install_refuses_registry_rust_inproc_before_persisting" classname="maos-cli::spirit_install_20_1" timestamp="2026-11-08T14:11:09.526+00:00" time="0.255"/>
+        <testcase name="installed_version_is_immutable_ac14" classname="maos-cli::spirit_install_20_1" timestamp="2026-11-08T14:11:09.781+00:00" time="1.257"/>
+        <testcase name="materialization_failure_never_activates_a_partial_install" classname="maos-cli::spirit_install_20_1" timestamp="2026-11-08T14:11:11.038+00:00" time="0.255"/>
+        <testcase name="offline_install_persists_remote_origin_and_rejects_tampering" classname="maos-cli::spirit_install_20_1" timestamp="2026-11-08T14:11:11.293+00:00" time="0.355"/>
+        <testcase name="wrong_publisher_key_and_claim_signature_are_refused" classname="maos-cli::spirit_install_20_1" timestamp="2026-11-08T14:11:11.648+00:00" time="0.255"/>
+        <testcase name="yanked_install_is_refused_before_persistence_ac16" classname="maos-cli::spirit_install_20_1" timestamp="2026-11-08T14:11:11.904+00:00" time="0.305"/>
+    </testsuite>
+    <testsuite name="maos-cli::spirit_upgrade_test" tests="10" skipped="0" errors="0" failures="0">
+        <testcase name="an_unknown_policy_is_refused_locally_without_a_round_trip" classname="maos-cli::spirit_upgrade_test" timestamp="2026-11-08T14:11:12.209+00:00" time="0.018"/>
+        <testcase name="attestation_and_keyring_travel_in_the_body" classname="maos-cli::spirit_upgrade_test" timestamp="2026-11-08T14:11:12.227+00:00" time="0.017"/>
+        <testcase name="cold_swap_reaches_the_door_and_its_outcomes_map_to_exits" classname="maos-cli::spirit_upgrade_test" timestamp="2026-11-08T14:11:12.244+00:00" time="0.062"/>
+        <testcase name="from_and_candidates_require_plan_locally" classname="maos-cli::spirit_upgrade_test" timestamp="2026-11-08T14:11:12.306+00:00" time="0.020"/>
+        <testcase name="manifest_not_found_refused_locally" classname="maos-cli::spirit_upgrade_test" timestamp="2026-11-08T14:11:12.326+00:00" time="0.015"/>
+        <testcase name="migrator_policy_reaches_the_door_and_its_outcomes_map_to_exits" classname="maos-cli::spirit_upgrade_test" timestamp="2026-11-08T14:11:12.341+00:00" time="0.031"/>
+        <testcase name="plan_mode_carries_create_plan_from_and_absolute_candidates" classname="maos-cli::spirit_upgrade_test" timestamp="2026-11-08T14:11:12.373+00:00" time="0.018"/>
+        <testcase name="upgrade_discovery_failures_map_to_typed_exits" classname="maos-cli::spirit_upgrade_test" timestamp="2026-11-08T14:11:12.391+00:00" time="0.061"/>
+        <testcase name="upgrade_maps_typed_responses_to_d16_1_p_exits" classname="maos-cli::spirit_upgrade_test" timestamp="2026-11-08T14:11:12.451+00:00" time="0.149"/>
+        <testcase name="upgrade_sends_absolute_manifest_and_default_policy" classname="maos-cli::spirit_upgrade_test" timestamp="2026-11-08T14:11:12.600+00:00" time="0.016"/>
+    </testsuite>
+    <testsuite name="maos-cli::two_host_reconcile_2c" tests="10" skipped="0" errors="0" failures="0">
+        <testcase name="a_seed_and_the_seeds_own_derived_pubkey_are_one_root" classname="maos-cli::two_host_reconcile_2c" timestamp="2026-11-08T14:11:12.616+00:00" time="0.107"/>
+        <testcase name="an_empty_host_tag_is_refused_at_export" classname="maos-cli::two_host_reconcile_2c" timestamp="2026-11-08T14:11:12.724+00:00" time="0.058"/>
+        <testcase name="an_unstamped_half_is_refused" classname="maos-cli::two_host_reconcile_2c" timestamp="2026-11-08T14:11:12.781+00:00" time="0.106"/>
+        <testcase name="disjoint_logs_are_refused" classname="maos-cli::two_host_reconcile_2c" timestamp="2026-11-08T14:11:12.887+00:00" time="0.107"/>
+        <testcase name="one_base_seed_under_two_claimed_regions_is_refused" classname="maos-cli::two_host_reconcile_2c" timestamp="2026-11-08T14:11:12.994+00:00" time="0.113"/>
+        <testcase name="one_root_signing_both_halves_is_refused" classname="maos-cli::two_host_reconcile_2c" timestamp="2026-11-08T14:11:13.107+00:00" time="0.112"/>
+        <testcase name="the_python_twin_verifies_a_host_stamped_bundle" classname="maos-cli::two_host_reconcile_2c" timestamp="2026-11-08T14:11:13.219+00:00" time="0.017"/>
+        <testcase name="the_python_twin_verifies_the_committed_non_ascii_tier2_bundle" classname="maos-cli::two_host_reconcile_2c" timestamp="2026-11-08T14:11:13.236+00:00" time="0.010"/>
+        <testcase name="the_two_host_receipt_is_written_and_verifies_under_the_operator_key" classname="maos-cli::two_host_reconcile_2c" timestamp="2026-11-08T14:11:13.245+00:00" time="0.108"/>
+        <testcase name="two_hosts_with_independent_roots_reconcile_on_the_shared_frame_id" classname="maos-cli::two_host_reconcile_2c" timestamp="2026-11-08T14:11:13.354+00:00" time="0.156"/>
+    </testsuite>
+    <testsuite name="maos-cli::uninstall_exit_codes_13_5b" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="uninstall_forwards_erased_held_not_found_and_failed_codes" classname="maos-cli::uninstall_exit_codes_13_5b" timestamp="2026-11-08T14:11:13.509+00:00" time="0.015"/>
+    </testsuite>
+    <testsuite name="maos-domain" tests="281" skipped="0" errors="0" failures="0">
+        <testcase name="cost::tests::btreemap_deterministic_order" classname="maos-domain" timestamp="2026-11-08T14:11:13.524+00:00" time="0.003"/>
+        <testcase name="cost::tests::cost_accumulation_is_linear_before_division" classname="maos-domain" timestamp="2026-11-08T14:11:13.528+00:00" time="0.003"/>
+        <testcase name="cost::tests::cost_attribution_payload_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.530+00:00" time="0.003"/>
+        <testcase name="cost::tests::forward_read_tolerance_unmodeled_dimension" classname="maos-domain" timestamp="2026-11-08T14:11:13.533+00:00" time="0.003"/>
+        <testcase name="cost::tests::golden_cost_vector_oracle" classname="maos-domain" timestamp="2026-11-08T14:11:13.536+00:00" time="0.003"/>
+        <testcase name="cost::tests::no_task_ref_in_payload" classname="maos-domain" timestamp="2026-11-08T14:11:13.539+00:00" time="0.003"/>
+        <testcase name="cost::tests::pricing_lookup" classname="maos-domain" timestamp="2026-11-08T14:11:13.542+00:00" time="0.003"/>
+        <testcase name="cost::tests::principal_ref_ambiguous_no_members" classname="maos-domain" timestamp="2026-11-08T14:11:13.545+00:00" time="0.003"/>
+        <testcase name="cost::tests::principal_ref_unattributed_serde" classname="maos-domain" timestamp="2026-11-08T14:11:13.548+00:00" time="0.003"/>
+        <testcase name="distillation::tests::digst_payload_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.550+00:00" time="0.003"/>
+        <testcase name="distillation::tests::distillation_error_audit_chain_missing_display" classname="maos-domain" timestamp="2026-11-08T14:11:13.553+00:00" time="0.003"/>
+        <testcase name="distillation::tests::distillation_error_distinguishes_variants" classname="maos-domain" timestamp="2026-11-08T14:11:13.556+00:00" time="0.003"/>
+        <testcase name="distillation::tests::receipt_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.559+00:00" time="0.003"/>
+        <testcase name="distillation::tests::request_new_accepts_valid" classname="maos-domain" timestamp="2026-11-08T14:11:13.561+00:00" time="0.002"/>
+        <testcase name="distillation::tests::request_new_rejects_depth_zero" classname="maos-domain" timestamp="2026-11-08T14:11:13.564+00:00" time="0.003"/>
+        <testcase name="distillation::tests::request_new_rejects_empty_source" classname="maos-domain" timestamp="2026-11-08T14:11:13.567+00:00" time="0.003"/>
+        <testcase name="frame::tests::decision_dispatch_3_1_shape_backward_compat" classname="maos-domain" timestamp="2026-11-08T14:11:13.570+00:00" time="0.003"/>
+        <testcase name="frame::tests::decision_dispatch_3_3_shape_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.573+00:00" time="0.003"/>
+        <testcase name="frame::tests::epistemic_halt_payload_3_1_shape_backward_compat" classname="maos-domain" timestamp="2026-11-08T14:11:13.576+00:00" time="0.002"/>
+        <testcase name="frame::tests::epistemic_halt_payload_rejects_empty_halt_id" classname="maos-domain" timestamp="2026-11-08T14:11:13.578+00:00" time="0.002"/>
+        <testcase name="frame::tests::epistemic_halt_payload_rejects_nan_threshold" classname="maos-domain" timestamp="2026-11-08T14:11:13.581+00:00" time="0.003"/>
+        <testcase name="frame::tests::epistemic_halt_payload_rejects_nan_value" classname="maos-domain" timestamp="2026-11-08T14:11:13.583+00:00" time="0.002"/>
+        <testcase name="frame::tests::frame_address_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.586+00:00" time="0.003"/>
+        <testcase name="frame::tests::halt_policy_override_valid_f32_parses_at_serde_layer" classname="maos-domain" timestamp="2026-11-08T14:11:13.588+00:00" time="0.002"/>
+        <testcase name="frame::tests::iac_frame_consent_request_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.591+00:00" time="0.003"/>
+        <testcase name="frame::tests::iac_frame_decision_dispatch_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.594+00:00" time="0.003"/>
+        <testcase name="frame::tests::iac_frame_epistemic_halt_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.597+00:00" time="0.003"/>
+        <testcase name="frame::tests::iac_frame_intent_lineage_serde_default_backward_compat" classname="maos-domain" timestamp="2026-11-08T14:11:13.600+00:00" time="0.003"/>
+        <testcase name="frame::tests::iac_frame_intent_lineage_serde_round_trip_non_empty" classname="maos-domain" timestamp="2026-11-08T14:11:13.602+00:00" time="0.002"/>
+        <testcase name="frame::tests::iac_frame_retract_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.605+00:00" time="0.003"/>
+        <testcase name="frame::tests::iac_frame_task_assign_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.607+00:00" time="0.003"/>
+        <testcase name="frame::tests::iac_frame_task_complete_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.610+00:00" time="0.003"/>
+        <testcase name="frame::tests::iac_frame_telemetry_event_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.613+00:00" time="0.002"/>
+        <testcase name="frame::tests::posture_preferences_3_1_shape_backward_compat" classname="maos-domain" timestamp="2026-11-08T14:11:13.615+00:00" time="0.002"/>
+        <testcase name="frame::tests::posture_preferences_3_2_shape_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.618+00:00" time="0.003"/>
+        <testcase name="frame::tests::posture_preferences_default_has_empty_overrides" classname="maos-domain" timestamp="2026-11-08T14:11:13.621+00:00" time="0.003"/>
+        <testcase name="frame::tests::posture_preferences_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.624+00:00" time="0.003"/>
+        <testcase name="governance::tests::abi_extension_proposal_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.627+00:00" time="0.003"/>
+        <testcase name="governance::tests::erasure_class_lineage_ids" classname="maos-domain" timestamp="2026-11-08T14:11:13.629+00:00" time="0.003"/>
+        <testcase name="governance::tests::governance_event_kind_tagged" classname="maos-domain" timestamp="2026-11-08T14:11:13.632+00:00" time="0.003"/>
+        <testcase name="governance::tests::model_provenance_event_round_trip_and_tagged" classname="maos-domain" timestamp="2026-11-08T14:11:13.635+00:00" time="0.003"/>
+        <testcase name="governance::tests::model_provenance_payload_has_zero_claim_instance_ids" classname="maos-domain" timestamp="2026-11-08T14:11:13.638+00:00" time="0.003"/>
+        <testcase name="governance::tests::ratification_status_serde_snake_case" classname="maos-domain" timestamp="2026-11-08T14:11:13.641+00:00" time="0.002"/>
+        <testcase name="governance::tests::shared_schema_id_key_contract" classname="maos-domain" timestamp="2026-11-08T14:11:13.643+00:00" time="0.003"/>
+        <testcase name="halt::tests::halt_continuity_error_display" classname="maos-domain" timestamp="2026-11-08T14:11:13.646+00:00" time="0.002"/>
+        <testcase name="halt::tests::halt_id_new_empty_returns_error" classname="maos-domain" timestamp="2026-11-08T14:11:13.649+00:00" time="0.003"/>
+        <testcase name="halt::tests::halt_id_new_nonempty_works" classname="maos-domain" timestamp="2026-11-08T14:11:13.652+00:00" time="0.003"/>
+        <testcase name="halt::tests::halt_id_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.654+00:00" time="0.003"/>
+        <testcase name="halt::tests::halt_receipt_new_constructs_invocation_time_receipt" classname="maos-domain" timestamp="2026-11-08T14:11:13.657+00:00" time="0.003"/>
+        <testcase name="halt::tests::halt_receipt_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.660+00:00" time="0.003"/>
+        <testcase name="halt::tests::halt_receipt_with_resolution_fills_post_resolution_fields" classname="maos-domain" timestamp="2026-11-08T14:11:13.662+00:00" time="0.003"/>
+        <testcase name="halt::tests::halt_state_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.665+00:00" time="0.003"/>
+        <testcase name="halt::tests::invoke_halt_error_display" classname="maos-domain" timestamp="2026-11-08T14:11:13.668+00:00" time="0.003"/>
+        <testcase name="halt::tests::output_marker_override_for_constructs_valid_marker" classname="maos-domain" timestamp="2026-11-08T14:11:13.671+00:00" time="0.003"/>
+        <testcase name="halt::tests::output_marker_override_for_rejects_empty_policy_ref" classname="maos-domain" timestamp="2026-11-08T14:11:13.673+00:00" time="0.003"/>
+        <testcase name="halt::tests::output_marker_override_for_rejects_whitespace_only_policy_ref" classname="maos-domain" timestamp="2026-11-08T14:11:13.676+00:00" time="0.002"/>
+        <testcase name="halt::tests::output_marker_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.679+00:00" time="0.002"/>
+        <testcase name="halt::tests::resolution_authorized_override_rejects_empty" classname="maos-domain" timestamp="2026-11-08T14:11:13.681+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_authorized_override_rejects_whitespace_only" classname="maos-domain" timestamp="2026-11-08T14:11:13.685+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_deserialize_accepts_populated_payloads" classname="maos-domain" timestamp="2026-11-08T14:11:13.688+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_deserialize_rejects_empty_text" classname="maos-domain" timestamp="2026-11-08T14:11:13.691+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_deserialize_rejects_whitespace_operator_policy_ref" classname="maos-domain" timestamp="2026-11-08T14:11:13.694+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_kind_label_accepted_halt" classname="maos-domain" timestamp="2026-11-08T14:11:13.697+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_kind_label_authorized_override" classname="maos-domain" timestamp="2026-11-08T14:11:13.700+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_kind_label_provided_context" classname="maos-domain" timestamp="2026-11-08T14:11:13.703+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_provided_context_rejects_empty" classname="maos-domain" timestamp="2026-11-08T14:11:13.706+00:00" time="0.004"/>
+        <testcase name="halt::tests::resolution_provided_context_rejects_whitespace_only" classname="maos-domain" timestamp="2026-11-08T14:11:13.709+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_serde_round_trip_accepted_halt" classname="maos-domain" timestamp="2026-11-08T14:11:13.712+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_serde_round_trip_authorized_override" classname="maos-domain" timestamp="2026-11-08T14:11:13.715+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_serde_round_trip_provided_context" classname="maos-domain" timestamp="2026-11-08T14:11:13.718+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_validate_accepts_populated_and_unit_variants" classname="maos-domain" timestamp="2026-11-08T14:11:13.721+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_validate_rejects_struct_literal_empty_text" classname="maos-domain" timestamp="2026-11-08T14:11:13.723+00:00" time="0.003"/>
+        <testcase name="halt::tests::resolution_validate_rejects_struct_literal_whitespace_operator_policy_ref" classname="maos-domain" timestamp="2026-11-08T14:11:13.726+00:00" time="0.003"/>
+        <testcase name="halt::tests::termination_kind_revocation_terminated_as_str" classname="maos-domain" timestamp="2026-11-08T14:11:13.729+00:00" time="0.003"/>
+        <testcase name="halt::tests::termination_kind_revocation_terminated_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:13.731+00:00" time="0.003"/>
+        <testcase name="host_grant::tests::grant_permits_requested_tier_at_or_below_ceiling" classname="maos-domain" timestamp="2026-11-08T14:11:13.734+00:00" time="0.003"/>
+        <testcase name="host_grant::tests::no_matching_grant_fails_closed" classname="maos-domain" timestamp="2026-11-08T14:11:13.737+00:00" time="0.003"/>
+        <testcase name="host_grant::tests::request_above_grant_fails_closed_no_downgrade" classname="maos-domain" timestamp="2026-11-08T14:11:13.740+00:00" time="0.003"/>
+        <testcase name="hot_swap::tests::emigrator_missing_display" classname="maos-domain" timestamp="2026-11-08T14:11:13.742+00:00" time="0.003"/>
+        <testcase name="hot_swap::tests::halt_continuity_violation_wraps_inner_error" classname="maos-domain" timestamp="2026-11-08T14:11:13.745+00:00" time="0.003"/>
+        <testcase name="hot_swap::tests::hot_swap_result_new_happy_path" classname="maos-domain" timestamp="2026-11-08T14:11:13.748+00:00" time="0.002"/>
+        <testcase name="hot_swap::tests::hot_swap_result_new_rejects_pid_zero" classname="maos-domain" timestamp="2026-11-08T14:11:13.750+00:00" time="0.002"/>
+        <testcase name="hot_swap::tests::hot_swap_verb_exhaustiveness" classname="maos-domain" timestamp="2026-11-08T14:11:13.752+00:00" time="0.002"/>
+        <testcase name="hot_swap::tests::invalid_expected_schema_version_is_distinct_from_snapshot_and_migrator_errors" classname="maos-domain" timestamp="2026-11-08T14:11:13.755+00:00" time="0.002"/>
+        <testcase name="hot_swap::tests::migrator_error_not_implemented_display" classname="maos-domain" timestamp="2026-11-08T14:11:13.757+00:00" time="0.003"/>
+        <testcase name="iac_bus_types::tests::eintent_lineage_broken_display" classname="maos-domain" timestamp="2026-11-08T14:11:13.760+00:00" time="0.002"/>
+        <testcase name="iac_bus_types::tests::eintent_lineage_broken_spirit_drafted" classname="maos-domain" timestamp="2026-11-08T14:11:13.763+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::in_flight_entry_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:13.765+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::journal_entry_backward_compat_deser" classname="maos-domain" timestamp="2026-11-08T14:11:13.768+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::journal_entry_construction" classname="maos-domain" timestamp="2026-11-08T14:11:13.771+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::journal_entry_with_tier_roundtrips" classname="maos-domain" timestamp="2026-11-08T14:11:13.773+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::lifecycle_event_crash_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:13.776+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::lifecycle_event_non_exhaustive_match" classname="maos-domain" timestamp="2026-11-08T14:11:13.779+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::lifecycle_event_provider_switched_discriminant" classname="maos-domain" timestamp="2026-11-08T14:11:13.782+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::lifecycle_event_provider_switched_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:13.785+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::lifecycle_event_revoked_discriminant" classname="maos-domain" timestamp="2026-11-08T14:11:13.788+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::lifecycle_event_revoked_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:13.791+00:00" time="0.002"/>
+        <testcase name="invariants::i10::tests::lifecycle_event_silent_failure_suspect_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:13.793+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::lifecycle_event_stalled_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:13.796+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::lifecycle_event_upgrade_discriminant" classname="maos-domain" timestamp="2026-11-08T14:11:13.799+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::lifecycle_event_upgrade_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:13.802+00:00" time="0.003"/>
+        <testcase name="invariants::i10::tests::provider_switched_payload_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:13.805+00:00" time="0.002"/>
+        <testcase name="invariants::i11::tests::digest_ref_depth" classname="maos-domain" timestamp="2026-11-08T14:11:13.807+00:00" time="0.003"/>
+        <testcase name="invariants::i12::tests::working_memory_digest_refs" classname="maos-domain" timestamp="2026-11-08T14:11:13.811+00:00" time="0.003"/>
+        <testcase name="invariants::i13::tests::allowed_promotion_set" classname="maos-domain" timestamp="2026-11-08T14:11:13.813+00:00" time="0.003"/>
+        <testcase name="invariants::i13::tests::intent_lineage_default_is_empty" classname="maos-domain" timestamp="2026-11-08T14:11:13.816+00:00" time="0.003"/>
+        <testcase name="invariants::i13::tests::intent_lineage_is_empty_returns_true_for_empty_lineage" classname="maos-domain" timestamp="2026-11-08T14:11:13.819+00:00" time="0.002"/>
+        <testcase name="invariants::i14::tests::halt_continuity_variants" classname="maos-domain" timestamp="2026-11-08T14:11:13.821+00:00" time="0.002"/>
+        <testcase name="invariants::i1::tests::capability_token_exists" classname="maos-domain" timestamp="2026-11-08T14:11:13.824+00:00" time="0.003"/>
+        <testcase name="invariants::i1::tests::capability_token_is_non_exhaustive" classname="maos-domain" timestamp="2026-11-08T14:11:13.827+00:00" time="0.003"/>
+        <testcase name="invariants::i1::tests::invariant_i1_marker_is_zst" classname="maos-domain" timestamp="2026-11-08T14:11:13.829+00:00" time="0.003"/>
+        <testcase name="invariants::i1::tests::mcp_call_scope_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.832+00:00" time="0.003"/>
+        <testcase name="invariants::i2::tests::log_before_deliver_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:13.835+00:00" time="0.003"/>
+        <testcase name="invariants::i3::tests::frame_origin_discriminants_stable" classname="maos-domain" timestamp="2026-11-08T14:11:13.838+00:00" time="0.003"/>
+        <testcase name="invariants::i4::tests::approval_decision_construction" classname="maos-domain" timestamp="2026-11-08T14:11:13.841+00:00" time="0.003"/>
+        <testcase name="invariants::i5::tests::namespace_key_typed_scope" classname="maos-domain" timestamp="2026-11-08T14:11:13.843+00:00" time="0.002"/>
+        <testcase name="invariants::i6::tests::hot_swap_state_discriminants" classname="maos-domain" timestamp="2026-11-08T14:11:13.846+00:00" time="0.002"/>
+        <testcase name="invariants::i7::tests::scalar_tap_event_construction" classname="maos-domain" timestamp="2026-11-08T14:11:13.848+00:00" time="0.002"/>
+        <testcase name="invariants::i7::tests::telemetry_topic_creation" classname="maos-domain" timestamp="2026-11-08T14:11:13.850+00:00" time="0.002"/>
+        <testcase name="invariants::i8::tests::intent_allowlist_membership" classname="maos-domain" timestamp="2026-11-08T14:11:13.853+00:00" time="0.002"/>
+        <testcase name="invariants::i8::tests::is_canonical_accepts_reference_fleet_shapes" classname="maos-domain" timestamp="2026-11-08T14:11:13.855+00:00" time="0.003"/>
+        <testcase name="invariants::i8::tests::is_canonical_rejects_typo_class" classname="maos-domain" timestamp="2026-11-08T14:11:13.858+00:00" time="0.003"/>
+        <testcase name="invariants::i8::tests::parse_round_trips_canonical_and_rejects_non_canonical" classname="maos-domain" timestamp="2026-11-08T14:11:13.861+00:00" time="0.003"/>
+        <testcase name="invariants::i9::tests::abi_to_operational_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.864+00:00" time="0.002"/>
+        <testcase name="invariants::i9::tests::display_format" classname="maos-domain" timestamp="2026-11-08T14:11:13.866+00:00" time="0.002"/>
+        <testcase name="invariants::i9::tests::kernel_caching_shape" classname="maos-domain" timestamp="2026-11-08T14:11:13.869+00:00" time="0.003"/>
+        <testcase name="invariants::i9::tests::sandbox_tier_consts" classname="maos-domain" timestamp="2026-11-08T14:11:13.872+00:00" time="0.002"/>
+        <testcase name="invariants::i9::tests::sandbox_tier_default_is_t2" classname="maos-domain" timestamp="2026-11-08T14:11:13.874+00:00" time="0.003"/>
+        <testcase name="invariants::i9::tests::to_abi_rejects_out_of_range" classname="maos-domain" timestamp="2026-11-08T14:11:13.877+00:00" time="0.003"/>
+        <testcase name="invariants::i9::tests::try_from_manifest_str" classname="maos-domain" timestamp="2026-11-08T14:11:13.880+00:00" time="0.003"/>
+        <testcase name="invariants::i9::tests::try_from_u8_rejects_out_of_range" classname="maos-domain" timestamp="2026-11-08T14:11:13.882+00:00" time="0.003"/>
+        <testcase name="invariants::i9::tests::try_from_u8_valid" classname="maos-domain" timestamp="2026-11-08T14:11:13.885+00:00" time="0.003"/>
+        <testcase name="lifecycle::tests::lifecycle_error_already_loaded_display_contains_spirit_id" classname="maos-domain" timestamp="2026-11-08T14:11:13.888+00:00" time="0.003"/>
+        <testcase name="lifecycle::tests::lifecycle_receipt_new_with_none_offset" classname="maos-domain" timestamp="2026-11-08T14:11:13.891+00:00" time="0.003"/>
+        <testcase name="lifecycle::tests::lifecycle_receipt_rejects_pid_zero" classname="maos-domain" timestamp="2026-11-08T14:11:13.894+00:00" time="0.003"/>
+        <testcase name="lifecycle::tests::lifecycle_verb_variant_exhaustiveness" classname="maos-domain" timestamp="2026-11-08T14:11:13.896+00:00" time="0.003"/>
+        <testcase name="lifecycle::tests::spirit_lifecycle_state_is_runnable" classname="maos-domain" timestamp="2026-11-08T14:11:13.899+00:00" time="0.003"/>
+        <testcase name="lifecycle::tests::spirit_lifecycle_state_is_terminal" classname="maos-domain" timestamp="2026-11-08T14:11:13.902+00:00" time="0.003"/>
+        <testcase name="lifecycle::tests::spirit_lifecycle_state_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.905+00:00" time="0.002"/>
+        <testcase name="log_recall::tests::capability_denial_is_typed_and_contains_no_caller_identity" classname="maos-domain" timestamp="2026-11-08T14:11:13.907+00:00" time="0.002"/>
+        <testcase name="log_recall::tests::cross_wall_refusal_outcomes_are_machine_distinct" classname="maos-domain" timestamp="2026-11-08T14:11:13.910+00:00" time="0.003"/>
+        <testcase name="log_recall::tests::cross_wall_request_rejects_noncanonical_team" classname="maos-domain" timestamp="2026-11-08T14:11:13.912+00:00" time="0.003"/>
+        <testcase name="log_recall::tests::cross_wall_request_validates_team_and_preserves_filter" classname="maos-domain" timestamp="2026-11-08T14:11:13.915+00:00" time="0.003"/>
+        <testcase name="log_recall::tests::filter_default_sets_max_limit" classname="maos-domain" timestamp="2026-11-08T14:11:13.919+00:00" time="0.003"/>
+        <testcase name="log_recall::tests::filter_new_clamps_limit" classname="maos-domain" timestamp="2026-11-08T14:11:13.921+00:00" time="0.002"/>
+        <testcase name="log_recall::tests::log_fetch_response_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.924+00:00" time="0.002"/>
+        <testcase name="log_recall::tests::log_recall_cursor_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.926+00:00" time="0.003"/>
+        <testcase name="log_recall::tests::log_recall_error_distinguishes_variants" classname="maos-domain" timestamp="2026-11-08T14:11:13.929+00:00" time="0.003"/>
+        <testcase name="log_recall::tests::log_recall_error_scope_violation_carries_fields" classname="maos-domain" timestamp="2026-11-08T14:11:13.932+00:00" time="0.003"/>
+        <testcase name="log_recall::tests::log_recall_page_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.935+00:00" time="0.003"/>
+        <testcase name="memory::tests::forget_receipt_preserves_old_wire_shape_and_reports_typed_gaps" classname="maos-domain" timestamp="2026-11-08T14:11:13.937+00:00" time="0.003"/>
+        <testcase name="memory::tests::memory_error_display_collective" classname="maos-domain" timestamp="2026-11-08T14:11:13.940+00:00" time="0.003"/>
+        <testcase name="memory::tests::memory_error_display_invalid_key" classname="maos-domain" timestamp="2026-11-08T14:11:13.943+00:00" time="0.003"/>
+        <testcase name="memory::tests::memory_error_display_key_traversal" classname="maos-domain" timestamp="2026-11-08T14:11:13.945+00:00" time="0.003"/>
+        <testcase name="memory::tests::memory_error_from_io" classname="maos-domain" timestamp="2026-11-08T14:11:13.948+00:00" time="0.003"/>
+        <testcase name="memory::tests::memory_tier_discriminants_are_distinct" classname="maos-domain" timestamp="2026-11-08T14:11:13.951+00:00" time="0.003"/>
+        <testcase name="memory::tests::memory_tier_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:13.954+00:00" time="0.003"/>
+        <testcase name="memory::tests::memory_value_kind_blob" classname="maos-domain" timestamp="2026-11-08T14:11:13.957+00:00" time="0.003"/>
+        <testcase name="memory::tests::memory_value_kind_json" classname="maos-domain" timestamp="2026-11-08T14:11:13.960+00:00" time="0.002"/>
+        <testcase name="memory::tests::memory_value_kind_markdown" classname="maos-domain" timestamp="2026-11-08T14:11:13.962+00:00" time="0.003"/>
+        <testcase name="memory::tests::memory_value_kind_text" classname="maos-domain" timestamp="2026-11-08T14:11:13.965+00:00" time="0.002"/>
+        <testcase name="memory::tests::memory_value_serde_round_trip_json" classname="maos-domain" timestamp="2026-11-08T14:11:13.967+00:00" time="0.003"/>
+        <testcase name="memory::tests::memory_value_serde_round_trip_markdown" classname="maos-domain" timestamp="2026-11-08T14:11:13.970+00:00" time="0.003"/>
+        <testcase name="memory::tests::namespace_kind_labels_are_distinct" classname="maos-domain" timestamp="2026-11-08T14:11:13.973+00:00" time="0.003"/>
+        <testcase name="memory::tests::namespace_principal_rejects_colon_in_principal_id" classname="maos-domain" timestamp="2026-11-08T14:11:13.976+00:00" time="0.002"/>
+        <testcase name="memory::tests::namespace_principal_rejects_colon_in_schema" classname="maos-domain" timestamp="2026-11-08T14:11:13.978+00:00" time="0.003"/>
+        <testcase name="memory::tests::namespace_principal_rejects_control_char" classname="maos-domain" timestamp="2026-11-08T14:11:13.981+00:00" time="0.003"/>
+        <testcase name="memory::tests::namespace_principal_rejects_empty_principal_id" classname="maos-domain" timestamp="2026-11-08T14:11:13.985+00:00" time="0.003"/>
+        <testcase name="memory::tests::namespace_principal_rejects_empty_schema" classname="maos-domain" timestamp="2026-11-08T14:11:13.987+00:00" time="0.003"/>
+        <testcase name="memory::tests::namespace_principal_rejects_nul" classname="maos-domain" timestamp="2026-11-08T14:11:13.990+00:00" time="0.003"/>
+        <testcase name="memory::tests::namespace_principal_round_trips" classname="maos-domain" timestamp="2026-11-08T14:11:13.993+00:00" time="0.003"/>
+        <testcase name="memory::tests::principal_key_new_rejects_colon_in_principal_id" classname="maos-domain" timestamp="2026-11-08T14:11:13.995+00:00" time="0.003"/>
+        <testcase name="memory::tests::principal_key_new_rejects_empty_principal_id" classname="maos-domain" timestamp="2026-11-08T14:11:13.998+00:00" time="0.003"/>
+        <testcase name="memory::tests::principal_key_new_rejects_empty_schema" classname="maos-domain" timestamp="2026-11-08T14:11:14.001+00:00" time="0.003"/>
+        <testcase name="memory::tests::principal_key_new_round_trips" classname="maos-domain" timestamp="2026-11-08T14:11:14.004+00:00" time="0.003"/>
+        <testcase name="memory::tests::principal_matching_respects_unicode_and_punctuation_bridges" classname="maos-domain" timestamp="2026-11-08T14:11:14.006+00:00" time="0.002"/>
+        <testcase name="notification::tests::anomaly_flagged_accepts_boundary_confidence" classname="maos-domain" timestamp="2026-11-08T14:11:14.009+00:00" time="0.003"/>
+        <testcase name="notification::tests::anomaly_flagged_accepts_valid_input" classname="maos-domain" timestamp="2026-11-08T14:11:14.012+00:00" time="0.003"/>
+        <testcase name="notification::tests::anomaly_flagged_rejects_empty_summary" classname="maos-domain" timestamp="2026-11-08T14:11:14.014+00:00" time="0.003"/>
+        <testcase name="notification::tests::anomaly_flagged_rejects_nan_confidence" classname="maos-domain" timestamp="2026-11-08T14:11:14.017+00:00" time="0.003"/>
+        <testcase name="notification::tests::anomaly_flagged_rejects_out_of_range_confidence" classname="maos-domain" timestamp="2026-11-08T14:11:14.020+00:00" time="0.003"/>
+        <testcase name="notification::tests::anomaly_flagged_rejects_whitespace_only_summary" classname="maos-domain" timestamp="2026-11-08T14:11:14.023+00:00" time="0.003"/>
+        <testcase name="orchestrator::tests::instruction_id_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:14.026+00:00" time="0.003"/>
+        <testcase name="orchestrator::tests::instruction_new_accepts_nonempty_goal" classname="maos-domain" timestamp="2026-11-08T14:11:14.029+00:00" time="0.003"/>
+        <testcase name="orchestrator::tests::instruction_new_rejects_empty_goal" classname="maos-domain" timestamp="2026-11-08T14:11:14.031+00:00" time="0.003"/>
+        <testcase name="orchestrator::tests::instruction_new_rejects_whitespace_only_goal" classname="maos-domain" timestamp="2026-11-08T14:11:14.034+00:00" time="0.002"/>
+        <testcase name="orchestrator::tests::instruction_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:14.036+00:00" time="0.002"/>
+        <testcase name="ports::capability::tests::cap_error_distinguishes_variants" classname="maos-domain" timestamp="2026-11-08T14:11:14.039+00:00" time="0.002"/>
+        <testcase name="ports::crypto::tests::crypto_error_distinguishes_variants" classname="maos-domain" timestamp="2026-11-08T14:11:14.041+00:00" time="0.003"/>
+        <testcase name="ports::crypto::tests::crypto_provider_is_object_safe" classname="maos-domain" timestamp="2026-11-08T14:11:14.044+00:00" time="0.003"/>
+        <testcase name="ports::identity_assertion::tests::authenticated_principal_is_trait_object_safe_payload" classname="maos-domain" timestamp="2026-11-08T14:11:14.047+00:00" time="0.003"/>
+        <testcase name="ports::mcp::tests::mcp_attribution_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:14.050+00:00" time="0.003"/>
+        <testcase name="ports::mcp::tests::mcp_error_display" classname="maos-domain" timestamp="2026-11-08T14:11:14.053+00:00" time="0.003"/>
+        <testcase name="ports::mcp::tests::mcp_request_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:14.055+00:00" time="0.003"/>
+        <testcase name="ports::mcp::tests::mcp_response_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:14.058+00:00" time="0.002"/>
+        <testcase name="ports::mcp::tests::mcp_transport_id_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:14.060+00:00" time="0.003"/>
+        <testcase name="ports::policy_decision::tests::policy_decision_error_has_typed_variants" classname="maos-domain" timestamp="2026-11-08T14:11:14.063+00:00" time="0.003"/>
+        <testcase name="ports::policy_decision::tests::policy_decision_port_is_object_safe" classname="maos-domain" timestamp="2026-11-08T14:11:14.066+00:00" time="0.003"/>
+        <testcase name="ports::policy_decision::tests::policy_verdict_only_has_allow_and_deny" classname="maos-domain" timestamp="2026-11-08T14:11:14.069+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::publish_receipt_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.072+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::registry_error_display" classname="maos-domain" timestamp="2026-11-08T14:11:14.075+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::registry_error_is_non_exhaustive" classname="maos-domain" timestamp="2026-11-08T14:11:14.078+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::search_query_defaults" classname="maos-domain" timestamp="2026-11-08T14:11:14.080+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::search_query_deser_defaults" classname="maos-domain" timestamp="2026-11-08T14:11:14.083+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::search_query_limit_clamped_to_200" classname="maos-domain" timestamp="2026-11-08T14:11:14.086+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::search_query_limit_minimum_1" classname="maos-domain" timestamp="2026-11-08T14:11:14.089+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::search_query_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.091+00:00" time="0.002"/>
+        <testcase name="ports::registry::tests::signed_artifact_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.094+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::signed_manifest_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.096+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::signed_package_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.099+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::yank_entry_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.102+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::yank_list_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.105+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::yank_reason_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.108+00:00" time="0.003"/>
+        <testcase name="ports::registry::tests::yank_receipt_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.111+00:00" time="0.003"/>
+        <testcase name="ports::task::tests::task_assignment_record_construction" classname="maos-domain" timestamp="2026-11-08T14:11:14.113+00:00" time="0.002"/>
+        <testcase name="region::tests::canonicalize_accepts_hyphenated_and_digits" classname="maos-domain" timestamp="2026-11-08T14:11:14.116+00:00" time="0.002"/>
+        <testcase name="region::tests::canonicalize_accepts_simple_lowercase" classname="maos-domain" timestamp="2026-11-08T14:11:14.118+00:00" time="0.003"/>
+        <testcase name="region::tests::canonicalize_is_idempotent" classname="maos-domain" timestamp="2026-11-08T14:11:14.121+00:00" time="0.003"/>
+        <testcase name="region::tests::canonicalize_lowercases_so_two_spellings_key_identically" classname="maos-domain" timestamp="2026-11-08T14:11:14.124+00:00" time="0.003"/>
+        <testcase name="region::tests::canonicalize_rejects_disallowed_ascii" classname="maos-domain" timestamp="2026-11-08T14:11:14.127+00:00" time="0.003"/>
+        <testcase name="region::tests::canonicalize_rejects_non_ascii_and_homoglyphs" classname="maos-domain" timestamp="2026-11-08T14:11:14.129+00:00" time="0.003"/>
+        <testcase name="region::tests::canonicalize_rejects_too_long" classname="maos-domain" timestamp="2026-11-08T14:11:14.132+00:00" time="0.003"/>
+        <testcase name="region::tests::canonicalize_rejects_too_short" classname="maos-domain" timestamp="2026-11-08T14:11:14.135+00:00" time="0.003"/>
+        <testcase name="region::tests::canonicalize_trims_surrounding_whitespace" classname="maos-domain" timestamp="2026-11-08T14:11:14.138+00:00" time="0.003"/>
+        <testcase name="region::tests::encoding_id_is_frozen" classname="maos-domain" timestamp="2026-11-08T14:11:14.141+00:00" time="0.003"/>
+        <testcase name="region::tests::home_from_env_resolves_and_canonicalizes" classname="maos-domain" timestamp="2026-11-08T14:11:14.144+00:00" time="0.003"/>
+        <testcase name="region::tests::region_error_variants_are_distinct" classname="maos-domain" timestamp="2026-11-08T14:11:14.147+00:00" time="0.003"/>
+        <testcase name="region::tests::resolve_home_env_overrides_disk" classname="maos-domain" timestamp="2026-11-08T14:11:14.149+00:00" time="0.002"/>
+        <testcase name="reserved_namespaces::tests::reserved_are_unique_and_nonempty" classname="maos-domain" timestamp="2026-11-08T14:11:14.152+00:00" time="0.003"/>
+        <testcase name="reserved_namespaces::tests::reserved_do_not_collide_with_current_variants" classname="maos-domain" timestamp="2026-11-08T14:11:14.154+00:00" time="0.003"/>
+        <testcase name="revocation::tests::crl_directory_defaults_to_xdg_data_home" classname="maos-domain" timestamp="2026-11-08T14:11:14.157+00:00" time="0.003"/>
+        <testcase name="revocation::tests::crl_directory_falls_back_to_home_data_tree" classname="maos-domain" timestamp="2026-11-08T14:11:14.160+00:00" time="0.003"/>
+        <testcase name="revocation::tests::crl_directory_prefers_explicit_override" classname="maos-domain" timestamp="2026-11-08T14:11:14.162+00:00" time="0.003"/>
+        <testcase name="revocation::tests::crl_id_display_hex" classname="maos-domain" timestamp="2026-11-08T14:11:14.165+00:00" time="0.003"/>
+        <testcase name="revocation::tests::crl_id_is_the_sha256_of_recursively_key_sorted_entries" classname="maos-domain" timestamp="2026-11-08T14:11:14.168+00:00" time="0.003"/>
+        <testcase name="revocation::tests::registry_client_trait_object_safe" classname="maos-domain" timestamp="2026-11-08T14:11:14.171+00:00" time="0.003"/>
+        <testcase name="revocation::tests::revocation_action_as_str_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.173+00:00" time="0.003"/>
+        <testcase name="revocation::tests::revocation_action_default_is_terminate_immediately" classname="maos-domain" timestamp="2026-11-08T14:11:14.176+00:00" time="0.003"/>
+        <testcase name="revocation::tests::revocation_entry_new_rejects_empty_spirit_class" classname="maos-domain" timestamp="2026-11-08T14:11:14.179+00:00" time="0.003"/>
+        <testcase name="revocation::tests::revocation_entry_new_rejects_invalid_spirit_class" classname="maos-domain" timestamp="2026-11-08T14:11:14.182+00:00" time="0.003"/>
+        <testcase name="revocation::tests::revocation_origin_as_str_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.185+00:00" time="0.003"/>
+        <testcase name="revocation::tests::revocation_origin_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.188+00:00" time="0.003"/>
+        <testcase name="revocation::tests::semver_range_contains_in_range" classname="maos-domain" timestamp="2026-11-08T14:11:14.191+00:00" time="0.003"/>
+        <testcase name="revocation::tests::semver_range_contains_out_of_range" classname="maos-domain" timestamp="2026-11-08T14:11:14.194+00:00" time="0.003"/>
+        <testcase name="revocation::tests::semver_range_exact_match" classname="maos-domain" timestamp="2026-11-08T14:11:14.197+00:00" time="0.003"/>
+        <testcase name="revocation::tests::semver_range_malformed_returns_err" classname="maos-domain" timestamp="2026-11-08T14:11:14.199+00:00" time="0.003"/>
+        <testcase name="revocation::tests::semver_range_wildcard" classname="maos-domain" timestamp="2026-11-08T14:11:14.202+00:00" time="0.003"/>
+        <testcase name="revocation::tests::signed_revocation_list_new_rejects_empty_entries" classname="maos-domain" timestamp="2026-11-08T14:11:14.205+00:00" time="0.003"/>
+        <testcase name="revocation::tests::signed_revocation_list_new_rejects_wrong_schema_version" classname="maos-domain" timestamp="2026-11-08T14:11:14.208+00:00" time="0.003"/>
+        <testcase name="sandbox::tests::container_runtime_kind_as_str" classname="maos-domain" timestamp="2026-11-08T14:11:14.211+00:00" time="0.002"/>
+        <testcase name="sandbox::tests::container_runtime_kind_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.213+00:00" time="0.003"/>
+        <testcase name="sandbox::tests::image_attestation_id_display_hex" classname="maos-domain" timestamp="2026-11-08T14:11:14.216+00:00" time="0.003"/>
+        <testcase name="sandbox::tests::sandbox_inspect_report_serde_roundtrip" classname="maos-domain" timestamp="2026-11-08T14:11:14.219+00:00" time="0.003"/>
+        <testcase name="sandbox::tests::t3_error_display" classname="maos-domain" timestamp="2026-11-08T14:11:14.222+00:00" time="0.003"/>
+        <testcase name="sandbox::tests::t3_image_attestation_new_happy_path" classname="maos-domain" timestamp="2026-11-08T14:11:14.224+00:00" time="0.002"/>
+        <testcase name="sandbox::tests::t3_image_attestation_new_rejects_empty_entries" classname="maos-domain" timestamp="2026-11-08T14:11:14.227+00:00" time="0.002"/>
+        <testcase name="sandbox::tests::t3_image_attestation_new_rejects_multiple_defaults" classname="maos-domain" timestamp="2026-11-08T14:11:14.229+00:00" time="0.003"/>
+        <testcase name="sandbox::tests::t3_image_attestation_new_rejects_wrong_schema_version" classname="maos-domain" timestamp="2026-11-08T14:11:14.232+00:00" time="0.003"/>
+        <testcase name="sandbox::tests::t3_image_attestation_new_rejects_zero_pubkey" classname="maos-domain" timestamp="2026-11-08T14:11:14.235+00:00" time="0.003"/>
+        <testcase name="sandbox::tests::t3_image_attestation_new_rejects_zero_signature" classname="maos-domain" timestamp="2026-11-08T14:11:14.237+00:00" time="0.003"/>
+        <testcase name="sandbox::tests::t3_image_entry_new_happy_path" classname="maos-domain" timestamp="2026-11-08T14:11:14.241+00:00" time="0.003"/>
+        <testcase name="sandbox::tests::t3_image_entry_new_rejects_empty_uri" classname="maos-domain" timestamp="2026-11-08T14:11:14.243+00:00" time="0.003"/>
+        <testcase name="sandbox::tests::t3_image_entry_new_rejects_zero_sha" classname="maos-domain" timestamp="2026-11-08T14:11:14.246+00:00" time="0.003"/>
+        <testcase name="self_telemetry::tests::empty_report_json_snapshot" classname="maos-domain" timestamp="2026-11-08T14:11:14.248+00:00" time="0.003"/>
+        <testcase name="self_telemetry::tests::resolution_kind_label_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:14.251+00:00" time="0.002"/>
+        <testcase name="self_telemetry::tests::self_telemetry_error_display_backend_unavailable" classname="maos-domain" timestamp="2026-11-08T14:11:14.253+00:00" time="0.003"/>
+        <testcase name="self_telemetry::tests::self_telemetry_error_display_unknown" classname="maos-domain" timestamp="2026-11-08T14:11:14.256+00:00" time="0.002"/>
+        <testcase name="self_telemetry::tests::self_telemetry_error_display_window_invalid" classname="maos-domain" timestamp="2026-11-08T14:11:14.258+00:00" time="0.003"/>
+        <testcase name="self_telemetry::tests::self_telemetry_report_serde_round_trip" classname="maos-domain" timestamp="2026-11-08T14:11:14.261+00:00" time="0.002"/>
+        <testcase name="supervision::tests::child_exit_status_signaled_debug" classname="maos-domain" timestamp="2026-11-08T14:11:14.264+00:00" time="0.003"/>
+        <testcase name="supervision::tests::crash_cause_voluntary_str" classname="maos-domain" timestamp="2026-11-08T14:11:14.266+00:00" time="0.003"/>
+        <testcase name="supervision::tests::fault_cause_signaled_by_kernel_str" classname="maos-domain" timestamp="2026-11-08T14:11:14.269+00:00" time="0.003"/>
+        <testcase name="supervision::tests::null_replica_resolver_always_none" classname="maos-domain" timestamp="2026-11-08T14:11:14.272+00:00" time="0.003"/>
+        <testcase name="supervision::tests::on_crash_action_default_is_nack" classname="maos-domain" timestamp="2026-11-08T14:11:14.275+00:00" time="0.003"/>
+        <testcase name="supervision::tests::on_crash_action_display" classname="maos-domain" timestamp="2026-11-08T14:11:14.278+00:00" time="0.003"/>
+        <testcase name="supervision::tests::on_crash_action_serde_roundtrip_kebab_case" classname="maos-domain" timestamp="2026-11-08T14:11:14.281+00:00" time="0.003"/>
+        <testcase name="supervision::tests::trait_object_safety_replica_resolver" classname="maos-domain" timestamp="2026-11-08T14:11:14.284+00:00" time="0.003"/>
+        <testcase name="supervision::tests::trait_object_safety_subprocess_supervisor" classname="maos-domain" timestamp="2026-11-08T14:11:14.286+00:00" time="0.003"/>
+        <testcase name="team::tests::accepts_canonical_team_ids" classname="maos-domain" timestamp="2026-11-08T14:11:14.289+00:00" time="0.003"/>
+        <testcase name="team::tests::rejects_noncanonical_instead_of_normalizing" classname="maos-domain" timestamp="2026-11-08T14:11:14.292+00:00" time="0.003"/>
+        <testcase name="team::tests::serde_reuses_constructor_validation" classname="maos-domain" timestamp="2026-11-08T14:11:14.295+00:00" time="0.002"/>
+    </testsuite>
+    <testsuite name="maos-domain::consent_recall_17_8" tests="5" skipped="0" errors="0" failures="0">
+        <testcase name="consent_expiry_is_strict_and_open_ended_never_expires" classname="maos-domain::consent_recall_17_8" timestamp="2026-11-08T14:11:14.297+00:00" time="0.003"/>
+        <testcase name="consent_recall_policy_decodes_unknown_values_to_withheld" classname="maos-domain::consent_recall_17_8" timestamp="2026-11-08T14:11:14.300+00:00" time="0.003"/>
+        <testcase name="consent_withheld_display_names_only_the_frame" classname="maos-domain::consent_recall_17_8" timestamp="2026-11-08T14:11:14.302+00:00" time="0.003"/>
+        <testcase name="full_consent_envelope_json_is_byte_identical_to_pre_17_8_golden" classname="maos-domain::consent_recall_17_8" timestamp="2026-11-08T14:11:14.305+00:00" time="0.003"/>
+        <testcase name="granter_binding_compares_spirit_and_host_never_role" classname="maos-domain::consent_recall_17_8" timestamp="2026-11-08T14:11:14.308+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-domain::container_terminal_facts_17_7" tests="11" skipped="0" errors="0" failures="0">
+        <testcase name="cid_parser_and_cgroup_identity_are_exact" classname="maos-domain::container_terminal_facts_17_7" timestamp="2026-11-08T14:11:14.311+00:00" time="0.003"/>
+        <testcase name="completion_requires_available_exited_payload" classname="maos-domain::container_terminal_facts_17_7" timestamp="2026-11-08T14:11:14.314+00:00" time="0.003"/>
+        <testcase name="decoding_boundaries_and_pidfd_authority" classname="maos-domain::container_terminal_facts_17_7" timestamp="2026-11-08T14:11:14.317+00:00" time="0.003"/>
+        <testcase name="exit_record_rejects_each_cross_field_inconsistency" classname="maos-domain::container_terminal_facts_17_7" timestamp="2026-11-08T14:11:14.319+00:00" time="0.003"/>
+        <testcase name="exit_record_serializes_exact_six_keys_for_success_fallback_unavailable_and_residue" classname="maos-domain::container_terminal_facts_17_7" timestamp="2026-11-08T14:11:14.322+00:00" time="0.002"/>
+        <testcase name="inspect_parser_requires_all_typed_state_fields_and_terminality_is_exact" classname="maos-domain::container_terminal_facts_17_7" timestamp="2026-11-08T14:11:14.324+00:00" time="0.003"/>
+        <testcase name="invalid_runtime_exit_codes_are_truncated_without_invented_code_or_signal" classname="maos-domain::container_terminal_facts_17_7" timestamp="2026-11-08T14:11:14.327+00:00" time="0.003"/>
+        <testcase name="payload_classification_obeys_oom_authority_and_fallback" classname="maos-domain::container_terminal_facts_17_7" timestamp="2026-11-08T14:11:14.330+00:00" time="0.003"/>
+        <testcase name="pidfile_parser_accepts_only_positive_i32_decimal" classname="maos-domain::container_terminal_facts_17_7" timestamp="2026-11-08T14:11:14.333+00:00" time="0.003"/>
+        <testcase name="unavailable_state_is_always_truncated_even_with_clean_runtime_client" classname="maos-domain::container_terminal_facts_17_7" timestamp="2026-11-08T14:11:14.335+00:00" time="0.003"/>
+        <testcase name="wait_status_decode_is_terminal_only" classname="maos-domain::container_terminal_facts_17_7" timestamp="2026-11-08T14:11:14.338+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-domain::egress_destination_17_1" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="dns_label_and_total_lengths_are_bounded" classname="maos-domain::egress_destination_17_1" timestamp="2026-11-08T14:11:14.341+00:00" time="0.004"/>
+        <testcase name="invalid_authorities_are_refused_on_both_boundaries" classname="maos-domain::egress_destination_17_1" timestamp="2026-11-08T14:11:14.344+00:00" time="0.003"/>
+        <testcase name="manifest_requires_a_port_while_bare_grants_mean_https" classname="maos-domain::egress_destination_17_1" timestamp="2026-11-08T14:11:14.347+00:00" time="0.003"/>
+        <testcase name="serde_uses_the_same_strict_grammar_and_canonical_output" classname="maos-domain::egress_destination_17_1" timestamp="2026-11-08T14:11:14.350+00:00" time="0.002"/>
+    </testsuite>
+    <testsuite name="maos-domain::forget_cascade_18_6" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="legacy_erased_json_defaults_requests_and_notice_round_trips" classname="maos-domain::forget_cascade_18_6" timestamp="2026-11-08T14:11:14.352+00:00" time="0.003"/>
+        <testcase name="principal_matching_is_token_bounded_not_substring_bounded" classname="maos-domain::forget_cascade_18_6" timestamp="2026-11-08T14:11:14.355+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-domain::operator_door_control" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="concurrent_initializers_publish_one_complete_control_file" classname="maos-domain::operator_door_control" timestamp="2026-11-08T14:11:14.358+00:00" time="0.026"/>
+    </testsuite>
+    <testsuite name="maos-domain::scope_entitles_17_11" tests="5" skipped="0" errors="0" failures="0">
+        <testcase name="fs_subtree_fails_closed_on_ambiguous_components" classname="maos-domain::scope_entitles_17_11" timestamp="2026-11-08T14:11:14.384+00:00" time="0.003"/>
+        <testcase name="fs_subtree_is_lexical_component_containment" classname="maos-domain::scope_entitles_17_11" timestamp="2026-11-08T14:11:14.387+00:00" time="0.003"/>
+        <testcase name="identifier_scopes_are_exact_on_every_field" classname="maos-domain::scope_entitles_17_11" timestamp="2026-11-08T14:11:14.390+00:00" time="0.003"/>
+        <testcase name="net_https_is_exact_bytes" classname="maos-domain::scope_entitles_17_11" timestamp="2026-11-08T14:11:14.393+00:00" time="0.003"/>
+        <testcase name="unit_variants_by_kind_and_variants_never_cross" classname="maos-domain::scope_entitles_17_11" timestamp="2026-11-08T14:11:14.395+00:00" time="0.002"/>
+    </testsuite>
+    <testsuite name="maos-fkcs::fkcs_contract" tests="9" skipped="0" errors="0" failures="0">
+        <testcase name="always_admit_blind_harness_proves_the_rejection_is_not_canned" classname="maos-fkcs::fkcs_contract" timestamp="2026-11-08T14:11:14.398+00:00" time="0.004"/>
+        <testcase name="cohort_all_freeze_axes_red_hits_per_spirit_floor_but_fails_aggregate_floor" classname="maos-fkcs::fkcs_contract" timestamp="2026-11-08T14:11:14.402+00:00" time="0.003"/>
+        <testcase name="cohort_checklist_is_itemized_across_categories_not_a_flat_bucket" classname="maos-fkcs::fkcs_contract" timestamp="2026-11-08T14:11:14.405+00:00" time="0.003"/>
+        <testcase name="cohort_green_reconciles_every_spirit_and_clears_the_aggregate_floor" classname="maos-fkcs::fkcs_contract" timestamp="2026-11-08T14:11:14.408+00:00" time="0.003"/>
+        <testcase name="cohort_one_freeze_axis_red_drops_reconciled_count_while_admission_holds" classname="maos-fkcs::fkcs_contract" timestamp="2026-11-08T14:11:14.411+00:00" time="0.003"/>
+        <testcase name="cohort_with_negative_control_scores_below_floor_and_fails_aggregate" classname="maos-fkcs::fkcs_contract" timestamp="2026-11-08T14:11:14.414+00:00" time="0.003"/>
+        <testcase name="empty_cohort_is_na_never_a_vacuous_pass" classname="maos-fkcs::fkcs_contract" timestamp="2026-11-08T14:11:14.417+00:00" time="0.003"/>
+        <testcase name="journaled_flag_requires_a_returned_decision_receipt_not_only_the_enqueue_row" classname="maos-fkcs::fkcs_contract" timestamp="2026-11-08T14:11:14.420+00:00" time="0.003"/>
+        <testcase name="negative_control_rejects_at_real_admit_spirit_while_conformance_proxy_admits" classname="maos-fkcs::fkcs_contract" timestamp="2026-11-08T14:11:14.423+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-registry" tests="63" skipped="0" errors="0" failures="0">
+        <testcase name="admission::tests::attestation_promotes_public_untrusted_before_strictest_of" classname="maos-registry" timestamp="2026-11-08T14:11:14.426+00:00" time="0.006"/>
+        <testcase name="admission::tests::local_unsigned_allowed_when_policy_permits" classname="maos-registry" timestamp="2026-11-08T14:11:14.431+00:00" time="0.003"/>
+        <testcase name="admission::tests::local_unsigned_rejected_when_policy_strict" classname="maos-registry" timestamp="2026-11-08T14:11:14.435+00:00" time="0.003"/>
+        <testcase name="admission::tests::org_internal_signature_matches_admits" classname="maos-registry" timestamp="2026-11-08T14:11:14.438+00:00" time="0.003"/>
+        <testcase name="admission::tests::org_internal_signature_mismatch_rejects" classname="maos-registry" timestamp="2026-11-08T14:11:14.441+00:00" time="0.003"/>
+        <testcase name="admission::tests::org_internal_signature_requires_org_key" classname="maos-registry" timestamp="2026-11-08T14:11:14.444+00:00" time="0.003"/>
+        <testcase name="admission::tests::provenance_absent_admits_when_not_required_ac11" classname="maos-registry" timestamp="2026-11-08T14:11:14.447+00:00" time="0.003"/>
+        <testcase name="admission::tests::provenance_absent_but_required_rejects_catalogued" classname="maos-registry" timestamp="2026-11-08T14:11:14.451+00:00" time="0.003"/>
+        <testcase name="admission::tests::provenance_content_hash_is_deterministic" classname="maos-registry" timestamp="2026-11-08T14:11:14.454+00:00" time="0.003"/>
+        <testcase name="admission::tests::provenance_free_text_lineage_rejects_malformed" classname="maos-registry" timestamp="2026-11-08T14:11:14.457+00:00" time="0.003"/>
+        <testcase name="admission::tests::provenance_present_valid_returns_record_with_content_hash" classname="maos-registry" timestamp="2026-11-08T14:11:14.460+00:00" time="0.003"/>
+        <testcase name="admission::tests::provenance_stale_rejects" classname="maos-registry" timestamp="2026-11-08T14:11:14.463+00:00" time="0.003"/>
+        <testcase name="admission::tests::public_untrusted_with_fingerprint_drift_rejects" classname="maos-registry" timestamp="2026-11-08T14:11:14.467+00:00" time="0.004"/>
+        <testcase name="admission::tests::public_untrusted_with_t3_floor_returns_t3_sandbox" classname="maos-registry" timestamp="2026-11-08T14:11:14.471+00:00" time="0.003"/>
+        <testcase name="admission::tests::public_untrusted_with_tampered_envelope_rejects" classname="maos-registry" timestamp="2026-11-08T14:11:14.474+00:00" time="0.004"/>
+        <testcase name="admission::tests::public_untrusted_with_valid_envelope_admits" classname="maos-registry" timestamp="2026-11-08T14:11:14.478+00:00" time="0.004"/>
+        <testcase name="admission::tests::public_vetted_tier_always_rejects" classname="maos-registry" timestamp="2026-11-08T14:11:14.482+00:00" time="0.003"/>
+        <testcase name="admission::tests::strictest_of_resolves_all_combinations" classname="maos-registry" timestamp="2026-11-08T14:11:14.485+00:00" time="0.003"/>
+        <testcase name="admission::tests::strictest_of_resolves_correctly_local_vs_public_untrusted" classname="maos-registry" timestamp="2026-11-08T14:11:14.487+00:00" time="0.003"/>
+        <testcase name="admission::tests::vetted_promotion_preserves_compliance_envelope_verification" classname="maos-registry" timestamp="2026-11-08T14:11:14.490+00:00" time="0.004"/>
+        <testcase name="admission::tests::vetted_with_expired_attestation_is_rejected" classname="maos-registry" timestamp="2026-11-08T14:11:14.495+00:00" time="0.005"/>
+        <testcase name="admission::tests::vetted_with_forged_attestation_signature_is_rejected" classname="maos-registry" timestamp="2026-11-08T14:11:14.500+00:00" time="0.004"/>
+        <testcase name="admission::tests::vetted_with_unenrolled_vetter_is_rejected" classname="maos-registry" timestamp="2026-11-08T14:11:14.505+00:00" time="0.004"/>
+        <testcase name="admission::tests::vetted_with_valid_attestation_admits" classname="maos-registry" timestamp="2026-11-08T14:11:14.509+00:00" time="0.005"/>
+        <testcase name="admission::tests::vetted_without_attestation_is_deferred" classname="maos-registry" timestamp="2026-11-08T14:11:14.514+00:00" time="0.004"/>
+        <testcase name="admission::tests::wrapper_delegates_non_vetted_tiers" classname="maos-registry" timestamp="2026-11-08T14:11:14.518+00:00" time="0.003"/>
+        <testcase name="compliance_verify::tests::fingerprint_mismatch_is_rejected_via_delegation" classname="maos-registry" timestamp="2026-11-08T14:11:14.522+00:00" time="0.004"/>
+        <testcase name="compliance_verify::tests::tampered_signature_is_rejected_via_delegation" classname="maos-registry" timestamp="2026-11-08T14:11:14.525+00:00" time="0.003"/>
+        <testcase name="fixture_replay::tests::fixture_empty_queue_returns_transport_error" classname="maos-registry" timestamp="2026-11-08T14:11:14.529+00:00" time="0.003"/>
+        <testcase name="fixture_replay::tests::fixture_errors_propagate" classname="maos-registry" timestamp="2026-11-08T14:11:14.532+00:00" time="0.003"/>
+        <testcase name="fixture_replay::tests::fixture_records_calls" classname="maos-registry" timestamp="2026-11-08T14:11:14.534+00:00" time="0.003"/>
+        <testcase name="fixture_replay::tests::fixture_search_returns_queued_response" classname="maos-registry" timestamp="2026-11-08T14:11:14.538+00:00" time="0.003"/>
+        <testcase name="http::tests::drip_response_cannot_extend_exchange_deadline_f4" classname="maos-registry" timestamp="2026-11-08T14:11:14.541+00:00" time="0.244"/>
+        <testcase name="http::tests::later_resolved_address_is_tried_after_connection_refusal" classname="maos-registry" timestamp="2026-11-08T14:11:14.785+00:00" time="0.003"/>
+        <testcase name="http::tests::unsigned_http_refusal_preserves_status_p7" classname="maos-registry" timestamp="2026-11-08T14:11:14.788+00:00" time="0.003"/>
+        <testcase name="import::tests::divergent_manifest_rejects" classname="maos-registry" timestamp="2026-11-08T14:11:14.792+00:00" time="0.003"/>
+        <testcase name="import::tests::extract_and_verify_consistent_bundle" classname="maos-registry" timestamp="2026-11-08T14:11:14.795+00:00" time="0.003"/>
+        <testcase name="import::tests::missing_signed_package_json_rejects" classname="maos-registry" timestamp="2026-11-08T14:11:14.798+00:00" time="0.003"/>
+        <testcase name="operations::tests::artifact_args_serde_roundtrip" classname="maos-registry" timestamp="2026-11-08T14:11:14.801+00:00" time="0.003"/>
+        <testcase name="operations::tests::deprecate_args_serde_roundtrip" classname="maos-registry" timestamp="2026-11-08T14:11:14.804+00:00" time="0.003"/>
+        <testcase name="operations::tests::manifest_args_serde_roundtrip" classname="maos-registry" timestamp="2026-11-08T14:11:14.807+00:00" time="0.002"/>
+        <testcase name="operations::tests::operation_serialization_is_snake_case" classname="maos-registry" timestamp="2026-11-08T14:11:14.809+00:00" time="0.003"/>
+        <testcase name="operations::tests::search_args_defaults" classname="maos-registry" timestamp="2026-11-08T14:11:14.812+00:00" time="0.003"/>
+        <testcase name="operations::tests::search_args_serde_roundtrip" classname="maos-registry" timestamp="2026-11-08T14:11:14.815+00:00" time="0.003"/>
+        <testcase name="operations::tests::yanks_since_args_serde_roundtrip" classname="maos-registry" timestamp="2026-11-08T14:11:14.818+00:00" time="0.003"/>
+        <testcase name="security::review_tests::configured_ca_replaces_bundled_roots_d4" classname="maos-registry" timestamp="2026-11-08T14:11:14.820+00:00" time="0.004"/>
+        <testcase name="security::review_tests::explicit_development_literal_loopback_matrix_p3" classname="maos-registry" timestamp="2026-11-08T14:11:14.824+00:00" time="0.003"/>
+        <testcase name="security::review_tests::registry_hex_diagnostics_do_not_echo_input_p8" classname="maos-registry" timestamp="2026-11-08T14:11:14.827+00:00" time="0.003"/>
+        <testcase name="security::review_tests::registry_typo_is_refused_p11" classname="maos-registry" timestamp="2026-11-08T14:11:14.830+00:00" time="0.003"/>
+        <testcase name="security::review_tests::registry_uri_matrix_and_trailing_dns_labels_p3_p9" classname="maos-registry" timestamp="2026-11-08T14:11:14.833+00:00" time="0.003"/>
+        <testcase name="security::review_tests::signed_params_less_notification_verifies_p7" classname="maos-registry" timestamp="2026-11-08T14:11:14.836+00:00" time="0.004"/>
+        <testcase name="server::tests::development_default_ports_use_the_same_canonical_uri_as_clients" classname="maos-registry" timestamp="2026-11-08T14:11:14.840+00:00" time="0.003"/>
+        <testcase name="storage::tests::absent_install_inventory_does_not_create_a_store" classname="maos-registry" timestamp="2026-11-08T14:11:14.843+00:00" time="0.003"/>
+        <testcase name="storage::tests::put_and_get_artifact" classname="maos-registry" timestamp="2026-11-08T14:11:14.846+00:00" time="0.021"/>
+        <testcase name="storage::tests::put_and_get_manifest" classname="maos-registry" timestamp="2026-11-08T14:11:14.867+00:00" time="0.016"/>
+        <testcase name="storage::tests::search_excludes_yanked_by_default" classname="maos-registry" timestamp="2026-11-08T14:11:14.883+00:00" time="0.021"/>
+        <testcase name="storage::tests::search_finds_spirit_by_name" classname="maos-registry" timestamp="2026-11-08T14:11:14.904+00:00" time="0.016"/>
+        <testcase name="storage::tests::search_includes_yanked_when_requested" classname="maos-registry" timestamp="2026-11-08T14:11:14.920+00:00" time="0.020"/>
+        <testcase name="storage::tests::version_not_found_error" classname="maos-registry" timestamp="2026-11-08T14:11:14.939+00:00" time="0.003"/>
+        <testcase name="storage::tests::yanks_since_returns_filtered_entries" classname="maos-registry" timestamp="2026-11-08T14:11:14.943+00:00" time="0.021"/>
+        <testcase name="yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5" classname="maos-registry" timestamp="2026-11-08T14:11:14.964+00:00" time="0.003"/>
+        <testcase name="yank::tests::policy_outcomes_are_distinct_ac8" classname="maos-registry" timestamp="2026-11-08T14:11:14.966+00:00" time="0.003"/>
+        <testcase name="yank::tests::repeated_source_does_not_replay_journal_rows" classname="maos-registry" timestamp="2026-11-08T14:11:14.970+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-registry::form_admission_17_3b" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="rust_inproc_is_refused_before_every_admission_tier" classname="maos-registry::form_admission_17_3b" timestamp="2026-11-08T14:11:14.973+00:00" time="0.006"/>
+        <testcase name="structural_class_reads_have_the_named_typed_outcomes" classname="maos-registry::form_admission_17_3b" timestamp="2026-11-08T14:11:14.979+00:00" time="0.004"/>
+        <testcase name="structural_fkcs_reads_refuse_every_evasion_shape" classname="maos-registry::form_admission_17_3b" timestamp="2026-11-08T14:11:14.983+00:00" time="0.005"/>
+        <testcase name="wasm_component_uses_t2_at_each_admission_tier" classname="maos-registry::form_admission_17_3b" timestamp="2026-11-08T14:11:14.988+00:00" time="0.007"/>
+    </testsuite>
+    <testsuite name="maos-registry::fr59_yank_propagation_within_5min_test" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="fr59_300s_boundary_passes" classname="maos-registry::fr59_yank_propagation_within_5min_test" timestamp="2026-11-08T14:11:14.995+00:00" time="0.003"/>
+        <testcase name="fr59_301s_violates" classname="maos-registry::fr59_yank_propagation_within_5min_test" timestamp="2026-11-08T14:11:14.998+00:00" time="0.003"/>
+        <testcase name="fr59_poll_interval_resolver_clamps_correctly" classname="maos-registry::fr59_yank_propagation_within_5min_test" timestamp="2026-11-08T14:11:15.001+00:00" time="0.003"/>
+        <testcase name="fr59_yank_propagates_within_5min_window" classname="maos-registry::fr59_yank_propagation_within_5min_test" timestamp="2026-11-08T14:11:15.004+00:00" time="0.002"/>
+    </testsuite>
+    <testsuite name="maos-registry::import_air_gap_test" tests="9" skipped="0" errors="0" failures="0">
+        <testcase name="admit_spirit_local_unsigned_passes" classname="maos-registry::import_air_gap_test" timestamp="2026-11-08T14:11:15.006+00:00" time="0.004"/>
+        <testcase name="admit_spirit_public_untrusted_without_sig_fails" classname="maos-registry::import_air_gap_test" timestamp="2026-11-08T14:11:15.010+00:00" time="0.003"/>
+        <testcase name="divergent_manifest_rejects" classname="maos-registry::import_air_gap_test" timestamp="2026-11-08T14:11:15.014+00:00" time="0.003"/>
+        <testcase name="extract_bundle_happy_path" classname="maos-registry::import_air_gap_test" timestamp="2026-11-08T14:11:15.017+00:00" time="0.003"/>
+        <testcase name="missing_signed_package_rejects" classname="maos-registry::import_air_gap_test" timestamp="2026-11-08T14:11:15.020+00:00" time="0.003"/>
+        <testcase name="origin_roundtrips_through_storage" classname="maos-registry::import_air_gap_test" timestamp="2026-11-08T14:11:15.023+00:00" time="0.004"/>
+        <testcase name="publish_with_origin_persists_origin_file" classname="maos-registry::import_air_gap_test" timestamp="2026-11-08T14:11:15.027+00:00" time="0.003"/>
+        <testcase name="published_origin_persists_without_origin_file" classname="maos-registry::import_air_gap_test" timestamp="2026-11-08T14:11:15.030+00:00" time="0.003"/>
+        <testcase name="verify_consistent_bundle_ok" classname="maos-registry::import_air_gap_test" timestamp="2026-11-08T14:11:15.033+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-registry::registry_limits_20_1b" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="idle_first_byte_is_bounded_more_tightly_than_a_request_f1" classname="maos-registry::registry_limits_20_1b" timestamp="2026-11-08T14:11:15.037+00:00" time="1.055"/>
+        <testcase name="metadata_body_limit_is_checked_before_body_allocation_f2" classname="maos-registry::registry_limits_20_1b" timestamp="2026-11-08T14:11:16.091+00:00" time="0.054"/>
+        <testcase name="one_source_cannot_occupy_every_registry_slot_f1" classname="maos-registry::registry_limits_20_1b" timestamp="2026-11-08T14:11:16.145+00:00" time="0.054"/>
+        <testcase name="publication_hint_cannot_widen_another_rpc_body_cap_f2" classname="maos-registry::registry_limits_20_1b" timestamp="2026-11-08T14:11:16.199+00:00" time="0.104"/>
+    </testsuite>
+    <testsuite name="maos-registry::registry_security_20_1a" tests="11" skipped="0" errors="0" failures="0">
+        <testcase name="browser_and_rebinding_requests_cannot_publish" classname="maos-registry::registry_security_20_1a" timestamp="2026-11-08T14:11:16.303+00:00" time="0.305"/>
+        <testcase name="connection_population_is_bounded" classname="maos-registry::registry_security_20_1a" timestamp="2026-11-08T14:11:16.607+00:00" time="0.663"/>
+        <testcase name="header_bytes_and_count_are_bounded" classname="maos-registry::registry_security_20_1a" timestamp="2026-11-08T14:11:17.270+00:00" time="0.154"/>
+        <testcase name="index_persistence_failure_cannot_return_a_receipt" classname="maos-registry::registry_security_20_1a" timestamp="2026-11-08T14:11:17.425+00:00" time="0.016"/>
+        <testcase name="malformed_tools_call_has_a_json_rpc_error" classname="maos-registry::registry_security_20_1a" timestamp="2026-11-08T14:11:17.441+00:00" time="0.104"/>
+        <testcase name="registry_inbox_is_not_an_operator_install" classname="maos-registry::registry_security_20_1a" timestamp="2026-11-08T14:11:17.545+00:00" time="0.017"/>
+        <testcase name="server_tier_floor_uses_admission_policy_ordering" classname="maos-registry::registry_security_20_1a" timestamp="2026-11-08T14:11:17.562+00:00" time="1.057"/>
+        <testcase name="sibling_provenance_refuses_an_unrecorded_executable" classname="maos-registry::registry_security_20_1a" timestamp="2026-11-08T14:11:18.619+00:00" time="0.004"/>
+        <testcase name="sigterm_cancels_an_active_trickling_connection" classname="maos-registry::registry_security_20_1a" timestamp="2026-11-08T14:11:18.623+00:00" time="0.156"/>
+        <testcase name="traversal_publish_is_an_rpc_error_without_escape_files" classname="maos-registry::registry_security_20_1a" timestamp="2026-11-08T14:11:18.779+00:00" time="0.154"/>
+        <testcase name="trickling_request_has_an_absolute_deadline" classname="maos-registry::registry_security_20_1a" timestamp="2026-11-08T14:11:18.933+00:00" time="5.110"/>
+    </testsuite>
+    <testsuite name="maos-registry::registry_server_bin_20_1" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="standalone_population_rejection_has_complete_http_framing" classname="maos-registry::registry_server_bin_20_1" timestamp="2026-11-08T14:11:24.044+00:00" time="0.665"/>
+        <testcase name="standalone_rejections_have_complete_http_framing_and_clean_eof" classname="maos-registry::registry_server_bin_20_1" timestamp="2026-11-08T14:11:24.708+00:00" time="10.957"/>
+        <testcase name="standalone_server_roundtrip_isolates_root_and_exits_cleanly" classname="maos-registry::registry_server_bin_20_1" timestamp="2026-11-08T14:11:35.665+00:00" time="0.156"/>
+        <testcase name="unauthenticated_development_server_refuses_non_loopback_bind" classname="maos-registry::registry_server_bin_20_1" timestamp="2026-11-08T14:11:35.822+00:00" time="0.005"/>
+    </testsuite>
+    <testsuite name="maos-registry::registry_tls_20_1b" tests="40" skipped="0" errors="0" failures="0">
+        <testcase name="http_install_requires_explicit_development_opt_in_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:35.827+00:00" time="0.004"/>
+        <testcase name="server_requires_tls_or_explicit_loopback_development_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:35.831+00:00" time="0.003"/>
+        <testcase name="tls::bad_signature_byte_is_refused_p3" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:35.834+00:00" time="0.116"/>
+        <testcase name="tls::cli_omitted_yank_or_unauthenticated_head_refuses_before_persistence_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:35.950+00:00" time="0.491"/>
+        <testcase name="tls::cli_tls_install_authenticates_before_persistence_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:36.441+00:00" time="0.269"/>
+        <testcase name="tls::cli_tls_yanked_version_is_refused_before_persistence_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:36.710+00:00" time="0.316"/>
+        <testcase name="tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:37.026+00:00" time="0.124"/>
+        <testcase name="tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:37.150+00:00" time="0.068"/>
+        <testcase name="tls::configured_root_and_ca_authenticate_real_registry_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:37.218+00:00" time="0.519"/>
+        <testcase name="tls::configured_root_is_bound_to_canonical_uri_before_contact_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:37.737+00:00" time="0.072"/>
+        <testcase name="tls::envelope_incomplete_head_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:37.809+00:00" time="0.114"/>
+        <testcase name="tls::envelope_missing_head_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:37.923+00:00" time="0.114"/>
+        <testcase name="tls::envelope_missing_signature_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:38.037+00:00" time="0.114"/>
+        <testcase name="tls::envelope_stripped_yank_entry_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:38.151+00:00" time="0.117"/>
+        <testcase name="tls::envelope_wrong_nonce_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:38.268+00:00" time="0.114"/>
+        <testcase name="tls::envelope_wrong_uri_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:38.382+00:00" time="0.114"/>
+        <testcase name="tls::handshake_failure_never_attempts_plaintext_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:38.496+00:00" time="0.005"/>
+        <testcase name="tls::hostile_registry_wrong_configured_root_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:38.501+00:00" time="0.116"/>
+        <testcase name="tls::https_redirect_never_downgrades_to_http_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:38.617+00:00" time="0.058"/>
+        <testcase name="tls::https_requires_configured_root_not_response_supplied_key_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:38.675+00:00" time="0.003"/>
+        <testcase name="tls::incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:38.678+00:00" time="1.167"/>
+        <testcase name="tls::interception_expired_certificate_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:39.845+00:00" time="0.171"/>
+        <testcase name="tls::interception_untrusted_ca_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:40.017+00:00" time="0.172"/>
+        <testcase name="tls::interception_wrong_host_certificate_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:40.189+00:00" time="0.166"/>
+        <testcase name="tls::loopback_development_requires_both_sides_and_keeps_yank_signatures_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:40.355+00:00" time="0.169"/>
+        <testcase name="tls::malformed_private_seed_diagnostic_never_echoes_key_bytes_p8" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:40.524+00:00" time="0.003"/>
+        <testcase name="tls::private_key_custody_refuses_group_or_world_access_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:40.528+00:00" time="0.004"/>
+        <testcase name="tls::private_key_custody_refuses_seed_inside_package_store_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:40.532+00:00" time="0.004"/>
+        <testcase name="tls::private_seed_custody_refuses_0644_and_0440_p12" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:40.535+00:00" time="0.003"/>
+        <testcase name="tls::private_tls_key_inside_package_store_is_refused_p12" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:40.539+00:00" time="0.003"/>
+        <testcase name="tls::server_rejects_client_without_dev_handshake_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:40.542+00:00" time="0.070"/>
+        <testcase name="tls::signed_head_behind_requested_cursor_is_typed_d3_p5" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:40.612+00:00" time="0.060"/>
+        <testcase name="tls::signed_payload_head_must_equal_envelope_head_p3" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:40.672+00:00" time="0.112"/>
+        <testcase name="tls::signed_valid_duplicate_body_is_refused_p3" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:40.784+00:00" time="0.118"/>
+        <testcase name="tls::signed_valid_empty_view_with_nonzero_head_is_refused_p3" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:40.902+00:00" time="0.116"/>
+        <testcase name="tls::signed_valid_extra_entries_are_refused_p3" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:41.018+00:00" time="0.116"/>
+        <testcase name="tls::signed_valid_gap_body_is_refused_p3" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:41.134+00:00" time="0.115"/>
+        <testcase name="tls::signed_wrong_envelope_version_is_refused_p3" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:41.249+00:00" time="0.114"/>
+        <testcase name="tls::signed_wrong_request_hash_is_refused_p3" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:41.363+00:00" time="0.117"/>
+        <testcase name="tls::tls_admission_refusal_is_encrypted_http_503_f1" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-08T14:11:41.480+00:00" time="0.116"/>
+    </testsuite>
+    <testsuite name="maos-registry::runtime_drift_test" tests="5" skipped="0" errors="0" failures="0">
+        <testcase name="crypto_provider_drift_rejects_naming_field" classname="maos-registry::runtime_drift_test" timestamp="2026-11-08T14:11:41.596+00:00" time="0.006"/>
+        <testcase name="honest_claim_with_matching_runtime_override_admits" classname="maos-registry::runtime_drift_test" timestamp="2026-11-08T14:11:41.601+00:00" time="0.004"/>
+        <testcase name="manifest_matching_envelope_still_admits" classname="maos-registry::runtime_drift_test" timestamp="2026-11-08T14:11:41.605+00:00" time="0.004"/>
+        <testcase name="provider_endpoint_drift_rejects_naming_field" classname="maos-registry::runtime_drift_test" timestamp="2026-11-08T14:11:41.609+00:00" time="0.004"/>
+        <testcase name="trust_tier_drift_rejects_naming_field" classname="maos-registry::runtime_drift_test" timestamp="2026-11-08T14:11:41.613+00:00" time="0.004"/>
+    </testsuite>
+    <testsuite name="maos-registry::search_lock_contention_test" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="search_acquires_yanks_lock_once" classname="maos-registry::search_lock_contention_test" timestamp="2026-11-08T14:11:41.617+00:00" time="0.020"/>
+        <testcase name="yank_visibility_preserved_after_contention_fix" classname="maos-registry::search_lock_contention_test" timestamp="2026-11-08T14:11:41.637+00:00" time="0.018"/>
+    </testsuite>
+    <testsuite name="maos-registry::uninstall_review_20_11" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="review_p5_index_recovery_error_is_returned_not_only_logged" classname="maos-registry::uninstall_review_20_11" timestamp="2026-11-08T14:11:41.655+00:00" time="0.020"/>
+        <testcase name="review_p5_partial_generation_delete_restores_the_complete_preimage" classname="maos-registry::uninstall_review_20_11" timestamp="2026-11-08T14:11:41.675+00:00" time="0.040"/>
+    </testsuite>
+    <testsuite name="maos-registry::vetting_attestation_gate" tests="9" skipped="0" errors="0" failures="0">
+        <testcase name="artifact_swap_is_refused_ac6" classname="maos-registry::vetting_attestation_gate" timestamp="2026-11-08T14:11:41.715+00:00" time="0.008"/>
+        <testcase name="fkcs_off_surface_refusal_precedes_a_valid_attestation" classname="maos-registry::vetting_attestation_gate" timestamp="2026-11-08T14:11:41.723+00:00" time="0.004"/>
+        <testcase name="leg1_round_trip_issue_promote_revoke" classname="maos-registry::vetting_attestation_gate" timestamp="2026-11-08T14:11:41.727+00:00" time="0.006"/>
+        <testcase name="leg2_forged_signature_refused" classname="maos-registry::vetting_attestation_gate" timestamp="2026-11-08T14:11:41.733+00:00" time="0.005"/>
+        <testcase name="leg3_expired_attestation_refused" classname="maos-registry::vetting_attestation_gate" timestamp="2026-11-08T14:11:41.737+00:00" time="0.005"/>
+        <testcase name="leg4_forged_vetter_key_refused" classname="maos-registry::vetting_attestation_gate" timestamp="2026-11-08T14:11:41.742+00:00" time="0.005"/>
+        <testcase name="leg5_upgrade_flap_control" classname="maos-registry::vetting_attestation_gate" timestamp="2026-11-08T14:11:41.748+00:00" time="0.006"/>
+        <testcase name="leg7_four_cause_distinguishability" classname="maos-registry::vetting_attestation_gate" timestamp="2026-11-08T14:11:41.754+00:00" time="0.003"/>
+        <testcase name="publisher_swap_is_refused_ac6" classname="maos-registry::vetting_attestation_gate" timestamp="2026-11-08T14:11:41.757+00:00" time="0.005"/>
+    </testsuite>
+    <testsuite name="maos-registry::yank_auth_20_1b" tests="31" skipped="0" errors="0" failures="0">
+        <testcase name="attestation_rejects_unscoped_digest_signature_review_f5" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:41.762+00:00" time="0.010"/>
+        <testcase name="blocked_registry_fetch_does_not_block_shutdown_or_boot" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:41.772+00:00" time="3.005"/>
+        <testcase name="cursor_from_another_registry_is_replayed_from_zero_p2" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:44.777+00:00" time="0.017"/>
+        <testcase name="daemon_cursor_restart_does_not_replay_journalled_yanks_ac7" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:44.795+00:00" time="0.255"/>
+        <testcase name="every_registry_auth_test_holds_the_shared_environment_mutex_p15" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:45.050+00:00" time="0.004"/>
+        <testcase name="expired_signed_yank_request_cannot_mutate_registry_f4" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:45.054+00:00" time="0.155"/>
+        <testcase name="first_publisher_pin_is_typed_and_survives_restart_ac10" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:45.209+00:00" time="0.029"/>
+        <testcase name="install_refuses_present_yank_with_unpinned_authority_f2" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:45.238+00:00" time="0.255"/>
+        <testcase name="installed_publisher_and_version_pins_survive_uninstall_d2" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:45.493+00:00" time="1.008"/>
+        <testcase name="installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:46.501+00:00" time="1.008"/>
+        <testcase name="keyring_event_rejects_unscoped_digest_signature_review_f5" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:47.509+00:00" time="0.005"/>
+        <testcase name="legacy_inactive_version_pins_are_migrated_before_uninstall_d2" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:47.514+00:00" time="0.606"/>
+        <testcase name="local_reevaluation_failure_does_not_prevent_fetch_p1" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:48.120+00:00" time="0.003"/>
+        <testcase name="missing_home_never_selects_shared_temporary_cursor_p14" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:48.124+00:00" time="0.003"/>
+        <testcase name="only_explicit_operator_release_allows_repin_after_uninstall_d2" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:48.127+00:00" time="0.656"/>
+        <testcase name="published_versions_are_immutable_and_identical_publish_is_idempotent_d3" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:48.782+00:00" time="0.016"/>
+        <testcase name="publisher_and_enrolled_vetter_yanks_are_signed_labelled_and_restart_safe_ac7" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:48.799+00:00" time="0.507"/>
+        <testcase name="renewed_promotion_replaces_only_evidence_for_identical_package_d4" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:49.306+00:00" time="0.406"/>
+        <testcase name="signed_nonce_cannot_be_reused_for_another_withdrawal_f4" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:49.712+00:00" time="0.256"/>
+        <testcase name="signed_revocation_lists_roundtrip_cbor_and_reject_wrong_byte_lengths" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:49.968+00:00" time="0.004"/>
+        <testcase name="signed_yank_cannot_be_replayed_to_another_registry_f4" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:49.972+00:00" time="0.255"/>
+        <testcase name="signed_yank_resigning_does_not_append_duplicate_rows_p13" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:50.228+00:00" time="0.306"/>
+        <testcase name="signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:50.533+00:00" time="0.357"/>
+        <testcase name="uninstall_waits_for_cross_process_mutation_lock_p8" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:50.890+00:00" time="0.556"/>
+        <testcase name="unreadable_promotion_is_not_treated_as_absent_p17" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:51.447+00:00" time="0.256"/>
+        <testcase name="unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:51.703+00:00" time="0.405"/>
+        <testcase name="unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:52.108+00:00" time="0.004"/>
+        <testcase name="v2_role_nonce_audience_and_lifetime_vectors_reject_rebinding_f4_f5" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:52.112+00:00" time="0.009"/>
+        <testcase name="verified_cursor_is_persisted_before_later_transient_failure_p2" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:52.121+00:00" time="0.022"/>
+        <testcase name="yank_authorization_allows_bounded_clock_skew_p10" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:52.143+00:00" time="0.004"/>
+        <testcase name="zero_interval_cannot_silently_disable_local_vetting_p11" classname="maos-registry::yank_auth_20_1b" timestamp="2026-11-08T14:11:52.148+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-registry::yank_cadence_20_1b" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="signed_yank_crosses_real_server_at_30_second_floor_ac7" classname="maos-registry::yank_cadence_20_1b" timestamp="2026-11-08T14:11:52.151+00:00" time="30.120"/>
+    </testsuite>
+    <testsuite name="maos-registry::yank_query_20_1b" tests="3" skipped="0" errors="0" failures="0">
+        <testcase name="filtered_snapshot_keeps_its_authenticated_complete_head_f6" classname="maos-registry::yank_query_20_1b" timestamp="2026-11-08T14:12:22.271+00:00" time="0.033"/>
+        <testcase name="large_delta_is_refused_instead_of_returning_an_incomplete_signed_head_f6" classname="maos-registry::yank_query_20_1b" timestamp="2026-11-08T14:12:22.304+00:00" time="0.033"/>
+        <testcase name="large_history_small_delta_uses_storage_lower_bound_f6" classname="maos-registry::yank_query_20_1b" timestamp="2026-11-08T14:12:22.337+00:00" time="0.032"/>
+    </testsuite>
+    <testsuite name="maos-shell::init_test" tests="6" skipped="0" errors="0" failures="0">
+        <testcase name="init_creates_a_home_that_does_not_exist" classname="maos-shell::init_test" timestamp="2026-11-08T14:12:22.369+00:00" time="0.028"/>
+        <testcase name="init_creates_config_and_dirs" classname="maos-shell::init_test" timestamp="2026-11-08T14:12:22.398+00:00" time="0.021"/>
+        <testcase name="init_does_not_rewrite_an_existing_control_json" classname="maos-shell::init_test" timestamp="2026-11-08T14:12:22.418+00:00" time="0.026"/>
+        <testcase name="init_is_idempotent" classname="maos-shell::init_test" timestamp="2026-11-08T14:12:22.445+00:00" time="0.025"/>
+        <testcase name="init_mints_control_json_on_an_already_initialised_home" classname="maos-shell::init_test" timestamp="2026-11-08T14:12:22.469+00:00" time="0.036"/>
+        <testcase name="init_mints_control_json_with_custody" classname="maos-shell::init_test" timestamp="2026-11-08T14:12:22.506+00:00" time="0.018"/>
+    </testsuite>
+    <testsuite name="maos-shell::shell_halt_repl_16_2" tests="14" skipped="0" errors="0" failures="0">
+        <testcase name="a_failed_raise_is_an_error_line_and_the_shell_keeps_serving" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:22.524+00:00" time="0.004"/>
+        <testcase name="an_oversized_clarification_is_refused_before_it_reaches_the_host" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:22.528+00:00" time="0.064"/>
+        <testcase name="at_directive_is_refused_while_a_halt_is_pending" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:22.592+00:00" time="0.043"/>
+        <testcase name="butler_pick_is_refused_typed_and_dispatches_nothing" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:22.635+00:00" time="0.003"/>
+        <testcase name="context_arriving_late_is_waited_for_and_used" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:22.639+00:00" time="0.423"/>
+        <testcase name="context_never_arriving_renders_not_delivered_and_never_proceeds" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:23.062+00:00" time="5.017"/>
+        <testcase name="door_path_resolution_renders_unprompted_within_ticks" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:28.080+00:00" time="0.103"/>
+        <testcase name="every_repl_line_flows_through_the_output_writer" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:28.183+00:00" time="0.003"/>
+        <testcase name="halt_already_resolved_is_printed_and_the_winner_still_renders" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:28.186+00:00" time="0.123"/>
+        <testcase name="halt_line_prints_only_after_the_kernel_accepted_the_halt" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:28.310+00:00" time="0.003"/>
+        <testcase name="late_clarification_names_the_halt_and_kind" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:28.313+00:00" time="0.043"/>
+        <testcase name="overridden_proceeds_without_context" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:28.356+00:00" time="0.103"/>
+        <testcase name="terminated_renders_turn_abandoned_and_dispatches_nothing" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:28.459+00:00" time="0.103"/>
+        <testcase name="typed_clarification_resolves_then_the_spirit_proceeds_with_the_context" classname="maos-shell::shell_halt_repl_16_2" timestamp="2026-11-08T14:12:28.563+00:00" time="0.124"/>
+    </testsuite>
+    <testsuite name="maos-shell::shell_test" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="dispatch_directive_ambiguous_halt" classname="maos-shell::shell_test" timestamp="2026-11-08T14:12:28.687+00:00" time="0.006"/>
+        <testcase name="dispatch_directive_well_specified_no_halt" classname="maos-shell::shell_test" timestamp="2026-11-08T14:12:28.692+00:00" time="0.003"/>
+        <testcase name="parse_at_line_tab_separator" classname="maos-shell::shell_test" timestamp="2026-11-08T14:12:28.695+00:00" time="0.003"/>
+        <testcase name="shell_parse_at_line_variations" classname="maos-shell::shell_test" timestamp="2026-11-08T14:12:28.698+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-spirit-cli" tests="13" skipped="0" errors="0" failures="0">
+        <testcase name="publish::tests::parse_tier_accepts_public_vetted" classname="maos-spirit-cli" timestamp="2026-11-08T14:12:28.701+00:00" time="0.005"/>
+        <testcase name="publish::tests::parse_tier_accepts_three_valid_tiers" classname="maos-spirit-cli" timestamp="2026-11-08T14:12:28.705+00:00" time="0.003"/>
+        <testcase name="publish::tests::parse_tier_rejects_unknown" classname="maos-spirit-cli" timestamp="2026-11-08T14:12:28.708+00:00" time="0.003"/>
+        <testcase name="publish::tests::resolve_registry_uri_rejects_whitespace_only" classname="maos-spirit-cli" timestamp="2026-11-08T14:12:28.711+00:00" time="0.003"/>
+        <testcase name="publish::tests::resolve_registry_uri_trims_whitespace" classname="maos-spirit-cli" timestamp="2026-11-08T14:12:28.713+00:00" time="0.002"/>
+        <testcase name="publish::tests::tier_to_cli_string_round_trips" classname="maos-spirit-cli" timestamp="2026-11-08T14:12:28.716+00:00" time="0.003"/>
+        <testcase name="signing::tests::base64_with_padding_decodes_correctly" classname="maos-spirit-cli" timestamp="2026-11-08T14:12:28.719+00:00" time="0.002"/>
+        <testcase name="signing::tests::base64_without_padding_fails" classname="maos-spirit-cli" timestamp="2026-11-08T14:12:28.721+00:00" time="0.002"/>
+        <testcase name="signing::tests::derive_keypair_round_trips_signature" classname="maos-spirit-cli" timestamp="2026-11-08T14:12:28.724+00:00" time="0.003"/>
+        <testcase name="signing::tests::extract_spirit_id_and_version_parses_minimal_manifest" classname="maos-spirit-cli" timestamp="2026-11-08T14:12:28.727+00:00" time="0.003"/>
+        <testcase name="signing::tests::extract_spirit_id_prefers_spirit_id_over_name" classname="maos-spirit-cli" timestamp="2026-11-08T14:12:28.729+00:00" time="0.003"/>
+        <testcase name="signing::tests::hex_seed_loads" classname="maos-spirit-cli" timestamp="2026-11-08T14:12:28.732+00:00" time="0.003"/>
+        <testcase name="signing::tests::hex_seed_with_prefix_and_whitespace_loads" classname="maos-spirit-cli" timestamp="2026-11-08T14:12:28.735+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-spirit-cli::publish_live_20_1" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="publish_multimegabyte_component_to_standalone_binary" classname="maos-spirit-cli::publish_live_20_1" timestamp="2026-11-08T14:12:28.737+00:00" time="2.825"/>
+        <testcase name="publish_real_address_returns_receipt_and_manifest" classname="maos-spirit-cli::publish_live_20_1" timestamp="2026-11-08T14:12:31.563+00:00" time="0.161"/>
+    </testsuite>
+    <testsuite name="maos-spirit-cli::publish_tier_validation_test" tests="3" skipped="0" errors="0" failures="0">
+        <testcase name="accepts_public_vetted_via_parse_tier" classname="maos-spirit-cli::publish_tier_validation_test" timestamp="2026-11-08T14:12:31.724+00:00" time="0.006"/>
+        <testcase name="rejects_tier_mismatch_with_manifest" classname="maos-spirit-cli::publish_tier_validation_test" timestamp="2026-11-08T14:12:31.730+00:00" time="0.004"/>
+        <testcase name="rejects_unknown_tier_via_parse_tier" classname="maos-spirit-cli::publish_tier_validation_test" timestamp="2026-11-08T14:12:31.734+00:00" time="0.002"/>
+    </testsuite>
+    <testsuite name="maos-spirit-cli::vet_lifecycle_20_1b" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="publisher_and_vetter_yank_verbs_authenticate_ac7" classname="maos-spirit-cli::vet_lifecycle_20_1b" timestamp="2026-11-08T14:12:31.736+00:00" time="0.263"/>
+        <testcase name="vet_issue_install_promote_revoke_refuses_next_admission_ac6" classname="maos-spirit-cli::vet_lifecycle_20_1b" timestamp="2026-11-08T14:12:32.000+00:00" time="0.406"/>
+    </testsuite>
+    <testsuite name="xtask::fkcs_oracle" tests="11" skipped="0" errors="0" failures="0">
+        <testcase name="diff_oracle_derives_kernel_unchanged_and_ignores_self_reported_flags" classname="xtask::fkcs_oracle" timestamp="2026-11-08T14:12:32.406+00:00" time="0.007"/>
+        <testcase name="diff_oracle_ignores_forged_self_report_even_when_it_claims_red" classname="xtask::fkcs_oracle" timestamp="2026-11-08T14:12:32.413+00:00" time="0.003"/>
+        <testcase name="diff_oracle_reports_kernel_unchanged_for_identical_surfaces" classname="xtask::fkcs_oracle" timestamp="2026-11-08T14:12:32.416+00:00" time="0.002"/>
+        <testcase name="disposition_inline_parser_extracts_phase_keys_and_rejects_malformed_stanzas" classname="xtask::fkcs_oracle" timestamp="2026-11-08T14:12:32.418+00:00" time="0.003"/>
+        <testcase name="every_declared_admission_file_reds_a_one_byte_mutation" classname="xtask::fkcs_oracle" timestamp="2026-11-08T14:12:32.422+00:00" time="0.010"/>
+        <testcase name="frozen_baseline_files_carry_real_public_surfaces_not_synthetic_tokens" classname="xtask::fkcs_oracle" timestamp="2026-11-08T14:12:32.432+00:00" time="0.004"/>
+        <testcase name="frozen_baseline_reconciles_live_triple_and_rejects_src_line_drift" classname="xtask::fkcs_oracle" timestamp="2026-11-08T14:12:32.436+00:00" time="0.125"/>
+        <testcase name="frozen_snapshot_and_current_kernel_baselines_are_independently_valid" classname="xtask::fkcs_oracle" timestamp="2026-11-08T14:12:32.560+00:00" time="0.139"/>
+        <testcase name="oracle_fault_injections_red_kernel_unchanged_around_a_stable_base" classname="xtask::fkcs_oracle" timestamp="2026-11-08T14:12:32.700+00:00" time="0.003"/>
+        <testcase name="phase_disposition_inherits_downward_and_resolves_the_blocking_window" classname="xtask::fkcs_oracle" timestamp="2026-11-08T14:12:32.703+00:00" time="0.003"/>
+        <testcase name="read_disposition_extracts_exactly_the_check_fkcs_stanza" classname="xtask::fkcs_oracle" timestamp="2026-11-08T14:12:32.706+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="xtask::registry_socket_security_20_1b" tests="7" skipped="0" errors="0" failures="0">
+        <testcase name="accepted_registry_sockets_are_blocking_before_clone_p2" classname="xtask::registry_socket_security_20_1b" timestamp="2026-11-08T14:12:32.709+00:00" time="0.021"/>
+        <testcase name="clone_failure_cannot_exit_the_registry_accept_loop_f3" classname="xtask::registry_socket_security_20_1b" timestamp="2026-11-08T14:12:32.730+00:00" time="0.016"/>
+        <testcase name="daemon_registry_policy_has_one_fail_closed_reader_d1_p10" classname="xtask::registry_socket_security_20_1b" timestamp="2026-11-08T14:12:32.746+00:00" time="0.191"/>
+        <testcase name="registry_accept_errors_have_backoff_f3" classname="xtask::registry_socket_security_20_1b" timestamp="2026-11-08T14:12:32.937+00:00" time="0.015"/>
+        <testcase name="registry_bodies_do_not_preallocate_declared_lengths_f2" classname="xtask::registry_socket_security_20_1b" timestamp="2026-11-08T14:12:32.952+00:00" time="0.015"/>
+        <testcase name="registry_poller_starts_after_shared_installed_boot_admission_f9" classname="xtask::registry_socket_security_20_1b" timestamp="2026-11-08T14:12:32.968+00:00" time="0.192"/>
+        <testcase name="registry_tls_features_are_explicit_not_transitive_defaults_d2" classname="xtask::registry_socket_security_20_1b" timestamp="2026-11-08T14:12:33.160+00:00" time="0.011"/>
+    </testsuite>
+    <testsuite name="xtask::registry_workflow_security_20_1b" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="executable_typescript_registry_example_has_both_development_optins_p1" classname="xtask::registry_workflow_security_20_1b" timestamp="2026-11-08T14:12:33.171+00:00" time="0.006"/>
+        <testcase name="registry_workflows_explicitly_select_server_mode_and_client_development_optin" classname="xtask::registry_workflow_security_20_1b" timestamp="2026-11-08T14:12:33.177+00:00" time="0.052"/>
+    </testsuite>
+</testsuites>

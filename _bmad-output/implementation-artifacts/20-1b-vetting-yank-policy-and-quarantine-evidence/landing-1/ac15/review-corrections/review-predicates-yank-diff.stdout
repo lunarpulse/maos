@@ -1,0 +1,11 @@
+--- restored/crates/maos-registry/src/yank.rs
++++ planted/crates/maos-registry/src/yank.rs
+@@ -120,7 +120,7 @@
+             .cache
+             .lock()
+             .map_err(|e| RegistryError::Transport(e.to_string()))?;
+-        if let Some(head) = list.head.filter(|head| *head < cache.last_seen_ns) {
++        if let Some(head) = list.head.filter(|head| false && *head < cache.last_seen_ns) {
+             cache.resync = false;
+             let error = RegistryError::HeadBehindCursor { head, cursor: cache.last_seen_ns };
+             eprintln!("yank-head-rollback: {error}");

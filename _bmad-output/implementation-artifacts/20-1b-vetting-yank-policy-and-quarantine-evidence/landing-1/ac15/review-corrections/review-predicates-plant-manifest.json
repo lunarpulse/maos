@@ -1,0 +1,38 @@
+{
+  "crates/maos-bin/src/main.rs": {
+    "restored_sha256": "44dfc8306d693e0b2c0c2a257761a79af8663b41cb55a17b19063c49ce1ba838",
+    "planted_sha256": "f3f56e2e26f256f49c3dd5d90fd7936e87536846e023d5b163ff72b0295488e0"
+  },
+  "crates/maos-registry/src/security.rs": {
+    "restored_sha256": "6bb1dd8de34daeef5e5974436d3436a3c6e238cbcb903ce3c370d162e23a9d25",
+    "planted_sha256": "14020bda603b03ac3ed61b44f07ef9e2285277d84a1739f6f28416a0c4503317"
+  },
+  "crates/maos-registry/src/http.rs": {
+    "restored_sha256": "58fa56ea49b5ac28aed6815b67091b04dfb08c7c706e15e66889a6d58c4aeef2",
+    "planted_sha256": "278130c12eb3f400bcba511e7c20d4a2157bef44de58ac81d7b1f0a1daa69261"
+  },
+  "crates/maos-registry/src/server.rs": {
+    "restored_sha256": "4644b95d98d6a505a85f2452c62c7d03f1f15451b30ebb236c578e2f069ef410",
+    "planted_sha256": "495f5a3cea25122b097a28d8dc64e0737db4b261ed3e214e7b0bd958035630bb"
+  },
+  "crates/maos-registry/src/client.rs": {
+    "restored_sha256": "a112c76ddefd48923b2dba406b8cc126a0abb99cd67f8e1b578048f2afbaccc9",
+    "planted_sha256": "3ef23ff58797d066d1032eff6936537f98009c21fd34e2e02181384ec3d62992"
+  },
+  "crates/maos-registry/src/yank.rs": {
+    "restored_sha256": "04f2bee1463695522a46fb91d2253b77d56e2cf0e482e249634c9827c4e70a4e",
+    "planted_sha256": "58fe1b77cce23666e08d0d604a61cacdb2dd1e0d35336f3cdd61c0ebb38b2dcf"
+  },
+  "crates/maos-registry/src/storage.rs": {
+    "restored_sha256": "08f4b46a24f2411932f2a258b7e93c84825b514e7cb8f3884e0130e16df00c69",
+    "planted_sha256": "e6e4e6be405b9fcefa241696d83590e2bc192ce18e8b771ed1e1f5230c0e02e4"
+  },
+  "crates/maos-registry/src/handlers/yanks_since.rs": {
+    "restored_sha256": "ccb871c67a45bb18965716c8d69757ccaacafa6352686bd1da2aefd4bdc6adc1",
+    "planted_sha256": "8eec21c257477bae9ea3f0e403713a1ea2234b307a5d195baffcb37958c520b5"
+  },
+  "crates/maos-fkcs/Cargo.toml": {
+    "restored_sha256": "674edd3907542a3cd4c0d0260d78dac5bbd17d7edd2fc7a60062764a85e32322",
+    "planted_sha256": "37ec3d7036b7f59a87e25c9cb13eb53264eab3a639fee08de35aa90bc62603ca"
+  }
+}

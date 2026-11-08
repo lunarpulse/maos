@@ -1,0 +1,31 @@
+{
+  "name": "nextest-run",
+  "tests": "5836",
+  "skipped": "0",
+  "failures": "3",
+  "errors": "0",
+  "uuid": "f6748ad2-1296-4b1c-a5ee-e387563850c1",
+  "timestamp": "2026-11-08T14:28:43.723+00:00",
+  "time": "93.736",
+  "testcase_sum_seconds": 1144.817,
+  "failed_cases": [
+    {
+      "suite": "maos-audit::erasure_review_20_11",
+      "name": "p3_p4_f4_f5_f6_f11_f12_both_verifiers_enforce_the_same_signed_contract",
+      "time": "0.050",
+      "failure": "thread 'p3_p4_f4_f5_f6_f11_f12_both_verifiers_enforce_the_same_signed_contract' (1010155) panicked at crates/maos-audit/tests/erasure_review_20_11.rs:392:9:\ndeclared verifier runner needs tools/verify-erasure/requirements.txt; missing dependency is not a skip: Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\n    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey\nModuleNotFoundError: No module named 'cryptography'\n\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    },
+    {
+      "suite": "maos-bin::erasure_inventory_20_11",
+      "name": "ac1_category_evidence_is_required_by_both_verifiers",
+      "time": "1.263",
+      "failure": "thread 'ac1_category_evidence_is_required_by_both_verifiers' (1013406) panicked at crates/maos-bin/tests/erasure_inventory_20_11.rs:292:5:\nassertion failed: Command::new(\"python3\").arg(&verifier).arg(&path).arg(&pubkey).status().expect(\"python verifier\").success()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    },
+    {
+      "suite": "maos-bin::erasure_million_20_11",
+      "name": "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption",
+      "time": "43.366",
+      "failure": "thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (1031231) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:\npending operation did not finish: op-1a279e88449a10b8a7a7be05\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    }
+  ]
+}

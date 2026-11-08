@@ -1,0 +1,21 @@
+
+running 7 tests
+test parenthesized_and_select_drains_require_join_p6 ... FAILED
+test qualified_drop_requires_join_p6 ... FAILED
+test helper_and_task_sender_moves_are_rejected_p6 ... FAILED
+test joined_qualified_drop_and_select_are_accounted_p6 ... FAILED
+test wildcard_sender_binding_is_not_a_release_p6 ... FAILED
+test sibling_join_does_not_authorize_another_arm_p6 ... ok
+test supervisor_and_unload_must_follow_join_p4 ... ok
+
+failures:
+
+failures:
+    helper_and_task_sender_moves_are_rejected_p6
+    joined_qualified_drop_and_select_are_accounted_p6
+    parenthesized_and_select_drains_require_join_p6
+    qualified_drop_requires_join_p6
+    wildcard_sender_binding_is_not_a_release_p6
+
+test result: FAILED. 2 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

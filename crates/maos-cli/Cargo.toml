@@ -15,12 +15,16 @@ path = "src/main.rs"
 name = "maos_cli"
 path = "src/lib.rs"
 
+[features]
+default = ["tls"]
+tls = ["maos-registry/tls"]
+
 [dependencies]
 chrono = "0.4"    # Story 9.3b — calendar-safe month-range parsing
 clap = { version = "4.5", features = ["derive"] }
 maos-audit = { path = "../maos-audit" }
 maos-domain = { path = "../maos-domain" }  # Story 9.1 FR44 — audit key loader
-maos-registry = { path = "../maos-registry" }
+maos-registry = { path = "../maos-registry", default-features = false }
 maos-eval = { path = "../maos-eval", features = ["benchmark-sidecar"] }  # Story 18-2 — verify the signed halt benchmark sidecar
 maos-compliance = { path = "../maos-compliance" }
 maos-skill = { path = "../maos-skill" }   # Story 7.4 — `maosctl skills` discovery + admission exit

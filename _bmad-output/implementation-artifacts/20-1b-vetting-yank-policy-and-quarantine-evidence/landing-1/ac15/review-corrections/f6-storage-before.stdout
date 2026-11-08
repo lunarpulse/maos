@@ -1,0 +1,14 @@
+
+running 3 tests
+test filtered_snapshot_keeps_its_authenticated_complete_head_f6 ... FAILED
+test large_delta_is_refused_instead_of_returning_an_incomplete_signed_head_f6 ... FAILED
+test large_history_small_delta_uses_storage_lower_bound_f6 ... ok
+
+failures:
+
+failures:
+    filtered_snapshot_keeps_its_authenticated_complete_head_f6
+    large_delta_is_refused_instead_of_returning_an_incomplete_signed_head_f6
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+

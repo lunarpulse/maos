@@ -1,0 +1,11 @@
+
+running 1 test
+test yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5 ... FAILED
+
+failures:
+
+failures:
+    yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+

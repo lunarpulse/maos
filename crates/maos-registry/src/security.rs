@@ -25,6 +25,23 @@ impl RegistrySecurityConfig {
         }
     }
     pub(crate) fn from_operator(value: Option<&toml::Value>) -> Result<Self, String> {
+        if let Some(table) = value.and_then(toml::Value::as_table) {
+            const KEYS: &[&str] = &[
+                "uri",
+                "tier_floor",
+                "t3_for_public_untrusted",
+                "allow_unsigned_local",
+                "org_signing_pubkey",
+                "require_server_tier_signature",
+                "allow_force_tier_at_import",
+                "signing_pubkey",
+                "ca_certificate",
+                "development_http",
+            ];
+            if let Some(key) = table.keys().find(|key| !KEYS.contains(&key.as_str())) {
+                return Err(format!("unknown registry key {key:?}"));
+            }
+        }
         #[derive(Default, Deserialize)]
         #[serde(default)]
         struct Disk {
@@ -45,7 +62,7 @@ impl RegistrySecurityConfig {
                 .signing_pubkey
                 .map(|key| {
                     hex::decode(key)
-                        .map_err(|e| e.to_string())?
+                        .map_err(|_| "registry signing_pubkey must be 32-byte hex")?
                         .try_into()
                         .map_err(|_| "registry signing_pubkey must be 32 bytes".to_owned())
                 })
@@ -67,6 +84,9 @@ pub fn canonical_uri(uri: &str) -> Result<url::Url, String> {
         || url.fragment().is_some()
         || url.path() != "/mcp"
         || url.as_str() != uri
+        || url
+            .host_str()
+            .is_some_and(|host| host.ends_with('.') || host.contains(".."))
     {
         return Err("registry URI must be canonical http(s)://host[:port]/mcp".into());
     }
@@ -167,9 +187,12 @@ pub(crate) fn verify_response(
         .map_err(authentication)?;
     verify_head(request, response, claim.yank_head)
 }
-fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(), IoError> {
-    // Inspect only routing/cursor fields. In particular, never materialize a
-    // second JSON Value containing a publication's potentially large artifact.
+pub(crate) struct RequestRoute<'a> {
+    pub method: &'a str,
+    pub since: Option<u64>,
+}
+/// Borrow routing fields, skipping publication payloads without a second JSON Value.
+pub(crate) fn request_route(request: &[u8]) -> Result<RequestRoute<'_>, IoError> {
     #[derive(Deserialize)]
     struct Cursor {
         since_ns: Option<u64>,
@@ -184,18 +207,32 @@ fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(),
     #[derive(Deserialize)]
     struct Request<'a> {
         method: &'a str,
-        #[serde(borrow)]
-        params: Params<'a>,
+        #[serde(default, borrow)]
+        params: Option<Params<'a>>,
     }
     let request: Request<'_> = serde_json::from_slice(request).map_err(authentication)?;
-    let since = if request.method == "registry.yanks_since" {
-        request.params.since_ns
-    } else if request.method == "tools/call" && request.params.name == Some("registry.yanks_since")
-    {
-        request.params.arguments.and_then(|args| args.since_ns)
+    if request.method == "tools/call" {
+        let params = request
+            .params
+            .ok_or_else(|| authentication("missing tool routing"))?;
+        Ok(RequestRoute {
+            method: params
+                .name
+                .ok_or_else(|| authentication("missing tool name"))?,
+            since: params.arguments.and_then(|arguments| arguments.since_ns),
+        })
     } else {
+        Ok(RequestRoute {
+            method: request.method,
+            since: request.params.and_then(|params| params.since_ns),
+        })
+    }
+}
+fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(), IoError> {
+    let route = request_route(request)?;
+    if route.method != "registry.yanks_since" {
         return Ok(());
-    };
+    }
     #[derive(Deserialize)]
     struct Sequence {
         sequence: u64,
@@ -203,6 +240,7 @@ fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(),
     #[derive(Deserialize)]
     struct List {
         entries: Vec<Sequence>,
+        head: u64,
     }
     #[derive(Deserialize)]
     struct Response {
@@ -212,7 +250,20 @@ fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(),
     let Some(list) = response.result else {
         return Ok(());
     };
-    let mut next = since.ok_or_else(|| authentication("missing yank cursor"))?;
+    let head = head.ok_or_else(|| authentication("missing authenticated yank head"))?;
+    if list.head != head {
+        return Err(authentication(
+            "payload head differs from authenticated head",
+        ));
+    }
+    let mut next = route
+        .since
+        .ok_or_else(|| authentication("missing yank cursor"))?;
+    // A valid empty historical view is authenticated, but semantically a rollback.
+    // Preserve that distinction for the registry client's typed boundary error.
+    if next > head && list.entries.is_empty() {
+        return Ok(());
+    }
     for entry in list.entries {
         next = next
             .checked_add(1)
@@ -221,7 +272,7 @@ fn verify_head(request: &[u8], response: &[u8], head: Option<u64>) -> Result<(),
             return Err(authentication("yank list gap or duplicate"));
         }
     }
-    if head != Some(next) {
+    if head != next {
         return Err(authentication(
             "yank list does not reach authenticated head",
         ));
@@ -270,13 +321,7 @@ pub(crate) fn certificates(
 pub(crate) fn client_tls(
     ca: Option<&Path>,
 ) -> Result<std::sync::Arc<rustls::ClientConfig>, String> {
-    let mut roots = rustls::RootCertStore::empty();
-    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    if let Some(path) = ca {
-        for certificate in certificates(path)? {
-            roots.add(certificate).map_err(|e| e.to_string())?;
-        }
-    }
+    let roots = client_roots(ca)?;
     let config = rustls::ClientConfig::builder_with_provider(std::sync::Arc::new(
         rustls::crypto::ring::default_provider(),
     ))
@@ -285,6 +330,18 @@ pub(crate) fn client_tls(
     .with_root_certificates(roots)
     .with_no_client_auth();
     Ok(std::sync::Arc::new(config))
+}
+#[cfg(feature = "tls")]
+fn client_roots(ca: Option<&Path>) -> Result<rustls::RootCertStore, String> {
+    let mut roots = rustls::RootCertStore::empty();
+    if let Some(path) = ca {
+        for certificate in certificates(path)? {
+            roots.add(certificate).map_err(|e| e.to_string())?;
+        }
+    } else {
+        roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    }
+    Ok(roots)
 }
 #[cfg(feature = "tls")]
 pub(crate) fn server_tls(
@@ -304,4 +361,117 @@ pub(crate) fn server_tls(
     .with_single_cert(certificates(cert)?, key)
     .map_err(|e| e.to_string())?;
     Ok(std::sync::Arc::new(config))
+}
+
+#[cfg(test)]
+mod review_tests {
+    use super::*;
+
+    #[test]
+    fn registry_uri_matrix_and_trailing_dns_labels_p3_p9() {
+        for uri in [
+            "https://REGISTRY.example/mcp",
+            "https://registry.example:443/mcp",
+            "https://registry.example./mcp",
+            "https://registry..example/mcp",
+            "https://registry.example/mcp/",
+            "https://registry.example/%6dcp",
+            "https://user:password@registry.example/mcp",
+        ] {
+            assert!(
+                canonical_uri(uri).is_err(),
+                "non-canonical URI accepted: {uri}"
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_development_literal_loopback_matrix_p3() {
+        for (host, allowed) in [
+            ("127.0.0.1", true),
+            ("127.0.0.2", true),
+            ("[::1]", true),
+            ("0.0.0.0", false),
+            ("[::ffff:127.0.0.1]", false),
+            ("localhost", false),
+        ] {
+            let accepted = canonical_uri(&format!("http://{host}/mcp"))
+                .is_ok_and(|uri| literal_loopback(&uri));
+            assert_eq!(accepted, allowed, "{host}");
+        }
+    }
+
+    #[test]
+    fn registry_typo_is_refused_p11() {
+        let value = toml::Value::Table(toml::map::Map::from_iter([(
+            "signing_pubky".into(),
+            toml::Value::String("typo".into()),
+        )]));
+        assert!(
+            RegistrySecurityConfig::from_operator(Some(&value)).is_err(),
+            "unknown registry security keys must not silently disappear"
+        );
+    }
+
+    #[test]
+    fn registry_hex_diagnostics_do_not_echo_input_p8() {
+        let value = toml::Value::Table(toml::map::Map::from_iter([(
+            "signing_pubkey".into(),
+            toml::Value::String("!".repeat(64)),
+        )]));
+        let error = RegistrySecurityConfig::from_operator(Some(&value)).unwrap_err();
+        assert!(
+            !error.contains('!'),
+            "hex diagnostic leaked offending input: {error}"
+        );
+    }
+
+    #[test]
+    fn signed_params_less_notification_verifies_p7() {
+        let request = br#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#;
+        let response = br#"{"jsonrpc":"2.0","id":null,"result":{}}"#;
+        let seed = [0x91; 32];
+        let pair = ring::signature::Ed25519KeyPair::from_seed_unchecked(&seed).unwrap();
+        use ring::signature::KeyPair;
+        let key: [u8; 32] = pair.public_key().as_ref().try_into().unwrap();
+        let header = sign_response(
+            "https://registry.example/mcp",
+            [7; 32],
+            request,
+            response,
+            None,
+            &seed,
+        )
+        .unwrap();
+        assert!(verify_response(
+            "https://registry.example/mcp",
+            [7; 32],
+            request,
+            response,
+            Some(&header),
+            &key
+        )
+        .is_ok());
+    }
+
+    #[cfg(feature = "tls")]
+    #[test]
+    fn configured_ca_replaces_bundled_roots_d4() {
+        let directory = tempfile::tempdir().unwrap();
+        let key = rcgen::KeyPair::generate().unwrap();
+        let mut params = rcgen::CertificateParams::new(Vec::<String>::new()).unwrap();
+        params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+        let ca = params.self_signed(&key).unwrap();
+        let path = directory.path().join("operator-ca.pem");
+        std::fs::write(&path, ca.pem()).unwrap();
+        assert_eq!(
+            client_roots(Some(&path)).unwrap().len(),
+            1,
+            "a configured private CA must replace, not extend, bundled Mozilla roots"
+        );
+        assert_eq!(
+            client_roots(None).unwrap().len(),
+            webpki_roots::TLS_SERVER_ROOTS.len()
+        );
+    }
 }

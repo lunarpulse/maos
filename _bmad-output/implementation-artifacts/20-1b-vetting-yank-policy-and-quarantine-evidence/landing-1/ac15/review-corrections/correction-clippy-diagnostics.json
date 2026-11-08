@@ -1,0 +1,6837 @@
+[
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-spirit-abi/src/gateway.rs",
+        "line": 273,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (9/7)",
+    "spans": [
+      {
+        "file": "crates/maos-spirit-abi/src/gateway.rs",
+        "line": 285,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-spirit-abi/src/lifecycle.rs",
+        "line": 415,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_contains",
+    "message": "using `contains()` instead of `iter().any()` is more efficient",
+    "spans": [
+      {
+        "file": "crates/maos-spirit-abi/src/lifecycle.rs",
+        "line": 518,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::empty_line_after_doc_comments",
+    "message": "empty line after doc comment",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/ports/collective_memory.rs",
+        "line": 111,
+        "primary": false
+      },
+      {
+        "file": "crates/maos-domain/src/ports/collective_memory.rs",
+        "line": 109,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/audit_key.rs",
+        "line": 349,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::chunks_exact_to_as_chunks",
+    "message": "using `chunks_exact` with a constant chunk size",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/audit_key.rs",
+        "line": 356,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_conversion",
+    "message": "useless conversion to the same type: `u8`",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/audit_key.rs",
+        "line": 367,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/invariants/i12.rs",
+        "line": 46,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/invariants/i13.rs",
+        "line": 53,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/frame.rs",
+        "line": 159,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::incompatible_msrv",
+    "message": "current MSRV (Minimum Supported Rust Version) is `1.88.0` but this item is stable since `1.91.0`",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/frame.rs",
+        "line": 357,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/hot_swap.rs",
+        "line": 231,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/hot_swap.rs",
+        "line": 232,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/iac_bus_types.rs",
+        "line": 110,
+        "primary": false
+      },
+      {
+        "file": "crates/maos-domain/src/ports/iac_bus.rs",
+        "line": 51,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_clamp",
+    "message": "clamp-like pattern without using clamp function",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/ports/registry.rs",
+        "line": 99,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_range_contains",
+    "message": "manual `!RangeInclusive::contains` implementation",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/region.rs",
+        "line": 61,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (11/7)",
+    "spans": [
+      {
+        "file": "crates/maos-domain/src/self_telemetry.rs",
+        "line": 30,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::empty_line_after_doc_comments",
+    "message": "empty line after doc comment",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/lib.rs",
+        "line": 189,
+        "primary": false
+      },
+      {
+        "file": "crates/maos-audit/src/lib.rs",
+        "line": 187,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::collapsible_if",
+    "message": "this `if` statement can be collapsed",
+    "spans": [
+      {
+        "file": "crates/maos-egress/src/upstream.rs",
+        "line": 199,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "spirits/architect/src/lib.rs",
+        "line": 20,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-compliance/src/vetting/mod.rs",
+        "line": 321,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::new_without_default",
+    "message": "you should consider adding a `Default` implementation for `CapShard`",
+    "spans": [
+      {
+        "file": "crates/maos-capability/src/cap_tokens/shard.rs",
+        "line": 20,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::clone_on_copy",
+    "message": "using `clone` on type `IntentClass` which implements the `Copy` trait",
+    "spans": [
+      {
+        "file": "crates/maos-capability/src/cap_tokens/shard.rs",
+        "line": 37,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "spirits/orchestrator/src/lib.rs",
+        "line": 720,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "spirits/nash/src/lib.rs",
+        "line": 157,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "spirits/nash/src/lib.rs",
+        "line": 158,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "spirits/nash/src/lib.rs",
+        "line": 159,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "line": 461,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_map",
+    "message": "manual implementation of `Option::map`",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "line": 1446,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "line": 1677,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "line": 1989,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::chunks_exact_to_as_chunks",
+    "message": "using `chunks_exact` with a constant chunk size",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "line": 2003,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "line": 4887,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "line": 4904,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-skill/src/lib.rs",
+        "line": 15,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-skill/src/lib.rs",
+        "line": 16,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-skill/src/lib.rs",
+        "line": 17,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::incompatible_msrv",
+    "message": "current MSRV (Minimum Supported Rust Version) is `1.88.0` but this item is stable since `1.89.0`",
+    "spans": [
+      {
+        "file": "crates/maos-skill/src/store.rs",
+        "line": 166,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_div_ceil",
+    "message": "manually reimplementing `div_ceil`",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/erasure/merkle.rs",
+        "line": 88,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (11/7)",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/erasure/proof.rs",
+        "line": 356,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_closure",
+    "message": "redundant closure",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/log_composition.rs",
+        "line": 216,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_closure",
+    "message": "redundant closure",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/log_composition.rs",
+        "line": 219,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_conversion",
+    "message": "explicit call to `.into_iter()` in function argument accepting `IntoIterator`",
+    "spans": [
+      {
+        "file": "crates/maos-pdp/src/reconcile.rs",
+        "line": 190,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/sealed_export.rs",
+        "line": 520,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_fallible_conversions",
+    "message": "use of a fallible conversion when an infallible one could be used",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/lib.rs",
+        "line": 208,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_fallible_conversions",
+    "message": "use of a fallible conversion when an infallible one could be used",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/lib.rs",
+        "line": 385,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::explicit_counter_loop",
+    "message": "the variable `line_no` is used as a loop counter",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/lib.rs",
+        "line": 699,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_range_patterns",
+    "message": "this OR pattern can be rewritten using a range",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/lib.rs",
+        "line": 881,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::write_literal",
+    "message": "literal with an empty format string",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/lib.rs",
+        "line": 909,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::write_literal",
+    "message": "literal with an empty format string",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/lib.rs",
+        "line": 946,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::explicit_counter_loop",
+    "message": "the variable `line_no` is used as a loop counter",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/lib.rs",
+        "line": 949,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_late_init",
+    "message": "unneeded late initialization",
+    "spans": [
+      {
+        "file": "crates/maos-audit/src/lib.rs",
+        "line": 1244,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::field_reassign_with_default",
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      {
+        "file": "crates/maos-siem/src/lib.rs",
+        "line": 137,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/ccac/expansion.rs",
+        "line": 91,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/ccac/expansion.rs",
+        "line": 207,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_div_ceil",
+    "message": "manually reimplementing `div_ceil`",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/red_team/expansion.rs",
+        "line": 27,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/red_team/expansion.rs",
+        "line": 146,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/red_team/expansion.rs",
+        "line": 147,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/red_team/expansion.rs",
+        "line": 209,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::should_implement_trait",
+    "message": "method `default` can be confused for the standard trait method `std::default::Default::default`",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/red_team/mod.rs",
+        "line": 70,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/secret_redaction/expansion.rs",
+        "line": 172,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/secret_redaction/expansion.rs",
+        "line": 192,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/secret_redaction/expansion.rs",
+        "line": 200,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_borrows_in_formatting",
+    "message": "redundant reference in `format!` argument",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/secret_redaction/expansion.rs",
+        "line": 209,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_borrows_in_formatting",
+    "message": "redundant reference in `format!` argument",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/secret_redaction/expansion.rs",
+        "line": 210,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/secret_redaction/mod.rs",
+        "line": 76,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/secret_redaction/mod.rs",
+        "line": 80,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/secret_redaction/mod.rs",
+        "line": 81,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::should_implement_trait",
+    "message": "method `default` can be confused for the standard trait method `std::default::Default::default`",
+    "spans": [
+      {
+        "file": "crates/maos-corpus-gen/src/secret_redaction/mod.rs",
+        "line": 100,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::chunks_exact_to_as_chunks",
+    "message": "using `chunks_exact` with a constant chunk size",
+    "spans": [
+      {
+        "file": "spirits/researcher/src/lib.rs",
+        "line": 1802,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 874,
+        "primary": false
+      },
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 159,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 874,
+        "primary": false
+      },
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 200,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 424,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 436,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 874,
+        "primary": false
+      },
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 818,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_lazy_evaluations",
+    "message": "unnecessary closure used with `bool::then`",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 1093,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 874,
+        "primary": false
+      },
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 1168,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 874,
+        "primary": false
+      },
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 1265,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 874,
+        "primary": false
+      },
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 1325,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 874,
+        "primary": false
+      },
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 1738,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 874,
+        "primary": false
+      },
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 1769,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 874,
+        "primary": false
+      },
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 1882,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 874,
+        "primary": false
+      },
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 1899,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 874,
+        "primary": false
+      },
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 1971,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 2026,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 874,
+        "primary": false
+      },
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 2084,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 874,
+        "primary": false
+      },
+      {
+        "file": "spirits/butler/src/lib.rs",
+        "line": 2164,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_closure",
+    "message": "redundant closure",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/distillate.rs",
+        "line": 152,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_closure",
+    "message": "redundant closure",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/distillate.rs",
+        "line": 171,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_closure",
+    "message": "redundant closure",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/distillate.rs",
+        "line": 180,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_range_loop",
+    "message": "the loop variable `i` is used to index `bytes`",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/distillate.rs",
+        "line": 486,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/drr_scheduler.rs",
+        "line": 91,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-loom-lite/src/replication/leaf.rs",
+        "line": 130,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_unit_err",
+    "message": "this returns a `Result<_, ()>`",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/mailbox.rs",
+        "line": 242,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_unit_err",
+    "message": "this returns a `Result<_, ()>`",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/mailbox.rs",
+        "line": 248,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_unit_err",
+    "message": "this returns a `Result<_, ()>`",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/mailbox.rs",
+        "line": 262,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/mailbox.rs",
+        "line": 266,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-loom-lite/src/store.rs",
+        "line": 605,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/mailbox.rs",
+        "line": 400,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/mailbox.rs",
+        "line": 410,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/mailbox.rs",
+        "line": 481,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/mailbox.rs",
+        "line": 684,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/orchestrator_dispatch.rs",
+        "line": 67,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_fold",
+    "message": "this `.fold` can be written more succinctly using another method",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/redaction.rs",
+        "line": 268,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-a2a-core/src/corpus.rs",
+        "line": 145,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_unit_err",
+    "message": "this returns a `Result<_, ()>`",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/transparency_log.rs",
+        "line": 729,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-a2a-core/src/router.rs",
+        "line": 129,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-a2a-core/src/router.rs",
+        "line": 130,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (9/7)",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/transparency_log.rs",
+        "line": 1140,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (10/7)",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/transparency_log.rs",
+        "line": 1186,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (10/7)",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/transparency_log.rs",
+        "line": 1230,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter/transparency_log.rs",
+        "line": 2049,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "crates/maos-a2a-core/src/router.rs",
+        "line": 2006,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter.rs",
+        "line": 334,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::collapsible_if",
+    "message": "this `if` statement can be collapsed",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter.rs",
+        "line": 421,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter.rs",
+        "line": 636,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter.rs",
+        "line": 648,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter.rs",
+        "line": 649,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter.rs",
+        "line": 656,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::vec_init_then_push",
+    "message": "calls to `push` immediately after creation",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter.rs",
+        "line": 763,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::vec_init_then_push",
+    "message": "calls to `push` immediately after creation",
+    "spans": [
+      {
+        "file": "crates/maos-iac/src/adapter.rs",
+        "line": 771,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "spans": [
+      {
+        "file": "crates/maos-a2a-core/src/transport/json_rpc.rs",
+        "line": 212,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/admission.rs",
+        "line": 437,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/admission.rs",
+        "line": 554,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/admission.rs",
+        "line": 556,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/client.rs",
+        "line": 280,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/client.rs",
+        "line": 282,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/client.rs",
+        "line": 284,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/handlers/manifest.rs",
+        "line": 16,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/handlers/manifest.rs",
+        "line": 18,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/handlers/manifest.rs",
+        "line": 20,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_clamp",
+    "message": "clamp-like pattern without using clamp function",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/operations.rs",
+        "line": 44,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/origin.rs",
+        "line": 21,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_clamp",
+    "message": "clamp-like pattern without using clamp function",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/storage.rs",
+        "line": 921,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_closure",
+    "message": "redundant closure",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/storage.rs",
+        "line": 1164,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_closure",
+    "message": "redundant closure",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/distillate_corpus.rs",
+        "line": 91,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/halt_continuity_corpus.rs",
+        "line": 66,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/admission.rs",
+        "line": 437,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/admission.rs",
+        "line": 554,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/admission.rs",
+        "line": 556,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::io_other_error",
+    "message": "this can be `std::io::Error::other(_)`",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/halt_corpus.rs",
+        "line": 78,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/halt_corpus.rs",
+        "line": 82,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::len_without_is_empty",
+    "message": "struct `HaltCorpus` has a public `len` method, but no `is_empty` method",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/halt_corpus.rs",
+        "line": 97,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/admission.rs",
+        "line": 792,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/admission.rs",
+        "line": 794,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/admission.rs",
+        "line": 911,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/admission.rs",
+        "line": 913,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/admission.rs",
+        "line": 1156,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/admission.rs",
+        "line": 1158,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/client.rs",
+        "line": 280,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/client.rs",
+        "line": 282,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/client.rs",
+        "line": 284,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/handlers/manifest.rs",
+        "line": 16,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/handlers/manifest.rs",
+        "line": 18,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/handlers/manifest.rs",
+        "line": 20,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/halt_replay.rs",
+        "line": 223,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_clamp",
+    "message": "clamp-like pattern without using clamp function",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/operations.rs",
+        "line": 44,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/hsis_corpus.rs",
+        "line": 131,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/origin.rs",
+        "line": 21,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::io_other_error",
+    "message": "this can be `std::io::Error::other(_)`",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/intent_lineage_corpus.rs",
+        "line": 77,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/intent_lineage_corpus.rs",
+        "line": 81,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/intent_lineage_corpus.rs",
+        "line": 84,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/intent_lineage_corpus.rs",
+        "line": 85,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/isolation_corpus.rs",
+        "line": 6,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_closure",
+    "message": "redundant closure",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/isolation_corpus.rs",
+        "line": 235,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_closure",
+    "message": "redundant closure",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/isolation_corpus.rs",
+        "line": 268,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_clamp",
+    "message": "clamp-like pattern without using clamp function",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/storage.rs",
+        "line": 921,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_closure",
+    "message": "redundant closure",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/storage.rs",
+        "line": 1164,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::io_other_error",
+    "message": "this can be `std::io::Error::other(_)`",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/retract_corpus.rs",
+        "line": 55,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/retract_corpus.rs",
+        "line": 59,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/retract_corpus.rs",
+        "line": 62,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/retract_corpus.rs",
+        "line": 63,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::io_other_error",
+    "message": "this can be `std::io::Error::other(_)`",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/revocation_corpus.rs",
+        "line": 41,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/revocation_corpus.rs",
+        "line": 83,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::io_other_error",
+    "message": "this can be `std::io::Error::other(_)`",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/t3_escape_corpus.rs",
+        "line": 54,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/t3_escape_corpus.rs",
+        "line": 58,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/t3_escape_corpus.rs",
+        "line": 61,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::io_other_error",
+    "message": "this can be `std::io::Error::other(_)`",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/termination_corpus.rs",
+        "line": 54,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/termination_corpus.rs",
+        "line": 58,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::len_without_is_empty",
+    "message": "struct `TerminationCorpus` has a public `len` method, but no `is_empty` method",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/termination_corpus.rs",
+        "line": 73,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_saturating_arithmetic",
+    "message": "manual saturating arithmetic",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/trial_attestation.rs",
+        "line": 419,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/trial_attestation.rs",
+        "line": 727,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::io_other_error",
+    "message": "this can be `std::io::Error::other(_)`",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/upgrade_policy_corpus.rs",
+        "line": 41,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/upgrade_policy_corpus.rs",
+        "line": 45,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-eval/src/upgrade_policy_corpus.rs",
+        "line": 48,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_closure",
+    "message": "redundant closure",
+    "spans": [
+      {
+        "file": "crates/maos-director-surface/src/notification.rs",
+        "line": 265,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-a2a/src/adapter.rs",
+        "line": 30,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-a2a/src/adapter.rs",
+        "line": 31,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-a2a/src/adapter.rs",
+        "line": 32,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/tests/runtime_drift_test.rs",
+        "line": 55,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-registry/tests/runtime_drift_test.rs",
+        "line": 57,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-fkcs/src/lib.rs",
+        "line": 160,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::duplicated_attributes",
+    "message": "duplicated attribute",
+    "spans": [
+      {
+        "file": "crates/maos-cohort/src/error.rs",
+        "line": 24,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-fkcs/src/lib.rs",
+        "line": 160,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::duplicated_attributes",
+    "message": "duplicated attribute",
+    "spans": [
+      {
+        "file": "crates/maos-cohort/src/manifest.rs",
+        "line": 36,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::duplicated_attributes",
+    "message": "duplicated attribute",
+    "spans": [
+      {
+        "file": "crates/maos-cohort/src/pin.rs",
+        "line": 35,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-a2a-tcp/src/transport.rs",
+        "line": 976,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-spirit-cli/src/publish.rs",
+        "line": 125,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-spirit-cli/src/publish.rs",
+        "line": 127,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_div_ceil",
+    "message": "manually reimplementing `div_ceil`",
+    "spans": [
+      {
+        "file": "crates/maos-cohort/src/state.rs",
+        "line": 851,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cmp_owned",
+    "message": "this creates an owned instance just for comparison",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/accessibility.rs",
+        "line": 59,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cmp_owned",
+    "message": "this creates an owned instance just for comparison",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/accessibility.rs",
+        "line": 59,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (10/7)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs",
+        "line": 53,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs",
+        "line": 68,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::new_without_default",
+    "message": "you should consider adding a `Default` implementation for `PolicyTable`",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/capability/cap_policy/mod.rs",
+        "line": 103,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/capability/mod.rs",
+        "line": 155,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_conversion",
+    "message": "useless conversion to the same type: `maos_skill::ESkillStore`",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 1111,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/capability/mod.rs",
+        "line": 292,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::clone_on_copy",
+    "message": "using `clone` on type `HaltState` which implements the `Copy` trait",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/halt/mod.rs",
+        "line": 404,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (9/7)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/hot_swap/coordinator.rs",
+        "line": 71,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::clone_on_copy",
+    "message": "using `clone` on type `OnCrashAction` which implements the `Copy` trait",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/hot_swap/coordinator.rs",
+        "line": 311,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_strip",
+    "message": "stripping a suffix manually",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 2953,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_strip",
+    "message": "stripping a suffix manually",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 2963,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_unwrap",
+    "message": "called `unwrap` on `filter.boot_nonce` after checking its variant with `is_some`",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 3057,
+        "primary": false
+      },
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 3061,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::four_forward_slashes",
+    "message": "this item has comments with 4 forward slashes (`////`). These look like doc comments, but they aren't",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/hot_swap/post_swap_monitor.rs",
+        "line": 24,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_conversion",
+    "message": "useless conversion to the same type: `std::string::String`",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/hot_swap/state_codec.rs",
+        "line": 110,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::for_kv_map",
+    "message": "you seem to want to iterate on a map's values",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/iac.rs",
+        "line": 46,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::for_kv_map",
+    "message": "you seem to want to iterate on a map's values",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/iac.rs",
+        "line": 58,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 3975,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (9/7)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/inference/mod.rs",
+        "line": 129,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::vec_init_then_push",
+    "message": "calls to `push` immediately after creation",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/inference/mod.rs",
+        "line": 177,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/isolation/runner.rs",
+        "line": 107,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_unwrap_or_default",
+    "message": "match can be simplified with `.unwrap_or_default()`",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 4545,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_overindented_list_items",
+    "message": "doc list item overindented",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs",
+        "line": 14,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_overindented_list_items",
+    "message": "doc list item overindented",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs",
+        "line": 16,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::large_enum_variant",
+    "message": "large size difference between variants",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs",
+        "line": 468,
+        "primary": true
+      },
+      {
+        "file": "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs",
+        "line": 472,
+        "primary": false
+      },
+      {
+        "file": "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs",
+        "line": 471,
+        "primary": false
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/memory/principal.rs",
+        "line": 105,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_conversion",
+    "message": "useless conversion to the same type: `maos_skill::ESkillStore`",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 1111,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/memory/mod.rs",
+        "line": 253,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_lazy_evaluations",
+    "message": "unnecessary closure used to substitute value for `Option::None`",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/memory/mod.rs",
+        "line": 265,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_lazy_evaluations",
+    "message": "unnecessary closure used to substitute value for `Option::None`",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/memory/mod.rs",
+        "line": 271,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_lazy_evaluations",
+    "message": "unnecessary closure used to substitute value for `Option::None`",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/memory/mod.rs",
+        "line": 329,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_lazy_evaluations",
+    "message": "unnecessary closure used to substitute value for `Option::None`",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/memory/mod.rs",
+        "line": 335,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/memory/mod.rs",
+        "line": 362,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_lazy_evaluations",
+    "message": "unnecessary closure used to substitute value for `Option::None`",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/memory/mod.rs",
+        "line": 374,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_lazy_evaluations",
+    "message": "unnecessary closure used to substitute value for `Option::None`",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/memory/mod.rs",
+        "line": 380,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_strip",
+    "message": "stripping a suffix manually",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 2953,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_strip",
+    "message": "stripping a suffix manually",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 2963,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_unwrap",
+    "message": "called `unwrap` on `filter.boot_nonce` after checking its variant with `is_some`",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 3057,
+        "primary": false
+      },
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 3061,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::clone_on_copy",
+    "message": "using `clone` on type `GatewayType` which implements the `Copy` trait",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs",
+        "line": 270,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/revocation/applier.rs",
+        "line": 45,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 3975,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::if_same_then_else",
+    "message": "this `if` has identical blocks",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/revocation/poller.rs",
+        "line": 83,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_unwrap_or_default",
+    "message": "match can be simplified with `.unwrap_or_default()`",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 4545,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/scheduler/control_block.rs",
+        "line": 221,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::clone_on_copy",
+    "message": "using `clone` on type `OnCrashAction` which implements the `Copy` trait",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/scheduler/control_block.rs",
+        "line": 327,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/scheduler/hook_dispatch.rs",
+        "line": 65,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_clamp",
+    "message": "clamp-like pattern without using clamp function",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/scheduler/idle_watchdog.rs",
+        "line": 124,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/scheduler/kernel_ctx.rs",
+        "line": 33,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::field_reassign_with_default",
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 5565,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::for_kv_map",
+    "message": "you seem to want to iterate on a map's values",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs",
+        "line": 165,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_clamp",
+    "message": "clamp-like pattern without using clamp function",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs",
+        "line": 316,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (12/7)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/scheduler/scheduler_loop.rs",
+        "line": 100,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-cli/src/subcommands.rs",
+        "line": 5945,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::let_underscore_future",
+    "message": "non-binding `let` on a future",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/scheduler/scheduler_loop.rs",
+        "line": 665,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::clone_on_copy",
+    "message": "using `clone` on type `OnCrashAction` which implements the `Copy` trait",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/scheduler/scheduler_loop.rs",
+        "line": 733,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::new_without_default",
+    "message": "you should consider adding a `Default` implementation for `MockLifecycleResolver`",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/scheduler/verb_resolver.rs",
+        "line": 169,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/posture.rs",
+        "line": 111,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/posture.rs",
+        "line": 112,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/posture.rs",
+        "line": 129,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/posture.rs",
+        "line": 137,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/posture.rs",
+        "line": 145,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/posture.rs",
+        "line": 149,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/posture.rs",
+        "line": 248,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (12/7)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/sandbox/t3/argv.rs",
+        "line": 25,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_closure",
+    "message": "redundant closure",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/sandbox/t3/runtime_detect.rs",
+        "line": 32,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::wildcard_in_or_patterns",
+    "message": "wildcard pattern covers any other pattern as it will match anyway",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/sandbox/t3/runtime_detect.rs",
+        "line": 44,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_pattern_matching",
+    "message": "redundant pattern matching",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/sandbox/linux.rs",
+        "line": 133,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_cast",
+    "message": "casting to the same type is unnecessary (`i64` -> `i64`)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/sandbox/linux.rs",
+        "line": 335,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_cast",
+    "message": "casting to the same type is unnecessary (`i64` -> `i64`)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/sandbox/linux.rs",
+        "line": 394,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (16/7)",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/security/mod.rs",
+        "line": 246,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::clone_on_copy",
+    "message": "using `clone` on type `OnCrashAction` which implements the `Copy` trait",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/supervision/crash_detector.rs",
+        "line": 175,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::let_unit_value",
+    "message": "this let-binding has unit value",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/supervision/crash_detector.rs",
+        "line": 182,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::new_without_default",
+    "message": "you should consider adding a `Default` implementation for `SimulatedChildSupervisor`",
+    "spans": [
+      {
+        "file": "crates/maos-kernel-core/src/supervision/test_double.rs",
+        "line": 28,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::suspicious_to_owned",
+    "message": "this `to_owned` call clones the `Cow<'_, str>` itself and does not cause its contents to become owned",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/support/fixture_door.rs",
+        "line": 296,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::suspicious_to_owned",
+    "message": "this `to_owned` call clones the `Cow<'_, str>` itself and does not cause its contents to become owned",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/support/fixture_door.rs",
+        "line": 296,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::suspicious_to_owned",
+    "message": "this `to_owned` call clones the `Cow<'_, str>` itself and does not cause its contents to become owned",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/support/fixture_door.rs",
+        "line": 296,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::suspicious_to_owned",
+    "message": "this `to_owned` call clones the `Cow<'_, str>` itself and does not cause its contents to become owned",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/support/fixture_door.rs",
+        "line": 296,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::suspicious_to_owned",
+    "message": "this `to_owned` call clones the `Cow<'_, str>` itself and does not cause its contents to become owned",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/support/fixture_door.rs",
+        "line": 296,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::suspicious_to_owned",
+    "message": "this `to_owned` call clones the `Cow<'_, str>` itself and does not cause its contents to become owned",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/support/fixture_door.rs",
+        "line": 296,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::suspicious_to_owned",
+    "message": "this `to_owned` call clones the `Cow<'_, str>` itself and does not cause its contents to become owned",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/support/fixture_door.rs",
+        "line": 296,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::suspicious_to_owned",
+    "message": "this `to_owned` call clones the `Cow<'_, str>` itself and does not cause its contents to become owned",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/support/fixture_door.rs",
+        "line": 296,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::suspicious_to_owned",
+    "message": "this `to_owned` call clones the `Cow<'_, str>` itself and does not cause its contents to become owned",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/support/fixture_door.rs",
+        "line": 296,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::suspicious_to_owned",
+    "message": "this `to_owned` call clones the `Cow<'_, str>` itself and does not cause its contents to become owned",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/support/fixture_door.rs",
+        "line": 296,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::suspicious_to_owned",
+    "message": "this `to_owned` call clones the `Cow<'_, str>` itself and does not cause its contents to become owned",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/support/fixture_door.rs",
+        "line": 296,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/benchmark_sidecar_18_2.rs",
+        "line": 223,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/skill_queue_reconcile_test.rs",
+        "line": 5,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/skill_queue_integration_test.rs",
+        "line": 546,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::suspicious_to_owned",
+    "message": "this `to_owned` call clones the `Cow<'_, str>` itself and does not cause its contents to become owned",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/support/fixture_door.rs",
+        "line": 296,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::suspicious_to_owned",
+    "message": "this `to_owned` call clones the `Cow<'_, str>` itself and does not cause its contents to become owned",
+    "spans": [
+      {
+        "file": "crates/maos-cli/tests/support/fixture_door.rs",
+        "line": 296,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bench/src/harness/j0.rs",
+        "line": 28,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bench/src/harness/j_researcher.rs",
+        "line": 63,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_lifetimes",
+    "message": "the following explicit lifetimes could be elided: 'a",
+    "spans": [
+      {
+        "file": "crates/maos-control/src/lib.rs",
+        "line": 1734,
+        "primary": true
+      },
+      {
+        "file": "crates/maos-control/src/lib.rs",
+        "line": 1734,
+        "primary": true
+      },
+      {
+        "file": "crates/maos-control/src/lib.rs",
+        "line": 1734,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-bench/src/decision.rs",
+        "line": 30,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::obfuscated_if_else",
+    "message": "this method chain can be written more clearly with `if .. else ..`",
+    "spans": [
+      {
+        "file": "crates/maos-bench/src/distill_eval.rs",
+        "line": 260,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-bench/src/halt_eval.rs",
+        "line": 220,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bench/src/halt_eval.rs",
+        "line": 455,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_unwrap",
+    "message": "called `unwrap_err` on `measurement_result` after checking its variant with `is_err`",
+    "spans": [
+      {
+        "file": "crates/maos-bench/src/harness/j1.rs",
+        "line": 135,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_closure",
+    "message": "redundant closure",
+    "spans": [
+      {
+        "file": "crates/maos-bench/src/harness/j1.rs",
+        "line": 235,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "crates/maos-bench/src/harness/j_researcher.rs",
+        "line": 54,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::new_without_default",
+    "message": "you should consider adding a `Default` implementation for `BenchHarness`",
+    "spans": [
+      {
+        "file": "crates/maos-bench/src/harness/mod.rs",
+        "line": 110,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (9/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/cross_team_crossing.rs",
+        "line": 800,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_overindented_list_items",
+    "message": "doc list item overindented",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_identity.rs",
+        "line": 553,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_overindented_list_items",
+    "message": "doc list item overindented",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_identity.rs",
+        "line": 554,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_overindented_list_items",
+    "message": "doc list item overindented",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_identity.rs",
+        "line": 564,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_overindented_list_items",
+    "message": "doc list item overindented",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_identity.rs",
+        "line": 565,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::io_other_error",
+    "message": "this can be `std::io::Error::other(_)`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_identity.rs",
+        "line": 582,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_fallible_conversions",
+    "message": "use of a fallible conversion when an infallible one could be used",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_identity.rs",
+        "line": 592,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/operator_door.rs",
+        "line": 469,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_conversion",
+    "message": "useless conversion to the same type: `maos_skill::ESkillStore`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/operator_door.rs",
+        "line": 2806,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::items_after_test_module",
+    "message": "items after a test module",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/cross_team_crossing.rs",
+        "line": 918,
+        "primary": true
+      },
+      {
+        "file": "crates/maos-bin/src/cross_team_crossing.rs",
+        "line": 1011,
+        "primary": true
+      },
+      {
+        "file": "crates/maos-bin/src/cross_team_crossing.rs",
+        "line": 1012,
+        "primary": true
+      },
+      {
+        "file": "crates/maos-bin/src/cross_team_crossing.rs",
+        "line": 1012,
+        "primary": true
+      },
+      {
+        "file": "crates/maos-bin/src/cross_team_crossing.rs",
+        "line": 1012,
+        "primary": true
+      },
+      {
+        "file": "crates/maos-bin/src/cross_team_crossing.rs",
+        "line": 1013,
+        "primary": true
+      },
+      {
+        "file": "crates/maos-bin/src/cross_team_crossing.rs",
+        "line": 1014,
+        "primary": true
+      },
+      {
+        "file": "crates/maos-bin/src/cross_team_crossing.rs",
+        "line": 1019,
+        "primary": true
+      },
+      {
+        "file": "crates/maos-bin/src/cross_team_crossing.rs",
+        "line": 1028,
+        "primary": true
+      },
+      {
+        "file": "crates/maos-bin/src/cross_team_crossing.rs",
+        "line": 1065,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (9/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/cross_team_crossing.rs",
+        "line": 800,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (9/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/shell_host.rs",
+        "line": 60,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_lazy_evaluations",
+    "message": "unnecessary closure used to substitute value for `Option::None`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/supervision.rs",
+        "line": 2109,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_cast",
+    "message": "casting to the same type is unnecessary (`i32` -> `i32`)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/supervision.rs",
+        "line": 3263,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_cast",
+    "message": "casting to the same type is unnecessary (`i32` -> `i32`)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/supervision.rs",
+        "line": 3264,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/worker_spawn.rs",
+        "line": 407,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/worker_spawn.rs",
+        "line": 831,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/worker_spawn.rs",
+        "line": 839,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/worker_spawn.rs",
+        "line": 947,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_overindented_list_items",
+    "message": "doc list item overindented",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_identity.rs",
+        "line": 553,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_overindented_list_items",
+    "message": "doc list item overindented",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_identity.rs",
+        "line": 554,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_overindented_list_items",
+    "message": "doc list item overindented",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_identity.rs",
+        "line": 564,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_overindented_list_items",
+    "message": "doc list item overindented",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_identity.rs",
+        "line": 565,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::io_other_error",
+    "message": "this can be `std::io::Error::other(_)`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_identity.rs",
+        "line": 582,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_fallible_conversions",
+    "message": "use of a fallible conversion when an infallible one could be used",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_identity.rs",
+        "line": 592,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (9/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_identity.rs",
+        "line": 724,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/enterprise_pdp_runtime.rs",
+        "line": 280,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/operator_door.rs",
+        "line": 469,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_conversion",
+    "message": "useless conversion to the same type: `maos_skill::ESkillStore`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/operator_door.rs",
+        "line": 2806,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (9/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/shell_host.rs",
+        "line": 60,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_lazy_evaluations",
+    "message": "unnecessary closure used to substitute value for `Option::None`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/supervision.rs",
+        "line": 2109,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_cast",
+    "message": "casting to the same type is unnecessary (`i32` -> `i32`)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/supervision.rs",
+        "line": 3263,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_cast",
+    "message": "casting to the same type is unnecessary (`i32` -> `i32`)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/supervision.rs",
+        "line": 3264,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/worker_spawn.rs",
+        "line": 407,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/worker_spawn.rs",
+        "line": 831,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/worker_spawn.rs",
+        "line": 839,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/worker_spawn.rs",
+        "line": 947,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/shell_host_16_2.rs",
+        "line": 189,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/shell_host_16_2.rs",
+        "line": 294,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/shell_host_16_2.rs",
+        "line": 442,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/shell_host_16_2.rs",
+        "line": 497,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/shell_host_16_2.rs",
+        "line": 576,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::collapsible_str_replace",
+    "message": "used consecutive `str::replace` call",
+    "spans": [
+      {
+        "file": "xtask/src/check_empty_kernel.rs",
+        "line": 437,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "xtask/src/check_service_boundary.rs",
+        "line": 127,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_service_boundary.rs",
+        "line": 1132,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_service_boundary.rs",
+        "line": 1235,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_unwrap",
+    "message": "called `unwrap` on `pr_number` after checking its variant with `is_some`",
+    "spans": [
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 349,
+        "primary": false
+      },
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 353,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_unwrap",
+    "message": "called `unwrap` on `sha` after checking its variant with `is_some`",
+    "spans": [
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 349,
+        "primary": false
+      },
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 355,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::collapsible_if",
+    "message": "this `if` statement can be collapsed",
+    "spans": [
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 440,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_return",
+    "message": "unneeded `return` statement",
+    "spans": [
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 554,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_return",
+    "message": "unneeded `return` statement",
+    "spans": [
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 557,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::trim_split_whitespace",
+    "message": "found call to `str::trim_start` before `str::split_whitespace`",
+    "spans": [
+      {
+        "file": "xtask/src/check_exit_commands.rs",
+        "line": 403,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::while_let_loop",
+    "message": "this loop could be written as a `while let` loop",
+    "spans": [
+      {
+        "file": "xtask/src/check_exit_commands.rs",
+        "line": 554,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::while_let_loop",
+    "message": "this loop could be written as a `while let` loop",
+    "spans": [
+      {
+        "file": "xtask/src/check_exit_commands.rs",
+        "line": 1251,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "xtask/src/check_fkcs.rs",
+        "line": 849,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "xtask/src/check_trial_attestation.rs",
+        "line": 291,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "xtask/src/check_trial_attestation.rs",
+        "line": 359,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::collapsible_if",
+    "message": "this `if` statement can be collapsed",
+    "spans": [
+      {
+        "file": "xtask/src/sprint_status.rs",
+        "line": 29,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/worker_crash_corpus_16_3.rs",
+        "line": 855,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::let_and_return",
+    "message": "returning the result of a `let` binding from a block",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs",
+        "line": 533,
+        "primary": false
+      },
+      {
+        "file": "crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs",
+        "line": 534,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs",
+        "line": 745,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 177,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 666,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 2373,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 7501,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::field_reassign_with_default",
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 8082,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 10134,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_inspect",
+    "message": "using `map_err` over `inspect_err`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 10174,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 10685,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 12053,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (16/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 12127,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 12909,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_guards",
+    "message": "redundant guard",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 13963,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 14901,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 16640,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 16703,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 16831,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/cli_wrapper_exhaustion_17_9.rs",
+        "line": 41,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::while_let_loop",
+    "message": "this loop could be written as a `while let` loop",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/researcher_8_14c.rs",
+        "line": 92,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/tests/story_10_5_proven_red.rs",
+        "line": 21,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::empty_line_after_doc_comments",
+    "message": "empty line after doc comment",
+    "spans": [
+      {
+        "file": "xtask/src/check_scale_churn.rs",
+        "line": 348,
+        "primary": false
+      },
+      {
+        "file": "xtask/src/check_scale_churn.rs",
+        "line": 342,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::field_reassign_with_default",
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/identity_asserted_write.rs",
+        "line": 126,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::field_reassign_with_default",
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/identity_asserted_write.rs",
+        "line": 132,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 272,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 507,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 599,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 703,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 782,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 916,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 1053,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::empty_line_after_doc_comments",
+    "message": "empty line after doc comment",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_two_host_signed_run.rs",
+        "line": 1255,
+        "primary": false
+      },
+      {
+        "file": "xtask/src/check_j1_two_host_signed_run.rs",
+        "line": 1224,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::empty_line_after_doc_comments",
+    "message": "empty line after doc comment",
+    "spans": [
+      {
+        "file": "xtask/src/stability_matrix.rs",
+        "line": 271,
+        "primary": false
+      },
+      {
+        "file": "xtask/src/stability_matrix.rs",
+        "line": 266,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::zombie_processes",
+    "message": "spawned process is not `wait()`ed on in all code paths",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/cert_rotation_trigger_14_2a.rs",
+        "line": 249,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/hook_pump_17_4.rs",
+        "line": 1403,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/hook_pump_17_4.rs",
+        "line": 1683,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/hook_pump_17_4.rs",
+        "line": 1874,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_a2a_sender_completeness.rs",
+        "line": 234,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_a2a_sender_completeness.rs",
+        "line": 235,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_a2a_sender_completeness.rs",
+        "line": 329,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_range_contains",
+    "message": "manual `!RangeInclusive::contains` implementation",
+    "spans": [
+      {
+        "file": "xtask/src/check_rto_gate.rs",
+        "line": 158,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_rotation_real_timing.rs",
+        "line": 165,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_scale_churn.rs",
+        "line": 176,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "xtask/src/check_scale_churn.rs",
+        "line": 233,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_enterprise_pdp.rs",
+        "line": 20,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_enterprise_pdp.rs",
+        "line": 21,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "xtask/src/check_fkcs.rs",
+        "line": 849,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "xtask/src/check_trial_attestation.rs",
+        "line": 291,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "xtask/src/check_trial_attestation.rs",
+        "line": 359,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_model_tier.rs",
+        "line": 12,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_model_tier.rs",
+        "line": 13,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_record_completeness.rs",
+        "line": 175,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_record_completeness.rs",
+        "line": 817,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_record_completeness.rs",
+        "line": 818,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_record_completeness.rs",
+        "line": 819,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_record_completeness.rs",
+        "line": 820,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::trim_split_whitespace",
+    "message": "found call to `str::trim_start` before `str::split_whitespace`",
+    "spans": [
+      {
+        "file": "xtask/src/check_exit_commands.rs",
+        "line": 403,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::while_let_loop",
+    "message": "this loop could be written as a `while let` loop",
+    "spans": [
+      {
+        "file": "xtask/src/check_exit_commands.rs",
+        "line": 554,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::while_let_loop",
+    "message": "this loop could be written as a `while let` loop",
+    "spans": [
+      {
+        "file": "xtask/src/check_exit_commands.rs",
+        "line": 1251,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "xtask/src/check_manifest_schema_version.rs",
+        "line": 167,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_unwrap",
+    "message": "called `unwrap` on `current_struct` after checking its variant with `is_some`",
+    "spans": [
+      {
+        "file": "xtask/src/check_pub_field_constructors.rs",
+        "line": 139,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_pattern_char_comparison",
+    "message": "this manual char comparison can be written more succinctly",
+    "spans": [
+      {
+        "file": "xtask/src/check_review_findings_resolved.rs",
+        "line": 94,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_contains",
+    "message": "using `contains()` instead of `iter().any()` is more efficient",
+    "spans": [
+      {
+        "file": "xtask/src/check_security_md.rs",
+        "line": 77,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "xtask/src/check_third_party_trial.rs",
+        "line": 268,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_range_contains",
+    "message": "manual `RangeInclusive::contains` implementation",
+    "spans": [
+      {
+        "file": "xtask/src/check_third_party_trial.rs",
+        "line": 411,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_fuzz_floor.rs",
+        "line": 8,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_fuzz_targets.rs",
+        "line": 86,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::collapsible_str_replace",
+    "message": "used consecutive `str::replace` call",
+    "spans": [
+      {
+        "file": "xtask/src/check_unsafe.rs",
+        "line": 135,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "xtask/src/coverage_matrix.rs",
+        "line": 120,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::double_ended_iterator_last",
+    "message": "called `Iterator::last` on a `DoubleEndedIterator`; this will needlessly iterate the entire iterator",
+    "spans": [
+      {
+        "file": "xtask/src/coverage_matrix_nfr_test_3.rs",
+        "line": 117,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_two_host_signed_run.rs",
+        "line": 51,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_two_host_signed_run.rs",
+        "line": 52,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_two_host_signed_run.rs",
+        "line": 907,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::vec_init_then_push",
+    "message": "calls to `push` immediately after creation",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_two_host_signed_run.rs",
+        "line": 1189,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::single_char_add_str",
+    "message": "calling `push_str()` using a single-character string literal",
+    "spans": [
+      {
+        "file": "xtask/src/gen_abi_docs.rs",
+        "line": 444,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::single_char_add_str",
+    "message": "calling `push_str()` using a single-character string literal",
+    "spans": [
+      {
+        "file": "xtask/src/gen_abi_docs.rs",
+        "line": 446,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::iter_kv_map",
+    "message": "iterating on a map's keys",
+    "spans": [
+      {
+        "file": "xtask/src/gen_abi_docs.rs",
+        "line": 541,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "xtask/src/gen_isolation_corpus.rs",
+        "line": 92,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "xtask/src/gen_isolation_corpus.rs",
+        "line": 102,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "xtask/src/gen_isolation_corpus.rs",
+        "line": 111,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "xtask/src/gen_isolation_corpus.rs",
+        "line": 120,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_slicing",
+    "message": "redundant slicing of the whole range",
+    "spans": [
+      {
+        "file": "xtask/src/gen_isolation_corpus.rs",
+        "line": 148,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_slicing",
+    "message": "redundant slicing of the whole range",
+    "spans": [
+      {
+        "file": "xtask/src/gen_isolation_corpus.rs",
+        "line": 148,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::obfuscated_if_else",
+    "message": "this method chain can be written more clearly with `if .. else ..`",
+    "spans": [
+      {
+        "file": "xtask/src/prepush.rs",
+        "line": 442,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (9/7)",
+    "spans": [
+      {
+        "file": "xtask/src/release_verify.rs",
+        "line": 19,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::collapsible_if",
+    "message": "this `if` statement can be collapsed",
+    "spans": [
+      {
+        "file": "xtask/src/sprint_status.rs",
+        "line": 29,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::enum_variant_names",
+    "message": "variant name ends with the enum's name",
+    "spans": [
+      {
+        "file": "xtask/src/main.rs",
+        "line": 432,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::obfuscated_if_else",
+    "message": "this method chain can be written more clearly with `if .. else ..`",
+    "spans": [
+      {
+        "file": "xtask/tests/../src/prepush.rs",
+        "line": 442,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "xtask/tests/gate_honesty_20_3a.rs",
+        "line": 317,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "xtask/tests/gate_honesty_20_3a.rs",
+        "line": 332,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "xtask/tests/cgroup_ceiling_workflow_17_2.rs",
+        "line": 15,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "xtask/tests/story_10_2_proven_red.rs",
+        "line": 140,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "xtask/tests/story_10_2_proven_red.rs",
+        "line": 354,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "xtask/tests/story_10_2_proven_red.rs",
+        "line": 409,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "xtask/tests/story_10_2_proven_red.rs",
+        "line": 442,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "xtask/tests/story_10_2_proven_red.rs",
+        "line": 485,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_split_once",
+    "message": "manual implementation of `split_once`",
+    "spans": [
+      {
+        "file": "xtask/tests/story_10_2_proven_red.rs",
+        "line": 993,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::obfuscated_if_else",
+    "message": "this method chain can be written more clearly with `if .. else ..`",
+    "spans": [
+      {
+        "file": "xtask/tests/../src/prepush.rs",
+        "line": 442,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/tests/decision_adrs_and_provisioning.rs",
+        "line": 660,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::empty_line_after_doc_comments",
+    "message": "empty line after doc comment",
+    "spans": [
+      {
+        "file": "xtask/tests/j1_crosshost_2a_proven_red.rs",
+        "line": 554,
+        "primary": false
+      },
+      {
+        "file": "xtask/tests/j1_crosshost_2a_proven_red.rs",
+        "line": 546,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "xtask/tests/epic17_exit_workflow_17_7.rs",
+        "line": 15,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::empty_line_after_doc_comments",
+    "message": "empty line after doc comment",
+    "spans": [
+      {
+        "file": "xtask/src/check_scale_churn.rs",
+        "line": 348,
+        "primary": false
+      },
+      {
+        "file": "xtask/src/check_scale_churn.rs",
+        "line": 342,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 272,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 507,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 599,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 703,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 782,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 916,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_static_lifetimes",
+    "message": "constants have by default a `'static` lifetime",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_loopback_delegation.rs",
+        "line": 1053,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::empty_line_after_doc_comments",
+    "message": "empty line after doc comment",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_two_host_signed_run.rs",
+        "line": 1255,
+        "primary": false
+      },
+      {
+        "file": "xtask/src/check_j1_two_host_signed_run.rs",
+        "line": 1224,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::empty_line_after_doc_comments",
+    "message": "empty line after doc comment",
+    "spans": [
+      {
+        "file": "xtask/src/stability_matrix.rs",
+        "line": 271,
+        "primary": false
+      },
+      {
+        "file": "xtask/src/stability_matrix.rs",
+        "line": 266,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "xtask/src/tests/calibrate_tests.rs",
+        "line": 73,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "xtask/src/tests/calibrate_tests.rs",
+        "line": 98,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "xtask/src/tests/calibrate_tests.rs",
+        "line": 133,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "xtask/src/tests/calibrate_tests.rs",
+        "line": 163,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_a2a_sender_completeness.rs",
+        "line": 234,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_a2a_sender_completeness.rs",
+        "line": 235,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_a2a_sender_completeness.rs",
+        "line": 329,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_range_contains",
+    "message": "manual `!RangeInclusive::contains` implementation",
+    "spans": [
+      {
+        "file": "xtask/src/check_rto_gate.rs",
+        "line": 158,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::items_after_test_module",
+    "message": "items after a test module",
+    "spans": [
+      {
+        "file": "xtask/src/check_cross_region_consensus.rs",
+        "line": 223,
+        "primary": true
+      },
+      {
+        "file": "xtask/src/check_cross_region_consensus.rs",
+        "line": 327,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::items_after_test_module",
+    "message": "items after a test module",
+    "spans": [
+      {
+        "file": "xtask/src/check_multi_region_slo.rs",
+        "line": 653,
+        "primary": true
+      },
+      {
+        "file": "xtask/src/check_multi_region_slo.rs",
+        "line": 770,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_rotation_real_timing.rs",
+        "line": 165,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_scale_churn.rs",
+        "line": 176,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "xtask/src/check_scale_churn.rs",
+        "line": 233,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::items_after_test_module",
+    "message": "items after a test module",
+    "spans": [
+      {
+        "file": "xtask/src/check_multi_tenant_loom.rs",
+        "line": 1945,
+        "primary": true
+      },
+      {
+        "file": "xtask/src/check_multi_tenant_loom.rs",
+        "line": 1986,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::items_after_test_module",
+    "message": "items after a test module",
+    "spans": [
+      {
+        "file": "xtask/src/check_reza_production_path.rs",
+        "line": 1121,
+        "primary": true
+      },
+      {
+        "file": "xtask/src/check_reza_production_path.rs",
+        "line": 1170,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::single_element_loop",
+    "message": "for loop over a single element",
+    "spans": [
+      {
+        "file": "xtask/src/check_reza_production_path.rs",
+        "line": 1136,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_enterprise_pdp.rs",
+        "line": 20,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_enterprise_pdp.rs",
+        "line": 21,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "xtask/src/check_fkcs.rs",
+        "line": 849,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "xtask/src/check_trial_attestation.rs",
+        "line": 291,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "xtask/src/check_trial_attestation.rs",
+        "line": 359,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_model_tier.rs",
+        "line": 12,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_model_tier.rs",
+        "line": 13,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_record_completeness.rs",
+        "line": 175,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_record_completeness.rs",
+        "line": 817,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_record_completeness.rs",
+        "line": 818,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_record_completeness.rs",
+        "line": 819,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_dev_record_completeness.rs",
+        "line": 820,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::trim_split_whitespace",
+    "message": "found call to `str::trim_start` before `str::split_whitespace`",
+    "spans": [
+      {
+        "file": "xtask/src/check_exit_commands.rs",
+        "line": 403,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::while_let_loop",
+    "message": "this loop could be written as a `while let` loop",
+    "spans": [
+      {
+        "file": "xtask/src/check_exit_commands.rs",
+        "line": 554,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::while_let_loop",
+    "message": "this loop could be written as a `while let` loop",
+    "spans": [
+      {
+        "file": "xtask/src/check_exit_commands.rs",
+        "line": 1251,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "xtask/src/check_manifest_schema_version.rs",
+        "line": 167,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_unwrap",
+    "message": "called `unwrap` on `current_struct` after checking its variant with `is_some`",
+    "spans": [
+      {
+        "file": "xtask/src/check_pub_field_constructors.rs",
+        "line": 139,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_pattern_char_comparison",
+    "message": "this manual char comparison can be written more succinctly",
+    "spans": [
+      {
+        "file": "xtask/src/check_review_findings_resolved.rs",
+        "line": 94,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_contains",
+    "message": "using `contains()` instead of `iter().any()` is more efficient",
+    "spans": [
+      {
+        "file": "xtask/src/check_security_md.rs",
+        "line": 77,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "xtask/src/check_third_party_trial.rs",
+        "line": 268,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_range_contains",
+    "message": "manual `RangeInclusive::contains` implementation",
+    "spans": [
+      {
+        "file": "xtask/src/check_third_party_trial.rs",
+        "line": 411,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_fuzz_floor.rs",
+        "line": 8,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_fuzz_targets.rs",
+        "line": 86,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::collapsible_str_replace",
+    "message": "used consecutive `str::replace` call",
+    "spans": [
+      {
+        "file": "xtask/src/check_unsafe.rs",
+        "line": 135,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "xtask/src/coverage_matrix.rs",
+        "line": 120,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::double_ended_iterator_last",
+    "message": "called `Iterator::last` on a `DoubleEndedIterator`; this will needlessly iterate the entire iterator",
+    "spans": [
+      {
+        "file": "xtask/src/coverage_matrix_nfr_test_3.rs",
+        "line": 117,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_two_host_signed_run.rs",
+        "line": 51,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::doc_lazy_continuation",
+    "message": "doc list item without indentation",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_two_host_signed_run.rs",
+        "line": 52,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_two_host_signed_run.rs",
+        "line": 907,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::vec_init_then_push",
+    "message": "calls to `push` immediately after creation",
+    "spans": [
+      {
+        "file": "xtask/src/check_j1_two_host_signed_run.rs",
+        "line": 1189,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::single_char_add_str",
+    "message": "calling `push_str()` using a single-character string literal",
+    "spans": [
+      {
+        "file": "xtask/src/gen_abi_docs.rs",
+        "line": 444,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::single_char_add_str",
+    "message": "calling `push_str()` using a single-character string literal",
+    "spans": [
+      {
+        "file": "xtask/src/gen_abi_docs.rs",
+        "line": 446,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::iter_kv_map",
+    "message": "iterating on a map's keys",
+    "spans": [
+      {
+        "file": "xtask/src/gen_abi_docs.rs",
+        "line": 541,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "xtask/src/gen_isolation_corpus.rs",
+        "line": 92,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "xtask/src/gen_isolation_corpus.rs",
+        "line": 102,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "xtask/src/gen_isolation_corpus.rs",
+        "line": 111,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "xtask/src/gen_isolation_corpus.rs",
+        "line": 120,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_slicing",
+    "message": "redundant slicing of the whole range",
+    "spans": [
+      {
+        "file": "xtask/src/gen_isolation_corpus.rs",
+        "line": 148,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_slicing",
+    "message": "redundant slicing of the whole range",
+    "spans": [
+      {
+        "file": "xtask/src/gen_isolation_corpus.rs",
+        "line": 148,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::obfuscated_if_else",
+    "message": "this method chain can be written more clearly with `if .. else ..`",
+    "spans": [
+      {
+        "file": "xtask/src/prepush.rs",
+        "line": 442,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (9/7)",
+    "spans": [
+      {
+        "file": "xtask/src/release_verify.rs",
+        "line": 19,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::collapsible_if",
+    "message": "this `if` statement can be collapsed",
+    "spans": [
+      {
+        "file": "xtask/src/sprint_status.rs",
+        "line": 29,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "xtask/src/stability_matrix.rs",
+        "line": 530,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "xtask/src/stability_matrix.rs",
+        "line": 544,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::enum_variant_names",
+    "message": "variant name ends with the enum's name",
+    "spans": [
+      {
+        "file": "xtask/src/main.rs",
+        "line": 432,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_vec",
+    "message": "useless use of `vec!`",
+    "spans": [
+      {
+        "file": "xtask/src/templates_regen.rs",
+        "line": 274,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/f4_pairing.rs",
+        "line": 68,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/f4_pairing.rs",
+        "line": 69,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/f4_pairing.rs",
+        "line": 76,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (10/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/f4_pairing.rs",
+        "line": 259,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::obfuscated_if_else",
+    "message": "this method chain can be written more clearly with `if .. else ..`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/f4_pairing.rs",
+        "line": 271,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/j_researcher_survey_18_3.rs",
+        "line": 1103,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/bounded_postures_2b.rs",
+        "line": 389,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/egress_daemon_17_1.rs",
+        "line": 18,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/egress_daemon_17_1.rs",
+        "line": 73,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/egress_daemon_17_1.rs",
+        "line": 163,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/researcher_inference_18_3.rs",
+        "line": 221,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/inference_mode_15_6.rs",
+        "line": 538,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/cross_team_consent_13_3.rs",
+        "line": 713,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/cross_team_crossing_13_6b.rs",
+        "line": 1462,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/cross_team_crossing_13_6b.rs",
+        "line": 1644,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/cross_team_crossing_13_6b.rs",
+        "line": 1839,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/cross_team_crossing_13_6b.rs",
+        "line": 2358,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/cross_team_crossing_13_6b.rs",
+        "line": 2815,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/cross_team_crossing_13_6b.rs",
+        "line": 3182,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/root_shutdown_unload_16_3.rs",
+        "line": 1828,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/root_shutdown_unload_16_3.rs",
+        "line": 1829,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_contains",
+    "message": "using `contains()` instead of `iter().any()` is more efficient",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/root_shutdown_unload_16_3.rs",
+        "line": 1305,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (9/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/root_shutdown_unload_16_3.rs",
+        "line": 1979,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::obfuscated_if_else",
+    "message": "this method chain can be written more clearly with `if .. else ..`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/root_shutdown_unload_16_3.rs",
+        "line": 1990,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/worker_freeze_19_2.rs",
+        "line": 67,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::while_let_loop",
+    "message": "this loop could be written as a `while let` loop",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/butler_8_14b.rs",
+        "line": 191,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/two_host_delegation_2b.rs",
+        "line": 48,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/two_host_delegation_2b.rs",
+        "line": 49,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/two_host_delegation_2b.rs",
+        "line": 658,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unusual_byte_groupings",
+    "message": "digits of hex, binary or octal literal not in groups of equal size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/recall_mediation_17_3d.rs",
+        "line": 30,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::ptr_arg",
+    "message": "writing `&PathBuf` instead of `&Path` involves a new object where a slice will do",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/worker_resource_limits_17_2.rs",
+        "line": 305,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::ptr_arg",
+    "message": "writing `&PathBuf` instead of `&Path` involves a new object where a slice will do",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/worker_resource_limits_17_2.rs",
+        "line": 334,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::chunks_exact_to_as_chunks",
+    "message": "using `chunks_exact` with a constant chunk size",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/recall_mediation_17_3d.rs",
+        "line": 258,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (9/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/two_host_delegation_2b.rs",
+        "line": 241,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::obfuscated_if_else",
+    "message": "this method chain can be written more clearly with `if .. else ..`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/two_host_delegation_2b.rs",
+        "line": 252,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/two_host_delegation_2b.rs",
+        "line": 331,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::collapsible_str_replace",
+    "message": "used consecutive `str::replace` call",
+    "spans": [
+      {
+        "file": "xtask/src/check_empty_kernel.rs",
+        "line": 437,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "xtask/src/check_service_boundary.rs",
+        "line": 127,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_service_boundary.rs",
+        "line": 1132,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "xtask/src/check_service_boundary.rs",
+        "line": 1235,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_unwrap",
+    "message": "called `unwrap` on `pr_number` after checking its variant with `is_some`",
+    "spans": [
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 349,
+        "primary": false
+      },
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 353,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_unwrap",
+    "message": "called `unwrap` on `sha` after checking its variant with `is_some`",
+    "spans": [
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 349,
+        "primary": false
+      },
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 355,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::collapsible_if",
+    "message": "this `if` statement can be collapsed",
+    "spans": [
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 440,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_return",
+    "message": "unneeded `return` statement",
+    "spans": [
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 554,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_return",
+    "message": "unneeded `return` statement",
+    "spans": [
+      {
+        "file": "xtask/src/invariant_lock.rs",
+        "line": 557,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_literal_unwrap",
+    "message": "used `unwrap()` on `Some` value",
+    "spans": [
+      {
+        "file": "xtask/src/tests/invariant_lock_tests.rs",
+        "line": 7,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::trim_split_whitespace",
+    "message": "found call to `str::trim_start` before `str::split_whitespace`",
+    "spans": [
+      {
+        "file": "xtask/src/check_exit_commands.rs",
+        "line": 403,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::while_let_loop",
+    "message": "this loop could be written as a `while let` loop",
+    "spans": [
+      {
+        "file": "xtask/src/check_exit_commands.rs",
+        "line": 554,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::while_let_loop",
+    "message": "this loop could be written as a `while let` loop",
+    "spans": [
+      {
+        "file": "xtask/src/check_exit_commands.rs",
+        "line": 1251,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "xtask/src/check_fkcs.rs",
+        "line": 849,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "xtask/src/check_trial_attestation.rs",
+        "line": 291,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "xtask/src/check_trial_attestation.rs",
+        "line": 359,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::collapsible_if",
+    "message": "this `if` statement can be collapsed",
+    "spans": [
+      {
+        "file": "xtask/src/sprint_status.rs",
+        "line": 29,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 177,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 666,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 2373,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 7501,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::field_reassign_with_default",
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 8082,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 10134,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_inspect",
+    "message": "using `map_err` over `inspect_err`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 10174,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 10685,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 12053,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (16/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 12127,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 12909,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_guards",
+    "message": "redundant guard",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 13963,
+        "primary": true
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "line": 14901,
+        "primary": true
+      }
+    ]
+  }
+]

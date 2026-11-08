@@ -2702,6 +2702,7 @@ dependencies = [
  "observer",
  "orchestrator",
  "parking_lot",
+ "proc-macro2",
  "rcgen",
  "researcher",
  "reviewer",

@@ -1,0 +1,14 @@
+{
+  "exit_code": 0,
+  "changed_primary_span_diagnostics": [],
+  "new_untracked_test_files_included": [
+    "xtask/tests/registry_workflow_security_20_1b.rs",
+    "xtask/tests/registry_socket_security_20_1b.rs",
+    "crates/maos-bin/tests/registry_config_20_1b.rs",
+    "crates/maos-bin/tests/support/yank_audit.rs",
+    "crates/maos-bin/tests/yank_audit_structure_20_1b.rs",
+    "crates/maos-registry/tests/registry_limits_20_1b.rs",
+    "crates/maos-registry/tests/yank_query_20_1b.rs"
+  ],
+  "qualification": "Primary-span intersection against this pass diff plus all new test files; no clean-baseline compilation is fabricated."
+}

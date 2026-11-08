@@ -1,0 +1,12 @@
+{
+  "baseline": "9e8c7737b0aaae730024ae66966c20106563141e",
+  "cwd": "/home/lunarpulse/dev_ws",
+  "gate_environment": {
+    "CI": null,
+    "GITHUB_ACTIONS": null,
+    "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+  },
+  "inherited_CARGO_TARGET_DIR": null,
+  "target_resolution": "/mnt/build/cargo-maos",
+  "agent_set_target_dir": false
+}

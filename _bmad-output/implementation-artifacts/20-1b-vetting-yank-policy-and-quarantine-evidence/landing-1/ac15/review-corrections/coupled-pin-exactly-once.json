@@ -1,0 +1,23 @@
+{
+  "path": "xtask/kloc.toml",
+  "changes": [
+    {
+      "old": "maos-registry = 5668   # HISTORY:",
+      "new": "maos-registry = 6151   # HISTORY: 20-1b-vetting-yank-policy-and-quarantine AC15 independent-review corrections, Main rulings D-20-1b-09..13 at9e8c7737, 2026-11-08; exact after cargo fmt --all / kloc-check --json: 5668 -> 6151 (+483); strict shared policy, typed signed-head rollback, CA replacement, bounded socket/admission/body/deadline behavior and charged inline controls; ceiling7081; ZERO HEADROOM. | PRIOR: HISTORY:"
+    },
+    {
+      "old": "maos-bin = 35589   # HISTORY:",
+      "new": "maos-bin = 35586   # HISTORY: 20-1b-vetting-yank-policy-and-quarantine AC15 independent-review corrections, Main D1/P4/F9, 2026-11-08 at9e8c7737; exact after cargo fmt --all / kloc-check --json: 35589 -> 35586 (-3); one strict reader and actual banner, owner start after installed boot, joins before supervisor/unload; ceiling35671; ZERO HEADROOM. | PRIOR: HISTORY:"
+    },
+    {
+      "old": "maos-domain = 10137   # HISTORY:",
+      "new": "maos-domain = 10144   # HISTORY: 20-1b-vetting-yank-policy-and-quarantine AC15 review D3/F5, Main authorized correction ceiling10155 = exact10137 +18; exact after cargo fmt --all / kloc-check --json, 2026-11-08 at9e8c7737: 10137 -> 10144 (+7); typed HeadBehindCursor plus optional authenticated complete head, no kernel source change; ZERO HEADROOM. | PRIOR: HISTORY:"
+    },
+    {
+      "old": "_aggregate_hardfail = 196965   # HISTORY:",
+      "new": "_aggregate_hardfail = 197452   # HISTORY: 20-1b-vetting-yank-policy-and-quarantine AC15 independent-review corrections, Main ruled ceilings, 2026-11-08 at9e8c7737; exact after cargo fmt --all / kloc-check --json: 196965 -> 197452; measured197451+1, delta487 = registry483 + domain7 - bin3; ceiling198621, kernel unchanged26841/21042, xtask44696 external20-2 d84b83dd unchanged; ZERO HEADROOM. | PRIOR: HISTORY:"
+    }
+  ],
+  "measurement": "correction-kloc-measured.stdout",
+  "note": "Prescribed exactly-once Python replacements of >768-character history rows; other counts unchanged; no hard-coded old-count tests found by two targeted searches."
+}

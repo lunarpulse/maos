@@ -1,0 +1,9 @@
+{
+  "path": "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine.md",
+  "reason": "D4 operator ruling; update >768-character D-row using prescribed exactly-once Python replacement",
+  "occurrences": 1,
+  "old": "explicit certificate chain and private-key files supplied by path, platform/WebPKI trust with optional operator CA, hostname verification;",
+  "new": "explicit certificate chain and private-key files supplied by path, hostname validation and bundled Mozilla WebPKI without a configured CA; a configured CA replaces public roots (D-20-1b-12);",
+  "before_sha256": "121ff932d3227e95d6806be2cbdfb7d2f1d6b03ad3658ff0462ebba443024bf8",
+  "after_sha256": "c2a987f8184a2e7c4382f9c9ac01670c40f54c4446c190c531ba0427e103018b"
+}

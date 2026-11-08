@@ -384,11 +384,17 @@ impl YankEntry {
 pub struct YankList {
     #[doc = "Construct via [`YankList::new`]."]
     pub entries: Vec<YankEntry>,
+    /// Authenticated complete server head, when supplied by the registry protocol.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head: Option<u64>,
 }
 
 impl YankList {
     pub fn new(entries: Vec<YankEntry>) -> Self {
-        Self { entries }
+        Self {
+            entries,
+            head: None,
+        }
     }
 }
 
@@ -435,6 +441,9 @@ pub enum RegistryError {
 
     #[error("registry transport error: {0}")]
     Transport(String),
+
+    #[error("registry history rollback: authenticated head {head} is behind cursor {cursor}; cursor unchanged, operator intervention required")]
+    HeadBehindCursor { head: u64, cursor: u64 },
 
     #[error("registry not configured (set MAOS_REGISTRY_URI or [registry].uri in operator.toml)")]
     Unconfigured,

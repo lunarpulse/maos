@@ -61,120 +61,18 @@ mod doorless_home;
 #[path = "../../../tests/harness/t3_substrate.rs"]
 mod t3_substrate;
 
+#[path = "support/yank_audit.rs"]
+mod yank_audit;
+
 /// Every explicit root audit-sender release must follow a joined yank owner.
-/// Parent-block state is inherited, but a join in a sibling branch is not.
 #[test]
 fn every_audit_sender_release_joins_the_yank_owner() {
-    use syn::visit::Visit;
-
-    #[derive(Default)]
-    struct AuditReleases {
-        joined: bool,
-        releases: usize,
-        drains: usize,
-    }
-    fn is_yank_join(statement: &syn::Stmt) -> bool {
-        let syn::Stmt::Expr(syn::Expr::Await(awaited), _) = statement else {
-            return false;
-        };
-        let syn::Expr::MethodCall(call) = awaited.base.as_ref() else {
-            return false;
-        };
-        matches!(call.receiver.as_ref(), syn::Expr::Path(path)
-            if path.path.is_ident("yank_poller_task"))
-            && call.method == "shutdown"
-            && call.args.is_empty()
-    }
-    fn is_writer(expression: &syn::Expr) -> bool {
-        match expression {
-            syn::Expr::Path(path) => path.path.is_ident("audit_writer"),
-            syn::Expr::Reference(reference) => is_writer(&reference.expr),
-            _ => false,
-        }
-    }
-    impl<'ast> Visit<'ast> for AuditReleases {
-        fn visit_block(&mut self, block: &'ast syn::Block) {
-            let inherited = self.joined;
-            for statement in &block.stmts {
-                self.visit_stmt(statement);
-                self.joined |= is_yank_join(statement);
-            }
-            self.joined = inherited;
-        }
-        fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
-            if matches!(call.func.as_ref(), syn::Expr::Path(path)
-                if path.path.is_ident("drop"))
-                && call.args.len() == 1
-                && matches!(call.args.first(), Some(syn::Expr::Path(path))
-                    if path.path.is_ident("audit_tx"))
-            {
-                assert!(
-                    self.joined,
-                    "audit_tx release without a prior yank-owner join in its teardown scope"
-                );
-                self.releases += 1;
-            }
-            syn::visit::visit_expr_call(self, call);
-        }
-        fn visit_expr_await(&mut self, awaited: &'ast syn::ExprAwait) {
-            if is_writer(&awaited.base)
-                || matches!(awaited.base.as_ref(), syn::Expr::Call(call)
-                    if call.args.iter().any(is_writer))
-            {
-                assert!(
-                    self.joined,
-                    "audit writer drain without a prior yank-owner join"
-                );
-                self.drains += 1;
-            }
-            syn::visit::visit_expr_await(self, awaited);
-        }
-        fn visit_stmt_macro(&mut self, statement: &'ast syn::StmtMacro) {
-            if statement.mac.path.is_ident("release_audit_tx_holders") {
-                self.joined = true;
-            }
-            syn::visit::visit_stmt_macro(self, statement);
-        }
-        fn visit_item_macro(&mut self, statement: &'ast syn::ItemMacro) {
-            if statement
-                .ident
-                .as_ref()
-                .is_some_and(|ident| ident == "release_audit_tx_holders")
-            {
-                let compact: String = statement
-                    .mac
-                    .tokens
-                    .to_string()
-                    .split_whitespace()
-                    .collect();
-                assert!(
-                    compact.contains("yank_poller_task.shutdown().await;drop(audit_tx);"),
-                    "the shared audit-release macro must join before releasing its sender"
-                );
-                self.releases += 1;
-            }
-            syn::visit::visit_item_macro(self, statement);
-        }
-    }
     let source = include_str!("../src/main.rs");
-    let file = syn::parse_file(source).expect("composition root remains valid Rust");
-    let mut audit = AuditReleases::default();
-    audit.visit_file(&file);
+    let audit = yank_audit::inspect(source);
+    assert!(audit.errors.is_empty(), "{audit:?}");
     assert!(
-        audit.releases >= 7,
-        "all seven existing audit release sites must be audited"
-    );
-    assert!(
-        audit.drains >= 11,
-        "all eleven existing audit writer drains must be audited"
-    );
-    assert_eq!(
-        audit.releases,
-        source
-            .lines()
-            .filter(|line| line.trim() == "drop(audit_tx);")
-            .count(),
-        "a new macro or release shape needs an explicit AST audit"
+        audit.has_expected_main_arms(),
+        "root teardown arms changed: {audit:?}"
     );
 }
 
@@ -2312,17 +2210,24 @@ mod cohort {
     #[cfg(target_os = "linux")]
     #[test]
     fn declared_capable_cohort_worker_prerequisite_never_green_skips() {
+        let name =
+            std::any::type_name_of_val(&ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains);
+        let name = name
+            .split_once("::")
+            .expect("test function includes its crate")
+            .1;
         let output = Command::new(std::env::current_exe().expect("current test executable"))
-            .args([
-                "--exact",
-                "cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains",
-                "--nocapture",
-            ])
+            .args(["--exact", name, "--nocapture"])
             .env("CI", "1")
             .env_remove("GITHUB_ACTIONS")
             .env_remove("MAOS_T3_RUNTIME")
             .output()
             .expect("run declared-capable prerequisite negative control");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.lines().any(|line| line == "running 1 test"),
+            "negative control must select exactly one real test: {stdout}"
+        );
         assert!(
             !output.status.success(),
             "declared-capable runner silently skipped T3"

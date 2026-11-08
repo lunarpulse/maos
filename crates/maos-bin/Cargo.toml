@@ -17,6 +17,7 @@ network = [
     "dep:maos-registry",
     "maos-registry/tls",
     "maos-spirit-cli/tls",
+    "maos-cli/tls",
     "dep:maos-providers",
     "dep:maos-mcp",
     "dep:maos-a2a-tcp",
@@ -44,7 +45,7 @@ maos-shell = { path = "../maos-shell" }
 # Story 16-2 / §15 R9 — halt ids minted as ULIDs, the kernel's halt-id grammar
 # (same spec as maos-kernel-core; Cargo.lock resolves 1.2.1 through it).
 ulid = "1.1"
-maos-cli = { path = "../maos-cli" }
+maos-cli = { path = "../maos-cli", default-features = false }
 maos-audit = { path = "../maos-audit" }
 maos-director-surface = { path = "../maos-director-surface" }
 maos-domain = { path = "../maos-domain" }
@@ -132,6 +133,7 @@ maos-secrets = { path = "../maos-secrets", features = ["keyring"] }
 tokio = { version = "1", features = ["process", "test-util"] }   # test-util: story 19-7 re-pin hold tests run under paused time
 tempfile = "3"
 syn = { version = "2.0", features = ["full", "visit"] }
+proc-macro2 = "1"
 maos-eval = { path = "../maos-eval", features = ["benchmark-sidecar"] }   # Story 18-2 — verify the eval sidecar in eval_halt_18_2.rs
 wit-parser = "0.254"
 ed25519-dalek = { version = "2", features = ["std"] }   # Story 12.3 — sign a cohort manifest fixture for the Fact-2 provenance test
