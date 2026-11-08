@@ -33,7 +33,7 @@ fn raw(addr: &str, head: &str, body: &[u8]) -> Vec<u8> {
         .unwrap();
     let sent = write!(
         socket,
-        "{head}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "{head}\r\nX-Maos-Registry-Development: true\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
     )
     .and_then(|_| socket.write_all(body));
@@ -287,6 +287,8 @@ fn server_tier_floor_uses_admission_policy_ordering() {
                     tier_floor: *floor,
                     require_server_tier_signature: true,
                     org_signing_pubkey: Some(key),
+                    security: maos_registry::security::RegistrySecurityConfig::development_loopback(
+                    ),
                 },
             )
             .unwrap();

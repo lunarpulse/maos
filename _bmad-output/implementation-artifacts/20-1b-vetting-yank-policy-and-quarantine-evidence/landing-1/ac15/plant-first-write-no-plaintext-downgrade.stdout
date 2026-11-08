@@ -1,0 +1,18 @@
+
+running 1 test
+test tls::handshake_failure_never_attempts_plaintext_ac15 ... FAILED
+
+failures:
+
+---- tls::handshake_failure_never_attempts_plaintext_ac15 stdout ----
+
+thread 'tls::handshake_failure_never_attempts_plaintext_ac15' (387202) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:469:38:
+called `Result::unwrap_err()` on an `Ok` value: (TcpStream { addr: 127.0.0.1:41977, peer: 127.0.0.1:49804, fd: 4 }, 127.0.0.1:49804)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tls::handshake_failure_never_attempts_plaintext_ac15
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s
+

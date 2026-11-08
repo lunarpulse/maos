@@ -1,0 +1,20 @@
+
+running 15 tests
+test ac3_operator_door_unload_stops_a_live_worker_once ... ok
+test ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm ... ok
+test ac4_v2_butler_once_receipts_the_raised_halt_and_drains ... ok
+test ac4_v3_topology_once_unloads_every_loaded_spirit ... ok
+test ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker ... ok
+test ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan ... ok
+test ac4_v4b_grandchild_is_stopped_with_its_worker_container ... ok
+test ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15 ... ok
+test cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains ... ok
+test cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown ... ok
+test cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants ... ok
+test cohort::cohort_sigterm_without_worker_joins_local_yank_timer_and_drains ... ok
+test cohort::declared_capable_cohort_worker_prerequisite_never_green_skips ... ok
+test every_audit_sender_release_joins_the_yank_owner ... ok
+test harness_owns_grandchildren_before_discovery_even_when_startup_panics ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+

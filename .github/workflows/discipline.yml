@@ -1864,7 +1864,7 @@ jobs:
       # as siblings of the running `maos`, so a release test needs release
       # siblings and a debug test needs debug siblings. Both hold below.
       # ───────────────────────────────────────────────────────────────────────
-      - name: Run root shutdown unload suite (release — 9 vectors)
+      - name: Run root shutdown unload suite (release — 10 vectors)
         run: cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort
       # The debug siblings, for the debug half. Same sibling-consistency rule.
       - name: Build debug binaries for the cohort vectors
@@ -1874,19 +1874,19 @@ jobs:
           cargo build -p worker --bin worker-cli-fixture
       - name: Run root shutdown unload cohort vectors (debug — boot-nonce override live)
         run: cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort
-      # Coverage guard: the split MUST NOT silently drop a vector. 9 + 3 = 12
-      # (20-3a added the harness-ownership control
-      # `harness_owns_grandchildren_before_discovery_even_when_startup_panics`).
+      # Coverage guard: the split MUST NOT silently drop a vector. 10 + 5 = 15.
+      # 20-3a added harness ownership; 20-1b adds the AST teardown guard,
+      # no-Worker local-timer drain and declared-capability negative control.
       # A renamed module makes `--skip cohort` match nothing, the release run
-      # then executes all 12 and fails LOUD on the cohort three — never silent.
+      # then executes all 15 and fails LOUD on the live-Worker cohort vectors.
       - name: Assert the two halves still sum to the whole suite
         run: |
           set -euo pipefail
           rel=$(cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort 2>&1 | sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' | tail -1)
           dbg=$(cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort 2>&1 | sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' | tail -1)
           echo "release=${rel} debug=${dbg} total=$(( rel + dbg ))"
-          if [ "$(( rel + dbg ))" -ne 12 ]; then
-            echo "root_shutdown_unload_16_3 profile split lost coverage: ${rel} + ${dbg} != 12"
+          if [ "$(( rel + dbg ))" -ne 15 ]; then
+            echo "root_shutdown_unload_16_3 profile split lost coverage: ${rel} + ${dbg} != 15"
             exit 1
           fi
 

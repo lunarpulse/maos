@@ -1,6 +1,6 @@
 name: ci-20-1b-verify
 # Operator-controlled verification branch only; never install this workflow on main.
-# Authored, NOT executed locally or hosted. F5 and final KQ1 effects are NOT proved here.
+# Authored, NOT executed hosted. AC15 real TLS/dev witnesses included; final KQ1 effects excluded.
 on:
   push:
     branches: ['ci/20-1b-verify']
@@ -34,6 +34,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: verify-20-1b-${{ matrix.image }}
+      - uses: ./.github/actions/provision-t3-test-substrate
       - name: Build actual harness-resolved fixtures then genuine journey binaries
         shell: bash
         run: |
@@ -41,13 +42,12 @@ jobs:
           mkdir -p evidence
           cargo build --locked -p xtask
           env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR="$PWD/xtask" \
-            target/debug/xtask build-test-fixtures --only maosctl,maos-spirit,maos-registry-server \
-            2>&1 | tee evidence/fixtures.log
+            target/debug/xtask build-test-fixtures 2>&1 | tee evidence/fixtures.log
           cargo build --locked -p maos-bin -p maos-cli
           cargo metadata --locked --format-version 1 > evidence/cargo-metadata.json
           cargo nextest list --locked -p maos-bin -p maos-registry -p maos-spirit-cli -p maos-cli \
             --list-type binaries-only --message-format json > evidence/binaries-metadata.json
-      - name: Sixty-six kernel-free witnesses including production admission and boot
+      - name: 107 kernel-free witnesses including TLS and real cohort teardown
         shell: bash
         run: |
           set -euo pipefail
@@ -55,10 +55,10 @@ jobs:
             --cargo-metadata evidence/cargo-metadata.json \
             --binaries-metadata evidence/binaries-metadata.json \
             --profile ci --test-threads 1 --no-fail-fast --no-capture \
-            -E 'binary(yank_auth_20_1b) | binary(yank_cadence_20_1b) | binary(vetting_attestation_gate) | binary(yank_policy_20_1b) | binary(spirit_install_20_1) | binary(vet_lifecycle_20_1b) | binary(installed_spirit_dispatch_20_1) | test(=vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9) | test(=registry_bound_principal_is_counted_and_erased_on_uninstall_p3)' \
+            -E 'binary(yank_auth_20_1b) | binary(yank_cadence_20_1b) | binary(vetting_attestation_gate) | binary(yank_policy_20_1b) | binary(spirit_install_20_1) | binary(vet_lifecycle_20_1b) | binary(installed_spirit_dispatch_20_1) | binary(registry_tls_20_1b) | binary(root_shutdown_unload_16_3) | test(=vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9) | test(=registry_bound_principal_is_counted_and_erased_on_uninstall_p3)' \
             2>&1 | tee evidence/contracts.log
           cp target/nextest/ci/junit.xml evidence/junit.xml
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 66 \
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 107 \
             --required-test unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17 \
             --required-test publisher_and_vetter_yank_verbs_authenticate_ac7 \
             --required-test signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8 \
@@ -67,7 +67,23 @@ jobs:
             --required-test registry_bound_principal_is_counted_and_erased_on_uninstall_p3 \
             --required-test installed_component_dispatch_reports_typed_boot_refusal \
             --required-test signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13 \
+            --required-test tls::cli_tls_install_authenticates_before_persistence_ac15 \
+            --required-test tls::cli_omitted_yank_or_unauthenticated_head_refuses_before_persistence_ac15 \
+            --required-test tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15 \
+            --required-test tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15 \
+            --required-test tls::interception_wrong_host_certificate_is_refused_ac15 \
+            --required-test tls::interception_expired_certificate_is_refused_ac15 \
+            --required-test tls::interception_untrusted_ca_is_refused_ac15 \
+            --required-test tls::handshake_failure_never_attempts_plaintext_ac15 \
+            --required-test tls::https_redirect_never_downgrades_to_http_ac15 \
+            --required-test tls::server_rejects_client_without_dev_handshake_ac15 \
+            --required-test tls::private_key_custody_refuses_group_or_world_access_ac15 \
+            --required-test tls::private_key_custody_refuses_seed_inside_package_store_ac15 \
             --required-test installed_version_is_immutable_ac14 \
+            --required-test cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains \
+            --required-test cohort::cohort_sigterm_without_worker_joins_local_yank_timer_and_drains \
+            --required-test cohort::declared_capable_cohort_worker_prerequisite_never_green_skips \
+            --required-test every_audit_sender_release_joins_the_yank_owner \
             --required-test yanked_install_is_refused_before_persistence_ac16 evidence/contracts.log
       - name: Kernel baseline is unchanged
         shell: bash
@@ -79,4 +95,29 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: trust-20-1b-${{ matrix.image }}
+          path: evidence
+  registry-tls-macos:
+    # Unverified portability leg; the Apple runner supplies the C toolchain/SDK absent locally.
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin
+      - name: Check leaf TLS with the real Apple C toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          xcrun --show-sdk-path | tee evidence/apple-sdk.log
+          cargo check --locked -p maos-registry -p maos-spirit-cli \
+            --target aarch64-apple-darwin 2>&1 | tee evidence/apple-check.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: trust-20-1b-macos
           path: evidence

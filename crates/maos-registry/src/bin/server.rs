@@ -1,4 +1,4 @@
-//! Standalone loopback registry and explicit local installed-pin release.
+//! Authenticated TLS registry, explicit loopback development, and local pin release.
 use maos_registry::server::RegistryServerArgs;
 
 #[tokio::main(flavor = "current_thread")]
@@ -9,9 +9,9 @@ async fn main() -> std::process::ExitCode {
         .is_some_and(|arg| arg == "--help" || arg == "-h")
     {
         println!(
-            "Usage: maos-registry-server [--bind <addr>] [--root <dir>] [--signing-key <path>]\n       maos-registry-server [--root <dir>] release-pin <name>"
+            "Usage: maos-registry-server [--bind <addr>] [--root <dir>] --uri <https://host/mcp> --signing-key <hex-seed-path> --tls-cert <chain.pem> --tls-key <key.pem>\n       maos-registry-server [--bind <loopback>] [--root <dir>] --dev-http\n       maos-registry-server [--root <dir>] release-pin <name>"
         );
-        println!("Signed mutations; first-contact/TLS transport policy belongs to AC15.");
+        println!("Installers configure the URI-bound signing public key and optional CA in operator.toml. HTTP requires explicit development opt-in at both ends.");
         return std::process::ExitCode::SUCCESS;
     }
     let result = async {

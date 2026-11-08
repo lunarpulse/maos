@@ -30,6 +30,7 @@ default_seconds = 30
 # Record the next green hosted sum and re-tighten under 20-7's rule-10 review row.
 # Prior: 800 -> 1100 from hosted40955589411 sum880.6s, E19 wave-2 vectors.
 total_seconds = 1440
+# AC15/cohort post-fix local JUnit64ad0f22 sum807.751s (10 failures); not hosted authority.
 
 # Story 18-5-context-token-budget-accounting: context_budget_18_5,
 # context_refusal_18_5, context_signal_18_5, context_budget_gate_18_5 and

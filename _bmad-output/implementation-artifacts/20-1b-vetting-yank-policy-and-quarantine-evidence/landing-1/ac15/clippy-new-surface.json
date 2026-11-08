@@ -1,0 +1,75 @@
+[
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused imports: `ComplianceClaimEnvelope` and `SigningAlg`",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/server.rs",
+        "line": 759
+      },
+      {
+        "file": "crates/maos-registry/src/server.rs",
+        "line": 759
+      }
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused imports: `Read` and `Write`",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/server.rs",
+        "line": 760
+      },
+      {
+        "file": "crates/maos-registry/src/server.rs",
+        "line": 760
+      }
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused import: `std::net::TcpStream`",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/server.rs",
+        "line": 761
+      }
+    ]
+  },
+  {
+    "code": {
+      "code": "unused_imports",
+      "explanation": null
+    },
+    "message": "unused import: `std::time::Duration`",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/server.rs",
+        "line": 762
+      }
+    ]
+  },
+  {
+    "code": {
+      "code": "dead_code",
+      "explanation": null
+    },
+    "message": "function `temp_storage` is never used",
+    "spans": [
+      {
+        "file": "crates/maos-registry/src/server.rs",
+        "line": 764
+      }
+    ]
+  }
+]

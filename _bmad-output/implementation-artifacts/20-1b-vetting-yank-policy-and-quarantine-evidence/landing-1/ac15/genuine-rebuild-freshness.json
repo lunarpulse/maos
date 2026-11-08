@@ -1,0 +1,12 @@
+{
+  "source_input_touch_only": true,
+  "artifact_timestamp_touch": false,
+  "build_exit_code": 0,
+  "mtime_ns": {
+    "crates/maos-bin/src/main.rs": 1794095651824801919,
+    "crates/maos-cli/src/main.rs": 1794095651824801919,
+    "target/debug/maos": 1794095665728681962,
+    "target/debug/maosctl": 1794095663909697676
+  },
+  "standalone_workspace_retried": false
+}

@@ -1,0 +1,125 @@
+{
+  "baseline": "c656a6e7",
+  "scope": "AC15/F5 completion plus hosted42418118608 cohort regression; earlier L1 AC6-10/14/16/17 remain implemented and freshly selected",
+  "f5_design_rows": {
+    "D-20-1b-01": "RULED A: out-of-band configured Ed25519 root, exact canonical URI binding",
+    "D-20-1b-02": "RULED A: rustls client/server, operator certificate/private-key paths, WebPKI plus optional CA, hostname/time checks",
+    "D-20-1b-03": "RULED A: explicit both-end literal-loopback dev HTTP only, never HTTPS downgrade"
+  },
+  "f5_design_blocked": false,
+  "ruling_phrase": "orchestrator-adjudicated rebase, D02 A, disclosed to the operator",
+  "counts": {
+    "maos-registry": 5668,
+    "maos-bin": 35589,
+    "maos-cli": 6429,
+    "maos-spirit-cli": 942,
+    "maos-compliance": 2077,
+    "maos-audit": 8179,
+    "maos-domain": 10137,
+    "maos-iac": 8625,
+    "xtask": 44696,
+    "aggregate": 196964,
+    "strict_hardfail": 196965
+  },
+  "ceilings": {
+    "maos-registry": 7081,
+    "maos-bin": 35671,
+    "maos-cli": 6549,
+    "maos-spirit-cli": 984,
+    "aggregate": 198621
+  },
+  "kernel": {
+    "physical": 26841,
+    "tokei": 21042,
+    "file_count": 95,
+    "set_hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+    "changed_files": []
+  },
+  "focused": {
+    "tls": {
+      "cases": 26,
+      "exit": 0,
+      "seconds": 3.329
+    },
+    "cohort_binary": {
+      "harness_results": 15,
+      "exit": 0,
+      "seconds": 0.64,
+      "live_t3_cases": "explicit local prerequisite skips, not exercised passes"
+    },
+    "cohort_before_runtime": 101,
+    "cohort_plant_runtime": 101,
+    "cohort_before_ast": 101,
+    "cohort_plant_ast": 101,
+    "restoration_cp_cmp_touch": [
+      0,
+      0,
+      0
+    ],
+    "structural_gate_passes": 16,
+    "affected_clippy_new_warning_fingerprints": 0,
+    "final_cohort_clippy_new_warning_fingerprints": 0,
+    "cargo_deny_exit": 0,
+    "fmt_exit": 0
+  },
+  "workspace": {
+    "exit": 100,
+    "run": 5783,
+    "passed": 5773,
+    "failed": 10,
+    "sum_seconds": 807.751,
+    "uuid": "64ad0f22-ddd8-4997-a50e-ff7f383a017f",
+    "retries": 0,
+    "failure_disposition": "One existing1M pending oracle owned20-7; nine conservative stale-CLI preparation failures, not flakes. Genuine source-triggered recompilation repairs the latter before the separately required prepush."
+  },
+  "prepush": {
+    "exit": 1,
+    "elapsed_seconds": 1832.115,
+    "records": {
+      "pass": 83,
+      "skip": 7,
+      "red": 1,
+      "advisory": 1
+    },
+    "workspace_run": 5783,
+    "workspace_passed": 5782,
+    "workspace_failed": 1,
+    "sum_seconds": 1102.543,
+    "uuid": "9554b0c5-9e63-477c-8745-7622029439e4",
+    "retries": 0,
+    "failure_disposition": "Only existing1M pending oracle remains,43.305s; owner20-7. Five unchanged/default per-binary timing advisories recorded without widening. All nine earlier stale journey cases now green."
+  },
+  "selected_contract_harness_results": {
+    "count": 107,
+    "failed_standalone": 0,
+    "failed_prepush": 0,
+    "live_t3_worker_bodies": "unverified locally; explicit skips"
+  },
+  "hosted": "Branch recipe selects107 actual names with26 required-test markers and the real signed-T3 action; Apple SDK leg authored only, not run hosted. No real external privileged-network/OCI proof claimed locally.",
+  "limits": [
+    "AC8 quarantine EFFECT and AC11-AC13 are final KQ1, not claimed in L1",
+    "Unsigned explicit dev HTTP lacks peer/confidentiality/omission/freshness guarantees unless root-signed responses independently apply; plaintext never confidential",
+    "Configured authority lying, key compromise and authority-signed rollback to a fresh client are not solved",
+    "Independent AC15 security/code review remains Main-owned; inherited FKCS136c579d verify_attestation input/test-field hunk is an explicit review focus"
+  ],
+  "cleanup": {
+    "stale_session_directories_removed": 209,
+    "removed_own_temporary": [
+      "/tmp/201b-ac15",
+      "/tmp/201b-ac15-verifier"
+    ],
+    "removed_file_logical_bytes": 4115228024,
+    "fully_unlinked_inode_allocated_bytes": 3350249472,
+    "available_byte_delta": {
+      "/mnt/build/cargo-maos/debug/incremental": 2416631808,
+      "/tmp": 0
+    },
+    "measurement_caveat": "Allocated bytes count only inodes whose complete hardlink set was unlinked; filesystem available-byte deltas can include unrelated host activity and filesystem allocation behavior."
+  },
+  "source_inventory": "source-inventory.json (35 owned non-AC15-evidence paths, two orchestrator cleanup reports excluded and untouched)",
+  "acceptance_table": "ac-witness-table.md",
+  "commands": "commands.json and commands.md",
+  "post_prepush_changes": "Evidence/story/deferred/tracker notes and a comment-only budget-note relocation; no Rust/source behavior change after prepush",
+  "commit_push_status_flip": false,
+  "freeze_release": "Explicitly released in final handoff; no cargo process remains owned by this agent"
+}

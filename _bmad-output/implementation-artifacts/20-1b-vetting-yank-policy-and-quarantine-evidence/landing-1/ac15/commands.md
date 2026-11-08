@@ -1,0 +1,151 @@
+# AC15/cohort exact observed commands
+
+Structural gate calls use CI/GITHUB_ACTIONS unset, CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask and the temporary hash-locked verifier PATH. The explicit prepush argv includes its environment recipe. Expected before/plant reds, incomplete probes and actual enclosing-suite failures are labelled in plants.md and the summary files, not relabelled as passes.
+
+- `before-development-opt-in`: exit 101; 10.845s; `cargo test -p maos-registry --test registry_tls_20_1b -- --test-threads=1`
+- `before-development-opt-in-observed`: exit 101; 2.259s; `cargo test -p maos-registry --test registry_tls_20_1b -- --test-threads=1`
+- `development-implementation-compile`: exit 101; 29.592s; `cargo test -p maos-registry --test registry_tls_20_1b -- --test-threads=1`
+- `tls-basic-focus`: exit 101; 17.903s; `cargo test -p maos-registry --test registry_tls_20_1b -- --test-threads=1`
+- `tls-basic-wire-focus`: exit 0; 6.577s; `cargo test -p maos-registry --test registry_tls_20_1b -- --test-threads=1`
+- `before-cli-trust-and-tls`: exit 101; 2.815s; `cargo test -p maos-registry --test registry_tls_20_1b tls::cli_ -- --test-threads=1`
+- `ac15-genuine-cli-build`: exit 101; 29.954s; `cargo build -p maos-cli -p maos-spirit-cli`
+- `ac15-genuine-cli-build-corrected`: exit 0; 15.433s; `cargo build -p maos-cli -p maos-spirit-cli`
+- `tls-complete-focus`: exit 101; 2.753s; `cargo test -p maos-registry --test registry_tls_20_1b -- --test-threads=1`
+- `tls-complete-wire-focus`: exit 101; 7.249s; `cargo test -p maos-registry --test registry_tls_20_1b -- --test-threads=1`
+- `tls-final-oracle-focus`: exit 0; 13.688s; `cargo test -p maos-registry --test registry_tls_20_1b -- --test-threads=1`
+- `registry-affected-focus`: exit 0; 33.271s; `cargo test -p maos-registry --test registry_security_20_1a --test registry_server_bin_20_1 --test yank_auth_20_1b -- --test-threads=1`
+- `certificate-validation-save`: exit 1; 0.025s; `cp /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs /tmp/201b-ac15/plants/certificate-validation.saved`
+- `certificate-validation-save`: exit 0; 0.004s; `cp /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs /tmp/201b-ac15/plants/certificate-validation.saved`
+- `plant-certificate-validation`: exit 101; 14.542s; `cargo test -p maos-registry --test registry_tls_20_1b tls::interception_ -- --test-threads=1`
+- `certificate-validation-copyback`: exit 0; 0.004s; `cp /tmp/201b-ac15/plants/certificate-validation.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs`
+- `certificate-validation-cmp`: exit 0; 0.002s; `cmp /tmp/201b-ac15/plants/certificate-validation.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs`
+- `certificate-validation-touch`: exit 0; 0.002s; `touch /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs`
+- `response-envelope-save`: exit 0; 0.002s; `cp /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs /tmp/201b-ac15/plants/response-envelope.saved`
+- `plant-response-envelope-api`: exit 101; 8.018s; `cargo test -p maos-registry --test registry_tls_20_1b tls::envelope_ -- --test-threads=1`
+- `plant-configured-root-key`: exit 101; 0.389s; `cargo test -p maos-registry --test registry_tls_20_1b hostile_registry_wrong_configured_root -- --test-threads=1`
+- `plant-envelope-cli-build`: exit 0; 21.648s; `cargo build -p maos-cli`
+- `plant-envelope-install-persistence`: exit 101; 0.685s; `cargo test -p maos-registry --test registry_tls_20_1b cli_omitted_yank -- --test-threads=1`
+- `response-envelope-copyback`: exit 0; 0.005s; `cp /tmp/201b-ac15/plants/response-envelope.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `response-envelope-cmp`: exit 0; 0.001s; `cmp /tmp/201b-ac15/plants/response-envelope.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `response-envelope-touch`: exit 0; 0.002s; `touch /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `head-and-dev-security-save`: exit 0; 0.003s; `cp /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs /tmp/201b-ac15/plants/head-and-dev-security.saved`
+- `head-and-dev-http-save`: exit 0; 0.002s; `cp /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs /tmp/201b-ac15/plants/head-and-dev-http.saved`
+- `head-and-dev-server-save`: exit 0; 0.002s; `cp /home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs /tmp/201b-ac15/plants/head-and-dev-server.saved`
+- `plant-head-and-development`: exit 100; 6.319s; `cargo nextest run -p maos-registry --test registry_tls_20_1b -E 'test(http_install_requires_explicit) | test(server_requires_tls_or_explicit) | test(server_rejects_client_without_dev_handshake) | test(envelope_missing_head) | test(envelope_incomplete_head)' --test-threads=1`
+- `head-and-dev-security-copyback`: exit 0; 0.002s; `cp /tmp/201b-ac15/plants/head-and-dev-security.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs`
+- `head-and-dev-security-cmp`: exit 0; 0.001s; `cmp /tmp/201b-ac15/plants/head-and-dev-security.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs`
+- `head-and-dev-security-touch`: exit 0; 0.002s; `touch /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs`
+- `head-and-dev-http-copyback`: exit 0; 0.002s; `cp /tmp/201b-ac15/plants/head-and-dev-http.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `head-and-dev-http-cmp`: exit 0; 0.001s; `cmp /tmp/201b-ac15/plants/head-and-dev-http.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `head-and-dev-http-touch`: exit 0; 0.002s; `touch /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `head-and-dev-server-copyback`: exit 0; 0.002s; `cp /tmp/201b-ac15/plants/head-and-dev-server.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs`
+- `head-and-dev-server-cmp`: exit 0; 0.001s; `cmp /tmp/201b-ac15/plants/head-and-dev-server.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs`
+- `head-and-dev-server-touch`: exit 0; 0.002s; `touch /home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs`
+- `plant-head-and-development-remaining`: exit 100; 6.456s; `cargo nextest run -p maos-registry --test registry_tls_20_1b -E 'test(server_requires_tls_or_explicit) | test(server_rejects_client_without_dev_handshake) | test(envelope_missing_head) | test(envelope_incomplete_head)' --no-fail-fast --test-threads=1`
+- `head-and-dev-security-remaining-copyback`: exit 0; 0.003s; `cp /tmp/201b-ac15/plants/head-and-dev-security.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs`
+- `head-and-dev-security-remaining-cmp`: exit 0; 0.001s; `cmp /tmp/201b-ac15/plants/head-and-dev-security.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs`
+- `head-and-dev-security-remaining-touch`: exit 0; 0.002s; `touch /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs`
+- `head-and-dev-server-remaining-copyback`: exit 0; 0.002s; `cp /tmp/201b-ac15/plants/head-and-dev-server.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs`
+- `head-and-dev-server-remaining-cmp`: exit 0; 0.001s; `cmp /tmp/201b-ac15/plants/head-and-dev-server.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs`
+- `head-and-dev-server-remaining-touch`: exit 0; 0.002s; `touch /home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs`
+- `configured-uri-and-root-save`: exit 0; 0.006s; `cp /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs /tmp/201b-ac15/plants/configured-uri-and-root.saved`
+- `plant-configured-uri-and-root`: exit 100; 9.133s; `cargo nextest run -p maos-registry --test registry_tls_20_1b -E 'test(configured_root_is_bound_to_canonical_uri_before_contact) | test(https_requires_configured_root_not_response_supplied_key)' --no-fail-fast --test-threads=1`
+- `configured-uri-and-root-copyback`: exit 0; 0.006s; `cp /tmp/201b-ac15/plants/configured-uri-and-root.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `configured-uri-and-root-cmp`: exit 0; 0.001s; `cmp /tmp/201b-ac15/plants/configured-uri-and-root.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `configured-uri-and-root-touch`: exit 0; 0.002s; `touch /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `no-plaintext-downgrade-save`: exit 0; 0.002s; `cp /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs /tmp/201b-ac15/plants/no-plaintext-downgrade.saved`
+- `plant-no-plaintext-downgrade`: exit 100; 7.956s; `cargo nextest run -p maos-registry --test registry_tls_20_1b -E 'test(handshake_failure_never_attempts_plaintext) | test(https_redirect_never_downgrades_to_http)' --no-fail-fast --test-threads=1`
+- `no-plaintext-downgrade-copyback`: exit 0; 0.005s; `cp /tmp/201b-ac15/plants/no-plaintext-downgrade.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `no-plaintext-downgrade-cmp`: exit 0; 0.001s; `cmp /tmp/201b-ac15/plants/no-plaintext-downgrade.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `no-plaintext-downgrade-touch`: exit 0; 0.002s; `touch /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `plant-first-write-no-plaintext-downgrade`: exit 101; 6.313s; `cargo test -p maos-registry --test registry_tls_20_1b handshake_failure_never_attempts_plaintext -- --test-threads=1`
+- `first-write-no-plaintext-downgrade-copyback`: exit 0; 0.002s; `cp /tmp/201b-ac15/plants/no-plaintext-downgrade.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `first-write-no-plaintext-downgrade-cmp`: exit 0; 0.001s; `cmp /tmp/201b-ac15/plants/no-plaintext-downgrade.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `first-write-no-plaintext-downgrade-touch`: exit 0; 0.002s; `touch /home/lunarpulse/dev_ws/crates/maos-registry/src/http.rs`
+- `no-default-normal-dependency-tree`: exit 0; 0.391s; `cargo tree -p maos-bin --no-default-features --edges normal`
+- `no-default-production-check`: exit 0; 57.259s; `cargo check -p maos-bin --no-default-features`
+- `cargo-deny`: exit 0; 0.993s; `cargo deny check`
+- `before-private-key-custody`: exit 101; 19.344s; `cargo test -p maos-registry --test registry_tls_20_1b private_key_custody_ -- --test-threads=1`
+- `private-key-custody-save`: exit 0; 0.072s; `cp /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs /tmp/201b-ac15/plants/private-key-custody.saved`
+- `plant-private-key-custody`: exit 101; 15.810s; `cargo test -p maos-registry --test registry_tls_20_1b private_key_custody_ -- --test-threads=1`
+- `private-key-custody-copyback`: exit 0; 0.002s; `cp /tmp/201b-ac15/plants/private-key-custody.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs`
+- `private-key-custody-cmp`: exit 0; 0.002s; `cmp /tmp/201b-ac15/plants/private-key-custody.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs`
+- `private-key-custody-touch`: exit 0; 0.002s; `touch /home/lunarpulse/dev_ws/crates/maos-registry/src/security.rs`
+- `ac15-fmt`: exit 0; 3.001s; `cargo fmt --all`
+- `ac15-clippy-affected`: exit 0; 277.120s; `cargo clippy -p maos-registry -p maos-spirit-cli -p maos-cli -p maos-bin --all-targets --message-format=json`
+- `formatted-pin-measurement`: exit 1; 0.095s; `/mnt/build/cargo-maos/debug/xtask kloc-check --json`
+- `verifier-backend-venv`: exit 0; 1.223s; `/usr/bin/python3 -m venv --system-site-packages /tmp/201b-ac15-verifier`
+- `verifier-backend-provision`: exit 0; 0.929s; `/tmp/201b-ac15-verifier/bin/python3 -m pip install --no-cache-dir --only-binary=:all: --require-hashes -r tools/verify-erasure/requirements.txt`
+- `ac15-fixture-builder`: exit 0; 43.276s; `/mnt/build/cargo-maos/debug/xtask build-test-fixtures --only maosctl,maos-spirit,maos-registry-server`
+- `ac15-genuine-journey-build`: exit 0; 46.476s; `cargo build -p maos-bin -p maos-cli`
+- `ac15-provenance-tls-focus`: exit 0; 29.887s; `cargo nextest run -p maos-registry --test registry_tls_20_1b --profile ci --no-fail-fast --test-threads=1`
+- `ac15-tls-junit-custody`: exit 0; 0.008s; `cp /home/lunarpulse/dev_ws/target/nextest/ci/junit.xml /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/tls-junit.xml`
+- `ac15-client-and-producer-focus`: exit 0; 56.071s; `cargo test -p maos-cli --test spirit_install_20_1 -p maos-spirit-cli --lib -- --test-threads=1`
+- `ac15-final-test-fmt`: exit 0; 3.245s; `cargo fmt --all`
+- `ac15-tls-publish-positive`: exit 0; 27.492s; `cargo test -p maos-registry --test registry_tls_20_1b configured_root_and_ca_authenticate_real_registry -- --test-threads=1`
+- `ac15-no-default-final-check`: exit 0; 33.573s; `cargo check -p maos-bin --no-default-features`
+- `ac15-no-default-verb-table`: exit 0; 35.039s; `cargo test -p maos-bin --no-default-features --test verb_table_15_3`
+- `ac15-count-pin-gate`: exit 0; 0.133s; `/mnt/build/cargo-maos/debug/xtask kloc-check --json`
+- `default-port-canonical-uri-save`: exit 0; 0.008s; `cp /home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs /tmp/201b-ac15/plants/default-port-canonical-uri.saved`
+- `plant-default-port-canonical-uri`: exit 101; 4.294s; `cargo test -p maos-registry --lib development_default_ports_use_the_same_canonical_uri_as_clients -- --test-threads=1`
+- `default-port-canonical-uri-copyback`: exit 0; 0.005s; `cp /tmp/201b-ac15/plants/default-port-canonical-uri.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs`
+- `default-port-canonical-uri-cmp`: exit 0; 0.001s; `cmp /tmp/201b-ac15/plants/default-port-canonical-uri.saved /home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs`
+- `default-port-canonical-uri-touch`: exit 0; 0.002s; `touch /home/lunarpulse/dev_ws/crates/maos-registry/src/server.rs`
+- `ac15-final-source-fmt`: exit 0; 2.979s; `cargo fmt --all`
+- `ac15-final-count-measurement`: exit 1; 0.088s; `/mnt/build/cargo-maos/debug/xtask kloc-check --json`
+- `head-before-final-gates`: exit 0; 0.003s; `git log --oneline -5`
+- `ac15-default-port-final`: exit 0; 3.830s; `cargo test -p maos-registry --lib development_default_ports_use_the_same_canonical_uri_as_clients -- --test-threads=1`
+- `ac15-final-registry-clippy`: exit 0; 64.470s; `cargo clippy -p maos-registry --all-targets --message-format=json`
+- `ac15-all-fixture-builder`: exit 0; 55.029s; `/mnt/build/cargo-maos/debug/xtask build-test-fixtures`
+- `ac15-final-genuine-journey-build`: exit 0; 20.871s; `cargo build -p maos-bin -p maos-cli`
+- `ac15-workspace-cargo-metadata`: exit 0; 0.320s; `cargo metadata --locked --format-version 1`
+- `ac15-workspace-binaries-metadata`: exit 0; 1021.041s; `cargo nextest list --workspace --all-targets --locked --list-type binaries-only --message-format json`
+- `before-cohort-audit-drain`: exit 0; 51.857s; `cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort`
+- `before-cohort-new-oracles`: exit 101; 25.860s; `cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort_sigterm_without_worker_joins_local_yank_timer_and_drains`
+- `before-cohort-ast-release-guard`: exit 101; 0.362s; `cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 --exact every_audit_sender_release_joins_the_yank_owner`
+- `cohort-declared-capability-control`: exit 0; 0.204s; `cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 --exact cohort::declared_capable_cohort_worker_prerequisite_never_green_skips`
+- `cohort-local-substrate-disposition`: exit 0; 0.214s; `cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 --exact cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains --nocapture`
+- `cohort-yank-join-save`: exit 0; 0.007s; `cp /home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs /tmp/201b-ac15/plants/cohort-yank-join.saved`
+- `plant-cohort-yank-join-runtime`: exit 101; 17.089s; `cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 --exact cohort::cohort_sigterm_without_worker_joins_local_yank_timer_and_drains`
+- `plant-cohort-yank-join-ast`: exit 101; 0.574s; `cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 --exact every_audit_sender_release_joins_the_yank_owner`
+- `cohort-yank-join-copyback`: exit 0; 0.009s; `cp /tmp/201b-ac15/plants/cohort-yank-join.saved /home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs`
+- `cohort-yank-join-cmp`: exit 0; 0.004s; `cmp /tmp/201b-ac15/plants/cohort-yank-join.saved /home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs`
+- `cohort-yank-join-touch`: exit 0; 0.002s; `touch /home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs`
+- `final-cohort-yank-owner-oracles`: exit 0; 15.003s; `cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1`
+- `ac15-final-fmt`: exit 0; 3.146s; `cargo fmt --all`
+- `cohort-final-ast-drain-guard`: exit 0; 6.166s; `cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --exact every_audit_sender_release_joins_the_yank_owner`
+- `ac15-cohort-final-count-measurement`: exit 1; 0.076s; `/mnt/build/cargo-maos/debug/xtask kloc-check --json`
+- `ac15-final-kloc-check`: exit 0; 0.101s; `/mnt/build/cargo-maos/debug/xtask kloc-check --json`
+- `ac15-final-check-kernel-baseline`: exit 0; 0.012s; `/mnt/build/cargo-maos/debug/xtask check-kernel-baseline --json`
+- `ac15-final-check-dependency-closure`: exit 0; 0.460s; `/mnt/build/cargo-maos/debug/xtask check-dependency-closure --json`
+- `ac15-final-check-env-contract`: exit 0; 0.466s; `/mnt/build/cargo-maos/debug/xtask check-env-contract --json`
+- `ac15-final-check-fkcs`: exit 0; 34.631s; `/mnt/build/cargo-maos/debug/xtask check-fkcs --json`
+- `ac15-final-check-vetting-attestation`: exit 0; 14.035s; `/mnt/build/cargo-maos/debug/xtask check-vetting-attestation --json`
+- `ac15-final-check-exit-commands`: exit 0; 0.347s; `/mnt/build/cargo-maos/debug/xtask check-exit-commands --json`
+- `ac15-final-check-decision-register`: exit 0; 0.007s; `/mnt/build/cargo-maos/debug/xtask check-decision-register --json`
+- `ac15-final-check-test-cost`: exit 0; 0.343s; `/mnt/build/cargo-maos/debug/xtask check-test-cost --json`
+- `ac15-final-check-coverage-matrix-completeness`: exit 0; 0.012s; `/mnt/build/cargo-maos/debug/xtask check-coverage-matrix-completeness --json`
+- `ac15-final-check-serde-error-handling`: exit 0; 0.267s; `/mnt/build/cargo-maos/debug/xtask check-serde-error-handling --json`
+- `ac15-final-check-composition-root-completeness`: exit 0; 0.040s; `/mnt/build/cargo-maos/debug/xtask check-composition-root-completeness --json`
+- `ac15-final-check-dev-record-completeness`: exit 0; 0.065s; `/mnt/build/cargo-maos/debug/xtask check-dev-record-completeness --json`
+- `ac15-final-check-model-currency`: exit 0; 0.444s; `/mnt/build/cargo-maos/debug/xtask check-model-currency --json`
+- `ac15-cohort-clippy`: exit 0; 161.295s; `cargo clippy -p maos-bin --all-targets --message-format=json`
+- `ac15-final-source-fmt`: exit 0; 3.254s; `cargo fmt --all`
+- `ac15-final-deny`: exit 0; 1.291s; `cargo deny check`
+- `ac15-final-all-fixtures`: exit 0; 3.329s; `/mnt/build/cargo-maos/debug/xtask build-test-fixtures`
+- `ac15-final-genuine-journey-build`: exit 0; 34.838s; `cargo build -p maos-bin -p maos-cli`
+- `ac15-final-workspace-cargo-metadata`: exit 0; 0.519s; `cargo metadata --locked --format-version 1`
+- `ac15-final-workspace-binaries-metadata`: exit 0; 239.358s; `cargo nextest list --workspace --all-targets --locked --list-type binaries-only --message-format json`
+- `ac15-final-contract-list`: exit 104; 3.371s; `cargo nextest list --cargo-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/ac15-final-workspace-cargo-metadata.stdout --binaries-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/ac15-final-workspace-binaries-metadata.stdout --profile ci --message-format json -E 'binary(yank_auth_20_1b) | binary(yank_cadence_20_1b) | binary(vetting_attestation_gate) | binary(yank_policy_20_1b) | binary(spirit_install_20_1) | binary(vet_lifecycle_20_1b) | binary(installed_spirit_dispatch_20_1) | binary(registry_tls_20_1b) | binary(root_shutdown_unload_16_3) | test(=vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9) | test(=registry_bound_principal_is_counted_and_erased_on_uninstall_p3)'`
+- `ac15-workspace-test-binaries-metadata`: exit 0; 11.222s; `cargo nextest list --workspace --locked --list-type binaries-only --message-format json`
+- `ac15-canonical-contract-list`: exit 0; 0.654s; `cargo nextest list --cargo-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/ac15-final-workspace-cargo-metadata.stdout --binaries-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/ac15-workspace-test-binaries-metadata.stdout --profile ci --message-format json -E 'binary(yank_auth_20_1b) | binary(yank_cadence_20_1b) | binary(vetting_attestation_gate) | binary(yank_policy_20_1b) | binary(spirit_install_20_1) | binary(vet_lifecycle_20_1b) | binary(installed_spirit_dispatch_20_1) | binary(registry_tls_20_1b) | binary(root_shutdown_unload_16_3) | test(=vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9) | test(=registry_bound_principal_is_counted_and_erased_on_uninstall_p3)'`
+- `ac15-workspace-nextest`: exit 100; 808.663s; `cargo nextest run --no-fail-fast --profile ci --test-threads 1 --cargo-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/ac15-final-workspace-cargo-metadata.stdout --binaries-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/ac15-workspace-test-binaries-metadata.stdout`
+- `ac15-workspace-junit-copy`: exit 0; 0.004s; `cp /home/lunarpulse/dev_ws/target/nextest/ci/junit.xml /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/workspace-junit.xml`
+- `ac15-workspace-test-budget`: exit 0; 0.024s; `/mnt/build/cargo-maos/debug/xtask check-test-budget --json --junit /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/workspace-junit.xml`
+- `ac15-prepush-prereq-check-pub-field-constructors`: exit 0; 0.294s; `/mnt/build/cargo-maos/debug/xtask check-pub-field-constructors --json`
+- `ac15-prepush-prereq-check-service-boundary`: exit 0; 1.151s; `/mnt/build/cargo-maos/debug/xtask check-service-boundary --json`
+- `ac15-genuine-source-rebuild-trigger`: exit 0; 0.004s; `touch /home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs /home/lunarpulse/dev_ws/crates/maos-cli/src/main.rs`
+- `ac15-genuine-both-roots-rebuild`: exit 0; 14.389s; `cargo build -p maos-bin -p maos-cli`
+- `ac15-prepush`: exit 1; 1832.115s; `env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask MAOS_17_2_CGROUP_MODE=undelegated /mnt/build/cargo-maos/debug/xtask prepush --json`
+- `ac15-prepush-junit-copy`: exit 0; 0.017s; `cp /home/lunarpulse/dev_ws/target/nextest/default/junit.xml /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/prepush-junit.xml`
+- `ac15-prepush-copied-junit-budget-detail`: exit 1; 0.044s; `/mnt/build/cargo-maos/debug/xtask check-test-budget --json --junit /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/prepush-junit.xml`

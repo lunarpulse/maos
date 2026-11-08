@@ -1,0 +1,41 @@
+
+running 23 tests
+test http_install_requires_explicit_development_opt_in_ac15 ... ok
+test server_requires_tls_or_explicit_loopback_development_ac15 ... ok
+test tls::cli_omitted_yank_or_unauthenticated_head_refuses_before_persistence_ac15 ... ok
+test tls::cli_tls_install_authenticates_before_persistence_ac15 ... FAILED
+test tls::cli_tls_yanked_version_is_refused_before_persistence_ac15 ... ok
+test tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15 ... ok
+test tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15 ... ok
+test tls::configured_root_and_ca_authenticate_real_registry_ac15 ... ok
+test tls::configured_root_is_bound_to_canonical_uri_before_contact_ac15 ... ok
+test tls::envelope_incomplete_head_is_refused_ac15 ... ok
+test tls::envelope_missing_head_is_refused_ac15 ... ok
+test tls::envelope_missing_signature_is_refused_ac15 ... ok
+test tls::envelope_stripped_yank_entry_is_refused_ac15 ... ok
+test tls::envelope_wrong_nonce_is_refused_ac15 ... ok
+test tls::envelope_wrong_uri_is_refused_ac15 ... ok
+test tls::handshake_failure_never_attempts_plaintext_ac15 ... ok
+test tls::hostile_registry_wrong_configured_root_is_refused_ac15 ... ok
+test tls::https_redirect_never_downgrades_to_http_ac15 ... ok
+test tls::https_requires_configured_root_not_response_supplied_key_ac15 ... ok
+test tls::interception_expired_certificate_is_refused_ac15 ... ok
+test tls::interception_untrusted_ca_is_refused_ac15 ... ok
+test tls::interception_wrong_host_certificate_is_refused_ac15 ... ok
+test tls::loopback_development_requires_both_sides_and_keeps_yank_signatures_ac15 ... ok
+
+failures:
+
+---- tls::cli_tls_install_authenticates_before_persistence_ac15 stdout ----
+maos-registry: listening on 127.0.0.1:39663
+
+thread 'tls::cli_tls_install_authenticates_before_persistence_ac15' (377670) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:201:9:
+assertion failed: home.path().join(".local/share/maos/registry/installed/tls-widget/1.0.0/signed_package.json").is_file()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tls::cli_tls_install_authenticates_before_persistence_ac15
+
+test result: FAILED. 22 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.94s
+

@@ -1,0 +1,13 @@
+
+running 8 tests
+test http_install_requires_explicit_development_opt_in_ac15 ... ok
+test server_requires_tls_or_explicit_loopback_development_ac15 ... ok
+test tls::configured_root_and_ca_authenticate_real_registry_ac15 ... ok
+test tls::configured_root_is_bound_to_canonical_uri_before_contact_ac15 ... ok
+test tls::hostile_registry_wrong_configured_root_is_refused_ac15 ... ok
+test tls::interception_expired_certificate_is_refused_ac15 ... ok
+test tls::interception_untrusted_ca_is_refused_ac15 ... ok
+test tls::interception_wrong_host_certificate_is_refused_ac15 ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+

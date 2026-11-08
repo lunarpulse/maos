@@ -1,0 +1,7 @@
+{
+  "command": ["cargo", "clippy", "-p", "maos-bin", "--all-targets", "--message-format=json"],
+  "exit_code": 0,
+  "distinct_current_warning_fingerprints": 400,
+  "new_warning_fingerprints": [],
+  "comparison": "Retained preceding final workspace warning baseline; fingerprint is diagnostic code/message/primary source file and source text, not shifted line numbers. Existing warnings are not claimed repaired."
+}

@@ -41,8 +41,10 @@ pub fn run(args: YankArgs) -> anyhow::Result<()> {
         )
         .map_err(anyhow::Error::msg)?,
     );
-    let client =
-        maos_registry::McpSpiritRegistryClient::http(args.registry_uri, Default::default())?;
+    let client = maos_registry::McpSpiritRegistryClient::http(
+        args.registry_uri,
+        maos_registry::install::operator_config().map_err(anyhow::Error::from_boxed)?,
+    )?;
     let receipt = client.deprecate(&SpiritId::from(name), version, &reason)?;
     println!("{}", serde_json::to_string(&receipt)?);
     Ok(())

@@ -1,0 +1,9 @@
+error: creating test list failed
+
+Caused by:
+  for `maos-kernel-core::bench/cap_token_verify_p99`, line "MAOS-PERF {\"metric\":\"adr-030-cap-token-verify-p99\",\"value\":1.523}" did not end with the string ": test" or ": benchmark"
+  full output:
+  cap_token_verify/verify_hot_path: benchmark
+  MAOS-PERF {"metric":"adr-030-cap-token-verify-p99","value":1.523}
+  MAOS-PERF {"metric":"nfr-perf-3-cap-token-verify-p99","value":1.523}
+

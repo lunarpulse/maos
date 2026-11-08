@@ -57,7 +57,7 @@ struct PublishArgsCli {
     #[arg(long)]
     signing_key_env: Option<String>,
 
-    /// Registry URI override. Precedence: --registry-uri > $MAOS_REGISTRY_URI > built-in default.
+    /// URI precedence: --registry-uri > $MAOS_REGISTRY_URI > [registry].uri > loopback default.
     #[arg(long)]
     registry_uri: Option<String>,
 

@@ -1,0 +1,6 @@
+{
+  "path": "/home/lunarpulse/dev_ws/target/debug/maosctl",
+  "mtime": 1794082532.6390626,
+  "sha256": "934af16c15d6a120bad38b7934580e10ae99427c048922a189f54fc967f53a98",
+  "provenance": "genuine pre-AC15 CLI left by previous landing build; new source has not been built into this binary; current test peer uses the new TLS/server boundary, so refusal-phase reds do not claim old HTTPS accepted malicious certificates"
+}

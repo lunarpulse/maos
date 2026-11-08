@@ -1,0 +1,26 @@
+
+running 2 tests
+test tls::private_key_custody_refuses_group_or_world_access_ac15 ... FAILED
+test tls::private_key_custody_refuses_seed_inside_package_store_ac15 ... FAILED
+
+failures:
+
+---- tls::private_key_custody_refuses_group_or_world_access_ac15 stdout ----
+
+thread 'tls::private_key_custody_refuses_group_or_world_access_ac15' (390170) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:91:9:
+assertion failed: server.with_tls(&certs.cert, &certs.key,
+        "https://localhost/mcp".into()).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- tls::private_key_custody_refuses_seed_inside_package_store_ac15 stdout ----
+
+thread 'tls::private_key_custody_refuses_seed_inside_package_store_ac15' (390171) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:104:9:
+private signing seed inside the package store was accepted
+
+
+failures:
+    tls::private_key_custody_refuses_group_or_world_access_ac15
+    tls::private_key_custody_refuses_seed_inside_package_store_ac15
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 24 filtered out; finished in 0.00s
+

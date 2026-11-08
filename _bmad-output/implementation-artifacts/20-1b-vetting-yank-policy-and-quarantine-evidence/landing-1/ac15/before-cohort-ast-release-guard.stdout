@@ -1,0 +1,18 @@
+
+running 1 test
+test every_audit_sender_release_joins_the_yank_owner ... FAILED
+
+failures:
+
+---- every_audit_sender_release_joins_the_yank_owner stdout ----
+
+thread 'every_audit_sender_release_joins_the_yank_owner' (506720) panicked at crates/maos-bin/tests/root_shutdown_unload_16_3.rs:103:17:
+audit_tx release without a prior yank-owner join in its teardown scope
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    every_audit_sender_release_joins_the_yank_owner
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.16s
+

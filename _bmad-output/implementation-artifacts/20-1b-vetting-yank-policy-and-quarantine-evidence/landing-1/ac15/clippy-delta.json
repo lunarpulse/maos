@@ -1,0 +1,8 @@
+{
+  "comparison": "code/message/primary file+source text, not shifted line numbers; current affected packages vs prior final workspace clippy",
+  "current_occurrences": 510,
+  "current_distinct": 424,
+  "new_occurrences": 0,
+  "new_messages": [],
+  "baseline": "_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/review-corrections/handoff-clippy-workspace.stdout"
+}

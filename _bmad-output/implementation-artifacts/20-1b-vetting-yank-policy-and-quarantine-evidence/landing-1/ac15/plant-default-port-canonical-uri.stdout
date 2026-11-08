@@ -1,0 +1,20 @@
+
+running 1 test
+test server::tests::development_default_ports_use_the_same_canonical_uri_as_clients ... FAILED
+
+failures:
+
+---- server::tests::development_default_ports_use_the_same_canonical_uri_as_clients stdout ----
+
+thread 'server::tests::development_default_ports_use_the_same_canonical_uri_as_clients' (416775) panicked at crates/maos-registry/src/server.rs:770:9:
+assertion `left == right` failed
+  left: "http://127.0.0.1:80/mcp"
+ right: "http://127.0.0.1/mcp"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    server::tests::development_default_ports_use_the_same_canonical_uri_as_clients
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 55 filtered out; finished in 0.00s
+

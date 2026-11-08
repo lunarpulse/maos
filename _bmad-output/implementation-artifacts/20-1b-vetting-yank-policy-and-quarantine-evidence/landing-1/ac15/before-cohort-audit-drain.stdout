@@ -1,0 +1,8 @@
+
+running 3 tests
+test cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains ... ok
+test cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown ... ok
+test cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+

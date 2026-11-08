@@ -2,19 +2,47 @@
 
 ## Deployment boundary
 
-The server remains a **loopback development listener over plaintext HTTP**.
-It rejects non-loopback listeners and enforces Host/Origin/content-type/path guards.
-Those guards are not authentication and do not establish a first-contact trust root.
-Do not expose this listener publicly or treat a reverse proxy as an implemented
-end-to-end authenticated installation path.
+Production uses **rustls TLS plus a separately configured Ed25519 registry root**.
+The leaf uses bundled WebPKI roots, optionally extended with an operator CA, and
+verifies the certificate hostname and validity. Neither a response-supplied key
+nor a valid certificate by itself authorizes registry metadata.
 
-Story `20-1b-vetting-yank-policy-and-quarantine` AC15 (operator `f1b`, 2026-11-06)
-requires authenticated first contact and TLS. D-20-1b-01/02/03 were **RULED A/A/A**
-on 2026-11-07: a URI-bound configured signing key, rustls with operator-managed
-certificate/key paths, and explicit both-end development opt-in for literal
-loopback HTTP. Execution is held for the separate AC15 handoff. Hostile-registry
-and interception refusal proof remains owed. No TLS security or public deployment
-claim is made by this kernel-free correction landing.
+Provision the registry signing key out of band. The server reads its 32-byte hex
+seed from `--signing-key`; supply the certificate chain with `--tls-cert`, its
+private key with `--tls-key`, and the canonical external HTTPS `/mcp` URI with
+`--uri`. Keep key files operator-owned, mode0600, outside packages and the registry
+store. Certificate/key and vetter authorization changes require a server restart.
+TLS permits a non-loopback bind; it does not introduce anonymous mutation access.
+
+Installers, producers and daemon pollers share `$HOME/.config/maos/operator.toml`:
+`[registry].uri` is the exact canonical registry URI, `signing_pubkey` is the
+out-of-band 64-hex-character public key, and optional `ca_certificate` is a PEM CA
+file path. The root key must be bound to that URI, including when supplied for
+development HTTP. URI aliases, credentials, query and fragment are refused.
+HTTPS without a configured root refuses before contact; there is no TOFU,
+response-key bootstrap, redirect following or HTTPS-to-HTTP fallback.
+Use absolute operator-controlled CA paths for consistent CLI/daemon working
+directories; a relative CA path is opened relative to the invoking process.
+This is a forward installation guarantee, not retroactive authentication of
+earlier unsigned HTTP installs. Noncanonical legacy origins are not silently
+rewritten: use explicit operator uninstall/reinstall when migrating them, with
+the durable publisher/version pins and local pin-release rules below still active.
+
+Plain HTTP is an explicit **development exception**: server `--dev-http` and
+installer/producer `[registry].development_http = true` are both required.
+Only literal loopback IPs are permitted (not `localhost`/DNS aliases); the client
+sends an explicit development handshake header. Server Host/Origin/path/type
+guards remain enforced. Without a configured signing root, this mode provides
+**neither peer authentication nor confidentiality nor yank omission/freshness
+protection** against a hostile local peer/interceptor. Mutation authorization,
+present-yank signatures, publisher/version/origin pins and admission still apply.
+Providing a URI-bound root also authenticates development responses/heads, but
+never turns plaintext HTTP into confidential transport.
+
+AC15 local witnesses use freshly rcgen-generated test CA/leaf keys, real TLS,
+wrong-root/URI refusal, wrong-host/expired/untrusted certificates, plaintext traps,
+and real CLI persistence oracles. The branch-only hosted recipe is authored but
+not executed; hosted interception and macOS compilation remain unverified.
 
 ## Authenticated mutations
 
@@ -55,10 +83,11 @@ that ledger entry. Retained installed generations remain immutable. A missing
 Newly verified promotion evidence may atomically replace `vetting.json` only for
 an otherwise identical package and origin; renewal does not require erasing data.
 Installation verifies each present matching yank against the package publisher
-or an enrolled vetter before refusing it, before persistence. **An omitted yank
-is not detectable here:** authenticated first contact/transport and head integrity
-remain AC15 dependencies. Local publisher pins are integrity/provenance constraints,
-not authenticated first contact.
+or an enrolled vetter before refusing it, before persistence. HTTPS additionally
+requires an authenticated response/list head before persistence: a stripped entry,
+missing envelope/head, nonce/URI mismatch or sequence gap refuses. Local publisher
+pins alone are not authenticated first contact; unsigned development remains the
+explicit exception above.
 
 Vetting claims bind exact manifest bytes, artifact SHA-256 and publisher key.
 `maos-spirit vet issue` signs a package claim; `vet revoke` updates the supplied
@@ -83,9 +112,13 @@ cursor. Schema-2 cursor files bind the exact registry URI, persist each verified
 row atomically with fsync, and reset on obsolete/corrupt/foreign-registry state.
 Gaps/overshoots trigger a journaled history resync, never trusted advancement.
 Permanent rejected rows are journaled; only a verified row advances the frontier.
-Unknown uninstalled publishers never acknowledge a cursor. Without a signed head,
-withholding/rollback of registry history remains an AC15 dependency. Neither an
-unset HOME nor an empty explicit cursor path selects a shared `/tmp` fallback.
+Unknown uninstalled publishers never acknowledge a cursor. Signed response envelopes
+bind a fresh256-bit request nonce, exact request/response SHA-256, canonical URI and
+complete durable yank head from one snapshot. Incremental lists must reach that
+head contiguously from the requested cursor; no unsigned head advances trust.
+This prevents network replay/omission, not a configured signing authority lying,
+its signing-key compromise, or a fresh client's detection of an authority-signed
+rollback. Neither an unset HOME nor an empty explicit cursor path selects `/tmp`.
 
 Running-promotion reevaluation has an independent local timer even without a
 registry source, including installs appearing after boot. The remote poller is

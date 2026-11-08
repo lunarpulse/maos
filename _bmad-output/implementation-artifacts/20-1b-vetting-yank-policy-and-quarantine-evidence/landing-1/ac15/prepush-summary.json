@@ -1,0 +1,55 @@
+{
+  "exit_code": 1,
+  "record_status_counts": {
+    "pass": 83,
+    "skip": 7,
+    "red": 1,
+    "advisory": 1
+  },
+  "red_records": [
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "status": "red",
+      "detail": "expected exit 0, actual exit status: 100; 32426 lines omitted; thread 'adapter::transparency_log::tests::insert_frame_panics_on_write_failure' (696027) panicked at crates/maos-iac/src/adapter/transparency_log.rs:1439:17: thread 'side_row_failure_rolls_back_the_base_row_and_halts' (696411) panicked at crates/maos-iac/src/adapter/transparency_log.rs:1439:17: thread 'journey_binary_freshness_refuses_newer_source' (697108) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13: thread 'journey_binary_freshness_refuses_newer_source' (697108) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (698446) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:86:9: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (698446) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:86:9: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (698446) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (698446) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (698446) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (698446) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'missing_prebuilt_fixture_refuses_ci_but_allows_local_compilation' (698448) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:79:9: thread 'tokio-rt-worker' (698685) panicked at crates/maos-kernel-core/tests/crash_detector_in_process_panic.rs:16:9: thread 'tokio-rt-worker' (699265) panicked at crates/maos-kernel-core/tests/halt_carry_20_3c.rs:190:9: thread 'tokio-rt-worker' (699359) panicked at crates/maos-kernel-core/tests/hook_dispatch_budget_envelope.rs:41:13: thread 'tokio-rt-worker' (699393) panicked at crates/maos-kernel-core/tests/hot_swap_cross_major_migration.rs:42:9: thread 'tokio-rt-worker' (699715) panicked at crates/maos-kernel-core/tests/loaded_spirit_exit_16_6.rs:43:13: thread 'tokio-rt-worker' (699717) panicked at crates/maos-kernel-core/tests/loaded_spirit_exit_16_6.rs:43:13: thread 'fixture_replay::tests::empty_ring_panics' (701748) panicked at crates/maos-providers/src/fixture_replay.rs:47:13: thread 'sibling_provenance_refuses_an_unrecorded_executable' (702046) panicked at crates/maos-registry/tests/../../../tests/harness/fixtures.rs:57:5: thread 'assert_no_deprecations_panics_when_warnings_present' (703192) panicked at crates/maos-spirit-sdk/tests/deprecation_warnings_smoke.rs:112:5: thread 'assert_panics_message_contains_file_line_and_suggested_fix' (703268) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:34:9: thread 'assert_diagnostic_stable_output' (703267) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:227:9: thread 'assert_panics_on_false_with_diagnostics' (703270) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:28:5: thread 'expect_frame_bytes_exact_fails_on_mismatch' (703276) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:112:5: thread 'expect_frame_closest_diff_byte_correct' (703279) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:251:9: thread 'expect_frame_panics_on_no_match' (703288) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:81:5: thread 'expect_halt_panics_on_no_match' (703291) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:160:5: thread 'gate_otel_airgap_default_off_no_connects' (703350) panicked at crates/maos-telemetry/tests/otel_gates.rs:171:13: thread 'gate_otel_airgap_default_off_no_connects' (703370) panicked at crates/maos-telemetry/tests/otel_gates.rs:173:52: thread 'gate_otel_airgap_default_off_no_connects' (703396) panicked at crates/maos-telemetry/tests/otel_gates.rs:173:52: thread 'gate_otel_airgap_default_off_no_connects' (703422) panicked at crates/maos-telemetry/tests/otel_gates.rs:175:13: thread 'gate_otel_airgap_default_off_no_connects' (703435) panicked at crates/maos-telemetry/tests/otel_gates.rs:175:13: thread 'gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field' (704882) panicked at xtask/src/gate_common.rs:670:13: thread 'expansion_defaults_only_job_results' (711085) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'expansion_defaults_only_job_results' (711085) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'expansion_defaults_only_job_results' (711085) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field' (712078) panicked at xtask/src/gate_common.rs:670:13: FAIL [ 43.305s] (5723/5783) maos-bin::erasure_million_20_11 ac5_million_row_pending_forget_finishes_and_repeats_without_corruption FAIL [ 43.305s] (5723/5783) maos-bin::erasure_million_20_11 ac5_million_row_pending_forget_finishes_and_repeats_without_corruption thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (687705) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:",
+      "wall_ms": 1065416
+    }
+  ],
+  "junit_uuid": "9554b0c5-9e63-477c-8745-7622029439e4",
+  "run": 5783,
+  "passed": 5782,
+  "failed": 1,
+  "case_sum_seconds": 1102.543,
+  "failures": [
+    {
+      "binary": "maos-bin::erasure_million_20_11",
+      "test": "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption",
+      "seconds": 43.305,
+      "message": "thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (687705) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:\npending operation did not finish: op-a9e7bf8ef81445e5df33c267\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    }
+  ],
+  "landing_contracts": {
+    "selected": 107,
+    "present": 107,
+    "failed": 0,
+    "live_t3_worker_bodies": "unverified locally; explicit prerequisite skips"
+  },
+  "timing_advisory": {
+    "gate": "check-test-budget",
+    "passed": false,
+    "junit": "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/landing-1/ac15/prepush-junit.xml",
+    "binaries": 614,
+    "total_span_seconds": 517.3900027275085,
+    "total_sum_seconds": 1102.5429999999997,
+    "findings": [
+      "maos-bin::erasure_uninstall_13_5b took 30.614 s (\u03a3 per-test time) over 26 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+      "maos-bin::hook_pump_17_4 took 30.093 s (\u03a3 per-test time) over 26 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+      "maos-bin::one_daemon_one_door_16_1 took 31.998 s (\u03a3 per-test time) over 43 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+      "maos-iac::participant_recall_17_8 took 40.829 s (\u03a3 per-test time) over 29 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+      "xtask::bin/xtask took 31.167 s (\u03a3 per-test time) over 463 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml"
+    ]
+  },
+  "freshness_disposition": "All nine previously stale journey cases have green prepush harness results after genuine recompilation of both source inputs. No standalone retry and no artifact timestamp touch.",
+  "root_shutdown_sum_seconds": 1.237,
+  "installed_dispatch_sum_seconds": 3.952
+}

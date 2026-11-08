@@ -1,0 +1,53 @@
+
+running 6 tests
+test tls::envelope_incomplete_head_is_refused_ac15 ... FAILED
+test tls::envelope_missing_head_is_refused_ac15 ... FAILED
+test tls::envelope_missing_signature_is_refused_ac15 ... FAILED
+test tls::envelope_stripped_yank_entry_is_refused_ac15 ... FAILED
+test tls::envelope_wrong_nonce_is_refused_ac15 ... FAILED
+test tls::envelope_wrong_uri_is_refused_ac15 ... FAILED
+
+failures:
+
+---- tls::envelope_incomplete_head_is_refused_ac15 stdout ----
+
+thread 'tls::envelope_incomplete_head_is_refused_ac15' (380906) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:373:17:
+altered/omitted authenticated yank view was accepted
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- tls::envelope_missing_head_is_refused_ac15 stdout ----
+
+thread 'tls::envelope_missing_head_is_refused_ac15' (380909) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:373:17:
+altered/omitted authenticated yank view was accepted
+
+---- tls::envelope_missing_signature_is_refused_ac15 stdout ----
+
+thread 'tls::envelope_missing_signature_is_refused_ac15' (380912) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:373:17:
+altered/omitted authenticated yank view was accepted
+
+---- tls::envelope_stripped_yank_entry_is_refused_ac15 stdout ----
+
+thread 'tls::envelope_stripped_yank_entry_is_refused_ac15' (380915) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:373:17:
+altered/omitted authenticated yank view was accepted
+
+---- tls::envelope_wrong_nonce_is_refused_ac15 stdout ----
+
+thread 'tls::envelope_wrong_nonce_is_refused_ac15' (380918) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:373:17:
+altered/omitted authenticated yank view was accepted
+
+---- tls::envelope_wrong_uri_is_refused_ac15 stdout ----
+
+thread 'tls::envelope_wrong_uri_is_refused_ac15' (380922) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:373:17:
+altered/omitted authenticated yank view was accepted
+
+
+failures:
+    tls::envelope_incomplete_head_is_refused_ac15
+    tls::envelope_missing_head_is_refused_ac15
+    tls::envelope_missing_signature_is_refused_ac15
+    tls::envelope_stripped_yank_entry_is_refused_ac15
+    tls::envelope_wrong_nonce_is_refused_ac15
+    tls::envelope_wrong_uri_is_refused_ac15
+
+test result: FAILED. 0 passed; 6 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.62s
+

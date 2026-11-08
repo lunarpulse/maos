@@ -12,7 +12,7 @@
 //! - 5 MCP-Streamable-HTTP operations per ADR-008 binding-v0.5
 //! - Three-trust-tier strictest-of-floor admission per ADR-009 binding-v0.5
 //! - Structural-only ComplianceClaim verification (Ed25519 signature + fingerprint hash match)
-//! - Single-threaded TCP listener on 127.0.0.1 (HTTP only per `SECURITY.md`)
+//! - Bounded blocking TLS server; HTTP only with explicit literal-loopback development opt-in
 //! - Content-addressed filesystem storage at `~/.local/share/maos/registry/`
 //! - Yank propagation via the 5-min polling loop (distinct from FR13 CRL)
 //!
@@ -33,6 +33,7 @@ pub mod import;
 pub mod install;
 pub mod operations;
 pub mod origin;
+pub mod security;
 pub mod server;
 pub mod storage;
 pub mod yank;

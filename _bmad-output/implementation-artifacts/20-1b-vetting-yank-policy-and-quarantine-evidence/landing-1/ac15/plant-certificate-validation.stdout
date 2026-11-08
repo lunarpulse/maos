@@ -1,0 +1,35 @@
+
+running 3 tests
+test tls::interception_expired_certificate_is_refused_ac15 ... FAILED
+test tls::interception_untrusted_ca_is_refused_ac15 ... FAILED
+test tls::interception_wrong_host_certificate_is_refused_ac15 ... FAILED
+
+failures:
+
+---- tls::interception_expired_certificate_is_refused_ac15 stdout ----
+maos-registry: listening on 127.0.0.1:34815
+
+thread 'tls::interception_expired_certificate_is_refused_ac15' (380042) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:162:43:
+called `Result::unwrap_err()` on an `Ok` value: YankList { entries: [] }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- tls::interception_untrusted_ca_is_refused_ac15 stdout ----
+maos-registry: listening on 127.0.0.1:36591
+
+thread 'tls::interception_untrusted_ca_is_refused_ac15' (380045) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:171:43:
+called `Result::unwrap_err()` on an `Ok` value: YankList { entries: [] }
+
+---- tls::interception_wrong_host_certificate_is_refused_ac15 stdout ----
+maos-registry: listening on 127.0.0.1:33481
+
+thread 'tls::interception_wrong_host_certificate_is_refused_ac15' (380049) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:154:43:
+called `Result::unwrap_err()` on an `Ok` value: YankList { entries: [] }
+
+
+failures:
+    tls::interception_expired_certificate_is_refused_ac15
+    tls::interception_untrusted_ca_is_refused_ac15
+    tls::interception_wrong_host_certificate_is_refused_ac15
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 20 filtered out; finished in 0.35s
+

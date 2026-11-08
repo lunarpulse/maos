@@ -57,7 +57,10 @@ async fn signed_yank_crosses_real_server_at_30_second_floor_ac7() {
     let source = Arc::new(Source {
         client: maos_registry::McpSpiritRegistryClient::http(
             format!("http://{}/mcp", server.addr),
-            Default::default(),
+            maos_registry::client::RegistryClientConfig {
+                security: maos_registry::security::RegistrySecurityConfig::development_loopback(),
+                ..Default::default()
+            },
         )
         .unwrap(),
         polls: AtomicUsize::new(0),

@@ -1,0 +1,85 @@
+
+running 48 tests
+test accessibility::tests::no_color_env_empty_string_does_not_disable_color ... ok
+test accessibility::tests::no_color_env_with_any_value_disables_color ... ok
+test accessibility::tests::no_color_wins_over_term_dumb ... ok
+test accessibility::tests::no_env_falls_through_to_auto ... ok
+test accessibility::tests::plain_flag_overrides_everything ... ok
+test accessibility::tests::plain_flag_wins_over_no_color_set ... ok
+test accessibility::tests::term_dumb_disables_color_when_no_color_unset ... ok
+test accessibility::tests::term_xterm_falls_through_to_auto ... ok
+test backup::tests::tenant_backup_round_trip_rejects_wrong_team ... ok
+test backup::tests::validate_restore_target_team_refuses_cross_team_planting ... ok
+test subcommands::tests::audit_keygen_parses ... ok
+test subcommands::tests::audit_posture_delta_parses ... ok
+test subcommands::tests::audit_query_accepts_plain_format ... ok
+test subcommands::tests::audit_query_accepts_spirit_and_format_flags ... ok
+test subcommands::tests::audit_query_capability_parses ... ok
+test subcommands::tests::audit_query_defaults_format_to_ndjson ... ok
+test subcommands::tests::audit_query_intent_contains_parses ... ok
+test subcommands::tests::audit_query_range_parses ... ok
+test subcommands::tests::audit_query_spirit_all_boots_parses ... ok
+test subcommands::tests::audit_sealed_export_parses ... ok
+test subcommands::tests::audit_subject_access_parses ... ok
+test subcommands::tests::audit_verify_bundle_parses ... ok
+test subcommands::tests::capture_tripwire_allows_hex_tl_refs ... ok
+test subcommands::tests::capture_tripwire_refuses_a_pasted_api_key ... ok
+test subcommands::tests::capture_validation_refuses_adapter_only_fs_jail ... ok
+test subcommands::tests::capture_validation_refuses_the_two_host_overclaim_directions ... ok
+test subcommands::tests::capture_validation_refuses_unenforced_egress ... ok
+test subcommands::tests::capture_validation_rejects_missing_signer ... ok
+test subcommands::tests::capture_validation_requires_at_least_one_audit_ref ... ok
+test subcommands::tests::capture_validation_requires_verified_redaction ... ok
+test subcommands::tests::cost_report_reads_payload_not_intent ... ok
+test subcommands::tests::dispatch_forget_rejects_empty_principal ... ok
+test subcommands::tests::dispatch_install ... ok
+test subcommands::tests::dispatch_run_hello_spirit ... ok
+test subcommands::tests::dispatch_start_parses_hello_spirit_globally_with_plain ... ok
+test subcommands::tests::dispatch_stop_unload_parse_with_no_args ... ok
+test subcommands::tests::dispatch_unknown_spirit_install ... ok
+test subcommands::tests::dispatch_unknown_spirit_run ... ok
+test subcommands::tests::forget_parses_principal_and_reason ... ok
+test subcommands::tests::forget_reason_is_optional ... ok
+test subcommands::tests::install_verify_local_release_artifact ... ok
+test subcommands::tests::install_verify_missing_sig_fails ... ok
+test subcommands::tests::install_verify_tampered_artifact_rejected ... ok
+test subcommands::tests::journal_run_capture_row_fails_closed_without_a_tl ... ok
+test subcommands::tests::record_capture_parses_flags ... ok
+test subcommands::tests::record_capture_row_round_trips_through_audit_query ... ok
+test subcommands::tests::resolve_spirit_pid_reads_from_tl ... ok
+test subcommands::tests::resolve_spirit_pid_rejects_unknown_names_with_clear_diagnostic ... ok
+
+test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+
+
+running 9 tests
+test built_in_shell_names_are_reserved_before_admission ... ok
+test configured_org_key_requires_a_valid_server_tier_signature ... ok
+test independently_keyed_server_is_verified_and_wrong_key_never_persists ... ok
+test install_refuses_registry_rust_inproc_before_persisting ... ok
+test installed_version_is_immutable_ac14 ... ok
+test materialization_failure_never_activates_a_partial_install ... ok
+test offline_install_persists_remote_origin_and_rejects_tampering ... ok
+test wrong_publisher_key_and_claim_signature_are_refused ... ok
+test yanked_install_is_refused_before_persistence_ac16 ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.78s
+
+
+running 13 tests
+test publish::tests::parse_tier_accepts_public_vetted ... ok
+test publish::tests::parse_tier_accepts_three_valid_tiers ... ok
+test publish::tests::parse_tier_rejects_unknown ... ok
+test publish::tests::resolve_registry_uri_rejects_whitespace_only ... ok
+test publish::tests::resolve_registry_uri_trims_whitespace ... ok
+test publish::tests::tier_to_cli_string_round_trips ... ok
+test signing::tests::base64_with_padding_decodes_correctly ... ok
+test signing::tests::base64_without_padding_fails ... ok
+test signing::tests::derive_keypair_round_trips_signature ... ok
+test signing::tests::extract_spirit_id_and_version_parses_minimal_manifest ... ok
+test signing::tests::extract_spirit_id_prefers_spirit_id_over_name ... ok
+test signing::tests::hex_seed_loads ... ok
+test signing::tests::hex_seed_with_prefix_and_whitespace_loads ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

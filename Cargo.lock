@@ -2715,6 +2715,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "smallvec",
+ "syn 2.0.117",
  "tar",
  "tempfile",
  "thiserror 2.0.18",
@@ -3158,8 +3159,11 @@ dependencies = [
  "maos-mcp",
  "maos-spirit-abi",
  "parking_lot",
+ "rcgen",
  "ring",
  "rustix",
+ "rustls",
+ "rustls-pemfile",
  "serde",
  "serde_cbor",
  "serde_json",
@@ -3170,6 +3174,8 @@ dependencies = [
  "tokio",
  "toml 0.8.23",
  "tracing",
+ "url",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]

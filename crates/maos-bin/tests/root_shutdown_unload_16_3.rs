@@ -61,6 +61,123 @@ mod doorless_home;
 #[path = "../../../tests/harness/t3_substrate.rs"]
 mod t3_substrate;
 
+/// Every explicit root audit-sender release must follow a joined yank owner.
+/// Parent-block state is inherited, but a join in a sibling branch is not.
+#[test]
+fn every_audit_sender_release_joins_the_yank_owner() {
+    use syn::visit::Visit;
+
+    #[derive(Default)]
+    struct AuditReleases {
+        joined: bool,
+        releases: usize,
+        drains: usize,
+    }
+    fn is_yank_join(statement: &syn::Stmt) -> bool {
+        let syn::Stmt::Expr(syn::Expr::Await(awaited), _) = statement else {
+            return false;
+        };
+        let syn::Expr::MethodCall(call) = awaited.base.as_ref() else {
+            return false;
+        };
+        matches!(call.receiver.as_ref(), syn::Expr::Path(path)
+            if path.path.is_ident("yank_poller_task"))
+            && call.method == "shutdown"
+            && call.args.is_empty()
+    }
+    fn is_writer(expression: &syn::Expr) -> bool {
+        match expression {
+            syn::Expr::Path(path) => path.path.is_ident("audit_writer"),
+            syn::Expr::Reference(reference) => is_writer(&reference.expr),
+            _ => false,
+        }
+    }
+    impl<'ast> Visit<'ast> for AuditReleases {
+        fn visit_block(&mut self, block: &'ast syn::Block) {
+            let inherited = self.joined;
+            for statement in &block.stmts {
+                self.visit_stmt(statement);
+                self.joined |= is_yank_join(statement);
+            }
+            self.joined = inherited;
+        }
+        fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+            if matches!(call.func.as_ref(), syn::Expr::Path(path)
+                if path.path.is_ident("drop"))
+                && call.args.len() == 1
+                && matches!(call.args.first(), Some(syn::Expr::Path(path))
+                    if path.path.is_ident("audit_tx"))
+            {
+                assert!(
+                    self.joined,
+                    "audit_tx release without a prior yank-owner join in its teardown scope"
+                );
+                self.releases += 1;
+            }
+            syn::visit::visit_expr_call(self, call);
+        }
+        fn visit_expr_await(&mut self, awaited: &'ast syn::ExprAwait) {
+            if is_writer(&awaited.base)
+                || matches!(awaited.base.as_ref(), syn::Expr::Call(call)
+                    if call.args.iter().any(is_writer))
+            {
+                assert!(
+                    self.joined,
+                    "audit writer drain without a prior yank-owner join"
+                );
+                self.drains += 1;
+            }
+            syn::visit::visit_expr_await(self, awaited);
+        }
+        fn visit_stmt_macro(&mut self, statement: &'ast syn::StmtMacro) {
+            if statement.mac.path.is_ident("release_audit_tx_holders") {
+                self.joined = true;
+            }
+            syn::visit::visit_stmt_macro(self, statement);
+        }
+        fn visit_item_macro(&mut self, statement: &'ast syn::ItemMacro) {
+            if statement
+                .ident
+                .as_ref()
+                .is_some_and(|ident| ident == "release_audit_tx_holders")
+            {
+                let compact: String = statement
+                    .mac
+                    .tokens
+                    .to_string()
+                    .split_whitespace()
+                    .collect();
+                assert!(
+                    compact.contains("yank_poller_task.shutdown().await;drop(audit_tx);"),
+                    "the shared audit-release macro must join before releasing its sender"
+                );
+                self.releases += 1;
+            }
+            syn::visit::visit_item_macro(self, statement);
+        }
+    }
+    let source = include_str!("../src/main.rs");
+    let file = syn::parse_file(source).expect("composition root remains valid Rust");
+    let mut audit = AuditReleases::default();
+    audit.visit_file(&file);
+    assert!(
+        audit.releases >= 7,
+        "all seven existing audit release sites must be audited"
+    );
+    assert!(
+        audit.drains >= 11,
+        "all eleven existing audit writer drains must be audited"
+    );
+    assert_eq!(
+        audit.releases,
+        source
+            .lines()
+            .filter(|line| line.trim() == "drop(audit_tx);")
+            .count(),
+        "a new macro or release shape needs an explicit AST audit"
+    );
+}
+
 /// The stderr handshake (D-16-3-M): the listener's SIGTERM/SIGINT streams are
 /// created synchronously at the site BEFORE this line is printed, so a signal
 /// sent after reading it is captured by the listener instead of racing the
@@ -1765,16 +1882,16 @@ fn scratch_dir(label: &str) -> PathBuf {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Vectors 5 / 5b / 5c — the cohort-a2a-daemon root (two-host TLS fixture,
-// helpers reused from `two_host_delegation_2b.rs`)
+// Vectors 5 / 5b / 5c — the cohort root, plus 20-1b timer/CI controls
+// (two-host TLS helpers reused from `two_host_delegation_2b.rs`).
 //
 // Gated on the `network` feature exactly like the fixture they reuse: the
 // daemon arm, the optional TLS crates and `maos-cohort` all exist only in a
 // network build (maos-bin's DEFAULT), so an air-gap build still compiles this
-// file — with these three vectors absent, and nothing else.
+// file — with the five cohort controls absent.
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// ⚠ THESE THREE VECTORS REQUIRE A **DEBUG** PROFILE. Do not "fix" the CI job by
+// ⚠ THE THREE LIVE-WORKER VECTORS REQUIRE A **DEBUG** PROFILE. Do not "fix" CI by
 // folding them back into the `--release` run; they were RED from the day this
 // file was created and the Epic-16 retrospective (2026-09-21) measured why.
 //
@@ -1792,7 +1909,7 @@ fn scratch_dir(label: &str) -> PathBuf {
 // (`maos-a2a-core/src/router.rs:1372-1380`) and the sender reports
 // `CrossHostPinMismatch`. Measured: release 9/11 with these three red; debug
 // 3/3 green. `.github/workflows/discipline.yml` runs the suite in both profiles
-// and asserts 8 + 3 == 11 so the split cannot silently drop a vector.
+// and now asserts 10 + 5 == 15, including the later ownership/timer/CI controls.
 //
 // NOT covered here, and deliberately so: the designed `re-pin` recovery. Since
 // Story 19-7 `TofuPinStore::await_repin_consent` has a production caller — the
@@ -2154,6 +2271,67 @@ mod cohort {
                 None => std::thread::sleep(Duration::from_millis(20)),
             }
         }
+    }
+
+    /// Kernel-free regression: the local timer owns audit senders even when
+    /// no Worker or registry source exists. Exercise the real cohort teardown
+    /// without requiring the unavailable local OCI substrate.
+    #[test]
+    fn cohort_sigterm_without_worker_joins_local_yank_timer_and_drains() {
+        let fixture = fixture("yank-local-drain", "hang");
+        let config = write_daemon_config(
+            &fixture,
+            "host-b",
+            &fixture.b_cert,
+            &fixture.b_key,
+            delegation::FROM_HOST,
+            &fixture.a_fingerprint,
+            NONCE_A,
+            "tls://127.0.0.1:1",
+            false,
+        );
+        let (mut daemon, _, _, stderr_text) =
+            boot_until_listening(daemon_command(&config, &fixture.host_b_log, NONCE_B));
+        daemon_sigterm(daemon.0.id());
+        let (status, elapsed) = daemon_exit(&mut daemon, Duration::from_secs(20), &stderr_text);
+        let stderr = stderr_text
+            .lock()
+            .expect("stderr capture lock poisoned")
+            .clone();
+        assert!(
+            status.success(),
+            "cohort teardown failed: {status}; {stderr}"
+        );
+        assert!(
+            !stderr.contains("drain timed out"),
+            "local yank timer must release its audit senders before the writer drains: {stderr}"
+        );
+        println!("cohort without Worker: audit drained in {elapsed:?}");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn declared_capable_cohort_worker_prerequisite_never_green_skips() {
+        let output = Command::new(std::env::current_exe().expect("current test executable"))
+            .args([
+                "--exact",
+                "cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains",
+                "--nocapture",
+            ])
+            .env("CI", "1")
+            .env_remove("GITHUB_ACTIONS")
+            .env_remove("MAOS_T3_RUNTIME")
+            .output()
+            .expect("run declared-capable prerequisite negative control");
+        assert!(
+            !output.status.success(),
+            "declared-capable runner silently skipped T3"
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("declared-capable T3"),
+            "missing signed T3 substrate must fail explicitly: {stderr}"
+        );
     }
 
     /// AC4 (5) — SIGTERM with a live host-B `hang` Worker.

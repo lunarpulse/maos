@@ -22,6 +22,7 @@ pub struct RegistryClientConfig {
     pub tier_floor: TrustTier,
     pub require_server_tier_signature: bool,
     pub org_signing_pubkey: Option<[u8; 32]>,
+    pub security: crate::security::RegistrySecurityConfig,
 }
 
 impl Default for RegistryClientConfig {
@@ -30,6 +31,7 @@ impl Default for RegistryClientConfig {
             tier_floor: TrustTier::Local,
             require_server_tier_signature: false,
             org_signing_pubkey: None,
+            security: Default::default(),
         }
     }
 }
@@ -49,7 +51,10 @@ impl McpSpiritRegistryClient {
         use maos_mcp::transport::{streamable_http::StreamableHttpTransport, McpTransport};
         use std::collections::BTreeMap;
         let transport: Arc<dyn McpTransport> = Arc::new(StreamableHttpTransport::new(
-            Arc::new(crate::http::RegistryHttp),
+            Arc::new(
+                crate::http::RegistryHttp::new(&uri, config.security.clone())
+                    .map_err(|e| RegistryError::Transport(e.to_string()))?,
+            ),
             uri,
             None,
         ));

@@ -1,0 +1,61 @@
+
+running 11 tests
+test browser_and_rebinding_requests_cannot_publish ... ok
+test connection_population_is_bounded ... ok
+test header_bytes_and_count_are_bounded ... ok
+test index_persistence_failure_cannot_return_a_receipt ... ok
+test malformed_tools_call_has_a_json_rpc_error ... ok
+test registry_inbox_is_not_an_operator_install ... ok
+test server_tier_floor_uses_admission_policy_ordering ... ok
+test sibling_provenance_refuses_an_unrecorded_executable ... ok
+test sigterm_cancels_an_active_trickling_connection ... ok
+test traversal_publish_is_an_rpc_error_without_escape_files ... ok
+test trickling_request_has_an_absolute_deadline ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.22s
+
+
+running 4 tests
+test standalone_population_rejection_has_complete_http_framing ... ok
+test standalone_rejections_have_complete_http_framing_and_clean_eof ... ok
+test standalone_server_roundtrip_isolates_root_and_exits_cleanly ... ok
+test unauthenticated_development_server_refuses_non_loopback_bind ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.18s
+
+
+running 31 tests
+test attestation_rejects_unscoped_digest_signature_review_f5 ... ok
+test blocked_registry_fetch_does_not_block_shutdown_or_boot ... ok
+test cursor_from_another_registry_is_replayed_from_zero_p2 ... ok
+test daemon_cursor_restart_does_not_replay_journalled_yanks_ac7 ... ok
+test every_registry_auth_test_holds_the_shared_environment_mutex_p15 ... ok
+test expired_signed_yank_request_cannot_mutate_registry_f4 ... ok
+test first_publisher_pin_is_typed_and_survives_restart_ac10 ... ok
+test install_refuses_present_yank_with_unpinned_authority_f2 ... ok
+test installed_publisher_and_version_pins_survive_uninstall_d2 ... ok
+test installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16 ... ok
+test keyring_event_rejects_unscoped_digest_signature_review_f5 ... ok
+test legacy_inactive_version_pins_are_migrated_before_uninstall_d2 ... ok
+test local_reevaluation_failure_does_not_prevent_fetch_p1 ... ok
+test missing_home_never_selects_shared_temporary_cursor_p14 ... ok
+test only_explicit_operator_release_allows_repin_after_uninstall_d2 ... ok
+test published_versions_are_immutable_and_identical_publish_is_idempotent_d3 ... ok
+test publisher_and_enrolled_vetter_yanks_are_signed_labelled_and_restart_safe_ac7 ... ok
+test renewed_promotion_replaces_only_evidence_for_identical_package_d4 ... ok
+test signed_nonce_cannot_be_reused_for_another_withdrawal_f4 ... ok
+test signed_revocation_lists_roundtrip_cbor_and_reject_wrong_byte_lengths ... ok
+test signed_yank_cannot_be_replayed_to_another_registry_f4 ... ok
+test signed_yank_resigning_does_not_append_duplicate_rows_p13 ... ok
+test signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13 ... ok
+test uninstall_waits_for_cross_process_mutation_lock_p8 ... ok
+test unreadable_promotion_is_not_treated_as_absent_p17 ... ok
+test unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17 ... ok
+test unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2 ... ok
+test v2_role_nonce_audience_and_lifetime_vectors_reject_rebinding_f4_f5 ... ok
+test verified_cursor_is_persisted_before_later_transient_failure_p2 ... ok
+test yank_authorization_allows_bounded_clock_skew_p10 ... ok
+test zero_interval_cannot_silently_disable_local_vetting_p11 ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.28s
+

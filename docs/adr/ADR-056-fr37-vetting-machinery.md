@@ -146,3 +146,24 @@ open. One bad Spirit or rejected withdrawal does not starve another observation,
 and retrying an effect does not repeat its terminal observation.
 The correction landing has zero kernel delta (26,841 physical / 21,042 tokei);
 quarantine is still a typed request only, with its effect reserved for final KQ1.
+
+## Amendment — AC15 authenticated first contact and yank heads
+
+Under D-20-1b-01/02/03 A/A/A, the shared registry leaf requires WebPKI TLS and
+an operator-configured Ed25519 signing key bound to the canonical `/mcp` URI.
+The server's operator-provided certificate/key and signing seed are separate
+credentials. A certificate or response-provided public key cannot bootstrap
+registry authority. Explicit literal-loopback development is the only HTTP mode;
+without a configured root its confidentiality/peer/omission guarantees stay open.
+
+The v1 response envelope signs
+`SHA-256("maos.registry.response.v1" || NUL || claim_CBOR)` with Ed25519.
+The fixed claim field order is version, URI,256-bit nonce, exact request SHA-256,
+exact response SHA-256 and optional yank-head sequence. Root verification is
+outside the kernel. The full yank head and filtered entries share a durable
+snapshot; a client requires all sequences through the authenticated head.
+Nonce/request binding refuses replay; body binding refuses stripping or rewriting.
+This is not protection against a trusted signing authority lying or signing a
+rollback to a fresh client. No KQ1 enforcement or kernel signature-format change
+is introduced. Hosted/macOS recipe legs remain unverified until execution.
+

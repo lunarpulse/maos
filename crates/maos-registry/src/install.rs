@@ -56,7 +56,7 @@ pub fn install(
     if matches!(id, "hello-spirit" | "butler") {
         return Err("registry install name is reserved by the shell".into());
     }
-    let config = resolve_config()?;
+    let config = operator_config()?;
     let client = McpSpiritRegistryClient::http(uri.to_owned(), config.clone())?;
     let id = SpiritId::from(id);
     let manifest = client.manifest(&id, version)?;
@@ -96,8 +96,8 @@ pub fn install(
     if !crate::admission::verify_publisher_sig(&pkg) {
         return Err(crate::admission::AdmissionError::PublisherSignatureInvalid.into());
     }
-    // Authenticate every present withdrawal for this exact package before
-    // persistence. Feed omission still requires AC15's authenticated transport.
+    // HTTPS verifies the signed response envelope and complete yank head before
+    // returning this list. Explicit unsigned loopback development cannot do so.
     if let Some(entry) = client
         .yanks_since(0)?
         .entries
@@ -309,7 +309,7 @@ pub fn verify_installed(name: &str, manifest_path: &Path) -> Result<String, Erro
 }
 
 /// Same [registry] keys and env precedence as the daemon, with fail-closed parsing.
-fn resolve_config() -> Result<RegistryClientConfig, Error> {
+pub fn operator_config() -> Result<RegistryClientConfig, Error> {
     let path = std::path::PathBuf::from(std::env::var("HOME")?).join(".config/maos/operator.toml");
     let disk: toml::Value = match std::fs::read_to_string(path) {
         Ok(text) => toml::from_str(&text)?,
@@ -364,5 +364,6 @@ fn resolve_config() -> Result<RegistryClientConfig, Error> {
         tier_floor,
         require_server_tier_signature: required || org_signing_pubkey.is_some(),
         org_signing_pubkey,
+        security: crate::security::RegistrySecurityConfig::from_operator(disk.get("registry"))?,
     })
 }

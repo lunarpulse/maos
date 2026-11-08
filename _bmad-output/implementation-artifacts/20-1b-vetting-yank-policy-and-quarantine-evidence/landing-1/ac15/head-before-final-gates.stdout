@@ -1,0 +1,5 @@
+c656a6e7 20-1b L1 review corrections (durable pins, immutable publication, authenticated yank evidence, role-separated signatures, boot-drain regression fixed, door upgrade, erasure identity); AC15/F5 ruled A/A/A pending; budget total 1440; bin 35626 registry 5071 aggregate 196401
+62faff63 20-1b landing 1 candidate (kernel-free: AC6-AC10 trust/yank/cadence, F4 immutable installs, F6 yanked-install refusal, publish/deprecate auth; AC8 quarantine effect and F5 trust-root/TLS pending rulings); FKCS re-pin precedes review; bin 35422 registry 4627 aggregate 195738
+bdfc1430 20-2 hosted-4 fixes (brew: executable mode, formula_opt_bin, pubkey binding, strict-audit offenses)
+d84b83dd 20-2 hosted-3 fixes (brew: HOMEBREW_GIT identity, logged blocking strict audit, formula/renderer style); cargo validation and pin check pending
+96a1dce2 20-2 hosted-2 fixes (arch regular-file materialization before verify, brew git identity + formula stanza order); xtask renderer pins/cargo checks pending

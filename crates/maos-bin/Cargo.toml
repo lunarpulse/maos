@@ -15,6 +15,8 @@ path = "src/main.rs"
 default = ["network"]
 network = [
     "dep:maos-registry",
+    "maos-registry/tls",
+    "maos-spirit-cli/tls",
     "dep:maos-providers",
     "dep:maos-mcp",
     "dep:maos-a2a-tcp",
@@ -60,7 +62,7 @@ maos-host = { path = "../maos-host" }   # Story 11.1a — Spirit Host Port trait
 maos-wasm-host = { path = "../maos-wasm-host", optional = true }   # Story 11.1a — wasmtime component adapter, behind `wasm-host` feature (export-control OFF-by-default, AC6)
 maos-mcp = { path = "../maos-mcp", optional = true }
 maos-notify-push = { path = "../maos-notify-push", optional = true }
-maos-registry = { path = "../maos-registry", optional = true }
+maos-registry = { path = "../maos-registry", default-features = false, optional = true }
 maos-acp = { path = "../maos-acp" }
 maos-providers = { path = "../maos-providers", optional = true }
 maos-bench = { path = "../maos-bench" }
@@ -74,7 +76,7 @@ maos-a2a-tcp = { path = "../maos-a2a-tcp", optional = true }    # Story 8.6 — 
 maos-cohort = { path = "../maos-cohort", optional = true }      # Story 12.1 — signed cohort manifest state + distribution
 rcgen = { version = "0.13", optional = true }  # Story 8.6 — runtime self-signed cert gen for the smoke-a2a-tcp-8-6 demo
 maos-compliance = { path = "../maos-compliance" }   # Story 7.3 — v0.9-binding evaluator (smoke-compliance-7-3)
-maos-spirit-cli = { path = "../maos-spirit-cli" }   # Story 7.3 — REAL producer round-trip in the smoke arm
+maos-spirit-cli = { path = "../maos-spirit-cli", default-features = false }   # Story 7.3 — REAL producer round-trip in the smoke arm
 maos-corpus-gen = { path = "../maos-corpus-gen" }   # Story 7.3 — CCAC slice replay + reference contexts
 maos-skill = { path = "../maos-skill" }   # Story 7.4 — skill ecosystem (smoke-skill-7-4)
 orchestrator = { path = "../../spirits/orchestrator" }   # Story 8.4 — founder-loop wedge (smoke-founder-loop-8-4)
@@ -129,6 +131,7 @@ maos-secrets = { path = "../maos-secrets", features = ["keyring"] }
 [dev-dependencies]
 tokio = { version = "1", features = ["process", "test-util"] }   # test-util: story 19-7 re-pin hold tests run under paused time
 tempfile = "3"
+syn = { version = "2.0", features = ["full", "visit"] }
 maos-eval = { path = "../maos-eval", features = ["benchmark-sidecar"] }   # Story 18-2 — verify the eval sidecar in eval_halt_18_2.rs
 wit-parser = "0.254"
 ed25519-dalek = { version = "2", features = ["std"] }   # Story 12.3 — sign a cohort manifest fixture for the Fact-2 provenance test

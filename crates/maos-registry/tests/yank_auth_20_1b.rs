@@ -239,7 +239,10 @@ fn daemon_cursor_restart_does_not_replay_journalled_yanks_ac7() {
     let client = Arc::new(
         maos_registry::McpSpiritRegistryClient::http(
             format!("http://{}/mcp", server.addr),
-            Default::default(),
+            maos_registry::client::RegistryClientConfig {
+                security: maos_registry::security::RegistrySecurityConfig::development_loopback(),
+                ..Default::default()
+            },
         )
         .unwrap(),
     );

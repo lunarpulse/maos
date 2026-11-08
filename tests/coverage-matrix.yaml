@@ -901,8 +901,12 @@ coverage:
       replay rebinding. A rejected row or corrupt install cannot starve a later
       observation. Existing installed_spirit_dispatch_20_1.rs also enforces a
       no-registry boot-latency bound without disabling local reevaluation.
-      First-contact trust/TLS D-01/02/03 are ruled A/A/A; execution awaits the
-      separate AC15 handoff. Omitted/rolled-back history is not detected here.
+      AC15 now adds URI-bound configured roots, real rustls transport and signed
+      response/yank heads: maos-registry/tests/registry_tls_20_1b.rs includes real
+      CLI persistence, hostile roots/URI, certificate interception, downgrade and
+      both-end development controls. Authenticated mode detects network omission;
+      unsigned loopback development and authority-signed fresh-client rollback
+      stay outside that guarantee. Hosted TLS/dev and macOS legs are unverified.
       Sticky quarantine effect awaits final KQ1; no accredited-vetter claim.
   FR6:
     gates: []

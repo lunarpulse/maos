@@ -1,0 +1,26 @@
+
+running 2 tests
+test http_install_requires_explicit_development_opt_in_ac15 ... FAILED
+test server_requires_tls_or_explicit_loopback_development_ac15 ... FAILED
+
+failures:
+
+---- http_install_requires_explicit_development_opt_in_ac15 stdout ----
+
+thread 'http_install_requires_explicit_development_opt_in_ac15' (368594) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:7:5:
+HTTP install without explicit development opt-in was accepted
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- server_requires_tls_or_explicit_loopback_development_ac15 stdout ----
+maos-registry: listening on 127.0.0.1:42343
+
+thread 'server_requires_tls_or_explicit_loopback_development_ac15' (368595) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:19:5:
+server silently enabled unauthenticated development transport
+
+
+failures:
+    http_install_requires_explicit_development_opt_in_ac15
+    server_requires_tls_or_explicit_loopback_development_ac15
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

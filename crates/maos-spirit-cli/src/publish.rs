@@ -236,7 +236,7 @@ pub async fn run_publish(args: PublishArgs) -> anyhow::Result<()> {
 
     let uri = resolve_registry_uri(args.registry_uri.as_deref());
 
-    if uri == "stub" {
+    if uri.as_deref() == Some("stub") {
         #[cfg(feature = "fixture_replay")]
         {
             let synthetic_receipt = serde_json::json!({
@@ -261,26 +261,30 @@ pub async fn run_publish(args: PublishArgs) -> anyhow::Result<()> {
         }
     }
 
-    let client = maos_registry::McpSpiritRegistryClient::http(uri, Default::default())?;
+    let config = maos_registry::install::operator_config().map_err(anyhow::Error::from_boxed)?;
+    let uri = uri
+        .or_else(|| config.security.uri.clone())
+        .unwrap_or_else(|| "http://127.0.0.1:6789/mcp".into());
+    let client = maos_registry::McpSpiritRegistryClient::http(uri, config)?;
     let outcome = run_publish_with_client(&args, &client).map_err(|e| anyhow::anyhow!(e))?;
     println!("{}", serde_json::to_string_pretty(&outcome)?);
     Ok(())
 }
 
-fn resolve_registry_uri(arg: Option<&str>) -> String {
+fn resolve_registry_uri(arg: Option<&str>) -> Option<String> {
     if let Some(s) = arg {
         let trimmed = s.trim();
         if !trimmed.is_empty() {
-            return trimmed.to_string();
+            return Some(trimmed.to_string());
         }
     }
     if let Ok(v) = std::env::var("MAOS_REGISTRY_URI") {
         let trimmed = v.trim();
         if !trimmed.is_empty() {
-            return trimmed.to_string();
+            return Some(trimmed.to_string());
         }
     }
-    "http://127.0.0.1:6789/mcp".into()
+    None
 }
 
 #[cfg(test)]
@@ -331,15 +335,12 @@ mod tests {
     fn resolve_registry_uri_trims_whitespace() {
         assert_eq!(
             resolve_registry_uri(Some("  http://example.com  ")),
-            "http://example.com"
+            Some("http://example.com".into())
         );
     }
 
     #[test]
     fn resolve_registry_uri_rejects_whitespace_only() {
-        assert_eq!(
-            resolve_registry_uri(Some("   ")),
-            "http://127.0.0.1:6789/mcp"
-        );
+        assert_eq!(resolve_registry_uri(Some("   ")), None);
     }
 }

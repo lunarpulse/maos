@@ -46,8 +46,11 @@ binary_id(xtask::example_spirit_regen_integration)
 | binary_id(maos-registry::fr59_yank_propagation_within_5min_test)
 | binary_id(maos-bin::erasure_million_20_11)
 | binary_id(maos-registry::yank_cadence_20_1b)
+| binary_id(maos-registry::registry_tls_20_1b)
 """
 test-group = "serial"
+# AC15 real TLS/CLI witnesses share the owned serial resource group; measured
+# cheap under the default30s budget, no per-binary exception widening.
 
 [profile.ci]
 fail-fast = false

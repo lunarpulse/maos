@@ -1,0 +1,6 @@
+{
+  "xcrun": null,
+  "sdkroot": null,
+  "cross_check_executed": false,
+  "reason": "no Apple C toolchain/SDK available locally; branch-only macOS recipe supplies it, unverified"
+}

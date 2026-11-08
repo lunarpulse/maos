@@ -3227,58 +3227,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use maos_registry::client::NullSpiritRegistryClient;
             Arc::new(NullSpiritRegistryClient)
         } else {
-            // Production path: McpSpiritRegistryClient wrapping the Streamable-HTTP
-            // transport over IoSubsystemPort. This is the path the operator uses
-            // when MAOS_REGISTRY_URI points to a real HTTP endpoint.
-            use maos_domain::ports::mcp::McpTransportId;
-            use maos_mcp::client::{McpClientImpl, McpServerEntry};
-            use maos_mcp::transport::streamable_http::StreamableHttpTransport;
-            use maos_mcp::transport::McpTransport;
-            use maos_registry::client::McpSpiritRegistryClient;
-            use std::collections::BTreeMap;
-
-            let transport: Arc<dyn McpTransport> = Arc::new(StreamableHttpTransport::new(
-                Arc::clone(&io_arc),
+            // Registry trust is independent of the general MCP bearer transport.
+            // Use the same operator-pinned TLS/envelope leaf as offline install.
+            let config =
+                maos_registry::install::operator_config().map_err(|error| error.to_string())?;
+            let registry_client = Arc::new(maos_registry::McpSpiritRegistryClient::http(
                 registry_cfg.uri.clone(),
-                None, // Story 18-8 CR-5: the registry is not one of the eight bearer servers.
-            ));
-            let mut transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>> = BTreeMap::new();
-            transports.insert(McpTransportId::StreamableHttp, transport);
-
-            let mut servers: BTreeMap<String, McpServerEntry> = BTreeMap::new();
-            servers.insert(
-                "spirit-registry".into(),
-                McpServerEntry {
-                    name: "spirit-registry".into(),
-                    transport: McpTransportId::StreamableHttp,
-                    fallback_transport: None,
-                },
-            );
-
-            match McpClientImpl::new(transports, McpTransportId::StreamableHttp, servers) {
-                Ok(mcp) => {
-                    let registry_client = Arc::new(
-                        McpSpiritRegistryClient::new(Arc::new(mcp), "spirit-registry".into())
-                            .with_config(maos_registry::client::RegistryClientConfig {
-                                tier_floor: registry_cfg.tier_floor,
-                                require_server_tier_signature: registry_cfg
-                                    .require_server_tier_signature,
-                                org_signing_pubkey: registry_cfg.org_signing_pubkey,
-                            }),
-                    );
-                    yank_source = Some(registry_client.clone());
-                    registry_client as Arc<dyn maos_domain::ports::registry::SpiritRegistryClient>
-                }
-                Err(e) => {
-                    eprintln!(
-                        "maos: warning: failed to construct McpClient for registry uri '{}': {e} \
-                         — falling back to NullSpiritRegistryClient",
-                        registry_cfg.uri
-                    );
-                    use maos_registry::client::NullSpiritRegistryClient;
-                    Arc::new(NullSpiritRegistryClient)
-                }
-            }
+                config,
+            )?);
+            yank_source = Some(registry_client.clone());
+            registry_client as Arc<dyn maos_domain::ports::registry::SpiritRegistryClient>
         }
     };
     let yank_policy = std::env::var("MAOS_YANK_POLICY")
@@ -9336,6 +9294,7 @@ description = "smoke test spirit successor"
             )
             .await;
             unload_report.render(&mut std::io::stderr());
+            yank_poller_task.shutdown().await;
             drop(audit_tx);
             drop(inference);
             drop(orchestrator);

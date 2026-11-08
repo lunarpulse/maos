@@ -1,11 +1,6 @@
-//! SpiritRegistryServer — MCP-Streamable-HTTP server on std::net::TcpListener.
-//!
-//! v0.5-α: HTTP-only on 127.0.0.1.  Each connection is handled by a dedicated
-//! `std::thread::spawn` worker.  The worker reads one JSON-RPC 2.0 frame,
-//! dispatches to the matching handler based on `method`, and returns the result.
-//!
-//! Per the kernel-stays-small invariant: NO `tokio::net`, NO `axum`, NO `hyper`.
-//! Transport dependency is `std::net` + `std::io::BufRead` + `serde_json`.
+//! Bounded blocking registry server: authenticated TLS, or explicit loopback development.
+//! No kernel, hyper or asynchronous network stack. Response signatures bind the
+//! operator-configured URI, fresh request nonce, exact bytes and complete yank head.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -23,6 +18,12 @@ const MAX_CONNECTIONS: usize = 8;
 const MAX_HEADER_BYTES: usize = 16 * 1024;
 const MAX_HEADERS: usize = 64;
 const REQUEST_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
+
+fn development_uri(addr: std::net::SocketAddr) -> Result<String, String> {
+    url::Url::parse(&format!("http://{addr}/mcp"))
+        .map(String::from)
+        .map_err(|error| error.to_string())
+}
 
 /// JSON-RPC 2.0 request frame.
 #[derive(Debug, serde::Deserialize)]
@@ -52,6 +53,14 @@ struct JsonRpcError {
     message: String,
 }
 
+#[derive(Clone, Default)]
+struct ServerSecurity {
+    development_http: bool,
+    uri: Option<String>,
+    #[cfg(feature = "tls")]
+    tls: Option<Arc<rustls::ServerConfig>>,
+}
+
 /// The Spirit Registry server.
 pub struct SpiritRegistryServer {
     storage: Arc<dyn RegistryStorage>,
@@ -60,6 +69,7 @@ pub struct SpiritRegistryServer {
     /// Story 7.2 — Ed25519 signing key for server-side tier attestation.
     server_signing_key: Option<[u8; 32]>,
     vetters: Option<Arc<(maos_compliance::VetterKeyring, [u8; 32])>>,
+    security: ServerSecurity,
 }
 
 impl SpiritRegistryServer {
@@ -75,6 +85,7 @@ impl SpiritRegistryServer {
             org_pubkey,
             server_signing_key: None,
             vetters: None,
+            security: Default::default(),
         }
     }
 
@@ -82,6 +93,25 @@ impl SpiritRegistryServer {
     pub fn with_server_signing_key(mut self, key: [u8; 32]) -> Self {
         self.server_signing_key = Some(key);
         self
+    }
+
+    pub fn with_development_http(mut self) -> Self {
+        self.security.development_http = true;
+        self
+    }
+    #[cfg(feature = "tls")]
+    pub fn with_tls(
+        mut self,
+        certificate: &std::path::Path,
+        key: &std::path::Path,
+        uri: String,
+    ) -> Result<Self, String> {
+        if crate::security::canonical_uri(&uri)?.scheme() != "https" {
+            return Err("TLS registry requires an https canonical URI".into());
+        }
+        self.security.tls = Some(crate::security::server_tls(certificate, key)?);
+        self.security.uri = Some(uri);
+        Ok(self)
     }
 
     /// Operator-root anchored lifecycle journal authorizing vetter withdrawals.
@@ -94,7 +124,7 @@ impl SpiritRegistryServer {
         self
     }
 
-    /// Run the loopback development server, draining workers on SIGTERM.
+    /// Run the configured TLS/development server, draining workers on SIGTERM.
     pub async fn run(self) -> Result<(), String> {
         let listener = TcpListener::bind(&self.listen_addr).map_err(|e| format!("bind: {e}"))?;
         #[cfg(unix)]
@@ -118,13 +148,29 @@ impl SpiritRegistryServer {
         worker.await.map_err(|e| e.to_string())?
     }
 
-    /// Serve an already-bound loopback listener; caller owns its shutdown flag.
+    /// Serve an already-bound listener; caller owns its shutdown flag.
     pub fn serve(self, listener: TcpListener, shutdown: Arc<AtomicBool>) -> Result<(), String> {
         let addr = listener
             .local_addr()
             .map_err(|e| format!("local_addr: {e}"))?;
-        if !addr.ip().is_loopback() {
-            return Err("development registry requires a loopback bind; authenticated first-contact/TLS implementation is held for AC15".into());
+        let mut security = self.security;
+        #[cfg(feature = "tls")]
+        let tls_enabled = security.tls.is_some();
+        #[cfg(not(feature = "tls"))]
+        let tls_enabled = false;
+        if tls_enabled {
+            if security.development_http || self.server_signing_key.is_none() {
+                return Err(
+                    "TLS requires a registry signing key and forbids development mode".into(),
+                );
+            }
+        } else if !security.development_http || !addr.ip().is_loopback() {
+            return Err(
+                "registry requires TLS or explicit literal-loopback development mode".into(),
+            );
+        }
+        if security.uri.is_none() {
+            security.uri = Some(development_uri(addr)?);
         }
         listener.set_nonblocking(true).map_err(|e| e.to_string())?;
         eprintln!("maos-registry: listening on {addr}");
@@ -145,17 +191,21 @@ impl SpiritRegistryServer {
                     if handles.len() >= MAX_CONNECTIONS {
                         let _ =
                             stream.set_write_timeout(Some(std::time::Duration::from_millis(100)));
-                        let _ = reject_http(&mut stream, "503 Service Unavailable");
+                        // Never answer a TLS connection with plaintext HTTP.
+                        if security.development_http {
+                            let _ = stream.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                        }
                         continue;
                     }
                     let cancel = stream.try_clone().map_err(|e| e.to_string())?;
                     let s = Arc::clone(&storage);
                     let vetters = vetters.clone();
+                    let security = security.clone();
                     handles.push((
                         cancel,
                         thread::spawn(move || {
                             if let Err(error) =
-                                handle_connection(s, server_signing_key, vetters, stream)
+                                handle_connection(s, server_signing_key, vetters, stream, security)
                             {
                                 eprintln!("maos-registry: connection error: {error}");
                             }
@@ -191,6 +241,10 @@ pub struct RegistryServerArgs {
     pub vetter_keyring: Option<std::path::PathBuf>,
     pub operator_root: Option<String>,
     pub release_pin: Option<String>,
+    pub tls_certificate: Option<std::path::PathBuf>,
+    pub tls_private_key: Option<std::path::PathBuf>,
+    pub uri: Option<String>,
+    pub development_http: bool,
 }
 
 impl RegistryServerArgs {
@@ -198,11 +252,18 @@ impl RegistryServerArgs {
         let mut result = Self::default();
         let mut args = args;
         while let Some(flag) = args.next() {
+            if flag == "--dev-http" {
+                result.development_http = true;
+                continue;
+            }
             let value = args.next().ok_or_else(|| format!("{flag} needs a value"))?;
             match flag.as_str() {
                 "--bind" => result.bind = Some(value),
                 "--root" => result.root = Some(value.into()),
                 "--signing-key" => result.signing_key = Some(value.into()),
+                "--tls-cert" => result.tls_certificate = Some(value.into()),
+                "--tls-key" => result.tls_private_key = Some(value.into()),
+                "--uri" => result.uri = Some(value),
                 "--vetter-keyring" => result.vetter_keyring = Some(value.into()),
                 "--operator-root" => result.operator_root = Some(value),
                 "release-pin" => result.release_pin = Some(value),
@@ -223,19 +284,47 @@ impl RegistryServerArgs {
             None => crate::storage::LocalFsRegistryStorage::new(),
         }
         .map_err(|e| format!("registry root: {e}"))?;
+        for path in self.signing_key.iter().chain(self.tls_private_key.iter()) {
+            crate::security::key_outside_store(path, storage.root_path())?;
+        }
         let mut server = SpiritRegistryServer::new(
             Arc::new(storage),
             self.bind.unwrap_or_else(|| "127.0.0.1:6789".into()),
             None,
         );
         if let Some(path) = self.signing_key {
-            let text =
-                std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            let mut text = String::new();
+            crate::security::private_key_file(&path)?
+                .read_to_string(&mut text)
+                .map_err(|e| format!("{}: {e}", path.display()))?;
             let seed = hex::decode(text.trim())
                 .map_err(|e| format!("signing key hex: {e}"))?
                 .try_into()
                 .map_err(|_| "signing key must be a 32-byte hex seed")?;
             server = server.with_server_signing_key(seed);
+        }
+        if self.development_http {
+            server = server.with_development_http();
+        }
+        match (self.tls_certificate, self.tls_private_key, self.uri) {
+            (None, None, None) if self.development_http => {}
+            (Some(cert), Some(key), Some(uri)) if !self.development_http => {
+                #[cfg(feature = "tls")]
+                {
+                    server = server.with_tls(&cert, &key, uri)?;
+                }
+                #[cfg(not(feature = "tls"))]
+                {
+                    let _ = (cert, key, uri);
+                    return Err("registry TLS feature is disabled".into());
+                }
+            }
+            _ => {
+                return Err(
+                    "supply --tls-cert, --tls-key, --uri and --signing-key; or explicit --dev-http"
+                        .into(),
+                )
+            }
         }
         match (self.vetter_keyring, self.operator_root) {
             (Some(path), Some(root)) => {
@@ -261,24 +350,40 @@ fn handle_connection(
     storage: Arc<dyn RegistryStorage>,
     server_signing_key: Option<[u8; 32]>,
     vetters: Option<Arc<(maos_compliance::VetterKeyring, [u8; 32])>>,
-    mut stream: TcpStream,
+    stream: TcpStream,
+    security: ServerSecurity,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let registry_uri = security
+        .uri
+        .as_deref()
+        .ok_or("missing registry canonical URI")?;
+    let endpoint = crate::security::canonical_uri(registry_uri)?;
     let deadline = std::time::Instant::now() + REQUEST_DEADLINE;
-    let mut reader = BufReader::new(DeadlineStream {
-        stream: stream.try_clone()?,
-        deadline,
-    });
-    let content_length = match read_request_headers(&mut reader) {
-        Ok(length) => length,
+    let stream = DeadlineStream { stream, deadline };
+    #[cfg(feature = "tls")]
+    let stream = if let Some(config) = security.tls {
+        ServerStream::Tls(Box::new(rustls::StreamOwned::new(
+            rustls::ServerConnection::new(config)?,
+            stream,
+        )))
+    } else {
+        ServerStream::Plain(stream)
+    };
+    #[cfg(not(feature = "tls"))]
+    let stream = ServerStream::Plain(stream);
+    let mut reader = BufReader::new(stream);
+    let headers = match read_request_headers(&mut reader, &endpoint, security.development_http) {
+        Ok(headers) => headers,
         Err(status) => {
-            reject_http(&mut stream, status)?;
+            reject_http(reader.get_mut(), status)?;
             return Ok(());
         }
     };
+    let content_length = headers.content_length;
 
     const MAX_BODY_SIZE: usize = 64 * 1024 * 1024;
     if content_length > MAX_BODY_SIZE {
-        reject_http(&mut stream, "413 Payload Too Large")?;
+        reject_http(reader.get_mut(), "413 Payload Too Large")?;
         return Ok(());
     }
 
@@ -293,7 +398,7 @@ fn handle_connection(
         } else {
             "400 Bad Request"
         };
-        reject_http(&mut stream, status)?;
+        reject_http(reader.get_mut(), status)?;
         return Ok(());
     }
 
@@ -311,12 +416,11 @@ fn handle_connection(
                 }),
             };
             let resp_json = serde_json::to_vec(&resp)?;
-            respond_http(&mut stream, "200 OK", &resp_json)?;
+            respond_http(reader.get_mut(), "200 OK", &resp_json, None)?;
             return Ok(());
         }
     };
 
-    let registry_uri = format!("http://{}/mcp", stream.local_addr()?);
     let handle_result = |method: &str,
                          params: &serde_json::Value|
      -> Result<serde_json::Value, String> {
@@ -347,7 +451,7 @@ fn handle_connection(
                 handlers::deprecate::handle_deprecate(
                     &storage,
                     &args,
-                    &registry_uri,
+                    registry_uri,
                     vetters.as_deref().map(|(keyring, root)| (keyring, root)),
                 )
             }
@@ -378,6 +482,11 @@ fn handle_connection(
         handle_result(&request.method, &request.params)
     };
 
+    let head = result
+        .as_ref()
+        .ok()
+        .and_then(|value| value.get("head"))
+        .and_then(|value| value.as_u64());
     let response = match result {
         Ok(value) => JsonRpcResponse {
             jsonrpc: "2.0".into(),
@@ -397,71 +506,61 @@ fn handle_connection(
     };
 
     let resp_json = serde_json::to_vec(&response)?;
-    respond_http(&mut stream, "200 OK", &resp_json)?;
+    let signed = headers
+        .nonce
+        .zip(server_signing_key)
+        .map(|(nonce, seed)| {
+            crate::security::sign_response(registry_uri, nonce, &body, &resp_json, head, &seed)
+        })
+        .transpose()?;
+    respond_http(reader.get_mut(), "200 OK", &resp_json, signed.as_deref())?;
     Ok(())
 }
 
-fn reject_http(stream: &mut TcpStream, status: &str) -> std::io::Result<()> {
-    respond_http(stream, status, &[])
+fn reject_http(stream: &mut ServerStream, status: &str) -> std::io::Result<()> {
+    respond_http(stream, status, &[], None)
 }
 
-fn respond_http(stream: &mut TcpStream, status: &str, body: &[u8]) -> std::io::Result<()> {
+fn respond_http(
+    stream: &mut ServerStream,
+    status: &str,
+    body: &[u8],
+    signature: Option<&str>,
+) -> std::io::Result<()> {
     // A consumed request deadline must never suppress an HTTP error (or a
     // successful publish receipt after durable storage). Writes have their own
     // absolute bound; do not extend the five-second request-read deadline.
-    let mut writer = DeadlineStream {
-        stream: stream.try_clone()?,
-        deadline: std::time::Instant::now() + REQUEST_DEADLINE,
-    };
+    stream.set_deadline(std::time::Instant::now() + REQUEST_DEADLINE);
     write!(
-        writer,
-        "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        stream,
+        "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n",
         body.len()
     )?;
-    writer.write_all(body)?;
-    writer.flush()?;
-    stream.shutdown(std::net::Shutdown::Write)?;
-    // FIN delivers a complete response even when rejecting before the body.
-    // Drain unread input briefly to avoid a reset on close, without allowing a
-    // trickling peer to hold a worker beyond an absolute close deadline.
-    let mut drain = DeadlineStream {
-        stream: stream.try_clone()?,
-        deadline: std::time::Instant::now() + std::time::Duration::from_millis(100),
-    };
-    let _ = std::io::copy(
-        &mut (&mut drain).take(64 * 1024 * 1024),
-        &mut std::io::sink(),
-    );
+    if let Some(signature) = signature {
+        write!(
+            stream,
+            "{}: {signature}\r\n",
+            crate::security::RESPONSE_HEADER
+        )?;
+    }
+    stream.write_all(b"\r\n")?;
+    stream.write_all(body)?;
+    stream.flush()?;
+    stream.shutdown_write()?;
+    stream.set_deadline(std::time::Instant::now() + std::time::Duration::from_millis(100));
+    let _ = std::io::copy(&mut stream.take(64 * 1024 * 1024), &mut std::io::sink());
     Ok(())
 }
 
-fn loopback_authority(value: &str) -> bool {
-    if let Ok(socket) = value.parse::<std::net::SocketAddr>() {
-        return socket.ip().is_loopback();
-    }
-    let host = if let Some(host) = value.strip_prefix('[').and_then(|v| v.strip_suffix(']')) {
-        host
-    } else if let Some((host, port)) = value.rsplit_once(':') {
-        if value
-            .parse::<std::net::IpAddr>()
-            .is_ok_and(|ip| ip.is_loopback())
-        {
-            return true;
-        }
-        if port.parse::<u16>().is_err() {
-            return false;
-        }
-        host
-    } else {
-        value
-    };
-    host.eq_ignore_ascii_case("localhost")
-        || host
-            .parse::<std::net::IpAddr>()
-            .is_ok_and(|ip| ip.is_loopback())
+struct RequestHeaders {
+    content_length: usize,
+    nonce: Option<[u8; 32]>,
 }
-
-fn read_request_headers(reader: &mut impl BufRead) -> Result<usize, &'static str> {
+fn read_request_headers(
+    reader: &mut impl BufRead,
+    endpoint: &url::Url,
+    development: bool,
+) -> Result<RequestHeaders, &'static str> {
     let mut line = String::new();
     let mut bytes = 0;
     let mut next_line = |line: &mut String| -> Result<(), &'static str> {
@@ -502,6 +601,8 @@ fn read_request_headers(reader: &mut impl BufRead) -> Result<usize, &'static str
     }
     let (mut host, mut json, mut origin) = (false, false, false);
     let mut length = None;
+    let mut nonce = None;
+    let mut development_opt_in = false;
     for _ in 0..=MAX_HEADERS {
         next_line(&mut line)?;
         if line == "\r\n" {
@@ -511,7 +612,13 @@ fn read_request_headers(reader: &mut impl BufRead) -> Result<usize, &'static str
             if !json {
                 return Err("415 Unsupported Media Type");
             }
-            return length.ok_or("411 Length Required");
+            if development != development_opt_in || (!development && nonce.is_none()) {
+                return Err("403 Forbidden");
+            }
+            return Ok(RequestHeaders {
+                content_length: length.ok_or("411 Length Required")?,
+                nonce,
+            });
         }
         let (name, value) = line.trim_end().split_once(':').ok_or("400 Bad Request")?;
         let value = value.trim();
@@ -519,7 +626,7 @@ fn read_request_headers(reader: &mut impl BufRead) -> Result<usize, &'static str
             if host {
                 return Err("400 Bad Request");
             }
-            if !loopback_authority(value) {
+            if value != &endpoint[url::Position::BeforeHost..url::Position::AfterPort] {
                 return Err("403 Forbidden");
             }
             host = true;
@@ -527,11 +634,7 @@ fn read_request_headers(reader: &mut impl BufRead) -> Result<usize, &'static str
             if origin {
                 return Err("400 Bad Request");
             }
-            if !value
-                .strip_prefix("http://")
-                .or_else(|| value.strip_prefix("https://"))
-                .is_some_and(loopback_authority)
-            {
+            if value != endpoint.origin().ascii_serialization() {
                 return Err("403 Forbidden");
             }
             origin = true;
@@ -556,9 +659,73 @@ fn read_request_headers(reader: &mut impl BufRead) -> Result<usize, &'static str
             }
         } else if name.eq_ignore_ascii_case("transfer-encoding") {
             return Err("400 Bad Request");
+        } else if name.eq_ignore_ascii_case(crate::security::NONCE_HEADER) {
+            let decoded = hex::decode(value).map_err(|_| "400 Bad Request")?;
+            if nonce
+                .replace(decoded.try_into().map_err(|_| "400 Bad Request")?)
+                .is_some()
+            {
+                return Err("400 Bad Request");
+            }
+        } else if name.eq_ignore_ascii_case(crate::security::DEVELOPMENT_HEADER) {
+            if development_opt_in || value != "true" {
+                return Err("400 Bad Request");
+            }
+            development_opt_in = true;
         }
     }
     Err("431 Request Header Fields Too Large")
+}
+
+enum ServerStream {
+    Plain(DeadlineStream),
+    #[cfg(feature = "tls")]
+    Tls(Box<rustls::StreamOwned<rustls::ServerConnection, DeadlineStream>>),
+}
+impl ServerStream {
+    fn socket(&mut self) -> &mut DeadlineStream {
+        match self {
+            Self::Plain(stream) => stream,
+            #[cfg(feature = "tls")]
+            Self::Tls(stream) => &mut stream.sock,
+        }
+    }
+    fn set_deadline(&mut self, deadline: std::time::Instant) {
+        self.socket().deadline = deadline;
+    }
+    fn shutdown_write(&mut self) -> std::io::Result<()> {
+        #[cfg(feature = "tls")]
+        if let Self::Tls(stream) = self {
+            stream.conn.send_close_notify();
+            stream.flush()?;
+        }
+        self.socket().stream.shutdown(std::net::Shutdown::Write)
+    }
+}
+impl Read for ServerStream {
+    fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            Self::Plain(stream) => stream.read(bytes),
+            #[cfg(feature = "tls")]
+            Self::Tls(stream) => stream.read(bytes),
+        }
+    }
+}
+impl Write for ServerStream {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        match self {
+            Self::Plain(stream) => stream.write(bytes),
+            #[cfg(feature = "tls")]
+            Self::Tls(stream) => stream.write(bytes),
+        }
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Plain(stream) => stream.flush(),
+            #[cfg(feature = "tls")]
+            Self::Tls(stream) => stream.flush(),
+        }
+    }
 }
 
 struct DeadlineStream {
@@ -599,6 +766,18 @@ mod tests {
     use std::io::{Read, Write};
     use std::net::TcpStream;
     use std::time::Duration;
+
+    #[test]
+    fn development_default_ports_use_the_same_canonical_uri_as_clients() {
+        assert_eq!(
+            development_uri(([127, 0, 0, 1], 80).into()).unwrap(),
+            "http://127.0.0.1/mcp"
+        );
+        assert_eq!(
+            development_uri((std::net::Ipv6Addr::LOCALHOST, 80).into()).unwrap(),
+            "http://[::1]/mcp"
+        );
+    }
 
     fn temp_storage() -> Arc<dyn RegistryStorage> {
         let dir =

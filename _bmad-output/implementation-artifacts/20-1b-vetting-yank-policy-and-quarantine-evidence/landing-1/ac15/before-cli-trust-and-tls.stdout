@@ -1,0 +1,36 @@
+
+running 3 tests
+test tls::cli_tls_install_authenticates_before_persistence_ac15 ... FAILED
+test tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15 ... FAILED
+test tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15 ... FAILED
+
+failures:
+
+---- tls::cli_tls_install_authenticates_before_persistence_ac15 stdout ----
+maos-registry: listening on 127.0.0.1:44229
+
+thread 'tls::cli_tls_install_authenticates_before_persistence_ac15' (372422) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:200:9:
+maosctl spirit install: registry transport error: transport error: primary transport error: transport-level error: http_post: invalid url: development registry requires http:// (TLS is not implemented)
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15 stdout ----
+maos-registry: listening on 127.0.0.1:35349
+
+thread 'tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15' (372425) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:209:9:
+assertion failed: String::from_utf8_lossy(&output.stderr).contains("authentication")
+
+---- tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15 stdout ----
+maos-registry: listening on 127.0.0.1:41517
+
+thread 'tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15' (372436) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:218:9:
+assertion failed: String::from_utf8_lossy(&output.stderr).contains("authentication")
+
+
+failures:
+    tls::cli_tls_install_authenticates_before_persistence_ac15
+    tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15
+    tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.30s
+

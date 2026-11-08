@@ -1,0 +1,19 @@
+
+running 1 test
+test tls::hostile_registry_wrong_configured_root_is_refused_ac15 ... FAILED
+
+failures:
+
+---- tls::hostile_registry_wrong_configured_root_is_refused_ac15 stdout ----
+maos-registry: listening on 127.0.0.1:43305
+
+thread 'tls::hostile_registry_wrong_configured_root_is_refused_ac15' (381004) panicked at crates/maos-registry/tests/registry_tls_20_1b.rs:132:43:
+called `Result::unwrap_err()` on an `Ok` value: YankList { entries: [] }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tls::hostile_registry_wrong_configured_root_is_refused_ac15
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.11s
+

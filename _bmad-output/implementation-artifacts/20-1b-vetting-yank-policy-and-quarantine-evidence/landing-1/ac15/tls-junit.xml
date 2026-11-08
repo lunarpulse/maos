@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="26" skipped="0" failures="0" errors="0" uuid="3699cb5a-134d-45f3-9a4c-68de086e9ee3" timestamp="2026-11-07T22:04:54.334+00:00" time="3.329">
+    <testsuite name="maos-registry::registry_tls_20_1b" tests="26" skipped="0" errors="0" failures="0">
+        <testcase name="http_install_requires_explicit_development_opt_in_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:54.338+00:00" time="0.003"/>
+        <testcase name="server_requires_tls_or_explicit_loopback_development_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:54.342+00:00" time="0.003"/>
+        <testcase name="tls::cli_omitted_yank_or_unauthenticated_head_refuses_before_persistence_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:54.345+00:00" time="0.531"/>
+        <testcase name="tls::cli_tls_install_authenticates_before_persistence_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:54.876+00:00" time="0.272"/>
+        <testcase name="tls::cli_tls_yanked_version_is_refused_before_persistence_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:55.147+00:00" time="0.317"/>
+        <testcase name="tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:55.465+00:00" time="0.124"/>
+        <testcase name="tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:55.589+00:00" time="0.067"/>
+        <testcase name="tls::configured_root_and_ca_authenticate_real_registry_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:55.656+00:00" time="0.417"/>
+        <testcase name="tls::configured_root_is_bound_to_canonical_uri_before_contact_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:56.073+00:00" time="0.070"/>
+        <testcase name="tls::envelope_incomplete_head_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:56.143+00:00" time="0.114"/>
+        <testcase name="tls::envelope_missing_head_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:56.257+00:00" time="0.114"/>
+        <testcase name="tls::envelope_missing_signature_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:56.371+00:00" time="0.116"/>
+        <testcase name="tls::envelope_stripped_yank_entry_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:56.487+00:00" time="0.122"/>
+        <testcase name="tls::envelope_wrong_nonce_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:56.609+00:00" time="0.114"/>
+        <testcase name="tls::envelope_wrong_uri_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:56.723+00:00" time="0.112"/>
+        <testcase name="tls::handshake_failure_never_attempts_plaintext_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:56.835+00:00" time="0.005"/>
+        <testcase name="tls::hostile_registry_wrong_configured_root_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:56.840+00:00" time="0.116"/>
+        <testcase name="tls::https_redirect_never_downgrades_to_http_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:56.956+00:00" time="0.060"/>
+        <testcase name="tls::https_requires_configured_root_not_response_supplied_key_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:57.016+00:00" time="0.004"/>
+        <testcase name="tls::interception_expired_certificate_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:57.020+00:00" time="0.117"/>
+        <testcase name="tls::interception_untrusted_ca_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:57.137+00:00" time="0.117"/>
+        <testcase name="tls::interception_wrong_host_certificate_is_refused_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:57.255+00:00" time="0.117"/>
+        <testcase name="tls::loopback_development_requires_both_sides_and_keeps_yank_signatures_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:57.372+00:00" time="0.167"/>
+        <testcase name="tls::private_key_custody_refuses_group_or_world_access_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:57.540+00:00" time="0.004"/>
+        <testcase name="tls::private_key_custody_refuses_seed_inside_package_store_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:57.544+00:00" time="0.004"/>
+        <testcase name="tls::server_rejects_client_without_dev_handshake_ac15" classname="maos-registry::registry_tls_20_1b" timestamp="2026-11-07T22:04:57.548+00:00" time="0.116"/>
+    </testsuite>
+</testsuites>

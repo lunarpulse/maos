@@ -1,0 +1,83 @@
+{
+  "exit_code": 100,
+  "uuid": "64ad0f22-ddd8-4997-a50e-ff7f383a017f",
+  "run": 5783,
+  "passed": 5773,
+  "failed": 10,
+  "nextest_filter_skipped": 138,
+  "case_sum_seconds": 807.751,
+  "wall_seconds": 808.136,
+  "landing_contract_results": {
+    "selected": 107,
+    "present": 107,
+    "failed": 0,
+    "t3_live_worker_body": "unverified locally; explicit prerequisite skip, not an exercised pass"
+  },
+  "failures": [
+    {
+      "binary": "maos-bin::erasure_million_20_11",
+      "test": "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption",
+      "seconds": 36.27,
+      "message": "thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (545411) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:\npending operation did not finish: op-d4de988844886d2447d5e820\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    },
+    {
+      "binary": "maos-journey-test::journey_forget_18_6",
+      "test": "live_forget_redistills_and_never_resurrects_then_pending_is_typed",
+      "seconds": 0.009,
+      "message": "thread 'live_forget_redistills_and_never_resurrects_then_pending_is_typed' (573139) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13:\nstale journey binary /home/lunarpulse/dev_ws/crates/maos-journey-test/../../target/debug/maosctl: source /home/lunarpulse/dev_ws/crates/maos-journey-test/../../crates/maos-bin/src/main.rs is newer; run `cargo build -p maos-bin -p maos-cli`\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    },
+    {
+      "binary": "maos-journey-test::journey_j0",
+      "test": "j0_halt_resolved_in_the_repl",
+      "seconds": 0.415,
+      "message": "thread 'j0_halt_resolved_in_the_repl' (573143) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13:\nstale journey binary /home/lunarpulse/dev_ws/crates/maos-journey-test/../../target/debug/maosctl: source /home/lunarpulse/dev_ws/crates/maos-journey-test/../../crates/maos-bin/src/main.rs is newer; run `cargo build -p maos-bin -p maos-cli`\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    },
+    {
+      "binary": "maos-journey-test::journey_j0",
+      "test": "j0_halt_resolved_over_the_door",
+      "seconds": 0.413,
+      "message": "thread 'j0_halt_resolved_over_the_door' (573246) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13:\nstale journey binary /home/lunarpulse/dev_ws/crates/maos-journey-test/../../target/debug/maosctl: source /home/lunarpulse/dev_ws/crates/maos-journey-test/../../crates/maos-bin/src/main.rs is newer; run `cargo build -p maos-bin -p maos-cli`\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    },
+    {
+      "binary": "maos-journey-test::journey_skill_authoring_18_7",
+      "test": "corrupt_queue_warns_at_boot_and_refuses_door_operations_without_overwrite",
+      "seconds": 0.015,
+      "message": "thread 'corrupt_queue_warns_at_boot_and_refuses_door_operations_without_overwrite' (573841) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13:\nstale journey binary /home/lunarpulse/dev_ws/crates/maos-journey-test/../../target/debug/maosctl: source /home/lunarpulse/dev_ws/crates/maos-journey-test/../../crates/maos-bin/src/main.rs is newer; run `cargo build -p maos-bin -p maos-cli`\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    },
+    {
+      "binary": "maos-journey-test::journey_skill_authoring_18_7",
+      "test": "live_author_revision_restart_and_rejection_preserve_the_payload",
+      "seconds": 0.004,
+      "message": "thread 'live_author_revision_restart_and_rejection_preserve_the_payload' (573843) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13:\nstale journey binary /home/lunarpulse/dev_ws/crates/maos-journey-test/../../target/debug/maosctl: source /home/lunarpulse/dev_ws/crates/maos-journey-test/../../crates/maos-bin/src/main.rs is newer; run `cargo build -p maos-bin -p maos-cli`\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    },
+    {
+      "binary": "maos-journey-test::journey_skill_authoring_18_7",
+      "test": "no_data_home_does_not_abort_the_daemon_or_offline_children",
+      "seconds": 0.004,
+      "message": "thread 'no_data_home_does_not_abort_the_daemon_or_offline_children' (573845) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13:\nstale journey binary /home/lunarpulse/dev_ws/crates/maos-journey-test/../../target/debug/maosctl: source /home/lunarpulse/dev_ws/crates/maos-journey-test/../../crates/maos-bin/src/main.rs is newer; run `cargo build -p maos-bin -p maos-cli`\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    },
+    {
+      "binary": "maos-journey-test::journey_skill_authoring_18_7",
+      "test": "rejected_discovered_skill_blocks_even_a_non_run_root",
+      "seconds": 0.003,
+      "message": "thread 'rejected_discovered_skill_blocks_even_a_non_run_root' (573847) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13:\nstale journey binary /home/lunarpulse/dev_ws/crates/maos-journey-test/../../target/debug/maosctl: source /home/lunarpulse/dev_ws/crates/maos-journey-test/../../crates/maos-bin/src/main.rs is newer; run `cargo build -p maos-bin -p maos-cli`\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    },
+    {
+      "binary": "maos-journey-test::journey_skill_authoring_18_7",
+      "test": "rejected_spirit_authored_draft_does_not_block_the_next_boot",
+      "seconds": 0.003,
+      "message": "thread 'rejected_spirit_authored_draft_does_not_block_the_next_boot' (573849) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13:\nstale journey binary /home/lunarpulse/dev_ws/crates/maos-journey-test/../../target/debug/maosctl: source /home/lunarpulse/dev_ws/crates/maos-journey-test/../../crates/maos-bin/src/main.rs is newer; run `cargo build -p maos-bin -p maos-cli`\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    },
+    {
+      "binary": "maos-journey-test::journey_skill_authoring_18_7",
+      "test": "undeclared_live_researcher_is_refused_without_queue_mutation",
+      "seconds": 0.003,
+      "message": "thread 'undeclared_live_researcher_is_refused_without_queue_mutation' (573851) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13:\nstale journey binary /home/lunarpulse/dev_ws/crates/maos-journey-test/../../target/debug/maosctl: source /home/lunarpulse/dev_ws/crates/maos-journey-test/../../crates/maos-bin/src/main.rs is newer; run `cargo build -p maos-bin -p maos-cli`\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+    }
+  ],
+  "test_budget_exit_code": 0,
+  "root_shutdown_sum_seconds": 0.6990000000000001,
+  "installed_dispatch_sum_seconds": 2.7600000000000002,
+  "freshness_disposition": "Required genuine build0 reused unchanged maosctl; its mtime1794091554822005203 precedes main source1794092850245241219. Both source trees are checked against each exe. Will genuinely rebuild both after touching source inputs, never binary timestamps; no standalone retry.",
+  "preflight_metadata_disposition": "An all-targets metadata listing included a custom Criterion benchmark whose --list output is not libtest syntax. No workspace tests ran in that preflight. Canonical metadata omits --all-targets, matching xtask/src/prepush.rs:391; all ordinary workspace tests remain unfiltered."
+}

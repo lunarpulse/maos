@@ -25,16 +25,22 @@ tar = { version = "0.4", default-features = false }
 tempfile = "3"
 tokio = { version = "1", features = ["rt", "time", "macros", "signal", "sync"] }
 tracing = { version = "0.1", optional = true }
+url = "2.5"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+rustls-pemfile = { version = "2.2", optional = true }
+webpki-roots = { version = "0.26", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-rustix = { version = "1.1", features = ["fs"] }
+rustix = { version = "1.1", features = ["fs", "process"] }
 
 [dev-dependencies]
 base64 = "0.22"
 parking_lot = "0.12"
+rcgen = "0.13"
 
 [features]
-default = []
+default = ["tls"]
+tls = ["dep:rustls", "dep:rustls-pemfile", "dep:webpki-roots"]
 fixture_replay = ["maos-mcp/fixture_replay"]
 
 [[bin]]

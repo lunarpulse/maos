@@ -31,9 +31,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 maos-domain = { path = "../maos-domain" }
 maos-compliance = { path = "../maos-compliance" }
 maos-mcp = { path = "../maos-mcp" }
-maos-registry = { path = "../maos-registry" }
+maos-registry = { path = "../maos-registry", default-features = false }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
 
 [features]
-default = []
+default = ["tls"]
+tls = ["maos-registry/tls"]
 fixture_replay = ["maos-mcp/fixture_replay", "maos-registry/fixture_replay"]

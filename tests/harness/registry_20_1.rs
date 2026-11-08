@@ -20,6 +20,12 @@ impl Scratch {
                 .as_nanos()
         ));
         std::fs::create_dir_all(path.join("home")).unwrap();
+        std::fs::create_dir_all(path.join("home/.config/maos")).unwrap();
+        std::fs::write(
+            path.join("home/.config/maos/operator.toml"),
+            "[registry]\ndevelopment_http = true\n",
+        )
+        .unwrap();
         Self(path)
     }
     pub fn command(&self, binary: &Path) -> Command {
@@ -55,7 +61,7 @@ pub fn rpc(addr: &str, method: &str, params: serde_json::Value) -> serde_json::V
     .unwrap();
     write!(
         stream,
-        "POST /mcp HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "POST /mcp HTTP/1.1\r\nHost: {addr}\r\nX-Maos-Registry-Development: true\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
     )
     .unwrap();
@@ -73,7 +79,7 @@ impl Server {
     pub fn start(scratch: &Scratch, binary: &Path) -> Self {
         let mut child = scratch
             .command(binary)
-            .args(["--bind", "127.0.0.1:0", "--root"])
+            .args(["--dev-http", "--bind", "127.0.0.1:0", "--root"])
             .arg(scratch.0.join("registry"))
             .stderr(Stdio::piped())
             .spawn()
@@ -132,7 +138,8 @@ impl InProcessServer {
             std::sync::Arc::new(storage),
             addr.clone(),
             None,
-        );
+        )
+        .with_development_http();
         let server = if let Some(key) = key {
             server.with_server_signing_key(key)
         } else {

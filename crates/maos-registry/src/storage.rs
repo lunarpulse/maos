@@ -268,6 +268,9 @@ impl LocalFsRegistryStorage {
             yanks: Mutex::new(yanks),
         })
     }
+    pub(crate) fn root_path(&self) -> &Path {
+        &self.root
+    }
     fn default_root() -> PathBuf {
         dirs_fallback().join(".local/share/maos/registry")
     }

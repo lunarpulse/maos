@@ -15,7 +15,10 @@ fn standalone_server_roundtrip_isolates_root_and_exits_cleanly() {
     let pkg = trust::package("root-witness", "0.1.0", &trust::PUBLISHER);
     let client = maos_registry::McpSpiritRegistryClient::http(
         format!("http://{}/mcp", server.addr),
-        Default::default(),
+        maos_registry::client::RegistryClientConfig {
+            security: maos_registry::security::RegistrySecurityConfig::development_loopback(),
+            ..Default::default()
+        },
     )
     .unwrap();
     let receipt = client.publish(&pkg).unwrap();
@@ -51,7 +54,7 @@ fn unauthenticated_development_server_refuses_non_loopback_bind() {
         .command(std::path::Path::new(env!(
             "CARGO_BIN_EXE_maos-registry-server"
         )))
-        .args(["--bind", "0.0.0.0:0", "--root"])
+        .args(["--dev-http", "--bind", "0.0.0.0:0", "--root"])
         .arg(scratch.0.join("registry"))
         .output()
         .unwrap();
@@ -102,7 +105,7 @@ fn standalone_rejections_have_complete_http_framing_and_clean_eof() {
         std::path::Path::new(env!("CARGO_BIN_EXE_maos-registry-server")),
     );
     let head = format!(
-        "POST /mcp HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\n",
+        "POST /mcp HTTP/1.1\r\nHost: {}\r\nX-Maos-Registry-Development: true\r\nContent-Type: application/json\r\n",
         server.addr
     );
     for (request, status) in [
