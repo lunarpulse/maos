@@ -107,3 +107,12 @@ drill_success = true
 mode = "synthetic"
 notes = "integrity=true,rpo=true,frames=10000"
 
+
+
+[[evidence]]
+drill_date = "2026-11-08"
+rto_seconds = 2
+drill_success = true
+mode = "synthetic"
+notes = "integrity=true,rpo=true,frames=10000"
+
