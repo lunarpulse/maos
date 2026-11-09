@@ -190,6 +190,20 @@ fn typescript_component_round_trips_a_fully_populated_frame() {
         "Ready"
     );
     let request = maos_frame_codec::read_frame(&mut reader)
+        .expect("read skill author request")
+        .expect("guest must author before recalling");
+    assert!(matches!(
+        recall_wire::decode_request(&request).expect("tagged skill author request"),
+        RecallRequest::SkillAuthor { .. }
+    ));
+    let reply = recall_wire::encode_reply(&RecallReply::Skill {
+        entry_id: "entry".into(),
+        target: "example-spirit-ts.example@1.0.0".into(),
+    })
+    .expect("encode skill reply");
+    maos_frame_codec::write_frame(&mut writer, &reply).expect("reply to skill author");
+    writer.flush().expect("flush skill reply");
+    let request = maos_frame_codec::read_frame(&mut reader)
         .expect("read recall request")
         .expect("guest must recall before emitting");
     assert_eq!(

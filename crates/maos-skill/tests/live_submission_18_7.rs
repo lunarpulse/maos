@@ -63,6 +63,42 @@ fn refused(
     assert!(matches!(&result, Err(ESkillStore::InvalidEntry(error)) if error == &expected));
     assert_eq!(q.entries().len(), before);
 }
+
+#[test]
+fn guest_submissions_are_bounded_per_payload_and_author() {
+    let mut q = SkillAdmissionQueue::new();
+    let author = Author::new("researcher", 7);
+    let oversized = document("researcher.large", "1.0.0", &"x".repeat(262_145));
+    refused(
+        &q,
+        q.prepare_author(oversized, &author.ctx(), &[]),
+        ESkillQueue::PayloadTooLarge,
+    );
+    refused(
+        &q,
+        q.prepare_proposal(proposal(7, "1.0.0", &"x".repeat(262_145)), &author.ctx()),
+        ESkillQueue::PayloadTooLarge,
+    );
+    for i in 0..64 {
+        let (entry, _) = q
+            .prepare_author(
+                document(&format!("researcher.item{i}"), "1.0.0", "Body"),
+                &author.ctx(),
+                &[],
+            )
+            .unwrap();
+        q.commit_prepared(entry).unwrap();
+    }
+    refused(
+        &q,
+        q.prepare_author(
+            document("researcher.extra", "1.0.0", "Body"),
+            &author.ctx(),
+            &[],
+        ),
+        ESkillQueue::PendingLimit,
+    );
+}
 #[test]
 fn vetting_refuses_foreign_namespace_capability_escalation_and_malformed_document() {
     let q = SkillAdmissionQueue::new();

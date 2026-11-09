@@ -15,6 +15,10 @@ use crate::invariants::i3::FrameOrigin;
 pub enum IacBusError {
     #[error("intent promotion denied for recipient {recipient}")]
     IntentPromotionDenied { recipient: String },
+    #[error("promotion distillate not found")]
+    PromotionDistillateNotFound,
+    #[error("promotion distillate storage failure: {0}")]
+    PromotionDistillateStorage(String),
     #[error("spirit {0} is not registered — call register_spirit first")]
     UnknownSpirit(String),
     #[error(

@@ -58,9 +58,17 @@ ratifier = "Lunarpulse"
 # Semantic strengthening lives in compliance, outside this file fingerprint.
 # Code, this fingerprint and exact kloc/kernel pin sets travel together in
 # Main's landing commit. No kernel source/frozen tag/declared file-set change.
+# RE-PINNED — 20-8-manifest-contract-completion L1, after independent review:
+# 20-8-manifest-contract-completion-evidence/landing-1/review/fkcs-skill-limits-review.md.
+# Exact declared-file hunk: maos-skill/src/admission.rs +31, 256 KiB payload
+# and 64 pending per author class; maos-registry/src/admission.rs unchanged.
+# Later changes to either limit require another FKCS review. No kernel source,
+# frozen tag or declared file-set change.
+# 136c579d6a2ae4804d0f57864cec8c583363b563e2f063a870f6ae6f38256a46 ->
+# 3dc4d08e237fffb6338354d71fc504a7d4a20217230237471e13f7cbaec349f9.
 [admission_baseline]
 files = [
     "crates/maos-registry/src/admission.rs",
     "crates/maos-skill/src/admission.rs",
 ]
-sha256 = "136c579d6a2ae4804d0f57864cec8c583363b563e2f063a870f6ae6f38256a46"
+sha256 = "3dc4d08e237fffb6338354d71fc504a7d4a20217230237471e13f7cbaec349f9"

@@ -876,6 +876,87 @@ async fn oversized_fetch_reply_is_typed_and_next_call_same_turn_still_works() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn denied_promotion_counts_without_terminating_wasm_session() {
+    use maos_domain::distillation::{DigestPayload, DistillationRequest};
+    use maos_domain::invariants::i13::AllowedPromotionSet;
+    use maos_domain::invariants::i8::A2AIntent;
+    use maos_domain::ports::DistillationPort;
+    if !t2_available() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let world = World::new(dir.path());
+    let mut receiver = world
+        .iac
+        .register_spirit_typed(&SpiritId::from("collector"))
+        .unwrap();
+    world.tl.insert_frame_event(
+        JournalKind::TaskAssign,
+        0,
+        None,
+        "standard",
+        b"source",
+        FrameOrigin::HumanAuthored,
+    );
+    let request = DistillationRequest::new(
+        vec![world.tl.last_frame_id()],
+        1,
+        DigestPayload::Text("digest".into()),
+        None,
+    )
+    .unwrap();
+    let writer =
+        maos_iac::adapter::distillate::DistillateWriter::new(Arc::clone(&world.tl), Arc::new(()));
+    let digest = writer.write_distillate(0, request).unwrap().digest_frame_id;
+    let mut allowed = AllowedPromotionSet::new();
+    allowed.insert(A2AIntent::new("review"));
+    world.iac.register_promotion_set("collector", Some(allowed));
+    let (core, admitted) = admit(&world, &manifest(true)).await;
+    let script = format!("promote {}", hex::encode(digest));
+    if let Some(report) = t2_result(
+        run_admitted_session(
+            world.session(),
+            admitted,
+            core,
+            launch(input(&script), true),
+        )
+        .await,
+    ) {
+        assert_eq!((report.delivered_frames, report.denied_frames), (1, 1));
+        while let Some((kind, _)) = receiver.try_recv().unwrap() {
+            assert_ne!(kind, FrameKind::TaskAssign, "denied task must not enqueue");
+        }
+    }
+    drop(receiver);
+    world.drain().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn skill_author_call_after_sixty_four_recalls_exhausts_same_budget() {
+    if !t2_available() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let world = World::new(dir.path());
+    let (core, admitted) = admit(&world, &manifest(true)).await;
+    let result = run_admitted_session(
+        world.session(),
+        admitted,
+        core,
+        launch(input("recalls 64\nskill-author 61"), true),
+    )
+    .await;
+    assert!(
+        matches!(
+            result,
+            Err(SessionError::Protocol("recall budget exceeded"))
+        ),
+        "{result:?}"
+    );
+    world.drain().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn sixty_fifth_recall_closes_channel_once_with_typed_protocol_end() {
     if !t2_available() {
         return;

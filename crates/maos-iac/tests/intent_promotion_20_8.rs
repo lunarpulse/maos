@@ -59,7 +59,7 @@ async fn recipient_promotion_set_checks_stored_lineage_before_enqueue() {
         Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new()))),
         Arc::clone(&log),
     );
-    let _handle = bus.register_spirit(&SpiritId::from("recipient")).unwrap();
+    let mut handle = bus.register_spirit(&SpiritId::from("recipient")).unwrap();
     log.insert_frame_event(
         LogKind::TaskAssign,
         1,
@@ -94,11 +94,53 @@ async fn recipient_promotion_set_checks_stored_lineage_before_enqueue() {
         .unwrap();
     assert_eq!(denial.kind, LogKind::TelemetryEvent);
     assert!(denial.capability_token.is_none());
+    let record: serde_json::Value = serde_json::from_slice(&denial.payload_redacted).unwrap();
+    assert_eq!(record["recipient"], "recipient");
+    assert_eq!(record["sender"], "sender");
+    assert_eq!(
+        record["frame_id"],
+        ulid::Ulid::from_bytes([1; 16]).to_string()
+    );
+    assert_eq!(
+        record["digest_frame_id"],
+        ulid::Ulid::from_bytes(digest).to_string()
+    );
+    assert_eq!(record["cause"], "lineage-denied");
     assert!(!rows.iter().any(|row| row.frame_id == [1; 16]));
+    assert!(matches!(handle.try_recv(), Ok(None)));
     let mut consult = AllowedPromotionSet::new();
     consult.insert(A2AIntent::new("consult"));
     bus.register_promotion_set("recipient", Some(consult));
     assert!(bus.deliver_typed(frame(2, digest), 0, None).await.is_ok());
+    assert!(matches!(handle.try_recv(), Ok(Some(_))));
     bus.unregister_promotion_set("recipient");
     assert!(bus.deliver_typed(frame(3, digest), 0, None).await.is_ok());
+    assert!(matches!(handle.try_recv(), Ok(Some(_))));
+    let mut source_frame = frame(4, digest);
+    if let FramePayload::TaskAssign(task) = &mut source_frame.payload {
+        task.prior_distillate_ref = None;
+    }
+    bus.deliver_typed(source_frame, 0, None).await.unwrap();
+    assert!(matches!(handle.try_recv(), Ok(Some(_))));
+    let request = DistillationRequest::new(
+        vec![[4; 16]],
+        1,
+        DigestPayload::Text("routed digest".into()),
+        None,
+    )
+    .unwrap();
+    let routed_digest = writer.write_distillate(0, request).unwrap().digest_frame_id;
+    let mut standard = AllowedPromotionSet::new();
+    standard.insert(A2AIntent::new("standard"));
+    bus.register_promotion_set("recipient", Some(standard));
+    assert!(bus
+        .deliver_typed(frame(5, routed_digest), 0, None)
+        .await
+        .is_ok());
+    assert!(matches!(handle.try_recv(), Ok(Some(_))));
+    assert!(matches!(
+        bus.deliver_typed(frame(6, [42; 16]), 0, None).await,
+        Err(IacBusError::PromotionDistillateNotFound)
+    ));
+    assert!(matches!(handle.try_recv(), Ok(None)));
 }

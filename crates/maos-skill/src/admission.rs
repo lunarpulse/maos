@@ -9,6 +9,9 @@ use maos_domain::invariants::i4::ApprovalDecision;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+const MAX_SUBMISSION_BYTES: usize = 256 * 1024;
+const MAX_PENDING_PER_AUTHOR: usize = 64;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SkillAdmissionState {
     Pending,
@@ -127,6 +130,32 @@ impl SkillAdmissionQueue {
         Ok(())
     }
 
+    fn check_submission_limits(
+        &self,
+        payload: &str,
+        ctx: &SubmissionContext<'_>,
+    ) -> Result<(), ESkillStore> {
+        if payload.len() > MAX_SUBMISSION_BYTES {
+            return Err(ESkillQueue::PayloadTooLarge.into());
+        }
+        if self
+            .pending
+            .iter()
+            .filter(|entry| {
+                entry.state == SkillAdmissionState::Pending
+                    && entry
+                        .author
+                        .as_ref()
+                        .is_some_and(|author| author.class == ctx.author.class)
+            })
+            .count()
+            >= MAX_PENDING_PER_AUTHOR
+        {
+            return Err(ESkillQueue::PendingLimit.into());
+        }
+        Ok(())
+    }
+
     /// `discovered` must contain the root's complete package discovery snapshot.
     pub fn prepare_author(
         &self,
@@ -134,6 +163,7 @@ impl SkillAdmissionQueue {
         ctx: &SubmissionContext<'_>,
         discovered: &[DiscoveredSkill],
     ) -> Result<(QueueEntry, ApprovalDecision), ESkillStore> {
+        self.check_submission_limits(&document, ctx)?;
         Self::vet_principals(&document, ctx)?;
         let skill = parse_skill(&document).map_err(ESkillQueue::Schema)?;
         Self::validate_authored_id(&skill.manifest.id)?;
@@ -186,6 +216,7 @@ impl SkillAdmissionQueue {
         proposal: SkillRevisionProposal,
         ctx: &SubmissionContext<'_>,
     ) -> Result<(QueueEntry, ApprovalDecision), ESkillStore> {
+        self.check_submission_limits(&proposal.proposed_diff, ctx)?;
         Self::vet_principals(&proposal.proposed_diff, ctx)?;
         Self::validate_evidence(&proposal)?;
         let proposal = build_proposal(

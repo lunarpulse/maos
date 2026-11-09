@@ -1,5 +1,9 @@
 #![forbid(unsafe_code)]
 
+#[cfg(all(target_os = "linux", feature = "network", feature = "wasm-host"))]
+#[path = "wasm_skill_authoring_20_8/signed.rs"]
+mod signed;
+
 #[test]
 fn default_build_checks_the_versioned_skill_import() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../wit/spirit.wit");

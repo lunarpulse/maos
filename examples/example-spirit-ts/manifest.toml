@@ -19,14 +19,11 @@ fetch = true
 [capabilities.required.skill]
 author_self = true
 
-[skills]
-uses = ["example-prerequisite"]
-
 [explanation_shape]
 required_fields = ["reason"]
 
 [intent_promotion_set]
-allowed = ["consult"]
+allowed = ["standard"]
 
 [swap_invariants]
 preserve = ["example-state"]

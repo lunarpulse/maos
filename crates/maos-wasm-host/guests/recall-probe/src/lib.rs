@@ -13,6 +13,7 @@
 //!   `context ok USED WINDOW LEVEL CROSSED|-` or `context err CODE`.
 //! - `skill-author HEX`: submit a UTF-8 document encoded as hexadecimal.
 //! - `skill-propose ID VERSION HEX`: propose a hex-encoded diff.
+//! - `promote HEX`: emit a TaskAssign referencing the 16-byte digest, then the report.
 //! - `to SPIRIT`: address the emitted report to this Spirit instead of the input
 //!   recipients. Session send authorization sees these claims; telemetry delivery
 //!   itself uses the bus's broadcast subscription.
@@ -161,6 +162,7 @@ impl Guest for RecallProbe {
         };
         let mut last = None;
         let mut cursor = None;
+        let mut promotion = None;
         for line in script.lines().filter(|line| !line.trim().is_empty()) {
             let mut words = line.split_whitespace();
             match words.next() {
@@ -174,6 +176,9 @@ impl Guest for RecallProbe {
                     }
                     None => report.push_str("script err invalid-request\n"),
                 },
+                Some("promote") => {
+                    promotion = words.next().and_then(unhex).filter(|id| id.len() == 16);
+                }
                 Some("recall") => match filter(words, &cursor) {
                     Some(filter) => run_recall(filter, &mut report, &mut last, &mut cursor),
                     None => report.push_str("script err invalid-request\n"),
@@ -261,12 +266,25 @@ impl Guest for RecallProbe {
                 _ => report.push_str("script err invalid-request\n"),
             }
         }
+        let task = promotion.and_then(|digest_frame_id| {
+            let mut task = frame.clone();
+            if let FramePayload::TaskAssign(body) = &mut task.payload {
+                body.prior_distillate_ref = Some(maos::spirit::frames::PriorDistillateRef {
+                    digest_frame_id,
+                    distillation_depth: 1,
+                    intent_lineage: vec![],
+                });
+                Some(task)
+            } else {
+                None
+            }
+        });
         frame.kind = FrameKind::TelemetryEvent;
         frame.payload = FramePayload::TelemetryEvent(TelemetryEventBody {
             event_type: "recall.probe".into(),
             data: report,
         });
-        Ok(vec![frame])
+        Ok(task.into_iter().chain(std::iter::once(frame)).collect())
     }
     fn on_start() -> Result<(), Halt> {
         assert!(matches!(skills::author("outside-export"), Err(SkillError::Unavailable)));

@@ -21,7 +21,8 @@ export function handleFrame(frame: IacFrame): IacFrame[] {
   }
 
   if (!authored) {
-    author(`---
+    try {
+      author(`---
 id='{{project-name}}.example'
 version='1.0.0'
 name='Example skill'
@@ -30,6 +31,19 @@ required_capabilities=['skill.author.self']
 ---
 Follow the example procedure.
 `);
+    } catch (error) {
+      if (
+        typeof error !== "object" || error === null || !("payload" in error) ||
+        typeof error.payload !== "object" || error.payload === null ||
+        !("tag" in error.payload) ||
+        (error.payload.tag !== "refused" && error.payload.tag !== "unavailable" &&
+          error.payload.tag !== "capability-denied")
+      ) {
+        throw error;
+      }
+      console.log("Skill authoring declined:", error.payload.tag,
+        "val" in error.payload ? error.payload.val : "");
+    }
     authored = true;
   }
 

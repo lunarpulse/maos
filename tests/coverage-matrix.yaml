@@ -994,9 +994,12 @@ coverage:
       ABI surface frozen via abi-diff gate; manifest schema types live in maos-spirit-abi.
       Story 20-8 L1: `manifest_declarations_20_8` (AC1), `manifest_n_minus_1_compat`
       (AC2), `skill_declarations_20_8` (AC3), `intent_promotion_20_8` (AC4).
-      `hook_pump_17_4` witnesses pre-pid journaling, later refusal and I2 fail-stop.
-      A declaration is not proof of admission. Hosted signed install proof remains
-      unverified; AC8 swap-invariant refusal is open for the final kernel landing.
+      `hook_pump_17_4` witnesses pre-pid journaling, later refusal and I2 fail-stop;
+      `recipient_promotion_set_checks_stored_lineage_before_enqueue` is the I13 witness.
+      The signed install publisher/digest/tamper witness is
+      `wasm_skill_authoring_20_8::signed::installed_signed_manifest_journals_verified_publisher_and_rejects_tamper`.
+      A declaration is not proof of admission. Hosted T2 proof remains unverified;
+      AC8 swap-invariant refusal is open for the final kernel landing.
   FR9:
     gates:
       - journal_survives_cold_restart

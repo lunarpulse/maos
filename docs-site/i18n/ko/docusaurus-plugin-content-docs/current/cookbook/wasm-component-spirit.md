@@ -84,7 +84,7 @@ bus 전송에는 `[capabilities.required.iac]`를 선언하세요. kernel은 전
 
 ## 참여한 frame 회상하기
 
-`maos:spirit@2.2.0` world는 두 함수를 제공하는 `maos:spirit/recall@2.2.0`을 import합니다.
+`maos:spirit@2.3.0` world는 두 함수를 제공하는 `maos:spirit/recall@2.3.0`을 import합니다.
 
 ```wit
 recall: func(filter: recall-filter) -> result<recall-page, recall-error>;
@@ -124,11 +124,12 @@ fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
 경로별 오류, 전달 의미와 명시된 한계(incarnation 범위, 새 Worker 용량,
 설정 불가능한 예산, 문자열 오류만 제공하는 호출자, 감사 전용 schedule token)를
 확인하세요. 이는 ADR-016의 context-token 신호가 아닙니다. 그 신호는 guest가
-`maos:spirit/context@2.2.0` `report(used-tokens)`로 자기 token 수를 보고한 뒤
+`maos:spirit/context@2.3.0` `report(used-tokens)`로 자기 token 수를 보고한 뒤
 `handle-frame`으로 받는 kernel의 `context-pressure` / `context-limit` 프레임이며,
 daemon이 pid와 승인된 window를 고정합니다(`18-5-context-token-budget-accounting`).
 
-2.2 runner는 기존 2.0 및 2.1 component를 다시 빌드하지 않고도 받습니다.
+2.3 runner에는 2.0–2.2 component용 binding이 유지됩니다. 로컬 증거는
+2.0만 실행하며 실제 2.1 및 2.2 guest의 호환성은 아직 검증되지 않았습니다.
 인스턴스화 전에 기존의 닫힌 enum export binding을 선택하고 같은 frame pump를
 공유합니다. context kind나 payload는 이전 스키마로 낮출 수 없으며,
 `retract.original-kind` 또는 `consent-rupture.original-kind` 안의 context kind도

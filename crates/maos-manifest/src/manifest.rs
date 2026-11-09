@@ -363,7 +363,7 @@ pub fn warn_n_minus_1_degradations(declared_schema: u32) -> Vec<&'static str> {
             declared_schema,
             current_schema = maos_spirit_abi::MANIFEST_SCHEMA_VERSION,
             section = *section,
-            "manifest N-1 degradation: section '[{section}]' absent in V-{} manifest — defaulted via serde(default)",
+            "manifest N-1 degradation: section '[{section}]' is ignored or defaulted for a V-{} manifest",
             maos_spirit_abi::MANIFEST_SCHEMA_VERSION - declared_schema,
         );
     }
@@ -4164,10 +4164,18 @@ fn declared_names(field: &str, names: Vec<String>) -> Result<Vec<String>, Manife
             && name
                 .bytes()
                 .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._:-".contains(&b));
-        if !valid || !seen.insert(name.as_str()) {
+        let problem = if !valid {
+            Some("invalid")
+        } else if !seen.insert(name.as_str()) {
+            Some("duplicate")
+        } else {
+            None
+        };
+        if let Some(problem) = problem {
+            let excerpt: String = name.chars().take(64).collect();
             return Err(ManifestError::Toml(validation_msg(
                 field,
-                &format!("invalid or duplicate entry '{name}'"),
+                &format!("{problem} entry {excerpt:?}"),
             )));
         }
     }
@@ -4181,9 +4189,29 @@ fn parse_raw<T: serde::de::DeserializeOwned>(s: &str) -> Result<T, ManifestError
 impl SkillsSection {
     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
         let raw: RawSkillsSection = parse_raw(s)?;
-        Ok(Self {
-            uses: declared_names("skills.uses", raw.uses)?,
-        })
+        let uses = declared_names("skills.uses", raw.uses)?;
+        for name in &uses {
+            let secret_prefix = name
+                .split(|c: char| !c.is_ascii_alphanumeric() && c != '_' && c != '-')
+                .any(|part| {
+                    [
+                        "sk-", "ghp_", "gho_", "ghs_", "ghu_", "ghc_", "ghr_", "ya29",
+                    ]
+                    .iter()
+                    .any(|prefix| part.starts_with(prefix))
+                });
+            let long_hex = name
+                .as_bytes()
+                .split(|b| !b.is_ascii_hexdigit())
+                .any(|run| run.len() >= 32);
+            if secret_prefix || long_hex {
+                return Err(ManifestError::Toml(validation_msg(
+                    "skills.uses",
+                    "entry resembles a redacted secret",
+                )));
+            }
+        }
+        Ok(Self { uses })
     }
 }
 

@@ -125,8 +125,7 @@ and `fetch = true`. During `handleFrame`, the guest imports
 frame id before echoing the frame. These imports are available only during
 `handleFrame`, not lifecycle hooks.
 
-Before launch, copy `skills/example-prerequisite.md` to `$HOME/.maos/skills/`,
-then use `maosctl skills approve example-prerequisite` as the operator.
+No pre-approved skill is required to launch the example.
 The example's first `handleFrame` calls
 `skills.author` to queue `example-spirit-ts.example`; an operator must approve
 it. `author` and `propose` are available only in `handleFrame`, with

@@ -887,6 +887,32 @@ kernel_or_spirit = "kernel"
 since_version = "1.0.0"
 
 [[error]]
+code = "ESkillQueue::PayloadTooLarge"
+cause = "A Spirit-authored document or revision diff exceeds 256 KiB."
+remediation = "Reduce the document or diff to at most 256 KiB before submitting it."
+rust_path = "ESkillQueue::PayloadTooLarge"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "Skill submission exceeds the payload byte limit"
+severity = "policy"
+recovery_class = "retry_with_correction"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "1.0.0"
+
+[[error]]
+code = "ESkillQueue::PendingLimit"
+cause = "The author class already has 64 pending skill submissions."
+remediation = "Have an operator decide pending submissions before submitting another."
+rust_path = "ESkillQueue::PendingLimit"
+source_file = "crates/maos-skill/src/errors.rs"
+description = "Author class has reached the pending submission limit"
+severity = "policy"
+recovery_class = "retry"
+owner = "maos-skill"
+kernel_or_spirit = "kernel"
+since_version = "1.0.0"
+
+[[error]]
 code = "ESkillQueue::NonFiniteEvidence"
 cause = "Revision telemetry contains a non-finite f32 halt value or threshold that cannot round-trip through durable JSON."
 remediation = "Correct the telemetry producer and submit only finite evidence; preserve the existing queue and never replace non-finite measurements with fabricated values."

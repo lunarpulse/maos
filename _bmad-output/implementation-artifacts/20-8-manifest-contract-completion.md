@@ -203,8 +203,8 @@ change is authorized. The prior compact-hex requirement is superseded.
 manifest ≤ 4,812; bin ≤ 36,160; wasm-host ≤ 2,874; domain ≤ 10,205;
 iac ≤ 8,865; skill ≤ 1,294; xtask ≤ 44,749; aggregate ≤ 199,078.
 Registry is zero-growth (pin 6,151); kernel is unchanged. Other pending
-stories also claim envelopes on shared crates. Exact formatted measurements
-and pins remain owed at landing.
+stories also claim envelopes on shared crates. Exact formatted L1 and review
+correction measurements are recorded in the Dev Agent Record below.
 The domain ceiling was 10,174 before the orchestrator-adjudicated overdraft
 (disclosed to the operator): formatted 10,190 from 10,144 (+46 versus +11
 creation estimate); 15 lines slack. The approved `enc208` decoder and typed
@@ -227,7 +227,7 @@ re-base their domain draws on this landing's eventual exact pin.
    `HotSwapError::SwapInvariantDropped { invariant }` before `on_swap_out`. 20-9's spawned swap/upgrade path goes through the same
    coordinator gate and adds the state-preservation proof (FR10, HSIS criterion 2): this story's check is structural only. Under C,
    20-9 owns KB + KS (priced here).
-5. **Journal.** Each issued pid has a prior `governance:manifest-declaration` row through `emit_manifest_declaration_event`; a later
+5. **Journal.** Each pid issued by `load_admit_start` has a prior `governance:manifest-declaration` row through `emit_manifest_declaration_event`; compiled-in first-party roots outside this path do not write one. A later
    refusal may leave a declaration row and must separately record its refusal. A declaration is not proof of admission. 20-9's successor
    admission on a swap or upgrade hop writes the successor's row through the same function; there is no second writer.
 6. **Admission.** `GatedManifest.{skills, explanation_shape, intent_promotion_set, swap_invariants, publisher}`. The installed signed path sets
@@ -253,22 +253,14 @@ Every AC names a failing-before witness and a plant. **local** = hermetic on the
    journals `governance:manifest-declaration` with `{spirit_id, version,
    manifest_sha256 = colon_hex(sha256(exact manifest bytes)), publisher, declared}`.
    Serialization and validation failures are typed pre-pid refusals; a storage
-   failure follows the existing I2 fail-stop. Every issued pid has a prior row;
+   failure follows the existing I2 fail-stop. Every pid issued by `load_admit_start` has a prior row;
    a later refusal may retain a declaration row and must be separately
    journaled. A declaration is evidence of what was declared, not admission.
 4. `maos_registry::install::verify_installed` returns the verified publisher key with the text. `InstalledSpirits::boot` sets
    `gated.publisher`. Local paths leave `None`. No second signature implementation: verification stays `verify_publisher_sig`
    (`maos-registry/src/admission.rs:546-562`).
-5. **The command (local with `--features maos-bin/wasm-host` and the guest toolchain; else AC7 hosted).** Publish the TS example (AC6.7: schema 7, all four
-   sections declared) with `maos-spirit publish`, then run `maosctl spirit install example-spirit-ts@<ver> --registry-uri <uri>`, `maos init`
-   and replay `maos shell` fed `@example-spirit-ts hello`. `maosctl audit query --intent governance:manifest-declaration` returns one row.
-   Its payload (asserted by the witness reading the TL) carries the installed manifest's sha256, the publisher key hex and all four
-   names. Editing the installed manifest's `[swap_invariants]` after install makes the next boot refuse with `installed_package_invalid` and write no declaration row.
-6. **Failing-before (local):** `crates/maos-bin/tests/manifest_declarations_20_8.rs` (new; door/run admission of temp manifests +
-   a signed installed package via `tests/harness/registry_20_1.rs`). At HEAD an empty `preserve`, a 33-entry list, an uppercase
-   name, a duplicate and an unknown key are all **admitted** (sections unread, inventory #2), and no declaration row exists. After:
-   each is refused before a pid, the valid manifest is admitted with one row, and the tamper vector reuses
-   `installed_spirit_dispatch_20_1.rs:82`'s shape.
+5. **The command (hosted AC7; unverified).** Publish the schema-7 TS example with `maos-spirit publish`, install and boot it, and query `governance:manifest-declaration`. Per operator O1 the shipped example and template declare three FR8 sections, not `[skills]`; the dedicated skill fixture covers that fourth section. The row must carry the installed manifest's sha256, verified publisher and those three names. Editing installed `[swap_invariants]` must make the next boot refuse with `installed_package_invalid` and write no declaration row.
+6. **Local witnesses:** `crates/maos-bin/tests/manifest_declarations_20_8.rs` exercises invalid sections and local null publisher. `crates/maos-bin/tests/wasm_skill_authoring_20_8/signed.rs::installed_signed_manifest_journals_verified_publisher_and_rejects_tamper` publishes a real signed echo component, installs and boots it, verifies publisher and digest in its declaration, and rejects a post-install tamper without a new declaration. The publisher-binding removal plant was observed red and restored; hosted T2 remains separately unverified.
 7. **Plant (local, one):** skip `emit_manifest_declaration_event` ⇒ the one-row assertion reds.
 
 #### AC2 — schema 7 with documented degradation (D-20-8-03 A)
@@ -317,7 +309,7 @@ Every AC names a failing-before witness and a plant. **local** = hermetic on the
 1. `wit/spirit.wit`: package `2.3.0`, `interface skills { record queued; variant skill-error { capability-denied, refused(string),
    unavailable }; author; propose }`, `import skills;` in `world spirit` (prototype `wit`). Add `[[ratification]] 20-8-wit-spirit-2.3.0`.
    Re-issue the four provenance-pinned components (`tests/fixtures/wasm/equiv-fixtures.provenance.toml`; `wit/spirit.wit:21-23`)
-   by `build-test-fixtures`. `check-equiv-fixture-provenance` green.
+   using the manual reproduction recipe in the provenance header. `check-equiv-fixture-provenance` green.
 2. `maos-wasm-host`: `RecallRequest::{SkillAuthor, SkillPropose}`, `RecallReply::Skill`, `WireError::Refused` with code
    `refused`; `skills::Host` on `HostState` over the shared `exchange`; linker registration; `skills@` in the major check;
    instantiate error text names 2.3.0; in-file wire round-trip vectors.
@@ -333,21 +325,17 @@ Every AC names a failing-before witness and a plant. **local** = hermetic on the
    (extend `guests/recall-probe` or new `guests/skills-probe`). At HEAD the 2.3 guest fails to instantiate (unsatisfied
    `maos:spirit/skills@2.3.0`). After: (a) declaring `author_self = true` ⇒ one Pending entry authored by the Spirit's class
    (`maosctl skills show <entry_id>`); (b) undeclared ⇒ `capability-denied` + `skill.author.refused:capability-denied`; (c) propose
-   on a skill the Spirit does not own ⇒ `refused(...)`; (d) a call outside `handle-frame` ⇒ `unavailable`; (e) a 2.2.0 guest and the
-   2.0/2.1 legacy guests still run (`crates/maos-wasm-host/tests/wit_corpus.rs`).
+   on a skill the Spirit does not own ⇒ `refused(...)`; (d) a call outside `handle-frame` ⇒ `unavailable`; (e) the 2.0 legacy guest runs. Genuine 2.1 and 2.2 guests are not locally witnessed; compatibility remains unverified.
 6. **Plant (local, one):** the daemon arm answers `Unavailable` unconditionally ⇒ (a) reds.
 7. TS SDK and docs: `templates/spirit-ts/` and `examples/example-spirit-ts/` `wit/spirit.wit` copies equal the root. `src/index.ts` in the example
    imports `maos:spirit/skills@2.3.0` and authors one skill on its first turn under `[capabilities.required.skill] author_self = true`.
-   The manifests move to schema 7 and declare the four sections. README + `docs-site/docs/cookbook/wasm-component-spirit.md` en + ko
+   The manifests move to schema 7 and declare three sections; the dedicated skill witness covers `[skills]` without making the shipped example depend on a pre-approved skill. README + `docs-site/docs/cookbook/wasm-component-spirit.md` en + ko
    cover the import, its errors, the in-export rule and the limits (no content import, operator-only admission).
    `gen-abi-docs --check` green. The example manifest change widens the focused set (AC9 commands).
 
 #### AC7 — hosted T2 proof of host/guest admission and author/propose (epic AC3)
 
-1. `epic-20-exit` (`discipline.yml:2898`) builds the example at the story SHA, publishes, installs and boots it. It asserts one
-   `governance:manifest-declaration` row carrying the example's publisher key, one Pending entry authored by `example-spirit-ts`,
-   and `maosctl skills approve <entry_id>` admitting it. `wasm-host-tests` (`:4550`) runs AC6.5; `check-wasm-form-equiv` (`:5236`)
-   is green on the re-issued fixtures.
+1. The branch-only evidence recipe builds, publishes, installs and boots the example, checks its declaration and authoring, and runs the wasm-host and equivalence legs. This hosted run remains unverified and is not installed on main.
 2. **Plant (hosted, one image):** the example manifest drops `author_self` ⇒ the exit job's queue assertion fails (`proof-contract.md:14-17`).
 3. External-author cohort evidence is not claimed (operator lane).
 
@@ -376,12 +364,12 @@ Every AC names a failing-before witness and a plant. **local** = hermetic on the
 ## Tasks / Subtasks
 
 - [ ] **T0 — Preflight.** Operator rulings on D-20-8-01…12 recorded; tracker → `in-progress`. Confirm `20-1a` is `done` (D-02). Run `creation/measurements.md` "Not measured here" 1–2. Re-measure every cite this story touches (rule 9; `admission.rs`/`main.rs` will have moved with 20-4 L1). A measured figure above the ruled envelope, or a T0 result contradicting a ruled option, is STOP + D-row.
-- [ ] **T1 — Sections + schema (AC1.1, AC2).** `man` shape; v7 docs; ratification; STABILITY.md; degrade vector; plant.
-- [ ] **T2 — Gate + record + signer (AC1.2–1.7).** `gate` shape; `manifest_declarations_20_8.rs`; command line; plant.
-- [ ] **T3 — Skills `uses` (AC3).** Admission check, refusal codes, vectors, plant.
-- [ ] **T4 — I13 consumer (AC4).** Bus registration, delivery check, `IntentPromotionDenied`, `intent_promotion_20_8.rs`, I13 doc, plant.
-- [ ] **T5 — Explanation label (AC5).** Docs text; deferred row stays open.
-- [ ] **T6 — WIT 2.3 + bridge + TS (AC6).** `wit` shape; guest; fixtures; `wasm_skill_authoring_20_8.rs`; template/example/docs; plant.
+- [x] **T1 — Sections + schema (AC1.1, AC2).** `man` shape; v7 docs; ratification; STABILITY.md; degrade vector; plant.
+- [x] **T2 — Gate + record + signer (AC1.2–1.7).** `gate` shape; `manifest_declarations_20_8.rs`; local signed install witness; plant. The TS hosted command remains AC7.
+- [x] **T3 — Skills `uses` (AC3).** Admission check, refusal codes, vectors, plant.
+- [x] **T4 — I13 consumer (AC4).** Bus registration, delivery check, `IntentPromotionDenied`, `intent_promotion_20_8.rs`, plant. Invariant registry documentation remains unchanged.
+- [x] **T5 — Explanation label (AC5).** Docs text; deferred row stays open.
+- [ ] **T6 — WIT 2.3 + bridge + TS (AC6).** Implementation and local skill witness exist; genuine 2.1/2.2 guest execution and hosted TS proof remain unverified.
 - [ ] **T7 — L1 landing (D-20-8-01 A).** Exact pins inside the ruled envelope. Gates: `check-manifest-schema-version`, `check-stability-matrix`, `gen-abi-docs --check`, `check-equiv-fixture-provenance`, `abi-diff`, `kloc-check`, `check-kernel-baseline` (unchanged), `check-service-boundary`, `check-corpus`, `check-env-contract` (no new variable expected), `check-dev-record-completeness`, `check-epic-close-coherence`, `check-exit-commands`, `check-decision-register`, `prepush`. One hosted discipline run on the final tree + AC7 plant. Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
 - [ ] **T8 — Kernel (AC8)** under the ruled row: red-before test, the shape, door mapping, plant.
 - [ ] **T9 — L2 landing + records (AC9).** Kernel pins + hashes (re-base); FLAG-Winston record updated; `cargo test -p maos-kernel-core --lib`; hosted run; ledger closure; coverage; docs.
@@ -401,7 +389,7 @@ Every AC names a failing-before witness and a plant. **local** = hermetic on the
 | WASM host | `wit/spirit.wit`; `crates/maos-wasm-host/src/{recall_wire.rs:69-131, host_state.rs:12-226, runner.rs:242-373, wit_guest.rs:1-11}`; guest `guests/recall-probe` or NEW `guests/skills-probe`; `tests/fixtures/wasm/*` | AC6 |
 | Researcher (uncharged) | `spirits/researcher/src/skill_author.rs:137-154` (`code()`) | AC6 |
 | Kernel ◆ (L2) | `crates/maos-kernel-core/src/scheduler/control_block.rs:195-238`; `lifecycle/upgrade.rs:307-429`; `hot_swap/coordinator.rs:158-188`; NEW `tests/swap_invariants_20_8.rs`; pins `xtask/kernel-core-baseline.toml`, `xtask/kloc.toml:264` | AC8 |
-| TS / docs | `templates/spirit-ts/`, `examples/example-spirit-ts/` (`wit/spirit.wit`, `src/index.ts`, `manifest.toml`, README); `docs-site/docs/manifest/v7.md` + ko; `docs-site/docs/cookbook/wasm-component-spirit.md` + ko; `docs/invariants/I13.md` | AC2, AC5, AC6 |
+| TS / docs | `templates/spirit-ts/`, `examples/example-spirit-ts/` (`wit/spirit.wit`, `src/index.ts`, `manifest.toml`, README); `docs-site/docs/manifest/v7.md` + ko; `docs-site/docs/cookbook/wasm-component-spirit.md` + ko | AC2, AC5, AC6 |
 | CI / records | `.github/workflows/discipline.yml:2898` (`epic-20-exit` steps); `tests/coverage-matrix.yaml:656,834,922`; `deferred-work.md:1344-1350`; `xtask/kloc.toml` rows | AC7, AC9 |
 
 New maos-bin `src` files (none planned) must join `SCANNED_SOURCE_FILES` (`crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs`). A new
@@ -512,18 +500,21 @@ E20@HEAD:7,55-61,81,256-262; PF `epic-20-preflight-2026-10-30.md:82,126,141,242-
 ### Completion Notes List
 
 - Implemented the L1 schema-7 declarations and degradation, pre-pid single declaration writer, verified publisher carriage, skill admission checks, I13 recipient promotion enforcement and WIT 2.3 skill bridge. The declaration row means only “declared”; I2 failure remains fail-stop and a later refusal has a separate record. This one-directional clarification of ruling A is disclosed to the operator.
-- The domain ceiling is the orchestrator-adjudicated overdraft 10,174 → 10,205, disclosed to the operator; final formatted 10,190 from 10,144. Exact re-pins are in `xtask/kloc.toml`; aggregate 198,074 / 199,078, hardfail 198,075; kernel unchanged. 20-9/20-13/20-14 must re-base.
+- The domain ceiling is the orchestrator-adjudicated overdraft 10,174 → 10,205, disclosed to the operator; L1 measured 10,190 from 10,144 and review corrections measured 10,198. Exact re-pins are in `xtask/kloc.toml`; review aggregate 198,235 / 199,078, hardfail 198,236; kernel unchanged. xtask 44696 -> 44715 at L1 and 44715 -> 44700 after removal of unused builder rows. 20-9/20-13/20-14 must re-base on the landed domain pin.
 - Local witnesses, plants, commands and limitations are in `20-8-manifest-contract-completion-evidence/landing-1/preflight.md`. The CI recipe in the evidence `ci/` directory is branch-only and unverified. Bare `abi-diff --json` is deferred to the orchestrator's clean post-commit run; local Apple SDK/cross C compiler and Node ≥22.20 are unavailable.
-- The sole standalone workspace run exited 100 (5,841/5,847), with two corrected 20-8 regressions, two missing-verifier-dependency failures and two recorded 20-7 timing observations. The only prepush hit its 3,000 s deadline without JSON; its JUnit records 5,848/5,849 and the 20-7 1M timing failure. The standalone run predates the deterministic corrections; no green final-tree workspace or completed prepush is claimed. See L1 evidence.
+- The original L1 standalone workspace run exited 100 (5,841/5,847) and its prepush timed out at 3,000 s; see L1 evidence. The separately prescribed review-correction workspace run exited 100 (5,835/5,854; 19 failures), and its single frozen-tree prepush also timed out at 3,000 s without JSON. The workspace failures include verifier dependency and stale fixture preparation omissions, catalog/FKCS drift corrected afterward, and the recorded 20-7 1M timing observation. No final-tree workspace pass or completed prepush is claimed; `review/workspace-observations.md` and the same-run JUnit retain the results.
 - AC8 and kernel work remain L2; explanation-shape enforcement and external-author J6 are not claimed. No status flip is made by this L1.
+- Independent-review corrections and observed witnesses are recorded in `20-8-manifest-contract-completion-evidence/landing-1/review/correction-evidence.md`; genuine 2.1 and 2.2 guests, hosted T2 and clean-tree ABI diff remain unverified. I13 no-set behavior remains opt-in, accepted as a risk until a future default-deny policy story. `recipient_promotion_set_checks_stored_lineage_before_enqueue` is the L1 I13 witness; no invariant documentation was changed.
 
 ### File List
 
 - `crates/maos-manifest/src/{lib.rs,manifest.rs}`; `crates/maos-manifest/tests/{fr8_declarations_20_8.rs,manifest_n_minus_1_compat.rs}`; `crates/maos-spirit-abi/src/lib.rs`; `crates/maos-spirit-abi/tests/manifest_n_minus_1_test.rs`.
 - `crates/maos-bin/src/{admission.rs,installed_spirits.rs,main.rs,operator_door.rs,recall_mediation.rs,skill_authoring.rs,spirit_session.rs,supervision.rs}`; `crates/maos-bin/tests/{hook_pump_17_4.rs,j_researcher_survey_18_3.rs,live_escape_anomaly_17_10.rs,manifest_declarations_20_8.rs,observer_activity_corpus_17_4.rs,one_daemon_one_door_16_1.rs,participant_recall_17_8.rs,recall_17_3d.rs,skill_declarations_20_8.rs,spawned_scope_17_3c.rs,wasm_skill_authoring_20_8.rs,yank_policy_20_1b.rs}`.
 - `crates/maos-registry/src/install.rs` (only `verify_installed` returns the already-verified publisher); `crates/maos-cli/src/cli.rs`; `crates/maos-cli/tests/manifest_intent_20_8.rs`; `crates/maos-domain/src/{governance.rs,iac_bus_types.rs}`; `crates/maos-iac/src/{adapter.rs,adapter/distillate.rs}`; `crates/maos-iac/tests/intent_promotion_20_8.rs`; `spirits/researcher/src/skill_author.rs`.
+- Review correction: `crates/maos-skill/src/{admission.rs,errors.rs}` and `tests/live_submission_18_7.rs`; `crates/maos-bin/tests/wasm_skill_authoring_20_8/signed.rs`; `.github/workflows/discipline.yml`.
 - `wit/spirit.wit`; `crates/maos-wasm-host/src/{host_state.rs,recall_wire.rs,runner.rs,wit_guest.rs}`; `crates/maos-wasm-host/tests/wit_corpus.rs`; `crates/maos-wasm-host/guests/recall-probe/src/lib.rs`; `tests/fixtures/wasm/{echo_spirit_component.wasm,equiv_cosmetic_spirit_component.wasm,equiv_divergent_spirit_component.wasm,equiv_identity_spirit_component.wasm,equiv-fixtures.provenance.toml}`.
-- `templates/spirit-ts/` and `examples/example-spirit-ts/` manifest, WIT, source, tests, README and prerequisite skill; `docs/invariants/I13.md`; `docs-site/docs/{manifest/v6.md,manifest/v7.md,cookbook/wasm-component-spirit.md}` and their Korean counterparts; `docs-site/abi/v1/*.md`; `STABILITY.md`.
+- `templates/spirit-ts/` and `examples/example-spirit-ts/` manifest, WIT, source, tests and README; the obsolete prerequisite fixtures were removed under O1. `docs-site/docs/{manifest/v6.md,manifest/v7.md,cookbook/wasm-component-spirit.md}` and their Korean counterparts; `docs-site/abi/v1/*.md`; `STABILITY.md`. `docs/invariants/I13.md` was not changed.
+- Error catalog metadata and generated artifact: `xtask/error-catalog.toml`, `docs/errors/error-catalog.json`, `docs-site/route-manifest.json`, and `docs-site/docs/errors/ESkillQueue-{PayloadTooLarge,PendingLimit}.md`. The independently reviewed skill-admission limits re-pin `xtask/fkcs-baseline.toml`; any later limit change needs review.
 - `tests/coverage-matrix.yaml` — FR8, FR39 and FR57 L1 witness and deferred-proof notes.
 - `_bmad-output/planning-artifacts/epics/{epic-20-ship-it-w5.md,requirements-inventory.md}` — L1 status and remaining-proof clarifications.
 - `.config/nextest.toml`; `xtask/{abi-ratifications.toml,kloc.toml,test-budgets.toml,src/build_test_fixtures.rs,src/check_manifest_schema_version.rs}`; `_bmad-output/implementation-artifacts/{20-8-manifest-contract-completion.md,20-8-flag-winston-decision.md,deferred-work.md,sprint-status.yaml,20-8-manifest-contract-completion-evidence/landing-1/,20-8-manifest-contract-completion-evidence/ci/}`.
@@ -533,3 +524,4 @@ E20@HEAD:7,55-61,81,256-262; PF `epic-20-preflight-2026-10-30.md:82,126,141,242-
 - 2026-11-03: Story created at `8c809f9c` (ready-for-dev; D-20-8-01…12 PROPOSED). Inventory measured: the four FR8 sections absent; invalid sections silently unread; signature verified only on the install path; no declaration journaled; I13 check without production caller; no explanation carrier; WIT 2.2 without skills. Kernel priced by reverted prototypes (KS +38 / +33 recommended; KB +10 / +8, KB4 +34 / +32, K0). Out-of-kernel measured: manifest +104, bin +156, wasm-host +51, domain +11, xtask +4. E20 §20-8 cites corrected in place.
 - 2026-11-03: Operator ruled D-20-8-01…12 all as recommended (ask `d_batch4`): each row selects A. Kernel KS and the per-crate envelope are ruled; ceilings bind at the applicable dev start after re-baselining, with L2 kernel last. Creation-time history above is retained.
 - 2026-11-09: L1 kernel-free implementation, `ac13i2` and `enc208` rulings, one-directional admission clarification, exact pins and disclosed orchestrator-adjudicated domain overdraft. Hosted proof is authored, not run; L2 remains open.
+- 2026-11-09: Review corrections, independently reviewed FKCS skill-limit re-pin, explicit workspace and prepush limitations, and catalog documentation.

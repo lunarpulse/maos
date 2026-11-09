@@ -27,6 +27,11 @@ versus creation estimate +11); the enc208 decoder and typed fields are
 production code. Aggregate ceiling stays 199,078. 20-9/20-13/20-14 re-base
 their domain draws on the eventual landed pin. Kernel KS is unchanged.
 
+L1 review-correction formatted measurement is domain 10,198, within the
+orchestrator-adjudicated 10,205 ceiling; aggregate 198,235 is within 199,078.
+The overdraft remains disclosed to the operator, and 20-9/20-13/20-14 re-base
+their domain draws on the eventual landed pin. No kernel grant is consumed.
+
 ## Why the kernel is touched at all
 
 A hot swap parses its successor in the kernel (`load_bundle_from_file`, `crates/maos-kernel-core/src/lifecycle/upgrade.rs:307-429`, caller

@@ -73,6 +73,7 @@ pub struct IacBusAdapter {
         std::sync::Arc<dashmap::DashMap<[u8; 16], maos_domain::invariants::i13::IntentLineage>>,
     promotion_sets:
         std::sync::Arc<dashmap::DashMap<String, maos_domain::invariants::i13::AllowedPromotionSet>>,
+    promotion_audit_last: std::sync::Arc<std::sync::Mutex<Option<std::time::Instant>>>,
     /// Story 9.5b — optional OTel trace sink for IAC-frame span emission.
     /// `None` = off (no-op branch; zero allocation). Wired from
     /// composition root via [`IacBusAdapter::with_trace_sink`].
@@ -107,6 +108,7 @@ impl IacBusAdapter {
             }),
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
             promotion_sets: std::sync::Arc::new(dashmap::DashMap::new()),
+            promotion_audit_last: std::sync::Arc::new(std::sync::Mutex::new(None)),
             trace_sink: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
@@ -234,27 +236,62 @@ impl IacBusAdapter {
             let Some(allowed) = self.promotion_sets.get(recipient.spirit_id.as_str()) else {
                 continue;
             };
-            if distillate::DistillateWriter::admit_from_log(
+            let verdict = distillate::DistillateWriter::admit_from_log(
                 &self.transparency_log,
                 reference.digest_frame_id,
                 &allowed,
-            )
-            .is_err()
-            {
+            );
+            drop(allowed);
+            if let Err(error) = verdict {
+                use maos_domain::distillation::DistillationError;
+                use maos_domain::iac_bus_types::IacBusError;
                 let id = recipient.spirit_id.as_str();
-                let _ = self.transparency_log.insert_frame_event(
-                    FrameKind::TelemetryEvent,
-                    0,
-                    None,
-                    "iac:intent-promotion-denied",
-                    id.as_bytes(),
-                    maos_domain::invariants::i3::FrameOrigin::Kernel,
-                );
-                return Err(
-                    maos_domain::iac_bus_types::IacBusError::IntentPromotionDenied {
-                        recipient: id.to_owned(),
-                    },
-                );
+                let (cause, result) = match error {
+                    DistillationError::IntentPromotionDenied { .. } => (
+                        "lineage-denied",
+                        IacBusError::IntentPromotionDenied {
+                            recipient: id.to_owned(),
+                        },
+                    ),
+                    DistillationError::SourceFrameNotFound { .. } => (
+                        "distillate-not-found",
+                        IacBusError::PromotionDistillateNotFound,
+                    ),
+                    other => (
+                        "storage",
+                        IacBusError::PromotionDistillateStorage(other.to_string()),
+                    ),
+                };
+                let now = std::time::Instant::now();
+                let mut last = self
+                    .promotion_audit_last
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                let emit = last.is_none_or(|previous| {
+                    now.duration_since(previous) >= std::time::Duration::from_secs(1)
+                });
+                if emit {
+                    *last = Some(now);
+                }
+                drop(last);
+                if emit {
+                    let body = serde_json::json!({
+                        "recipient": id,
+                        "sender": frame.from.spirit_id.as_str(),
+                        "frame_id": ulid::Ulid::from_bytes(frame.frame_id).to_string(),
+                        "digest_frame_id": ulid::Ulid::from_bytes(reference.digest_frame_id).to_string(),
+                        "cause": cause,
+                    });
+                    let _ = self.transparency_log.insert_frame_event(
+                        FrameKind::TelemetryEvent,
+                        0,
+                        None,
+                        "iac:intent-promotion-denied",
+                        body.to_string().as_bytes(),
+                        maos_domain::invariants::i3::FrameOrigin::Kernel,
+                    );
+                }
+                return Err(result);
             }
         }
         Ok(())
@@ -925,6 +962,7 @@ impl Default for IacBusAdapter {
             }),
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
             promotion_sets: std::sync::Arc::new(dashmap::DashMap::new()),
+            promotion_audit_last: std::sync::Arc::new(std::sync::Mutex::new(None)),
             trace_sink: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,

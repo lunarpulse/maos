@@ -66,7 +66,7 @@ Epic 6 §A4(소급 2026-05-28)에서 Epic 6 스토리 6.2 / 6.4 / 6.5에 걸쳐 
 (`from_manifest_toml`은 없으면 `None`을 반환), 따라서 `MANIFEST_SCHEMA_VERSION = 3`의 kernel은 여전히 `= 2` 기준으로 작성된 manifest를 허용합니다
 (N-1 지원 하한선) — AC-11 append-only 호환. `xtask/abi-ratifications.toml`에 하나의 비준된 `[[ratification]]` 항목으로 기록됩니다.
 
-Story 13.5d에서 `[capabilities.required.loom]` 섹션을 위해 `4`로, Story 17-3b에서 `wasm-component`와 `[class].artifact`를 위해 `5`로 올려졌습니다. Story 18-7-live-skill-authoring-and-revisions의 D-02 A는 `[capabilities.required.skill].author_self`를 위해 `6`으로 올립니다. schema6 미만에서는 이 선언을 제거하여 권한을 부여하지 않습니다. 현재 지원 범위는 `1..=6`입니다.
+Story 13.5d에서 `[capabilities.required.loom]` 섹션을 위해 `4`로, Story 17-3b에서 `wasm-component`와 `[class].artifact`를 위해 `5`로 올려졌습니다. Story 18-7의 D-02 A는 `[capabilities.required.skill].author_self`를 위해 `6`으로 올렸습니다. Story 20-8은 네 FR8 선언을 위해 `7`로 올렸으며 schema 7 미만에서는 이 선언을 무시합니다. 현재 지원 범위는 `1..=7`입니다.
 
 이 상수는 `maos-manifest::ClassSection` 검증과 `xtask
 check-manifest-schema-version` 게이트가 소비하는 단일 권위 원천입니다. Story 7.5a의 ABI Stability Triple
@@ -77,17 +77,17 @@ check-manifest-schema-version` 게이트가 소비하는 단일 권위 원천입
 ```rust
 use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 
-assert_eq!(MANIFEST_SCHEMA_VERSION, 6);
+assert_eq!(MANIFEST_SCHEMA_VERSION, 7);
 ```
 
 
 ```rust
-pub const MANIFEST_SCHEMA_VERSION: u32 = 6u32;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 7u32;
 ```
 
 ### `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` {#maos-spirit-abi-min-supported-manifest-schema-version}
 
-`MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`과 함께 이 kernel이 어드미션 시점에 수락하는 범위의 하한을 정의합니다. 현재 하한은 `1`이고, 지원 범위는 `1..=6`입니다.
+`MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`과 함께 이 kernel이 어드미션 시점에 수락하는 범위의 하한을 정의합니다. 현재 하한은 `1`이고, 지원 범위는 `1..=7`입니다.
 
 # Example {#maos-spirit-abi-min-supported-manifest-schema-version-example}
 

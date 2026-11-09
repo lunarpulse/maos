@@ -719,6 +719,38 @@
     "remediation": "Correct the telemetry producer and submit only finite evidence; preserve the existing queue and never replace non-finite measurements with fabricated values.",
     "docs_url": "https://docs.maos.dev/errors/ESkillQueue::NonFiniteEvidence"
   },
+  "ESkillQueue::PayloadTooLarge": {
+    "code": "ESkillQueue::PayloadTooLarge",
+    "rust_path": "ESkillQueue::PayloadTooLarge",
+    "severity": "policy",
+    "recovery_class": "retry_with_correction",
+    "retryable": false,
+    "cause_chain_semantics": "admission or runtime policy",
+    "owner": "maos-skill",
+    "kernel_or_spirit": "kernel",
+    "since_version": "1.0.0",
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "description": "Skill submission exceeds the payload byte limit",
+    "cause": "A Spirit-authored document or revision diff exceeds 256 KiB.",
+    "remediation": "Reduce the document or diff to at most 256 KiB before submitting it.",
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::PayloadTooLarge"
+  },
+  "ESkillQueue::PendingLimit": {
+    "code": "ESkillQueue::PendingLimit",
+    "rust_path": "ESkillQueue::PendingLimit",
+    "severity": "policy",
+    "recovery_class": "retry",
+    "retryable": true,
+    "cause_chain_semantics": "admission or runtime policy",
+    "owner": "maos-skill",
+    "kernel_or_spirit": "kernel",
+    "since_version": "1.0.0",
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "description": "Author class has reached the pending submission limit",
+    "cause": "The author class already has 64 pending skill submissions.",
+    "remediation": "Have an operator decide pending submissions before submitting another.",
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::PendingLimit"
+  },
   "ESkillQueue::PrincipalDataRefused": {
     "code": "ESkillQueue::PrincipalDataRefused",
     "rust_path": "ESkillQueue::PrincipalDataRefused",

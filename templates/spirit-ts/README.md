@@ -95,10 +95,7 @@ and `fetch = true`. During `handleFrame`, the guest imports
 frame id before echoing the frame. These imports are available only during
 `handleFrame`, not lifecycle hooks.
 
-The schema-7 manifest requires `example-prerequisite` to be discovered and
-operator-admitted before launch. Copy `skills/example-prerequisite.md` to
-`$HOME/.maos/skills/` and approve it with `maosctl skills approve
-example-prerequisite`, or replace it with your own admitted skill.
+The template does not require a pre-approved skill to launch.
 `skills.author` and `skills.propose` run only inside `handleFrame` and return
 `capability-denied`, `refused(code)` or `unavailable`. The host binds identity
 and telemetry; skills are never auto-admitted and no content import is offered.

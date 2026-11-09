@@ -120,8 +120,9 @@ pub fn emit_vetter_key_event(
 pub fn emit_manifest_declaration_event(
     tl: &maos_kernel_core::iac::TransparencyLogAdapter,
     gated: &GatedManifest,
-) -> Result<(), String> {
+) -> Result<String, String> {
     use sha2::Digest;
+    let attempt_id = ulid::Ulid::new().to_string();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or(std::time::Duration::ZERO)
@@ -138,6 +139,8 @@ pub fn emit_manifest_declaration_event(
         event: maos_domain::governance::GovernanceEventKind::ManifestDeclaration(
             maos_domain::governance::ManifestDeclarationPayload {
                 spirit_id: gated.spirit_id.clone(),
+                attempt_id: attempt_id.clone(),
+                outcome: "declared".into(),
                 version: gated.class_section.version.clone(),
                 manifest_sha256: maos_domain::governance::encode_declaration_bytes(
                     &sha2::Sha256::digest(gated.manifest_toml.as_bytes()).into(),
@@ -167,7 +170,23 @@ pub fn emit_manifest_declaration_event(
         &bytes,
         maos_domain::invariants::i3::FrameOrigin::Kernel,
     );
-    Ok(())
+    Ok(attempt_id)
+}
+
+fn emit_manifest_declaration_outcome(
+    tl: &maos_kernel_core::iac::TransparencyLogAdapter,
+    attempt_id: &str,
+    outcome: &str,
+) {
+    let payload = serde_json::json!({ "attempt_id": attempt_id, "outcome": outcome });
+    tl.insert_frame_event(
+        maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
+        0,
+        None,
+        "governance:manifest-declaration-outcome",
+        payload.to_string().as_bytes(),
+        maos_domain::invariants::i3::FrameOrigin::Kernel,
+    );
 }
 
 /// Story 20-3c (FR62(b), D-20-3c-05 B) — journal an ABI-extension proposal or a
@@ -847,6 +866,16 @@ pub fn gate_manifest(
             )?,
         )
     } else {
+        for name in [
+            "skills",
+            "explanation_shape",
+            "intent_promotion_set",
+            "swap_invariants",
+        ] {
+            if root.get(name).is_some() {
+                eprintln!("maos: WARNING — declared section {name} ignored below schema 7");
+            }
+        }
         (None, None, None, None)
     };
     // The component's manifest has now passed every structural gate. The
@@ -1043,18 +1072,20 @@ pub fn check_declared_skills(
     let unavailable = |skill: &str| AdmissionRefusal::SkillUnavailable {
         skill: skill.to_owned(),
     };
-    let first = skills.uses.first().ok_or_else(|| unavailable(""))?;
+    let store_error = |error: &dyn std::fmt::Display| AdmissionRefusal::Admission {
+        detail: format!("skill store unavailable: {error}"),
+    };
     let serialization = crate::operator_door::skill_serialization();
     let _guard = serialization
         .lock()
         .unwrap_or_else(|error| error.into_inner());
-    let store = maos_skill::LocalFsSkillQueueStore::new().map_err(|_| unavailable(first))?;
+    let store = maos_skill::LocalFsSkillQueueStore::new().map_err(|e| store_error(&e))?;
     let discovered =
         maos_skill::discover_skills_detailed(&maos_skill::default_search_path()).discovered;
-    let entries = store.load().map_err(|_| unavailable(first))?;
-    let approvals = tl.query_approvals(None).map_err(|_| unavailable(first))?;
+    let entries = store.load().map_err(|e| store_error(&e))?;
+    let approvals = tl.query_approvals(None).map_err(|e| store_error(&e))?;
     let queue = maos_cli::subcommands::skill_entries(&discovered, entries, &approvals)
-        .map_err(|_| unavailable(first))?;
+        .map_err(|e| store_error(&e))?;
     let scopes = maos_manifest::capabilities_required_to_scopes(&gated.caps_required);
     for id in &skills.uses {
         let mut found = false;
@@ -1110,14 +1141,21 @@ pub async fn load_admit_start(
     start: StartPolicy,
     on_loaded: &mut (dyn FnMut(u32) + Send),
 ) -> Result<Admitted, AdmissionRefusal> {
-    if let Some(providers) = &gated.providers {
-        check_provider_pins(providers, deps.providers)?;
-    }
-    check_declared_skills(gated, deps.transparency_log)?;
-    if gated.intent_promotion_set.is_some() && deps.iac.is_none() {
-        return Err(AdmissionRefusal::Admission {
-            detail: "intent promotion bus unavailable".into(),
-        });
+    let early_gates = (|| {
+        if let Some(providers) = &gated.providers {
+            check_provider_pins(providers, deps.providers)?;
+        }
+        check_declared_skills(gated, deps.transparency_log)?;
+        if gated.intent_promotion_set.is_some() && deps.iac.is_none() {
+            return Err(AdmissionRefusal::Admission {
+                detail: "intent promotion bus unavailable".into(),
+            });
+        }
+        Ok(())
+    })();
+    if let Err(refusal) = early_gates {
+        emit_structural_rejection(deps.transparency_log, &gated.manifest_toml, &refusal);
+        return Err(refusal);
     }
     let spirit_id = gated.spirit_id.clone();
     let archive_root = maos_audit::default_archive_dir();
@@ -1143,7 +1181,7 @@ pub async fn load_admit_start(
         emit_model_provenance_event(deps.transparency_log, &record)
             .map_err(|detail| AdmissionRefusal::ModelProvenance { detail })?;
     }
-    emit_manifest_declaration_event(deps.transparency_log, gated)
+    let attempt_id = emit_manifest_declaration_event(deps.transparency_log, gated)
         .map_err(|detail| AdmissionRefusal::Admission { detail })?;
 
     let pid = match deps
@@ -1161,6 +1199,7 @@ pub async fn load_admit_start(
                 "N/A",
                 "admission rejected: already loaded",
             );
+            emit_manifest_declaration_outcome(deps.transparency_log, &attempt_id, "refused");
             return Err(AdmissionRefusal::AlreadyLoaded { spirit_id });
         }
         Err(error) => {
@@ -1172,6 +1211,7 @@ pub async fn load_admit_start(
                 "N/A",
                 &format!("load rejected: {error}"),
             );
+            emit_manifest_declaration_outcome(deps.transparency_log, &attempt_id, "refused");
             if let Some(pid) = deps.scheduler.resolve_pid(&spirit_id) {
                 rollback(deps, pid, &spirit_id).await;
             }
@@ -1196,6 +1236,7 @@ pub async fn load_admit_start(
             "N/A",
             &format!("storage identity rejected: {error}"),
         );
+        emit_manifest_declaration_outcome(deps.transparency_log, &attempt_id, "refused");
         rollback(deps, pid, &spirit_id).await;
         return Err(AdmissionRefusal::Load {
             detail: error.to_string(),
@@ -1236,6 +1277,7 @@ pub async fn load_admit_start(
                 "N/A",
                 &format!("admission rejected: {error}"),
             );
+            emit_manifest_declaration_outcome(deps.transparency_log, &attempt_id, "refused");
             rollback(deps, pid, &spirit_id).await;
             return Err(AdmissionRefusal::Admission {
                 detail: error.to_string(),
@@ -1250,6 +1292,7 @@ pub async fn load_admit_start(
         &format!("{:?}", spec.tier),
         "admission granted",
     );
+    emit_manifest_declaration_outcome(deps.transparency_log, &attempt_id, "admitted");
     // Story 19-5 (D-19-5-03 A) — only a GRANTED admission leaves the FR11
     // identity record a later cross-major load is checked against.
     archive_admitted(&archive_root, gated);
@@ -1291,6 +1334,7 @@ pub async fn load_admit_start(
                 "N/A",
                 &format!("start rejected: {error}"),
             );
+            emit_manifest_declaration_outcome(deps.transparency_log, &attempt_id, "refused");
             if let Some(hooks) = hooks {
                 hooks.unregister(pid, "start-failed");
             }

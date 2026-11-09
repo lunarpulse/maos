@@ -485,6 +485,13 @@ async fn a_refused_admission_or_a_failed_start_leaves_no_registration() {
         matches!(failed, Err(AdmissionRefusal::Start { .. })),
         "{failed:?}"
     );
+    assert!(world
+        .tl
+        .query_frames(FrameFilter::default())
+        .unwrap()
+        .iter()
+        .any(|row| row.intent == "governance:vetter-key-rejection"
+            && String::from_utf8_lossy(&row.payload_redacted).contains("start rejected")));
     let rows = world.subscription_rows();
     assert_eq!(rows.len(), 2, "{rows:?}");
     assert_eq!((rows[0].1, rows[0].2.as_str()), (true, "admitted"));
@@ -2100,6 +2107,54 @@ async fn admission_storage_binding_refusal_is_typed_and_unloads_the_spirit() {
     assert!(world.scheduler.resolve_pid(&gated.spirit_id).is_none());
     assert!(world.lookup.read().expect("lookup lock").is_empty());
     assert!(world.subscription_rows().is_empty());
+    assert!(world
+        .tl
+        .query_frames(FrameFilter::default())
+        .unwrap()
+        .iter()
+        .any(|row| row.intent == "governance:vetter-key-rejection"
+            && String::from_utf8_lossy(&row.payload_redacted)
+                .contains("storage identity rejected")));
+    world.pump.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn missing_skill_is_journaled_before_pid() {
+    let world = World::new();
+    let manifest = format!(
+        "{}\n[skills]\nuses = [\"missing-20-8-witness\"]\n",
+        OBSERVER_MANIFEST.replace("manifest_schema_version = 2", "manifest_schema_version = 7")
+    );
+    let gated = gate_manifest(&manifest, &|name| KNOWN_CLASS_NAMES.contains(&name)).unwrap();
+    let deps = AdmissionDeps {
+        providers: None,
+        iac: Some(&world.iac),
+        scheduler: &world.scheduler,
+        security: &world.security,
+        transparency_log: &world.tl,
+        journal: &world.journal,
+        memory: &world.memory,
+        pid_by_spirit_id: &world.lookup,
+        hooks: Some(&world.pump),
+    };
+    let result = load_admit_start(
+        &deps,
+        &gated,
+        make_spirit_obj(Observer::default()),
+        NONCE,
+        StartPolicy::LeaveLoaded,
+        &mut |_| panic!("missing skill issued a pid"),
+    )
+    .await;
+    assert!(matches!(
+        result,
+        Err(AdmissionRefusal::SkillUnavailable { .. })
+    ));
+    let rows = world.tl.query_frames(FrameFilter::default()).unwrap();
+    assert!(rows
+        .iter()
+        .any(|row| row.intent == "governance:vetter-key-rejection"
+            && String::from_utf8_lossy(&row.payload_redacted).contains("skill_unavailable")));
     world.pump.shutdown().await;
 }
 
@@ -2138,6 +2193,26 @@ async fn manifest_declaration_precedes_pid_and_refusal_is_distinct() {
     .await
     .unwrap();
     assert!(admitted.pid > 0);
+    let connection =
+        rusqlite::Connection::open(world._dir.path().join("transparency.sqlite")).unwrap();
+    let declaration_row: i64 = connection
+        .query_row(
+            "SELECT rowid FROM transparency_log WHERE intent = 'governance:manifest-declaration'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    let load_row: i64 = connection
+        .query_row(
+            "SELECT rowid FROM transparency_log WHERE intent = 'lifecycle.admit'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(
+        declaration_row < load_row,
+        "declaration must precede scheduler load"
+    );
     let refused = load_admit_start(
         &deps,
         &gated,
@@ -2164,6 +2239,32 @@ async fn manifest_declaration_precedes_pid_and_refusal_is_distinct() {
             .count(),
         1
     );
+    let declarations: Vec<_> = rows
+        .iter()
+        .filter(|row| row.intent == "governance:manifest-declaration")
+        .map(|row| {
+            let payload: maos_domain::governance::GovernanceEventPayload =
+                serde_json::from_slice(&row.payload_redacted).unwrap();
+            let maos_domain::governance::GovernanceEventKind::ManifestDeclaration(declaration) =
+                payload.event
+            else {
+                panic!("unexpected event");
+            };
+            assert_eq!(declaration.outcome, "declared");
+            declaration.attempt_id
+        })
+        .collect();
+    assert_ne!(declarations[0], declarations[1]);
+    let outcomes: Vec<serde_json::Value> = rows
+        .iter()
+        .filter(|row| row.intent == "governance:manifest-declaration-outcome")
+        .map(|row| serde_json::from_slice(&row.payload_redacted).unwrap())
+        .collect();
+    for (id, outcome) in declarations.iter().zip(["admitted", "refused"]) {
+        assert!(outcomes
+            .iter()
+            .any(|row| row["attempt_id"] == *id && row["outcome"] == outcome));
+    }
     world.pump.shutdown().await;
 }
 

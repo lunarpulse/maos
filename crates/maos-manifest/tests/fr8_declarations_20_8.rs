@@ -39,3 +39,28 @@ fn declarations_validate_bounded_unique_names_and_unknown_keys() {
         assert!(!accepts(&format!("{field} = [\"valid\"]\nunknown = 1")));
     }
 }
+
+#[test]
+fn invalid_declaration_errors_are_bounded_and_distinguish_duplicates() {
+    let invalid = SkillsSection::from_toml_str(&format!("uses = [\"{}\"]", "x".repeat(10_000)))
+        .unwrap_err()
+        .to_string();
+    assert!(invalid.len() < 256, "unbounded refusal: {}", invalid.len());
+    assert!(invalid.contains("invalid entry"));
+    let duplicate = SkillsSection::from_toml_str("uses = [\"same\", \"same\"]")
+        .unwrap_err()
+        .to_string();
+    assert!(duplicate.contains("duplicate entry"));
+}
+
+#[test]
+fn skill_identifiers_must_survive_log_redaction() {
+    for name in [
+        "sk-review",
+        "ghp_example",
+        "ya29.example",
+        "abcdef0123456789abcdef0123456789",
+    ] {
+        assert!(SkillsSection::from_toml_str(&format!("uses = [\"{name}\"]")).is_err());
+    }
+}

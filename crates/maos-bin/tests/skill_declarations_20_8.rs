@@ -74,6 +74,33 @@ fn unavailable_pending_escalation_and_admitted_skills_are_distinguished() {
     )
     .unwrap();
     assert!(check_declared_skills(&covered, &log).is_ok());
+    let second = skills.join("older-copy.md");
+    std::fs::write(&second, "---\nid='admission-witness'\nversion='0.9.0'\nname='Older witness'\ndescription='second copy'\nrequired_capabilities=['mcp.call']\n---\nA second skill.\n").unwrap();
+    assert_eq!(
+        check_declared_skills(&covered, &log).unwrap_err().code(),
+        "skill_unavailable"
+    );
+    let older = QueueEntry::package_shipped(
+        SkillId("admission-witness".into()),
+        SkillVersion("0.9.0".into()),
+    )
+    .unwrap();
+    log.insert_approval_decision(ApprovalDecision {
+        actor: "operator".into(),
+        target: older.approval_target(),
+        capability: "skill.admission.approve".into(),
+        intent: "approve".into(),
+        decision: true,
+        reasoning: None,
+    })
+    .unwrap();
+    assert!(check_declared_skills(&covered, &log).is_ok());
+    std::fs::write(&second, "---\nid='admission-witness'\nversion='0.9.0'\nname='Older witness'\ndescription='second copy'\nrequired_capabilities=['memory.write']\n---\nA second skill.\n").unwrap();
+    assert_eq!(
+        check_declared_skills(&covered, &log).unwrap_err().code(),
+        "skill_escalation"
+    );
+    std::fs::remove_file(second).unwrap();
     emit_manifest_declaration_event(&log, &covered).unwrap();
     let rows = log.query_frames(FrameFilter::default()).unwrap();
     let row = rows

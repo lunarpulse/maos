@@ -307,6 +307,8 @@
     "ESkillQueue::ForeignNamespace",
     "ESkillQueue::InvalidStoredEntry",
     "ESkillQueue::NonFiniteEvidence",
+    "ESkillQueue::PayloadTooLarge",
+    "ESkillQueue::PendingLimit",
     "ESkillQueue::PrincipalDataRefused",
     "ESkillQueue::Proposal",
     "ESkillQueue::Schema",

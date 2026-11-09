@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 
 vi.mock("maos:spirit/recall@2.3.0", () => ({
   recall: vi.fn(),
@@ -19,6 +20,12 @@ function componentError(tag: string): Error {
 
 const frame = { frameId: new Uint8Array(16).fill(17) } as Parameters<typeof handleFrame>[0];
 
+
+it("ships without an unavailable prerequisite and uses routed intent vocabulary", () => {
+  const manifest = readFileSync(new URL("../manifest.toml", import.meta.url), "utf8");
+  expect(manifest).not.toMatch(/^\[skills\]$/m);
+  expect(manifest).toContain('allowed = ["standard"]');
+});
 describe("WASM component guest", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -47,6 +54,15 @@ describe("WASM component guest", () => {
       vi.mocked(fetch).mock.invocationCallOrder[0],
     );
   });
+
+  it.each(["refused", "unavailable", "capability-denied"])(
+    "continues after skill authoring reports %s", (tag) => {
+      vi.mocked(author).mockImplementation(() => { throw componentError(tag); });
+      expect(handleFrame(frame)).toEqual([frame]);
+      expect(handleFrame(frame)).toEqual([frame]);
+      expect(author).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("echoes when fetch reports scope-violation", () => {
     vi.mocked(fetch).mockImplementation(() => { throw componentError("scope-violation"); });

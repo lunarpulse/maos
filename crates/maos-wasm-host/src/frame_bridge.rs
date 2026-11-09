@@ -1,4 +1,4 @@
-//! Codec between domain `IacFrame` values and the `maos:spirit@2.2.0`
+//! Codec between domain `IacFrame` values and the `maos:spirit@2.3.0`
 //! WIT-generated `IacFrame` the wasmtime guest speaks.
 //!
 //! The runner decodes ADR-032 CBOR bytes into a domain frame, lowers it into

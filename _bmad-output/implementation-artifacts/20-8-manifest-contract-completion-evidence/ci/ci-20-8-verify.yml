@@ -37,6 +37,8 @@ jobs:
           MAOS_17_2_CGROUP_MODE: undelegated
         run: |
           cargo test --locked -p maos-bin --features maos-bin/wasm-host --test wasm_skill_authoring_20_8
+          cargo test --locked -p maos-bin --features maos-bin/wasm-host --test recall_17_3d denied_promotion_counts_without_terminating_wasm_session
+          cargo test --locked -p maos-bin --features maos-bin/wasm-host --test recall_17_3d skill_author_call_after_sixty_four_recalls_exhausts_same_budget
           cargo test --locked -p maos-wasm-host --test wit_corpus
   check-wasm-form-equiv:
     runs-on: ubuntu-24.04
@@ -88,9 +90,7 @@ jobs:
           export HOME="$scratch/home" MAOS_HOME="$scratch/home/.maos" XDG_DATA_HOME="$scratch/home/.local/share" XDG_CONFIG_HOME="$scratch/home/.config" XDG_RUNTIME_DIR="$scratch/run"
           mkdir -p "$HOME/.maos/skills" "$XDG_CONFIG_HOME/maos" "$XDG_RUNTIME_DIR"
           printf '[registry]\ndevelopment_http = true\n' > "$XDG_CONFIG_HOME/maos/operator.toml"
-          cp examples/example-spirit-ts/skills/example-prerequisite.md "$HOME/.maos/skills/"
           maos init --plain
-          maosctl skills approve example-prerequisite
           maos-registry-server --dev-http --bind 127.0.0.1:6789 --root "$scratch/registry" > registry.log 2>&1 &
           server_pid=$!
           trap 'kill -TERM "$server_pid" 2>/dev/null || true; wait "$server_pid" || true; rm -rf "$scratch"' EXIT
@@ -131,7 +131,7 @@ jobs:
           row=rows[0]
           assert row['manifest_sha256'].replace(':','')==hashlib.sha256((package/'manifest.toml').read_bytes()).hexdigest()
           assert row['publisher'].replace(':','')==signed['publisher_pubkey']
-          assert set(row['declared'])=={'skills','explanation_shape','intent_promotion_set','swap_invariants'}
+          assert set(row['declared'])=={'explanation_shape','intent_promotion_set','swap_invariants'}
           if os.environ['CAPABILITY_CASE']=='declared':
               skill=json.load(open('skill.json'))
               assert skill['state']=='Pending' and skill['author']['class']=='example-spirit-ts', skill
@@ -149,7 +149,8 @@ jobs:
             set +e
             printf '@example-spirit-ts hello\n' | sudo systemd-run --unit=maos-20-8-tamper --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" PATH="$PATH" MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" "$target/release/maos" shell --plain > tamper.log 2>&1
             set -e
-            grep -F installed_package_invalid tamper.log
+            grep -F 'refused at boot: admission_refused' tamper.log
+            maosctl audit query --intent governance:vetter-key-rejection | grep -F installed_package_invalid
             maosctl audit query --intent governance:manifest-declaration > after-tamper.ndjson
             cmp declarations.ndjson after-tamper.ndjson
           fi

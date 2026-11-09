@@ -51,8 +51,8 @@ binary_id(xtask::example_spirit_regen_integration)
 | binary_id(maos-bin::wasm_skill_authoring_20_8)
 """
 test-group = "serial"
-# AC15 real TLS/CLI witnesses share the owned serial resource group; measured
-# cheap under the default30s budget, no per-binary exception widening.
+# AC15 real TLS/CLI and 20-8 skill witnesses share the owned serial resource
+# group; the two 20-8 binaries have separately owned 31s exceptions.
 
 [profile.ci]
 fail-fast = false

@@ -85,7 +85,7 @@ No skill-content import exists and admission remains operator-only.
 
 ## Recall frames you participated in
 
-The `maos:spirit@2.2.0` world imports `maos:spirit/recall@2.2.0`, which provides two functions:
+The `maos:spirit@2.3.0` world imports `maos:spirit/recall@2.3.0`, which provides two functions:
 
 ```wit
 recall: func(filter: recall-filter) -> result<recall-page, recall-error>;
@@ -127,11 +127,12 @@ scope, fresh Worker capacity, non-configurable budget, string-only callers and
 audit-only schedule tokens). These are not ADR-016 context-token signals:
 those arrive as kernel `context-pressure` / `context-limit` frames through
 `handle-frame` after the guest reports its own count with
-`maos:spirit/context@2.2.0` `report(used-tokens)`; the daemon binds the pid and
+`maos:spirit/context@2.3.0` `report(used-tokens)`; the daemon binds the pid and
 the admitted window (`18-5-context-token-budget-accounting`).
 
-The 2.2 runner also accepts existing 2.0 and 2.1 components without rebuilding
-them: it selects their original closed-enum export bindings before
+The 2.3 runner retains bindings for existing 2.0–2.2 components; the local
+compatibility witness exercises 2.0, while genuine 2.1 and 2.2 guests remain
+unverified. It selects their original closed-enum export bindings before
 instantiation and shares the same frame pump. A context kind or payload cannot
 be lowered into that older schema, including a context kind nested in
 `retract.original-kind` or `consent-rupture.original-kind`; the runner refuses

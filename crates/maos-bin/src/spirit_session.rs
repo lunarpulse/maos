@@ -174,6 +174,8 @@ pub enum SessionError {
     Codec(String),
     #[error("session mailbox failed: {0}")]
     Mailbox(String),
+    #[error("intent promotion denied")]
+    IntentPromotionDenied,
     #[error("session journal failed: {0}")]
     Journal(String),
     #[error("session token rollback failed: {0}")]
@@ -612,7 +614,11 @@ fn deliver_bounded<T>(
             tokio::select! {
                 done = &mut work => {
                     return match done {
-                        Ok(result) => result.map_err(|error| SessionError::Mailbox(error.to_string())),
+                        Ok(result) => result.map_err(|error| match error {
+                            maos_domain::iac_bus_types::IacBusError::IntentPromotionDenied { .. } =>
+                                SessionError::IntentPromotionDenied,
+                            other => SessionError::Mailbox(other.to_string()),
+                        }),
                         Err(_) => Err(SessionError::Deadline("delivery")),
                     };
                 }
@@ -1037,6 +1043,10 @@ fn authorize_and_deliver(
         )
         .map(drop)
     };
+    if matches!(delivery, Err(SessionError::IntentPromotionDenied)) {
+        revoke(&deps.capability, &mut issued)?;
+        return Ok(false);
+    }
     if let Err(error) = delivery {
         return Err(fail(&deps.capability, &mut issued, error));
     }

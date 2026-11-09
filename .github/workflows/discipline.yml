@@ -1448,11 +1448,15 @@ jobs:
             echo "::error title=Default WASM admission::rc=$rc"
           fi
           exit "$rc"
+      - name: Build WASM skill witness fixtures
+        run: |
+          rustup target add wasm32-wasip2
+          cargo run --locked -p xtask -- build-test-fixtures
       - name: Assert WASM admission and unsupported in-process surface refusals
         shell: bash
         run: |
           set +e
-          cargo test --locked -p maos-bin --features wasm-host --test wasm_form_admission_17_3b -- --nocapture 2>&1 | tee wasm-admission-wasm-host.log
+          cargo test --locked -p maos-bin --features wasm-host --test wasm_form_admission_17_3b --test wasm_skill_authoring_20_8 -- --nocapture 2>&1 | tee wasm-admission-wasm-host.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -eq 0 ]; then
             echo "::notice title=wasm-host WASM admission::rc=0 $(grep 'test result' wasm-admission-wasm-host.log | paste -sd';' -)"

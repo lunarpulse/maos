@@ -29,6 +29,16 @@ tier = "T0"
 }
 
 #[test]
+fn schema_seven_passes_real_abi_triple_check() {
+    let text = manifest(7, "").replace(
+        "min_substrate_version = \"0.1.0\"",
+        "min_substrate_version = \"0.1.0-alpha.1\"",
+    );
+    let gated = gate_manifest(&text, &|_| true).unwrap();
+    maos_kernel_core::security::check_abi_triple(&gated.spirit_id, &gated.class_section).unwrap();
+}
+
+#[test]
 fn declarations_reject_invalid_before_load_and_degrade_under_schema_six() {
     let many = (0..33)
         .map(|n| format!("\"item{n}\""))
@@ -48,6 +58,19 @@ fn declarations_reject_invalid_before_load_and_degrade_under_schema_six() {
             "manifest_section_invalid"
         );
         assert!(gate_manifest(&manifest(6, &section), &|_| true).is_ok());
+        let gated = gate_manifest(&manifest(6, &section), &|_| true).unwrap();
+        let log = TransparencyLogAdapter::open_in_memory(208);
+        emit_manifest_declaration_event(&log, &gated).unwrap();
+        let rows = log.query_frames(FrameFilter::default()).unwrap();
+        let payload: maos_domain::governance::GovernanceEventPayload =
+            serde_json::from_slice(&rows[0].payload_redacted).unwrap();
+        let maos_domain::governance::GovernanceEventKind::ManifestDeclaration(declaration) =
+            payload.event
+        else {
+            panic!("wrong governance event");
+        };
+        assert!(declaration.declared.is_empty());
+        assert!(declaration.publisher.is_none());
     }
 }
 

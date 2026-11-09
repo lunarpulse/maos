@@ -148,6 +148,12 @@ pub struct ModelProvenancePayload {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ManifestDeclarationPayload {
     pub spirit_id: String,
+    /// Correlates this pre-admission declaration with subsequent outcomes.
+    #[serde(default)]
+    pub attempt_id: String,
+    /// Always "declared"; this record is not an admission grant.
+    #[serde(default)]
+    pub outcome: String,
     pub version: String,
     /// SHA-256 of the exact manifest, in colon-delimited lowercase hex.
     pub manifest_sha256: String,

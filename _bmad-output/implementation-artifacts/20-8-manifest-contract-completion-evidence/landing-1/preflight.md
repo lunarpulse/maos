@@ -220,7 +220,9 @@ PyYAML is absent (exit 1). Parsing is not hosted execution.
 
 The prebuilt `kloc-check --json` run against the current tree reported aggregate 196,964, kernel 21,042, maos-manifest 4,604, maos-bin 35,589, maos-wasm-host 2,412, maos-domain 10,137, maos-iac 8,625, maos-skill 1,234 and xtask 44,696 (exit 0). Rebase the creation-time L1 allowances under D02 A onto these pins; ceilings are not reservations:
 
-| Crate | Pin | L1 allowance | L1 ceiling |
+The following table is the superseded initial rebase, retained as historical T0 evidence; the effective later ceiling is in the story and flag decision.
+
+| Crate | Pin | L1 allowance | Initial ceiling (superseded) |
 |---|---:|---:|---:|
 | maos-manifest | 4,604 | 208 | 4,812 |
 | maos-bin | 35,589 | 574 | 36,163 |
@@ -231,7 +233,7 @@ The prebuilt `kloc-check --json` run against the current tree reported aggregate
 | xtask | 44,696 | 53 | 44,749 |
 | aggregate | 196,964 | 1,627 | 198,591 |
 
-Kernel is unchanged in L1. Other crates have zero allowance; the existing maos-spirit-abi budget remains 3,000. Final measured pins and exact aggregate hardfail are still owed.
+Kernel is unchanged in L1. The later rebase supersedes this table; it is not the final measurement or ceiling.
 
 ## Observed failing-before witness
 

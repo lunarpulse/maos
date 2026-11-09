@@ -29,9 +29,9 @@ use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i8::A2AIntent;
 use maos_domain::ports::DistillationPort;
 
-use super::transparency_log::{
-    DistillateWriteToken, FrameFilter, FrameKind, TransparencyLogAdapter,
-};
+#[cfg(test)]
+use super::transparency_log::FrameFilter;
+use super::transparency_log::{DistillateWriteToken, FrameKind, TransparencyLogAdapter};
 /// Stable intent string constant for `CapabilityInvocation` audit row.
 pub const DISTILLATE_WRITE_INTENT: &str = "distillate.write";
 
@@ -147,13 +147,10 @@ impl DistillateWriter {
         digest_frame_id: [u8; 16],
         allowed: &AllowedPromotionSet,
     ) -> Result<(), DistillationError> {
-        let entries = log
-            .query_frames(FrameFilter::default())
+        let entry = log
+            .query_frame_by_id(digest_frame_id)
             .map_err(|error| DistillationError::Storage(error.to_string()))?;
-        match entries
-            .iter()
-            .find(|entry| entry.frame_id == digest_frame_id)
-        {
+        match entry {
             Some(entry) if entry.kind == FrameKind::Distillate => {
                 let receipt = Self::deserialize_receipt(&entry.payload_redacted)?;
                 if allowed.allows(&receipt.intent_lineage) {

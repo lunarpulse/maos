@@ -77,6 +77,10 @@ pub enum ESkillQueue {
     /// A Pending entry with this SkillId already exists in the queue.
     #[error("duplicate skill id `{0}`: a Pending entry with this id already exists in the admission queue")]
     DuplicateSkillId(String),
+    #[error("skill submission exceeds its payload size limit")]
+    PayloadTooLarge,
+    #[error("author has too many pending skill submissions")]
+    PendingLimit,
     #[error("authored skill id is outside the root-resolved class namespace")]
     ForeignNamespace,
     #[error("revision target is not an admitted skill authored by this class")]
@@ -114,6 +118,8 @@ impl ESkillQueue {
     pub fn code(&self) -> &'static str {
         match self {
             Self::DuplicateSkillId(_) => "duplicate-skill-id",
+            Self::PayloadTooLarge => "payload-too-large",
+            Self::PendingLimit => "pending-limit",
             Self::ForeignNamespace => "foreign-namespace",
             Self::TargetNotOwned => "target-not-owned",
             Self::StaleTargetVersion => "stale-target-version",
