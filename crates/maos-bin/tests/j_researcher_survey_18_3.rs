@@ -945,6 +945,7 @@ async fn mcp_response_only_principal_is_purged_without_cached_claim_resurrection
     let admitted = load_admit_start(
         &AdmissionDeps {
             providers: None,
+            iac: None,
             scheduler: &scheduler,
             security: &security,
             transparency_log: &tl,

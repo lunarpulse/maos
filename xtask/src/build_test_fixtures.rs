@@ -72,11 +72,11 @@ fn fixtures(root: &Path, target: &Path, fixture_dir: &Path, release: bool) -> Ve
     let profile_flag: &[&str] = if release { &["--release"] } else { &[] };
     let workspace = root.join("Cargo.toml");
     let wasm = target.join("wasm32-wasip2/release");
-    let guest = |name: &'static str, artefact: &'static str| {
+    let guest = |name: &'static str, package: &'static str, artefact: &'static str| {
         let manifest = root.join(format!("crates/maos-wasm-host/guests/{name}/Cargo.toml"));
         Fixture {
             name: artefact,
-            package: name,
+            package,
             args: [
                 s(&[
                     "build",
@@ -234,10 +234,25 @@ fn fixtures(root: &Path, target: &Path, fixture_dir: &Path, release: bool) -> Ve
             copy: Some((target.join("debug/maos-wasm-runner"), fault_inject.clone())),
             artefacts: vec![("maos-wasm-runner-fault-inject", fault_inject)],
         },
-        guest("echo-spirit", "echo_spirit.wasm"),
-        guest("routed-relay", "routed_relay.wasm"),
-        guest("recall-probe", "recall_probe.wasm"),
-        guest("compat-echo-2-0", "compat_echo_2_0.wasm"),
+        guest("echo-spirit", "echo-spirit", "echo_spirit.wasm"),
+        guest("routed-relay", "routed-relay", "routed_relay.wasm"),
+        guest("recall-probe", "recall-probe", "recall_probe.wasm"),
+        guest("compat-echo-2-0", "compat-echo-2-0", "compat_echo_2_0.wasm"),
+        guest(
+            "equiv-fixture/wasm-guest",
+            "equiv-identity-spirit",
+            "equiv_identity_spirit.wasm",
+        ),
+        guest(
+            "equiv-fixture/divergent-guest",
+            "equiv-divergent-spirit",
+            "equiv_divergent_spirit.wasm",
+        ),
+        guest(
+            "equiv-fixture/cosmetic-guest",
+            "equiv-cosmetic-spirit",
+            "equiv_cosmetic_spirit.wasm",
+        ),
         Fixture {
             name: "equiv-native-twin",
             package: "equiv-native-twin",

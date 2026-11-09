@@ -1,7 +1,7 @@
 # {{crate_name}}
 
 A TypeScript MAOS Spirit scaffold that builds a `wasm-component` implementing
-`maos:spirit@2.2.0`.
+`maos:spirit@2.3.0`.
 
 ## Requirements
 
@@ -89,11 +89,20 @@ truncated with a marker.
 
 ## Recall demo
 
-The schema-5 manifest grants `[capabilities.required.log]` with `recall = true`
+The schema-7 manifest grants `[capabilities.required.log]` with `recall = true`
 and `fetch = true`. During `handleFrame`, the guest imports
-`maos:spirit/recall@2.2.0`, recalls up to 16 entries, then fetches the inbound
+`maos:spirit/recall@2.3.0`, recalls up to 16 entries, then fetches the inbound
 frame id before echoing the frame. These imports are available only during
 `handleFrame`, not lifecycle hooks.
+
+The schema-7 manifest requires `example-prerequisite` to be discovered and
+operator-admitted before launch. Copy `skills/example-prerequisite.md` to
+`$HOME/.maos/skills/` and approve it with `maosctl skills approve
+example-prerequisite`, or replace it with your own admitted skill.
+`skills.author` and `skills.propose` run only inside `handleFrame` and return
+`capability-denied`, `refused(code)` or `unavailable`. The host binds identity
+and telemetry; skills are never auto-admitted and no content import is offered.
+The explanation declaration is journaled, not enforced.
 
 Recall lists frames the Spirit sent or received in this daemon run, so fetching
 the received `--once` operator seed succeeds. Withheld frames are omitted from

@@ -118,6 +118,9 @@ mod wit_ast {
     pub fn recall_errors() -> Vec<String> {
         variant_case_names("recall-error")
     }
+    pub fn skill_errors() -> Vec<String> {
+        variant_case_names("skill-error")
+    }
     pub fn record_names() -> Vec<String> {
         all_record_names()
     }
@@ -201,8 +204,8 @@ fn corpus_covers_all_record_types() {
     let records = wit_ast::record_names();
     assert_eq!(
         records.len(),
-        27,
-        "must cover all 27 record types from the parsed .wit AST, got {records:?}"
+        28,
+        "must cover all 28 record types from the parsed .wit AST, got {records:?}"
     );
     // Every field is also mechanically counted — adding a field to any
     // record without updating this list of expectations trips a test.
@@ -234,6 +237,7 @@ fn corpus_covers_all_record_types() {
         ("fetch-response", 6),
         ("context-envelope", 4),
         ("context-status", 4),
+        ("queued", 2),
     ];
     for (name, expected) in expected_field_counts {
         assert_eq!(
@@ -242,6 +246,14 @@ fn corpus_covers_all_record_types() {
             "record `{name}` field count drifted from the parsed .wit AST"
         );
     }
+}
+
+#[test]
+fn skill_errors_are_the_final_2_3_vocabulary() {
+    assert_eq!(
+        wit_ast::skill_errors(),
+        ["capability-denied", "refused", "unavailable"]
+    );
 }
 
 #[test]

@@ -27,6 +27,11 @@ use maos_spirit_abi::{
 };
 
 #[test]
+fn schema_seven_is_supported_for_fr8_declarations() {
+    assert!(MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION >= 7);
+}
+
+#[test]
 fn min_supported_does_not_exceed_current() {
     assert!(
         MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION <= MANIFEST_SCHEMA_VERSION,
@@ -99,11 +104,12 @@ fn manifest_schema_version_pinned_at_epic_6_addition_count() {
     //   3 → 4  Story 13.5d: [capabilities.required.loom] declaration surface.
     //   4 → 5  Story 17-3b: wasm-component form + [class].artifact.
     //   5 → 6  Story 18-7: [capabilities.required.skill].author_self (D-02 A).
+    //   6 → 7  Story 20-8: FR8 contract declarations.
     //
     // When the next bump lands, update this assertion in the same PR as the new
     // STABILITY.md / ratification entry.
     assert_eq!(
-        MANIFEST_SCHEMA_VERSION, 6,
+        MANIFEST_SCHEMA_VERSION, 7,
         "MANIFEST_SCHEMA_VERSION was changed without updating this guard — \
          add the bump to the ledger above + the governing ratification/retro entry",
     );

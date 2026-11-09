@@ -153,6 +153,23 @@ pub enum SkillPortError {
     Mediation(String),
 }
 
+impl SkillPortError {
+    /// Stable refusal code used in both audit receipts and guest replies.
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::HostShutDown => "host-shut-down",
+            Self::CapabilityDenied => "capability-denied",
+            Self::ContextExhausted => "context-exhausted",
+            Self::QuotaExhausted => "quota-exhausted",
+            Self::QueueUnavailable => "queue-unavailable",
+            Self::Submission(maos_skill::ESkillStore::InvalidEntry(error)) => error.code(),
+            Self::Submission(_) => "queue-unavailable",
+            Self::Journal(_) => "journal-failed",
+            Self::Mediation(_) => "mediation-failed",
+        }
+    }
+}
+
 pub trait SkillAuthorPort: Send + Sync {
     /// Refuse undeclared authoring before spending a model completion and return
     /// a trusted telemetry summary for revision generation. The host journals

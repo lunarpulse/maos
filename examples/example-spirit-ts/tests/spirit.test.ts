@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("maos:spirit/recall@2.2.0", () => ({
+vi.mock("maos:spirit/recall@2.3.0", () => ({
   recall: vi.fn(),
   fetch: vi.fn(),
 }));
+vi.mock("maos:spirit/skills@2.3.0", () => ({ author: vi.fn() }));
 
-import { recall, fetch } from "maos:spirit/recall@2.2.0";
+import { recall, fetch } from "maos:spirit/recall@2.3.0";
+import { author } from "maos:spirit/skills@2.3.0";
 import { handleFrame, onShutdown, onStart } from "../src/index.js";
 
 // Imported WIT result errors are wrapped by componentize-js in this shape.
@@ -38,6 +40,7 @@ describe("WASM component guest", () => {
       intent: "standard", payload: new Uint8Array(), origin: "human-authored",
     });
     expect(handleFrame(frame)).toEqual([frame]);
+    expect(author).toHaveBeenCalledTimes(1);
     expect(recall).toHaveBeenCalledWith({ limit: 16 });
     expect(fetch).toHaveBeenCalledWith(frame.frameId);
     expect(vi.mocked(recall).mock.invocationCallOrder[0]).toBeLessThan(

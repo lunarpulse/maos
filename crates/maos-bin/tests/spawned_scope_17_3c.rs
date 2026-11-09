@@ -198,6 +198,7 @@ impl World {
     fn admission(&self) -> AdmissionDeps<'_> {
         AdmissionDeps {
             providers: None,
+            iac: None,
             scheduler: &self.scheduler,
             security: &self.security,
             transparency_log: &self.tl,
@@ -223,6 +224,7 @@ impl World {
             pid_by_spirit_id: Arc::clone(&self.lookup),
             enterprise: None,
             pdp: None,
+            skill: None,
         }
     }
 
@@ -349,6 +351,7 @@ fn echo_launch(spirit_id: &str) -> SessionLaunch {
         turn_budget: Duration::from_secs(30),
         once: true,
         context_window: Default::default(),
+        scopes: Vec::new(),
         initial_frame: Some(IacFrame {
             frame_id: ulid::Ulid::new().to_bytes(),
             timestamp_ns: 1,
@@ -640,6 +643,7 @@ async fn eight_real_admitted_forms_use_trusted_sender_policy_not_echoed_claims()
                         turn_budget: Duration::from_secs(30),
                         once: true,
                         context_window: Default::default(),
+                        scopes: Vec::new(),
                         initial_frame: Some(seed),
                     },
                 )
@@ -892,6 +896,7 @@ async fn run_hostile_twin_with_quota(
                 turn_budget,
                 once: true,
                 context_window: Default::default(),
+                scopes: Vec::new(),
                 initial_frame: Some(seed),
             },
         ),
@@ -1496,6 +1501,7 @@ async fn assert_hostile_lifting(aliases: bool, count: usize, exhausts: bool) {
             turn_budget: Duration::from_secs(30),
             once: true,
             context_window: Default::default(),
+            scopes: Vec::new(),
             initial_frame: Some(seed),
         },
     )
@@ -1621,6 +1627,7 @@ async fn actual_runner_sigsys_reaches_escape_consumer_but_planned_stop_does_not(
                 turn_budget: Duration::from_secs(30),
                 once: false,
                 context_window: Default::default(),
+                scopes: Vec::new(),
                 initial_frame: None,
             },
         ));
@@ -1813,6 +1820,7 @@ async fn repeated_mailbox_exports_survive_idle_without_an_active_task_or_stall()
             turn_budget: TURN_BUDGET,
             once: false,
             context_window: Default::default(),
+            scopes: Vec::new(),
             initial_frame: Some(seed(1)),
         },
     ));
@@ -2089,6 +2097,7 @@ async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_form
                     turn_budget: Duration::from_secs(30),
                     once: true,
                     context_window: Default::default(),
+                    scopes: Vec::new(),
                     initial_frame: Some(seed),
                 },
             )

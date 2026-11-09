@@ -22,8 +22,8 @@ impl InstalledSpirits {
     ) -> Self {
         let mut result = Self::default();
         for (name, path) in manifests {
-            let text = match maos_registry::install::verify_installed(&name, &path) {
-                Ok(text) => text,
+            let (text, publisher) = match maos_registry::install::verify_installed(&name, &path) {
+                Ok(verified) => verified,
                 Err(error) => {
                     crate::admission::emit_vetter_key_event(
                         deps.transparency_log,
@@ -47,7 +47,7 @@ impl InstalledSpirits {
             let admission = async {
                 // Registry installs never introduce compiled-in first-party classes.
                 let mut gated = crate::admission::gate_manifest(&text, &|_| false)?;
-                gated.bind_registry_package_at(&path)?;
+                gated.bind_registry_publisher(&publisher);
                 if gated.spirit_id != name {
                     return Err(AdmissionRefusal::ClassBuild {
                         detail: "installed name differs from signed manifest".into(),

@@ -1,0 +1,6 @@
+Command: env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=$PWD/xtask /mnt/build/cargo-maos/debug/xtask check-test-budget --junit _bmad-output/implementation-artifacts/20-8-manifest-contract-completion-evidence/landing-1/workspace-junit.xml --json
+Exit: 1
+Observed: 625 binaries, total per-test sum 828.981 s, span 829.2640056610107 s.
+Finding: maos-iac::participant_recall_17_8 took 30.319 s over 29 tests; default budget 30.000 s.
+Finding: maos-bin::wasm_skill_authoring_20_8 exception was absent from the default-feature JUnit because its only test had a crate-wide wasm-host feature guard.
+Disposition: the feature-gated real guest test remains unchanged; a meaningful default-feature WIT AST test now checks that maos:spirit@2.3.0's world imports author/propose, so the owned binary is visible in normal workspace JUnit. No per-test timing limit or baseline was increased. The 30.319 s observation remains owned by 20-7; no retry to green.

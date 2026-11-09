@@ -27,6 +27,8 @@ pub struct MediatedLogRecall {
     spirit_id: String,
     /// Story 18-5 — the session's pid- and window-bound context reporter.
     pub context: Option<Arc<dyn maos_domain::ports::ContextBudgetPort>>,
+    #[cfg(feature = "wasm-host")]
+    pub skill: Option<Arc<dyn researcher::SkillAuthorPort>>,
 }
 
 /// Field order is part of the operator-only refusal receipt format.
@@ -63,6 +65,8 @@ impl MediatedLogRecall {
             pdp,
             spirit_id,
             context: None,
+            #[cfg(feature = "wasm-host")]
+            skill: None,
         }
     }
 
@@ -278,6 +282,22 @@ impl MediatedLogRecall {
                 let reply = wire::context_reply(self.context.as_deref(), used_tokens);
                 return wire::encode_reply(&reply).map_err(|_| ProtocolViolation("context reply"));
             }
+            RecallRequest::SkillAuthor { document } => {
+                let reply = skill_reply(self.skill.as_deref().map(|port| port.author(document)));
+                return wire::encode_reply(&reply).map_err(|_| ProtocolViolation("skill reply"));
+            }
+            RecallRequest::SkillPropose {
+                target_id,
+                target_version,
+                diff,
+            } => {
+                let reply = skill_reply(
+                    self.skill
+                        .as_deref()
+                        .map(|port| port.propose(target_id, target_version, diff)),
+                );
+                return wire::encode_reply(&reply).map_err(|_| ProtocolViolation("skill reply"));
+            }
             RecallRequest::Recall { filter } => {
                 let result = wire_filter(filter).and_then(|filter| self.recall_inner(pid, filter));
                 let result = result
@@ -408,6 +428,24 @@ fn kind_name(kind: maos_domain::log_recall::FrameKindLabel) -> String {
     match serde_json::to_value(kind) {
         Ok(serde_json::Value::String(name)) => name,
         _ => unreachable!("frame kind labels serialize as strings"),
+    }
+}
+
+#[cfg(feature = "wasm-host")]
+fn skill_reply(
+    result: Option<Result<maos_skill::QueueEntry, researcher::SkillPortError>>,
+) -> maos_wasm_host::recall_wire::RecallReply {
+    use maos_wasm_host::recall_wire::{RecallReply, WireError};
+    match result {
+        Some(Ok(entry)) => RecallReply::Skill {
+            target: entry.approval_target(),
+            entry_id: entry.entry_id,
+        },
+        Some(Err(researcher::SkillPortError::CapabilityDenied)) => {
+            RecallReply::Error(WireError::CapabilityDenied)
+        }
+        Some(Err(error)) => RecallReply::Error(WireError::Refused(error.code().to_owned())),
+        None => RecallReply::Error(WireError::Unavailable),
     }
 }
 

@@ -72,6 +72,16 @@ time_cap_seconds = 60
 
 bus 전송에는 `[capabilities.required.iac]`를 선언하세요. kernel은 전달되는 각 frame을 `iac.send` capability token으로 중재합니다(Spirit에게 주소가 지정된 frame은 `"spirit:peer"`, 수신자가 없는 frame은 `"broadcast"`). 따라서 Spirit의 전달 내역이 `maosctl audit query --spirit`에 나타납니다. 스키마 v5의 `[capabilities.required.log]` table은 recall과 fetch 권한을 각각 부여합니다. 두 boolean의 기본값은 모두 `false`이고, 알 수 없는 key는 거부됩니다. 스키마 5 미만에서는 `[capabilities.required.iac]`와 마찬가지로 기능 저하 경고와 함께 table이 제거됩니다. WASM world는 provider capability를 import하지 않으므로 `[capabilities.required.provider]`를 추가하지 마세요. `[class]` 안에서 trust tier는 `org-internal`, `public-untrusted`, `public-vetted` 같은 하이픈 값으로 사용합니다.
 
+스키마 7은 [FR8 선언](/manifest/v7)을 추가합니다. `explanation_shape`는
+선언과 저널 기록만 하며, 결정 프레임에 설명 본문이 없어 **강제되지
+않습니다**. 커널 landing 전에는 swap invariant도 선언만 하고 검사하지 않습니다.
+
+추가된 `maos:spirit/skills@2.3.0`의 `author(document)`와
+`propose(target-id, target-version, diff)`는 `handle-frame` 안에서만 호출할
+수 있습니다. 오류는 `capability-denied`, 안정적인 거부 코드인
+`refused(code)`, `unavailable`입니다. host가 pid, class, telemetry를
+고정합니다. skill 콘텐츠 import는 없고 승인은 운영자만 할 수 있습니다.
+
 ## 참여한 frame 회상하기
 
 `maos:spirit@2.2.0` world는 두 함수를 제공하는 `maos:spirit/recall@2.2.0`을 import합니다.

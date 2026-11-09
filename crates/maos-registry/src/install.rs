@@ -273,7 +273,7 @@ pub fn publisher_storage_identity(name: &str, publisher: &[u8; 32]) -> String {
 
 /// Recheck the actual installed package at each boot, not merely its inventory
 /// entry. Only return manifest bytes whose publisher, claim and component agree.
-pub fn verify_installed(name: &str, manifest_path: &Path) -> Result<String, Error> {
+pub fn verify_installed(name: &str, manifest_path: &Path) -> Result<(String, [u8; 32]), Error> {
     let directory = manifest_path.parent().ok_or("install has no directory")?;
     let pkg =
         signed_package_at(name, manifest_path)?.ok_or("installed signed package is absent")?;
@@ -305,7 +305,7 @@ pub fn verify_installed(name: &str, manifest_path: &Path) -> Result<String, Erro
     {
         return Err(format!("installed ComplianceClaim refused: {reason:?}").into());
     }
-    Ok(String::from_utf8(pkg.manifest_toml)?)
+    Ok((String::from_utf8(pkg.manifest_toml)?, pkg.publisher_pubkey))
 }
 
 /// Same [registry] keys and env precedence as the daemon, with fail-closed parsing.

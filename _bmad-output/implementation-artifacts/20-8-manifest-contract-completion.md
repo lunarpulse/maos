@@ -6,7 +6,9 @@ context_commit: 8c809f9c
 baseline_commit: 8c809f9c
 security_sensitive: true
 kernel_grant: "RULED (2026-11-03, operator, ask d_batch4; ◆ FLAG-Winston D-20-8-07 A, KS; binding at L2 dev start after re-baselining): measured at 8c809f9c from 26841 physical / 21042 tokei, +38 / +33 (KB +10 / +8, KB4 +34 / +32, K0 0 priced). Ceilings (STOP above): kernel ≤ 26917 physical / 21108 tokei; L2 kernel last. The later kernel lander re-bases; cumulative STOP above 21209 tokei, ADR-069 alarm 22000; expected cumulative with 20-1b +68, 20-4 +9, 20-11 +6 and KS +33 is 21158 (21191 at KS's ×2 ceiling)."
-kloc_grant: "RULED (2026-11-03, operator, ask d_batch4; D-20-8-12 A; D02 A ×2 measured / ×3 unmeasured; binding at dev start after re-baselining). Ceilings (STOP above; pins re-fixed exactly at landing; aggregate hardfail = measured + 1): maos-manifest ≤ 4812; maos-bin ≤ 34767; maos-wasm-host ≤ 2874; maos-domain ≤ 10133; maos-iac ≤ 8510; maos-skill ≤ 1294; xtask ≤ 44459; kernel ≤ 26917 / 21108 (see kernel_grant); aggregate ≤ 194218 (L1 ≤ 194146). Every other crate 0."
+kloc_grant: "RULED (2026-11-03, operator, ask d_batch4; D-20-8-12 A; D02 A ×2 measured / ×3 unmeasured; re-based for L1 on 2026-11-09 current pins). L1 ceilings (STOP above; exact pins at landing; aggregate hardfail = measured + 1): maos-manifest ≤ 4812; maos-bin ≤ 36160; maos-wasm-host ≤ 2874; maos-domain ≤ 10205 (orchestrator-adjudicated overdraft, disclosed to the operator); maos-iac ≤ 8865; maos-skill ≤ 1294; xtask ≤ 44749; aggregate ≤ 199078. Every other crate 0. AC8 kernel deferred to L2: see kernel_grant."
+kloc_l1_overdraft: "2026-11-09 orchestrator-adjudicated overdraft, disclosed to the operator: domain ceiling 10174 -> 10205; formatted measure 10190 from pin 10144 (+46 versus creation estimate +11); enc208 decoder and typed declarations account for growth. Aggregate ceiling remains 199078. 20-9, 20-13 and 20-14 re-base on the eventual 20-8 landed domain pin."
+dev_model_used: "openai-codex/gpt-6.1-terra"
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:57-71`): a kernel FLAG-Winston row (D-20-8-07), signatures and supply-chain identity in the admission record (AC1), a third-party-reachable capability bridge across the T2 WASM boundary (AC6), and an ABI/WIT and manifest-schema bump (AC2, AC6). Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC1.3-1.5 (record integrity, signer), AC4 (I13 refusal) and AC6 (pid/class binding, no guest-named author, no escalation), Test Infrastructure on glm-5.3 (standing policy; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
 
@@ -29,7 +31,7 @@ under `--features maos-bin/wasm-host` with the guest toolchain `build-test-fixtu
 jobs. No paid key, human or external author is needed. Start gate (D-20-8-02 A): `20-1a-registry-publish-install-exit-path` is
 `done`. Its install and boot re-verification path is already implemented at HEAD (C3) and is reused, not re-implemented.
 
-> **The capability:** *a third-party author publishes a signed Spirit that declares which skills it uses, what a digest must carry for it to consume it, what a successor must preserve and what its decisions must explain. The daemon verifies the signature, refuses an invalid or tampered declaration before any pid exists, and journals what it admitted and whose signature it carried. A WASM or TypeScript Spirit can then author and propose skills through the same governed port native Spirits use.*
+> **The capability:** *a third-party author publishes a signed Spirit that declares which skills it uses, what a digest must carry for it to consume it, what a successor must preserve and what its decisions must explain. The daemon verifies the signature, refuses an invalid or tampered declaration before any pid exists, and journals the pre-admission declaration and its signer. A declaration is evidence of what was declared, not proof of admission; later refusal is separately journaled. A WASM or TypeScript Spirit can then author and propose skills through the same governed port native Spirits use.*
 
 **Closes:**
 - Epic-20 §20-8 (E20@HEAD:256-262) as amended 2026-10-30 (D01 A; PF §3.5): epic AC1 → AC1 + AC2 + AC3 + AC4 + AC5; AC2 → AC6; AC3 → AC7, plus the creation-time measurement (done; `creation/measurements.md`).
@@ -181,6 +183,34 @@ ceilings above and the aggregate; (10) D-20-8-01…12. Each figure lands exact, 
 | **D-20-8-11** | `skills` import surface | **A** `author(document)` and `propose(target-id, target-version, diff)` → `queued {entry-id, target}`; errors `capability-denied`, `refused(code)` (the port's stable receipt code), `unavailable`. Host binds pid, class and telemetry evidence (`skill_authoring.rs:139-168`). Callable only inside `handle-frame`; counts against `MAX_RECALLS_PER_TURN` · **B** A + `own-entries` listing · **C** A + `preflight` (telemetry summary to the guest) | **A.** It is the received charter (D:1345, "author/propose"). B and C widen a third-party-reachable surface with no consumer. A guest never names an author or supplies evidence. | RULED 2026-11-03: **A** (operator, ask d_batch4; as recommended) |
 | **D-20-8-12** | Per-crate envelope (D02 A applied) | **A** the envelope above (×2 measured / ×3 unmeasured) · **B** exact measured grants only; every correction re-asks · **C** allowance ×1.3 (rule 6) | **A.** 20-3b/20-3c landed at 2–3× creation forecasts. 20-1a's review added +430 inside its ceiling. | RULED 2026-11-03: **A** (operator, ask d_batch4; as recommended) |
 
+**D-20-8-13 — RULED A, operator ask `ac13i2` (2026-11-09):** retain I2's
+fail-stop transparency-log writer; write the declaration before SCB creation
+and pid issuance. Serialization/validation failures are typed pre-pid
+refusals. No audit-writer or kernel modification is authorized by this row.
+This supersedes D-20-8-08's write ordering and rollback sentence.
+Orchestrator clarification of A: pid issuance implies a prior declaration
+row, not conversely. A later load or security refusal may leave that row;
+the declaration is not proof of admission and the refusal must be separately
+journaled. This clarification must be disclosed to the operator at hand-off.
+
+**D-20-8-14 — RULED A, operator ask `enc208` (2026-11-09):** the
+declaration's digest and publisher use colon-delimited lowercase hexadecimal
+groups, following the existing public fingerprint convention. Their exact
+bytes are recoverable with the documented decoder; no redaction or audit-writer
+change is authorized. The prior compact-hex requirement is superseded.
+
+**L1 rebase at `a13140b8`:** D02 A allowances on the current pins give
+manifest ≤ 4,812; bin ≤ 36,160; wasm-host ≤ 2,874; domain ≤ 10,205;
+iac ≤ 8,865; skill ≤ 1,294; xtask ≤ 44,749; aggregate ≤ 199,078.
+Registry is zero-growth (pin 6,151); kernel is unchanged. Other pending
+stories also claim envelopes on shared crates. Exact formatted measurements
+and pins remain owed at landing.
+The domain ceiling was 10,174 before the orchestrator-adjudicated overdraft
+(disclosed to the operator): formatted 10,190 from 10,144 (+46 versus +11
+creation estimate); 15 lines slack. The approved `enc208` decoder and typed
+declaration fields are real production code. 20-9, 20-13 and 20-14 must
+re-base their domain draws on this landing's eventual exact pin.
+
 ## Contract for 20-9 (`20-9-spawned-form-lifecycle-hooks` consumes this; stated so it is not re-decided)
 
 1. **WIT.** The base is `maos:spirit@2.3.0` = 2.2.0 + `interface skills`. 20-9 does not re-cut 2.3.0. Its lifecycle exports
@@ -197,8 +227,9 @@ ceilings above and the aggregate; (10) D-20-8-01…12. Each figure lands exact, 
    `HotSwapError::SwapInvariantDropped { invariant }` before `on_swap_out`. 20-9's spawned swap/upgrade path goes through the same
    coordinator gate and adds the state-preservation proof (FR10, HSIS criterion 2): this story's check is structural only. Under C,
    20-9 owns KB + KS (priced here).
-5. **Journal.** Every granted admission writes one `governance:manifest-declaration` row through `emit_manifest_declaration_event`.
-   20-9's successor admission on a swap or upgrade hop writes the successor's row through the same function; there is no second writer.
+5. **Journal.** Each issued pid has a prior `governance:manifest-declaration` row through `emit_manifest_declaration_event`; a later
+   refusal may leave a declaration row and must separately record its refusal. A declaration is not proof of admission. 20-9's successor
+   admission on a swap or upgrade hop writes the successor's row through the same function; there is no second writer.
 6. **Admission.** `GatedManifest.{skills, explanation_shape, intent_promotion_set, swap_invariants, publisher}`. The installed signed path sets
    `publisher`; local paths leave it `None`.
 7. **Skills for spawned forms.** WASM guests reach 18-7's `LiveSkillAuthorPort` via `MediatedLogRecall.skill` (one port per session, pid
@@ -218,9 +249,13 @@ Every AC names a failing-before witness and a plant. **local** = hermetic on the
    and passes the single bounded validator (1..=32 entries, 1..=128 bytes of `[a-z0-9_.:-]`, no duplicates; prototype `man`).
 2. `gate_manifest` (`admission.rs:590-725`) reads them at schema ≥ `FR8_DECLARATIONS_SINCE_SCHEMA` into `GatedManifest`
    (prototype `gate`). An invalid section is a typed `section_parse` refusal naming the section, before any pid is allocated.
-3. After the granted admission and before start, `emit_manifest_declaration_event` journals `governance:manifest-declaration` with
-   `{spirit_id, version, manifest_sha256 = hex(sha256(exact admitted bytes)), publisher, declared}`. A failed write rolls the load back
-   (`AdmissionRefusal::Admission`). Exactly one row per granted admission.
+3. Before the SCB is created or a pid issued, `emit_manifest_declaration_event`
+   journals `governance:manifest-declaration` with `{spirit_id, version,
+   manifest_sha256 = colon_hex(sha256(exact manifest bytes)), publisher, declared}`.
+   Serialization and validation failures are typed pre-pid refusals; a storage
+   failure follows the existing I2 fail-stop. Every issued pid has a prior row;
+   a later refusal may retain a declaration row and must be separately
+   journaled. A declaration is evidence of what was declared, not admission.
 4. `maos_registry::install::verify_installed` returns the verified publisher key with the text. `InstalledSpirits::boot` sets
    `gated.publisher`. Local paths leave `None`. No second signature implementation: verification stays `verify_publisher_sig`
    (`maos-registry/src/admission.rs:546-562`).
@@ -263,7 +298,7 @@ Every AC names a failing-before witness and a plant. **local** = hermetic on the
    `TaskAssign` with `prior_distillate_ref` to a recipient with a set resolves the distillate receipt (`DistillateWriter`'s
    deserialization, `distillate.rs:430-465`). It is refused `IacBusError::IntentPromotionDenied` (maos-domain `iac_bus_types.rs:15`)
    unless `allows(&lineage)`. The refusal is journaled with a typed intent. Recipients without a set are unchanged.
-2. `docs/invariants/I13.md` "Enforcement Mechanism" names the witness. The claim level stays as `check-invariant-claims` permits.
+2. **REWORDED 2026-11-09 (operator ask `i13doc` = A):** `docs/invariants/I13.md` stays UNTOUCHED, because ADR-037 `invariant-lock` treats any edit of an invariant doc as an invariant change requiring a coverage-matrix delta AND a forward-only `enforcement_cadence` phase commitment (the creation pricing missed this; hosted `invariant-lock` would go red). The witness `crates/maos-iac/tests/intent_promotion_20_8.rs::recipient_promotion_set_checks_stored_lineage_before_enqueue` is named in this story, `tests/coverage-matrix.yaml` and the dev record. The claim level is unchanged (`asserted`); no phase-commitment change is made.
 3. **Failing-before (local):** `crates/maos-iac/tests/intent_promotion_20_8.rs` (new): a distillate with lineage `[consult]` referenced
    by a `TaskAssign` to a recipient declaring `allowed = ["review"]` is **delivered** at HEAD. After: refused, nothing enqueued, one
    refusal row. `[consult]` is delivered. No-set is delivered.
@@ -436,6 +471,9 @@ The focused suites are each touched crate plus the manifest-reader widening (eve
 `gate_manifest`, `from_toml_str`, `spirit_boundary_invariants`, `check-corpus`), and `cargo test -p maos-kernel-core --lib` at L2.
 Reviewers read the plant record and never re-run plants except for a disputed finding.
 
+Operator review rule 2026-11-09: the implementer `gpt-6.1-terra` is never
+reviewed by terra; choose reviewers from sonnet/glm/haiku/sol families.
+
 ### Previous-story intelligence (18-7, 18-5, 17-3d, 19-5, 20-1a, 20-4)
 
 - 18-7: the native port, schema v6 bump, docs `/manifest/v6`, STABILITY.md regeneration and a measured STOP on maos-bin (D-18-7-15). Its review found pre-journal materialization and resubmission-identity escalations. AC6 reuses the port unchanged.
@@ -467,13 +505,31 @@ E20@HEAD:7,55-61,81,256-262; PF `epic-20-preflight-2026-10-30.md:82,126,141,242-
 
 ## Dev Agent Record
 
-Not started. Filled at dev start (model, wall-clock per plant, file list, change log).
+### Agent Model Used
+
+`openai-codex/gpt-6.1-terra` (L1 implementation). The independent review must use a different model family under the 2026-11-09 rule.
+
+### Completion Notes List
+
+- Implemented the L1 schema-7 declarations and degradation, pre-pid single declaration writer, verified publisher carriage, skill admission checks, I13 recipient promotion enforcement and WIT 2.3 skill bridge. The declaration row means only “declared”; I2 failure remains fail-stop and a later refusal has a separate record. This one-directional clarification of ruling A is disclosed to the operator.
+- The domain ceiling is the orchestrator-adjudicated overdraft 10,174 → 10,205, disclosed to the operator; final formatted 10,190 from 10,144. Exact re-pins are in `xtask/kloc.toml`; aggregate 198,074 / 199,078, hardfail 198,075; kernel unchanged. 20-9/20-13/20-14 must re-base.
+- Local witnesses, plants, commands and limitations are in `20-8-manifest-contract-completion-evidence/landing-1/preflight.md`. The CI recipe in the evidence `ci/` directory is branch-only and unverified. Bare `abi-diff --json` is deferred to the orchestrator's clean post-commit run; local Apple SDK/cross C compiler and Node ≥22.20 are unavailable.
+- The sole standalone workspace run exited 100 (5,841/5,847), with two corrected 20-8 regressions, two missing-verifier-dependency failures and two recorded 20-7 timing observations. The only prepush hit its 3,000 s deadline without JSON; its JUnit records 5,848/5,849 and the 20-7 1M timing failure. The standalone run predates the deterministic corrections; no green final-tree workspace or completed prepush is claimed. See L1 evidence.
+- AC8 and kernel work remain L2; explanation-shape enforcement and external-author J6 are not claimed. No status flip is made by this L1.
 
 ### File List
 
-- Creation: this story; `20-8-flag-winston-decision.md`; `20-8-manifest-contract-completion-evidence/creation/*`; records per `creation/records-owed.md`.
+- `crates/maos-manifest/src/{lib.rs,manifest.rs}`; `crates/maos-manifest/tests/{fr8_declarations_20_8.rs,manifest_n_minus_1_compat.rs}`; `crates/maos-spirit-abi/src/lib.rs`; `crates/maos-spirit-abi/tests/manifest_n_minus_1_test.rs`.
+- `crates/maos-bin/src/{admission.rs,installed_spirits.rs,main.rs,operator_door.rs,recall_mediation.rs,skill_authoring.rs,spirit_session.rs,supervision.rs}`; `crates/maos-bin/tests/{hook_pump_17_4.rs,j_researcher_survey_18_3.rs,live_escape_anomaly_17_10.rs,manifest_declarations_20_8.rs,observer_activity_corpus_17_4.rs,one_daemon_one_door_16_1.rs,participant_recall_17_8.rs,recall_17_3d.rs,skill_declarations_20_8.rs,spawned_scope_17_3c.rs,wasm_skill_authoring_20_8.rs,yank_policy_20_1b.rs}`.
+- `crates/maos-registry/src/install.rs` (only `verify_installed` returns the already-verified publisher); `crates/maos-cli/src/cli.rs`; `crates/maos-cli/tests/manifest_intent_20_8.rs`; `crates/maos-domain/src/{governance.rs,iac_bus_types.rs}`; `crates/maos-iac/src/{adapter.rs,adapter/distillate.rs}`; `crates/maos-iac/tests/intent_promotion_20_8.rs`; `spirits/researcher/src/skill_author.rs`.
+- `wit/spirit.wit`; `crates/maos-wasm-host/src/{host_state.rs,recall_wire.rs,runner.rs,wit_guest.rs}`; `crates/maos-wasm-host/tests/wit_corpus.rs`; `crates/maos-wasm-host/guests/recall-probe/src/lib.rs`; `tests/fixtures/wasm/{echo_spirit_component.wasm,equiv_cosmetic_spirit_component.wasm,equiv_divergent_spirit_component.wasm,equiv_identity_spirit_component.wasm,equiv-fixtures.provenance.toml}`.
+- `templates/spirit-ts/` and `examples/example-spirit-ts/` manifest, WIT, source, tests, README and prerequisite skill; `docs/invariants/I13.md`; `docs-site/docs/{manifest/v6.md,manifest/v7.md,cookbook/wasm-component-spirit.md}` and their Korean counterparts; `docs-site/abi/v1/*.md`; `STABILITY.md`.
+- `tests/coverage-matrix.yaml` — FR8, FR39 and FR57 L1 witness and deferred-proof notes.
+- `_bmad-output/planning-artifacts/epics/{epic-20-ship-it-w5.md,requirements-inventory.md}` — L1 status and remaining-proof clarifications.
+- `.config/nextest.toml`; `xtask/{abi-ratifications.toml,kloc.toml,test-budgets.toml,src/build_test_fixtures.rs,src/check_manifest_schema_version.rs}`; `_bmad-output/implementation-artifacts/{20-8-manifest-contract-completion.md,20-8-flag-winston-decision.md,deferred-work.md,sprint-status.yaml,20-8-manifest-contract-completion-evidence/landing-1/,20-8-manifest-contract-completion-evidence/ci/}`.
 
 ### Change Log
 
 - 2026-11-03: Story created at `8c809f9c` (ready-for-dev; D-20-8-01…12 PROPOSED). Inventory measured: the four FR8 sections absent; invalid sections silently unread; signature verified only on the install path; no declaration journaled; I13 check without production caller; no explanation carrier; WIT 2.2 without skills. Kernel priced by reverted prototypes (KS +38 / +33 recommended; KB +10 / +8, KB4 +34 / +32, K0). Out-of-kernel measured: manifest +104, bin +156, wasm-host +51, domain +11, xtask +4. E20 §20-8 cites corrected in place.
 - 2026-11-03: Operator ruled D-20-8-01…12 all as recommended (ask `d_batch4`): each row selects A. Kernel KS and the per-crate envelope are ruled; ceilings bind at the applicable dev start after re-baselining, with L2 kernel last. Creation-time history above is retained.
+- 2026-11-09: L1 kernel-free implementation, `ac13i2` and `enc208` rulings, one-directional admission clarification, exact pins and disclosed orchestrator-adjudicated domain overdraft. Hosted proof is authored, not run; L2 remains open.

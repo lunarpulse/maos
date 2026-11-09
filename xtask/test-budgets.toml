@@ -98,6 +98,18 @@ seconds = 39
 reason = "AC7 requires one real-server production poll at the unchanged 30-second clamp floor, isolated in its own binary and serial group. Local first exercised sample 30.57 s (landing-1/registry-focused-next.stdout), x1.25 rounds up to39; not a widened failure budget."
 owner = "20-1b-vetting-yank-policy-and-quarantine"
 
+[[exception]]
+binary = "maos-bin::skill_declarations_20_8"
+seconds = 31
+reason = "20-8 real filesystem discovery and admission reconciliation, isolated and serialized; local witness 0.01 s. The owned exception is the minimum whole second above the 30 s default required by check-test-cost."
+owner = "20-8-manifest-contract-completion"
+
+[[exception]]
+binary = "maos-bin::wasm_skill_authoring_20_8"
+seconds = 31
+reason = "20-8 real T2 guest, durable queue and approval receipts, isolated and serialized; local witness 1.00 s. The owned exception is the minimum whole second above the 30 s default required by check-test-cost."
+owner = "20-8-manifest-contract-completion"
+
 # --- Expensive tests (ignored in the default run) ---------------------------
 
 [[expensive]]

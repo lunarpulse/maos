@@ -116,6 +116,7 @@ impl World {
                 pid_by_spirit_id: &self.pids,
                 hooks: None,
                 providers: None,
+                iac: None,
             },
             gated,
             maos_kernel_core::scheduler::make_spirit_obj(Spirit),

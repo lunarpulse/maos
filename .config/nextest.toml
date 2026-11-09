@@ -47,6 +47,8 @@ binary_id(xtask::example_spirit_regen_integration)
 | binary_id(maos-bin::erasure_million_20_11)
 | binary_id(maos-registry::yank_cadence_20_1b)
 | binary_id(maos-registry::registry_tls_20_1b)
+| binary_id(maos-bin::skill_declarations_20_8)
+| binary_id(maos-bin::wasm_skill_authoring_20_8)
 """
 test-group = "serial"
 # AC15 real TLS/CLI witnesses share the owned serial resource group; measured

@@ -71,6 +71,8 @@ pub struct IacBusAdapter {
     /// Bounded by session lifetime; eviction at MAX_LINEAGE_CACHE_ENTRIES.
     frame_lineage_cache:
         std::sync::Arc<dashmap::DashMap<[u8; 16], maos_domain::invariants::i13::IntentLineage>>,
+    promotion_sets:
+        std::sync::Arc<dashmap::DashMap<String, maos_domain::invariants::i13::AllowedPromotionSet>>,
     /// Story 9.5b — optional OTel trace sink for IAC-frame span emission.
     /// `None` = off (no-op branch; zero allocation). Wired from
     /// composition root via [`IacBusAdapter::with_trace_sink`].
@@ -104,6 +106,7 @@ impl IacBusAdapter {
                 maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()
             }),
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
+            promotion_sets: std::sync::Arc::new(dashmap::DashMap::new()),
             trace_sink: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
@@ -196,6 +199,65 @@ impl IacBusAdapter {
     /// Access the underlying transparency log.
     pub fn transparency_log(&self) -> &std::sync::Arc<TransparencyLogAdapter> {
         &self.transparency_log
+    }
+
+    /// Register the current admitted recipient's I13 promotion set.
+    pub fn register_promotion_set(
+        &self,
+        spirit_id: &str,
+        set: Option<maos_domain::invariants::i13::AllowedPromotionSet>,
+    ) {
+        if let Some(set) = set {
+            self.promotion_sets.insert(spirit_id.to_owned(), set);
+        } else {
+            self.promotion_sets.remove(spirit_id);
+        }
+    }
+
+    /// Withdraw a recipient's set when it is unloaded.
+    pub fn unregister_promotion_set(&self, spirit_id: &str) {
+        self.promotion_sets.remove(spirit_id);
+    }
+
+    fn check_promotion(
+        &self,
+        frame: &maos_domain::frame::IacFrame,
+    ) -> Result<(), maos_domain::iac_bus_types::IacBusError> {
+        use maos_domain::frame::FramePayload;
+        let FramePayload::TaskAssign(task) = &frame.payload else {
+            return Ok(());
+        };
+        let Some(reference) = &task.prior_distillate_ref else {
+            return Ok(());
+        };
+        for recipient in &frame.to {
+            let Some(allowed) = self.promotion_sets.get(recipient.spirit_id.as_str()) else {
+                continue;
+            };
+            if distillate::DistillateWriter::admit_from_log(
+                &self.transparency_log,
+                reference.digest_frame_id,
+                &allowed,
+            )
+            .is_err()
+            {
+                let id = recipient.spirit_id.as_str();
+                let _ = self.transparency_log.insert_frame_event(
+                    FrameKind::TelemetryEvent,
+                    0,
+                    None,
+                    "iac:intent-promotion-denied",
+                    id.as_bytes(),
+                    maos_domain::invariants::i3::FrameOrigin::Kernel,
+                );
+                return Err(
+                    maos_domain::iac_bus_types::IacBusError::IntentPromotionDenied {
+                        recipient: id.to_owned(),
+                    },
+                );
+            }
+        }
+        Ok(())
     }
 
     /// Access the DRR scheduler (test-only introspection).
@@ -408,6 +470,7 @@ impl IacBusAdapter {
             &self.transparency_log,
             orchestrator_dispatch::DEFAULT_ORCHESTRATOR_DISPATCH_WINDOW_NS,
         )?;
+        self.check_promotion(&frame)?;
 
         // Story 4.5 — NFR-Aud-14 intent-lineage propagation.
         // Cross-Spirit determination: `frame.from.spirit_id != frame.to[0].spirit_id`
@@ -861,6 +924,7 @@ impl Default for IacBusAdapter {
                 maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()
             }),
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
+            promotion_sets: std::sync::Arc::new(dashmap::DashMap::new()),
             trace_sink: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,

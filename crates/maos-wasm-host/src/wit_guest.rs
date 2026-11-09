@@ -1,4 +1,4 @@
-//! Wasmtime-generated host bindings for the `maos:spirit@2.2.0` world.
+//! Wasmtime-generated host bindings for the `maos:spirit@2.3.0` world.
 //!
 //! Real component-model call path (Story 11.1a AC3) — NOT a hand-rolled
 //! echo loop. The `bindgen!` macro reads `wit/spirit.wit` at compile time

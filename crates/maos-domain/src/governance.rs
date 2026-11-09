@@ -144,6 +144,59 @@ pub struct ModelProvenancePayload {
     pub version: u32,
 }
 
+/// Identity and declarations before admission; this is not a grant.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ManifestDeclarationPayload {
+    pub spirit_id: String,
+    pub version: String,
+    /// SHA-256 of the exact manifest, in colon-delimited lowercase hex.
+    pub manifest_sha256: String,
+    /// Verified publisher key in colon-delimited lowercase hex, or None.
+    pub publisher: Option<String>,
+    /// Names of the FR8 sections present at the effective schema version.
+    pub declared: Vec<String>,
+    /// Skill identifiers declared by the manifest.
+    #[serde(default)]
+    pub skill_ids: Vec<String>,
+}
+
+/// Encode public 32-byte values as four-hex-digit groups separated by colons.
+pub fn encode_declaration_bytes(bytes: &[u8; 32]) -> String {
+    use std::fmt::Write;
+    let mut output = String::with_capacity(79);
+    for (index, chunk) in bytes.chunks_exact(2).enumerate() {
+        if index != 0 {
+            output.push(':');
+        }
+        let _ = write!(output, "{:02x}{:02x}", chunk[0], chunk[1]);
+    }
+    output
+}
+
+/// Decode the declaration's 16 colon-delimited four-digit hex groups.
+pub fn decode_declaration_bytes(text: &str) -> Option<[u8; 32]> {
+    if text.len() != 79 {
+        return None;
+    }
+    let mut out = [0; 32];
+    let mut parts = text.split(':');
+    for chunk in out.chunks_exact_mut(2) {
+        let part = parts.next()?;
+        if part.len() != 4
+            || !part
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return None;
+        }
+        hex::decode_to_slice(part, chunk).ok()?;
+    }
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(out)
+}
+
 /// Story 17-4 (AC2.7) — the host started or stopped delivering every
 /// `scalar.tap` write in the root to one admitted subscriber. The right comes
 /// from operator admission of a compiled-in Observer-class Spirit.
@@ -186,6 +239,8 @@ pub enum GovernanceEventKind {
     ModelProvenance(ModelProvenancePayload),
     /// Telemetry-subscription grant/revoke (Story 17-4 AC2.7).
     TelemetrySubscription(TelemetrySubscriptionPayload),
+    /// Manifest identity and FR8 declarations at admission.
+    ManifestDeclaration(ManifestDeclarationPayload),
 }
 
 /// Payload for governance TL frames (`FrameKind::GovernanceEvent` = 28).

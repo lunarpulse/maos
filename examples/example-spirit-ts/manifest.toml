@@ -2,7 +2,7 @@
 name = "example-spirit-ts"
 version = "0.1.0"
 abi = "1.0"
-manifest_schema_version = 5
+manifest_schema_version = 7
 min_substrate_version = "0.1.0-alpha.1"
 forms = ["wasm-component"]
 artifact = "dist/spirit.wasm"
@@ -15,6 +15,21 @@ send = ["spirit:peer"]
 [capabilities.required.log]
 recall = true
 fetch = true
+
+[capabilities.required.skill]
+author_self = true
+
+[skills]
+uses = ["example-prerequisite"]
+
+[explanation_shape]
+required_fields = ["reason"]
+
+[intent_promotion_set]
+allowed = ["consult"]
+
+[swap_invariants]
+preserve = ["example-state"]
 
 [posture]
 default = "assistive"

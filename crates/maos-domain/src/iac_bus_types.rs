@@ -13,6 +13,8 @@ use crate::invariants::i3::FrameOrigin;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum IacBusError {
+    #[error("intent promotion denied for recipient {recipient}")]
+    IntentPromotionDenied { recipient: String },
     #[error("spirit {0} is not registered — call register_spirit first")]
     UnknownSpirit(String),
     #[error(

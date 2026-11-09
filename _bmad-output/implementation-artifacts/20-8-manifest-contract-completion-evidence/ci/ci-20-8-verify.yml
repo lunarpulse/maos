@@ -1,0 +1,167 @@
+# Branch-only recipe. Copy to .github/workflows on ci/20-8-verify; not installed on main.
+# UNVERIFIED: hosted run and the author_self removal plant remain outstanding.
+name: 20-8 hosted proof
+on:
+  push:
+    branches: ['ci/20-8-verify']
+permissions:
+  contents: read
+jobs:
+  componentize-js:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Build TypeScript component
+        working-directory: examples/example-spirit-ts
+        run: npm ci && npm test && npm run build && npm run componentize
+  wasm-host-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo run --locked -p xtask -- build-test-fixtures
+      - name: Run real skill guest and legacy corpus
+        env:
+          MAOS_17_2_CGROUP_MODE: undelegated
+        run: |
+          cargo test --locked -p maos-bin --features maos-bin/wasm-host --test wasm_skill_authoring_20_8
+          cargo test --locked -p maos-wasm-host --test wit_corpus
+  check-wasm-form-equiv:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo run --locked -p xtask -- build-test-fixtures
+      - run: cargo run --locked -p xtask -- check-equiv-fixture-provenance --json
+      - run: cargo run --locked -p xtask -- check-wasm-form-equiv --json
+  epic-20-exit:
+    needs: [componentize-js, wasm-host-tests, check-wasm-form-equiv]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        capability: [declared, removed-plant]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Build example and production surfaces
+        run: |
+          set -euo pipefail
+          (cd examples/example-spirit-ts && npm ci && npm run build && npm run componentize)
+          cargo build --locked --release -p maos-bin --features wasm-host --bin maos
+          cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner
+          cargo build --locked --release -p maos-cli -p maos-registry -p maos-spirit-cli
+      - name: Publish, install, boot and inspect real records
+        shell: bash
+        env:
+          CAPABILITY_CASE: ${{ matrix.capability }}
+        run: |
+          set -euo pipefail
+          target="$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          export PATH="$target/release:$PATH"
+          scratch="$(mktemp -d)"
+          export HOME="$scratch/home" MAOS_HOME="$scratch/home/.maos" XDG_DATA_HOME="$scratch/home/.local/share" XDG_CONFIG_HOME="$scratch/home/.config" XDG_RUNTIME_DIR="$scratch/run"
+          mkdir -p "$HOME/.maos/skills" "$XDG_CONFIG_HOME/maos" "$XDG_RUNTIME_DIR"
+          printf '[registry]\ndevelopment_http = true\n' > "$XDG_CONFIG_HOME/maos/operator.toml"
+          cp examples/example-spirit-ts/skills/example-prerequisite.md "$HOME/.maos/skills/"
+          maos init --plain
+          maosctl skills approve example-prerequisite
+          maos-registry-server --dev-http --bind 127.0.0.1:6789 --root "$scratch/registry" > registry.log 2>&1 &
+          server_pid=$!
+          trap 'kill -TERM "$server_pid" 2>/dev/null || true; wait "$server_pid" || true; rm -rf "$scratch"' EXIT
+          ready=0
+          for i in $(seq 1 50); do if (exec 3<>/dev/tcp/127.0.0.1/6789) 2>/dev/null; then ready=1; break; fi; sleep 0.1; done
+          [ "$ready" -eq 1 ] || { cat registry.log; exit 1; }
+          export MAOS_SPIRIT_SIGNING_KEY="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')"
+          if [ "$CAPABILITY_CASE" = removed-plant ]; then
+            python3 -c 'from pathlib import Path; p=Path("examples/example-spirit-ts/manifest.toml"); s=p.read_text(); assert "author_self = true\n" in s; p.write_text(s.replace("author_self = true\n",""))'
+          fi
+          maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest examples/example-spirit-ts/manifest.toml --artifact examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
+          maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
+          set +e
+          printf '@example-spirit-ts hello\n' | sudo systemd-run --unit=maos-20-8-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" PATH="$PATH" MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" "$target/release/maos" shell --plain 2>&1 | tee shell.log
+          shell_status=${PIPESTATUS[1]}
+          set -e
+          maosctl audit query --intent governance:manifest-declaration > declarations.ndjson
+          if [ "$CAPABILITY_CASE" = removed-plant ]; then
+            maosctl audit query --intent skill.author.refused:capability-denied > plant-denial.ndjson
+            test -s plant-denial.ndjson
+            if maosctl skills show example-spirit-ts.example > skill.json 2>/dev/null; then
+              echo '::error::author_self removal unexpectedly queued a skill'; exit 1
+            fi
+          else
+            test "$shell_status" -eq 0
+            maosctl skills show example-spirit-ts.example > skill.json
+          fi
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib
+          home=pathlib.Path(os.environ['HOME']); registry=home/'.local/share/maos/registry'
+          index=json.loads((registry/'installed-index.json').read_text())
+          package=registry/'installed'/index['example-spirit-ts']
+          signed=json.loads((package/'signed_package.json').read_text())
+          rows=[json.loads(line) for line in open('declarations.ndjson') if line.strip()]
+          rows=[json.loads(row['payload'])['event'] for row in rows]
+          rows=[row for row in rows if row.get('spirit_id')=='example-spirit-ts']
+          assert len(rows)==1, rows
+          row=rows[0]
+          assert row['manifest_sha256'].replace(':','')==hashlib.sha256((package/'manifest.toml').read_bytes()).hexdigest()
+          assert row['publisher'].replace(':','')==signed['publisher_pubkey']
+          assert set(row['declared'])=={'skills','explanation_shape','intent_promotion_set','swap_invariants'}
+          if os.environ['CAPABILITY_CASE']=='declared':
+              skill=json.load(open('skill.json'))
+              assert skill['state']=='Pending' and skill['author']['class']=='example-spirit-ts', skill
+          PY
+          if [ "$CAPABILITY_CASE" = declared ]; then
+            maosctl skills approve example-spirit-ts.example
+            maosctl skills show example-spirit-ts.example | python3 -c 'import json,sys; assert json.load(sys.stdin)["state"] == "Admitted"'
+            python3 - <<'PY'
+          import json,os,pathlib
+          r=pathlib.Path(os.environ['HOME'])/'.local/share/maos/registry'
+          p=r/'installed'/json.loads((r/'installed-index.json').read_text())['example-spirit-ts']/'manifest.toml'
+          s=p.read_text(); assert 'preserve = ["example-state"]' in s
+          p.write_text(s.replace('preserve = ["example-state"]','preserve = ["tampered"]'))
+          PY
+            set +e
+            printf '@example-spirit-ts hello\n' | sudo systemd-run --unit=maos-20-8-tamper --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" PATH="$PATH" MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" "$target/release/maos" shell --plain > tamper.log 2>&1
+            set -e
+            grep -F installed_package_invalid tamper.log
+            maosctl audit query --intent governance:manifest-declaration > after-tamper.ndjson
+            cmp declarations.ndjson after-tamper.ndjson
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 20-8-hosted-proof-${{ matrix.capability }}
+          path: |
+            shell.log
+            registry.log
+            declarations.ndjson
+            skill.json
+            plant-denial.ndjson
+            tamper.log
+            after-tamper.ndjson

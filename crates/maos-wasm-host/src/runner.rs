@@ -15,7 +15,7 @@
 //! 1. Parse CLI arguments and create a fuel-metered wasmtime engine.
 //! 2. Compile the component under a watchdog, then reject an incompatible
 //!    `maos:spirit/frames` import before instantiation.
-//! 3. Instantiate it against the `maos:spirit@2.2.0` bindings, call
+//! 3. Instantiate it against the `maos:spirit@2.3.0` bindings, call
 //!    `on-start`, and exchange typed frames with `handle-frame`.
 //! 4. On EOF or a guest-returned `Halt`, call `on-shutdown` and use the
 //!    cause-distinguishing exit codes below.
@@ -79,7 +79,7 @@ fn main() -> ExitCode {
         Err(RunError::IncompatibleWorld(import)) => {
             eprintln!(
                 "maos-wasm-runner: IncompatibleWorld: component imports {import}; \
-                 this runner implements maos:spirit@2.2.0"
+                 this runner implements maos:spirit@2.3.0"
             );
             ExitCode::from(RunnerExit::IncompatibleWorld as u8)
         }
@@ -252,6 +252,11 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
         wasmtime::component::HasSelf<HostState>,
     >(&mut linker, |state| state)
     .map_err(|e| RunError::Other(format!("context linker setup: {e}")))?;
+    maos_wasm_host::wit_guest::maos::spirit::skills::add_to_linker::<
+        _,
+        wasmtime::component::HasSelf<HostState>,
+    >(&mut linker, |state| state)
+    .map_err(|e| RunError::Other(format!("skills linker setup: {e}")))?;
     // 2.0/2.1 have the same export schema, but its input enums are closed:
     // select their bindings before instantiation rather than widening them.
     macro_rules! run_guest {
@@ -265,7 +270,7 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
                 return Err(RunError::OutOfFuel);
             }
             return Err(RunError::InvalidComponent(format!(
-                "component does not conform to maos:spirit@2.2.0 (instantiate failed): {error_message}"
+                "component does not conform to maos:spirit@2.3.0 (instantiate failed): {error_message}"
             )));
         }
     };
@@ -356,8 +361,8 @@ fn compile_with_timeout(engine: &Engine, bytes: Vec<u8>) -> Result<Component, Ru
     }
 }
 
-/// Reject unsupported major versions of either Spirit host interface.
-/// Semver-compatible 2.0/2.1 imports resolve against this host's 2.2 definitions.
+/// Reject unsupported major versions of Spirit host interfaces.
+/// Semver-compatible 2.0–2.2 imports resolve against the 2.3 definitions.
 fn incompatible_spirit_import(component: &Component, engine: &Engine) -> Option<String> {
     component
         .component_type()
@@ -366,7 +371,8 @@ fn incompatible_spirit_import(component: &Component, engine: &Engine) -> Option<
             let version = name
                 .strip_prefix("maos:spirit/frames@")
                 .or_else(|| name.strip_prefix("maos:spirit/recall@"))
-                .or_else(|| name.strip_prefix("maos:spirit/context@"))?;
+                .or_else(|| name.strip_prefix("maos:spirit/context@"))
+                .or_else(|| name.strip_prefix("maos:spirit/skills@"))?;
             let major = version.split('.').next()?.parse::<u64>().ok()?;
             (major != 2).then(|| name.to_owned())
         })

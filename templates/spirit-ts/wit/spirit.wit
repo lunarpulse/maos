@@ -1,5 +1,5 @@
-// `maos:spirit@2.2.0` — lossless frames, participant-scoped log recall and
-// Spirit-self-reported context budgets.
+// `maos:spirit@2.3.0` — lossless frames, participant-scoped log recall,
+// Spirit-self-reported context budgets and governed skill authoring.
 //
 // Story 11.1a, ADR-031 §3: this WIT is the typed face a WASM Spirit author
 // binds against (wit-bindgen, `jco guest-types`). The host serializes and
@@ -17,6 +17,7 @@
 // interface frames. The daemon binds identity and grants on the stdio channel.
 // Story 18-5 (ADR-016, `18-5-AC3-wit-spirit-2.2.0`) adds the kernel-written
 // `context-pressure`/`context-limit` frames and the `context` report import.
+// Story 20-8 adds governed skill authoring and proposal imports.
 //
 // Every byte of this file feeds the four provenance-pinned components'
 // `source_sha256` (`tests/fixtures/wasm/equiv-fixtures.provenance.toml`): an
@@ -27,7 +28,7 @@
 //   FramePayload / IacFrame  — crates/maos-domain/src/frame.rs
 //   Scope                    — crates/maos-domain/src/invariants/i1.rs
 
-package maos:spirit@2.2.0;
+package maos:spirit@2.3.0;
 
 interface frames {
     // ── FrameKind (identity.rs:30-79) ──────────────────────────────────
@@ -368,6 +369,15 @@ interface context {
     report: func(used-tokens: u32) -> result<context-status, context-error>;
 }
 
+// The host binds pid, class and telemetry; only the operator admits skills.
+// Calls outside handle-frame return unavailable.
+interface skills {
+    record queued { entry-id: string, target: string }
+    variant skill-error { capability-denied, refused(string), unavailable }
+    author: func(document: string) -> result<queued, skill-error>;
+    propose: func(target-id: string, target-version: string, diff: string) -> result<queued, skill-error>;
+}
+
 // The Spirit world a WASM-component author implements. The host
 // (maos-wasm-host's `maos-wasm-runner`) drives it: feeds inbound frames decoded
 // from the ADR-032 stdio stream, and writes the guest's emitted frames back to
@@ -379,6 +389,7 @@ world spirit {
     use frames.{iac-frame, halt};
     import recall;
     import context;
+    import skills;
 
     // host → guest: deliver one inbound frame, get zero-or-more emitted
     // frames. A returned `halt` ends the session (maps to the ADR-032

@@ -68,6 +68,7 @@ pub struct SessionDeps {
     pub pid_by_spirit_id: Arc<RwLock<BTreeMap<String, u32>>>,
     pub enterprise: Option<Arc<EnterpriseRuntime>>,
     pub pdp: Option<EnterprisePdpRuntime>,
+    pub skill: Option<crate::skill_authoring::SkillBuilder>,
 }
 
 pub struct SessionLaunch {
@@ -79,6 +80,7 @@ pub struct SessionLaunch {
     pub context_window: maos_kernel_core::capability::context_budget::ContextWindow,
     pub once: bool,
     pub initial_frame: Option<IacFrame>,
+    pub scopes: Vec<maos_domain::invariants::i1::Scope>,
 }
 
 /// Resolve metadata before admission; component validation stays in the T2 child.
@@ -145,6 +147,7 @@ pub fn manifest_launch(
         context_window: crate::butler_root::context_window(gated.budget.as_ref()),
         once,
         initial_frame,
+        scopes: maos_manifest::capabilities_required_to_scopes(&gated.caps_required),
     })
 }
 
@@ -367,6 +370,10 @@ pub async fn run_admitted_session(
                 Arc::clone(deps.iac.transparency_log()),
                 Arc::new(move || Some(spirit.clone())),
             )));
+            let pid = admitted.pid;
+            recall.skill = deps.skill.as_ref()
+                .map(|bind| bind(Arc::new(move || Some(pid)), &launch.scopes))
+                .transpose().map_err(SessionError::Bridge)?;
             let mut deadline = Some((Instant::now() + launch.turn_budget, "startup"));
             let runtime = tokio::runtime::Handle::current();
             loop {

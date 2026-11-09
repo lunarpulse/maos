@@ -585,6 +585,14 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 
 Source: `../routing-audit-2026-10-22.md` — every row of the Recovery Coverage Map above was checked clause-by-clause against the owner story's AC text (verdicts OWNED / PARTIAL / MISROUTED / PARKED / LIVE-VERIFIED / LIVE-UNVERIFIED; 109 rows). Rows below supersede the map above for the named requirement; unlisted rows stand. New story keys are tracker `backlog` rows; their §-sections are written at the owning epic's preflight (operator directive 2026-09-06).
 
+**FR8 / 20-8 L1 update (2026-11-09):** the row below is historical creation
+pricing. Schema 7 and WIT 2.3, pre-pid declaration, declared-skill admission
+and the I13 consumer are implemented; hosted signed/TS proof is unverified,
+explanation-shape enforcement remains deferred, and AC8 is the kernel landing.
+An issued pid implies a declaration, but a declaration is not admission proof.
+The domain 10,174 → 10,205 ceiling overdraft is orchestrator-adjudicated,
+disclosed to the operator; 20-9/20-13/20-14 re-base on the 10,190 landed pin.
+
 | Requirement | Was | Now |
 |---|---|---|
 | FR39/FR57 `skill.author.self` + revision proposals | "follow-on at Epic 18 preflight" | `18-7-live-skill-authoring-and-revisions` (after 18-1) |

@@ -2523,15 +2523,20 @@ mod worker {
         }
 
         fn unload(&self, spirit_pid: u32) {
+            let core = self.registry.upgrade().and_then(|r| r.by_pid(spirit_pid));
             let result = self.block_on_anywhere(self.scheduler.unload(spirit_pid));
-            if let Some(core) = self.registry.upgrade().and_then(|r| r.by_pid(spirit_pid)) {
+            if let Some(core) = &core {
                 core.stop_session();
             }
             match result {
                 Some(Err(error)) => {
                     eprintln!("maos run: worker unload failed for pid {spirit_pid}: {error}");
                 }
-                Some(Ok(_)) => {}
+                Some(Ok(_)) => {
+                    if let Some(core) = core {
+                        self.iac.unregister_promotion_set(core.spirit_id());
+                    }
+                }
                 None => eprintln!("maos run: worker unload thread panicked for pid {spirit_pid}"),
             }
         }

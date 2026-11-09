@@ -15,6 +15,18 @@ Older arithmetic/rulings below remain historical; later kernel landers must re-m
 **Evidence:** `20-8-manifest-contract-completion-evidence/creation/measurements.md`, `kloc-kernel-8c809f9c-and-prototypes.json`, `prototypes/{kb,kb4,ks}-kernel-only.diff` (full-tree variants alongside).  
 **Precedent:** `20-4-flag-winston-decision.md`, `20-7-flag-winston-decision.md`.
 
+**L1 audit ordering — 2026-11-09 (ask `ac13i2` A).** The declaration row
+precedes pid issuance and keeps the I2 fail-stop writer; no kernel change.
+Orchestrator clarification: pid issuance implies a declaration row, not the
+reverse; a later refusal is separately recorded. L2's KS ruling is unchanged.
+Operator ask `enc208` A records public digest/key bytes in colon-delimited hex;
+this is an L1 representation ruling and does not alter KS or the I2 writer.
+Orchestrator-adjudicated overdraft (2026-11-09), disclosed to the operator:
+L1 domain ceiling 10,174 → 10,205 after formatted 10,190 from 10,144 (+46
+versus creation estimate +11); the enc208 decoder and typed fields are
+production code. Aggregate ceiling stays 199,078. 20-9/20-13/20-14 re-base
+their domain draws on the eventual landed pin. Kernel KS is unchanged.
+
 ## Why the kernel is touched at all
 
 A hot swap parses its successor in the kernel (`load_bundle_from_file`, `crates/maos-kernel-core/src/lifecycle/upgrade.rs:307-429`, caller
@@ -43,6 +55,6 @@ D-20-14-12 C (ask `d2014_12`, 2026-11-03) sets joint STOP **21250** for the comb
 
 ## Landing and accounting (if granted)
 
-L1 lands AC1–AC6 with no kernel line. L2 lands AC7 under the ruled option, re-measures the formatted code, and pins
+L1 is kernel-free (AC1–AC7 and AC9; hosted AC7 remains unverified). L2 implements AC8 under the ruled option, re-measures the formatted code, and pins
 `xtask/kernel-core-baseline.toml` (src_lines, content hashes of the changed files, set hash) and `xtask/kloc.toml:264` exactly, with
 HISTORY rows citing this key with `->`. Unused room is not reserved. A measured figure above the ceiling is STOP and a new D-row.

@@ -31,6 +31,7 @@
 //! | `gateway` | Story 6.5 | ADR-029 binding-v1.0 |
 //! | `deprecation` | Story 7.1 | Empty-present deprecation channel |
 //! | `MANIFEST_SCHEMA_VERSION = 6` | Story 18-7 | Runtime `[capabilities.required.skill]` |
+//! | `MANIFEST_SCHEMA_VERSION = 7` | Story 20-8 | FR8 contract declarations |
 //!
 //! ## Modules
 //! | Module | Description | Introduced |
@@ -105,6 +106,9 @@ pub const ABI_VERSION: u32 = 1;
 /// Bumped to `6` in Story 18-7-live-skill-authoring-and-revisions (D-02 A)
 /// for `[capabilities.required.skill].author_self`. Below schema 6 the
 /// declaration degrades away; the supported floor remains 1.
+/// Bumped to `7` in Story 20-8 for FR8 contract declarations; below schema 7
+/// these declarations degrade away.
+///
 ///
 /// This constant is the single authoritative source consumed by
 /// `maos-manifest::ClassSection` validation and by the `xtask
@@ -117,9 +121,9 @@ pub const ABI_VERSION: u32 = 1;
 /// ```rust
 /// use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 ///
-/// assert_eq!(MANIFEST_SCHEMA_VERSION, 6);
+/// assert_eq!(MANIFEST_SCHEMA_VERSION, 7);
 /// ```
-pub const MANIFEST_SCHEMA_VERSION: u32 = 6;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 7;
 
 /// Lowest manifest schema version this kernel accepts at admission.
 ///

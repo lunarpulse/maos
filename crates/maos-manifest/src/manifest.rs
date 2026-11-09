@@ -319,6 +319,9 @@ impl ManifestDocument {
 /// `check-manifest-schema-version` forbids literal schema compares.
 const WASM_COMPONENT_SINCE_SCHEMA: u32 = 5;
 
+/// First schema supporting the four FR8 contract declarations.
+pub const FR8_DECLARATIONS_SINCE_SCHEMA: u32 = 7;
+
 /// Story 17-3b (D-17-3b-G) — upper bound on `[class].artifact`'s byte length.
 const ARTIFACT_PATH_MAX_BYTES: usize = 4096;
 
@@ -334,7 +337,7 @@ const ARTIFACT_PATH_MAX_BYTES: usize = 4096;
 /// gate reports the constant as missing. Keep the declaration on one physical
 /// line and out of doc comments above it.
 #[rustfmt::skip]
-const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom", "capabilities.required.iac", "capabilities.required.log", "capabilities.required.skill"];
+const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom", "capabilities.required.iac", "capabilities.required.log", "capabilities.required.skill", "skills", "explanation_shape", "intent_promotion_set", "swap_invariants"];
 
 /// Story 7.5a (NFR-Maint-9) — emit a WARN-level degradation note for every
 /// newer-than-declared schema section that an N-1 manifest omits (and thus
@@ -4096,6 +4099,128 @@ impl HaltProtocolCompatibilitySection {
         }
         Ok(Self {
             version: raw.version,
+        })
+    }
+}
+
+/// Skill IDs required by a Spirit.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SkillsSection {
+    pub uses: Vec<String>,
+}
+
+/// Explanation fields declared for decision frames (not currently enforced).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ExplanationShapeSection {
+    pub required_fields: Vec<String>,
+}
+
+/// Intent lineage allowed in a distillate consumed by a Spirit.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct IntentPromotionSetSection {
+    pub allowed: Vec<String>,
+}
+
+/// Invariant names that a successor must preserve.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SwapInvariantsSection {
+    pub preserve: Vec<String>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawSkillsSection {
+    uses: Vec<String>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawExplanationShapeSection {
+    required_fields: Vec<String>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawIntentPromotionSetSection {
+    allowed: Vec<String>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawSwapInvariantsSection {
+    preserve: Vec<String>,
+}
+
+fn declared_names(field: &str, names: Vec<String>) -> Result<Vec<String>, ManifestError> {
+    if names.is_empty() || names.len() > 32 {
+        return Err(ManifestError::Toml(validation_msg(
+            field,
+            &format!("needs 1..=32 entries, got {}", names.len()),
+        )));
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for name in &names {
+        let valid = (1..=128).contains(&name.len())
+            && name
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._:-".contains(&b));
+        if !valid || !seen.insert(name.as_str()) {
+            return Err(ManifestError::Toml(validation_msg(
+                field,
+                &format!("invalid or duplicate entry '{name}'"),
+            )));
+        }
+    }
+    Ok(names)
+}
+
+fn parse_raw<T: serde::de::DeserializeOwned>(s: &str) -> Result<T, ManifestError> {
+    toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))
+}
+
+impl SkillsSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawSkillsSection = parse_raw(s)?;
+        Ok(Self {
+            uses: declared_names("skills.uses", raw.uses)?,
+        })
+    }
+}
+
+impl ExplanationShapeSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawExplanationShapeSection = parse_raw(s)?;
+        Ok(Self {
+            required_fields: declared_names(
+                "explanation_shape.required_fields",
+                raw.required_fields,
+            )?,
+        })
+    }
+}
+
+impl IntentPromotionSetSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawIntentPromotionSetSection = parse_raw(s)?;
+        Ok(Self {
+            allowed: declared_names("intent_promotion_set.allowed", raw.allowed)?,
+        })
+    }
+
+    pub fn to_allowed_set(&self) -> maos_domain::invariants::i13::AllowedPromotionSet {
+        let mut set = maos_domain::invariants::i13::AllowedPromotionSet::new();
+        for intent in &self.allowed {
+            set.insert(maos_domain::invariants::i8::A2AIntent::new(intent));
+        }
+        set
+    }
+}
+
+impl SwapInvariantsSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        let raw: RawSwapInvariantsSection = parse_raw(s)?;
+        Ok(Self {
+            preserve: declared_names("swap_invariants.preserve", raw.preserve)?,
         })
     }
 }

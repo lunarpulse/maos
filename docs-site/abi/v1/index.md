@@ -8,7 +8,7 @@
 - [Constants](./constants) — `ABI_VERSION` and `MANIFEST_SCHEMA_VERSION` reference
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 6*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 7*
 
 `maos-spirit-abi` — wire-stable types ONLY (`#![no_std]`).
 
@@ -40,6 +40,7 @@ All additions are ABI-additive per §8.5 rows 7+8. `ABI_VERSION` remains `1`.
 | `gateway` | Story 6.5 | ADR-029 binding-v1.0 |
 | `deprecation` | Story 7.1 | Empty-present deprecation channel |
 | `MANIFEST_SCHEMA_VERSION = 6` | Story 18-7 | Runtime `[capabilities.required.skill]` |
+| `MANIFEST_SCHEMA_VERSION = 7` | Story 20-8 | FR8 contract declarations |
 
 ## Modules {#maos-spirit-abi-modules}
 | Module | Description | Introduced |

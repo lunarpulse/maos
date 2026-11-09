@@ -478,6 +478,7 @@ impl World {
         let admitted = load_admit_start(
             &AdmissionDeps {
                 providers: None,
+                iac: None,
                 scheduler: &self.scheduler,
                 security: &self.security,
                 transparency_log: &self.tl,

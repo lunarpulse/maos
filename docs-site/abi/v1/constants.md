@@ -9,7 +9,7 @@
 - [v2 → v3 Migration](/migrate/v2-to-v3) — what changed at manifest schema version 3
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 6*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 7*
 
 
 ## Constants {#maos-spirit-abi-constants}
@@ -72,6 +72,9 @@ the N-1 manifest floor.
 Bumped to `6` in Story 18-7-live-skill-authoring-and-revisions (D-02 A)
 for `[capabilities.required.skill].author_self`. Below schema 6 the
 declaration degrades away; the supported floor remains 1.
+Bumped to `7` in Story 20-8 for FR8 contract declarations; below schema 7
+these declarations degrade away.
+
 
 This constant is the single authoritative source consumed by
 `maos-manifest::ClassSection` validation and by the `xtask
@@ -84,12 +87,12 @@ constant directly.
 ```rust
 use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 
-assert_eq!(MANIFEST_SCHEMA_VERSION, 6);
+assert_eq!(MANIFEST_SCHEMA_VERSION, 7);
 ```
 
 
 ```rust
-pub const MANIFEST_SCHEMA_VERSION: u32 = 6u32;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 7u32;
 ```
 
 ### `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` {#maos-spirit-abi-min-supported-manifest-schema-version}
@@ -150,5 +153,5 @@ assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
 
 
 ```rust
-pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 6u32;
+pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 7u32;
 ```

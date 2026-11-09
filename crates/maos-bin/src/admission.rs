@@ -116,6 +116,60 @@ pub fn emit_vetter_key_event(
     );
 }
 
+/// Record the declaration before issuing a pid. This is not an admission grant.
+pub fn emit_manifest_declaration_event(
+    tl: &maos_kernel_core::iac::TransparencyLogAdapter,
+    gated: &GatedManifest,
+) -> Result<(), String> {
+    use sha2::Digest;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or(std::time::Duration::ZERO)
+        .as_nanos() as u64;
+    let declared = [
+        ("skills", gated.skills.is_some()),
+        ("explanation_shape", gated.explanation_shape.is_some()),
+        ("intent_promotion_set", gated.intent_promotion_set.is_some()),
+        ("swap_invariants", gated.swap_invariants.is_some()),
+    ];
+    let payload = maos_domain::governance::GovernanceEventPayload {
+        recorded_at_ns: now,
+        effective_at_ns: now,
+        event: maos_domain::governance::GovernanceEventKind::ManifestDeclaration(
+            maos_domain::governance::ManifestDeclarationPayload {
+                spirit_id: gated.spirit_id.clone(),
+                version: gated.class_section.version.clone(),
+                manifest_sha256: maos_domain::governance::encode_declaration_bytes(
+                    &sha2::Sha256::digest(gated.manifest_toml.as_bytes()).into(),
+                ),
+                publisher: gated
+                    .publisher
+                    .as_ref()
+                    .map(maos_domain::governance::encode_declaration_bytes),
+                declared: declared
+                    .iter()
+                    .filter(|(_, present)| *present)
+                    .map(|(name, _)| (*name).to_owned())
+                    .collect(),
+                skill_ids: gated
+                    .skills
+                    .as_ref()
+                    .map_or_else(Vec::new, |s| s.uses.clone()),
+            },
+        ),
+    };
+    let bytes = serde_json::to_vec(&payload).map_err(|error| error.to_string())?;
+    tl.insert_frame_event(
+        maos_kernel_core::iac::transparency_log::FrameKind::GovernanceEvent,
+        0,
+        None,
+        "governance:manifest-declaration",
+        &bytes,
+        maos_domain::invariants::i3::FrameOrigin::Kernel,
+    );
+    Ok(())
+}
+
 /// Story 20-3c (FR62(b), D-20-3c-05 B) — journal an ABI-extension proposal or a
 /// status change as a `GovernanceEvent` (kind 28), carrying `recorded_at` (now)
 /// and the operator's `effective_at`. `maos_audit::load_ratification_frames`
@@ -297,6 +351,10 @@ pub enum AdmissionRefusal {
     EndpointPinMismatch { provider: String },
     /// Fallback would require authority the primary token does not carry.
     FallbackUnsupported,
+    /// Declared skill is not available and operator-admitted.
+    SkillUnavailable { skill: String },
+    /// A declared skill requires an undeclared action.
+    SkillEscalation { skill: String },
 }
 
 impl AdmissionRefusal {
@@ -325,6 +383,8 @@ impl AdmissionRefusal {
             Self::ProviderUnavailable { .. } => "provider_unavailable",
             Self::EndpointPinMismatch { .. } => "endpoint_pin_mismatch",
             Self::FallbackUnsupported => "fallback_unsupported",
+            Self::SkillUnavailable { .. } => "skill_unavailable",
+            Self::SkillEscalation { .. } => "skill_escalation",
         }
     }
 
@@ -400,6 +460,8 @@ impl std::fmt::Display for AdmissionRefusal {
             Self::ProviderUnavailable { provider } => write!(f, "provider_unavailable: '{provider}' is undeclared, unregistered, or its model assertion differs"),
             Self::EndpointPinMismatch { provider } => write!(f, "endpoint_pin_mismatch: '{provider}' does not match the configured endpoint"),
             Self::FallbackUnsupported => f.write_str("fallback_unsupported: a primary token cannot authorise fallback providers"),
+            Self::SkillUnavailable { skill } => write!(f, "skill_unavailable: {skill}"),
+            Self::SkillEscalation { skill } => write!(f, "skill_escalation: {skill}"),
         }
     }
 }
@@ -472,6 +534,11 @@ pub struct GatedManifest {
     pub on_revocation: Option<OnRevocationSection>,
     pub supervision: Option<SupervisionSection>,
     pub providers: Option<maos_kernel_core::security::ProvidersSection>,
+    pub skills: Option<maos_manifest::SkillsSection>,
+    pub explanation_shape: Option<maos_manifest::ExplanationShapeSection>,
+    pub intent_promotion_set: Option<maos_manifest::IntentPromotionSetSection>,
+    pub swap_invariants: Option<maos_manifest::SwapInvariantsSection>,
+    pub publisher: Option<[u8; 32]>,
     /// The raw text, kept for the model-provenance gate, which parses its own
     /// section out of the whole document, and for the FR11 archive record.
     pub manifest_toml: String,
@@ -483,6 +550,7 @@ impl GatedManifest {
     pub fn bind_registry_publisher(&mut self, publisher: &[u8; 32]) {
         self.storage_identity =
             maos_registry::install::publisher_storage_identity(&self.spirit_id, publisher);
+        self.publisher = Some(*publisher);
     }
 
     /// A signed registry/import sidecar opts into publisher-bound storage.
@@ -758,6 +826,29 @@ pub fn gate_manifest(
             return Err(AdmissionRefusal::FallbackUnsupported);
         }
     }
+    let fr8 = class_section.manifest_schema_version >= maos_manifest::FR8_DECLARATIONS_SINCE_SCHEMA;
+    let (skills, explanation_shape, intent_promotion_set, swap_invariants) = if fr8 {
+        (
+            optional_section(&root, "skills", maos_manifest::SkillsSection::from_toml_str)?,
+            optional_section(
+                &root,
+                "explanation_shape",
+                maos_manifest::ExplanationShapeSection::from_toml_str,
+            )?,
+            optional_section(
+                &root,
+                "intent_promotion_set",
+                maos_manifest::IntentPromotionSetSection::from_toml_str,
+            )?,
+            optional_section(
+                &root,
+                "swap_invariants",
+                maos_manifest::SwapInvariantsSection::from_toml_str,
+            )?,
+        )
+    } else {
+        (None, None, None, None)
+    };
     // The component's manifest has now passed every structural gate. The
     // refusal is feature-selected because a published binary's engine closure
     // is an export-control property, not runtime configuration.
@@ -786,6 +877,11 @@ pub fn gate_manifest(
         on_revocation,
         supervision,
         providers,
+        skills,
+        explanation_shape,
+        intent_promotion_set,
+        swap_invariants,
+        publisher: None,
         manifest_toml: manifest_toml.to_owned(),
     })
 }
@@ -901,6 +997,7 @@ pub struct AdmissionDeps<'a> {
     /// class is Observer.
     pub hooks: Option<&'a crate::hook_pump::HookPump>,
     pub providers: Option<&'a ProviderCatalog>,
+    pub iac: Option<&'a Arc<maos_iac::adapter::IacBusAdapter>>,
 }
 
 /// Whether the triple runs its third leg.
@@ -934,6 +1031,62 @@ pub struct Admitted {
     pub effective_posture_ceiling: Posture,
 }
 
+/// Validate discovered skill admission and declared actions before pid issuance.
+pub fn check_declared_skills(
+    gated: &GatedManifest,
+    tl: &maos_kernel_core::iac::TransparencyLogAdapter,
+) -> Result<(), AdmissionRefusal> {
+    use maos_skill::SkillQueueStore;
+    let Some(skills) = &gated.skills else {
+        return Ok(());
+    };
+    let unavailable = |skill: &str| AdmissionRefusal::SkillUnavailable {
+        skill: skill.to_owned(),
+    };
+    let first = skills.uses.first().ok_or_else(|| unavailable(""))?;
+    let serialization = crate::operator_door::skill_serialization();
+    let _guard = serialization
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    let store = maos_skill::LocalFsSkillQueueStore::new().map_err(|_| unavailable(first))?;
+    let discovered =
+        maos_skill::discover_skills_detailed(&maos_skill::default_search_path()).discovered;
+    let entries = store.load().map_err(|_| unavailable(first))?;
+    let approvals = tl.query_approvals(None).map_err(|_| unavailable(first))?;
+    let queue = maos_cli::subcommands::skill_entries(&discovered, entries, &approvals)
+        .map_err(|_| unavailable(first))?;
+    let scopes = maos_manifest::capabilities_required_to_scopes(&gated.caps_required);
+    for id in &skills.uses {
+        let mut found = false;
+        for item in discovered
+            .iter()
+            .filter(|item| item.skill.manifest.id == *id)
+        {
+            found = true;
+            let manifest = &item.skill.manifest;
+            if !queue.entries().iter().any(|entry| {
+                entry.id.0 == manifest.id
+                    && entry.version.0 == manifest.version
+                    && entry.entry_path != "revision_proposal"
+                    && entry.state == maos_skill::SkillAdmissionState::Admitted
+            }) {
+                return Err(unavailable(id));
+            }
+            if manifest.required_capabilities.iter().any(|capability| {
+                !scopes
+                    .iter()
+                    .any(|scope| maos_domain::ports::scope_action_key(scope) == capability.0)
+            }) {
+                return Err(AdmissionRefusal::SkillEscalation { skill: id.clone() });
+            }
+        }
+        if !found {
+            return Err(unavailable(id));
+        }
+    }
+    Ok(())
+}
+
 /// The whole `provenance → load → admit → start` triple, with rollback.
 ///
 /// `spirit_obj` is already class-dispatched by the caller, which is why the
@@ -960,6 +1113,12 @@ pub async fn load_admit_start(
     if let Some(providers) = &gated.providers {
         check_provider_pins(providers, deps.providers)?;
     }
+    check_declared_skills(gated, deps.transparency_log)?;
+    if gated.intent_promotion_set.is_some() && deps.iac.is_none() {
+        return Err(AdmissionRefusal::Admission {
+            detail: "intent promotion bus unavailable".into(),
+        });
+    }
     let spirit_id = gated.spirit_id.clone();
     let archive_root = maos_audit::default_archive_dir();
 
@@ -984,6 +1143,8 @@ pub async fn load_admit_start(
         emit_model_provenance_event(deps.transparency_log, &record)
             .map_err(|detail| AdmissionRefusal::ModelProvenance { detail })?;
     }
+    emit_manifest_declaration_event(deps.transparency_log, gated)
+        .map_err(|detail| AdmissionRefusal::Admission { detail })?;
 
     let pid = match deps
         .scheduler
@@ -992,9 +1153,25 @@ pub async fn load_admit_start(
     {
         Ok(pid) => pid,
         Err(maos_domain::lifecycle::LifecycleError::AlreadyLoaded { spirit_id }) => {
+            emit_vetter_key_event(
+                deps.transparency_log,
+                &spirit_id,
+                &gated.class_section.version,
+                false,
+                "N/A",
+                "admission rejected: already loaded",
+            );
             return Err(AdmissionRefusal::AlreadyLoaded { spirit_id });
         }
         Err(error) => {
+            emit_vetter_key_event(
+                deps.transparency_log,
+                &spirit_id,
+                &gated.class_section.version,
+                false,
+                "N/A",
+                &format!("load rejected: {error}"),
+            );
             if let Some(pid) = deps.scheduler.resolve_pid(&spirit_id) {
                 rollback(deps, pid, &spirit_id).await;
             }
@@ -1011,6 +1188,14 @@ pub async fn load_admit_start(
         .memory
         .bind_storage_identity(pid, &gated.storage_identity)
     {
+        emit_vetter_key_event(
+            deps.transparency_log,
+            &spirit_id,
+            &gated.class_section.version,
+            false,
+            "N/A",
+            &format!("storage identity rejected: {error}"),
+        );
         rollback(deps, pid, &spirit_id).await;
         return Err(AdmissionRefusal::Load {
             detail: error.to_string(),
@@ -1076,6 +1261,15 @@ pub async fn load_admit_start(
             error.into_inner()
         })
         .insert(spirit_id.clone(), pid);
+    if let Some(iac) = deps.iac {
+        iac.register_promotion_set(
+            &spirit_id,
+            gated
+                .intent_promotion_set
+                .as_ref()
+                .map(|s| s.to_allowed_set()),
+        );
+    }
 
     // Story 17-4 — register only after the granted admission and before
     // `start`; a spawned form (WASM) never registers, whatever the caller
@@ -1089,6 +1283,14 @@ pub async fn load_admit_start(
 
     if start == StartPolicy::StartNow {
         if let Err(error) = deps.scheduler.start(pid).await {
+            emit_vetter_key_event(
+                deps.transparency_log,
+                &spirit_id,
+                &gated.class_section.version,
+                false,
+                "N/A",
+                &format!("start rejected: {error}"),
+            );
             if let Some(hooks) = hooks {
                 hooks.unregister(pid, "start-failed");
             }
@@ -1099,6 +1301,9 @@ pub async fn load_admit_start(
                 // Story 16-6 review 2026-09-20: `handle_crash` already owns
                 // teardown after a panicked hook. A lost race can only lose
                 // crash classification, never corrupt scheduler state.
+                if let Some(iac) = deps.iac {
+                    iac.unregister_promotion_set(&spirit_id);
+                }
                 remove_pid_by_spirit_id(deps, &spirit_id);
             } else {
                 rollback(deps, pid, &spirit_id).await;
@@ -1146,6 +1351,9 @@ async fn rollback(deps: &AdmissionDeps<'_>, pid: u32, spirit_id: &str) {
             "maos: CRITICAL — rollback of partially admitted Spirit '{spirit_id}' (pid {pid}) \
              failed: {error}"
         );
+    }
+    if let Some(iac) = deps.iac {
+        iac.unregister_promotion_set(spirit_id);
     }
     remove_pid_by_spirit_id(deps, spirit_id);
 }

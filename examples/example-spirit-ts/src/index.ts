@@ -1,9 +1,11 @@
-import type { IacFrame } from "maos:spirit/spirit@2.2.0";
-import { recall, fetch } from "maos:spirit/recall@2.2.0";
+import type { IacFrame } from "maos:spirit/spirit@2.3.0";
+import { recall, fetch } from "maos:spirit/recall@2.3.0";
+import { author } from "maos:spirit/skills@2.3.0";
 
 import { halt } from "./halt.js";
 
 let started = false;
+let authored = false;
 
 /**
  * Echoes one inbound ADR-032 frame after the guest has started.
@@ -16,6 +18,19 @@ let started = false;
 export function handleFrame(frame: IacFrame): IacFrame[] {
   if (!started) {
     halt("handleFrame called before onStart");
+  }
+
+  if (!authored) {
+    author(`---
+id='example-spirit-ts.example'
+version='1.0.0'
+name='Example skill'
+description='A skill proposed for operator admission'
+required_capabilities=['skill.author.self']
+---
+Follow the example procedure.
+`);
+    authored = true;
   }
 
   // Recall lists frames this Spirit sent or received in this daemon run.
@@ -49,4 +64,5 @@ export function onStart(): void {
 
 export function onShutdown(): void {
   started = false;
+  authored = false;
 }

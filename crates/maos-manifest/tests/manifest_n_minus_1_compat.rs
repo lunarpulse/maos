@@ -132,6 +132,19 @@ fn n_minus_1_emits_warn_degradation_per_post_v1_section() {
 }
 
 #[test]
+fn schema_six_degrades_all_fr8_sections() {
+    let degraded = warn_n_minus_1_degradations(6);
+    for name in [
+        "skills",
+        "explanation_shape",
+        "intent_promotion_set",
+        "swap_invariants",
+    ] {
+        assert!(degraded.contains(&name), "missing degradation for {name}");
+    }
+}
+
+#[test]
 fn v2_manifest_loads_on_v2_kernel() {
     // Direct guard for the Epic 6 §A4 bump: at v2, manifests authored against
     // the four new sections ([[cli_wrapper]], [[schedules]], [gateways],

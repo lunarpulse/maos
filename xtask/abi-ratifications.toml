@@ -292,3 +292,19 @@ adr_ref = "ADR-045,ADR-069"
 status = "ratified"
 covered_changes = ["MANIFEST_SCHEMA_VERSION", "CapabilitiesRequired", "SkillCapabilities", "RawCapabilitiesRequired"]
 ratified_at = "2026-10-26"
+
+[[ratification]]
+proposal_id = "20-8-manifest-schema-7"
+summary = "MANIFEST_SCHEMA_VERSION 6→7; four FR8 declaration sections with schema degradation"
+adr_ref = "ADR-045,ADR-069"
+status = "ratified"
+covered_changes = ["MANIFEST_SCHEMA_VERSION", "SkillsSection", "ExplanationShapeSection", "IntentPromotionSetSection", "SwapInvariantsSection"]
+ratified_at = "2026-11-03"
+
+[[ratification]]
+proposal_id = "20-8-wit-spirit-2.3.0"
+summary = "Additive skills author and propose host import with root-bound identity and operator admission"
+adr_ref = "ADR-031,ADR-045,ADR-060"
+status = "ratified"
+covered_changes = ["maos:spirit@2.3.0", "skills", "queued", "skill-error"]
+ratified_at = "2026-11-03"

@@ -11,6 +11,8 @@
 //! - `recalls N`: N recalls with the default filter (including zero).
 //! - `context N`: Story 18-5 — `context.report(N)`; reports
 //!   `context ok USED WINDOW LEVEL CROSSED|-` or `context err CODE`.
+//! - `skill-author HEX`: submit a UTF-8 document encoded as hexadecimal.
+//! - `skill-propose ID VERSION HEX`: propose a hex-encoded diff.
 //! - `to SPIRIT`: address the emitted report to this Spirit instead of the input
 //!   recipients. Session send authorization sees these claims; telemetry delivery
 //!   itself uses the bus's broadcast subscription.
@@ -30,6 +32,7 @@ wit_bindgen::generate!({ path: "../../../../wit/spirit.wit", world: "spirit" });
 
 use maos::spirit::frames::{FrameKind, FrameOrigin, FramePayload, TelemetryEventBody};
 use maos::spirit::recall::{self, RecallCursor, RecallError, RecallFilter};
+use maos::spirit::skills::{self, SkillError};
 use std::fmt::Write;
 struct RecallProbe;
 
@@ -199,6 +202,24 @@ impl Guest for RecallProbe {
                     },
                     None => report.push_str("script err invalid-request\n"),
                 },
+                Some("skill-author") => {
+                    let doc = words.next().and_then(unhex).and_then(|bytes| String::from_utf8(bytes).ok());
+                    match doc.filter(|_| words.next().is_none()) {
+                        Some(doc) => skill_report(&mut report, skills::author(&doc)),
+                        None => report.push_str("script err invalid-request\n"),
+                    }
+                }
+                Some("skill-propose") => {
+                    let values = (words.next(), words.next(), words.next().and_then(unhex));
+                    match values {
+                        (Some(id), Some(version), Some(diff)) if words.next().is_none() => {
+                            if let Ok(diff) = String::from_utf8(diff) {
+                                skill_report(&mut report, skills::propose(id, version, &diff));
+                            } else { report.push_str("script err invalid-request\n"); }
+                        }
+                        _ => report.push_str("script err invalid-request\n"),
+                    }
+                }
                 Some("fetch") => {
                     let id = match words.next() {
                         Some("self") => Some(frame.frame_id.clone()),
@@ -248,6 +269,7 @@ impl Guest for RecallProbe {
         Ok(vec![frame])
     }
     fn on_start() -> Result<(), Halt> {
+        assert!(matches!(skills::author("outside-export"), Err(SkillError::Unavailable)));
         assert!(matches!(
             recall::recall(&default_filter()),
             Err(RecallError::Unavailable)
@@ -261,4 +283,13 @@ impl Guest for RecallProbe {
         ));
     }
 }
+fn skill_report(report: &mut String, result: Result<skills::Queued, SkillError>) {
+    match result {
+        Ok(queued) => writeln!(report, "skill ok {} {}", queued.entry_id, queued.target).unwrap(),
+        Err(SkillError::CapabilityDenied) => report.push_str("skill err capability-denied\n"),
+        Err(SkillError::Refused(code)) => writeln!(report, "skill err {code}").unwrap(),
+        Err(SkillError::Unavailable) => report.push_str("skill err unavailable\n"),
+    }
+}
+
 export!(RecallProbe);

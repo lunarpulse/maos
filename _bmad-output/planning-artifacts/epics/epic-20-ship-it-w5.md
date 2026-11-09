@@ -288,6 +288,15 @@ Received E19 and routing residuals: FR41 `--tag` is explicitly refused, not impl
 
 **RULED 2026-11-03 (ask `d_batch4`):** D-20-8-01…12 as recommended; KS +38/+33 and ceilings per story. Kernel remains a measured request binding at dev start; no landing claimed. Creation notes below are historical.
 
+**L1 implementation 2026-11-09:** schema 7, pre-pid declaration, skill
+admission, I13 recipient check and WIT 2.3 author/propose are implemented.
+Issued pid implies an earlier declaration, not conversely; later refusal is
+separately recorded. A declaration is not proof of admission. Hosted TS/T2
+proof and plant remain unverified; AC8 KS remains the final kernel landing.
+The domain ceiling 10,174 → 10,205 is an orchestrator-adjudicated overdraft,
+disclosed to the operator (measured 10,190); 20-9/20-13/20-14 re-base on that
+landed pin. See the story and L1 evidence for gates and limitations.
+
 ⚠ **AMENDED 2026-10-30 (operator ratified D01 A; preflight §3.5).** After 20-1; FR8, measured kernel grant required. Manifest fields missing at ~~`crates/maos-manifest/src/manifest.rs:228-237,2423-2454`~~ → *corrected 2026-11-03 at 20-8 creation (@8c809f9c, `20-8-…-evidence/creation/cites-8c809f9c.md` C1, C3, C4): the four fields are absent from every crate; the cited ranges are `ClassSection` (`:223-238`) and `[providers]` (`:2423-2455`). New sections follow `:4101`; `POST_V1_SCHEMA_SECTIONS` `:336-337`. "After 20-1" = after `20-1a` (split D-20-1-01 B; its `verify_installed` `crates/maos-registry/src/install.rs:109-150` is the reused path). Installed packages are already signature-verified at install and every boot. What is missing is the journaled declaration record (`crates/maos-bin/src/admission.rs:63-117` journals tier only).* Story: `20-8-manifest-contract-completion.md` (AC1–AC9; 20-9 consumes its §Contract for 20-9).
 
 - **AC1 (command).** A third-party signed manifest declaring `skills`, `explanation_shape`, `intent_promotion_set` and `swap_invariants` is verified, admitted and journaled; tampered manifest/artifact and invalid declarations refuse. Reuse 20-1 artifact admission rather than a second signature implementation.

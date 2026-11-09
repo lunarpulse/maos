@@ -149,6 +149,9 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         pread: Option<Arc<String>>,
     ) -> Result<crate::admission::Admitted, crate::admission::AdmissionRefusal>;
 
+    /// Withdraw any I13 recipient policy after a successful unload.
+    fn forget_promotion_set(&self, _spirit_id: &str) {}
+
     /// Recovery uses precisely the same structural gate and constructor as load.
     #[cfg(feature = "network")]
     fn prepare_spirit(
@@ -937,6 +940,9 @@ impl DoorInner {
                 },
             };
         }
+        if verb == "unload" {
+            self.private_ops.forget_promotion_set(spirit_id);
+        }
 
         if let Err(error) = self
             .private_ops
@@ -1470,6 +1476,7 @@ impl DoorInner {
                 detail: error.to_string(),
             };
         }
+        self.private_ops.forget_promotion_set(spirit_id);
         let (outcome, journal, result) = match self.admit_and_start(spirit_id, target).await {
             Ok(new_pid) => ("completed", Some(LifecycleEvent::Upgrade), Ok(new_pid)),
             Err(refused) => match self.admit_and_start(spirit_id, &restore_manifest.0).await {
@@ -1554,6 +1561,9 @@ impl DoorInner {
             .map_err(|refusal| format!("{}: {refusal}", refusal.code()))?;
         if admitted.spirit_id != spirit_id {
             let unwound = self.scheduler.unload(admitted.pid).await;
+            if unwound.is_ok() {
+                self.private_ops.forget_promotion_set(&admitted.spirit_id);
+            }
             return Err(format!(
                 "target_manifest_mismatch: admitted {}; unwind: {unwound:?}",
                 admitted.spirit_id
@@ -1561,6 +1571,9 @@ impl DoorInner {
         }
         if let Err(error) = self.scheduler.start(admitted.pid).await {
             let unwound = self.scheduler.unload(admitted.pid).await;
+            if unwound.is_ok() {
+                self.private_ops.forget_promotion_set(&admitted.spirit_id);
+            }
             return Err(match unwound {
                 Ok(_) => format!("start_failed: {error}"),
                 Err(unwind) => format!("start_failed: {error}; unwind unload failed: {unwind}"),
@@ -1663,6 +1676,7 @@ impl DoorInner {
                 detail: error.to_string(),
             };
         }
+        self.private_ops.forget_promotion_set(spirit_id);
         let outcome = self
             .private_ops
             .run_uninstall_cascade(spirit_id, schedule_ids)

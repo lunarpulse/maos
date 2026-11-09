@@ -71,6 +71,18 @@ time_cap_seconds = 60
 
 Declare `[capabilities.required.iac]` for bus emission: the kernel mediates each delivered frame with an `iac.send` capability token (`"spirit:peer"` for frames addressed to Spirits, `"broadcast"` for frames with no recipient), so the Spirit's deliveries appear in `maosctl audit query --spirit`. The schema v5 `[capabilities.required.log]` table independently grants recall and fetch; both booleans default to `false`, and unknown keys are refused. Below schema 5, the table is dropped with a degradation warning, like `[capabilities.required.iac]`. Do not add `[capabilities.required.provider]`: the WASM world imports no provider capability. Inside `[class]`, trust tiers use hyphenated values such as `org-internal`, `public-untrusted`, and `public-vetted`.
 
+Schema 7 adds the [FR8 declarations](/manifest/v7). `explanation_shape` is
+declared and journaled, **not enforced** because no decision frame has an
+explanation body. Until the kernel landing, swap invariants are also
+declared-only and are not checked at swap.
+
+The additive `maos:spirit/skills@2.3.0` import offers `author(document)` and
+`propose(target-id, target-version, diff)` only inside `handle-frame`.
+`capability-denied` means authority was refused; `refused(code)` is a stable
+port refusal; `unavailable` covers calls outside the export or absent host
+service. The host binds pid, class and telemetry; guests supply none of them.
+No skill-content import exists and admission remains operator-only.
+
 ## Recall frames you participated in
 
 The `maos:spirit@2.2.0` world imports `maos:spirit/recall@2.2.0`, which provides two functions:

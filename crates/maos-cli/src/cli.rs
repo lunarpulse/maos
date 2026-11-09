@@ -527,7 +527,7 @@ pub enum AuditQuery {
         frame_kind: Option<String>,
 
         /// FR41 — substring match on intent column (param-bound, SQLi-safe).
-        #[arg(long)]
+        #[arg(long, alias = "intent")]
         intent_contains: Option<String>,
 
         /// FR41 — hex-encoded capability token for exact-match filter.

@@ -77,6 +77,14 @@ pub enum RecallRequest {
     Context {
         used_tokens: u32,
     },
+    SkillAuthor {
+        document: String,
+    },
+    SkillPropose {
+        target_id: String,
+        target_version: String,
+        diff: String,
+    },
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WireError {
@@ -88,6 +96,7 @@ pub enum WireError {
     ConsentWithheld,
     ReplyTooLarge(u64),
     Unavailable,
+    Refused(String),
 }
 impl WireError {
     /// WIT case name, also used by the daemon's refusal receipts.
@@ -101,6 +110,7 @@ impl WireError {
             Self::ConsentWithheld => "consent-withheld",
             Self::ReplyTooLarge(_) => "reply-too-large",
             Self::Unavailable => "unavailable",
+            Self::Refused(_) => "refused",
         }
     }
 }
@@ -126,6 +136,10 @@ pub enum RecallReply {
         window: u32,
         level: u8,
         crossed: Option<u8>,
+    },
+    Skill {
+        entry_id: String,
+        target: String,
     },
     Error(WireError),
 }
@@ -238,6 +252,35 @@ mod tests {
             intent: "Standard".into(),
             payload: WireBytes(vec![42; len]),
             origin: "kernel".into(),
+        }
+    }
+    #[test]
+    fn skill_requests_and_responses_round_trip() {
+        for request in [
+            RecallRequest::SkillAuthor {
+                document: "document".into(),
+            },
+            RecallRequest::SkillPropose {
+                target_id: "author.skill".into(),
+                target_version: "1.0.0".into(),
+                diff: "diff".into(),
+            },
+        ] {
+            assert_eq!(
+                decode_request(&encode_request(&request).unwrap()).unwrap(),
+                request
+            );
+        }
+        for reply in [
+            RecallReply::Skill {
+                entry_id: "entry".into(),
+                target: "author.skill@1.0.0".into(),
+            },
+            RecallReply::Error(WireError::Refused("target-not-owned".into())),
+            RecallReply::Error(WireError::CapabilityDenied),
+            RecallReply::Error(WireError::Unavailable),
+        ] {
+            assert_eq!(decode_reply(&encode_reply(&reply).unwrap()).unwrap(), reply);
         }
     }
     #[test]

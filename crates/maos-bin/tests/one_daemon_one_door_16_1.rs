@@ -2281,6 +2281,7 @@ async fn admitted_class_bundle(
     let admitted = maos_bin::admission::load_admit_start(
         &maos_bin::admission::AdmissionDeps {
             providers: None,
+            iac: None,
             scheduler: &scheduler,
             security: &security,
             transparency_log: &tl,

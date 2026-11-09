@@ -346,16 +346,14 @@ L1 must not claim that kernel-dependent proof or borrow a hosted run from an anc
   `uninstall_package`, CLI doc and snapshot plant; `forget_spirit` and its plant at the final KS landing.
   - [x] L1 snapshot/package implementation and restored pre-unload plant.
   - [ ] Final KS watchdog cleanup and its plant (explicitly outside this assignment).
-- [ ] **T5 — EC-13 (AC5), REOPENED by review ruling 2026-11-05.** Local constituent/VM bounded-work witnesses are green;
-  the unchanged <25% wall criterion and real 1M completion require hosted proof. AC5/EC-13 stays owned by 20-11;
-  the shared-host timing/I/O stable-runner half has a same-line rule-10 disposition under 20-7. No retry-to-green.
+- [ ] **T5 — EC-13 (AC5), REOPENED by review ruling 2026-11-05.** Hosted run `42533166219` passes the 100k writer and 1M completion/repeat vectors; full AC5/EC-13 remains open for final landing review of all clauses and controls. The shared-host timing/I/O half remains dispositioned under 20-7; earlier failures are retained. [Hosted evidence](20-11-erasure-inventory-closure-evidence/landing-1/hosted-evidence.md).
 - [x] **T6 — Inventory (AC7).** Typed store list, named categories, vector + plant.
 - [ ] **T7 — T3 leg (AC6).** Hosted branch run under `provision-t3-test-substrate`; run id.
 - [ ] **T8 — L1 landing (kernel-free).** Exact pins inside the ruled envelope; `check-kernel-baseline` unchanged;
   `kloc-check`, `check-service-boundary`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`;
   one hosted discipline run on the final tree. No commit or push without the operator.
   - [x] Local source/focused/structural gates, exact pins, final clippy delta, one standalone workspace execution and once-only final prepush recorded.
-  - [ ] Hosted signed-T3/discipline run id (unavailable locally; no hosted pass claimed).
+  - [ ] Hosted discipline run `42533166219` failed on the 20-7 snapshot-owner timing family; signed-T3 Worker execution cannot be distinguished from the witness's successful early return using the log alone. Final landing review remains owed.
 - [ ] **T9 — Final kernel landing (L2).** Granted KS + O4 last, together with AC3 halt counts/receipt category;
   re-base onto then-current pins, obey shared measured STOP 21250; FLAG-Winston record, exact pins/content hashes,
   single HaltRegistry surface-hash refresh under ADR-066, O4 domain variant and AC8. KH/KF are not granted.
@@ -1045,10 +1043,18 @@ openai-codex/gpt-6.1-sol (landing-1 T0 STOP investigation and Dev2011b L1 contin
 
 - Closing exit-command, decision-register, Dev Agent Record and epic-coherence checks each exit0 after the final prepush/deferred records. Final guarded cleanup exits0: /proc has no cargo/rustc/clippy/rustdoc/nextest process, own scratch removed and544 stale incremental sessions pruned while retaining newest/recent2h sessions. Logical8111838200 bytes / last-link file allocation6504443904 bytes unlinked; observed Cargo-filesystem free-space gain5914886144 bytes. Earlier aborted-fixture cleanup is separate (1396526824 logical/1396523008 allocated bytes). All completed raw evidence is archived; no deps/build/fingerprint, other-worktree, .devcontainer or parked-archive deletion. No checks after final cleanup.
 
+### Hosted discipline observation — 2026-11-08
+
+Main run [`42533166219`](https://github.com/lunarpulse/maos/actions/runs/42533166219) at `a13140b847a1dfe888384670e56bcaaad4c4d116` is **failure**, not a green discipline run: workspace 5835/5836, sole failure the previously recorded 20-7 snapshot-owner teardown timing family. The 100k continuous-writer and 1M completion/repeat witnesses pass in 4.698 s and 40.957 s respectively (workspace job `128891635866`, raw log lines 8851 and 9145). These are first hosted passes of both full vectors, not printed numeric ratios; AC5/EC-13 remains open until final review accounts for all AC5 clauses and plants.
+
+The run's epic-17-exit matrix, check-test-budget, check-perf-counts and macos-check jobs succeeded. IAC routing measured 960868.4 instructions against 997449.662 baseline; the hosted JUnit sum was 1133.876 s against 1440 s. Apple ARM all-target compilation passes, not FIFO runtime. Signed T3 substrate was provisioned and the AC6 test is reported PASS, but its skip guard makes live-Worker execution unverified from the log alone. AC3/KS/O4 and private/index hold lease remain final-kernel work. Exact job citations and AC5 clause boundaries: [hosted evidence](20-11-erasure-inventory-closure-evidence/landing-1/hosted-evidence.md). Status remains `ready-for-dev`.
+
+
 ### Completion Notes List
 
 - The historical `cbed4dad` local landing claims above are superseded by the review-correction Dev Agent Record and evidence. The correction remains kernel-free; AC5/EC-13 is explicitly OPEN pending hosted <25% wall and 1M completion, and AC6's T3 substrate is unverified locally. AC3/KS/O4 and the private-tier/index hold lease remain final-kernel work, not implemented here. Original T0 evidence, failures and rulings are preserved; no tracker flip.
 - The2026-11-06 hosted follow-up adds durable marker-scoped replay, indexed program reuse with paired allocation protection, portable FIFO creation, and the explicitly calibrated serial heavy-test binary. These implementation changes do not close the still-hosted fullAC5 or Apple/T3 evidence obligations.
+- 2026-11-08 hosted evidence supersedes the preceding historical pending-hosted and Apple-compilation statements: both large-log vectors passed and Apple ARM all-targets compiled; AC5 formal closure, AC6 live-Worker execution and final-kernel work remain open.
 
 ### File List
 
@@ -1081,6 +1087,7 @@ openai-codex/gpt-6.1-sol (landing-1 T0 STOP investigation and Dev2011b L1 contin
 - Hosted-follow-up production: `crates/maos-iac/src/adapter/{transparency_log,mailbox}.rs`, `crates/maos-iac/Cargo.toml`, and `crates/maos-bin/src/operator_door.rs` — cached INSERT, inline accepted buffer, existing correlation lookup and bounded durable replay; no kernel file.
 - Hosted-follow-up tests: `crates/maos-iac/tests/support/erasure_races_20_11.rs`, `crates/maos-bin/tests/erasure_inventory_20_11.rs`, `crates/maos-bin/tests/shell_host_16_2.rs`, new `crates/maos-bin/tests/erasure_million_20_11.rs` and `crates/maos-bin/tests/support/shell_world_16_2.rs` — real regression controls, portable FIFO and unchanged heavy vectors/helper transfer.
 - Hosted-follow-up records/configuration: `.config/nextest.toml`, `xtask/test-budgets.toml`, `xtask/kloc.toml`, this story, `deferred-work.md`, ADR-044, EN/KO operator docs, coverage matrix and `20-11-erasure-inventory-closure-evidence/landing-1/hosted-followup-42224167600/`; existing T0 and prior failed evidence retained.
+- Hosted evidence record: `20-11-erasure-inventory-closure-evidence/landing-1/hosted-evidence.md`.
 
 ## Change Log
 
@@ -1105,3 +1112,4 @@ openai-codex/gpt-6.1-sol (landing-1 T0 STOP investigation and Dev2011b L1 contin
 - 2026-11-06: Hosted42224167600 follow-up from cleanfd4f60f1 implements cached indexed INSERT plus allocation-neutral inline delivery storage, safe POSIX FIFO creation, durable marker-scoped replay with generation/hold/tail controls and preserved transport deadline, and unchanged physical100k/1M vectors in the explicitly approved78s serial binary. Genuine before/plant failures and restored positives are preserved; no perf/latency/deadline/oracle widening, new crate version, kernel change or tracker flip. Exact aggregate194934/hardfail194935; AC5/full hosted proof remains open.
 - 2026-11-06: Final follow-up source/record/fmt/docs bundle20/20 and explicit cargo-deny0; actual default-concurrency standalone5702/5708 with six retained timing/I/O observations, once-only prepush5707/5708 with sole1M completion observation and seven unchanged-budget advisories. Prepush2943.623s stays within3000s; no retry, baseline/deadline widening, kernel edit or tracker flip. Exact pins194934/hardfail194935; source/name/control records and resource cleanup are retained. AC5/full hosted proof stays open.
 - 2026-11-06: Closing four record gates0; guarded owned-scratch/incremental cleanup0 removes544 stale sessions,8111838200 logical bytes /6504443904 last-link allocated-file bytes, with5914886144 observed Cargo free-space gain. Earlier positively identified aborted1M fixture cleanup is separately recorded; no source/pin/status change or checks after cleanup.
+- 2026-11-08: Recorded hosted run `42533166219` @ `a13140b8`: 100k/1M vectors pass; workspace fails only the known 20-7 snapshot-owner timing family. AC5/EC-13 stays open for final review, AC6 live Worker remains unverified from the log, final-kernel work remains owed, and status is unchanged.

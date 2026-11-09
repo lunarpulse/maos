@@ -199,19 +199,7 @@ impl LiveSkillAuthorPort {
         result: &Result<T, SkillPortError>,
     ) -> Result<(), SkillPortError> {
         if let Err(error) = result {
-            let code = match error {
-                SkillPortError::HostShutDown => "host-shut-down",
-                SkillPortError::CapabilityDenied => "capability-denied",
-                SkillPortError::ContextExhausted => "context-exhausted",
-                SkillPortError::QuotaExhausted => "quota-exhausted",
-                SkillPortError::QueueUnavailable => "queue-unavailable",
-                SkillPortError::Submission(maos_skill::ESkillStore::InvalidEntry(error)) => {
-                    error.code()
-                }
-                SkillPortError::Submission(_) => "queue-unavailable",
-                SkillPortError::Journal(_) => "journal-failed",
-                SkillPortError::Mediation(_) => "mediation-failed",
-            };
+            let code = error.code();
             let receipt =
                 serde_json::to_vec(&serde_json::json!({"spirit_pid": pid, "reason": code}))
                     .map_err(|error| SkillPortError::Journal(error.to_string()))?;

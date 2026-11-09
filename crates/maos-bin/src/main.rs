@@ -3482,6 +3482,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             memory: Arc::clone(&memory),
             capability: Arc::clone(&capability),
             transparency_log: Arc::clone(&transparency_log),
+            iac: Arc::clone(&iac),
             audit_db_path: audit_db_path.clone(),
             memory_db_path: memory_db_path.clone(),
             shared_journal: Arc::clone(&shared_journal),
@@ -4199,6 +4200,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )) as Arc<dyn maos_domain::ports::LogRecallPort>)
         })
     };
+    #[cfg(feature = "wasm-host")]
+    let wasm_skill = skill_store.as_ref().map(|store| {
+        maos_bin::skill_authoring::binder(
+            &capability,
+            &security,
+            &transparency_log,
+            &self_telemetry,
+            &scheduler.scbs(),
+            store,
+            enterprise_runtime.as_ref(),
+            enterprise_pdp_runtime.clone(),
+        )
+    });
     *researcher_wiring
         .lock()
         .unwrap_or_else(|error| error.into_inner()) =
@@ -4268,6 +4282,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             installed_manifests,
             &maos_bin::admission::AdmissionDeps {
                 providers: provider_catalog.get(),
+                iac: Some(&iac),
                 scheduler: &scheduler,
                 security: &security,
                 transparency_log: &transparency_log,
@@ -4293,6 +4308,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     pid_by_spirit_id: Arc::clone(&pid_by_spirit_id),
                     enterprise: enterprise_runtime.clone(),
                     pdp: enterprise_pdp_runtime.clone(),
+                    skill: wasm_skill.clone(),
                 }),
         )
         .await,
@@ -5773,6 +5789,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let admitted = maos_bin::admission::load_admit_start(
                         &maos_bin::admission::AdmissionDeps {
                             providers: provider_catalog.get(),
+                            iac: Some(&iac),
                             scheduler: &scheduler,
                             security: &security,
                             transparency_log: &transparency_log,
@@ -6664,6 +6681,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let admitted = maos_bin::admission::load_admit_start(
                 &maos_bin::admission::AdmissionDeps {
                     providers: provider_catalog.get(),
+                    iac: Some(&iac),
                     scheduler: &scheduler,
                     security: &security,
                     transparency_log: &transparency_log,
@@ -6721,6 +6739,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 pid_by_spirit_id: Arc::clone(&pid_by_spirit_id),
                                 enterprise: enterprise_runtime.clone(),
                                 pdp: enterprise_pdp_runtime.clone(),
+                                skill: wasm_skill.clone(),
                             },
                             admitted,
                             core,
@@ -9963,6 +9982,7 @@ struct BinPrivateOpsImpl {
     memory: Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
     capability: Arc<maos_kernel_core::api::CapabilityRegistryAdapter>,
     transparency_log: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+    iac: Arc<maos_iac::adapter::IacBusAdapter>,
     audit_db_path: std::path::PathBuf,
     memory_db_path: std::path::PathBuf,
     shared_journal: Arc<maos_kernel_core::journal::JournalAdapter>,
@@ -9992,6 +10012,10 @@ struct BinPrivateOpsImpl {
 #[cfg(feature = "network")]
 #[async_trait::async_trait]
 impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
+    fn forget_promotion_set(&self, spirit_id: &str) {
+        self.iac.unregister_promotion_set(spirit_id);
+    }
+
     async fn append_lifecycle_journal(
         &self,
         event: maos_domain::invariants::i10::LifecycleEvent,
@@ -10182,6 +10206,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         let admitted = maos_bin::admission::load_admit_start(
             &maos_bin::admission::AdmissionDeps {
                 providers: self.provider_catalog.get(),
+                iac: Some(&self.iac),
                 scheduler: &self.scheduler,
                 security: &self.security,
                 transparency_log: &self.transparency_log,

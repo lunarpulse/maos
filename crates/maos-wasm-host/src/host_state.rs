@@ -14,6 +14,7 @@ use std::io::{BufReader, BufWriter};
 use crate::recall_wire::{self as wire, RecallReply, RecallRequest, WireBytes, WireError};
 use crate::wit_guest::maos::spirit::context as ctx;
 use crate::wit_guest::maos::spirit::recall as wit;
+use crate::wit_guest::maos::spirit::skills as sk;
 use wasmtime::component::ResourceTable;
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
@@ -210,6 +211,39 @@ impl crate::wit_guest::maos::spirit::context::Host for HostState {
     }
 }
 
+impl HostState {
+    fn skill(&mut self, request: RecallRequest) -> Result<sk::Queued, sk::SkillError> {
+        match self.exchange(request) {
+            Ok(RecallReply::Skill { entry_id, target }) => Ok(sk::Queued { entry_id, target }),
+            Ok(RecallReply::Error(WireError::CapabilityDenied)) => {
+                Err(sk::SkillError::CapabilityDenied)
+            }
+            Ok(RecallReply::Error(WireError::Refused(code))) => Err(sk::SkillError::Refused(code)),
+            Ok(RecallReply::Error(WireError::Unavailable)) => Err(sk::SkillError::Unavailable),
+            Ok(_) => Err(self.desync()).map_err(|_| sk::SkillError::Unavailable),
+            Err(_) => Err(sk::SkillError::Unavailable),
+        }
+    }
+}
+
+impl sk::Host for HostState {
+    fn author(&mut self, document: String) -> Result<sk::Queued, sk::SkillError> {
+        self.skill(RecallRequest::SkillAuthor { document })
+    }
+    fn propose(
+        &mut self,
+        target_id: String,
+        target_version: String,
+        diff: String,
+    ) -> Result<sk::Queued, sk::SkillError> {
+        self.skill(RecallRequest::SkillPropose {
+            target_id,
+            target_version,
+            diff,
+        })
+    }
+}
+
 impl From<WireError> for wit::RecallError {
     fn from(error: WireError) -> Self {
         match error {
@@ -220,7 +254,7 @@ impl From<WireError> for wit::RecallError {
             WireError::CapabilityDenied => Self::CapabilityDenied,
             WireError::ConsentWithheld => Self::ConsentWithheld,
             WireError::ReplyTooLarge(bound) => Self::ReplyTooLarge(bound),
-            WireError::Unavailable => Self::Unavailable,
+            WireError::Unavailable | WireError::Refused(_) => Self::Unavailable,
         }
     }
 }

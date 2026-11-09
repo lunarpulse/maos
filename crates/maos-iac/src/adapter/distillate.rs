@@ -141,6 +141,33 @@ impl DistillateWriter {
         serde_json::to_vec(&payload).map_err(|e| DistillationError::Storage(format!("serde: {e}")))
     }
 
+    /// Check a stored distillate's kernel-written lineage against a consumer.
+    pub fn admit_from_log(
+        log: &TransparencyLogAdapter,
+        digest_frame_id: [u8; 16],
+        allowed: &AllowedPromotionSet,
+    ) -> Result<(), DistillationError> {
+        let entries = log
+            .query_frames(FrameFilter::default())
+            .map_err(|error| DistillationError::Storage(error.to_string()))?;
+        match entries
+            .iter()
+            .find(|entry| entry.frame_id == digest_frame_id)
+        {
+            Some(entry) if entry.kind == FrameKind::Distillate => {
+                let receipt = Self::deserialize_receipt(&entry.payload_redacted)?;
+                if allowed.allows(&receipt.intent_lineage) {
+                    Ok(())
+                } else {
+                    Err(DistillationError::IntentPromotionDenied { digest_frame_id })
+                }
+            }
+            _ => Err(DistillationError::SourceFrameNotFound {
+                frame_id: digest_frame_id,
+            }),
+        }
+    }
+
     /// Parse a JSON receipt payload from a Distillate frame back into a `DistillationReceipt`.
     fn deserialize_receipt(payload: &[u8]) -> Result<DistillationReceipt, DistillationError> {
         let v: serde_json::Value = serde_json::from_slice(payload)
@@ -439,29 +466,11 @@ impl DistillationPort for DistillateWriter {
             maos_spirit_sdk::spirit_test::IsolationHookOutcome::Continue,
         );
 
-        // Query TL for the digest frame.
-        let entries = self
-            .transparency_log
-            .query_frames(FrameFilter::default())
-            .map_err(|e| DistillationError::Storage(e.to_string()))?;
-
-        let entry = entries.iter().find(|e| e.frame_id == digest_frame_id);
-        match entry {
-            Some(e) if e.kind == FrameKind::Distillate => {
-                let receipt = Self::deserialize_receipt(&e.payload_redacted)?;
-                if consumer_allowed_promotion_set.allows(&receipt.intent_lineage) {
-                    Ok(())
-                } else {
-                    Err(DistillationError::IntentPromotionDenied { digest_frame_id })
-                }
-            }
-            Some(_) => Err(DistillationError::SourceFrameNotFound {
-                frame_id: digest_frame_id,
-            }),
-            None => Err(DistillationError::SourceFrameNotFound {
-                frame_id: digest_frame_id,
-            }),
-        }
+        Self::admit_from_log(
+            &self.transparency_log,
+            digest_frame_id,
+            consumer_allowed_promotion_set,
+        )
     }
 }
 

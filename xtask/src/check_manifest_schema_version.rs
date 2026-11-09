@@ -45,6 +45,10 @@ const RATIFIED_POST_V1_SCHEMA_SECTIONS: &[&str] = &[
     "capabilities.required.iac",
     "capabilities.required.log",
     "capabilities.required.skill",
+    "skills",
+    "explanation_shape",
+    "intent_promotion_set",
+    "swap_invariants",
 ];
 
 /// Parse `pub const NAME: u32 = N;` (or an alias to another such const) from a

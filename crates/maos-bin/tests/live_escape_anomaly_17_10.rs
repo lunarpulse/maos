@@ -174,6 +174,7 @@ impl World {
     fn admission(&self) -> AdmissionDeps<'_> {
         AdmissionDeps {
             providers: None,
+            iac: None,
             scheduler: &self.scheduler,
             security: &self.security,
             transparency_log: &self.tl,
@@ -198,6 +199,7 @@ impl World {
             pid_by_spirit_id: Arc::clone(&self.lookup),
             enterprise: None,
             pdp: None,
+            skill: None,
         }
     }
 
@@ -352,6 +354,7 @@ async fn run(dir: &Path, forbidden: bool) -> Run {
             turn_budget: Duration::from_secs(30),
             once: false,
             context_window: Default::default(),
+            scopes: Vec::new(),
             initial_frame: None,
         },
     ));

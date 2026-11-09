@@ -149,6 +149,7 @@ impl World {
         load_admit_start(
             &AdmissionDeps {
                 providers: None,
+                iac: None,
                 scheduler: &self.scheduler,
                 security: &self.security,
                 transparency_log: &self.tl,
@@ -2074,6 +2075,7 @@ async fn admission_storage_binding_refusal_is_typed_and_unloads_the_spirit() {
     let refused = load_admit_start(
         &AdmissionDeps {
             providers: None,
+            iac: None,
             scheduler: &world.scheduler,
             security: &world.security,
             transparency_log: &world.tl,
@@ -2099,4 +2101,113 @@ async fn admission_storage_binding_refusal_is_typed_and_unloads_the_spirit() {
     assert!(world.lookup.read().expect("lookup lock").is_empty());
     assert!(world.subscription_rows().is_empty());
     world.pump.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn manifest_declaration_precedes_pid_and_refusal_is_distinct() {
+    let world = World::new();
+    let gated =
+        gate_manifest(OBSERVER_MANIFEST, &|name| KNOWN_CLASS_NAMES.contains(&name)).unwrap();
+    let deps = AdmissionDeps {
+        providers: None,
+        iac: Some(&world.iac),
+        scheduler: &world.scheduler,
+        security: &world.security,
+        transparency_log: &world.tl,
+        journal: &world.journal,
+        memory: &world.memory,
+        pid_by_spirit_id: &world.lookup,
+        hooks: Some(&world.pump),
+    };
+    let admitted = load_admit_start(
+        &deps,
+        &gated,
+        make_spirit_obj(Observer::default()),
+        NONCE,
+        StartPolicy::LeaveLoaded,
+        &mut |_| {
+            let rows = world.tl.query_frames(FrameFilter::default()).unwrap();
+            assert_eq!(
+                rows.iter()
+                    .filter(|row| row.intent == "governance:manifest-declaration")
+                    .count(),
+                1
+            );
+        },
+    )
+    .await
+    .unwrap();
+    assert!(admitted.pid > 0);
+    let refused = load_admit_start(
+        &deps,
+        &gated,
+        make_spirit_obj(Observer::default()),
+        NONCE,
+        StartPolicy::LeaveLoaded,
+        &mut |_| panic!("duplicate must not issue a pid"),
+    )
+    .await;
+    assert!(matches!(
+        refused,
+        Err(AdmissionRefusal::AlreadyLoaded { .. })
+    ));
+    let rows = world.tl.query_frames(FrameFilter::default()).unwrap();
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row.intent == "governance:manifest-declaration")
+            .count(),
+        2
+    );
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row.intent == "governance:vetter-key-rejection")
+            .count(),
+        1
+    );
+    world.pump.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[should_panic(expected = "MAOS kernel panic — Transparency Log write failed")]
+async fn declaration_storage_failure_stops_before_pid_issuance() {
+    struct NoPidOnUnwind<'a> {
+        world: &'a World,
+        spirit: &'a str,
+    }
+    impl Drop for NoPidOnUnwind<'_> {
+        fn drop(&mut self) {
+            assert!(self.world.scheduler.resolve_pid(self.spirit).is_none());
+            assert!(self.world.lookup.read().unwrap().is_empty());
+        }
+    }
+    let world = World::new();
+    let gated =
+        gate_manifest(OBSERVER_MANIFEST, &|name| KNOWN_CLASS_NAMES.contains(&name)).unwrap();
+    let connection =
+        rusqlite::Connection::open(world._dir.path().join("transparency.sqlite")).unwrap();
+    connection.execute_batch("CREATE TRIGGER fail_declaration BEFORE INSERT ON transparency_log WHEN NEW.intent = 'governance:manifest-declaration' BEGIN SELECT RAISE(ABORT, 'declaration storage failure'); END;").unwrap();
+    let _no_pid = NoPidOnUnwind {
+        world: &world,
+        spirit: &gated.spirit_id,
+    };
+    let deps = AdmissionDeps {
+        providers: None,
+        iac: Some(&world.iac),
+        scheduler: &world.scheduler,
+        security: &world.security,
+        transparency_log: &world.tl,
+        journal: &world.journal,
+        memory: &world.memory,
+        pid_by_spirit_id: &world.lookup,
+        hooks: Some(&world.pump),
+    };
+    let _ = load_admit_start(
+        &deps,
+        &gated,
+        make_spirit_obj(Observer::default()),
+        NONCE,
+        StartPolicy::LeaveLoaded,
+        &mut |_| panic!("storage failure must precede the loaded callback"),
+    )
+    .await;
 }
