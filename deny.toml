@@ -49,6 +49,14 @@ ignore = [
     "RUSTSEC-2026-0370",
     "RUSTSEC-2026-0371",
     "RUSTSEC-2026-0372",
+    # libsqlite3-sys 0.28.0 — bundled C SQLite CVE-2026-119375 (RUSTSEC-2026-0459;
+    # SQLite < 3.54.0). Fixed in libsqlite3-sys >= 0.39.0, i.e. rusqlite >= 0.39,
+    # a breaking API change across 7 crates (maos-audit, maos-bench, maos-bin,
+    # maos-cli, maos-escape-detector, maos-iac; butler dev-dep). maos opens only
+    # maos-written databases, never attacker-supplied ones. Newly published
+    # advisory-DB drift, not a 20-8 change. Trigger to drop: the rusqlite >= 0.39
+    # bump. Ruled 2026-11-10 (hosted cargo-deny finding); tracked in deferred-work.md.
+    "RUSTSEC-2026-0459",
 ]
 
 [licenses]

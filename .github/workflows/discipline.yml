@@ -4785,13 +4785,14 @@ jobs:
           rc=$?
           fail=0
           [ "$rc" -eq 0 ] || { echo "::error title=17-3d recall (${{ matrix.image }})::nextest rc=$rc"; fail=1; }
-          grep -Eq '(^|[[:space:]])18 tests run: 18 passed([,[:space:]]|$)' "$RUNNER_TEMP/recall-17-3d.log" || { echo "::error title=17-3d recall (${{ matrix.image }})::missing '18 tests run: 18 passed'"; fail=1; }
+          grep -Eq '(^|[[:space:]])20 tests run: 20 passed([,[:space:]]|$)' "$RUNNER_TEMP/recall-17-3d.log" || { echo "::error title=17-3d recall (${{ matrix.image }})::missing '20 tests run: 20 passed'"; fail=1; }
           required=()
           for name in checked_in_researcher_admits_both_scopes_and_native_port_rows_pass_fr4 \
                       configured_sso_preserves_r1_r2_order_and_never_recalls_identity_asserted \
                       context_18_5_report_status_and_journaled_kinds_32_33_reach_wasm_handle_frame \
                       context_18_5_wasm_guest_cannot_forge_kernel_pressure_or_limit_to_peer \
                       cross_boot_same_pid_is_not_recalled_and_fetch_is_scope_violation \
+                      denied_promotion_counts_without_terminating_wasm_session \
                       empty_page_has_one_token_bearing_call_and_no_receipt \
                       exhausted_quota_has_receipt_without_tokenless_fallback_call \
                       junk_after_tag_closes_once_with_typed_protocol_end \
@@ -4802,6 +4803,7 @@ jobs:
                       own_receipt_and_authorization_ids_are_never_recalled_and_fetch_is_scope_violation \
                       seed_fetch_succeeds_r1_r2_precede_authorization_without_receipt_and_fr4_succeeds \
                       sixty_fifth_recall_closes_channel_once_with_typed_protocol_end \
+                      skill_author_call_after_sixty_four_recalls_exhausts_same_budget \
                       tagged_record_between_exports_closes_once_with_typed_protocol_end \
                       ungranted_manifest_denies_with_receipt_only \
                       unknown_tag_closes_once_with_typed_protocol_end; do
@@ -4817,7 +4819,7 @@ jobs:
             echo "::error title=17-3d recall (${{ matrix.image }})::${line}"
           done
           echo "::notice title=17-3d recall (${{ matrix.image }})::rc=$rc fail=$fail $(grep 'tests run:' "$RUNNER_TEMP/recall-17-3d.log")"
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 18 "${required[@]}" "$RUNNER_TEMP/recall-17-3d.log" || fail=1
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 20 "${required[@]}" "$RUNNER_TEMP/recall-17-3d.log" || fail=1
           exit "$fail"
       # Story 17-8 — participant recall and consent envelopes for BOTH forms
       # (native Researcher through MediatedLogRecall, WASM recall-probe through
@@ -5200,12 +5202,13 @@ jobs:
           cargo test --locked -p maos-wasm-host --lib recall_wire -- --nocapture 2>&1 | tee recall-wire.log
           rc=${PIPESTATUS[0]}
           [ "$rc" -eq 0 ] || exit "$rc"
-          grep -q '^test result: ok\. 6 passed; 0 failed; 0 ignored;' recall-wire.log || exit 1
+          grep -q '^test result: ok\. 7 passed; 0 failed; 0 ignored;' recall-wire.log || exit 1
           for name in empty_page_and_all_error_cases_round_trip \
                       partial_header_is_protocol_error_not_clean_eof \
                       tags_discriminate_requests_replies_and_iac_frames \
                       oversized_fetch_and_body_are_refused_at_bound_plus_one \
                       page_prefix_at_exact_expansion_budget_boundary \
+                      skill_requests_and_responses_round_trip \
                       megabyte_payload_is_one_byte_string_not_a_sequence; do
             grep -q "^test recall_wire::tests::$name \.\.\. ok$" recall-wire.log || exit 1
           done
@@ -6201,12 +6204,13 @@ jobs:
           cargo test --locked -p maos-wasm-host --lib recall_wire -- --nocapture 2>&1 | tee recall-wire.log
           rc=${PIPESTATUS[0]}
           [ "$rc" -eq 0 ] || exit "$rc"
-          grep -q '^test result: ok\. 6 passed; 0 failed; 0 ignored;' recall-wire.log || exit 1
+          grep -q '^test result: ok\. 7 passed; 0 failed; 0 ignored;' recall-wire.log || exit 1
           for name in empty_page_and_all_error_cases_round_trip \
                       partial_header_is_protocol_error_not_clean_eof \
                       tags_discriminate_requests_replies_and_iac_frames \
                       oversized_fetch_and_body_are_refused_at_bound_plus_one \
                       page_prefix_at_exact_expansion_budget_boundary \
+                      skill_requests_and_responses_round_trip \
                       megabyte_payload_is_one_byte_string_not_a_sequence; do
             grep -q "^test recall_wire::tests::$name \.\.\. ok$" recall-wire.log || exit 1
           done

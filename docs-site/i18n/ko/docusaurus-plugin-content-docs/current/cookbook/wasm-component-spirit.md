@@ -74,7 +74,7 @@ bus 전송에는 `[capabilities.required.iac]`를 선언하세요. kernel은 전
 
 스키마 7은 [FR8 선언](/manifest/v7)을 추가합니다. `explanation_shape`는
 선언과 저널 기록만 하며, 결정 프레임에 설명 본문이 없어 **강제되지
-않습니다**. 커널 landing 전에는 swap invariant도 선언만 하고 검사하지 않습니다.
+않습니다**. kernel landing 전에는 swap invariant도 선언만 하고 검사하지 않습니다.
 
 추가된 `maos:spirit/skills@2.3.0`의 `author(document)`와
 `propose(target-id, target-version, diff)`는 `handle-frame` 안에서만 호출할
