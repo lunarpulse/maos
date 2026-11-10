@@ -105,3 +105,24 @@ fn scheduler_journal_echo_rows_are_not_spirit_identities() {
         "a pid-0 journal echo must not displace the Worker's real pid"
     );
 }
+
+#[test]
+fn cost_spirit_names_distinguish_boots_and_skip_echoes() {
+    let temp = tempfile::TempDir::new().expect("tempdir");
+    let path = temp.path().join("audit.sqlite");
+    let connection = create_log(&path);
+    insert_lifecycle_load(&connection, 1, 10, 7, 42, "lifecycle.load", "alpha");
+    insert_lifecycle_load(&connection, 2, 20, 8, 42, "lifecycle.load", "beta");
+    insert_lifecycle_load(&connection, 3, 30, 7, 42, "lifecycle.journal", "wrong");
+    connection
+        .execute(
+            "INSERT INTO transparency_log VALUES (?1, 40, 43, 8, NULL, 19, 'gamma', ?2, 0)",
+            rusqlite::params![&[4u8; 16] as &[u8], b"{}" as &[u8]],
+        )
+        .expect("insert admission");
+    drop(connection);
+    let names = maos_audit::spirit_names(&path).expect("names");
+    assert_eq!(names.get(&(7, 42)).map(String::as_str), Some("alpha"));
+    assert_eq!(names.get(&(8, 42)).map(String::as_str), Some("beta"));
+    assert_eq!(names.get(&(8, 43)).map(String::as_str), Some("gamma"));
+}

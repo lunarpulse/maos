@@ -4772,7 +4772,10 @@ fn default_transparency_log_path() -> PathBuf {
 /// FR64 cost-reconcile report row.
 #[derive(Debug, serde::Serialize)]
 struct CostReportRow {
+    task: String,
     principal: String,
+    attribution_source: String,
+    spirit: String,
     spirit_pid: u32,
     provider: String,
     model: String,
@@ -4792,6 +4795,7 @@ struct CostReport {
     /// `attributable_fraction`, each entry only counts costs emitted by that
     /// spirit_pid.
     per_spirit_attributable_fraction: std::collections::BTreeMap<u32, f64>,
+    note: &'static str,
     warnings: Vec<String>,
 }
 
@@ -4843,18 +4847,19 @@ fn build_cost_report(
     month: &str,
     entries: &[maos_audit::AuditEntry],
     pricing: &maos_domain::cost::ProviderPricingConfig,
+    names: &std::collections::BTreeMap<(u64, u32), String>,
 ) -> CostReport {
-    use maos_domain::cost::{CostAttributionPayload, CostDimension, PrincipalRef};
+    use maos_domain::cost::{AttributionSource, CostDimension, CostFrameBody, PrincipalRef};
     use std::collections::BTreeMap;
 
-    // Group key: (principal_display, spirit_pid, provider, model)
-    type Key = (String, u32, String, String);
+    // Task, principal, source, Spirit name, pid, provider, model.
+    type Key = (String, String, &'static str, String, u32, String, String);
     // Accumulator: (tokens_in, tokens_out)
     let mut groups: BTreeMap<Key, (i64, i64)> = BTreeMap::new();
     let mut warnings: Vec<String> = Vec::new();
 
     for entry in entries {
-        let payload: CostAttributionPayload = match serde_json::from_str(&entry.payload) {
+        let frame: CostFrameBody = match serde_json::from_str(&entry.payload) {
             Ok(p) => p,
             Err(e) => {
                 warnings.push(format!(
@@ -4864,6 +4869,7 @@ fn build_cost_report(
                 continue;
             }
         };
+        let payload = frame.payload;
 
         let principal_display = match &payload.principal {
             PrincipalRef::Resolved { principal_id } => principal_id.clone(),
@@ -4885,8 +4891,19 @@ fn build_cost_report(
             .unwrap_or(0)
             .max(0);
 
+        let source = match payload.attribution_source {
+            AttributionSource::SessionPrincipal => "session_principal",
+            AttributionSource::WriteTargetProxy => "write_target_proxy",
+        };
+        let spirit = names
+            .get(&(entry.boot_nonce, payload.spirit_pid))
+            .cloned()
+            .unwrap_or_else(|| format!("pid:{}", payload.spirit_pid));
         let key = (
+            frame.task_ref.unwrap_or_else(|| "none".into()),
             principal_display,
+            source,
+            spirit,
             payload.spirit_pid,
             payload.provider.clone(),
             payload.model.clone(),
@@ -4905,7 +4922,7 @@ fn build_cost_report(
 
     for (key, (tokens_in, tokens_out)) in &groups {
         let (input_price, output_price) = pricing
-            .lookup(&key.2, &key.3)
+            .lookup(&key.5, &key.6)
             .map(|e| (e.input_price_micro_per_1k, e.output_price_micro_per_1k))
             .unwrap_or((0, 0));
 
@@ -4913,12 +4930,12 @@ fn build_cost_report(
             + (*tokens_out as u128) * (output_price as u128);
 
         total_cost_u128 += cost_u128;
-        if key.0 != "host-unallocated" {
+        if key.1 != "host-unallocated" {
             attributed_cost_u128 += cost_u128;
         }
-        let spirit_entry = per_spirit_cost.entry(key.1).or_insert((0, 0));
+        let spirit_entry = per_spirit_cost.entry(key.4).or_insert((0, 0));
         spirit_entry.0 += cost_u128;
-        if key.0 != "host-unallocated" {
+        if key.1 != "host-unallocated" {
             spirit_entry.1 += cost_u128;
         }
         row_precisions.push((key.clone(), (*tokens_in, *tokens_out), cost_u128));
@@ -4955,10 +4972,13 @@ fn build_cost_report(
         };
         assigned_total += cost_micro;
         rows.push(CostReportRow {
-            principal: key.0.clone(),
-            spirit_pid: key.1,
-            provider: key.2.clone(),
-            model: key.3.clone(),
+            task: key.0.clone(),
+            principal: key.1.clone(),
+            attribution_source: key.2.to_string(),
+            spirit: key.3.clone(),
+            spirit_pid: key.4,
+            provider: key.5.clone(),
+            model: key.6.clone(),
             tokens_in: *tokens_in,
             tokens_out: *tokens_out,
             cost_micro,
@@ -4978,6 +4998,7 @@ fn build_cost_report(
         attributed_cost_micro,
         attributable_fraction,
         per_spirit_attributable_fraction,
+        note: "Worker CLI spend through the egress proxy is not included in cost frames.",
         warnings,
     }
 }
@@ -4987,6 +5008,7 @@ fn format_cost_report_plain(report: &CostReport) -> String {
     let mut out = String::new();
     use std::fmt::Write;
     let _ = writeln!(out, "Cost Reconcile Report — {}", report.month);
+    let _ = writeln!(out, "  {}", report.note);
     let _ = writeln!(
         out,
         "  total={} µ$  attributed={} µ$  fraction={:.4}",
@@ -4995,8 +5017,11 @@ fn format_cost_report_plain(report: &CostReport) -> String {
     for row in &report.rows {
         let _ = writeln!(
             out,
-            "  {:30} pid={:<5} {:12}/{:24} in={:<10} out={:<10} cost={} µ$",
+            "  task={} {} ({}) {} pid={:<5} {:12}/{:24} in={:<10} out={:<10} cost={} µ$",
+            row.task,
             row.principal,
+            row.attribution_source,
+            row.spirit,
             row.spirit_pid,
             row.provider,
             row.model,
@@ -5070,7 +5095,14 @@ fn audit_cost_reconcile(month: &str, pricing_path: &str, format: AuditFormat) ->
         }
     };
 
-    let report = build_cost_report(month, &entries, &pricing);
+    let names = match maos_audit::spirit_names(&db_path) {
+        Ok(names) => names,
+        Err(e) => {
+            eprintln!("maosctl: audit cost-reconcile — identity error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let report = build_cost_report(month, &entries, &pricing, &names);
 
     let stdout = std::io::stdout();
     let mut lock = stdout.lock();
@@ -5903,14 +5935,83 @@ mod tests {
                 output_price_micro_per_1k: 15000,
             },
         ]);
-        let report = build_cost_report("2026-06", &[entry], &pricing);
+        let report = build_cost_report("2026-06", &[entry], &pricing, &Default::default());
         assert_eq!(report.warnings.len(), 0, "must not warn on valid payload");
         assert_eq!(report.rows.len(), 1);
+        assert_eq!(report.rows[0].task, "none");
         assert_eq!(report.rows[0].principal, "user:alice");
         assert_eq!(report.rows[0].tokens_in, 1000);
         assert_eq!(report.rows[0].tokens_out, 500);
         // (1000*3000 + 500*15000) / 1000 = 10_500 µ$
         assert_eq!(report.total_cost_micro, 10_500);
+    }
+
+    #[test]
+    fn cost_report_separates_task_source_and_boot_names() {
+        use maos_domain::cost::{
+            AttributionConfidence, AttributionSource, CostAttributionPayload, CostFrameBody,
+            PrincipalRef,
+        };
+        let payload = CostAttributionPayload {
+            schema_version: 2,
+            timestamp_ns: 1,
+            spirit_pid: 7,
+            provider: "p".into(),
+            model: "m".into(),
+            principal: PrincipalRef::Unattributed,
+            attribution_source: AttributionSource::WriteTargetProxy,
+            attribution_confidence: AttributionConfidence::Unknown,
+            dimensions: Default::default(),
+        };
+        let entry = |boot, task: Option<&str>, source| maos_audit::AuditEntry {
+            frame_id_hex: format!("{boot:032x}"),
+            timestamp_ns: 1,
+            spirit_pid: 7,
+            boot_nonce: boot,
+            capability_token_hex: None,
+            kind: "cost.attribution".into(),
+            intent: "cost:inference-attribution".into(),
+            payload: serde_json::to_string(&CostFrameBody {
+                payload: CostAttributionPayload {
+                    attribution_source: source,
+                    ..payload.clone()
+                },
+                task_ref: task.map(str::to_owned),
+            })
+            .unwrap(),
+            redaction: None,
+        };
+        let names = [((1, 7), "alpha".into()), ((2, 7), "beta".into())]
+            .into_iter()
+            .collect();
+        let entries = [
+            entry(1, Some("t-1"), AttributionSource::WriteTargetProxy),
+            entry(1, Some("t-2"), AttributionSource::WriteTargetProxy),
+            entry(1, Some("t-1"), AttributionSource::SessionPrincipal),
+            entry(2, None, AttributionSource::WriteTargetProxy),
+        ];
+        let report = build_cost_report(
+            "2026-06",
+            &entries,
+            &maos_domain::cost::ProviderPricingConfig::new(vec![]),
+            &names,
+        );
+        assert_eq!(report.rows.len(), 4);
+        assert!(report
+            .rows
+            .iter()
+            .any(|r| r.task == "none" && r.spirit == "beta"));
+        assert!(report.rows.iter().any(|r| r.task == "t-1"
+            && r.spirit == "alpha"
+            && r.attribution_source == "session_principal"));
+        assert!(report
+            .rows
+            .iter()
+            .all(|r| r.principal == "host-unallocated"));
+        assert!(format_cost_report_plain(&report).contains(report.note));
+        assert!(serde_json::to_string(&report)
+            .unwrap()
+            .contains(report.note));
     }
 
     // ── Story 9.4: install --from-local verification tests ──────────

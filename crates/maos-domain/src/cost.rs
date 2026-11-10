@@ -57,7 +57,7 @@ pub enum AttributionSource {
     /// Derived from `principal_ids_for_spirit_pid` (memory-write-target
     /// reverse-lookup proxy — not the authoritative session principal).
     WriteTargetProxy,
-    /// Future: per-call principal binding via SCB marker.
+    /// Bound by the composition root to the session, not supplied by a Spirit.
     SessionPrincipal,
 }
 
@@ -103,6 +103,22 @@ pub struct CostAttributionPayload {
     /// Cost-dimension quantities (R6: `BTreeMap` not `HashMap` for
     /// deterministic serialization — R6/ADR-028 byte-identity).
     pub dimensions: BTreeMap<CostDimension, i64>,
+}
+
+/// Root-bound attribution for a unit of work.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CostScope {
+    pub task_ref: Option<String>,
+    pub session_principal: Option<String>,
+}
+
+/// Additive frame body; the existing payload remains usable by legacy writers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CostFrameBody {
+    #[serde(flatten)]
+    pub payload: CostAttributionPayload,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_ref: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -245,26 +261,18 @@ mod tests {
     }
 
     #[test]
-    fn no_task_ref_in_payload() {
-        // R3: task_ref DROPPED from v1.0 — negative assertion
-        let payload = CostAttributionPayload {
-            schema_version: 1,
-            timestamp_ns: 0,
-            spirit_pid: 0,
-            provider: "test".into(),
-            model: "test".into(),
-            principal: PrincipalRef::Unattributed,
-            attribution_source: AttributionSource::WriteTargetProxy,
-            attribution_confidence: AttributionConfidence::Unknown,
-            dimensions: BTreeMap::new(),
-        };
-        let json = serde_json::to_string(&payload).unwrap();
-        assert!(
-            !json.contains("task_ref")
-                && !json.contains("correlation_id")
-                && !json.contains("request_id"),
-            "R3: no task_ref/correlation_id/request_id in v1.0 cost frame"
-        );
+    fn cost_frame_task_and_legacy_serde() {
+        let legacy = r#"{"schema_version":1,"timestamp_ns":18446744073709551615,"spirit_pid":0,"provider":"test","model":"test","principal":{"kind":"Unattributed"},"attribution_source":"write_target_proxy","attribution_confidence":"unknown","dimensions":{},"future_field":true}"#;
+        let mut frame: CostFrameBody = serde_json::from_str(legacy).unwrap();
+        assert_eq!(frame.payload.timestamp_ns, u64::MAX);
+        assert_eq!(frame.task_ref, None);
+        assert!(!serde_json::to_string(&frame.payload)
+            .unwrap()
+            .contains("task_ref"));
+        frame.task_ref = Some("t-1".into());
+        let json = serde_json::to_string(&frame).unwrap();
+        assert!(json.contains("\"task_ref\":\"t-1\""));
+        assert_eq!(serde_json::from_str::<CostFrameBody>(&json).unwrap(), frame);
     }
 
     #[test]

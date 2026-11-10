@@ -13,6 +13,15 @@ Older arithmetic/rulings below remain historical; later kernel landers must re-m
 **Scope:** the kernel row of `20-14-complete-cost-attribution`: the cost-attribution emission site reads a root-bound task / session-principal scope; no implementation or landing claimed.  
 **Story:** `_bmad-output/implementation-artifacts/20-14-complete-cost-attribution.md`, frontmatter, §Decisions, §Kernel and kloc pricing.  
 **Evidence:** `20-14-complete-cost-attribution-evidence/creation/measurements.md`, `kloc-kernel-8c809f9c-and-prototypes.json`, `kt-token-bound-scope.diff`, `km-scb-marker.diff`, `km-naive-scb-marker.diff`, `kp-root-cost-scope-port.diff`, `k0-token-on-cost-row.diff`, `kr-request-correlation-id-on-km-naive.diff`, `rec-kt-domain-cli-audit-bin-shell-slice.diff`.  
+
+**L1 amendment (operator ask d1408, D-20-14-13 A):** the existing kernel
+literal and `CostAttributionPayload` stay unchanged in L1. `CostFrameBody`
+flattens that payload and carries `task_ref`; L2 wraps the existing literal
+and must re-measure its kernel hunk against the KT grant (the original
+prototype did not price that wrapper). Orchestrator-adjudicated overdrafts,
+disclosed to the operator: domain ceiling 10200 -> 10215 (d1408 wrapper),
+CLI 6524 -> 6545 (formatted report and new witness); audit 8237 and aggregate
+199369 remain unchanged. 20-9 and 20-5 re-base domain on the exact landed pin.
 **Precedent:** `20-4-flag-winston-decision.md`, `20-7-flag-winston-decision.md`.
 
 ## Decision requested

@@ -7,6 +7,7 @@ baseline_commit: 8c809f9c
 security_sensitive: true
 kernel_grant: "RULED (operator 2026-11-03, ask d_batch4; D-20-14-02 B + D-20-14-03 B; FLAG-Winston, `20-14-flag-winston-decision.md`): KT token-bound cost scope measured at 8c809f9c from 26841 physical / 21042 tokei, +35 / +25. Creation-priced ceilings (STOP above): kernel ≤ 26911 physical / 21092 tokei; L2 kernel last. Binding at dev start only after re-base onto then-landed pins and cumulative room; the later kernel lander re-bases. Recorded cumulative measured 21203; this story at ×2 21228; both 20-9 and 20-14 at ×2 21249. D-20-14-12 C (ask d2014_12) grants joint targeted STOP 21250 for 20-9 L2 + 20-14 L2 only; shared STOP 21209 for everything else; D-20-9-15 A retains 21230 as 20-9 single-story ceiling; ADR-069 alarm 22000 untouched."
 kloc_grant: "RULED (operator 2026-11-03, ask d_batch4) (D-20-14-09 A; D02 A ×2 measured / ×3 unmeasured). Creation-priced ceilings (STOP above; pins re-fixed exactly at landing; aggregate hardfail = measured + 1; each ceiling is HEAD + allowance and re-bases onto the exact pins at landing): kernel ≤ 26911 / 21092; maos-domain ≤ 10101; maos-cli ≤ 6524; maos-audit ≤ 7779; maos-bin ≤ 34441; aggregate ≤ 192974. Binding at dev start only after re-base onto then-landed pins; creation-wide pricing below is historical evidence, not a reservation. Every other crate 0."
+landing_1_grant: "D02 A rebase: domain 10198 + 2 = 10200; CLI 6429 + 95 = 6524; audit 8179 + 58 = 8237; bin 36225 + 250 = 36475; aggregate 198914 + 455 = 199369; kernel unchanged 26841/21042. Orchestrator-adjudicated overdrafts, disclosed to the operator: domain 10200 -> 10215 (d1408 wrapper, initial 10207 + 8); CLI 6524 -> 6545 (formatted report and new in-source witness, measured 6528 + 17). Later 20-9 and 20-5 domain draws re-base onto the exact landed pin."
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:67-71`): a kernel FLAG-Winston row (D-20-14-02), an attesting audit-record writer (the cost frame, rule 11) and an anti-spoof principal source (AC3). Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC2.3 (no Spirit reaches the scope binding), AC3 (principal source, SR-3, SR-4) and D-20-14-04, Test Infrastructure on glm-5.3 (standing policy; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
 
@@ -177,6 +178,7 @@ hardfail measured + 1; (7) D-20-14-01…12 (12: the cumulative kernel STOP).
 | **D-20-14-10** | Where the operator cost page lives (AC5) | **A** a "Cost attribution" section in `run-maos.md` (`docs/maos.dev/`, `docs-site/docs/`, `docs-site/i18n/ko/…/current/`) · **B** a new runbook `docs/runbooks/cost-attribution.md` · **C** a new docs-site route (en + ko, route manifest) | **A.** The page does not exist (C18); `run-maos.md` is where the operator surfaces live and where 20-4/20-10 add theirs; C adds a route and the manifest-parity/ko gates for one section. | RULED 2026-11-03 (operator, ask d_batch4): as recommended **A** |
 | **D-20-14-11** | NFR-Cost-1's ≥ 98 % operational half | **A** stays "Ownerless and open" in `deferred-work.md:91` (the clause this story closes is split out), the doc states the limit · **B** a new operator-lane row `ops-cost-billing-reconciliation` (ADR-046 §7 weekly sampling runbook) | **A.** The epic excludes it (E20:332); a new tracker key is an operator act and touches the doc gates. B is the operator's to add. | RULED 2026-11-03 (operator, ask d_batch4): as recommended **A** |
 | **D-20-14-12** | Cumulative kernel room (rule: cumulative > 21209 is an operator row) — measured 21203 with every ruled row, 21228 with this story's ×2 ceiling, 21249 with 20-9's too | **A split** — no allowance here: 20-14's kernel ceiling is its exact measured +25, re-based; any review correction above it is STOP · **B exchange** — K0 (0 kernel lines, D-02 D) instead of KT, freeing 25 tokei at the cost of the task/principal not riding the frame · **C bump** — one joint targeted cumulative STOP with D-20-9-15 sized to both ×2 allowances, **21250** (750 under the 22000 alarm, ADR-069 envelope 23000 untouched) | **C**, joint targeted exception for 20-9 L2 + 20-14 L2 (ask `d2014_12`); D-20-9-15 A remains 20-9’s single-story ceiling of 21230. 20-14 lands last (PF:142) and would otherwise meet 6 tokei of room with a +25 row whose review history (20-3b/20-3c landed at 2–3× creation) makes a STOP at landing likely; A turns every review correction into a new ask; B gives up the charter's "task reference on the cost frame". C still leaves 750 under the alarm. | RULED 2026-11-03 (operator, ask d_batch4): as recommended **C**; ask `d2014_12`: joint targeted STOP **21250** for 20-9 L2 + 20-14 L2 only; shared STOP **21209** otherwise; ADR-069 alarm **22000** unchanged; D-20-9-15 A retains **21230** as 20-9's single-story ceiling |
+| **D-20-14-13** | Kernel-free frame schema | **A** keep the bare `CostAttributionPayload` unchanged; add `CostFrameBody` flattening it and carrying optional `task_ref`, plus `CostScope`; reader parses the wrapper. L2 wraps its existing literal at emission. | The exhaustive kernel literal otherwise requires a kernel edit in L1. Operator ruled **A**, ask `d1408`, 2026-11-12. Domain 10200 -> 10215 and CLI 6524 -> 6545 are orchestrator-adjudicated overdrafts, disclosed to the operator; wrapper and formatted test costs were not in the creation forecast. |
 
 ## Acceptance Criteria
 
@@ -187,11 +189,14 @@ hardfail measured + 1; (7) D-20-14-01…12 (12: the cumulative kernel STOP).
 
 #### AC4 — the report has task, attribution-source and Spirit axes; old frames still read (epic AC1, report half; D-20-14-05, -06, -07)
 
-1. `CostAttributionPayload` gains `task_ref: Option<String>` (`#[serde(default, skip_serializing_if = "Option::is_none")]`)
-   and `maos_domain::cost::CostScope { task_ref, session_principal }` (prototype `dom`); `no_task_ref_in_payload`
-   (`cost.rs:247-268`) is **replaced**, not kept beside, by a test that a set `task_ref` serializes and a schema-1 frame
-   without it reads `None`; `AttributionSource::SessionPrincipal` loses "Future" (`:60`); SR-4 (`:238-245`) and R6
-   (`:270-311`) tests unchanged and green. Every payload literal gains the field (K8).
+1. The frame body gains `task_ref: Option<String>` through the additive `CostFrameBody`
+   wrapper, flattening the unchanged `CostAttributionPayload` (D-20-14-13 A),
+   and `maos_domain::cost::CostScope { task_ref, session_principal }` is added.
+   `no_task_ref_in_payload` is replaced by wrapper and legacy-read vectors; SR-4
+   and R6 tests remain unchanged. In L2 the kernel wraps its existing literal as
+   `CostFrameBody { payload: CostAttributionPayload { ... }, task_ref: scope.task_ref }`;
+   the original KT +35/+25 prototype did not price this wrapper hunk and the
+   final kernel lander must re-measure it against the rebased grant.
 2. `build_cost_report` (`subcommands.rs:4842-4983`) groups by `(task, principal, attribution_source, spirit, spirit_pid,
    provider, model)`; a row carries `task` (`none` when absent), `attribution_source` (`session_principal` |
    `write_target_proxy`) and `spirit` — the name at `(boot_nonce, spirit_pid)` from `maos_audit::spirit_names`
@@ -450,7 +455,39 @@ anthropic/claude-opus-5-5 (creation).
 
 ### Completion Notes List
 
+L1 implementation evidence: `20-14-complete-cost-attribution-evidence/landing-1/evidence.md`.
+The reader, wrapper, name lookup and guides are implemented; current writers
+still emit schema 1 and proxy attribution. `CostFrameBody` is permanent; the
+new in-source report test cannot move to `tests/` without exposing private
+report internals. New supplementary serde vectors were moved to `tests/` without
+moving existing counted tests. Domain 10198 -> 10203, CLI 6429 -> 6529,
+audit 8179 -> 8209, aggregate 198914 -> 199049; kernel unchanged 26841/21042.
+The explicit schema-1 `task: none` assertion was added after the workspace run
+and has not been run; its one-line formatted source is measured in the pins.
+20-9 forecasts domain 0..6 and 20-5 +8; cumulative measured-forecast domain
+10211..10217 [INFERENCE], before later rebasing and review corrections.
+AC1–AC3 and AC6 closure remain L2; hosted recipe unverified. Focused suites
+were interrupted by missing Python cryptography; the provisioned subsequent
+workspace run exited 100 with 5879 passed and two failures (no-data-home and
+20-11's 1M pending observation), without retry. Frozen prepush timed out at
+3000 s. Full commands, plant outcomes and same-line failures are in evidence.
+
 ### File List
+
+- `crates/maos-domain/src/cost.rs`, `crates/maos-domain/tests/cost_frame_20_14.rs`,
+  `crates/maos-audit/src/lib.rs`, `crates/maos-audit/tests/spirit_resolution.rs`,
+  `crates/maos-cli/src/subcommands.rs`, `crates/maos-cli/tests/cost_docs_20_14.rs`:
+  frame reader, report and witnesses.
+- `crates/maos-kernel-core/tests/forget_cascade_18_6.rs`: T0 session-principal
+  erasure vector; no kernel source change.
+- `docs/maos.dev/run-maos.md`, `docs-site/docs/run-maos.md`,
+  `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md`,
+  `docs/adr/ADR-046-cost-attribution-and-reconciliation.md`: operator limits
+  and the pending final binding.
+- `tests/coverage-matrix.yaml`, `xtask/kloc.toml`, `deferred-work.md`, this story,
+  its FLAG-Winston record, tracker and
+  `20-14-complete-cost-attribution-evidence/{landing-1,ci}`: scoped coverage,
+  exact pins, rulings and observed evidence.
 
 ## Change Log
 

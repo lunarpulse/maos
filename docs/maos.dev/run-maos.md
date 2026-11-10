@@ -248,6 +248,27 @@ The kernel composition root lives in `crates/maos-bin`. Operational surfaces —
 - [Troubleshooting](/troubleshoot/) — every error code with cause and remediation
 - [ABI Stability](https://github.com/lunarpulse/maos/blob/main/STABILITY.md) — the v1.0 ABI compatibility matrix
 
+### Cost attribution
+
+`maosctl audit cost-reconcile --month YYYY-MM --format ndjson --pricing xtask/provider-pricing.toml`
+groups Inference Port token usage by task, principal, attribution source, Spirit,
+provider and model. Plain output is also available. The report is observability,
+not an invoice. Worker CLI spend through the egress proxy is not included in
+cost frames.
+
+`session_principal` means an operator-bound boot session principal, not an
+authenticated end user; `write_target_proxy` is a reverse lookup of write targets
+that the attributed Spirit can write. Ambiguous and unattributed results remain
+`host-unallocated`. On schema 1, `task: none` means a pre-attribution frame;
+on schema 2 it means no scope was bound. The reader is available in 20-14 L1;
+root task and session binding is pending the final kernel landing, so existing
+writers still emit schema 1 and proxy attribution.
+
+NFR-Cost-1's per-Spirit, task and principal dimensions concern token spend;
+CPU time and storage I/O are planned for v1.1 (ADR-046 R6). The ≥98% aggregate
+invoice reconciliation is an operational check, not a synthetic test or proof
+of per-principal billing accuracy.
+
 ## Air-gapped install
 
 For network-isolated environments, see the [Air-Gap Deployment Runbook](/deploy/air-gap-deployment) and the `maosctl install --source` offline import path.

@@ -1,0 +1,47 @@
+name: ci-20-14-verify
+# Branch-only recipe; unverified, not installed on main.
+on:
+  push:
+    branches: ['ci/20-14-verify']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reader:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - name: Provision verifier dependency
+        run: |
+          python3 -m venv "$RUNNER_TEMP/verify-venv"
+          "$RUNNER_TEMP/verify-venv/bin/python" -m pip install --require-hashes -r tools/verify-erasure/requirements.txt
+          echo "$RUNNER_TEMP/verify-venv/bin" >> "$GITHUB_PATH"
+      - run: cargo nextest run --locked -p maos-domain -p maos-cli -p maos-audit --profile ci
+      - run: cargo test --locked -p maos-kernel-core --test forget_cascade_18_6 session_principal_cost_scrub_preserves_other_frame
+      - run: cargo test -p maos-bin --no-default-features --test verb_table_15_3
+      - run: cargo run --locked -p xtask -- check-kernel-baseline --json
+      - run: cargo run --locked -p xtask -- kloc-check --json
+  apple:
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --locked --workspace --all-targets --target aarch64-apple-darwin

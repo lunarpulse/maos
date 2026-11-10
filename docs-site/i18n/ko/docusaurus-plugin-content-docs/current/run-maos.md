@@ -283,6 +283,25 @@ kernel composition root는 `crates/maos-bin`에 있습니다. 운영 표면 — 
 - [문제 해결](/troubleshoot/) — 원인과 해결책을 포함한 모든 오류 코드
 - [ABI 안정성](https://github.com/lunarpulse/maos/blob/main/STABILITY.md) — v1.0 ABI 호환성 매트릭스
 
+### 비용 귀속
+
+`maosctl audit cost-reconcile --month YYYY-MM --format ndjson --pricing xtask/provider-pricing.toml`은
+Inference Port 토큰 사용량을 task, principal, attribution source, Spirit, provider,
+model별로 묶습니다. plain 출력도 가능합니다. 보고서는 관측 정보이며 청구서가
+아닙니다. egress proxy를 통과하는 Worker CLI 지출은 cost frame에 포함되지 않습니다.
+
+`session_principal`은 운영자가 부팅 시 바인딩한 세션 principal이며 인증된 최종
+사용자를 뜻하지 않습니다. `write_target_proxy`는 해당 Spirit이 쓸 수 있는
+쓰기 대상의 역조회입니다. 모호하거나 귀속되지 않은 값은 `host-unallocated`에
+남습니다. schema 1의 `task: none`은 이전 frame을, schema 2에서는 바인딩된
+scope가 없음을 뜻합니다. 20-14 L1은 읽기 기능이며 root task와 session
+바인딩은 최종 kernel landing을 기다립니다. 기존 writer는 여전히 schema 1과
+proxy 귀속을 기록합니다.
+
+NFR-Cost-1의 Spirit/task/principal 차원은 토큰 지출에 적용됩니다. CPU 시간과
+storage I/O는 v1.1 계획입니다(ADR-046 R6). 청구서와 전체 ≥98% 조정은 운영
+검사이며 합성 테스트나 principal별 청구 정확도의 증명이 아닙니다.
+
 ## 에어갭 설치
 
 네트워크 격리 환경에서는 [에어갭 배포 런북](/deploy/air-gap-deployment)과

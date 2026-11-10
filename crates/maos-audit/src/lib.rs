@@ -1776,6 +1776,38 @@ pub fn resolve_spirit_name_optional(
     Ok(resolved)
 }
 
+/// Names recorded for each boot-local Spirit identity, in journal order.
+pub fn spirit_names(
+    db_path: &Path,
+) -> Result<std::collections::BTreeMap<(u64, u32), String>, String> {
+    let conn = open_transparency_log_readonly(db_path)?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT boot_nonce, spirit_pid, kind, intent, payload_redacted FROM transparency_log
+         WHERE kind IN (7, 19) AND intent != 'lifecycle.journal'
+         ORDER BY timestamp_ns ASC, frame_id ASC",
+        )
+        .map_err(|e| format!("prepare failed: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let (boot, pid, kind): (i64, i64, i64) = (row.get(0)?, row.get(1)?, row.get(2)?);
+            let (intent, payload): (String, Vec<u8>) = (row.get(3)?, row.get(4)?);
+            Ok((boot as u64, pid as u32, kind, intent, payload))
+        })
+        .map_err(|e| format!("query failed: {e}"))?;
+    let mut names = std::collections::BTreeMap::new();
+    for row in rows {
+        let (boot, pid, kind, intent, payload) = row.map_err(|e| format!("row error: {e}"))?;
+        let name = if kind == 19 {
+            intent
+        } else {
+            payload_spirit_id(&payload).unwrap_or(intent)
+        };
+        names.insert((boot, pid), name);
+    }
+    Ok(names)
+}
+
 /// The `spirit_id` field of a redacted lifecycle payload, when it parses as
 /// JSON and carries one.
 fn payload_spirit_id(payload: &[u8]) -> Option<String> {

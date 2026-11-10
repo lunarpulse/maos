@@ -12,7 +12,7 @@ A sec-redteam review (3 adversarial lenses, 2026-06-14) examined the proposed li
 
 - **The attribution source is spoofable by the attributed party.** Principal is derived from `principal_ids_for_spirit_pid` over the `principal_index`, which is written whenever a Spirit writes a `principal:<id>:<schema>` namespace. **`validate_namespace_write()` (`crates/maos-kernel-core/src/memory/mod.rs:327`) is a stub returning `true`** — no per-principal write authorization. A Spirit can write to *any* principal namespace, injecting arbitrary principals into its own attribution set. "Never caller-supplied" is true of the inference request but false of the write path.
 - **The source is lifetime-cumulative, not per-call.** `principal_ids_for_spirit_pid` = `SELECT DISTINCT principal_id … WHERE writer_spirit_pid = ?`, **no time/session bound**. `Resolved(single)` is the transient case; cumulative `Ambiguous` is the steady state for a multi-tenant Spirit; an inference-only Spirit returns `[]`.
-- **No session-principal concept exists** anywhere in the kernel (verified). The proxy is the only available source — so the fix is not "use the real principal" (there is none) but to **restrict and label** what the proxy may drive.
+- **No session-principal concept existed** at the 9.3b decision. Superseded by 20-14's ruled root-bound session scope; the L1 reader lands first, while the final kernel landing remains pending.
 - The originally-named compensating control (reconcile per-principal vs provider invoices) is **structurally blind**: the provider bills a single host API key with no principal breakdown, so the only reconcilable quantity is the aggregate host total, which nets out all cross-principal mis-attribution.
 
 **Operator decision (2026-06-14):** ship the **observability-not-invoice** posture. With no per-principal invoice emitted, the spoofable/smeared/blind-control risks cannot cause financial mis-billing — they degrade only a clearly-labeled, coverage-reported signal.
@@ -35,9 +35,13 @@ Cost-dimension quantities ride `dimensions: BTreeMap<CostDimension, i64>` (integ
 - v1.0 dimensions = `TokensIn`, `TokensOut`. **`UsdMicros` is NOT a journaled dimension** (money is read-time, §1).
 - **CPU-time and storage-I/O are DEFERRED to v1.1** (neither exists today). The extensible shape makes the addition purely additive (new enum variant + new map key; absent keys were never serialized, so existing journaled frames stay byte-identical). A **forward-read-tolerance test** (a synthetic frame with an unmodeled dimension key the reader must tolerate, not panic) ships in v1.0 as the insurance on the deferral.
 
-### 3. R3 — `task_ref` is DROPPED from v1.0
+### 3. R3 — root-bound `task_ref` (20-14 amendment)
 
-Verified: `InferenceRequest` (`crates/maos-domain/src/ports/inference.rs:30`) carries no request/correlation/span id, and the SCB (`control_block.rs:273`) has no current-task marker. So a `task_ref` would be **structurally always-None** at emission — dead weight on a billing surface. Because `abi-diff` is Added-only, a future story can add it **for free, already carrying a value**. No synthesized weak key (a `spirit_pid + timestamp` key fabricates an attribution signal and lies about its resolution). The dimension's intent is documented here, not in the ABI. **Named successor:** the SCB current-task marker (its own story) unblocks per-task cost.
+The 9.3b decision dropped `task_ref` because neither a request id nor an SCB
+marker was an authoritative task source. Story 20-14 instead binds the root's
+turn or pass scope to the minted token (D-20-14-01 A / -02 B). It never takes
+the task from an inference request or fabricates a pid/time key. L1 adds a
+forward-compatible frame-body reader; the writer and binding land in L2.
 
 ### 4. R2 / SR-4 — principal attribution: tagged, non-fabricating, count-not-members
 
@@ -78,14 +82,20 @@ The erasure record stamps `schema_id` + `schema_version` (the schema in force at
 
 ### 10. SR-5 — proxy debt recorded; the real fix is per-call principal binding
 
-v1.0 attribution is a **write-target reverse-lookup proxy, not an authority/session principal**. The durable fix is **per-call principal binding** (tie attribution to the live session/task lineage at the emission site) — the same missing primitive as the §3 SCB-current-task-marker. Tracked as a follow-up; not a 9.3b blocker under the observability posture.
+The 9.3b write-target reverse-lookup proxy is not an authority. Story 20-14
+rules per-call binding through the root's token-bound scope; its final kernel
+landing is pending. The reader distinguishes `session_principal` from the
+tagged proxy fallback. The session principal is operator asserted at boot, not
+an authenticated end-user identity.
 
 ## Consequences
 
 - **Kernel-core delta ~60–100 LOC** (closeout C1 — supersedes the stub's ~70–120 *and* Round-2's ~46–64): FR64 emission ~28–40 + FrameKind 28 ~18–24 + **SR-3 forget-orchestration call + AC6 erasure-payload stamp ~15–35** (both touch `forget_with_reason`). Bulk of cost-compute/pricing/scrub work stays off-baseline (maos-domain/maos-audit/maos-iac). **Re-pin target ~21400–21440** (from 21336), jointly with FR62 (FLAG-Winston), recorded as the first ratified `AbiExtensionProposal`.
 - NFR-Cost-1 splits into a deterministic CI claim (100% vs synthetic price-book) and an operational claim (aggregate ≥98% vs real invoices, runbook) — errata applied to `requirements-inventory.md`.
 - The cost report is **coverage-honest, not an invoice**: a real `attributable_fraction` < 1 is expected and surfaced, not hidden.
-- Two items are explicitly **out of 9.3b, tracked**: the **SR-1 write-path authorization** fix (`validate_namespace_write` stub) and the **SR-5 / R3 per-call principal binding** (SCB current-task marker + an `InferenceRequest` correlation id).
+- The SR-5 / R3 binding is ruled by 20-14, with the reader in L1 and the
+  token-bound writer pending L2; the proxy remains a tagged fallback. No
+  `InferenceRequest` correlation id is introduced.
 
 ## Gate
 

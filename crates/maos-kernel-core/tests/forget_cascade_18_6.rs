@@ -192,6 +192,32 @@ fn cost_scrub_keeps_figures_and_removes_nested_principal() {
 }
 
 #[test]
+fn session_principal_cost_scrub_preserves_other_frame() {
+    let s = Scene::new();
+    let alice = s.raw(FrameKind::CostAttribution, 7, r#"{"schema_version":2,"principal":{"kind":"Resolved","principal_id":"alice"},"attribution_source":"session_principal","task_ref":"turn:1","dimensions":{"tokens_in":42,"tokens_out":7}}"#);
+    let bob = s.raw(FrameKind::CostAttribution, 7, r#"{"schema_version":2,"principal":{"kind":"Resolved","principal_id":"bob"},"attribution_source":"session_principal","task_ref":"turn:2","dimensions":{"tokens_in":9,"tokens_out":3}}"#);
+    let before = s
+        .log
+        .query_frame_by_id(bob)
+        .unwrap()
+        .unwrap()
+        .payload_redacted;
+    s.memory.forget_with_reason("alice", None).unwrap();
+    let body = s.body(alice);
+    assert_eq!(body["principal"]["principal_id"], "[REDACTED]");
+    assert_eq!(body["dimensions"]["tokens_in"], 42);
+    assert_eq!(body["dimensions"]["tokens_out"], 7);
+    assert_eq!(
+        before,
+        s.log
+            .query_frame_by_id(bob)
+            .unwrap()
+            .unwrap()
+            .payload_redacted
+    );
+}
+
+#[test]
 fn token_boundary_prevents_overerasure_and_all_scrubbed_sources_stay_empty() {
     let s = Scene::new();
     let target = s.raw(FrameKind::McpInvocation, 7, "a@b.org CANARY");
