@@ -343,7 +343,7 @@ impl TransparencyLogAdapter {
                 || state
                     .subjects
                     .iter()
-                    .any(|subject| principal_id_occurs(&body, subject))
+                    .any(|subject| Self::subject_in_frame(kind, &body, subject))
             {
                 return Ok(false);
             }

@@ -2003,10 +2003,10 @@ impl TransparencyLogAdapter {
         };
         self.scan_rowid_range(sql, principal, range, |row| {
             let body: Vec<u8> = row.get(4).map_err(AuditError::SqliteRead)?;
-            if principal.is_some_and(|id| !principal_id_occurs(&body, id)) {
+            let kind: i64 = row.get(1).map_err(AuditError::SqliteRead)?;
+            if principal.is_some_and(|id| !Self::subject_in_frame(kind, &body, id)) {
                 return Ok(());
             }
-            let kind: i64 = row.get(1).map_err(AuditError::SqliteRead)?;
             let mut source_log_ref = if kind == FrameKind::Distillate as i64 {
                 Self::distillate_source_refs(&body).unwrap_or_default()
             } else {
@@ -2258,6 +2258,19 @@ impl TransparencyLogAdapter {
         Ok(())
     }
 
+    fn subject_in_frame(kind: i64, body: &[u8], subject: &str) -> bool {
+        if !matches!(kind, 28 | 29) {
+            return principal_id_occurs(body, subject);
+        }
+        match serde_json::from_slice::<serde_json::Value>(body) {
+            Ok(value) => ["/principal/principal_id", "/task_ref", "/session_principal"]
+                .iter()
+                .filter_map(|path| value.pointer(path).and_then(|v| v.as_str()))
+                .any(|text| principal_id_occurs(text.as_bytes(), subject)),
+            Err(_) => principal_id_occurs(body, subject),
+        }
+    }
+
     fn redacted_principals_body(
         existing: &[u8],
         principals: &[String],
@@ -2266,30 +2279,18 @@ impl TransparencyLogAdapter {
     ) -> Result<Vec<u8>, AuditError> {
         let redacted_bytes = match serde_json::from_slice::<serde_json::Value>(existing) {
             Ok(mut val) => {
-                fn scrub(value: &mut serde_json::Value, principals: &[String]) {
-                    match value {
-                        serde_json::Value::String(text)
+                for path in ["/principal/principal_id", "/task_ref", "/session_principal"] {
+                    match val.pointer_mut(path) {
+                        Some(serde_json::Value::String(text))
                             if principals.iter().any(|principal| {
                                 principal_id_occurs(text.as_bytes(), principal)
                             }) =>
                         {
-                            *text = "[REDACTED]".into()
-                        }
-                        serde_json::Value::Array(values) => {
-                            values.iter_mut().for_each(|v| scrub(v, principals))
-                        }
-                        serde_json::Value::Object(values) => {
-                            values.retain(|key, _| {
-                                !principals
-                                    .iter()
-                                    .any(|principal| principal_id_occurs(key.as_bytes(), principal))
-                            });
-                            values.values_mut().for_each(|v| scrub(v, principals));
+                            *text = "[REDACTED]".into();
                         }
                         _ => {}
                     }
                 }
-                scrub(&mut val, principals);
                 if let Some(obj) = val.as_object_mut() {
                     // Also record redaction metadata
                     obj.insert("redacted".to_string(), serde_json::Value::Bool(true));

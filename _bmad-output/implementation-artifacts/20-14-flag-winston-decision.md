@@ -22,6 +22,12 @@ prototype did not price that wrapper). Orchestrator-adjudicated overdrafts,
 disclosed to the operator: domain ceiling 10200 -> 10215 (d1408 wrapper),
 CLI 6524 -> 6545 (formatted report and new witness); audit 8237 and aggregate
 199369 remain unchanged. 20-9 and 20-5 re-base domain on the exact landed pin.
+**L1 review-corrections overdraft (security F1-F8, triage P1-P4):** an
+orchestrator-adjudicated overdraft, disclosed to the operator (D02 A): CLI
+ceiling 6545 -> 6610. Before: pin 6529, ceiling 6545. After: measured 6599
+(formatted), ceiling 6610 (+11 slack). Audit measured 8227 inside 8237; iac
+stays at its 8728 pin; aggregate 199146 inside the rebased 199378. No kernel
+line; kernel pins 26841/21042 unchanged.
 **Precedent:** `20-4-flag-winston-decision.md`, `20-7-flag-winston-decision.md`.
 
 ## Decision requested

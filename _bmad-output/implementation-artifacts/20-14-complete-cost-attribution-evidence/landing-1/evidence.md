@@ -65,3 +65,9 @@ excluding each crate's newest session, requiring age over three hours and
 non-blocking flock and record-lock probes. `/proc/1/fd` and `/proc/7/fd`
 were unreadable (permission denied); no deps, build or fingerprint trees
 were pruned.
+
+## Superseded in part by the review corrections
+
+Pins, plants and verification for the review corrections (security F1–F8, triage P1–P4) are in `review/corrections.md`; they supersede the CLI 6529 /
+audit 8209 / aggregate 199049 figures above (now CLI 6599, audit 8227, aggregate 199146; CLI ceiling 6545 -> 6610 is an orchestrator-adjudicated
+overdraft, disclosed to the operator). The schema-1 `task: none` assertion that "remains unrun" above now reads `none (schema 1)` and ran green.

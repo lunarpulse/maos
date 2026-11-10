@@ -34,3 +34,12 @@ fn operator_cost_guides_disclose_limits() {
     assert!(adr.contains("root-bound `task_ref`"));
     assert!(adr.contains("landing is pending"));
 }
+
+#[test]
+fn adr_retains_write_path_authorization_debt() {
+    let adr = include_str!("../../../docs/adr/ADR-046-cost-attribution-and-reconciliation.md");
+    let (_, followup) = adr.split_once("### 10. SR-5").unwrap();
+    let (followup, _) = followup.split_once("## Gate").unwrap();
+    assert!(followup.contains("SR-1"));
+    assert!(followup.contains("validate_namespace_write"));
+}

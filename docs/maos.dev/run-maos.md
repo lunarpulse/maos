@@ -257,11 +257,14 @@ not an invoice. Worker CLI spend through the egress proxy is not included in
 cost frames.
 
 `session_principal` means an operator-bound boot session principal, not an
-authenticated end user; `write_target_proxy` is a reverse lookup of write targets
-that the attributed Spirit can write. Ambiguous and unattributed results remain
-`host-unallocated`. On schema 1, `task: none` means a pre-attribution frame;
-on schema 2 it means no scope was bound. The reader is available in 20-14 L1;
-root task and session binding is pending the final kernel landing, so existing
+authenticated end user; `write_target_proxy` is a pid-keyed, lifetime-cumulative
+reverse lookup influenced by the Spirit's writes, not a session authority.
+Ambiguous and unattributed results remain `host-unallocated`. An absent `task: none`
+is displayed as `none (schema 1)` (legacy frame) or `none (schema 2)` (field
+absent); the latter alone cannot prove whether a scope was bound. Plain output
+escapes control characters and truncates each field to 256 characters, and a
+provider/model without a pricing entry is priced at 0 with a Warnings line.
+Root task and session binding is pending the final kernel landing, so existing
 writers still emit schema 1 and proxy attribution.
 
 NFR-Cost-1's per-Spirit, task and principal dimensions concern token spend;

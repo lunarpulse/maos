@@ -4791,10 +4791,8 @@ struct CostReport {
     total_cost_micro: u64,
     attributed_cost_micro: u64,
     attributable_fraction: f64,
-    /// Per-Spirit attributable fraction (SR-2).  Unlike the host-wide
-    /// `attributable_fraction`, each entry only counts costs emitted by that
-    /// spirit_pid.
-    per_spirit_attributable_fraction: std::collections::BTreeMap<u32, f64>,
+    /// Per boot-local Spirit attributable fraction (SR-2), keyed by `boot:pid`.
+    per_spirit_attributable_fraction: std::collections::BTreeMap<String, f64>,
     note: &'static str,
     warnings: Vec<String>,
 }
@@ -4847,7 +4845,7 @@ fn build_cost_report(
     month: &str,
     entries: &[maos_audit::AuditEntry],
     pricing: &maos_domain::cost::ProviderPricingConfig,
-    names: &std::collections::BTreeMap<(u64, u32), String>,
+    names: &maos_audit::SpiritNames,
 ) -> CostReport {
     use maos_domain::cost::{AttributionSource, CostDimension, CostFrameBody, PrincipalRef};
     use std::collections::BTreeMap;
@@ -4857,6 +4855,7 @@ fn build_cost_report(
     // Accumulator: (tokens_in, tokens_out)
     let mut groups: BTreeMap<Key, (i64, i64)> = BTreeMap::new();
     let mut warnings: Vec<String> = Vec::new();
+    let mut per_spirit_cost: BTreeMap<(u64, u32), (u128, u128)> = BTreeMap::new();
 
     for entry in entries {
         let frame: CostFrameBody = match serde_json::from_str(&entry.payload) {
@@ -4870,6 +4869,15 @@ fn build_cost_report(
             }
         };
         let payload = frame.payload;
+        if entry.spirit_pid != payload.spirit_pid
+            || frame.task_ref.as_ref().is_some_and(|task| task.len() > 256)
+        {
+            warnings.push(format!(
+                "skipping invalid cost identity for frame {}",
+                entry.frame_id_hex
+            ));
+            continue;
+        }
 
         let principal_display = match &payload.principal {
             PrincipalRef::Resolved { principal_id } => principal_id.clone(),
@@ -4890,6 +4898,20 @@ fn build_cost_report(
             .copied()
             .unwrap_or(0)
             .max(0);
+        let totals = per_spirit_cost
+            .entry((entry.boot_nonce, payload.spirit_pid))
+            .or_insert((0, 0));
+        if let Some(price) = pricing.lookup(&payload.provider, &payload.model) {
+            let cost = (tokens_in as u128)
+                .saturating_mul(price.input_price_micro_per_1k as u128)
+                .saturating_add(
+                    (tokens_out as u128).saturating_mul(price.output_price_micro_per_1k as u128),
+                );
+            totals.0 = totals.0.saturating_add(cost);
+            if matches!(payload.principal, PrincipalRef::Resolved { .. }) {
+                totals.1 = totals.1.saturating_add(cost);
+            }
+        }
 
         let source = match payload.attribution_source {
             AttributionSource::SessionPrincipal => "session_principal",
@@ -4897,10 +4919,27 @@ fn build_cost_report(
         };
         let spirit = names
             .get(&(entry.boot_nonce, payload.spirit_pid))
-            .cloned()
+            .and_then(|events| {
+                events
+                    .iter()
+                    .rev()
+                    .find(|(at, _)| *at <= entry.timestamp_ns)
+            })
+            .map(|(_, name)| name.clone())
             .unwrap_or_else(|| format!("pid:{}", payload.spirit_pid));
         let key = (
-            frame.task_ref.unwrap_or_else(|| "none".into()),
+            match frame.task_ref {
+                Some(task)
+                    if task.starts_with("literal:")
+                        || task == "none (schema 1)"
+                        || task == "none (schema 2)" =>
+                {
+                    format!("literal:{task}")
+                }
+                Some(task) => task,
+                None if payload.schema_version == 1 => "none (schema 1)".into(),
+                None => "none (schema 2)".into(),
+            },
             principal_display,
             source,
             spirit,
@@ -4918,41 +4957,45 @@ fn build_cost_report(
     let mut row_precisions: Vec<(Key, (i64, i64), u128)> = Vec::with_capacity(groups.len());
     let mut total_cost_u128: u128 = 0;
     let mut attributed_cost_u128: u128 = 0;
-    let mut per_spirit_cost: BTreeMap<u32, (u128, u128)> = BTreeMap::new();
 
     for (key, (tokens_in, tokens_out)) in &groups {
-        let (input_price, output_price) = pricing
-            .lookup(&key.5, &key.6)
-            .map(|e| (e.input_price_micro_per_1k, e.output_price_micro_per_1k))
-            .unwrap_or((0, 0));
+        let (input_price, output_price) = match pricing.lookup(&key.5, &key.6) {
+            Some(entry) => (
+                entry.input_price_micro_per_1k,
+                entry.output_price_micro_per_1k,
+            ),
+            None => {
+                let warning = format!("unpriced provider/model: {}/{}", key.5, key.6);
+                if !warnings.contains(&warning) {
+                    warnings.push(warning);
+                }
+                (0, 0)
+            }
+        };
 
-        let cost_u128 = (*tokens_in as u128) * (input_price as u128)
-            + (*tokens_out as u128) * (output_price as u128);
+        let cost_u128 = (*tokens_in as u128)
+            .saturating_mul(input_price as u128)
+            .saturating_add((*tokens_out as u128).saturating_mul(output_price as u128));
 
-        total_cost_u128 += cost_u128;
+        total_cost_u128 = total_cost_u128.saturating_add(cost_u128);
         if key.1 != "host-unallocated" {
-            attributed_cost_u128 += cost_u128;
-        }
-        let spirit_entry = per_spirit_cost.entry(key.4).or_insert((0, 0));
-        spirit_entry.0 += cost_u128;
-        if key.1 != "host-unallocated" {
-            spirit_entry.1 += cost_u128;
+            attributed_cost_u128 = attributed_cost_u128.saturating_add(cost_u128);
         }
         row_precisions.push((key.clone(), (*tokens_in, *tokens_out), cost_u128));
     }
 
-    let total_cost_micro = (total_cost_u128 / 1000) as u64;
-    let attributed_cost_micro = (attributed_cost_u128 / 1000) as u64;
+    let total_cost_micro = u64::try_from(total_cost_u128 / 1000).unwrap_or(u64::MAX);
+    let attributed_cost_micro = u64::try_from(attributed_cost_u128 / 1000).unwrap_or(u64::MAX);
 
-    let per_spirit_attributable_fraction: BTreeMap<u32, f64> = per_spirit_cost
+    let per_spirit_attributable_fraction: BTreeMap<String, f64> = per_spirit_cost
         .iter()
-        .map(|(pid, (total, attributed))| {
+        .map(|((boot, pid), (total, attributed))| {
             let fraction = if *total == 0 {
                 0.0
             } else {
                 *attributed as f64 / *total as f64
             };
-            (*pid, fraction)
+            (format!("{boot}:{pid}"), fraction)
         })
         .collect();
 
@@ -4966,11 +5009,13 @@ fn build_cost_report(
             0
         } else if i == row_precisions.len() - 1 {
             // Last row absorbs the residual so the column foots exactly.
-            total_cost_micro - assigned_total
+            total_cost_micro.saturating_sub(assigned_total)
         } else {
-            ((*cost_u128 * total_cost_micro as u128) / total_cost_u128) as u64
+            u64::try_from(cost_u128.saturating_mul(total_cost_micro as u128) / total_cost_u128)
+                .unwrap_or(u64::MAX)
+                .min(total_cost_micro.saturating_sub(assigned_total))
         };
-        assigned_total += cost_micro;
+        assigned_total = assigned_total.saturating_add(cost_micro);
         rows.push(CostReportRow {
             task: key.0.clone(),
             principal: key.1.clone(),
@@ -5003,12 +5048,29 @@ fn build_cost_report(
     }
 }
 
+fn cost_terminal_field(value: &str) -> String {
+    use std::fmt::Write;
+    let mut out = String::new();
+    for c in value.chars().take(256) {
+        if c.is_control() || matches!(c, '\u{2028}' | '\u{2029}') {
+            let _ = write!(out, "\\u{{{:x}}}", c as u32);
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 /// Format a cost report as human-readable plain text.
 fn format_cost_report_plain(report: &CostReport) -> String {
     let mut out = String::new();
     use std::fmt::Write;
-    let _ = writeln!(out, "Cost Reconcile Report — {}", report.month);
-    let _ = writeln!(out, "  {}", report.note);
+    let _ = writeln!(
+        out,
+        "Cost Reconcile Report — {}",
+        cost_terminal_field(&report.month)
+    );
+    let _ = writeln!(out, "  {}", cost_terminal_field(report.note));
     let _ = writeln!(
         out,
         "  total={} µ$  attributed={} µ$  fraction={:.4}",
@@ -5018,13 +5080,13 @@ fn format_cost_report_plain(report: &CostReport) -> String {
         let _ = writeln!(
             out,
             "  task={} {} ({}) {} pid={:<5} {:12}/{:24} in={:<10} out={:<10} cost={} µ$",
-            row.task,
-            row.principal,
-            row.attribution_source,
-            row.spirit,
+            cost_terminal_field(&row.task),
+            cost_terminal_field(&row.principal),
+            cost_terminal_field(&row.attribution_source),
+            cost_terminal_field(&row.spirit),
             row.spirit_pid,
-            row.provider,
-            row.model,
+            cost_terminal_field(&row.provider),
+            cost_terminal_field(&row.model),
             row.tokens_in,
             row.tokens_out,
             row.cost_micro,
@@ -5033,13 +5095,13 @@ fn format_cost_report_plain(report: &CostReport) -> String {
     if !report.per_spirit_attributable_fraction.is_empty() {
         let _ = writeln!(out, "\nPer-Spirit attributable fraction:");
         for (pid, frac) in &report.per_spirit_attributable_fraction {
-            let _ = writeln!(out, "  pid={pid}: {frac:.4}");
+            let _ = writeln!(out, "  boot:pid={pid}: {frac:.4}");
         }
     }
     if !report.warnings.is_empty() {
         let _ = writeln!(out, "\nWarnings:");
         for w in &report.warnings {
-            let _ = writeln!(out, "  ⚠ {w}");
+            let _ = writeln!(out, "  ⚠ {}", cost_terminal_field(w));
         }
     }
     out
@@ -5078,6 +5140,7 @@ fn audit_cost_reconcile(month: &str, pricing_path: &str, format: AuditFormat) ->
         kind: Some("cost".to_string()),
         since_ns: Some(since_ns),
         until_ns: Some(until_ns),
+        origin: Some(maos_domain::invariants::i3::FrameOrigin::Kernel),
         ..Default::default()
     };
     let entries = match maos_audit::query(&db_path, filter) {
@@ -5938,7 +6001,7 @@ mod tests {
         let report = build_cost_report("2026-06", &[entry], &pricing, &Default::default());
         assert_eq!(report.warnings.len(), 0, "must not warn on valid payload");
         assert_eq!(report.rows.len(), 1);
-        assert_eq!(report.rows[0].task, "none");
+        assert_eq!(report.rows[0].task, "none (schema 1)");
         assert_eq!(report.rows[0].principal, "user:alice");
         assert_eq!(report.rows[0].tokens_in, 1000);
         assert_eq!(report.rows[0].tokens_out, 500);
@@ -5981,9 +6044,12 @@ mod tests {
             .unwrap(),
             redaction: None,
         };
-        let names = [((1, 7), "alpha".into()), ((2, 7), "beta".into())]
-            .into_iter()
-            .collect();
+        let names = [
+            ((1, 7), vec![(1, "alpha".into())]),
+            ((2, 7), vec![(1, "beta".into())]),
+        ]
+        .into_iter()
+        .collect();
         let entries = [
             entry(1, Some("t-1"), AttributionSource::WriteTargetProxy),
             entry(1, Some("t-2"), AttributionSource::WriteTargetProxy),
@@ -6000,7 +6066,7 @@ mod tests {
         assert!(report
             .rows
             .iter()
-            .any(|r| r.task == "none" && r.spirit == "beta"));
+            .any(|r| r.task == "none (schema 2)" && r.spirit == "beta"));
         assert!(report.rows.iter().any(|r| r.task == "t-1"
             && r.spirit == "alpha"
             && r.attribution_source == "session_principal"));
@@ -6104,3 +6170,7 @@ mod tests {
         assert_eq!(exit, ExitCode::from(2));
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/support/cost_report_review_20_14.rs"]
+mod cost_report_review_20_14;

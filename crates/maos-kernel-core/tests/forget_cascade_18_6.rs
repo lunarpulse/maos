@@ -218,6 +218,44 @@ fn session_principal_cost_scrub_preserves_other_frame() {
 }
 
 #[test]
+fn cost_erasure_never_scrubs_schema_keys_or_unrelated_frames() {
+    for subject in [
+        "tokens",
+        "model",
+        "provider",
+        "dimensions",
+        "kind",
+        "Resolved",
+    ] {
+        let s = Scene::new();
+        let target = s.raw(FrameKind::CostAttribution, 7, &format!(r#"{{"schema_version":2,"principal":{{"kind":"Resolved","principal_id":"{subject}"}},"attribution_source":"session_principal","provider":"model","model":"provider","dimensions":{{"tokens_in":42,"tokens_out":7}}}}"#));
+        let other = s.raw(FrameKind::CostAttribution, 8, r#"{"schema_version":2,"principal":{"kind":"Resolved","principal_id":"bob"},"attribution_source":"session_principal","provider":"model","model":"provider","dimensions":{"tokens_in":9,"tokens_out":3}}"#);
+        let before = s
+            .log
+            .query_frame_by_id(other)
+            .unwrap()
+            .unwrap()
+            .payload_redacted;
+        s.memory.forget_with_reason(subject, None).unwrap();
+        let body = s.body(target);
+        assert_eq!(body["principal"]["principal_id"], "[REDACTED]", "{subject}");
+        assert_eq!(body["principal"]["kind"], "Resolved", "{subject}");
+        assert_eq!(body["provider"], "model", "{subject}");
+        assert_eq!(body["model"], "provider", "{subject}");
+        assert_eq!(body["dimensions"]["tokens_in"], 42, "{subject}");
+        assert_eq!(
+            before,
+            s.log
+                .query_frame_by_id(other)
+                .unwrap()
+                .unwrap()
+                .payload_redacted,
+            "{subject}"
+        );
+    }
+}
+
+#[test]
 fn token_boundary_prevents_overerasure_and_all_scrubbed_sources_stay_empty() {
     let s = Scene::new();
     let target = s.raw(FrameKind::McpInvocation, 7, "a@b.org CANARY");

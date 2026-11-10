@@ -107,6 +107,46 @@ fn assert_final_partial_page(count: usize) {
 }
 
 #[test]
+fn review_cost_schema_token_does_not_block_late_certification() {
+    let log = TransparencyLogAdapter::open_in_memory(2011);
+    log.insert_frame_event(
+        FrameKind::TaskAssign,
+        7,
+        None,
+        "unrelated",
+        b"unrelated",
+        FrameOrigin::Kernel,
+    );
+    let inserted = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let hook = std::sync::Arc::clone(&inserted);
+    AFTER_WINDOW.with(|slot| {
+        *slot.borrow_mut() = Some(Box::new(move |log, _sql, _principal| {
+            hook.store(true, std::sync::atomic::Ordering::SeqCst);
+            {
+                log.insert_frame_event(
+                    FrameKind::CostAttribution,
+                    7,
+                    None,
+                    "cost:inference-attribution",
+                    br#"{"provider":"p","principal":{"principal_id":"alice"},"dimensions":{"tokens_in":1}}"#,
+                    FrameOrigin::Kernel,
+                );
+            }
+        }))
+    });
+    let result = log.scrub_forget_frames("provider");
+    AFTER_WINDOW.with(|slot| *slot.borrow_mut() = None);
+    assert!(
+        inserted.load(std::sync::atomic::Ordering::SeqCst),
+        "hook must run"
+    );
+    assert!(result
+        .expect("unrelated cost frame cannot block")
+        .1
+        .is_empty());
+}
+
+#[test]
 fn review_f13_scan_snapshot_does_not_chase_a_sustained_writer() {
     let log = TransparencyLogAdapter::open_in_memory(2011);
     let append_page = |log: &TransparencyLogAdapter, first: i64| {

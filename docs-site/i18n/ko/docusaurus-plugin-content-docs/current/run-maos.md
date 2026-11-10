@@ -291,11 +291,14 @@ model별로 묶습니다. plain 출력도 가능합니다. 보고서는 관측 �
 아닙니다. egress proxy를 통과하는 Worker CLI 지출은 cost frame에 포함되지 않습니다.
 
 `session_principal`은 운영자가 부팅 시 바인딩한 세션 principal이며 인증된 최종
-사용자를 뜻하지 않습니다. `write_target_proxy`는 해당 Spirit이 쓸 수 있는
-쓰기 대상의 역조회입니다. 모호하거나 귀속되지 않은 값은 `host-unallocated`에
-남습니다. schema 1의 `task: none`은 이전 frame을, schema 2에서는 바인딩된
-scope가 없음을 뜻합니다. 20-14 L1은 읽기 기능이며 root task와 session
-바인딩은 최종 kernel landing을 기다립니다. 기존 writer는 여전히 schema 1과
+사용자를 뜻하지 않습니다. `write_target_proxy`는 pid 기준으로 누적되는 쓰기
+대상 역조회이며 Spirit의 쓰기에 영향을 받으므로 세션 권한이 아닙니다.
+모호하거나 귀속되지 않은 값은 `host-unallocated`에 남습니다. 없는 `task: none`은
+`none (schema 1)`(이전 frame) 또는 `none (schema 2)`(필드 없음)로 구분해 표시하며
+필드가 없다는 사실만으로 scope 바인딩 여부를 증명할 수 없습니다. plain 출력은
+제어 문자를 이스케이프하고 각 필드를 256자로 자르며, 가격 항목이 없는
+provider/model은 0으로 계산되고 Warnings 줄이 출력됩니다.
+root task와 session 바인딩은 최종 kernel landing을 기다립니다. 기존 writer는 여전히 schema 1과
 proxy 귀속을 기록합니다.
 
 NFR-Cost-1의 Spirit/task/principal 차원은 토큰 지출에 적용됩니다. CPU 시간과

@@ -10,7 +10,7 @@ FR64 asks for per-Spirit/per-task/per-principal cost attribution in the Transpar
 
 A sec-redteam review (3 adversarial lenses, 2026-06-14) examined the proposed lineage-derived attribution against the code and **falsified two load-bearing claims**, forcing a posture change:
 
-- **The attribution source is spoofable by the attributed party.** Principal is derived from `principal_ids_for_spirit_pid` over the `principal_index`, which is written whenever a Spirit writes a `principal:<id>:<schema>` namespace. **`validate_namespace_write()` (`crates/maos-kernel-core/src/memory/mod.rs:327`) is a stub returning `true`** — no per-principal write authorization. A Spirit can write to *any* principal namespace, injecting arbitrary principals into its own attribution set. "Never caller-supplied" is true of the inference request but false of the write path.
+- **The attribution source is influenced by the attributed party.** Principal is derived from the pid-keyed, lifetime-cumulative `principal_ids_for_spirit_pid` over `principal_index`. `validate_namespace_write` now rejects empty and NUL names, and principal-write enforcement authorizes by pid, not by individual principal. A Spirit authorized to write principal namespaces can influence its proxy set; "never caller-supplied" applies to the inference request, not the write path.
 - **The source is lifetime-cumulative, not per-call.** `principal_ids_for_spirit_pid` = `SELECT DISTINCT principal_id … WHERE writer_spirit_pid = ?`, **no time/session bound**. `Resolved(single)` is the transient case; cumulative `Ambiguous` is the steady state for a multi-tenant Spirit; an inference-only Spirit returns `[]`.
 - **No session-principal concept existed** at the 9.3b decision. Superseded by 20-14's ruled root-bound session scope; the L1 reader lands first, while the final kernel landing remains pending.
 - The originally-named compensating control (reconcile per-principal vs provider invoices) is **structurally blind**: the provider bills a single host API key with no principal breakdown, so the only reconcilable quantity is the aggregate host total, which nets out all cross-principal mis-attribution.
@@ -55,7 +55,7 @@ Principal is resolved at emission via `principal_ids_for_spirit_pid(req.spirit_p
 
 - **Only high-confidence `Resolved(single)` is attributed to a principal.** `Ambiguous` + `Unattributed` cost rolls into an explicit **`host-unallocated`** line. **No N-way split, no per-principal charge.**
 - The report surfaces an explicit **`attributable_fraction`** coverage metric (per-spirit + host-wide), so operators see the limitation instead of it being laundered into confident per-principal numbers.
-- The proxy's trust caveat (`validate_namespace_write` is an unguarded stub) is acceptable **only because** no invoice is emitted; gating that write path is a tracked follow-up (§10), not a 9.3b blocker.
+- The proxy's pid-keyed, Spirit-influenced write-path caveat is acceptable **only because** no invoice is emitted; SR-1 per-principal write-path authorization remains a tracked follow-up (§10), not a 9.3b blocker.
 
 ### 6. R5 — integer micro-units; accumulate then round once
 
@@ -87,6 +87,10 @@ rules per-call binding through the root's token-bound scope; its final kernel
 landing is pending. The reader distinguishes `session_principal` from the
 tagged proxy fallback. The session principal is operator asserted at boot, not
 an authenticated end-user identity.
+
+SR-1 write-path authorization remains a separate follow-up: `validate_namespace_write`
+does not establish per-principal authority. The 20-14 session binding does not
+close that debt.
 
 ## Consequences
 

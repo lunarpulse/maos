@@ -149,6 +149,8 @@ pub struct AuditFilter {
     /// FR41 — param-bound EXACT match on the intent column, where a halt
     /// journals its tag (`halt::invoke_halt`).
     pub tag: Option<String>,
+    /// Exact frame origin (e.g. kernel-written cost frames only).
+    pub origin: Option<maos_domain::invariants::i3::FrameOrigin>,
 }
 
 /// Resolve the `kind` filter string to a concrete list of `i64` discriminators.
@@ -274,6 +276,10 @@ pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, Aud
     if let Some(tag) = &filter.tag {
         where_clauses.push("intent = ?".to_string());
         params.push(Box::new(tag.clone()));
+    }
+    if let Some(origin) = filter.origin {
+        where_clauses.push("origin = ?".to_string());
+        params.push(Box::new(origin as i64));
     }
 
     if !where_clauses.is_empty() {
@@ -1776,34 +1782,49 @@ pub fn resolve_spirit_name_optional(
     Ok(resolved)
 }
 
+/// Boot-local identity events ordered by journal timestamp and frame id.
+pub type SpiritNames = std::collections::BTreeMap<(u64, u32), Vec<(u64, String)>>;
+
 /// Names recorded for each boot-local Spirit identity, in journal order.
-pub fn spirit_names(
-    db_path: &Path,
-) -> Result<std::collections::BTreeMap<(u64, u32), String>, String> {
+pub fn spirit_names(db_path: &Path) -> Result<SpiritNames, String> {
     let conn = open_transparency_log_readonly(db_path)?;
     let mut stmt = conn
         .prepare(
-            "SELECT boot_nonce, spirit_pid, kind, intent, payload_redacted FROM transparency_log
-         WHERE kind IN (7, 19) AND intent != 'lifecycle.journal'
-         ORDER BY timestamp_ns ASC, frame_id ASC",
+            "SELECT boot_nonce, spirit_pid, kind, intent, payload_redacted, timestamp_ns FROM transparency_log
+             WHERE kind=19 OR (kind=7 AND intent='lifecycle.load' AND capability_token IS NULL)
+             ORDER BY timestamp_ns ASC, frame_id ASC",
         )
         .map_err(|e| format!("prepare failed: {e}"))?;
     let rows = stmt
         .query_map([], |row| {
             let (boot, pid, kind): (i64, i64, i64) = (row.get(0)?, row.get(1)?, row.get(2)?);
             let (intent, payload): (String, Vec<u8>) = (row.get(3)?, row.get(4)?);
-            Ok((boot as u64, pid as u32, kind, intent, payload))
+            let timestamp: i64 = row.get(5)?;
+            Ok((
+                boot as u64,
+                pid as u32,
+                kind,
+                intent,
+                payload,
+                timestamp as u64,
+            ))
         })
         .map_err(|e| format!("query failed: {e}"))?;
-    let mut names = std::collections::BTreeMap::new();
+    let mut names = SpiritNames::new();
     for row in rows {
-        let (boot, pid, kind, intent, payload) = row.map_err(|e| format!("row error: {e}"))?;
+        let (boot, pid, kind, intent, payload, timestamp) =
+            row.map_err(|e| format!("row error: {e}"))?;
         let name = if kind == 19 {
-            intent
+            Some(intent)
         } else {
-            payload_spirit_id(&payload).unwrap_or(intent)
+            payload_spirit_id(&payload)
         };
-        names.insert((boot, pid), name);
+        if let Some(name) = name.filter(|name| !name.is_empty()) {
+            names
+                .entry((boot, pid))
+                .or_default()
+                .push((timestamp, name));
+        }
     }
     Ok(names)
 }
