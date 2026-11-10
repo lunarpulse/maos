@@ -29,6 +29,10 @@
       "content_floor": "link list"
     },
     {
+      "path": "/manifest/v7",
+      "label": "Manifest v7 Reference"
+    },
+    {
       "path": "/manifest/v6",
       "label": "Manifest v6 Reference"
     },
@@ -260,7 +264,7 @@
     }
   ],
   "error_routes_pattern": "/errors/{ERR_NAME}",
-  "expected_distinct_pages": 135,
+  "expected_distinct_pages": 137,
   "error_codes": [
     "EAbiTooNew",
     "EAbiTooOld",

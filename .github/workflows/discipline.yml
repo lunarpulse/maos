@@ -5531,7 +5531,7 @@ jobs:
       # Whole-package tests consume cross-package executables through the
       # fixture manifest, never presence-only paths or cargo spawned by tests.
       - name: Build registered debug siblings for the maos-bin whole-package leg
-        run: cargo run --locked -p xtask -- build-test-fixtures --only maosctl,worker-cli-fixture,maos-registry-server,maos-spirit
+        run: cargo run --locked -p xtask -- build-test-fixtures --only maosctl,worker-cli-fixture,maos-registry-server,maos-spirit,maos-crypto-recording
       # Operator ruling 2026-09-24: the DEDICATED CI-only evidence audit key.
       # Without it the required `reza-three-team-three-region-journey` leg is
       # ABSENT (xtask/src/check_multi_tenant_loom.rs:192) and this gate — and
