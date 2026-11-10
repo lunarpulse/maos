@@ -478,8 +478,8 @@ accepts only identity rows (kind 19, or kind 7 `lifecycle.load` with a NULL capa
 report uses the latest identity at or before the frame, else `pid:<n>`. P2: boot-separated and unnamed-pid vectors in
 `crates/maos-cli/tests/support/cost_report_review_20_14.rs`. P3: ADR-046 keeps the SR-1 write-path-authorization follow-up
 beside SR-5/R3 with a section-scoped test. P4: the unsupported D-13 calendar date is gone (ask `d1408`, date not recorded); status
-`in-progress`. F2: kinds 28/29 are selected and redacted by identity path only (a kind-28 frame with a principal string elsewhere
-is no longer rewritten; governance events carry no principal nexus, ADR-045 D5); F3: plain output escapes control characters and caps fields at 256;
+`in-progress`. F2: kinds 28/29 were first narrowed to identity paths (round 1), which wrongly exempted kind-28 governance receipts as having "no principal
+nexus" (false: ADR-045 has no blanket D5 exemption; that note is ModelProvenancePayload-only, `governance.rs:117-126`); corrected in round 2 below; F3: plain output escapes control characters and caps fields at 256;
 F4: origin=Kernel query filter, row pid must equal payload pid, `task_ref` over 256 skipped with a warning, distinct `none (schema 1)` /
 `none (schema 2)` / `literal:` labels; F5: `per_spirit_attributable_fraction` keyed `<boot_nonce>:<pid>` (closes review defer D1; the
 JSON key changed); F6: one warning per unpriced provider/model; F7: saturating/checked u128 and u64 arithmetic; F8: guides and ADR wording.
@@ -491,6 +491,19 @@ Still open: T0 measurements, T4 and all L2 work; AC1–AC3 and AC6 closure remai
 R6 wording (review D2) and schema/source cross-check (F4 residual).
 The schema-1 absent-task assertion that had not been run now reads `none (schema 1)` and ran green
 (`tests::cost_report_reads_payload_not_intent`, in the workspace run and the focused run).
+
+**L1 correction round 2 (2026-11-10; independent reviews `review/correction-review.md` CR1–CR3 and GLM `Sec2014Corr` F-1/F-2; evidence
+`20-14-complete-cost-attribution-evidence/landing-1/review/correction-round2.md`, raw red/plant/green logs under `review/correction-round2/`).**
+Round 1 had swapped over-erasure for under-erasure. CR1: kind-28 governance frames are not exempt (ADR-045 has no blanket D5; the note is
+`ModelProvenancePayload`-only); kinds 28/29 now share one value-only scrub for discovery, body replacement and the late-window certification predicate
+(keys, enum tags, hashes and fixed receipt discriminators never touched; kind 28 scrubs every other nested string value). CR2/F-1: a kind-29 frame is
+selected by whole-token value matches in `principal_id`, `task_ref`, `session_principal`, `provider` or `model`, and provider/model values are scrubbed
+too (priced as unpriced afterwards); a principal equal to a real provider name erases that value in every frame carrying it, documented in ADR-046 §8 and
+the guides. CR3/F-2: `cost_terminal_field` escapes backslashes and bidirectional-format ranges; guides document the `<boot_nonce>:<pid>` fraction keys and
+"input characters"; the report test pins the exact keys and fractions. Witnesses: a real T2 hostile-twin session receipt (`spawned_scope_17_3c.rs`),
+kernel forget vectors, late-append hooks in `erasure_races_20_11.rs`, CLI vectors. Pins: CLI 6599 -> 6603 (inside the 6610 orchestrator-adjudicated overdraft,
+disclosed to the operator), iac 8728 -> 8726, audit 8227, aggregate 199148, hardfail 199149. The existing F2 fixture values changed (`provider`/`model`
+values now `anthropic`/`claude-x`) because key-name values would now legitimately match as values; its assertions are unchanged.
 
 ### File List
 
@@ -512,6 +525,9 @@ The schema-1 absent-task assertion that had not been run now reads `none (schema
   `crates/maos-iac/{src/adapter/transparency_log.rs,src/adapter/transparency_log/erasure_sweep.rs,tests/support/erasure_races_20_11.rs}`,
   `crates/maos-kernel-core/tests/forget_cascade_18_6.rs` (test only), the three `run-maos.md` guides, ADR-046, `xtask/kloc.toml`,
   `deferred-work.md`, tracker, FLAG-Winston record and `20-14-complete-cost-attribution-evidence/landing-1/review/corrections*`.
+- Round 2: `crates/maos-bin/tests/spawned_scope_17_3c.rs` (helper parametrized by directory/seed; real-session forget witness), `crates/maos-iac/src/adapter/transparency_log.rs`
+  (shared value-only scrub), the erasure-race, forget-cascade and CLI report test files, the three guides, ADR-046 §8, `xtask/kloc.toml`,
+  `20-14-complete-cost-attribution-evidence/landing-1/review/correction-round2*`.
 
 ## Change Log
 
@@ -526,3 +542,5 @@ The schema-1 absent-task assertion that had not been run now reads `none (schema
 - 2026-11-03: Operator ruled D-20-14-01…12 as recommended (ask `d_batch4`): 01 A, 02 B, 03 B, 04–11 A, 12 C. D-20-14-12 C (ask `d2014_12`) grants joint targeted STOP 21250 for 20-9 L2 + 20-14 L2 only; shared STOP 21209 otherwise, 20-9 D-20-9-15 A single-story ceiling 21230, and ADR-069 alarm 22000 remain unchanged. Grants bind at dev start after re-base onto then-landed pins and cumulative room; no implementation or gates run.
 
 - 2026-11-10: L1 review corrections applied (see Completion Notes); status `in-progress`; CLI ceiling 6545 -> 6610 (orchestrator-adjudicated overdraft, disclosed to the operator); pins CLI 6599, audit 8227, hardfail 199147.
+
+- 2026-11-10: L1 correction round 2 (CR1–CR3, GLM F-1/F-2): value-only scrub for kinds 28/29 incl. provider/model values, backslash and bidi escaping, guide and ADR trade-off text, false kind-28 "no principal nexus" claim withdrawn; pins CLI 6603 (inside the 6610 overdraft), iac 8726, hardfail 199149.

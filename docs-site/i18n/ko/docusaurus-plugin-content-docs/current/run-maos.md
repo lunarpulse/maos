@@ -296,10 +296,22 @@ model별로 묶습니다. plain 출력도 가능합니다. 보고서는 관측 �
 모호하거나 귀속되지 않은 값은 `host-unallocated`에 남습니다. 없는 `task: none`은
 `none (schema 1)`(이전 frame) 또는 `none (schema 2)`(필드 없음)로 구분해 표시하며
 필드가 없다는 사실만으로 scope 바인딩 여부를 증명할 수 없습니다. plain 출력은
-제어 문자를 이스케이프하고 각 필드를 256자로 자르며, 가격 항목이 없는
-provider/model은 0으로 계산되고 Warnings 줄이 출력됩니다.
+백슬래시, 제어 문자, 양방향 서식 문자를 이스케이프하고 각 필드를 처음 256개
+입력 문자로 자르며(이스케이프로 출력이 더 길어질 수 있음) NDJSON은 이스케이프하지
+않습니다. 가격 항목이 없는 provider/model은 0으로 계산되고 Warnings 줄이 출력됩니다.
 root task와 session 바인딩은 최종 kernel landing을 기다립니다. 기존 writer는 여전히 schema 1과
 proxy 귀속을 기록합니다.
+
+JSON 보고서의 `per_spirit_attributable_fraction`은 부팅 단위 Spirit마다 한 항목이며
+키는 `<boot_nonce>:<pid>`(둘 다 부호 없는 십진수, 예: `"12:7"`)입니다. 다른 부팅의
+항목은 합쳐지지 않습니다.
+
+`maosctl forget <principal>`은 cost frame에서도 principal을 지웁니다. 일치하는
+principal, task, session-principal, provider, model 값을 `[REDACTED]`로 바꾸며(토큰
+단위 일치, 키·스키마 태그·토큰 수는 유지) 지워진 model/provider는 이후 가격 미등록으로
+계산됩니다. 실제 provider 또는 model 이름과 같은 principal id는 그 값을 담은 모든
+frame에서 해당 값을 지웁니다. principal을 인용하는 kernel 거버넌스 영수증도 같은
+방식으로 값만 지워집니다.
 
 NFR-Cost-1의 Spirit/task/principal 차원은 토큰 지출에 적용됩니다. CPU 시간과
 storage I/O는 v1.1 계획입니다(ADR-046 R6). 청구서와 전체 ≥98% 조정은 운영

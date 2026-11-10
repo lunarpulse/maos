@@ -146,6 +146,85 @@ fn review_cost_schema_token_does_not_block_late_certification() {
         .is_empty());
 }
 
+/// Append one matching frame after the first scan window; return the sweep's
+/// redacted-principal ids, the late frame's id and its final payload.
+fn late_matching_append(
+    kind: FrameKind,
+    body: &'static [u8],
+    subject: &str,
+) -> (Vec<String>, [u8; 16], serde_json::Value) {
+    let log = TransparencyLogAdapter::open_in_memory(2011);
+    log.insert_frame_event(
+        FrameKind::TaskAssign,
+        7,
+        None,
+        "unrelated",
+        b"unrelated",
+        FrameOrigin::Kernel,
+    );
+    let armed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let hook = std::sync::Arc::clone(&armed);
+    let late = std::sync::Arc::new(std::sync::Mutex::new([0u8; 16]));
+    let slot_id = std::sync::Arc::clone(&late);
+    AFTER_WINDOW.with(|slot| {
+        *slot.borrow_mut() = Some(Box::new(move |log, _sql, _principal| {
+            if !hook.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                log.insert_frame_event(kind, 7, None, "late.frame", body, FrameOrigin::Kernel);
+                *slot_id.lock().expect("late id") = log.last_frame_id();
+            }
+        }))
+    });
+    let result = log.scrub_forget_frames(subject);
+    AFTER_WINDOW.with(|slot| *slot.borrow_mut() = None);
+    assert!(
+        armed.load(std::sync::atomic::Ordering::SeqCst),
+        "hook must run"
+    );
+    let id = *late.lock().expect("late id");
+    let result = result.expect("a finite single late append completes");
+    let payload: Vec<u8> = log
+        .inner
+        .lock()
+        .conn
+        .query_row(
+            "SELECT payload_redacted FROM transparency_log WHERE frame_id=?1",
+            [id.as_slice()],
+            |row| row.get(0),
+        )
+        .expect("late frame");
+    (
+        result.1,
+        id,
+        serde_json::from_slice(&payload).expect("late frame JSON"),
+    )
+}
+
+#[test]
+fn review_round2_late_governance_receipt_is_erased_before_certification() {
+    let (ids, id, value) = late_matching_append(
+        FrameKind::GovernanceEvent,
+        br#"{"event":"spawned_frame_authorization","claims":{"payload":{"TaskAssign":{"goal":"review alice profile"}}}}"#,
+        "alice",
+    );
+    assert_eq!(ids, vec![format!("{:032x}", u128::from_be_bytes(id))]);
+    assert_eq!(value["redacted"], true);
+    assert!(!value.to_string().contains("alice"), "{value}");
+    assert_eq!(value["event"], "spawned_frame_authorization");
+}
+
+#[test]
+fn review_round2_late_cost_label_value_is_erased_before_certification() {
+    let (ids, id, value) = late_matching_append(
+        FrameKind::CostAttribution,
+        br#"{"principal":{"kind":"Resolved","principal_id":"carol"},"provider":"p","model":"ft:org:alice:job","dimensions":{"tokens_in":1}}"#,
+        "alice",
+    );
+    assert_eq!(ids, vec![format!("{:032x}", u128::from_be_bytes(id))]);
+    assert_eq!(value["model"], "[REDACTED]");
+    assert_eq!(value["principal"]["principal_id"], "carol");
+    assert_eq!(value["dimensions"]["tokens_in"], 1);
+}
+
 #[test]
 fn review_f13_scan_snapshot_does_not_chase_a_sustained_writer() {
     let log = TransparencyLogAdapter::open_in_memory(2011);

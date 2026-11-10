@@ -1646,6 +1646,7 @@ impl TransparencyLogAdapter {
                 )
                 .map_err(AuditError::SqliteRead)?;
             Self::redacted_principals_body(
+                target.kind,
                 &existing,
                 target.principals,
                 target.reason,
@@ -2259,59 +2260,58 @@ impl TransparencyLogAdapter {
     }
 
     fn subject_in_frame(kind: i64, body: &[u8], subject: &str) -> bool {
-        if !matches!(kind, 28 | 29) {
-            return principal_id_occurs(body, subject);
-        }
-        match serde_json::from_slice::<serde_json::Value>(body) {
-            Ok(value) => ["/principal/principal_id", "/task_ref", "/session_principal"]
-                .iter()
-                .filter_map(|path| value.pointer(path).and_then(|v| v.as_str()))
-                .any(|text| principal_id_occurs(text.as_bytes(), subject)),
-            Err(_) => principal_id_occurs(body, subject),
+        match matches!(kind, 28 | 29).then(|| serde_json::from_slice(body)) {
+            Some(Ok(mut value)) => Self::scrub(kind, &mut value, &[subject]),
+            _ => principal_id_occurs(body, subject),
         }
     }
 
+    /// Value-only erasure shared by discovery, replacement and certification: object keys, tags
+    /// and hashes never change; kind 29 reaches only identity and label values, kind 28 any value.
+    fn scrub(kind: i64, v: &mut serde_json::Value, who: &[impl AsRef<str>]) -> bool {
+        use maos_domain::memory::principal_id_occurs as seen;
+        use serde_json::Value::{Array, Object, String as Text};
+        const LABELS: &str = "principal principal_id task_ref session_principal provider model";
+        const FIXED: &str = "event kernel_verdict sha256 supersedes trusted_intent trusted_origin";
+        let listed = |names: &str, key: &str| names.split(' ').any(|name| name == key);
+        let mut hit = false;
+        match v {
+            Text(s) if who.iter().any(|p| seen(s.as_bytes(), p.as_ref())) => {
+                *s = "[REDACTED]".into();
+                hit = true;
+            }
+            Array(a) => a.iter_mut().for_each(|i| hit |= Self::scrub(kind, i, who)),
+            Object(m) => m
+                .iter_mut()
+                .filter(|(k, i)| match kind {
+                    29 => listed(LABELS, k),
+                    _ => !(i.is_string() && (k.ends_with("hash") || listed(FIXED, k))),
+                })
+                .for_each(|(_, i)| hit |= Self::scrub(kind, i, who)),
+            _ => {}
+        }
+        hit
+    }
+
     fn redacted_principals_body(
+        kind: i64,
         existing: &[u8],
         principals: &[String],
         reason: &str,
         frame_id: [u8; 16],
     ) -> Result<Vec<u8>, AuditError> {
-        let redacted_bytes = match serde_json::from_slice::<serde_json::Value>(existing) {
+        match serde_json::from_slice::<serde_json::Value>(existing) {
             Ok(mut val) => {
-                for path in ["/principal/principal_id", "/task_ref", "/session_principal"] {
-                    match val.pointer_mut(path) {
-                        Some(serde_json::Value::String(text))
-                            if principals.iter().any(|principal| {
-                                principal_id_occurs(text.as_bytes(), principal)
-                            }) =>
-                        {
-                            *text = "[REDACTED]".into();
-                        }
-                        _ => {}
-                    }
-                }
+                Self::scrub(kind, &mut val, principals);
                 if let Some(obj) = val.as_object_mut() {
-                    // Also record redaction metadata
-                    obj.insert("redacted".to_string(), serde_json::Value::Bool(true));
-                    obj.insert(
-                        "redaction_reason".to_string(),
-                        serde_json::Value::String(reason.to_string()),
-                    );
+                    obj.insert("redacted".into(), true.into());
+                    obj.insert("redaction_reason".into(), reason.into());
                 }
-                serde_json::to_vec(&val).map_err(|e| AuditError::Serialization(e.to_string()))?
+                serde_json::to_vec(&val).map_err(|e| AuditError::Serialization(e.to_string()))
             }
-            Err(_) => {
-                // Cannot parse payload — fall back to full replacement tombstone
-                let tombstone = serde_json::json!({
-                    "redacted": true,
-                    "reason": reason,
-                    "original_frame_id": format_frame_id_hex(&frame_id),
-                });
-                tombstone.to_string().into_bytes()
-            }
-        };
-        Ok(redacted_bytes)
+            // Cannot parse payload: fall back to the full replacement tombstone.
+            Err(_) => Ok(serde_json::json!({"redacted": true, "reason": reason, "original_frame_id": format_frame_id_hex(&frame_id)}).to_string().into_bytes()),
+        }
     }
 
     /// Keep the principal-global legal-hold table on the Host-global artifact

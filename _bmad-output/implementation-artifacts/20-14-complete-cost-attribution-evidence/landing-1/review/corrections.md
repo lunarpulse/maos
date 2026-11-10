@@ -48,9 +48,9 @@ Two earlier witness drafts were wrong and were replaced before the table rows ab
   consumers of that field must read the new key.
 - Absent task renders `none (schema 1)` / `none (schema 2)`; a literal task that equals one of those (or starts `literal:`) renders `literal:<task>`.
 - Frames with `task_ref` over 256 bytes or a row pid different from the payload pid are skipped with a warning; the query keeps only `origin=Kernel`.
-- Forget cascade for kinds 28 (GovernanceEvent) and 29 (CostAttribution) now selects and redacts only `/principal/principal_id`, `/task_ref` and
-  `/session_principal`. A kind-28 frame with a principal string elsewhere is no longer rewritten (ADR-045 D5: governance events carry no principal
-  nexus). Behaviour for every other kind is unchanged.
+- **[WITHDRAWN in round 2: see `correction-round2.md`]** Round 1 narrowed the forget cascade for kinds 28 and 29 to `/principal/principal_id`, `/task_ref` and
+  `/session_principal` and claimed governance events carry no principal nexus (ADR-045 D5). That claim was false (D5's note is `ModelProvenancePayload`-only,
+  `governance.rs:117-126`; spawned-frame authorization receipts quote guest frames) and the path-only scrub under-erased kind 28 and cost labels.
 
 ## Pins versus ceilings (exact, `cargo fmt --all` then `kloc-check --json`)
 

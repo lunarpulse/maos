@@ -821,9 +821,30 @@ async fn run_hostile_twin_with_quota(
     sends: Option<&[&str]>,
     exhaust_issuance: bool,
 ) -> HostileRun {
-    LazyLock::force(&FIXTURES);
     let dir = tempfile::tempdir().unwrap();
-    let world = World::new(dir.path());
+    run_hostile_twin_in(
+        dir.path(),
+        mode,
+        turn_budget,
+        sends,
+        exhaust_issuance,
+        (format!("hostile {mode}"), Vec::new()),
+    )
+    .await
+}
+
+/// The same run in a caller-owned directory with a caller-chosen operator seed
+/// `(goal, scope)`; the caller keeps the drained Transparency Log files.
+async fn run_hostile_twin_in(
+    dir: &Path,
+    mode: &str,
+    turn_budget: Duration,
+    sends: Option<&[&str]>,
+    exhaust_issuance: bool,
+    (goal, scope): (String, Vec<Scope>),
+) -> HostileRun {
+    LazyLock::force(&FIXTURES);
+    let world = World::new(dir);
     let id = "worker";
     let gated = gate_manifest(
         &manifest_with_sends(id, "subprocess", true, sends),
@@ -867,8 +888,8 @@ async fn run_hostile_twin_with_quota(
         intent: IntentClass::Standard,
         auto_marker: FrameOrigin::HumanAuthored,
         payload: FramePayload::TaskAssign(TaskAssignPayload {
-            goal: format!("hostile {mode}"),
-            scope: Vec::new(),
+            goal,
+            scope,
             success_criteria: "kernel-governed outcome".into(),
             posture_preferences: Default::default(),
             prior_distillate_ref: None,
@@ -920,7 +941,7 @@ async fn run_hostile_twin_with_quota(
     );
     drop(receiver);
     world.drain().await;
-    let audit = operator_audit_view(dir.path(), id);
+    let audit = operator_audit_view(dir, id);
     HostileRun {
         result,
         pid,
@@ -3161,4 +3182,97 @@ async fn fast_t2_crash_then_restart_orders_one_downgrade_after_crash() {
     assert_eq!(reopened_entries, sequence);
     let reopened = maos_kernel_core::journal::JournalAdapter::open(&journal_path).unwrap();
     assert_eq!(reopened.last_event(spirit_id), Some(expected_last));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn forget_erases_a_real_authorization_receipt_that_names_the_principal() {
+    use maos_domain::distillation::{DigestPayload, DistillationRequest};
+    use maos_domain::ports::{DistillationPort, MemoryManagerPort};
+    use maos_kernel_core::iac::transparency_log::FrameKind as LogKind;
+    let dir = tempfile::tempdir().unwrap();
+    let run = run_hostile_twin_in(
+        dir.path(),
+        "provenance",
+        Duration::from_secs(30),
+        Some(&["spirit:peer"]),
+        false,
+        (
+            "review alice profile".into(),
+            vec![Scope::MemRead {
+                scope: "principal:alice:profile".into(),
+            }],
+        ),
+    )
+    .await;
+    let receipt = run
+        .rows
+        .iter()
+        .find(|row| row.intent == "spirit.frame.authorization")
+        .expect("real authorization receipt at the admitted PID");
+    assert_eq!(receipt.kind, LogKind::GovernanceEvent);
+    let text = String::from_utf8(receipt.payload_redacted.clone()).unwrap();
+    assert!(text.contains("review alice profile"), "{text}");
+    assert!(text.contains("principal:alice:profile"), "{text}");
+    let bob_text = text.replace("alice", "bob");
+
+    let db = dir.path().join("transparency.sqlite");
+    let log =
+        Arc::new(TransparencyLogAdapter::open_with_global_legal_holds(&db, &db, NONCE).unwrap());
+    let memory_db = dir.path().join("forget-memory.sqlite");
+    let memory = MemoryManagerAdapter::new(
+        Arc::new(maos_kernel_core::memory::PrivateMemoryStore::new(
+            dir.path().join("forget-private"),
+            4096,
+        )),
+        Arc::new(maos_kernel_core::memory::SharedMemoryStore::open(&memory_db).unwrap()),
+        Arc::new(maos_kernel_core::memory::PrincipalNamespaceIndex::open(&memory_db).unwrap()),
+        Arc::clone(&log),
+    );
+    let digest =
+        maos_iac::adapter::distillate::DistillateWriter::new(Arc::clone(&log), Arc::new(()))
+            .write_distillate(
+                run.pid,
+                DistillationRequest::new(
+                    vec![receipt.frame_id],
+                    1,
+                    DigestPayload::Text("neutral digest of a receipt".into()),
+                    None,
+                )
+                .unwrap(),
+            )
+            .unwrap()
+            .digest_frame_id;
+    log.insert_frame_event_with_sender(
+        LogKind::GovernanceEvent,
+        run.pid,
+        "worker",
+        "",
+        None,
+        "spirit.frame.authorization",
+        bob_text.as_bytes(),
+        FrameOrigin::Kernel,
+    );
+    let bob = log.last_frame_id();
+    let read = |id: [u8; 16]| log.query_frame_by_id(id).unwrap().unwrap().payload_redacted;
+    let before = read(bob);
+    assert!(String::from_utf8(read(receipt.frame_id))
+        .unwrap()
+        .contains("alice"));
+    memory.forget_with_reason("alice", None).unwrap();
+    let after = String::from_utf8(read(receipt.frame_id)).unwrap();
+    assert!(!after.contains("alice"), "{after}");
+    let value: serde_json::Value = serde_json::from_str(&after).unwrap();
+    assert_eq!(value["redacted"], true);
+    assert_eq!(value["event"], "spawned_frame_authorization");
+    assert_eq!(value["spirit_pid"], run.pid);
+    let digest = String::from_utf8(read(digest)).unwrap();
+    assert!(
+        digest.contains("Distillate") && digest.contains("redacted"),
+        "{digest}"
+    );
+    assert_eq!(
+        before,
+        read(bob),
+        "the Bob control receipt is byte-identical"
+    );
 }

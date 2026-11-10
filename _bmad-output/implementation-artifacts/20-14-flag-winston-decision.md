@@ -27,7 +27,9 @@ orchestrator-adjudicated overdraft, disclosed to the operator (D02 A): CLI
 ceiling 6545 -> 6610. Before: pin 6529, ceiling 6545. After: measured 6599
 (formatted), ceiling 6610 (+11 slack). Audit measured 8227 inside 8237; iac
 stays at its 8728 pin; aggregate 199146 inside the rebased 199378. No kernel
-line; kernel pins 26841/21042 unchanged.
+line; kernel pins 26841/21042 unchanged. **Round 2 (CR1–CR3):** CLI re-measured 6603
+(inside the same orchestrator-adjudicated overdraft ceiling 6610, disclosed to the
+operator), iac 8726 (down 2; ceiling 8728 unchanged), aggregate 199148, hardfail 199149.
 **Precedent:** `20-4-flag-winston-decision.md`, `20-7-flag-winston-decision.md`.
 
 ## Decision requested

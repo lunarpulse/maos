@@ -306,10 +306,24 @@ reverse lookup influenced by the Spirit's writes, not a session authority.
 Ambiguous and unattributed results remain `host-unallocated`. An absent `task: none`
 is displayed as `none (schema 1)` (legacy frame) or `none (schema 2)` (field
 absent); the latter alone cannot prove whether a scope was bound. Plain output
-escapes control characters and truncates each field to 256 characters, and a
-provider/model without a pricing entry is priced at 0 with a Warnings line.
+escapes backslashes, control and bidirectional-format characters and truncates
+each field to its first 256 input characters (escapes can make the printed field
+longer); NDJSON is not escaped. A provider/model without a pricing entry is
+priced at 0 with a Warnings line.
 Root task and session binding is pending the final kernel landing, so existing
 writers still emit schema 1 and proxy attribution.
+
+In the JSON report, `per_spirit_attributable_fraction` has one entry per
+boot-local Spirit, keyed `<boot_nonce>:<pid>` (both unsigned decimal, for example
+`"12:7"`); entries from different boots never merge.
+
+`maosctl forget <principal>` erases the principal from cost frames too: it
+replaces matching principal, task, session-principal, provider and model values
+with `[REDACTED]` (whole-token matches; keys, schema tags and token counts stay),
+so a redacted model or provider is priced as unpriced afterwards. A principal id
+equal to a real provider or model name therefore erases that value in every frame
+that carries it. Kernel governance receipts that quote the principal are
+value-scrubbed the same way.
 
 NFR-Cost-1's per-Spirit, task and principal dimensions concern token spend;
 CPU time and storage I/O are planned for v1.1 (ADR-046 R6). The ≥98% aggregate

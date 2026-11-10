@@ -5052,7 +5052,11 @@ fn cost_terminal_field(value: &str) -> String {
     use std::fmt::Write;
     let mut out = String::new();
     for c in value.chars().take(256) {
-        if c.is_control() || matches!(c, '\u{2028}' | '\u{2029}') {
+        if c == '\\' {
+            out.push_str("\\\\");
+        } else if c.is_control()
+            || matches!(c, '\u{200b}'..='\u{200f}' | '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+        {
             let _ = write!(out, "\\u{{{:x}}}", c as u32);
         } else {
             out.push(c);

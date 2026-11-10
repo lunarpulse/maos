@@ -26,6 +26,9 @@ fn operator_cost_guides_disclose_limits() {
             "Worker CLI",
             "v1.1",
             "98%",
+            "per_spirit_attributable_fraction",
+            "<boot_nonce>:<pid>",
+            "[REDACTED]",
         ] {
             assert!(guide.contains(term), "{heading}: missing {term}");
         }

@@ -88,11 +88,8 @@ fn names_and_fractions_are_boot_local_and_unnamed_falls_back() {
         .any(|r| r.spirit == "pid:7" && r.tokens_in == 1000));
     let json = serde_json::to_value(&report).unwrap();
     assert_eq!(
-        json["per_spirit_attributable_fraction"]
-            .as_object()
-            .unwrap()
-            .len(),
-        3
+        json["per_spirit_attributable_fraction"],
+        serde_json::json!({"1:7": 1.0, "2:7": 1.0, "3:7": 0.0})
     );
 }
 
@@ -169,4 +166,39 @@ fn extreme_costs_do_not_silently_wrap() {
             .fold(0u64, |sum, row| sum.saturating_add(row.cost_micro))
             <= report.total_cost_micro
     );
+}
+
+#[test]
+fn plain_escape_is_injective_for_backslashes_and_hides_bidi_overrides() {
+    let real = "alice\u{85}";
+    let spelled = "alice\\u{85}";
+    assert_eq!(cost_terminal_field(real), "alice\\u{85}");
+    assert_eq!(cost_terminal_field(spelled), "alice\\\\u{85}");
+    assert_ne!(cost_terminal_field(real), cost_terminal_field(spelled));
+    assert_eq!(cost_terminal_field("a\\\\b"), "a\\\\\\\\b");
+    for c in [
+        '\u{200b}', '\u{200f}', '\u{202a}', '\u{202e}', '\u{2066}', '\u{2069}',
+    ] {
+        let shown = cost_terminal_field(&format!("x{c}y"));
+        assert_eq!(shown, format!("x\\u{{{:x}}}y", c as u32));
+        assert!(shown.is_ascii());
+    }
+    let rows = [
+        entry(1, Some("t"), 2, resolved(real), 1),
+        entry(2, Some("t"), 2, resolved(spelled), 1),
+    ];
+    let report = build_cost_report("2026-06", &rows, &pricing(1), &BTreeMap::new());
+    let text = format_cost_report_plain(&report);
+    assert!(
+        text.contains(" alice\\u{85} (") && text.contains(" alice\\\\u{85} ("),
+        "{text}"
+    );
+    let json = serde_json::to_value(&report).unwrap();
+    let principals: Vec<_> = json["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["principal"].as_str().unwrap().to_owned())
+        .collect();
+    assert!(principals.contains(&real.to_owned()) && principals.contains(&spelled.to_owned()));
 }

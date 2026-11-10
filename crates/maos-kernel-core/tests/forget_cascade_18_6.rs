@@ -226,10 +226,15 @@ fn cost_erasure_never_scrubs_schema_keys_or_unrelated_frames() {
         "dimensions",
         "kind",
         "Resolved",
+        "principal",
+        "principal_id",
+        "task_ref",
+        "session_principal",
+        "attribution_source",
     ] {
         let s = Scene::new();
-        let target = s.raw(FrameKind::CostAttribution, 7, &format!(r#"{{"schema_version":2,"principal":{{"kind":"Resolved","principal_id":"{subject}"}},"attribution_source":"session_principal","provider":"model","model":"provider","dimensions":{{"tokens_in":42,"tokens_out":7}}}}"#));
-        let other = s.raw(FrameKind::CostAttribution, 8, r#"{"schema_version":2,"principal":{"kind":"Resolved","principal_id":"bob"},"attribution_source":"session_principal","provider":"model","model":"provider","dimensions":{"tokens_in":9,"tokens_out":3}}"#);
+        let target = s.raw(FrameKind::CostAttribution, 7, &format!(r#"{{"schema_version":2,"principal":{{"kind":"Resolved","principal_id":"{subject}"}},"attribution_source":"session_principal","provider":"anthropic","model":"claude-x","dimensions":{{"tokens_in":42,"tokens_out":7}}}}"#));
+        let other = s.raw(FrameKind::CostAttribution, 8, r#"{"schema_version":2,"principal":{"kind":"Resolved","principal_id":"bob"},"attribution_source":"session_principal","provider":"anthropic","model":"claude-x","dimensions":{"tokens_in":9,"tokens_out":3}}"#);
         let before = s
             .log
             .query_frame_by_id(other)
@@ -240,8 +245,8 @@ fn cost_erasure_never_scrubs_schema_keys_or_unrelated_frames() {
         let body = s.body(target);
         assert_eq!(body["principal"]["principal_id"], "[REDACTED]", "{subject}");
         assert_eq!(body["principal"]["kind"], "Resolved", "{subject}");
-        assert_eq!(body["provider"], "model", "{subject}");
-        assert_eq!(body["model"], "provider", "{subject}");
+        assert_eq!(body["provider"], "anthropic", "{subject}");
+        assert_eq!(body["model"], "claude-x", "{subject}");
         assert_eq!(body["dimensions"]["tokens_in"], 42, "{subject}");
         assert_eq!(
             before,
@@ -252,6 +257,196 @@ fn cost_erasure_never_scrubs_schema_keys_or_unrelated_frames() {
                 .payload_redacted,
             "{subject}"
         );
+    }
+}
+
+fn cost(principal: &str, task: &str, session: &str, provider: &str, model: &str) -> String {
+    format!(
+        r#"{{"schema_version":2,"principal":{{"kind":"Resolved","principal_id":"{principal}"}},"attribution_source":"session_principal","task_ref":"{task}","session_principal":"{session}","provider":"{provider}","model":"{model}","dimensions":{{"tokens_in":42,"tokens_out":7}}}}"#
+    )
+}
+
+#[test]
+fn cost_erasure_scrubs_subject_bearing_values_and_keeps_the_frame_parseable() {
+    let s = Scene::new();
+    let both = s.raw(
+        FrameKind::CostAttribution,
+        7,
+        &cost("alice", "turn:1", "bob", "gw/alice", "ft:org:alice:job123"),
+    );
+    let label_only = s.raw(
+        FrameKind::CostAttribution,
+        7,
+        &cost("carol", "turn:2", "bob", "anthropic", "ft:org:alice:job124"),
+    );
+    let task_only = s.raw(
+        FrameKind::CostAttribution,
+        7,
+        &cost("carol", "turn:alice:3", "bob", "anthropic", "claude-x"),
+    );
+    let session_only = s.raw(
+        FrameKind::CostAttribution,
+        7,
+        &cost("carol", "turn:4", "alice", "anthropic", "claude-x"),
+    );
+    let bob = s.raw(
+        FrameKind::CostAttribution,
+        8,
+        &cost("bob", "turn:5", "bob", "anthropic", "claude-x"),
+    );
+    let before = s
+        .log
+        .query_frame_by_id(bob)
+        .unwrap()
+        .unwrap()
+        .payload_redacted;
+    for id in [both, label_only] {
+        assert!(s.body(id).to_string().contains("alice"));
+    }
+    s.memory.forget_with_reason("alice", None).unwrap();
+    for id in [both, label_only, task_only, session_only] {
+        let body = s.body(id);
+        assert!(!body.to_string().contains("alice"), "{body}");
+        assert_eq!(body["dimensions"]["tokens_in"], 42);
+        assert_eq!(body["dimensions"]["tokens_out"], 7);
+        assert_eq!(body["schema_version"], 2);
+        assert_eq!(body["attribution_source"], "session_principal");
+        assert_eq!(body["principal"]["kind"], "Resolved");
+    }
+    assert_eq!(s.body(both)["provider"], "[REDACTED]");
+    assert_eq!(s.body(both)["model"], "[REDACTED]");
+    assert_eq!(s.body(label_only)["model"], "[REDACTED]");
+    assert_eq!(s.body(label_only)["provider"], "anthropic");
+    assert_eq!(s.body(label_only)["principal"]["principal_id"], "carol");
+    assert_eq!(s.body(task_only)["task_ref"], "[REDACTED]");
+    assert_eq!(s.body(session_only)["session_principal"], "[REDACTED]");
+    assert_eq!(
+        before,
+        s.log
+            .query_frame_by_id(bob)
+            .unwrap()
+            .unwrap()
+            .payload_redacted
+    );
+}
+
+#[test]
+fn a_principal_equal_to_a_provider_name_erases_that_value_in_every_frame_that_carries_it() {
+    let s = Scene::new();
+    let a = s.raw(
+        FrameKind::CostAttribution,
+        7,
+        &cost("alice", "turn:1", "alice", "openai", "m1"),
+    );
+    let b = s.raw(
+        FrameKind::CostAttribution,
+        8,
+        &cost("bob", "turn:2", "bob", "openai", "m2"),
+    );
+    s.memory.forget_with_reason("openai", None).unwrap();
+    for id in [a, b] {
+        let body = s.body(id);
+        assert_eq!(body["provider"], "[REDACTED]");
+        assert_eq!(body["dimensions"]["tokens_in"], 42);
+        assert_eq!(body["principal"]["kind"], "Resolved");
+    }
+    assert_eq!(s.body(b)["principal"]["principal_id"], "bob");
+    assert_eq!(s.body(b)["model"], "m2");
+}
+
+fn receipt(goal: &str, scope: &str) -> String {
+    format!(
+        r#"{{"event":"spawned_frame_authorization","spirit_pid":7,"trusted_sender":"worker","trusted_intent":"standard","trusted_origin":"SpiritAuto","allowed":false,"refusal":null,"send":{{"scope":{{"IacSend":{{"peer_class":"spirit:peer"}}}},"kernel_verdict":"allow","refusal":null}},"decisions":[{{"scope":{{"MemRead":{{"scope":"{scope}"}}}},"kernel_verdict":"allow","refusal":null}}],"claims":{{"kind":"TaskAssign","intent":"Standard","payload":{{"TaskAssign":{{"goal":"{goal}","scope":[],"success_criteria":"done"}}}}}}}}"#
+    )
+}
+
+const LIFECYCLE: &str = r#"{"recorded_at_ns":1,"effective_at_ns":2,"event":{"SchemaLifecycle":{"schema_id":"s","schema_content_hash":"deadbeef","supersedes":"cafe","version":1,"ratified_by":"ADR-045"}}}"#;
+
+#[test]
+fn governance_receipts_are_value_scrubbed_with_dependent_closure() {
+    let s = Scene::new();
+    let alice = s.raw(
+        FrameKind::GovernanceEvent,
+        7,
+        &receipt("review alice profile", "principal:alice:profile"),
+    );
+    let bob = s.raw(
+        FrameKind::GovernanceEvent,
+        7,
+        &receipt("review bob profile", "principal:bob:profile"),
+    );
+    let abi = s.raw(FrameKind::GovernanceEvent, 7, r#"{"recorded_at_ns":1,"effective_at_ns":2,"event":{"AbiExtension":{"proposal_id":"p1","summary":"alice requested the extension","adr_ref":"ADR-045","status":"ratified","covered_changes":["GovernanceEvent"]}}}"#);
+    let digest = s.digest(7, vec![alice], "neutral digest of a receipt");
+    let before = s
+        .log
+        .query_frame_by_id(bob)
+        .unwrap()
+        .unwrap()
+        .payload_redacted;
+    assert!(s.body(alice).to_string().contains("alice"));
+    let ForgetOutcome::Erased {
+        redacted_distillate_frame_ids,
+        ..
+    } = s.memory.forget_with_reason("alice", None).unwrap()
+    else {
+        panic!("held")
+    };
+    assert_eq!(redacted_distillate_frame_ids.len(), 1);
+    assert_eq!(s.body(digest)["original_kind"], "Distillate");
+    for id in [alice, abi] {
+        assert!(!s.body(id).to_string().contains("alice"));
+        assert_eq!(s.body(id)["redacted"], true);
+    }
+    let kept = s.body(alice);
+    assert_eq!(kept["event"], "spawned_frame_authorization");
+    assert_eq!(kept["send"]["kernel_verdict"], "allow");
+    assert_eq!(
+        kept["claims"]["payload"]["TaskAssign"]["goal"],
+        "[REDACTED]"
+    );
+    assert_eq!(
+        kept["decisions"][0]["scope"]["MemRead"]["scope"],
+        "[REDACTED]"
+    );
+    assert_eq!(s.body(abi)["event"]["AbiExtension"]["adr_ref"], "ADR-045");
+    assert_eq!(
+        before,
+        s.log
+            .query_frame_by_id(bob)
+            .unwrap()
+            .unwrap()
+            .payload_redacted
+    );
+}
+
+#[test]
+fn governance_fixed_discriminators_and_hashes_never_select_a_frame() {
+    for subject in [
+        "allow",
+        "standard",
+        "SpiritAuto",
+        "event",
+        "claims",
+        "deadbeef",
+        "cafe",
+    ] {
+        let s = Scene::new();
+        let receipt = s.raw(
+            FrameKind::GovernanceEvent,
+            7,
+            &receipt("review bob profile", "principal:bob:profile"),
+        );
+        let lifecycle = s.raw(FrameKind::GovernanceEvent, 7, LIFECYCLE);
+        let read = |id| {
+            s.log
+                .query_frame_by_id(id)
+                .unwrap()
+                .unwrap()
+                .payload_redacted
+        };
+        let before = (read(receipt), read(lifecycle));
+        s.memory.forget_with_reason(subject, None).unwrap();
+        assert_eq!(before, (read(receipt), read(lifecycle)), "{subject}");
     }
 }
 
