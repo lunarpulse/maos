@@ -595,6 +595,7 @@ pub fn run_cli_wrapper_manifest(
     remote_requested: bool,
     supervision: &dyn crate::supervision::WorkerSupervision,
     task: crate::supervision::WorkerTask,
+    crypto: &dyn maos_domain::ports::CryptoProvider,
     #[cfg(unix)] egress: Option<&crate::egress::EgressHandle>,
 ) -> Result<WorkerRun, Box<dyn std::error::Error>> {
     use maos_domain::host_grant::HostGrantAllowlist;
@@ -885,10 +886,9 @@ pub fn run_cli_wrapper_manifest(
     let trust_anchor =
         maos_kernel_core::security::sandbox::t3::image_verify::read_trust_anchor_pub()
             .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
-    let crypto = maos_kernel_core::security::crypto::RingCryptoProvider;
     let lock = maos_kernel_core::security::sandbox::t3::image_lock::load_and_verify_lock(
         &trust_anchor,
-        &crypto,
+        crypto,
     )
     .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
     let image = lock

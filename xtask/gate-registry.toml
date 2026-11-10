@@ -38,6 +38,7 @@ gates = [
     "check-empty-kernel",
     "check-loom",
     "check-service-boundary",
+    "check-composition-root-completeness",
     "check-corpus",
     "check-judge-config",
     "coverage-matrix",

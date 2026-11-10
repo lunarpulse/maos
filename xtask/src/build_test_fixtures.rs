@@ -121,6 +121,30 @@ fn fixtures(root: &Path, target: &Path, fixture_dir: &Path, release: bool) -> Ve
     let twin = root.join("crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml");
     let mut table = vec![
         Fixture {
+            name: "maos-crypto-recording",
+            package: "maos-bin",
+            manifest: workspace.clone(),
+            args: s(&[
+                "build",
+                "--locked",
+                "-p",
+                "maos-bin",
+                "--bin",
+                "maos",
+                "--features",
+                "crypto-recording",
+            ]),
+            env: Vec::new(),
+            copy: Some((
+                target.join("debug/maos"),
+                fixture_dir.join("maos-crypto-recording"),
+            )),
+            artefacts: vec![(
+                "maos-crypto-recording",
+                fixture_dir.join("maos-crypto-recording"),
+            )],
+        },
+        Fixture {
             name: "worker-cli-fixture",
             package: "worker",
             manifest: workspace.clone(),

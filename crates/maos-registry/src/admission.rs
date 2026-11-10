@@ -548,6 +548,26 @@ pub fn extract_manifest_tier(manifest_toml: &[u8]) -> Result<TrustTier, Admissio
 /// Uses u64::to_le_bytes for cross-arch compatibility.
 pub fn verify_publisher_sig(pkg: &SignedPackage) -> bool {
     use ring::signature::{UnparsedPublicKey, ED25519};
+    let msg = publisher_signature_message(pkg);
+    let pk = UnparsedPublicKey::new(&ED25519, &pkg.publisher_pubkey);
+    pk.verify(&msg, &pkg.signature).is_ok()
+}
+
+/// Verify a publisher signature using the daemon's selected provider.
+pub fn verify_publisher_sig_with(
+    pkg: &SignedPackage,
+    crypto: &dyn maos_domain::ports::CryptoProvider,
+) -> bool {
+    crypto
+        .verify_signature(
+            &pkg.publisher_pubkey,
+            &publisher_signature_message(pkg),
+            &pkg.signature,
+        )
+        .is_ok()
+}
+
+fn publisher_signature_message(pkg: &SignedPackage) -> [u8; 32] {
     use sha2::Digest;
 
     let mut hasher = sha2::Sha256::new();
@@ -555,10 +575,7 @@ pub fn verify_publisher_sig(pkg: &SignedPackage) -> bool {
     hasher.update(&pkg.manifest_toml);
     hasher.update(&(pkg.artifact_bytes.len() as u64).to_le_bytes());
     hasher.update(&pkg.artifact_bytes);
-    let msg = hasher.finalize();
-
-    let pk = UnparsedPublicKey::new(&ED25519, &pkg.publisher_pubkey);
-    pk.verify(&msg, &pkg.signature).is_ok()
+    hasher.finalize().into()
 }
 
 // ---------------------------------------------------------------------------

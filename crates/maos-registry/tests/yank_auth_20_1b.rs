@@ -604,7 +604,14 @@ fn unreadable_promotion_is_not_treated_as_absent_p17() {
     let metadata = manifest.parent().unwrap().join("vetting.json");
     std::os::unix::fs::symlink("vetting.json", &metadata).unwrap();
     assert!(
-        maos_registry::install::verify_installed("unreadable", &manifest).is_err(),
+        maos_registry::install::verify_installed(
+            "unreadable",
+            &manifest,
+            &maos_kernel_core::security::crypto::RingCryptoProvider,
+            "ring",
+            &|_| None
+        )
+        .is_err(),
         "ELOOP is an unreadable promotion, never missing evidence"
     );
 }

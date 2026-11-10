@@ -870,6 +870,7 @@ pub struct HostBWorkerContext {
     /// `unload_all_loaded`, and its `shutdown_token()` to wake the daemon's
     /// `select!`. A trait object could reach neither.
     pub supervision: Arc<crate::supervision::WorkerSupervisor>,
+    pub crypto: Arc<dyn maos_domain::ports::CryptoProvider>,
     #[cfg(unix)]
     pub egress: Option<crate::egress::EgressHandle>,
 }
@@ -932,6 +933,7 @@ pub async fn handle_one_inbound(
     let enterprise_pdp_runtime = ctx.enterprise_pdp_runtime.clone();
     let remote_requested = ctx.remote_requested;
     let supervision = Arc::clone(&ctx.supervision);
+    let crypto = Arc::clone(&ctx.crypto);
     #[cfg(unix)]
     let egress = ctx.egress.clone();
     let completion = tokio::task::spawn_blocking(move || {
@@ -948,6 +950,7 @@ pub async fn handle_one_inbound(
             remote_requested,
             supervision.as_ref(),
             crate::supervision::WorkerTask::Delegation { frame_id },
+            crypto.as_ref(),
             #[cfg(unix)]
             egress.as_ref(),
         )

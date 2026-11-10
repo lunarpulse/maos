@@ -251,6 +251,7 @@ async fn exercise_unload(
             false,
             run_supervisor.as_ref(),
             WorkerTask::Standalone,
+            &maos_kernel_core::security::crypto::RingCryptoProvider,
             None,
         )
         .map_err(|error| error.to_string())

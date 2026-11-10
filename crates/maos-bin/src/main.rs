@@ -18,9 +18,8 @@
 //!   `tokio::signal::ctrl_c`), (b) SIGTERM (Unix; `tokio::signal::unix`),
 //!   (c) root-token cancellation. Any arm triggers root-token cancel,
 //!   then the program awaits all spawned tasks to drain.
-//! - **Crypto provider:** `Arc<dyn CryptoProvider> = Arc::new(RingCryptoProvider)`
-//!   per FR48 / NFR-Sec-15. Default `ring`/`rustls` adapter at v0.1-α;
-//!   FIPS / HSM / post-quantum providers swap by changing this one line.
+//! - **Crypto provider:** selected once from the init-owned configuration and
+//!   shared by FR48 consumers; v1.0 provides `ring`.
 //!
 //! Story 1b.4 wires the real I/O Subsystem, Anthropic provider, Inference
 //! Port adapter, and IAC telemetry registry.
@@ -75,11 +74,8 @@ use maos_director_surface::notification::{NotificationDispatcher, TerminalChanne
 #[cfg(feature = "network")]
 use maos_domain::invariants::i1::{IntentClass, Scope};
 #[cfg(feature = "network")]
-use maos_domain::ports::CryptoProvider;
-#[cfg(feature = "network")]
 use maos_kernel_core::api::{
-    CapabilityRegistryAdapter, IacBusAdapter, IoSubsystemAdapter, RingCryptoProvider,
-    TelemetryStreamAdapter,
+    CapabilityRegistryAdapter, IacBusAdapter, IoSubsystemAdapter, TelemetryStreamAdapter,
 };
 #[cfg(feature = "network")]
 use maos_kernel_core::hot_swap::HotSwapCoordinator;
@@ -1509,7 +1505,7 @@ fn main() {
             std::process::exit(1);
         }
         verbs::Outcome::Verb(verb) => match verb.name {
-            verbs::VerbName::Init => air_gap_init(),
+            verbs::VerbName::Init => air_gap_init(&argv[1..]),
             verbs::VerbName::Run => air_gap_run(&argv[1..]),
             verbs::VerbName::Backup => air_gap_backup(&argv[1..]),
             verbs::VerbName::Audit => air_gap_audit(&argv[1..]),
@@ -1537,13 +1533,31 @@ fn print_air_gap_usage() {
 }
 
 #[cfg(not(feature = "network"))]
-fn air_gap_init() {
+fn air_gap_init(args: &[String]) {
     let color =
         maos_cli::accessibility::ColorChoice::resolve(false, &maos_cli::accessibility::RealEnv);
-    if let Err(e) = maos_shell::run_init(color) {
+    let provider = init_crypto_provider(args).unwrap_or_else(|e| {
+        eprintln!("maos: {e}");
+        std::process::exit(78);
+    });
+    if let Err(e) = maos_shell::run_init(color, provider) {
         eprintln!("init failed: {e}");
         std::process::exit(1);
     }
+}
+
+fn init_crypto_provider(args: &[String]) -> Result<Option<&str>, String> {
+    let Some(index) = args.iter().position(|arg| arg == "--crypto-provider") else {
+        return Ok(None);
+    };
+    let name = args.get(index + 1).ok_or_else(|| {
+        format!(
+            "--crypto-provider requires a value (known: {})",
+            maos_bin::crypto_provider::known_names()
+        )
+    })?;
+    maos_bin::crypto_provider::validate(name)?;
+    Ok(Some(name))
 }
 
 #[cfg(not(feature = "network"))]
@@ -1849,7 +1863,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     plain_flag,
                     &maos_cli::accessibility::RealEnv,
                 );
-                return maos_shell::run_init(color);
+                let provider = init_crypto_provider(&argv[1..]).unwrap_or_else(|e| {
+                    eprintln!("maos: {e}");
+                    std::process::exit(78);
+                });
+                return maos_shell::run_init(color, provider);
             }
             verbs::VerbName::Audit => {
                 // Expected: audit query [--spirit <name>] [--format ndjson|plain]
@@ -1960,6 +1978,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         },
     }
+    // Refuse an invalid persisted selection before opening stores or parsing a
+    // run target; all boot paths below share this one selected instance.
+    let crypto_home = maos_domain::operator_door::maos_home()?.unwrap_or_default();
+    let selected_crypto = maos_bin::crypto_provider::select(&crypto_home).unwrap_or_else(|error| {
+        eprintln!("maos: {error}");
+        std::process::exit(78);
+    });
+    let crypto = Arc::clone(&selected_crypto.provider);
+    eprintln!(
+        "maos: crypto provider = {} {}",
+        selected_crypto.name, selected_crypto.version
+    );
 
     let cpus = worker_thread_count();
     eprintln!(
@@ -2152,12 +2182,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let io_arc: Arc<dyn maos_domain::ports::IoSubsystemPort> = Arc::new(io);
     let telemetry_stream = Arc::new(TelemetryStreamAdapter::default());
 
-    // ─────────────────────────────────────────────────────────────
-    // Story 1a.3 — FR48 / NFR-Sec-15 crypto-provider seam.
-    // Story 1b.2 — Capability Registry composite construction.
-    let crypto: Arc<dyn CryptoProvider> = Arc::new(RingCryptoProvider);
-    eprintln!("maos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)");
-
     // FIXME(1b.3): signing key MUST come from OS keyring / maos-secrets.
     let signing_key_bytes: [u8; 32] = {
         let mut seed = [0u8; 32];
@@ -2348,6 +2372,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             format!("maos: tenant Transparency Log binding write failed: {error}")
         })?;
     }
+    maos_bin::crypto_provider::journal(&transparency_log, &selected_crypto);
 
     // Story 13.5c — single composition root.  A `cohort-a2a-daemon` process
     // already ran this entire root; it must NOT open a second Transparency Log
@@ -3175,8 +3200,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         maos_domain::revocation::default_crl_dir(),
         revocation_trust_anchor,
     ));
-    let crypto_provider: Arc<dyn maos_domain::ports::crypto::CryptoProvider> =
-        Arc::new(maos_kernel_core::security::crypto::RingCryptoProvider);
+    let crypto_provider = Arc::clone(&crypto);
     let revocation_poller = Arc::new(maos_kernel_core::revocation::RevocationPoller::new(
         Arc::clone(&revocation_applier),
         local_file_registry,
@@ -4291,6 +4315,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 pid_by_spirit_id: &pid_by_spirit_id,
                 hooks: None,
             },
+            &selected_crypto,
             boot_nonce,
             #[cfg(feature = "wasm-host")]
             spirit_host.as_deref(),
@@ -5482,6 +5507,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 false,
                                 root_worker_supervision.as_ref(),
                                 worker_task,
+                                crypto.as_ref(),
                                 #[cfg(unix)]
                                 root_supervision
                                     .as_ref()
@@ -6073,6 +6099,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             false,
                             root_worker_supervision.as_ref(),
                             maos_bin::supervision::WorkerTask::Standalone,
+                            crypto.as_ref(),
                             #[cfg(unix)]
                             root_supervision
                                 .as_ref()
@@ -8378,8 +8405,7 @@ description = "smoke test spirit successor"
                             return Ok(());
                         }
                     };
-                    let crypto = maos_kernel_core::security::crypto::RingCryptoProvider;
-                    let lock = match maos_kernel_core::security::sandbox::t3::image_lock::load_and_verify_lock(&trust_anchor, &crypto) {
+                    let lock = match maos_kernel_core::security::sandbox::t3::image_lock::load_and_verify_lock(&trust_anchor, crypto.as_ref()) {
                         Ok(lock) => {
                             println!(r#"{{"step":2,"surface":"t3_image_verify","outcome":"verified"}}"#);
                             lock
@@ -9280,6 +9306,7 @@ description = "smoke test spirit successor"
                 enterprise_runtime.clone(),
                 enterprise_pdp_runtime.clone().map(Arc::new),
                 Arc::clone(&cohort_worker_supervision),
+                Arc::clone(&crypto),
                 // Story 19-7 — the door's set-once re-pin control; this root
                 // is the only one that installs a pin store into it.
                 operator_door_port.as_ref().map(|door| door.repin_control()),
@@ -10820,10 +10847,23 @@ async fn run_uninstall_cascade_inner(
             .iter()
             .all(|category| matches!(category.status, Status::VerifiedEmpty))
     {
-        // D-16-2-F keeps an unknown name on a populated log a failed lookup,
-        // not an identity inferred from unrelated rows. Installed/residue
-        // cases above still reach their real queried inventory and proof.
-        if all_incarnations.is_empty() && transparency_log.has_frames()? {
+        // Ignore only this boot's required provider-selection frame. It is
+        // infrastructure, not pre-existing evidence about the requested Spirit;
+        // all other rows, including selections from earlier boots, still count.
+        let conn = maos_audit::open_tenant_artifact_readonly(audit_db_path)?
+            .ok_or("opened transparency log disappeared")?;
+        let prior_frames: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM transparency_log WHERE NOT \
+             (boot_nonce = ?1 AND spirit_pid = 0 AND kind = ?2 AND intent = ?3 AND origin = ?4))",
+            rusqlite::params![
+                transparency_log.boot_nonce() as i64,
+                maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent as i64,
+                "crypto.provider.selected",
+                maos_domain::invariants::i3::FrameOrigin::Kernel as i64,
+            ],
+            |row| row.get(0),
+        )?;
+        if all_incarnations.is_empty() && prior_frames {
             return Err(
                 format!("unknown Spirit `{spirit_id}` in populated Transparency Log").into(),
             );
@@ -12083,6 +12123,7 @@ fn host_b_worker_context(
     enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
     enterprise_pdp_runtime: Option<Arc<enterprise_pdp_runtime::EnterprisePdpRuntime>>,
     supervision: Arc<maos_bin::supervision::WorkerSupervisor>,
+    crypto: Arc<dyn maos_domain::ports::CryptoProvider>,
     #[cfg(unix)] egress: Option<maos_bin::egress::EgressHandle>,
 ) -> Result<Option<maos_bin::delegation::HostBWorkerContext>, Box<dyn std::error::Error>> {
     let Some(path) = bootstrap.worker_manifest.as_ref() else {
@@ -12143,6 +12184,7 @@ fn host_b_worker_context(
         // cohort daemon held neither a scheduler nor a halt registry, so a
         // SIGKILLed host-B Worker reached nothing at all.
         supervision,
+        crypto,
         #[cfg(unix)]
         egress,
     }))
@@ -12183,6 +12225,7 @@ async fn run_cohort_a2a_daemon(
     // the same supervisor's scheduler and halt registry for
     // `unload_all_loaded`.
     worker_supervision: Arc<maos_bin::supervision::WorkerSupervisor>,
+    crypto: Arc<dyn maos_domain::ports::CryptoProvider>,
     // Story 19-7 — `None` only when this root built no door port.
     repin_control: Option<Arc<maos_bin::repin_door::RepinControl>>,
     #[cfg(unix)] egress: Option<maos_bin::egress::EgressHandle>,
@@ -12280,6 +12323,7 @@ async fn run_cohort_a2a_daemon(
         host_b_enterprise_runtime,
         host_b_enterprise_pdp_runtime,
         Arc::clone(&worker_supervision),
+        crypto,
         #[cfg(unix)]
         egress,
     )? {
@@ -15915,6 +15959,10 @@ mod tests {
     }
 }
 
+#[cfg(all(test, feature = "crypto-recording"))]
+#[path = "../tests/support/shell_world_16_2.rs"]
+mod crypto_test_world;
+
 // ─────────────────────────────────────────────────────────────────────────
 // Story 13.5a — enterprise governance at the cohort-a2a-daemon seam.
 //
@@ -16305,13 +16353,12 @@ mod story_13_5a_enterprise_daemon_seam {
     #[allow(clippy::type_complexity)]
     fn kernel_stack(
         boot_nonce: u64,
+        crypto: Arc<dyn maos_domain::ports::CryptoProvider>,
     ) -> (
         Arc<CapabilityRegistryAdapter>,
         Arc<maos_kernel_core::security::SecurityManagerAdapter>,
         tokio::sync::mpsc::Receiver<maos_kernel_core::capability::cap_audit::CapAuditEvent>,
     ) {
-        let crypto: Arc<dyn maos_domain::ports::CryptoProvider> =
-            Arc::new(maos_kernel_core::security::RingCryptoProvider);
         let signing_key =
             maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([7u8; 32]);
         let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
@@ -16338,9 +16385,8 @@ mod story_13_5a_enterprise_daemon_seam {
         ports: &RecordingPorts,
         fixture: &Fixture,
         boot_nonce: u64,
+        crypto: Arc<dyn maos_domain::ports::CryptoProvider>,
     ) -> Arc<maos_bin::enterprise_identity::EnterpriseRuntime> {
-        let crypto: Arc<dyn maos_domain::ports::CryptoProvider> =
-            Arc::new(maos_kernel_core::security::RingCryptoProvider);
         Arc::new(
             maos_bin::enterprise_identity::EnterpriseRuntime::from_ports(
                 maos_bin::enterprise_identity::EnterpriseConfig::empty()
@@ -16459,6 +16505,15 @@ mod story_13_5a_enterprise_daemon_seam {
         )
     }
 
+    struct SharedBoot {
+        log: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+        capability: Arc<CapabilityRegistryAdapter>,
+        security: Arc<maos_kernel_core::security::SecurityManagerAdapter>,
+        crypto: Arc<dyn maos_domain::ports::CryptoProvider>,
+        ready: tokio::sync::oneshot::Sender<()>,
+        resume: tokio::sync::oneshot::Receiver<()>,
+    }
+
     /// Boot a real target daemon plus a real second mTLS endpoint, then send a
     /// digest read through `route_outbound` → TLS → `handle_intake_verified` →
     /// consent → the installed governed port and wait for the daemon's real
@@ -16468,13 +16523,26 @@ mod story_13_5a_enterprise_daemon_seam {
         wiring: TestWiring,
         ports: &RecordingPorts,
     ) -> Result<(), String> {
-        let transparency_log = Arc::new(
-            maos_kernel_core::iac::TransparencyLogAdapter::open(
-                &fixture.audit_db,
-                DAEMON_BOOT_NONCE,
+        boot_and_drive_with_shared(fixture, wiring, ports, None).await
+    }
+
+    async fn boot_and_drive_with_shared(
+        fixture: &Fixture,
+        wiring: TestWiring,
+        ports: &RecordingPorts,
+        shared: Option<SharedBoot>,
+    ) -> Result<(), String> {
+        let transparency_log = if let Some(shared) = &shared {
+            Arc::clone(&shared.log)
+        } else {
+            Arc::new(
+                maos_kernel_core::iac::TransparencyLogAdapter::open(
+                    &fixture.audit_db,
+                    DAEMON_BOOT_NONCE,
+                )
+                .expect("open transparency log"),
             )
-            .expect("open transparency log"),
-        );
+        };
         let mut bootstrap = load_cohort_daemon_bootstrap(
             fixture.config_path.to_str().expect("utf-8 config path"),
             Arc::clone(&transparency_log),
@@ -16495,9 +16563,24 @@ mod story_13_5a_enterprise_daemon_seam {
             &fixture.client_fingerprint,
         ));
 
-        let (capability, security, _audit_rx) = kernel_stack(DAEMON_BOOT_NONCE);
+        let (crypto, capability, security, _audit_rx, handshake) = if let Some(shared) = shared {
+            (
+                shared.crypto,
+                shared.capability,
+                shared.security,
+                None,
+                Some((shared.ready, shared.resume)),
+            )
+        } else {
+            let crypto = maos_bin::crypto_provider::select(&fixture.home)
+                .map_err(|error| error.to_string())?
+                .provider;
+            let (capability, security, audit_rx) =
+                kernel_stack(DAEMON_BOOT_NONCE, Arc::clone(&crypto));
+            (crypto, capability, security, Some(audit_rx), None)
+        };
         let runtime = matches!(wiring, TestWiring::Full)
-            .then(|| enterprise_runtime(ports, fixture, DAEMON_BOOT_NONCE));
+            .then(|| enterprise_runtime(ports, fixture, DAEMON_BOOT_NONCE, crypto));
         let pdp =
             matches!(wiring, TestWiring::Full | TestWiring::PdpOnly).then(|| pdp_runtime(ports));
         let journal_path = fixture.home.join("journal").join("lifecycle.ndjson");
@@ -16536,6 +16619,14 @@ mod story_13_5a_enterprise_daemon_seam {
         )
         .await
         .map_err(|error| error.to_string())?;
+        if let Some((ready, resume)) = handshake {
+            ready
+                .send(())
+                .map_err(|_| "integrated witness lost ready receiver")?;
+            resume
+                .await
+                .map_err(|_| "integrated witness lost resume sender")?;
+        }
         daemon
             .assert_collective_serve_port_fails_closed()
             .map_err(|error| format!("boot self-check: {error}"))?;
@@ -16652,6 +16743,11 @@ mod story_13_5a_enterprise_daemon_seam {
         std::env::set_var("MAOS_SSO_ASSERTION", ASSERTION);
     }
 
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/support/crypto_integrated_20_13.rs"
+    ));
+
     // ── AC3 / AC5 leg 1 — the reach leg ──────────────────────────────────
 
     /// AC3 — ONE governed collective round-trip through a BOOTED
@@ -16664,12 +16760,29 @@ mod story_13_5a_enterprise_daemon_seam {
     async fn story_13_5a_enterprise_governance_reaches_the_booted_cohort_daemon() {
         let _guard = env_lock();
         let fixture = fixture("reach");
+        #[cfg(feature = "crypto-recording")]
+        std::fs::write(
+            fixture.home.join("config.toml"),
+            "[crypto]\nprovider = \"recording\"\n",
+        )
+        .unwrap();
         set_process_env(&fixture);
         let ports = RecordingPorts::new(PolicyVerdict::Allow);
 
         boot_and_drive(&fixture, TestWiring::Full, &ports)
             .await
             .expect("a fully governed collective read must be admitted");
+        #[cfg(feature = "crypto-recording")]
+        {
+            let operations =
+                std::fs::read_to_string(fixture.home.join("crypto-recording.log")).unwrap();
+            assert!(operations
+                .lines()
+                .any(|operation| operation == "sign_capability_token"));
+            assert!(operations
+                .lines()
+                .any(|operation| operation == "seal_for_export"));
+        }
 
         let (sso, pdp, kms, siem) = ports.counts();
         assert!(sso >= 1, "SSO principal verification never fired");
@@ -16777,7 +16890,10 @@ mod story_13_5a_enterprise_daemon_seam {
             Arc::clone(&transparency_log),
         )
         .expect("KMS test bootstrap");
-        let (capability, security, _audit_rx) = kernel_stack(DAEMON_BOOT_NONCE);
+        let crypto = maos_bin::crypto_provider::select(&kms_fixture.home)
+            .unwrap()
+            .provider;
+        let (capability, security, _audit_rx) = kernel_stack(DAEMON_BOOT_NONCE, crypto);
         let kms_down = Arc::new(
             maos_bin::enterprise_identity::EnterpriseRuntime::from_config(
                 &maos_bin::enterprise_identity::EnterpriseConfig::empty().with_kms_down(),
@@ -16900,9 +17016,12 @@ mod story_13_5a_enterprise_daemon_seam {
             Arc::clone(&transparency_log),
         )
         .expect("cohort daemon bootstrap");
-        let (capability, security, _audit_rx) = kernel_stack(boot_nonce);
+        let crypto = maos_bin::crypto_provider::select(&fixture.home)
+            .unwrap()
+            .provider;
+        let (capability, security, _audit_rx) = kernel_stack(boot_nonce, Arc::clone(&crypto));
         let ports = RecordingPorts::new(PolicyVerdict::Allow);
-        let runtime = enterprise_runtime(&ports, &fixture, boot_nonce);
+        let runtime = enterprise_runtime(&ports, &fixture, boot_nonce, crypto);
         let recorder = Arc::new(PidRecordingPdp::default());
         let pdp = enterprise_pdp_runtime::EnterprisePdpRuntime::new(
             Arc::clone(&recorder) as Arc<dyn PolicyDecisionPort>,

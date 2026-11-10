@@ -40,6 +40,13 @@ pub(super) struct KernelWorld {
 }
 
 pub(super) fn kernel_world(boot_nonce: u64) -> KernelWorld {
+    kernel_world_with_crypto(boot_nonce, Arc::new(RingCryptoProvider))
+}
+
+pub(super) fn kernel_world_with_crypto(
+    boot_nonce: u64,
+    crypto: Arc<dyn maos_domain::ports::CryptoProvider>,
+) -> KernelWorld {
     let dir = tempfile::TempDir::new().unwrap();
     let audit_db = dir.path().join("transparency.sqlite");
     let journal_path = dir.path().join("journal.sqlite");
@@ -76,7 +83,7 @@ pub(super) fn kernel_world(boot_nonce: u64) -> KernelWorld {
     let (audit_tx, mut audit_rx) = maos_kernel_core::capability::cap_audit::channel();
     std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
     let capability = Arc::new(CapabilityRegistryAdapter::new(
-        Arc::new(RingCryptoProvider),
+        crypto,
         Ed25519SigningKey::new([0x16; 32]),
         boot_nonce,
         Arc::clone(&policy),
@@ -282,6 +289,26 @@ pub(super) fn regression_door_with_ops(
     boot_nonce: u64,
     ops: Arc<dyn BinPrivateOps>,
 ) -> Arc<OperatorDoor> {
+    regression_door_with_crypto(
+        world,
+        scheduler,
+        rt.handle().clone(),
+        boot_nonce,
+        ops,
+        Arc::new(RingCryptoProvider),
+        None,
+    )
+}
+
+pub(super) fn regression_door_with_crypto(
+    world: &KernelWorld,
+    scheduler: &Arc<SpiritSchedulerAdapter>,
+    rt: tokio::runtime::Handle,
+    boot_nonce: u64,
+    ops: Arc<dyn BinPrivateOps>,
+    crypto: Arc<dyn maos_domain::ports::CryptoProvider>,
+    anchor: Option<Vec<u8>>,
+) -> Arc<OperatorDoor> {
     let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
     let iac = Arc::new(IacBusAdapter::new(
         Arc::clone(&mailbox),
@@ -326,10 +353,10 @@ pub(super) fn regression_door_with_ops(
         mailbox,
         Arc::new(NotificationDispatcher::new()),
         Arc::clone(&world.transparency_log),
-        Arc::new(RingCryptoProvider),
-        None, // crl_trust_anchor — no CRL verification on this path
+        crypto,
+        anchor,
         boot_nonce,
-        rt.handle().clone(),
+        rt,
         ops,
         SuccessorManifestSlot::default(),
     ));

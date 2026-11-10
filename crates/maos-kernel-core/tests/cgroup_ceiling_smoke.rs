@@ -681,6 +681,20 @@ fn assert_native_fd_refusal(program: &Path) {
     println!("\n::notice title=17-2 actual native FD refusal::within-hard=64 actual-guest-soft=64 actual-guest-hard=64 above-hard=65 refusal=EPERM refused-guest-effects=0 owned-residue=0");
 }
 
+fn descendant_is_dead(state: Option<&str>) -> bool {
+    matches!(state, None | Some("Z" | "X"))
+}
+
+#[test]
+fn descendant_terminal_state_accepts_reaped_or_dead_but_not_live() {
+    for state in [None, Some("Z"), Some("X")] {
+        assert!(descendant_is_dead(state), "expected dead state: {state:?}");
+    }
+    for state in [Some("R"), Some("S"), Some("D")] {
+        assert!(!descendant_is_dead(state), "live state accepted: {state:?}");
+    }
+}
+
 #[test]
 #[ignore = "expensive: rustc fixture compile (runs in cgroup-ceiling-delegated)"]
 fn killed_leader_cleanup_kills_its_surviving_descendant() {
@@ -757,10 +771,16 @@ fn assert_killed_leader_cleanup(resolved: ResolvedCaps) {
         ExitCause::Signaled { .. }
     ));
     match std::fs::read_to_string(format!("/proc/{descendant}/stat")) {
-        Ok(stat) => assert_eq!(
-            stat.rsplit_once(") ").unwrap().1.split_whitespace().next(),
-            Some("Z"),
-            "a descendant awaiting its new parent's reap must already be dead"
+        Ok(stat) => assert!(
+            descendant_is_dead(Some(
+                stat.rsplit_once(") ")
+                    .unwrap()
+                    .1
+                    .split_whitespace()
+                    .next()
+                    .expect("descendant stat must contain a state")
+            )),
+            "a descendant awaiting its new parent's reap must already be dead: {stat}"
         ),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => panic!("read descendant terminal state: {error}"),

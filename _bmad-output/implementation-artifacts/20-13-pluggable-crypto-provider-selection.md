@@ -191,6 +191,7 @@ Options list the recommendation first only where it is A; evidence is cited; pro
 | **D-20-13-14** | Where an operator sees the selection (epic AC3 "maosctl posture") | **A** the boot TelemetryEvent `crypto.provider.selected` `{provider, version, source}`, read with the existing `maosctl audit query --frame-kind TelemetryEvent --intent-contains crypto.provider`; it enters audit bundles with the TL · **B** a door route + new `maosctl` read verb · **C** stderr only | **A.** No new verb (verb-table and `check-exit-commands` churn), the TL is what auditors already export; precedent `secret.source.fallback` (`main.rs:3782-3789`). | RULED 2026-11-03 (operator, ask d_batch4): as recommended **A** |
 | **D-20-13-15** | Ordering against 20-1b (PF:130,141 "after 1's signing/attestation decisions") | **A** ready-for-dev now: 20-1's decisions are ruled (D-20-1-*), 20-1a landed boot re-verification; file-level serialization with 20-1b on `install.rs`, `admission.rs`, `evaluator.rs` (one integration owner, the later lander re-measures) · **B** wait for 20-1b `done` | **A.** This story changes which instance verifies, not the claim or vetting shape 20-1b AC6 binds; waiting idles a kernel-free L1. | RULED 2026-11-03 (operator, ask d_batch4): as recommended **A** |
 | **D-20-13-16** | Cumulative kernel STOP (21209) with the concurrent creation-priced rows 20-8 KS +33, 20-14 KT +25 and 20-9 R +21 | **A** no action: under KT3 the expectation is 21203 (6 below), this story lowers it by 1 · **B** split: any costlier ruled shape here (KT1, KTd, KI, KO — each crosses 21209) moves to a separate key landing after 20-8/20-9/20-14 re-base · **C** exchange: a costlier shape is granted only against an equal measured reduction elsewhere (e.g. KO deferred to v1.5 with the FIPS module) · **D** bump: the operator raises the internal STOP — the joint targeted STOP **21250** proposed by D-20-9-15 A / D-20-14-12 (covers their ×2 allowances, 21249); at measured figures KT1 21218, KTd 21210, KT3+KI 21221 fit, KO ≥ 21240 fits narrowly (ADR-069 alarm 22000 unchanged, `ADR-069:35-48`) | **A** with the recommended rows (D-04 A, D-03 A, D-11 A). If any of those is ruled otherwise, the crossing figures above apply and the operator picks B, C or D in the same ruling; ceiling sums are not the test (`20-4-flag-winston-decision.md` §Kernel grant). | RULED 2026-11-03 (operator, ask d_batch4): as recommended **A** |
+| **D-20-13-17** | Empty attestation scope in the shared evaluator | Preserve HEAD's exact comparisons for ring-direct `evaluate_envelope` / `evaluate_envelope_at`; only selected-provider daemon boot `evaluate_envelope_with` treats an empty attested crypto name or endpoint as unpinned. Non-empty attestations compare exactly on both paths. | The real install/import callers can pass non-empty manifest-derived values; applying unpinned behavior to the shared core would weaken their previous refusal. See `landing-1/evaluator-callers.md`. | RULED 2026-11-10 by orchestrator adjudication of D-20-13-06 A; disclosed to the operator in the landing report. |
 
 ## Acceptance Criteria
 
@@ -438,6 +439,83 @@ E20@HEAD:86,304-317; preflight `epic-20-preflight-2026-10-30.md:86,130,141,251-2
 `compliance-claim-schema-review.md:321`; ADR-069 (`:35-48`); review scout `review-2026-09-04/05-fr1-20-scout.md:24`.
 
 ## Dev Agent Record
+
+### L1 preflight — 2026-11-09
+
+At HEAD `37baeedf` the baseline is kernel 26,841 physical / 21,042 tokei,
+bin 35,914, shell 615, registry 6,151, compliance 2,077, domain 10,198,
+xtask 44,700, aggregate 198,235. Re-applying D02 A's ruled allowances gives
+ceilings bin 36,410, shell 737, registry 6,253, compliance 2,151, domain
+10,213, xtask 44,938, aggregate 199,280. L1 does not edit the kernel; rebase
+KT3 again at L2. Previous baseline and the AC1 observed-red run are recorded in
+`20-13-pluggable-crypto-provider-selection-evidence/landing-1/preflight.md`.
+20-4 L1's `ProviderCatalog` is the runtime endpoint source.
+
+### L1 implementation candidate — 2026-11-09
+
+The kernel-free candidate selects a configured provider once in the composition
+root, shares it across the L1 consumers, persists the init selection, records one
+boot journal frame, and supplies real runtime values to installed-package
+admission. The debug-only recording provider and the structural gate's live
+negative control exercise the boundaries; see `landing-1/preflight.md` and
+`landing-1/bypass-inventory.md`. T3 kernel admission remains an explicit L2
+exception; no AC7 or hosted-substrate success is claimed by L1.
+
+After formatting, measured bin 36,209, shell 673, registry 6,194, compliance
+2,107, domain 10,198, xtask 44,874, kernel 21,042 and aggregate 198,835;
+all are within the rebased ceilings above. Exact pins and hardfail 198,836
+replace the baseline pins without reserved headroom. The L1 candidate is
+uncommitted and the story is not marked complete.
+
+The new integrated witness is placed under `tests/support/` per the 14-2b
+test-location convention, not moved from an existing counted test. Tokei
+excludes that file; the measured bin source total **without the test body** is
+36,209 (baseline 35,914, growth +295), 201 below the rebased 36,410 ceiling.
+This total still includes the test-feature recorder's identity instrumentation
+and inline shared harness code. A temporary inline form measured 36,431 before
+the authorized new-test placement; it was never re-pinned.
+
+**D-05 boundary / pending:** only `verify_installed` daemon boot
+re-verification routes publisher and claim verification through the selected
+provider. Ring-direct `admit_spirit` (`maos-registry/src/admission.rs:152,
+296,313`), `maos-bin/src/yank_policy.rs:100`, `maos-bin/src/admission.rs:578`
+and `maos-bin/src/main.rs:193,10769` remain separately recorded for the
+L2 / v1.5 FIPS integration under `deferred-work.md` (rule 10(b)); no claim is
+made that all admission paths use the selected provider. FKCS admission
+fingerprint was re-pinned only after the independent `landing-1/review/
+fkcs-admission-review.md` and the orchestrator's explicit authorization.
+
+**L1 file list.** `crates/maos-bin/{Cargo.toml,src/{crypto_provider.rs,
+delegation.rs,installed_spirits.rs,lib.rs,main.rs,worker_spawn.rs},
+tests/{crypto_provider_20_13.rs,crypto_provider_t3_20_13.rs,
+cli_wrapper_exhaustion_17_9.rs,cohort_daemon_smoke_13_5c.rs,
+nfr_perf_8_real_spawn_fanout_20_7.rs,support/{worker_revoke_root.rs,
+shell_world_16_2.rs,crypto_integrated_20_13.rs},two_host_delegation_2b.rs,
+worker_terminal_facts_17_7/unload_scenes.rs,
+erasure_uninstall_13_5b.rs}}`; `crates/maos-compliance/{src/{evaluator.rs,lib.rs},
+tests/evaluator_test.rs}`; `crates/maos-domain/src/ports/crypto.rs`;
+`crates/maos-registry/{Cargo.toml,src/{admission.rs,install.rs},
+tests/{yank_auth_20_1b.rs,publisher_provider_20_13.rs}}`;
+`crates/maos-shell/{Cargo.toml,src/lib.rs}`; `Cargo.lock`,
+`.config/nextest.toml`, `tests/coverage-matrix.yaml`,
+`xtask/{kloc.toml,fkcs-baseline.toml,gate-registry.toml,test-budgets.toml,
+src/{build_test_fixtures.rs,check_composition_root_completeness.rs,
+check_mock_not_in_release.rs}}`; `docs/maos.dev/run-maos.md`,
+`docs-site/docs/run-maos.md`, the Korean `docs-site` run page; this story,
+`sprint-status.yaml` (decision comment only), `deferred-work.md`, and L1
+evidence `{preflight.md,verification.md,bypass-inventory.md,evaluator-callers.md}`
+plus the branch-only `ci/ci-20-13-verify.yml`.
+
+**Hosted fixes carried by 20-13 landing (not 20-13 scope).** Main reported
+discipline run 42722028970 on `be3b9763`: stale 18-pass recall workflow-shape
+assertions and an ARM cgroup descendant that was already dead (`X`) rather than
+zombie (`Z`). `xtask/tests/ci_shape_18_0.rs` derives recall and recall-wire
+counts/names from the Rust source and plants each missing token independently;
+`crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs` accepts reaped,
+`Z`, or `X`, but not a live state. Before fixing the classifier, the new `X`
+vector failed locally (exit 101, `artifact://15717`). Both changes are test-only;
+no kernel source or kernel pin is changed.
+
 
 ### Story context creation
 

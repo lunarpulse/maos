@@ -25,6 +25,7 @@ pub mod cross_team_consent;
 pub mod cross_team_crossing;
 #[cfg(feature = "network")]
 pub mod cross_wall_log_read;
+pub mod crypto_provider;
 /// j1-crosshost-1a — frame-borne `developer-remote` delegation (loopback A2A).
 /// `pub` so integration tests can drive the real production leg rather than a
 /// re-implementation of it.

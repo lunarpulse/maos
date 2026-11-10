@@ -26,7 +26,11 @@ pub struct Report {
     pub forbidden_symbols_found: Vec<String>,
 }
 
-const FORBIDDEN_PRODUCTION_SYMBOLS: &[&str] = &["MockHaltResolver", "FailingHaltResolver"];
+const FORBIDDEN_PRODUCTION_SYMBOLS: &[&str] = &[
+    "MockHaltResolver",
+    "FailingHaltResolver",
+    "RecordingCryptoProvider",
+];
 
 pub fn run(binary_path: &str, build_first: bool, json: bool) -> Result<(), String> {
     if build_first {

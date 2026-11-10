@@ -25,6 +25,26 @@ cargo build -p maos-bin --release
 it records the loopback endpoint and bearer token the mutating verbs
 authenticate with. Rotation is `rm $MAOS_HOME/control.json && maos init`.
 
+### Crypto provider
+
+`maos init --crypto-provider ring` records `[crypto] provider = "ring"` in
+`$MAOS_HOME/config.toml`. A fresh init defaults to `ring`; an older home without
+the section also defaults to `ring`. Re-running init with the flag changes only
+the crypto selection, effective on the next boot. Unknown or malformed
+selections refuse boot with exit 78 and list the providers available in that
+build. Each boot journals `crypto.provider.selected` with the provider, version
+and whether the selection came from config or the default. Inspect it with
+`maosctl audit query --frame-kind TelemetryEvent --intent-contains crypto.provider`.
+
+v1.0 ships `ring` only: this is a pluggability seam, not FIPS validation. A
+FIPS 140-3 validated module is planned for v1.5. Daemon boot re-verifies
+installed publisher signatures and ComplianceClaims using the selected
+provider; `maosctl spirit install` and `maosctl import` are install-time
+pre-checks, and the daemon re-verifies before anything runs. Audit-artifact
+signatures, publisher tooling and rustls TLS are outside this provider boundary.
+Until 20-13 L2, kernel-internal T3 admission still uses `ring`.
+
+
 ### The evaluator shell
 
 ```bash

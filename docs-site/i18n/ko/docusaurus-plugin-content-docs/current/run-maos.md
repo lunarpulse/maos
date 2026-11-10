@@ -26,6 +26,24 @@ cargo build -p maos-bin --release
 합니다. 루프백 엔드포인트와 bearer 토큰을 기록하며, 변경(mutating) 동사들이
 이로 인증합니다. 로테이션은 `rm $MAOS_HOME/control.json && maos init`입니다.
 
+### 암호화 공급자
+
+`maos init --crypto-provider ring`은 `$MAOS_HOME/config.toml`에
+`[crypto] provider = "ring"`을 기록합니다. 새 홈과 이 섹션이 없는 기존 홈의
+기본값은 `ring`입니다. 초기화 명령에 플래그를 다시 지정하면 암호화 선택만
+변경되며 다음 부팅부터 적용됩니다. 알 수 없거나 잘못된 선택은 사용 가능한
+공급자 목록과 함께 종료 코드 78로 부팅을 거부합니다. 부팅마다 공급자, 버전,
+설정 또는 기본값 출처가 `crypto.provider.selected`로 기록됩니다.
+`maosctl audit query --frame-kind TelemetryEvent --intent-contains crypto.provider`로 조회합니다.
+
+v1.0에는 `ring`만 포함됩니다. 이는 교체 가능한 연결점이며 FIPS 검증이 아닙니다.
+FIPS 140-3 검증 모듈은 v1.5에 계획되어 있습니다. daemon은 설치된 게시자 서명과
+ComplianceClaim을 선택된 공급자로 다시 검증합니다. `maosctl spirit install`과
+`maosctl import`는 설치 시 사전 검사이며 실행 전에 daemon이 다시 검증합니다.
+감사 산출물 서명, 게시자 도구, rustls TLS는 이 공급자 범위 밖입니다.
+20-13 L2 전에는 kernel 내부 T3 입장 검증이 여전히 `ring`을 사용합니다.
+
+
 ### 평가자(evaluator) 셸
 
 ```bash

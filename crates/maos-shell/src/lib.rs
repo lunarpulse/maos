@@ -51,7 +51,10 @@ fn transparency_log_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
 /// so `maos init` exited 1 with `ENOENT` on every machine that did not already
 /// have the home — J0's very first command, on a clean install. All four init
 /// tests passed because all four fixtures pre-created the directory.
-pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run_init(
+    color_choice: ColorChoice,
+    crypto_provider: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
     // `maos init` prints to the real stdout (not a REPL seam); routed through
     // the same writer-taking helper so there is ONE rendering rule.
     let mut out = std::io::stdout();
@@ -94,6 +97,17 @@ pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Err
                 // machine with no operator door and no way to get one short of
                 // deleting `config.toml`.
                 ensure_operator_door(&home, color_choice)?;
+                if let Some(provider) = crypto_provider {
+                    let previous = record_crypto_provider(&config_path, provider)?;
+                    print_line(
+                        &mut out,
+                        color_choice,
+                        &format!(
+                        "maos: crypto provider {} -> {provider} (takes effect at the next boot)",
+                        previous.as_deref().unwrap_or("ring (default)")
+                    ),
+                    )?;
+                }
                 print_line(
                     &mut out,
                     color_choice,
@@ -115,7 +129,11 @@ pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Err
     };
 
     // Write config.toml.
-    let config = default_config_toml();
+    let config = format!(
+        "{}\n[crypto]\nprovider = \"{}\"\n",
+        default_config_toml(),
+        crypto_provider.unwrap_or("ring")
+    );
     file.write_all(config.as_bytes())?;
 
     // Stage BMAD skills if the repo skill set is present.
@@ -779,6 +797,47 @@ fn maos_home() -> Result<PathBuf, Box<dyn std::error::Error>> {
             "maos: neither MAOS_HOME nor HOME is set — set one to proceed",
         )
     })
+}
+
+fn record_crypto_provider(
+    path: &std::path::Path,
+    provider: &str,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let mut doc = std::fs::read_to_string(path)?.parse::<toml_edit::DocumentMut>()?;
+    let previous = match doc.get("crypto") {
+        None => None,
+        Some(item) => {
+            let table = item.as_table().ok_or("[crypto] must be a table")?;
+            Some(
+                table
+                    .get("provider")
+                    .and_then(toml_edit::Item::as_str)
+                    .ok_or("[crypto] provider must be a string")?
+                    .to_owned(),
+            )
+        }
+    };
+    if doc.get("crypto").is_none() {
+        doc["crypto"] = toml_edit::Item::Table(toml_edit::Table::new());
+    }
+    doc["crypto"]["provider"] = toml_edit::value(provider);
+    let temporary = path.with_extension(format!("toml.{}.tmp", std::process::id()));
+    let mut staged = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)?;
+    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        staged.set_permissions(std::fs::metadata(path)?.permissions())?;
+        staged.write_all(doc.to_string().as_bytes())?;
+        staged.sync_all()?;
+        std::fs::rename(&temporary, path)?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    result?;
+    Ok(previous)
 }
 
 fn default_config_toml() -> String {

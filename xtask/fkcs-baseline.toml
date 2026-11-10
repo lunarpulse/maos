@@ -66,9 +66,15 @@ ratifier = "Lunarpulse"
 # frozen tag or declared file-set change.
 # 136c579d6a2ae4804d0f57864cec8c583363b563e2f063a870f6ae6f38256a46 ->
 # 3dc4d08e237fffb6338354d71fc504a7d4a20217230237471e13f7cbaec349f9.
+# RE-PINNED — 20-13-pluggable-crypto-provider-selection L1, after independent
+# review: 20-13-pluggable-crypto-provider-selection-evidence/landing-1/review/fkcs-admission-review.md.
+# Exact hunk: registry admission.rs:548-581 extracts the signature message and
+# adds the selected-provider verifier; skill admission and frozen file set unchanged.
+# 3dc4d08e237fffb6338354d71fc504a7d4a20217230237471e13f7cbaec349f9 ->
+# 6499fd6af0bb83f274765434cf40b4660e3382d19708fc8c9edb7b54a0eda3b3.
 [admission_baseline]
 files = [
     "crates/maos-registry/src/admission.rs",
     "crates/maos-skill/src/admission.rs",
 ]
-sha256 = "3dc4d08e237fffb6338354d71fc504a7d4a20217230237471e13f7cbaec349f9"
+sha256 = "6499fd6af0bb83f274765434cf40b4660e3382d19708fc8c9edb7b54a0eda3b3"

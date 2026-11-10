@@ -98,6 +98,7 @@ pub fn run(api_rs: &str, main_rs: &str, whitelist_path: &str, json: bool) -> Res
             ));
         }
     }
+    violations.extend(crypto_provider_violations(std::path::Path::new("crates"))?);
 
     if json {
         let payload = serde_json::json!({
@@ -128,5 +129,164 @@ pub fn run(api_rs: &str, main_rs: &str, whitelist_path: &str, json: bool) -> Res
         Ok(())
     } else {
         Err("composition-root-completeness violations found".to_string())
+    }
+}
+
+// L1's kernel T3 construction is the sole pending 20-13 L2 exception.
+const CRYPTO_ALLOWED_FILES: &[(&str, &str)] = &[
+    ("maos-bin/src/crypto_provider.rs", "provider selection root"),
+    (
+        "maos-kernel-core/src/security/crypto.rs",
+        "provider implementation",
+    ),
+    ("maos-bench/src/halt_eval.rs", "benchmark harness"),
+    ("maos-bench/src/harness/j4.rs", "benchmark harness"),
+];
+
+fn crypto_provider_violations(crates: &std::path::Path) -> Result<Vec<String>, String> {
+    use syn::visit::Visit;
+    let mut files = Vec::new();
+    crate::fs_walk::collect_rs_files(crates, &mut files);
+    let mut violations = Vec::new();
+    for file in files {
+        let path = file.to_string_lossy().replace('\\', "/");
+        let Some(rel) = path.split("crates/").nth(1) else {
+            continue;
+        };
+        if !rel.contains("/src/") || CRYPTO_ALLOWED_FILES.iter().any(|(p, _)| rel == *p) {
+            continue;
+        }
+        let text = fs::read_to_string(&file).map_err(|e| format!("{path}: {e}"))?;
+        let ast = syn::parse_file(&text).map_err(|e| format!("{path}: {e}"))?;
+        let mut visitor = CryptoConstructionVisitor {
+            path: rel,
+            pending_t3: false,
+            violations: &mut violations,
+        };
+        visitor.visit_file(&ast);
+    }
+    Ok(violations)
+}
+
+struct CryptoConstructionVisitor<'a> {
+    path: &'a str,
+    pending_t3: bool,
+    violations: &'a mut Vec<String>,
+}
+
+impl<'ast> syn::visit::Visit<'ast> for CryptoConstructionVisitor<'_> {
+    fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
+        if cfg_test(&item.attrs) {
+            return;
+        }
+        syn::visit::visit_item_mod(self, item);
+    }
+
+    fn visit_item_fn(&mut self, item: &'ast syn::ItemFn) {
+        if !cfg_test(&item.attrs) {
+            syn::visit::visit_item_fn(self, item);
+        }
+    }
+
+    fn visit_impl_item_fn(&mut self, item: &'ast syn::ImplItemFn) {
+        if cfg_test(&item.attrs) {
+            return;
+        }
+        let previous = self.pending_t3;
+        self.pending_t3 =
+            self.path == "maos-kernel-core/src/security/mod.rs" && item.sig.ident == "admit_spirit";
+        syn::visit::visit_impl_item_fn(self, item);
+        self.pending_t3 = previous;
+    }
+
+    fn visit_use_rename(&mut self, item: &'ast syn::UseRename) {
+        use syn::spanned::Spanned;
+        if item.ident == "RingCryptoProvider" {
+            self.violations.push(format!(
+                "error: {}:{} aliases RingCryptoProvider outside the selection root",
+                self.path,
+                item.span().start().line
+            ));
+        }
+        syn::visit::visit_use_rename(self, item);
+    }
+
+    fn visit_expr_path(&mut self, expr: &'ast syn::ExprPath) {
+        use syn::spanned::Spanned;
+        if expr
+            .path
+            .segments
+            .iter()
+            .any(|s| s.ident == "RingCryptoProvider")
+            && !(self.pending_t3 && expr.span().start().line == 350)
+        {
+            self.violations.push(format!(
+                "error: {}:{} constructs RingCryptoProvider outside the selection root",
+                self.path,
+                expr.span().start().line
+            ));
+        }
+        syn::visit::visit_expr_path(self, expr);
+    }
+
+    fn visit_expr_struct(&mut self, expr: &'ast syn::ExprStruct) {
+        use syn::spanned::Spanned;
+        if expr
+            .path
+            .segments
+            .iter()
+            .any(|s| s.ident == "RingCryptoProvider")
+        {
+            self.violations.push(format!(
+                "error: {}:{} constructs RingCryptoProvider outside the selection root",
+                self.path,
+                expr.span().start().line
+            ));
+        }
+        syn::visit::visit_expr_struct(self, expr);
+    }
+}
+
+fn cfg_test(attrs: &[syn::Attribute]) -> bool {
+    attrs.iter().any(|attr| {
+        attr.path().is_ident("cfg") && {
+            let text = quote::quote!(#attr).to_string().replace(' ', "");
+            text == "#[cfg(test)]" || text.starts_with("#[cfg(all(test,")
+        }
+    })
+}
+
+#[cfg(test)]
+mod crypto_tests {
+    use super::*;
+    use syn::visit::Visit;
+
+    fn violations(source: &str) -> usize {
+        let parsed = syn::parse_file(source).unwrap();
+        let mut found = Vec::new();
+        CryptoConstructionVisitor {
+            path: "maos-bin/src/main.rs",
+            pending_t3: false,
+            violations: &mut found,
+        }
+        .visit_file(&parsed);
+        found.len()
+    }
+
+    #[test]
+    fn crypto_construction_in_production_is_refused_after_test_module() {
+        assert_eq!(violations("#[cfg(test)] mod tests { fn t() { let _ = RingCryptoProvider; } } fn root() { let _ = maos_kernel_core::security::RingCryptoProvider; }"), 1);
+        assert_eq!(
+            violations("fn root() { let _ = RingCryptoProvider::default(); }"),
+            1
+        );
+        assert_eq!(
+            violations("fn root() { let _ = RingCryptoProvider {}; }"),
+            1
+        );
+        assert_eq!(
+            violations("use module::RingCryptoProvider as Hidden; fn root() { let _ = Hidden; }"),
+            1
+        );
     }
 }

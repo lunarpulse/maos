@@ -182,6 +182,14 @@ pub(crate) fn check_identity(document: &toml::Value, id: &str, version: &str) ->
 /// A registry subject is the signed package AND its deployed bytes, not a
 /// neighboring metadata file. Local manifests without sidecars remain local.
 pub fn signed_package_at(name: &str, manifest_path: &Path) -> Result<Option<SignedPackage>, Error> {
+    signed_package_at_with(name, manifest_path, None)
+}
+
+fn signed_package_at_with(
+    name: &str,
+    manifest_path: &Path,
+    crypto: Option<&dyn maos_domain::ports::CryptoProvider>,
+) -> Result<Option<SignedPackage>, Error> {
     let directory = manifest_path
         .parent()
         .ok_or("manifest has no package directory")?;
@@ -194,13 +202,21 @@ pub fn signed_package_at(name: &str, manifest_path: &Path) -> Result<Option<Sign
     if pkg.spirit_id.as_str() != name {
         return Err("installed package name differs".into());
     }
-    verify_deployed_package(&pkg, manifest_path)?;
+    verify_deployed_package_with(&pkg, manifest_path, crypto)?;
     Ok(Some(pkg))
 }
 
 /// Validate an explicit immutable subject against its original deployed files.
 /// A temporary manifest snapshot is never a package-identity lookup location.
 pub fn verify_deployed_package(pkg: &SignedPackage, manifest_path: &Path) -> Result<(), Error> {
+    verify_deployed_package_with(pkg, manifest_path, None)
+}
+
+fn verify_deployed_package_with(
+    pkg: &SignedPackage,
+    manifest_path: &Path,
+    crypto: Option<&dyn maos_domain::ports::CryptoProvider>,
+) -> Result<(), Error> {
     fn matches(path: &Path, expected: &[u8]) -> std::io::Result<bool> {
         use std::io::Read;
         let mut file = std::fs::File::open(path)?;
@@ -215,7 +231,10 @@ pub fn verify_deployed_package(pkg: &SignedPackage, manifest_path: &Path) -> Res
     }
     let directory = manifest_path.parent().ok_or("package has no directory")?;
     crate::storage::path_segment(&pkg.version)?;
-    if !crate::admission::verify_publisher_sig(pkg) {
+    if !crypto.map_or_else(
+        || crate::admission::verify_publisher_sig(pkg),
+        |provider| crate::admission::verify_publisher_sig_with(pkg, provider),
+    ) {
         return Err("installed publisher signature is invalid".into());
     }
     if !matches(manifest_path, &pkg.manifest_toml)?
@@ -273,10 +292,16 @@ pub fn publisher_storage_identity(name: &str, publisher: &[u8; 32]) -> String {
 
 /// Recheck the actual installed package at each boot, not merely its inventory
 /// entry. Only return manifest bytes whose publisher, claim and component agree.
-pub fn verify_installed(name: &str, manifest_path: &Path) -> Result<(String, [u8; 32]), Error> {
+pub fn verify_installed<'a>(
+    name: &str,
+    manifest_path: &Path,
+    crypto: &dyn maos_domain::ports::CryptoProvider,
+    crypto_name: &str,
+    endpoint: &dyn Fn(&str) -> Option<&'a str>,
+) -> Result<(String, [u8; 32]), Error> {
     let directory = manifest_path.parent().ok_or("install has no directory")?;
-    let pkg =
-        signed_package_at(name, manifest_path)?.ok_or("installed signed package is absent")?;
+    let pkg = signed_package_at_with(name, manifest_path, Some(crypto))?
+        .ok_or("installed signed package is absent")?;
     let mut fields =
         maos_compliance::runtime_context::extract_manifest_fingerprint_fields(&pkg.manifest_toml);
     let promotion = match std::fs::read(directory.join("vetting.json")) {
@@ -293,15 +318,20 @@ pub fn verify_installed(name: &str, manifest_path: &Path) -> Result<(String, [u8
         promotion.verify(&pkg, &root, crate::yank_auth::now_unix_ms()?)?;
         fields.trust_tier = TrustTier::PublicUntrusted;
     }
+    let mut runtime_endpoint = fields.provider_endpoint.clone();
+    runtime_endpoint.endpoint_url = endpoint(&runtime_endpoint.provider_id)
+        .unwrap_or("")
+        .to_owned();
+    let runtime_crypto = maos_spirit_abi::compliance::CryptoProviderId(crypto_name.to_owned());
     let context = maos_compliance::RuntimeExecutionContext::from_admission(
         fields.trust_tier,
         fields.sandbox_tier,
         &pkg,
-        &fields.provider_endpoint,
-        &fields.crypto_provider,
+        &runtime_endpoint,
+        &runtime_crypto,
     );
     if let maos_compliance::ComplianceVerdict::Reject(reason) =
-        maos_compliance::evaluate_envelope(&pkg.compliance_envelope, &context)
+        maos_compliance::evaluate_envelope_with(&pkg.compliance_envelope, &context, crypto)
     {
         return Err(format!("installed ComplianceClaim refused: {reason:?}").into());
     }

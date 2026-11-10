@@ -305,6 +305,7 @@ impl World {
                 } else {
                     WorkerTask::Standalone
                 },
+                &maos_kernel_core::security::crypto::RingCryptoProvider,
                 None,
             )
             .map(|run| run.completion)

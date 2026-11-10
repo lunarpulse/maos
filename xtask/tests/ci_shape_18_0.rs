@@ -98,19 +98,61 @@ fn assert_no_continue_on_error(value: &Value, what: &str) {
     }
 }
 
+fn source_test_names(source: &str, module: Option<&str>) -> Vec<String> {
+    let file = syn::parse_file(source).expect("parse Rust test source");
+    let items = if let Some(name) = module {
+        file.items
+            .iter()
+            .find_map(|item| match item {
+                syn::Item::Mod(item) if item.ident == name => {
+                    item.content.as_ref().map(|(_, items)| items)
+                }
+                _ => None,
+            })
+            .expect("test module")
+    } else {
+        &file.items
+    };
+    items
+        .iter()
+        .filter_map(|item| match item {
+            syn::Item::Fn(function)
+                if function.attrs.iter().any(|attr| {
+                    attr.path()
+                        .segments
+                        .last()
+                        .is_some_and(|segment| segment.ident == "test")
+                }) =>
+            {
+                Some(function.sig.ident.to_string())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn recall_gate_tokens() -> Vec<String> {
+    let names = source_test_names(
+        include_str!("../../crates/maos-bin/tests/recall_17_3d.rs"),
+        None,
+    );
+    let count = names.len();
+    let mut tokens = vec![
+        "binary_id(maos-bin::recall_17_3d)".into(),
+        format!("{count} tests run: {count} passed([,[:space:]]|$)"),
+        format!("missing '{count} tests run: {count} passed'"),
+        format!("--expected-count {count}"),
+    ];
+    tokens.extend(names);
+    tokens
+}
+
 fn recall_context_gate_is_complete(run: &str) -> bool {
-    run.contains("binary_id(maos-bin::recall_17_3d)")
-        && run.contains("18 tests run: 18 passed([,[:space:]]|$)")
-        && run.contains("missing '18 tests run: 18 passed'")
-        && run.contains("--expected-count 18")
-        && run.contains(
-            "context_18_5_report_status_and_journaled_kinds_32_33_reach_wasm_handle_frame",
-        )
-        && run.contains("context_18_5_wasm_guest_cannot_forge_kernel_pressure_or_limit_to_peer")
+    recall_gate_tokens().iter().all(|token| run.contains(token))
 }
 
 #[test]
-fn recall_gate_enrolls_both_context_vectors_and_pins_18_passes() {
+fn recall_gate_enrolls_all_source_vectors_and_pins_source_count() {
     let workflow = workflow();
     let job = key(key(&workflow, "jobs"), "wasm-host-tests");
     let step = &steps(job)[step_index(
@@ -119,18 +161,41 @@ fn recall_gate_enrolls_both_context_vectors_and_pins_18_passes() {
     )];
     let run = str_of(step, "run").expect("recall gate run");
     assert!(recall_context_gate_is_complete(run));
-    // Plants: each stale count and each missing context name must independently red.
-    for token in [
-        "18 tests run: 18 passed([,[:space:]]|$)",
-        "missing '18 tests run: 18 passed'",
-        "--expected-count 18",
-        "context_18_5_report_status_and_journaled_kinds_32_33_reach_wasm_handle_frame",
-        "context_18_5_wasm_guest_cannot_forge_kernel_pressure_or_limit_to_peer",
-    ] {
+    // Every count pin and every source test name must independently red.
+    for token in recall_gate_tokens() {
         assert!(
-            !recall_context_gate_is_complete(&run.replace(token, "REMOVED")),
+            !recall_context_gate_is_complete(&run.replace(&token, "REMOVED")),
             "gate must reject missing {token}"
         );
+    }
+}
+
+#[test]
+fn platform_recall_wire_gates_pin_every_source_test() {
+    let names = source_test_names(
+        include_str!("../../crates/maos-wasm-host/src/recall_wire.rs"),
+        Some("tests"),
+    );
+    let mut tokens = vec![format!("{} passed; 0 failed; 0 ignored;", names.len())];
+    tokens.extend(names);
+    let workflow = workflow();
+    let jobs = key(&workflow, "jobs");
+    for job_name in ["windows-check", "macos-check"] {
+        let job = key(jobs, job_name);
+        let step =
+            &steps(job)[step_index(job, "Run platform-neutral recall wire tests (Story 17-3d)")];
+        let run = str_of(step, "run").expect("recall wire gate run");
+        let complete = |script: &str| tokens.iter().all(|token| script.contains(token));
+        assert!(
+            complete(run),
+            "{job_name} missing recall-wire count or source name"
+        );
+        for token in &tokens {
+            assert!(
+                !complete(&run.replace(token, "REMOVED")),
+                "{job_name} accepted missing {token}"
+            );
+        }
     }
 }
 
@@ -1488,7 +1553,11 @@ fn wasm_archive_keeps_image_matrix_suite_counts_and_all_runtime_markers() {
         (
             "In-band recall through the admitted session (Story 17-3d)",
             "recall_17_3d",
-            18,
+            source_test_names(
+                include_str!("../../crates/maos-bin/tests/recall_17_3d.rs"),
+                None,
+            )
+            .len(),
         ),
         (
             "Participant recall and consent envelopes, both forms (Story 17-8)",

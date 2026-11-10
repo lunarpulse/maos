@@ -257,6 +257,7 @@ async fn fan_out_child(profile: Profile) {
                     false,
                     supervisor.as_ref(),
                     WorkerTask::TopologyEntry { index: task_index },
+                    &maos_kernel_core::security::crypto::RingCryptoProvider,
                     None,
                 )
                 .map(|worker| worker.spirit_pid)

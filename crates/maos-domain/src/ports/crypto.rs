@@ -1,20 +1,13 @@
 //! CryptoProvider port trait per architecture §8.6 + FR48 + NFR-Sec-15.
 //!
-//! The kernel's cryptographic operations — signature verification,
-//! sealed-export encryption, capability-token signing — route through
-//! this trait so FIPS 140-3-validated modules (NFR-Sec-15 v1.0),
-//! hardware-backed crypto (HSM / TPM / TEE), or post-quantum
-//! implementations can be substituted at the `maos-bin` composition
-//! root without recompiling any Spirit binary.
+//! The daemon routes signature verification, sealed-export encryption and
+//! capability-token signing through this trait. The composition root selects
+//! one provider from the init-owned configuration and shares its instance.
+//! v1.0 ships `ring`; a FIPS-validated provider is planned for v1.5.
+//! Kernel-internal T3 admission remains on `ring` until 20-13 L2.
 //!
-//! # v0.1-α scope
-//!
-//! Trait shape only. The default `RingCryptoProvider` adapter lives in
-//! `maos-kernel-core::security::crypto`. v0.1-α has zero kernel call
-//! sites that invoke these methods (Story 1b.1 lands audit-spine
-//! `verify_signature` on journal entries; Story 1b.2 lands `cap_tokens`
-//! `sign_capability_token`; Story 7.3 lands ComplianceClaim envelope
-//! `verify_signature` at admission time).
+//! Hardware-backed and other providers can be substituted at the composition
+//! root without recompiling Spirit binaries.
 //!
 //! # Sync trait method signatures
 //!
@@ -38,15 +31,11 @@ use thiserror::Error;
 
 /// Crypto-provider port — pluggable kernel cryptographic operations.
 ///
-/// Implemented by `maos_kernel_core::security::crypto::RingCryptoProvider`
-/// at v0.1-α; v1.0+ swaps in FIPS-validated, hardware-backed, or
-/// post-quantum providers per NFR-Sec-15.
+/// Implemented by `maos_kernel_core::security::crypto::RingCryptoProvider`.
+/// The composition root shares one selected `Arc<dyn CryptoProvider>`.
 ///
 /// **Trait-object safety:** all methods take `&self`, return `Result`
-/// or owned `Vec<u8>`, and use no generics — the trait IS object-safe.
-/// Composition root holds `Arc<dyn CryptoProvider>` (verified by
-/// `let _: Arc<dyn CryptoProvider> = Arc::new(RingCryptoProvider);`
-/// at `maos-bin/src/main.rs`).
+/// or owned `Vec<u8>`, and use no generics.
 pub trait CryptoProvider: Send + Sync {
     /// Class: data-movement
     ///

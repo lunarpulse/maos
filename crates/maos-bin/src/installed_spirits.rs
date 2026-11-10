@@ -16,13 +16,24 @@ impl InstalledSpirits {
     pub async fn boot(
         manifests: Vec<(String, PathBuf)>,
         deps: &AdmissionDeps<'_>,
+        crypto: &crate::crypto_provider::SelectedCrypto,
         boot_nonce: u64,
         #[cfg(feature = "wasm-host")] host: Option<&dyn maos_host::SpiritHostPort>,
         #[cfg(feature = "wasm-host")] session_deps: Option<crate::spirit_session::SessionDeps>,
     ) -> Self {
         let mut result = Self::default();
         for (name, path) in manifests {
-            let (text, publisher) = match maos_registry::install::verify_installed(&name, &path) {
+            let (text, publisher) = match maos_registry::install::verify_installed(
+                &name,
+                &path,
+                crypto.provider.as_ref(),
+                crypto.name,
+                &|id| {
+                    deps.providers
+                        .and_then(|catalog| catalog.get(id))
+                        .map(|provider| provider.endpoint.as_str())
+                },
+            ) {
                 Ok(verified) => verified,
                 Err(error) => {
                     crate::admission::emit_vetter_key_event(

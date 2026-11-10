@@ -110,6 +110,12 @@ seconds = 31
 reason = "20-8 real T2 guest, durable queue and approval receipts, isolated and serialized; local witness 1.00 s. The owned exception is the minimum whole second above the 30 s default required by check-test-cost."
 owner = "20-8-manifest-contract-completion"
 
+[[exception]]
+binary = "maos-bin::crypto_provider_t3_20_13"
+seconds = 31
+reason = "20-13 real signed-substrate T3 Worker witness is isolated and serialized; local leg skips because the T3 substrate is unavailable. The 31 s exception is the minimum above the default pending a hosted measurement."
+owner = "20-13-pluggable-crypto-provider-selection"
+
 # --- Expensive tests (ignored in the default run) ---------------------------
 
 [[expensive]]

@@ -774,17 +774,19 @@ coverage:
     gates:
       - check-service-boundary
       - reproducible-build
+      - check-composition-root-completeness
     corpora: []
     phase: v0.1-alpha
     valid_until: '2027-05-12'
     notes: |
-      1a.3 declares CryptoProvider port in maos-domain::ports::crypto
-      (sync, data-movement classification) + default RingCryptoProvider
-      adapter in maos-kernel-core::security::crypto backed by ring 0.17;
-      maos-bin/src/main.rs constructs Arc<dyn CryptoProvider> = Arc::new(
-      RingCryptoProvider) demonstrating the FR48 swap-at-composition-root
-      pattern; FIPS / HSM / post-quantum substitution lands at v1.0
-      (NFR-Sec-15) without recompiling any Spirit binary.
+      Story 20-13 L1: crypto_provider_20_13 witnesses init, refusal and
+      reselection (AC1), crypto and endpoint drift (AC4), and boot telemetry
+      (AC5). crypto_integrated_20_13 observes installed verification, token,
+      CRL over the live door and the governed at-rest seal on one boot with
+      one recording-provider identity (AC2).
+      check-composition-root-completeness refuses bypass construction (AC3).
+      Kernel T3 admission remains on ring pending 20-13 L2. Ring is not a
+      FIPS-validated module.
   FR49:
     gates: []
     enforcement: advisory-until-engagement
@@ -1843,6 +1845,9 @@ coverage:
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: |
+      Story 20-13 L1 witnesses provider selection and routing; the validated
+      FIPS 140-3 provider remains planned for v1.5, and kernel T3 routing awaits L2.
   NFR-Sec-16:
     gates: []
     corpora: []

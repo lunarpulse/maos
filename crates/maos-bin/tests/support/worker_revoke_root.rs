@@ -397,6 +397,7 @@ impl RevokeRoot {
                 false,
                 supervision.as_ref(),
                 WorkerTask::Standalone,
+                &maos_kernel_core::security::crypto::RingCryptoProvider,
                 None,
             )
             .map(|_| ())

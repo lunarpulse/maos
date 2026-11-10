@@ -788,6 +788,7 @@ fn in_process_context(fixture: &Fixture, log: Arc<TransparencyLogAdapter>) -> Ho
         enterprise_runtime: None,
         enterprise_pdp_runtime: None,
         supervision,
+        crypto: Arc::new(maos_kernel_core::security::crypto::RingCryptoProvider),
         #[cfg(unix)]
         egress: None,
     }
@@ -834,6 +835,7 @@ async fn malformed_worker_resources_refuse_before_cli_probe_or_binding() {
         context.remote_requested,
         context.supervision.as_ref(),
         maos_bin::supervision::WorkerTask::Standalone,
+        context.crypto.as_ref(),
         #[cfg(unix)]
         context.egress.as_ref(),
     )

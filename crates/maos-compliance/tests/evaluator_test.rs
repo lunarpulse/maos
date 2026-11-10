@@ -66,6 +66,33 @@ fn well_formed_envelope_admits() {
 }
 
 #[test]
+fn ring_direct_empty_claim_still_drifts_against_nonempty_runtime() {
+    let (kp, pk) = seeded_keypair(0x2013);
+    let runtime = reference_fp();
+    let ctx = ctx_from(&runtime);
+    for field in [DriftField::ProviderEndpoint, DriftField::CryptoProvider] {
+        let mut attested = runtime.clone();
+        match field {
+            DriftField::ProviderEndpoint => attested.provider_endpoint.endpoint_url.clear(),
+            DriftField::CryptoProvider => {
+                attested.crypto_provider = CryptoProviderId(String::new())
+            }
+            _ => unreachable!(),
+        }
+        let envelope = build_self_attested_envelope(&attested, &kp, pk);
+        assert_eq!(
+            maos_compliance::evaluate_envelope(&envelope, &ctx_from(&attested)),
+            ComplianceVerdict::Admit
+        );
+        assert!(matches!(
+            maos_compliance::evaluate_envelope(&envelope, &ctx),
+            ComplianceVerdict::Reject(EComplianceRejection::ContextDrift { field: actual, .. })
+                if actual == field
+        ));
+    }
+}
+
+#[test]
 fn tampered_signature_rejects_signature_invalid() {
     let (kp, pk) = seeded_keypair(0x7E57_0002);
     let fp = reference_fp();

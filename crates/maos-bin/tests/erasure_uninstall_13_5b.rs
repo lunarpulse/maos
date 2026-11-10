@@ -701,6 +701,34 @@ fn empty_transparency_log_is_not_found_even_for_unknown_spirit() {
     assert_eq!(regular_files(&fixture.proof_dir()), 0);
 }
 
+#[test]
+fn prior_boot_provider_selection_still_counts_as_populated_history() {
+    let fixture = Fixture::new();
+    std::fs::create_dir_all(fixture.audit_db().parent().unwrap()).unwrap();
+    drop(SharedMemoryStore::open(&fixture.audit_db()).unwrap());
+    let log = TransparencyLogAdapter::open_with_global_legal_holds(
+        &fixture.audit_db(),
+        &fixture.audit_db(),
+        1,
+    )
+    .unwrap();
+    log.insert_frame_event(
+        maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
+        0,
+        None,
+        "crypto.provider.selected",
+        b"{}",
+        maos_domain::invariants::i3::FrameOrigin::Kernel,
+    );
+    drop(log);
+    let mut command = fixture.command();
+    command.env("MAOS_SPIRIT_ID", "ghost-spirit");
+    let output = command.output().unwrap();
+    assert_eq!(output.status.code(), Some(5));
+    assert_eq!(terminal(&output)["outcome"], "failed");
+    assert_eq!(regular_files(&fixture.proof_dir()), 0);
+}
+
 /// Story 16-2 / D-16-2-F — branch 2: an unknown Spirit name on a POPULATED
 /// Transparency Log that also holds pre-partition Shared residue must reach
 /// the FAILED PARTIAL PROOF, never `not_found`.

@@ -82,12 +82,37 @@ pub fn evaluate_envelope(
     evaluate_envelope_at(envelope, ctx, now_unix_ms)
 }
 
+/// Evaluate daemon boot claims with the composition root's selected provider.
+pub fn evaluate_envelope_with(
+    envelope: &ComplianceClaimEnvelope,
+    ctx: &RuntimeExecutionContext,
+    crypto: &dyn maos_domain::ports::CryptoProvider,
+) -> ComplianceVerdict {
+    evaluate_envelope_core(
+        envelope,
+        ctx,
+        unix_now_ms(),
+        true,
+        &|key, message, signature| crypto.verify_signature(key, message, signature).is_ok(),
+    )
+}
+
 /// Deterministic core — `now_unix_ms` is injected so the CCAC ship gate and
 /// latency bench are reproducible.
 pub fn evaluate_envelope_at(
     envelope: &ComplianceClaimEnvelope,
     ctx: &RuntimeExecutionContext,
     now_unix_ms: u64,
+) -> ComplianceVerdict {
+    evaluate_envelope_core(envelope, ctx, now_unix_ms, false, &verify_ed25519)
+}
+
+fn evaluate_envelope_core(
+    envelope: &ComplianceClaimEnvelope,
+    ctx: &RuntimeExecutionContext,
+    now_unix_ms: u64,
+    unpinned_empty: bool,
+    verify: &dyn Fn(&[u8; 32], &[u8], &[u8; 64]) -> bool,
 ) -> ComplianceVerdict {
     use ComplianceVerdict::Reject;
     use EComplianceRejection::*;
@@ -97,7 +122,7 @@ pub fn evaluate_envelope_at(
     if envelope.signing_alg != SigningAlg::Ed25519 {
         return Reject(SignatureInvalid);
     }
-    if !verify_ed25519(
+    if !verify(
         &envelope.attester_pubkey,
         &envelope.claim_bytes,
         &envelope.signature,
@@ -122,7 +147,14 @@ pub fn evaluate_envelope_at(
     }
 
     // Step 3: recompute the RUNTIME fingerprint + its canonical-CBOR hash.
-    let actual_fp = ctx.to_fingerprint();
+    let mut actual_fp = ctx.to_fingerprint();
+    // Only daemon boot treats a claim's empty attestation as unpinned.
+    if unpinned_empty && claimed.crypto_provider.0.is_empty() {
+        actual_fp.crypto_provider = claimed.crypto_provider.clone();
+    }
+    if unpinned_empty && claimed.provider_endpoint.endpoint_url.is_empty() {
+        actual_fp.provider_endpoint = claimed.provider_endpoint.clone();
+    }
     let actual_hash = canonical_cbor::fingerprint_hash(&actual_fp);
 
     // Step 4: conjunctive comparison. Name the FIRST divergent structural
