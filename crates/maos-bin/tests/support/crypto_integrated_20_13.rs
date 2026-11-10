@@ -23,7 +23,7 @@ async fn crypto_provider_one_boot_reaches_all_four_surfaces() {
     )
     .unwrap();
     set_process_env(&fixture);
-    let selected = maos_bin::crypto_provider::select(&fixture.home).unwrap();
+    let selected = maos_bin::crypto_provider::select(Some(&fixture.home)).unwrap();
     let world = Arc::new(crate::crypto_test_world::kernel_world_with_crypto(
         DAEMON_BOOT_NONCE,
         Arc::clone(&selected.provider),

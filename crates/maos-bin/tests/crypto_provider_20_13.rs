@@ -105,14 +105,50 @@ fn absent_home_never_reads_working_directory_config() {
         "[crypto]\nprovider = \"bogus\"\n",
     )
     .unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let audit = data.path().join("audit/transparency.sqlite");
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .current_dir(cwd.path())
         .env_clear()
-        .args(["run", "unused.toml", "--once"])
+        .env("PATH", "/usr/bin:/bin")
+        .env("XDG_DATA_HOME", data.path().join("xdg"))
+        .env("MAOS_MEMORY_ROOT", data.path().join("memory"))
+        .env("MAOS_SECRETS_BACKEND", "env")
+        .env("MAOS_NOTIFY_DISABLE", "1")
+        .env(
+            "MAOS_JOURNAL_PATH",
+            data.path().join("journal/lifecycle.ndjson"),
+        )
+        .env("MAOS_ARCHIVE_DIR", data.path().join("archives"))
+        .env("MAOS_ERASURE_PROOFS_DIR", data.path().join("proofs"))
+        .env("MAOS_AUDIT_DB", &audit)
+        .args(["shell", "--plain"])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(78));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("no MAOS home resolvable"));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let db = rusqlite::Connection::open(audit).unwrap();
+    let payload: Vec<u8> = db.query_row(
+        "SELECT payload_redacted FROM transparency_log WHERE intent = 'crypto.provider.selected'",
+        [],
+        |row| row.get(0),
+    ).unwrap();
+    let payload: serde_json::Value = serde_json::from_slice(&payload).unwrap();
+    assert_eq!(payload["provider"], "ring");
+    assert_eq!(payload["source"], "default");
+
+    let configured = Command::new(env!("CARGO_BIN_EXE_maos"))
+        .current_dir(cwd.path())
+        .env_clear()
+        .env("MAOS_HOME", cwd.path())
+        .args(["run"])
+        .output()
+        .unwrap();
+    assert_eq!(configured.status.code(), Some(78));
+    assert!(String::from_utf8_lossy(&configured.stderr).contains("bogus"));
 }
 
 #[test]
@@ -635,7 +671,7 @@ fn recording_provider_routes_real_at_rest_seal() {
         "[crypto]\nprovider = \"recording\"\n",
     )
     .unwrap();
-    let selected = maos_bin::crypto_provider::select(home.path()).unwrap();
+    let selected = maos_bin::crypto_provider::select(Some(home.path())).unwrap();
     let kms = maos_secrets::LocalMasterKeyKms::from_master_key(&[0x42; 32]).unwrap();
     let sealed =
         maos_secrets::seal_at_rest(&kms, selected.provider.as_ref(), b"sensitive row").unwrap();

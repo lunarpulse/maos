@@ -1994,14 +1994,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     // Refuse an invalid persisted selection before opening stores or parsing a
     // run target; all boot paths below share this one selected instance.
-    let crypto_home = maos_domain::operator_door::maos_home()?.unwrap_or_else(|| {
-        eprintln!("maos: no MAOS home resolvable");
-        std::process::exit(78);
-    });
-    let selected_crypto = maos_bin::crypto_provider::select(&crypto_home).unwrap_or_else(|error| {
-        eprintln!("maos: {error}");
-        std::process::exit(78);
-    });
+    let crypto_home = maos_domain::operator_door::maos_home()?;
+    let selected_crypto =
+        maos_bin::crypto_provider::select(crypto_home.as_deref()).unwrap_or_else(|error| {
+            eprintln!("maos: {error}");
+            std::process::exit(78);
+        });
     let crypto = Arc::clone(&selected_crypto.provider);
     eprintln!(
         "maos: crypto provider = {} {}",
@@ -16587,7 +16585,7 @@ mod story_13_5a_enterprise_daemon_seam {
                 Some((shared.ready, shared.resume)),
             )
         } else {
-            let crypto = maos_bin::crypto_provider::select(&fixture.home)
+            let crypto = maos_bin::crypto_provider::select(Some(&fixture.home))
                 .map_err(|error| error.to_string())?
                 .provider;
             let (capability, security, audit_rx) =
@@ -16905,7 +16903,7 @@ mod story_13_5a_enterprise_daemon_seam {
             Arc::clone(&transparency_log),
         )
         .expect("KMS test bootstrap");
-        let crypto = maos_bin::crypto_provider::select(&kms_fixture.home)
+        let crypto = maos_bin::crypto_provider::select(Some(&kms_fixture.home))
             .unwrap()
             .provider;
         let (capability, security, _audit_rx) = kernel_stack(DAEMON_BOOT_NONCE, crypto);
@@ -17031,7 +17029,7 @@ mod story_13_5a_enterprise_daemon_seam {
             Arc::clone(&transparency_log),
         )
         .expect("cohort daemon bootstrap");
-        let crypto = maos_bin::crypto_provider::select(&fixture.home)
+        let crypto = maos_bin::crypto_provider::select(Some(&fixture.home))
             .unwrap()
             .provider;
         let (capability, security, _audit_rx) = kernel_stack(boot_nonce, Arc::clone(&crypto));

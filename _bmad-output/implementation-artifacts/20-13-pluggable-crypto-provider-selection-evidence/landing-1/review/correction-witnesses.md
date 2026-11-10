@@ -63,3 +63,48 @@ directories older than three hours after nonblocking sibling-lock probes.
 Estimated allocated space freed: 9,080,201,216 bytes (9,079,222,272
 incremental and 978,944 scratch). `/proc/1/fd` and `/proc/7/fd` were
 permission-denied, so the age and lock probes were the available safeguards.
+
+## Hosted no-home correction (discipline 42807966928)
+
+- Before: the unchanged `no_data_home_does_not_abort_the_daemon_or_offline_children`
+  failed with exit 101 and daemon exit 78, `no MAOS home resolvable`, after a
+  genuine `cargo build -p maos-bin -p maos-cli` (`artifact://16226`). The first
+  attempt (`artifact://16200`) was invalid as a behavioral witness because the
+  journey freshness guard reported a stale binary.
+- Negative control: plant `home.or(Some(Path::new(".")))` in selection;
+  `cargo test -p maos-bin --test crypto_provider_20_13
+  absent_home_never_reads_working_directory_config -- --exact` exited 101
+  because the bogus CWD config was read (`artifact://16256`). The source was
+  restored with copy-back, `cmp`, and `touch` before the final run.
+- The same real-root witness checks journaled ring/default, and separately
+  confirms HOME-unset/MAOS_HOME-set still reads the explicitly selected home.
+- Hosted forget's one pending result has no observed cause; the dispositioned
+  open row preserves that distinction and the strict assertion.
+- The final unchanged no-home journey exited 0; the requested
+  `cargo test -p maos-cli cost_report_reads_payload_not_intent` exited 0 with
+  its one matching test passing. Ten separate local forget-journey samples all
+  passed (10/10, exit 0 each); the hosted pending cause remains unknown.
+  Focused nextest for both journey binaries passed 8/8 (`artifact://16259`).
+- The first post-correction crypto cargo and nextest runs each had four
+  setup failures: the recording fixture was older than the `maos-cli` source
+  input because that source was touched after fixture provisioning
+  (`artifact://16259:2150-2220,9117-9241`). This is a deterministic fixture
+  freshness failure, not a test flake; a fresh fixture provision is required.
+- Final static gates (`artifact://16260`) passed kloc, env contract, service
+  boundary, composition root, test cost and kernel baseline. The first
+  dev-record gate found the new ownerless observation insufficiently marked;
+  after explicitly recording Main's disposition it passed (`artifact://16250`).
+- Re-provision after touching both source inputs completed all six fixture
+  artefacts, but the subsequent `cargo build -p maos-bin -p maos-cli` did not
+  finish before the 1,200 s command deadline (`artifact://16266:592-962`).
+  The timed-out step was a build, not a rerun of a failed test.
+- After provisioning, `cargo test -p maos-bin --test crypto_provider_20_13`
+  passed 12/12 and `cargo nextest run -p maos-bin --test
+  crypto_provider_20_13 --profile ci` passed 12/12 (`artifact://16270`).
+- Cleanup removed the plant scratch (6,057 apparent bytes) and at least
+  275 eligible old incremental directories (estimated 5,492,035,584 allocated
+  bytes). The first cleanup pass was interrupted at its deadline and resumed;
+  an interrupted removal could make that estimate low. `/proc/1/fd` and
+  `/proc/7/fd` were unreadable, so age and nonblocking lock probes were used.
+- `cargo test -p maos-bin --no-default-features --test verb_table_15_3`
+  exited 0, 7/7 (`artifact://16275`).

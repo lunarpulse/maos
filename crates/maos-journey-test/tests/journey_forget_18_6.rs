@@ -214,10 +214,17 @@ fn live_forget_redistills_and_never_resurrects_then_pending_is_typed() {
     assert!(!requests.is_empty());
     let outcomes = terminal["redistill_outcomes"].as_array().unwrap();
     assert_eq!(requests.len(), outcomes.len());
-    assert_eq!(terminal["pending_count"], 0);
+    assert_eq!(
+        terminal["pending_count"],
+        0,
+        "terminal: {terminal}\ndaemon: {}",
+        daemon.diagnostics()
+    );
     assert_eq!(
         terminal["redistilled_count"].as_u64().unwrap() as usize,
-        requests.len()
+        requests.len(),
+        "terminal: {terminal}\ndaemon: {}",
+        daemon.diagnostics()
     );
     let after_forget = h::rows(home.path());
     let mut scrubbed = Vec::new();

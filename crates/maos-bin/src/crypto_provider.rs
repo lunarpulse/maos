@@ -7,20 +7,27 @@ use maos_domain::ports::CryptoProvider;
 pub struct ProviderRow {
     pub name: &'static str,
     pub version: &'static str,
-    build: fn(&Path) -> Arc<dyn CryptoProvider>,
+    build: fn(Option<&Path>) -> Result<Arc<dyn CryptoProvider>, String>,
 }
 
 pub const PROVIDERS: &[ProviderRow] = &[
     ProviderRow {
         name: "ring",
         version: "0.17.14",
-        build: |_| Arc::new(maos_kernel_core::security::crypto::RingCryptoProvider),
+        build: |_| {
+            Ok(Arc::new(
+                maos_kernel_core::security::crypto::RingCryptoProvider,
+            ))
+        },
     },
     #[cfg(feature = "crypto-recording")]
     ProviderRow {
         name: "recording",
         version: "test",
-        build: |home| Arc::new(recording::RecordingCryptoProvider::new(home)),
+        build: |home| {
+            let home = home.ok_or("recording provider requires a home")?;
+            Ok(Arc::new(recording::RecordingCryptoProvider::new(home)))
+        },
     },
 ];
 
@@ -52,38 +59,42 @@ pub fn validate(name: &str) -> Result<&'static ProviderRow, String> {
         })
 }
 
-pub fn select(home: &Path) -> Result<SelectedCrypto, String> {
-    let path = home.join("config.toml");
-    let error = |detail: String| {
-        format!(
-            "{}: {detail} (known providers: {})",
-            path.display(),
-            known_names()
-        )
-    };
-    let recorded = match std::fs::read_to_string(&path) {
-        Ok(text) => {
-            let doc: toml::Value = toml::from_str(&text).map_err(|e| error(format!("{e}")))?;
-            match doc.get("crypto") {
-                None => None,
-                Some(table) => Some(
-                    table
-                        .get("provider")
-                        .and_then(toml::Value::as_str)
-                        .ok_or_else(|| error("[crypto] provider must be a string".into()))?
-                        .to_owned(),
-                ),
+pub fn select(home: Option<&Path>) -> Result<SelectedCrypto, String> {
+    let recorded = if let Some(home) = home {
+        let path = home.join("config.toml");
+        let error = |detail: String| {
+            format!(
+                "{}: {detail} (known providers: {})",
+                path.display(),
+                known_names()
+            )
+        };
+        match std::fs::read_to_string(&path) {
+            Ok(text) => {
+                let doc: toml::Value = toml::from_str(&text).map_err(|e| error(format!("{e}")))?;
+                match doc.get("crypto") {
+                    None => None,
+                    Some(table) => Some(
+                        table
+                            .get("provider")
+                            .and_then(toml::Value::as_str)
+                            .ok_or_else(|| error("[crypto] provider must be a string".into()))?
+                            .to_owned(),
+                    ),
+                }
             }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => return Err(error(e.to_string())),
         }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-        Err(e) => return Err(error(e.to_string())),
+    } else {
+        None
     };
     let row = validate(recorded.as_deref().unwrap_or("ring"))?;
     Ok(SelectedCrypto {
         name: row.name,
         version: row.version,
         defaulted: recorded.is_none(),
-        provider: (row.build)(home),
+        provider: (row.build)(home)?,
     })
 }
 

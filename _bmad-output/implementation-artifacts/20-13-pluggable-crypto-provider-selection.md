@@ -517,6 +517,20 @@ vectors failed before their respective fixes (exit 101, `artifact://15717` and
 `artifact://16016`). Both changes are test-only;
 no kernel source or kernel pin is changed.
 
+**Hosted correction to review F1/P7.** The review allowed either refusing an
+unresolvable home or rejecting a non-absolute configuration path. Its refusal
+fix conflicted with the earlier D-18-7-R1 contract: unavailable home must not
+abort the daemon or independent offline children with explicit data roots.
+When neither `MAOS_HOME` nor `HOME` resolves, provider selection now defaults
+to `ring` without constructing or reading any configuration path; the
+selection frame records `source: default`. An explicitly resolved `MAOS_HOME`
+still controls configuration even with `HOME` unset. The unchanged 18-7 journey
+and `absent_home_never_reads_working_directory_config` witness both behaviors,
+including an ignored bogus CWD configuration.
+The formatted correction measures bin 36,225 -> 36,234 (+9; ceiling
+36,410), and aggregate 199,049 -> 199,058 (+9; hardfail re-pinned to
+199,059). The 20-14 baseline is retained; kernel remains 26,841 / 21,042.
+
 **Review Defer 1 adjudication (2026-11-10).** Dismissed: I2 fail-stop already
 guarantees no unjournaled selection. Main corrected the premise of the operator
 `d1w` ruling: `insert_frame_event` returns `LogBeforeDeliver<()>`, not a
