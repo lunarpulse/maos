@@ -52,6 +52,21 @@ fn unknown_provider_refused_without_changing_config() {
     assert_eq!(rejected.status.code(), Some(78));
     assert!(String::from_utf8_lossy(&rejected.stderr).contains("ring"));
     assert_eq!(std::fs::read(&config).unwrap(), original);
+    for args in [
+        vec!["init", "--crypto-provider=bogus"],
+        vec![
+            "init",
+            "--crypto-provider",
+            "ring",
+            "--crypto-provider",
+            "bogus",
+        ],
+    ] {
+        let rejected = command(&args);
+        assert_eq!(rejected.status.code(), Some(78), "{args:?}");
+        assert!(String::from_utf8_lossy(&rejected.stderr).contains("ring"));
+        assert_eq!(std::fs::read(&config).unwrap(), original);
+    }
     std::fs::write(&config, "[crypto]\nprovider = \"bogus\"\n").unwrap();
     let rejected = command(&["run", "spirits/butler/manifest.toml", "--once"]);
     assert_eq!(rejected.status.code(), Some(78));
@@ -62,7 +77,42 @@ fn unknown_provider_refused_without_changing_config() {
     std::fs::write(&config, "[crypto]\nprovider = 4\n").unwrap();
     let malformed = command(&["run", "spirits/butler/manifest.toml", "--once"]);
     assert_eq!(malformed.status.code(), Some(78));
-    assert!(String::from_utf8_lossy(&malformed.stderr).contains("ring"));
+    assert!(
+        String::from_utf8_lossy(&malformed.stderr).contains("[crypto] provider must be a string")
+    );
+}
+
+#[test]
+fn malformed_provider_reports_the_exact_type_error() {
+    let home = tempfile::tempdir().unwrap();
+    std::fs::write(home.path().join("config.toml"), "[crypto]\nprovider = 4\n").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
+        .args(["run"])
+        .env_clear()
+        .env("HOME", home.path())
+        .env("MAOS_HOME", home.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(78));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("[crypto] provider must be a string"));
+}
+
+#[test]
+fn absent_home_never_reads_working_directory_config() {
+    let cwd = tempfile::tempdir().unwrap();
+    std::fs::write(
+        cwd.path().join("config.toml"),
+        "[crypto]\nprovider = \"bogus\"\n",
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
+        .current_dir(cwd.path())
+        .env_clear()
+        .args(["run", "unused.toml", "--once"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(78));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("no MAOS home resolvable"));
 }
 
 #[test]
@@ -98,6 +148,48 @@ fn reselection_preserves_unrelated_configuration() {
     assert!(result.status.success());
     assert!(String::from_utf8_lossy(&result.stdout).contains("ring -> ring"));
     assert_eq!(std::fs::read_to_string(config).unwrap(), before);
+}
+
+#[test]
+fn init_repairs_and_reselects_inline_or_missing_provider() {
+    let home = tempfile::tempdir().unwrap();
+    let dir = home.path().join("maos");
+    std::fs::create_dir_all(&dir).unwrap();
+    let config = dir.join("config.toml");
+    let binary = fixtures::fixture("maos-crypto-recording");
+    for previous in [
+        "crypto = { provider = \"ring\", keep = true }\n",
+        "[crypto]\nkeep = true\n",
+    ] {
+        std::fs::write(
+            &config,
+            format!("# retained\n{previous}\n[slots]\n[retention]\n"),
+        )
+        .unwrap();
+        let output = Command::new(&binary)
+            .args(["init", "--crypto-provider", "recording"])
+            .env_clear()
+            .env("HOME", home.path())
+            .env("MAOS_HOME", &dir)
+            .env("XDG_DATA_HOME", home.path().join("data"))
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let text = std::fs::read_to_string(&config).unwrap();
+        assert!(
+            text.contains("# retained") && text.contains("keep = true"),
+            "{text}"
+        );
+        let parsed: toml::Value = toml::from_str(&text).unwrap();
+        assert_eq!(parsed["crypto"]["provider"].as_str(), Some("recording"));
+        if previous.starts_with("crypto") {
+            assert!(String::from_utf8_lossy(&output.stdout).contains("ring -> recording"));
+        }
+    }
 }
 
 #[test]
@@ -253,9 +345,14 @@ fn installed_claims_compare_actual_crypto_and_endpoint() {
         .status
         .success());
     let refused_boot = command(&["shell", "--plain"]);
+    assert_eq!(
+        refused_boot.status.code(),
+        Some(0),
+        "daemon continues after per-spirit refusal"
+    );
     let refusal = String::from_utf8_lossy(&refused_boot.stderr);
     assert!(
-        refusal.contains("installed spirit 'drift-spirit' refused at boot")
+        refusal.contains("installed spirit 'drift-spirit' refused at boot: admission_refused")
             && refusal.contains("CryptoProvider"),
         "{refusal}"
     );
@@ -338,6 +435,10 @@ fn selected_provider_is_journaled_once_per_boot() {
     let payload: serde_json::Value =
         serde_json::from_str(rows[0]["payload"].as_str().unwrap()).unwrap();
     assert_eq!(payload["provider"], "ring");
+    assert_eq!(
+        payload["version"],
+        maos_bin::crypto_provider::validate("ring").unwrap().version
+    );
     assert_eq!(payload["source"], "config");
     // An upgraded home without a crypto table records the default exactly once.
     std::fs::write(home.path().join("maos/config.toml"), "[slots]\n").unwrap();
@@ -388,6 +489,39 @@ fn selected_provider_is_journaled_once_per_boot() {
             .count(),
         1
     );
+}
+
+#[test]
+fn selection_journal_failure_stops_real_boot() {
+    use maos_kernel_core::iac::TransparencyLogAdapter;
+    let home = tempfile::tempdir().unwrap();
+    let db = home.path().join("maos/audit/transparency.sqlite");
+    std::fs::create_dir_all(db.parent().unwrap()).unwrap();
+    drop(TransparencyLogAdapter::open_with_global_legal_holds(&db, &db, 1).unwrap());
+    rusqlite::Connection::open(&db)
+        .unwrap()
+        .execute_batch(
+            "CREATE TRIGGER fail_crypto_selection BEFORE INSERT ON transparency_log \
+         WHEN NEW.intent = 'crypto.provider.selected' \
+         BEGIN SELECT RAISE(ABORT, 'selection storage failure'); END;",
+        )
+        .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
+        .args(["shell", "--plain"])
+        .env_clear()
+        .env("PATH", "/usr/bin:/bin")
+        .env("HOME", home.path())
+        .env("MAOS_HOME", home.path().join("maos"))
+        .env("XDG_DATA_HOME", home.path().join("data"))
+        .env("XDG_CONFIG_HOME", home.path().join("config"))
+        .env("MAOS_MEMORY_ROOT", home.path().join("memory"))
+        .env("MAOS_NOTIFY_DISABLE", "1")
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("selection storage failure"));
+    assert!(!home.path().join("maos/control.json").exists());
 }
 
 #[test]
@@ -459,7 +593,7 @@ fn recording_provider_observes_crl_import_over_door() {
             .spawn()
             .unwrap(),
     );
-    let deadline = Instant::now() + Duration::from_secs(45);
+    let deadline = Instant::now() + Duration::from_secs(25);
     loop {
         let list = command(&ctl)
             .args(["revocations", "list"])

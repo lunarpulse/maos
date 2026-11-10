@@ -682,12 +682,12 @@ fn assert_native_fd_refusal(program: &Path) {
 }
 
 fn descendant_is_dead(state: Option<&str>) -> bool {
-    matches!(state, None | Some("Z" | "X"))
+    matches!(state, None | Some("Z" | "X" | "x"))
 }
 
 #[test]
 fn descendant_terminal_state_accepts_reaped_or_dead_but_not_live() {
-    for state in [None, Some("Z"), Some("X")] {
+    for state in [None, Some("Z"), Some("X"), Some("x")] {
         assert!(descendant_is_dead(state), "expected dead state: {state:?}");
     }
     for state in [Some("R"), Some("S"), Some("D")] {

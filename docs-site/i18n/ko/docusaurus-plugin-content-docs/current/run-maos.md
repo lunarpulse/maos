@@ -35,11 +35,16 @@ cargo build -p maos-bin --release
 공급자 목록과 함께 종료 코드 78로 부팅을 거부합니다. 부팅마다 공급자, 버전,
 설정 또는 기본값 출처가 `crypto.provider.selected`로 기록됩니다.
 `maosctl audit query --frame-kind TelemetryEvent --intent-contains crypto.provider`로 조회합니다.
+`Kernel` 출처이고 pid가 `0`인 행만 신뢰해야 합니다. Spirit도 같은 intent를
+기록할 수 있으며 그 행은 선택된 공급자의 증거가 아닙니다.
 
 v1.0에는 `ring`만 포함됩니다. 이는 교체 가능한 연결점이며 FIPS 검증이 아닙니다.
 FIPS 140-3 검증 모듈은 v1.5에 계획되어 있습니다. daemon은 설치된 게시자 서명과
 ComplianceClaim을 선택된 공급자로 다시 검증합니다. `maosctl spirit install`과
-`maosctl import`는 설치 시 사전 검사이며 실행 전에 daemon이 다시 검증합니다.
+`maosctl import`는 여전히 ring 직접 사전 검사입니다. 명시적인
+`maos run <installed-manifest>`도 ring으로 게시자 서명을 검증하고
+ComplianceClaim을 평가하지 않으므로 daemon 부팅 재검증 보장에 포함되지
+않습니다. vetting, yank, registry publish 검사도 ring을 직접 사용합니다.
 감사 산출물 서명, 게시자 도구, rustls TLS는 이 공급자 범위 밖입니다.
 20-13 L2 전에는 kernel 내부 T3 입장 검증이 여전히 `ring`을 사용합니다.
 

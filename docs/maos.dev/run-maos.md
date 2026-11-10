@@ -35,13 +35,18 @@ selections refuse boot with exit 78 and list the providers available in that
 build. Each boot journals `crypto.provider.selected` with the provider, version
 and whether the selection came from config or the default. Inspect it with
 `maosctl audit query --frame-kind TelemetryEvent --intent-contains crypto.provider`.
+Trust only rows whose origin is `Kernel` and pid is `0`; a Spirit can emit the
+same intent and its rows are not evidence of the selected provider.
 
 v1.0 ships `ring` only: this is a pluggability seam, not FIPS validation. A
 FIPS 140-3 validated module is planned for v1.5. Daemon boot re-verifies
 installed publisher signatures and ComplianceClaims using the selected
-provider; `maosctl spirit install` and `maosctl import` are install-time
-pre-checks, and the daemon re-verifies before anything runs. Audit-artifact
-signatures, publisher tooling and rustls TLS are outside this provider boundary.
+provider. `maosctl spirit install` and `maosctl import` remain ring-direct
+install-time pre-checks. An explicit `maos run <installed-manifest>` likewise
+uses ring-direct publisher verification and does not evaluate the ComplianceClaim;
+it is not covered by the daemon boot re-verification guarantee. Vetting, yank
+and registry publish checks also remain ring-direct. Audit-artifact signatures,
+publisher tooling and rustls TLS are outside this provider boundary.
 Until 20-13 L2, kernel-internal T3 admission still uses `ring`.
 
 

@@ -1547,17 +1547,31 @@ fn air_gap_init(args: &[String]) {
 }
 
 fn init_crypto_provider(args: &[String]) -> Result<Option<&str>, String> {
-    let Some(index) = args.iter().position(|arg| arg == "--crypto-provider") else {
-        return Ok(None);
-    };
-    let name = args.get(index + 1).ok_or_else(|| {
-        format!(
-            "--crypto-provider requires a value (known: {})",
-            maos_bin::crypto_provider::known_names()
-        )
-    })?;
-    maos_bin::crypto_provider::validate(name)?;
-    Ok(Some(name))
+    let mut selected = None;
+    let mut args = args.iter();
+    while let Some(arg) = args.next() {
+        let name = if arg == "--crypto-provider" {
+            Some(args.next().map(String::as_str).ok_or_else(|| {
+                format!(
+                    "--crypto-provider requires a value (known: {})",
+                    maos_bin::crypto_provider::known_names()
+                )
+            })?)
+        } else {
+            arg.strip_prefix("--crypto-provider=")
+        };
+        if let Some(name) = name {
+            if selected.is_some() {
+                return Err(format!(
+                    "--crypto-provider may only be specified once (known: {})",
+                    maos_bin::crypto_provider::known_names()
+                ));
+            }
+            maos_bin::crypto_provider::validate(name)?;
+            selected = Some(name);
+        }
+    }
+    Ok(selected)
 }
 
 #[cfg(not(feature = "network"))]
@@ -1980,7 +1994,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     // Refuse an invalid persisted selection before opening stores or parsing a
     // run target; all boot paths below share this one selected instance.
-    let crypto_home = maos_domain::operator_door::maos_home()?.unwrap_or_default();
+    let crypto_home = maos_domain::operator_door::maos_home()?.unwrap_or_else(|| {
+        eprintln!("maos: no MAOS home resolvable");
+        std::process::exit(78);
+    });
     let selected_crypto = maos_bin::crypto_provider::select(&crypto_home).unwrap_or_else(|error| {
         eprintln!("maos: {error}");
         std::process::exit(78);
@@ -10847,16 +10864,14 @@ async fn run_uninstall_cascade_inner(
             .iter()
             .all(|category| matches!(category.status, Status::VerifiedEmpty))
     {
-        // Ignore only this boot's required provider-selection frame. It is
-        // infrastructure, not pre-existing evidence about the requested Spirit;
-        // all other rows, including selections from earlier boots, still count.
+        // Kernel selection frames are infrastructure across all boots. A Spirit
+        // frame with the same intent remains evidence and must not be ignored.
         let conn = maos_audit::open_tenant_artifact_readonly(audit_db_path)?
             .ok_or("opened transparency log disappeared")?;
         let prior_frames: bool = conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM transparency_log WHERE NOT \
-             (boot_nonce = ?1 AND spirit_pid = 0 AND kind = ?2 AND intent = ?3 AND origin = ?4))",
+             (spirit_pid = 0 AND kind = ?1 AND intent = ?2 AND origin = ?3))",
             rusqlite::params![
-                transparency_log.boot_nonce() as i64,
                 maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent as i64,
                 "crypto.provider.selected",
                 maos_domain::invariants::i3::FrameOrigin::Kernel as i64,

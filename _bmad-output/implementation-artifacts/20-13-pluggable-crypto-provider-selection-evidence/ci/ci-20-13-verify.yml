@@ -41,6 +41,7 @@ jobs:
           cargo run --locked -p xtask -- build-test-fixtures
           cargo build --locked -p maos-bin -p maos-cli
           cargo nextest run --locked -p maos-bin --test crypto_provider_20_13 --profile ci --test-threads 1
+          cargo nextest run --locked -p maos-bin --test crypto_real_shell_20_13 --test crypto_real_boot_20_13 --profile ci --test-threads 1
           if [[ "${{ matrix.image }}" != *-arm ]]; then
             cargo nextest run --locked -p maos-bin --test crypto_provider_t3_20_13 --profile ci --test-threads 1
           fi

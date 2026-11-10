@@ -702,7 +702,7 @@ fn empty_transparency_log_is_not_found_even_for_unknown_spirit() {
 }
 
 #[test]
-fn prior_boot_provider_selection_still_counts_as_populated_history() {
+fn prior_boot_provider_selection_is_not_spirit_history() {
     let fixture = Fixture::new();
     std::fs::create_dir_all(fixture.audit_db().parent().unwrap()).unwrap();
     drop(SharedMemoryStore::open(&fixture.audit_db()).unwrap());
@@ -724,6 +724,39 @@ fn prior_boot_provider_selection_still_counts_as_populated_history() {
     let mut command = fixture.command();
     command.env("MAOS_SPIRIT_ID", "ghost-spirit");
     let output = command.output().unwrap();
+    assert_eq!(output.status.code(), Some(4));
+    assert_eq!(terminal(&output)["outcome"], "not_found");
+    let output = fixture
+        .command()
+        .env("MAOS_SPIRIT_ID", "ghost-spirit")
+        .output()
+        .unwrap();
+    // The first NotFound durably appends a Decision; HEAD counted that row.
+    assert_eq!(output.status.code(), Some(5));
+    assert_eq!(terminal(&output)["outcome"], "failed");
+    let fixture = Fixture::new();
+    std::fs::create_dir_all(fixture.audit_db().parent().unwrap()).unwrap();
+    drop(SharedMemoryStore::open(&fixture.audit_db()).unwrap());
+    let log = TransparencyLogAdapter::open_with_global_legal_holds(
+        &fixture.audit_db(),
+        &fixture.audit_db(),
+        2,
+    )
+    .unwrap();
+    log.insert_frame_event(
+        maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
+        17,
+        None,
+        "crypto.provider.selected",
+        b"{}",
+        maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+    );
+    drop(log);
+    let output = fixture
+        .command()
+        .env("MAOS_SPIRIT_ID", "ghost-spirit")
+        .output()
+        .unwrap();
     assert_eq!(output.status.code(), Some(5));
     assert_eq!(terminal(&output)["outcome"], "failed");
     assert_eq!(regular_files(&fixture.proof_dir()), 0);

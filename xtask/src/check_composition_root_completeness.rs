@@ -147,13 +147,17 @@ fn crypto_provider_violations(crates: &std::path::Path) -> Result<Vec<String>, S
     use syn::visit::Visit;
     let mut files = Vec::new();
     crate::fs_walk::collect_rs_files(crates, &mut files);
+    crate::fs_walk::collect_rs_files(std::path::Path::new("spirits"), &mut files);
+    crate::fs_walk::collect_rs_files(std::path::Path::new("examples"), &mut files);
+    crate::fs_walk::collect_rs_files(std::path::Path::new("xtask/src"), &mut files);
     let mut violations = Vec::new();
     for file in files {
         let path = file.to_string_lossy().replace('\\', "/");
-        let Some(rel) = path.split("crates/").nth(1) else {
-            continue;
-        };
-        if !rel.contains("/src/") || CRYPTO_ALLOWED_FILES.iter().any(|(p, _)| rel == *p) {
+        let rel = path.strip_prefix("crates/").unwrap_or(&path);
+        if !rel.contains("/src/")
+            || rel.contains("/src/tests/")
+            || CRYPTO_ALLOWED_FILES.iter().any(|(p, _)| rel == *p)
+        {
             continue;
         }
         let text = fs::read_to_string(&file).map_err(|e| format!("{path}: {e}"))?;
@@ -161,6 +165,7 @@ fn crypto_provider_violations(crates: &std::path::Path) -> Result<Vec<String>, S
         let mut visitor = CryptoConstructionVisitor {
             path: rel,
             pending_t3: false,
+            security_impl: false,
             violations: &mut violations,
         };
         visitor.visit_file(&ast);
@@ -171,7 +176,31 @@ fn crypto_provider_violations(crates: &std::path::Path) -> Result<Vec<String>, S
 struct CryptoConstructionVisitor<'a> {
     path: &'a str,
     pending_t3: bool,
+    security_impl: bool,
     violations: &'a mut Vec<String>,
+}
+impl CryptoConstructionVisitor<'_> {
+    fn reject(&mut self, span: proc_macro2::Span) {
+        self.violations.push(format!(
+            "error: {}:{} names RingCryptoProvider outside the selection root",
+            self.path,
+            span.start().line
+        ));
+    }
+}
+
+fn names_ring(path: &syn::Path) -> bool {
+    path.segments
+        .iter()
+        .any(|segment| segment.ident == "RingCryptoProvider")
+}
+
+fn tokens_name_ring(tokens: proc_macro2::TokenStream) -> bool {
+    tokens.into_iter().any(|token| match token {
+        proc_macro2::TokenTree::Ident(ident) => ident == "RingCryptoProvider",
+        proc_macro2::TokenTree::Group(group) => tokens_name_ring(group.stream()),
+        _ => false,
+    })
 }
 
 impl<'ast> syn::visit::Visit<'ast> for CryptoConstructionVisitor<'_> {
@@ -180,6 +209,16 @@ impl<'ast> syn::visit::Visit<'ast> for CryptoConstructionVisitor<'_> {
             return;
         }
         syn::visit::visit_item_mod(self, item);
+    }
+
+    fn visit_item_impl(&mut self, item: &'ast syn::ItemImpl) {
+        let previous = self.security_impl;
+        let self_ty = &item.self_ty;
+        self.security_impl = self.path == "maos-kernel-core/src/security/mod.rs"
+            && item.trait_.is_none()
+            && quote::quote!(#self_ty).to_string().replace(' ', "") == "SecurityManagerAdapter";
+        syn::visit::visit_item_impl(self, item);
+        self.security_impl = previous;
     }
 
     fn visit_item_fn(&mut self, item: &'ast syn::ItemFn) {
@@ -193,8 +232,7 @@ impl<'ast> syn::visit::Visit<'ast> for CryptoConstructionVisitor<'_> {
             return;
         }
         let previous = self.pending_t3;
-        self.pending_t3 =
-            self.path == "maos-kernel-core/src/security/mod.rs" && item.sig.ident == "admit_spirit";
+        self.pending_t3 = self.security_impl && item.sig.ident == "admit_spirit";
         syn::visit::visit_impl_item_fn(self, item);
         self.pending_t3 = previous;
     }
@@ -202,48 +240,51 @@ impl<'ast> syn::visit::Visit<'ast> for CryptoConstructionVisitor<'_> {
     fn visit_use_rename(&mut self, item: &'ast syn::UseRename) {
         use syn::spanned::Spanned;
         if item.ident == "RingCryptoProvider" {
-            self.violations.push(format!(
-                "error: {}:{} aliases RingCryptoProvider outside the selection root",
-                self.path,
-                item.span().start().line
-            ));
+            self.reject(item.span());
         }
         syn::visit::visit_use_rename(self, item);
     }
 
     fn visit_expr_path(&mut self, expr: &'ast syn::ExprPath) {
         use syn::spanned::Spanned;
-        if expr
-            .path
-            .segments
-            .iter()
-            .any(|s| s.ident == "RingCryptoProvider")
-            && !(self.pending_t3 && expr.span().start().line == 350)
+        if names_ring(&expr.path)
+            && !(self.pending_t3
+                && quote::quote!(#expr).to_string().replace(' ', "")
+                    == "crate::security::crypto::RingCryptoProvider"
+                && std::mem::take(&mut self.pending_t3))
         {
-            self.violations.push(format!(
-                "error: {}:{} constructs RingCryptoProvider outside the selection root",
-                self.path,
-                expr.span().start().line
-            ));
+            self.reject(expr.span());
         }
         syn::visit::visit_expr_path(self, expr);
     }
 
     fn visit_expr_struct(&mut self, expr: &'ast syn::ExprStruct) {
         use syn::spanned::Spanned;
-        if expr
-            .path
-            .segments
-            .iter()
-            .any(|s| s.ident == "RingCryptoProvider")
-        {
-            self.violations.push(format!(
-                "error: {}:{} constructs RingCryptoProvider outside the selection root",
-                self.path,
-                expr.span().start().line
-            ));
+        if names_ring(&expr.path) {
+            self.reject(expr.span());
         }
         syn::visit::visit_expr_struct(self, expr);
+    }
+
+    fn visit_type_path(&mut self, ty: &'ast syn::TypePath) {
+        use syn::spanned::Spanned;
+        if names_ring(&ty.path) {
+            self.reject(ty.span());
+        }
+        syn::visit::visit_type_path(self, ty);
+    }
+
+    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
+        use syn::spanned::Spanned;
+        let tokens = mac.tokens.to_string();
+        let generated = self.path == "maos-corpus-gen/src/lib.rs"
+            && ["sha_check_sr.rs", "sha_check_rt.rs", "sha_check_ccac.rs"]
+                .iter()
+                .any(|name| tokens == format!("concat ! (env ! (\"OUT_DIR\") , \"/{name}\")"));
+        if tokens_name_ring(mac.tokens.clone()) || (mac.path.is_ident("include") && !generated) {
+            self.reject(mac.span());
+        }
+        syn::visit::visit_macro(self, mac);
     }
 }
 
@@ -267,6 +308,7 @@ mod crypto_tests {
         CryptoConstructionVisitor {
             path: "maos-bin/src/main.rs",
             pending_t3: false,
+            security_impl: false,
             violations: &mut found,
         }
         .visit_file(&parsed);
@@ -287,6 +329,30 @@ mod crypto_tests {
         assert_eq!(
             violations("use module::RingCryptoProvider as Hidden; fn root() { let _ = Hidden; }"),
             1
+        );
+        for source in [
+            "type Hidden = RingCryptoProvider; fn f() { let _ = Hidden; }",
+            "fn f() { let _ = <RingCryptoProvider as Default>::default(); }",
+            "fn f() { let _: RingCryptoProvider = Default::default(); }",
+            "fn f() { let _ = vec![RingCryptoProvider]; }",
+            "macro_rules! hidden { () => { RingCryptoProvider } }",
+            "include!(\"hidden.rs\");",
+        ] {
+            assert!(violations(source) > 0, "missed {source}");
+        }
+        let mut found = Vec::new();
+        let syntax = syn::parse_file("\n\nimpl SecurityManagerAdapter { fn admit_spirit() { let _ = crate::security::crypto::RingCryptoProvider; let _ = crate::security::crypto::RingCryptoProvider; } fn other() { let _ = crate::security::crypto::RingCryptoProvider; } }").unwrap();
+        CryptoConstructionVisitor {
+            path: "maos-kernel-core/src/security/mod.rs",
+            pending_t3: false,
+            security_impl: false,
+            violations: &mut found,
+        }
+        .visit_file(&syntax);
+        assert_eq!(
+            found.len(),
+            2,
+            "only one named T3 construction may be exempt: {found:?}"
         );
     }
 }

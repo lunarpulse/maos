@@ -512,9 +512,67 @@ assertions and an ARM cgroup descendant that was already dead (`X`) rather than
 zombie (`Z`). `xtask/tests/ci_shape_18_0.rs` derives recall and recall-wire
 counts/names from the Rust source and plants each missing token independently;
 `crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs` accepts reaped,
-`Z`, or `X`, but not a live state. Before fixing the classifier, the new `X`
-vector failed locally (exit 101, `artifact://15717`). Both changes are test-only;
+`Z`, `X`, or `x`, but not a live state. The original `X` and subsequent `x`
+vectors failed before their respective fixes (exit 101, `artifact://15717` and
+`artifact://16016`). Both changes are test-only;
 no kernel source or kernel pin is changed.
+
+**Review Defer 1 adjudication (2026-11-10).** Dismissed: I2 fail-stop already
+guarantees no unjournaled selection. Main corrected the premise of the operator
+`d1w` ruling: `insert_frame_event` returns `LogBeforeDeliver<()>`, not a
+`Result`; SQLite write failure panics before consumers are served. Do not
+catch the panic or introduce a fallible append API. The real-boot SQLite
+failure-injection witness is `selection_journal_failure_stops_real_boot`.
+
+The recording-provider compile guard is `not(debug_assertions)`: a custom
+release profile enabling debug assertions can compile it. Release symbol
+inspection (`check-mock-not-in-release`) is the separate backstop; no such
+profile override was found by review.
+
+**P4 HEAD-equivalence adjudication (2026-11-10).** At `be3b9763`,
+`run_uninstall_cascade_inner` calls `has_frames()` with no frame exemption
+(`main.rs:10823-10826`) and `run_uninstall_cascade` appends the terminal
+Decision even for NotFound (`main.rs:10581-10589`). The existing
+`empty_transparency_log_is_not_found_even_for_unknown_spirit` test covers the
+first call only; no repeated-unknown test was found in the two uninstall
+binaries. The HEAD results below are inferred from those code paths, not
+measured by running the old tree:
+
+| Empty home, same unknown Spirit | HEAD (code-derived) | Corrected L1 |
+|---|---|---|
+| First uninstall | 4 / NotFound | 4 / NotFound, ignoring kernel selection rows |
+| Second uninstall | 5 / Failed: first NotFound Decision made the log populated | 5 / Failed for the same Decision row |
+
+Selection rows from every boot are excluded only when kind is TelemetryEvent,
+origin Kernel, pid 0, and intent exactly `crypto.provider.selected`. A
+Spirit-origin frame with that intent remains populated evidence.
+
+**P5 real-mode refinement (Main adjudication of `p5w`, 2026-11-10).**
+The literal one-boot four-surface witness remains the in-process
+`crypto_integrated_20_13` daemon harness. Real binaries are witnessed per mode:
+`crypto_real_shell_20_13` covers installed boot re-verification, a live-door
+CRL import and token issuance in one shell root; `crypto_real_boot_20_13`
+covers a cohort root's governed token and at-rest seal (and live-door CRL).
+No single production mode reaches all four: cohort one-shot mode deliberately
+skips the installed inventory. This security question is ownerless-and-open,
+dispositioned in `deferred-work.md` for the first story touching cohort boot.
+Both real witnesses and the in-process witness run in the blocking
+composition-root discipline job.
+
+Review corrections additionally change `.github/workflows/discipline.yml`,
+`crates/maos-bin/tests/{crypto_endpoint_drift_20_13.rs,
+crypto_real_shell_20_13.rs,crypto_real_boot_20_13.rs}`, the existing
+`crypto_provider_20_13.rs` and erasure witness, composition-root guard,
+`xtask/gate-registry.toml`, test budgets and nextest serial routing, and the
+operator docs / evidence / deferred records listed above. No kernel source or
+FKCS-declared admission file is modified by these corrections.
+
+After review corrections and `cargo fmt --all`, exact `kloc-check` measurement:
+bin 36,225 (+16 from candidate; ceiling 36,410), shell 675 (+2; ceiling 737),
+compliance 2,107 (unchanged), registry 6,194 (unchanged), domain 10,198
+(unchanged), xtask 44,935 (+61; ceiling 44,938), kernel 21,042 (unchanged),
+aggregate 198,914 (+79; ceiling 199,280). The exact pins and aggregate
+hardfail 198,915 are re-pinned together; `tests/` witness bodies are excluded.
 
 
 ### Story context creation

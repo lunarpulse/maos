@@ -94,6 +94,8 @@ pub fn journal(log: &maos_kernel_core::iac::TransparencyLogAdapter, selected: &S
         "source": if selected.defaulted { "default" } else { "config" },
     });
     let bytes = payload.to_string();
+    // The I2 writer returns a proof token, not a Result: any storage failure
+    // halts before this boot can expose consumers or an unjournaled selection.
     let _token = log.insert_frame_event(
         maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
         0,

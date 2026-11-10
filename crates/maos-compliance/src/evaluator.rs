@@ -153,7 +153,7 @@ fn evaluate_envelope_core(
         actual_fp.crypto_provider = claimed.crypto_provider.clone();
     }
     if unpinned_empty && claimed.provider_endpoint.endpoint_url.is_empty() {
-        actual_fp.provider_endpoint = claimed.provider_endpoint.clone();
+        actual_fp.provider_endpoint.endpoint_url = claimed.provider_endpoint.endpoint_url.clone();
     }
     let actual_hash = canonical_cbor::fingerprint_hash(&actual_fp);
 

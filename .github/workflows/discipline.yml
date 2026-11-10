@@ -441,6 +441,13 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-composition-root-completeness
         run: cargo run -p xtask -- check-composition-root-completeness --json
+      - name: Exercise recording-provider governance witness
+        run: cargo test --locked -p maos-bin --bin maos --features crypto-recording story_13_5a_enterprise_daemon_seam::crypto_provider_one_boot_reaches_all_four_surfaces -- --exact
+      - name: Build recording fixture and exercise real daemon modes
+        run: |
+          cargo run --locked -p xtask -- build-test-fixtures --only maos-crypto-recording
+          cargo build --locked -p maos-cli
+          cargo test --locked -p maos-bin --test crypto_real_shell_20_13 --test crypto_real_boot_20_13
 
   check-service-boundary:
     runs-on: ubuntu-latest

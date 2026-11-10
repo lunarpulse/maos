@@ -807,14 +807,16 @@ fn record_crypto_provider(
     let previous = match doc.get("crypto") {
         None => None,
         Some(item) => {
-            let table = item.as_table().ok_or("[crypto] must be a table")?;
-            Some(
-                table
-                    .get("provider")
-                    .and_then(toml_edit::Item::as_str)
-                    .ok_or("[crypto] provider must be a string")?
-                    .to_owned(),
-            )
+            let table = item.as_table_like().ok_or("[crypto] must be a table")?;
+            table
+                .get("provider")
+                .map(|value| {
+                    value
+                        .as_str()
+                        .map(str::to_owned)
+                        .ok_or("[crypto] provider must be a string")
+                })
+                .transpose()?
         }
     };
     if doc.get("crypto").is_none() {

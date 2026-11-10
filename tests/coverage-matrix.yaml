@@ -774,16 +774,18 @@ coverage:
     gates:
       - check-service-boundary
       - reproducible-build
-      - check-composition-root-completeness
     corpora: []
     phase: v0.1-alpha
     valid_until: '2027-05-12'
     notes: |
       Story 20-13 L1: crypto_provider_20_13 witnesses init, refusal and
       reselection (AC1), crypto and endpoint drift (AC4), and boot telemetry
-      (AC5). crypto_integrated_20_13 observes installed verification, token,
-      CRL over the live door and the governed at-rest seal on one boot with
-      one recording-provider identity (AC2).
+      (AC5). crypto_integrated_20_13 witnesses all four AC2 surfaces in one
+      in-process boot. Real-process witnesses are per mode: crypto_real_shell
+      covers installed verification, token and live-door CRL; crypto_real_boot
+      covers cohort token and governed at-rest seal. No single real mode reaches
+      all four: cohort mode skips the installed inventory. The blocking
+      composition-root discipline job runs these recording-provider witnesses.
       check-composition-root-completeness refuses bypass construction (AC3).
       Kernel T3 admission remains on ring pending 20-13 L2. Ring is not a
       FIPS-validated module.

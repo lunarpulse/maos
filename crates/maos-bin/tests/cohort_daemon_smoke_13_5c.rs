@@ -927,6 +927,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 19-1 — 32 → 33: `orchestrator_root.rs` joins it.
     // Story 19-3 — 33 → 34: `worker_workspace.rs` joins it.
     // Story 19-6 — 34 → 35: `replica_resolver.rs` joins it.
+    // Story 20-13 — 38 → 39: `crypto_provider.rs` joins the scanned roster.
     // Ring the doorbell, do not widen the wall.
     const SCANNED_SOURCE_FILES: [(&str, &str); 39] = [
         ("main.rs", include_str!("../src/main.rs")),

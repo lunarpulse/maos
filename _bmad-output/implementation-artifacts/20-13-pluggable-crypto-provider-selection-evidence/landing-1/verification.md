@@ -111,7 +111,7 @@ green. The recording feature is absent by default and refuses release builds.
 | Criterion | Witness (candidate line) | Before / plant | Observed final |
 |---|---|---|---|
 | AC1 | `crypto_provider_20_13.rs:9,36,81` | old init missing table; fallback plant exit 101 | focused 3 passed |
-| AC2 | `tests/support/crypto_integrated_20_13.rs:3` | CRL independent instance plant and identity split plant exit 101 | one boot passes all four surfaces with one recorded identity; T3 hosted-only |
+| AC2 | `tests/support/crypto_integrated_20_13.rs:3`; `crypto_real_shell_20_13.rs`; `crypto_real_boot_20_13.rs` | in-process CRL identity split plant and real-shell CRL split plant exit 101 | all four on one in-process boot; real processes prove per-mode subsets, not all four on one real boot; T3 hosted-only |
 | AC3 | `check_composition_root_completeness.rs` `crypto_construction_in_production_is_refused_after_test_module` | original scan five sites; root plant gate exit 1 | unit and final structural gate passed; T3 kernel exception explicitly retained for L2 |
 | AC4 | `crypto_provider_20_13.rs:156` | manifest crypto and endpoint plants each exit 101 | drift / unpinned integration vector passed |
 | AC5 | `crypto_provider_20_13.rs:69,288` | omitted-frame plant exit 101 | version pin and once-per-boot query passed |

@@ -116,6 +116,18 @@ seconds = 31
 reason = "20-13 real signed-substrate T3 Worker witness is isolated and serialized; local leg skips because the T3 substrate is unavailable. The 31 s exception is the minimum above the default pending a hosted measurement."
 owner = "20-13-pluggable-crypto-provider-selection"
 
+[[exception]]
+binary = "maos-bin::crypto_real_shell_20_13"
+seconds = 60
+reason = "20-13 real shell boot, installed package, live CRL and token witness; serialized, with bounded 25+10+10 second waits. Pending hosted timing."
+owner = "20-13-pluggable-crypto-provider-selection"
+
+[[exception]]
+binary = "maos-bin::crypto_real_boot_20_13"
+seconds = 75
+reason = "20-13 real cohort mTLS boot, live CRL and governed token/seal witness; serialized, with bounded 45+10+10 second waits. Pending hosted timing."
+owner = "20-13-pluggable-crypto-provider-selection"
+
 # --- Expensive tests (ignored in the default run) ---------------------------
 
 [[expensive]]
