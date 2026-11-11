@@ -1543,7 +1543,7 @@ fn wasm_archive_keeps_image_matrix_suite_counts_and_all_runtime_markers() {
         (
             "Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
             "spawned_scope_17_3c",
-            23,
+            24,
         ),
         (
             "Live escape-anomaly consumer under real T2 (Story 17-10)",

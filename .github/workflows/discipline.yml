@@ -4412,7 +4412,7 @@ jobs:
             --required-test same_spirit_simultaneous_native_spawns_have_distinct_owned_leaves \
             --required-test creation_limit_write_and_exec_failures_release_owned_leaves \
             --required-test killed_leader_cleanup_kills_its_surviving_descendant "$RUNNER_TEMP/cgroup-smoke.log"
-      - name: Real admitted session suite — 23 cases, serial
+      - name: Real admitted session suite — 24 cases, serial
         shell: bash
         env:
           NEXTEST_ARCHIVE_PACKAGES: maos-bin
@@ -4450,7 +4450,7 @@ jobs:
           while IFS= read -r test_name; do
             if [ -n "$test_name" ]; then required_tests+=(--required-test "$test_name"); fi
           done <<< "${EPIC17_SPAWNED_REQUIRED_TESTS}"
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 23 "${required_tests[@]}" "$RUNNER_TEMP/spawned-17-3c.log"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 24 "${required_tests[@]}" "$RUNNER_TEMP/spawned-17-3c.log"
       - name: Build the actual Worker CLI fixture before the in-unit canary (x64)
         if: ${{ !endsWith(matrix.image, '-arm') }}
         run: test -x target/debug/worker-cli-fixture
@@ -4559,7 +4559,7 @@ jobs:
           while IFS= read -r test_name; do
             if [ -n "$test_name" ]; then required_tests+=(--required-test "$test_name"); fi
           done <<< "${EPIC17_SPAWNED_REQUIRED_TESTS}"
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 23 "${required_tests[@]}" "$RUNNER_TEMP/undelegated-session.log"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 24 "${required_tests[@]}" "$RUNNER_TEMP/undelegated-session.log"
 
   wasm-host-tests:
     needs: [ci-test-producer, example-spirit-ts-tests]
@@ -4698,7 +4698,7 @@ jobs:
           rc=$?
           fail=0
           [ "$rc" -eq 0 ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::nextest rc=$rc"; fail=1; }
-          grep -Eq '(^|[[:space:]])23 tests run: 23 passed([,[:space:]]|$)' "$RUNNER_TEMP/spawned-17-3c.log" || { echo "::error title=17-3c process gates (${{ matrix.image }})::missing '23 tests run: 23 passed'"; fail=1; }
+          grep -Eq '(^|[[:space:]])24 tests run: 24 passed([,[:space:]]|$)' "$RUNNER_TEMP/spawned-17-3c.log" || { echo "::error title=17-3c process gates (${{ matrix.image }})::missing '24 tests run: 24 passed'"; fail=1; }
           for spec in 'SCOPED-VERDICT :8' 'GOVERNED-ATOMIC :10' 'HOSTILE-LIFTING :2' 'HOSTILE-LIFTING-CONTROL :1' \
                       'RUNNER-SIGSYS :2' 'REPEATED-MAILBOX :1' 'HOSTILE-PROVENANCE :1' 'HOSTILE-REFUSALS :1' \
                       'HOSTILE-FLOODS :1' 'HOSTILE-DIAGNOSTICS :1' 'HOSTILE-EXITS :1' 'HOSTILE-ONCE :1' \
@@ -4727,7 +4727,7 @@ jobs:
             done
           fi
           echo "::notice title=17-3c process gates (${{ matrix.image }})::rc=$rc fail=$fail"
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 23 "$RUNNER_TEMP/spawned-17-3c.log" || fail=1
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 24 "$RUNNER_TEMP/spawned-17-3c.log" || fail=1
           exit "$fail"
       # Story 17-10 (AC1.1, AC3.2) — the live escape-anomaly tail under real T2:
       # a real runner SIGSYS is surfaced by the RUNNING tail within 1 s, exactly
@@ -6583,7 +6583,7 @@ jobs:
           echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser + fuzz_exec_deps_parse_elf) |"
           echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
           echo "| check-ff-j6 | ${{ needs.check-ff-j6.result }} | cargo run -p xtask -- check-ff-j6 |"
-          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | 4 images, same-run producer nextest archives (cargo-nextest nextest run --archive-file): maos-wasm-host t2_sandbox_kill (exit line 3) + kernel/escape-detector T2 suites + maos-host/maos-wasm-host archive + native-twin fixture archive + 17-3c spawned_scope_17_3c gate (23 passed, exact marker counts, no SKIP; iac.send-mediated deliveries and FR4 maosctl audit view) + 17-3d recall_17_3d gate (18 passed, every name present, no SKIP) |"
+          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | 4 images, same-run producer nextest archives (cargo-nextest nextest run --archive-file): maos-wasm-host t2_sandbox_kill (exit line 3) + kernel/escape-detector T2 suites + maos-host/maos-wasm-host archive + native-twin fixture archive + 17-3c spawned_scope_17_3c gate (24 passed, exact marker counts, no SKIP; iac.send-mediated deliveries and FR4 maosctl audit view) + 17-3d recall_17_3d gate (20 passed, every name present, no SKIP) |"
           echo "| check-wasm-form-equiv | ${{ needs.check-wasm-form-equiv.result }} | cargo test -p maos-wasm-host --test equiv_harness |"
           echo "| check-cross-region-consensus | ${{ needs.check-cross-region-consensus.result }} | cargo run -p xtask -- check-cross-region-consensus |"
           echo "| check-multi-region-slo | ${{ needs.check-multi-region-slo.result }} | cargo run -p xtask -- check-multi-region-slo |"

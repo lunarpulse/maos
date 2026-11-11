@@ -164,9 +164,9 @@ fn archive_cgroup_jobs_keep_real_delegation_counts_and_rootless_canary() {
     let delegated = get(jobs, "cgroup-ceiling-delegated");
     for (step, mode, suite, archive, count) in [
         ("Native cgroup-v2 smoke — four real cases", "delegated", "cgroup_ceiling_smoke", "kernel", 4),
-        ("Real admitted session suite — 23 cases, serial", "delegated", "spawned_scope_17_3c", "maos-bin-network-wasm", 23),
+        ("Real admitted session suite — 24 cases, serial", "delegated", "spawned_scope_17_3c", "maos-bin-network-wasm", 24),
         ("Rootless T3 Worker resource enforcement (x64)", "delegated", "worker_resource_limits_17_2", "maos-bin-network-wasm", 2),
-        ("Full undelegated session suite — live fallback, strict refusal, persistence and ordering", "undelegated", "spawned_scope_17_3c", "maos-bin-network-wasm", 23),
+        ("Full undelegated session suite — live fallback, strict refusal, persistence and ordering", "undelegated", "spawned_scope_17_3c", "maos-bin-network-wasm", 24),
     ] {
         let job = if mode == "delegated" { delegated } else { get(jobs, "cgroup-ceiling-undelegated") };
         let step = named(job, step);
