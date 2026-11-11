@@ -387,7 +387,7 @@ coverage:
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
-    notes: asserted, owner 20-1b-vetting-yank-policy-and-quarantine. FR13 quarantine isolation is witnessed by crates/maos-kernel-core/tests/quarantine_fr13_20_1.rs (CRL arm fences every mediated action, never terminates, survives a director resume, ends at unload) and the signed-yank policy effect by crates/maos-bin/tests/yank_policy_20_1b.rs; the hosted T3 container leg is unverified and the invariant document I5 stays asserted under ADR-037.
+    notes: 'asserted, owner 20-1b-vetting-yank-policy-and-quarantine. FR13 isolation is NOT claimed. crates/maos-kernel-core/tests/quarantine_fr13_20_1.rs witnesses a capability-mediated fence only (issue/verify/recheck: MCP, inference, memory-by-token, IAC-by-token; the CRL arm never terminates, a director resume cannot lift it, unload ends it) and crates/maos-bin/tests/yank_policy_20_1b.rs the signed-yank effect. Private/shared memory writes, scalar mutation, DRR/native IAC and IO, hooks and telemetry are not fenced; the fence is per-pid in memory and is shed by restart, unload, swap and reload; a consumed yank row is never re-applied (the CRL path is durable). Operator ruling q 2026-11-12; closure is the priced quarantine-closure follow-up. The hosted T3 leg is unverified and the invariant document I5 stays asserted under ADR-037.'
   FR14:
     gates: []
     corpora: []
@@ -700,9 +700,11 @@ coverage:
       maos-bin/tests/one_daemon_one_door_16_1.rs. Actual poller/runtime clock,
       restart and no-registry late-install lapse observations:
       maos-bin/tests/yank_policy_20_1b.rs.
-      Sticky quarantine effect (20-1b landing 2): the quarantine policy fences the
-      signed-yank-matched running Spirit only (quarantine_policy_fences_only_the_signed_yank_target_and_stays_sticky_ac8
-      in maos-bin/tests/yank_policy_20_1b.rs); hostile or unrelated rows fence nothing.
+      Quarantine policy effect (20-1b landing 2): a capability-mediated, per-pid in-memory
+      fence on the signed-yank-matched running Spirit only
+      (quarantine_policy_fences_only_the_signed_yank_target_and_stays_sticky_ac8 in
+      maos-bin/tests/yank_policy_20_1b.rs); hostile or unrelated rows fence nothing. Not
+      isolation; shed by restart/unload/swap/reload; a consumed yank row is not re-applied.
   FR38:
     gates: []
     corpora: []
@@ -949,7 +951,7 @@ coverage:
       both-end development controls. Authenticated mode detects network omission;
       unsigned loopback development and authority-signed fresh-client rollback
       stay outside that guarantee. Hosted TLS/dev and macOS legs are unverified.
-      Sticky quarantine effect landed with 20-1b landing 2 (kernel KQ1); no accredited-vetter claim.
+      Capability-mediated quarantine fence landed with 20-1b landing 2 (kernel KQ1; not isolation); no accredited-vetter claim.
   FR6:
     gates: []
     corpora: []

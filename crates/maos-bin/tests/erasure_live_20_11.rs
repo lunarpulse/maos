@@ -181,18 +181,23 @@ fn exercise(worker: bool) {
         .expect("canonical live digest")
         .digest_frame_id;
     drop(stores);
-    // The schedule is firing (AC4.1) before the Spirit is uninstalled.
-    let firing = Instant::now() + Duration::from_secs(60);
-    while !h::rows(home)
-        .iter()
-        .any(|r| r.1 == pid && r.2 == "schedule.fire:daily")
-    {
-        assert!(
-            Instant::now() < firing,
-            "the schedule never fired: {}",
-            diagnostics(&live)
-        );
-        std::thread::sleep(Duration::from_millis(40));
+    // The schedule is firing (AC4.1) before the Spirit is uninstalled. A standalone
+    // `maos run` cli_wrapper Worker binds `SpiritManifestBundle { on_crash, supervision,
+    // ..Default::default() }` (`worker_spawn.rs`): its SCB carries no `[[schedule]]`, so no
+    // fire can ever be awaited for it.
+    if !worker {
+        let firing = Instant::now() + Duration::from_secs(60);
+        while !h::rows(home)
+            .iter()
+            .any(|r| r.1 == pid && r.2 == "schedule.fire:daily")
+        {
+            assert!(
+                Instant::now() < firing,
+                "the schedule never fired: {}",
+                diagnostics(&live)
+            );
+            std::thread::sleep(Duration::from_millis(40));
+        }
     }
     let output = h::ctl(&ctl, home, &["uninstall", &id]);
     assert!(
@@ -225,15 +230,26 @@ fn exercise(worker: bool) {
         "{:?}",
         status("pending_halts")
     );
-    // AC4: the firing schedule's SCB, buckets and stamp are gone.
-    assert!(
-        matches!(
-            status("scheduled_invocations"),
-            maos_audit::erasure::proof::CategoryStatus::Removed { count: 1 }
-        ),
-        "{:?}",
-        status("scheduled_invocations")
-    );
+    // AC4: the firing schedule's SCB, buckets and stamp are gone. The Worker's SCB has no
+    // schedule ids, and the cascade's `removed(0)` is `VerifiedEmpty` (`main.rs` `removed`).
+    let scheduled = status("scheduled_invocations");
+    if worker {
+        assert!(
+            matches!(
+                scheduled,
+                maos_audit::erasure::proof::CategoryStatus::VerifiedEmpty
+            ),
+            "{scheduled:?}"
+        );
+    } else {
+        assert!(
+            matches!(
+                scheduled,
+                maos_audit::erasure::proof::CategoryStatus::Removed { count: 1 }
+            ),
+            "{scheduled:?}"
+        );
+    }
     assert!(proof
         .erased_frame_proofs
         .iter()

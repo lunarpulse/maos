@@ -481,7 +481,7 @@ fn binary_size(root: &Path, report: &mut Report, closure: &BTreeSet<String>) {
     if !size_trigger(&report.changed_paths, closure) {
         return report.add(
             "binary-size",
-            "release maos <= 33554432 B",
+            "release maos <= 35651584 B",
             "skip",
             "no Cargo.toml, Cargo.lock, maos-bin or transitive local dependency changes",
         );
@@ -506,8 +506,8 @@ fn binary_size(root: &Path, report: &mut Report, closure: &BTreeSet<String>) {
         let stripped = temp.path().join("maos");
         capture_command(command(root, "strip", "-o").arg(&stripped).arg(source))?;
         let actual = fs::metadata(stripped).map_err(|e| e.to_string())?.len();
-        if actual > 33_554_432 {
-            return Err(format!("expected <= 33554432 B, actual {actual} B"));
+        if actual > 35_651_584 {
+            return Err(format!("expected <= 35651584 B, actual {actual} B"));
         }
         Ok(())
     })();

@@ -1,0 +1,11 @@
+--- /tmp/t201bk/keep-f2-no-dedup	2026-11-11 15:25:14.154240918 +0000
++++ /home/lunarpulse/dev_ws/crates/maos-bin/src/yank_policy.rs	2026-11-11 15:29:41.361202205 +0000
+@@ -412,7 +412,7 @@
+                 .rejected
+                 .lock()
+                 .map_err(|e| RegistryError::Transport(e.to_string()))?;
+-            if seen.get(&entry.sequence) == Some(&hash) {
++            if seen.get(&entry.sequence) == Some(&u64::MAX) {
+                 return Ok(());
+             }
+             if seen.len() >= 8192 {

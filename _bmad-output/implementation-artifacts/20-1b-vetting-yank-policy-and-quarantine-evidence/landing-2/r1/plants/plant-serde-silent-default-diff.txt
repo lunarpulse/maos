@@ -1,0 +1,11 @@
+--- /tmp/t201bk/keep-serde-silent-default	2026-11-11 15:26:52.217308419 +0000
++++ /home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs	2026-11-11 15:29:55.560701118 +0000
+@@ -11092,7 +11092,7 @@
+                 Ok(value) => value,
+                 // Kernel termination markers are kind-3 rows with an empty payload
+                 // by construction (`halt/termination.rs` `marker`): nothing to classify.
+-                Err(_) if kind == 3 && !text.trim().is_empty() => {
++                Err(_) if false => {
+                     let gap = format!(
+                         "halt scan of pid {pid}: a kind-3 row payload is not JSON; not classified"
+                     );

@@ -1,0 +1,32 @@
+[
+ {
+  "name": "fr4-historical-prefix",
+  "rc": 101,
+  "elapsed": 4.5,
+  "restored_cmp": true
+ },
+ {
+  "name": "f2-no-dedup",
+  "rc": 101,
+  "elapsed": 14.2,
+  "restored_cmp": true
+ },
+ {
+  "name": "serde-silent-default",
+  "rc": 101,
+  "elapsed": 7.0,
+  "restored_cmp": true
+ },
+ {
+  "name": "erasure-live-researcher-expects-empty",
+  "rc": 101,
+  "elapsed": 4.7,
+  "restored_cmp": true
+ },
+ {
+  "name": "size-prepush-old-limit",
+  "rc": 101,
+  "elapsed": 16.7,
+  "restored_cmp": true
+ }
+]

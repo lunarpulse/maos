@@ -1,0 +1,11 @@
+--- /tmp/t201bk/keep-size-prepush-old-limit	2026-11-11 15:29:18.426749063 +0000
++++ /home/lunarpulse/dev_ws/xtask/src/prepush.rs	2026-11-11 15:30:07.259607133 +0000
+@@ -506,7 +506,7 @@
+         let stripped = temp.path().join("maos");
+         capture_command(command(root, "strip", "-o").arg(&stripped).arg(source))?;
+         let actual = fs::metadata(stripped).map_err(|e| e.to_string())?.len();
+-        if actual > 35_651_584 {
++        if actual > 33_554_432 {
+             return Err(format!("expected <= 35651584 B, actual {actual} B"));
+         }
+         Ok(())

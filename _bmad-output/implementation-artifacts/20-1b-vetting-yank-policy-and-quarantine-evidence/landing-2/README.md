@@ -21,3 +21,9 @@ Retained caveats (not hidden):
 - The first kernel red run was a single combined test; it was split into four vectors and re-run before the retained log.
 - AC11.5 (hosted T3 container leg) was **not run**. Quarantine persistence across a process restart is **not delivered**
   (in-memory pid fence, KQ1 as ruled); see the deferred-work section "20-1b landing 2".
+
+## r1 (2026-11-12) — review corrections under ruling `q`
+
+`review/gpt-review.md` and `review/security.md` are the verbatim GPT and security reviews of `608735d2`. `r1/` holds the red-at-HEAD
+logs, plants, green logs, gates and `commands.md` of the kernel-free corrections. Note: `diff/bin-ac8-effect.diff` above is an
+intermediate snapshot (it still carries receipt `origin`/`cause` fields the committed code dropped); `608735d2` is authoritative.

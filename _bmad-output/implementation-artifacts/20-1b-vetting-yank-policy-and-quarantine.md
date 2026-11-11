@@ -53,6 +53,20 @@ Rulings are recorded in the Decisions table of `20-1a-registry-publish-install-e
   claimed in L1**. KQ0 / a resumable pause is not an approved substitute.
   The final kernel landing remains last; no kernel source change in L1.
 
+### Operator ruling `q` (narrow) — 2026-11-12
+
+After the independent GPT and security reviews of landing 2 (`landing-2/review/gpt-review.md`, `security.md`), the operator
+ruled **narrow**: KQ1 stays as ruled; **no kernel code is added**; every claim is reworded to: *capability-mediated actions
+(issue/verify/recheck: MCP, inference, memory-by-token, IAC-by-token) are fenced; private/shared memory writes, scalar
+mutation, DRR/native IAC/IO, hooks and telemetry are NOT fenced; the fence is per-pid in memory and is shed by restart,
+unload, swap and reload; a consumed yank row is never re-applied (the CRL path is durable).* The word "isolation" is
+removed from this story, ADR-056, the coverage matrix, the architecture addition and `SECURITY.md` (docs-site EN/KO carry
+no quarantine-policy claim). The gaps (GPT P1 memory/scalar writes; GLM F-1 yank durability, F-3 release verb and distinct
+readback, F-4 changing poller errors, F-5 token-only fence) are rule-10 deferred rows triggered by a **priced follow-up
+story the operator must price: "quarantine closure: memory/scalar fences + durable/load-time yank quarantine + operator
+release verb + distinct `quarantined` readback: kernel +30..+80 tokei, unmeasured"**. **20-1b stays not `done`; AC11 is
+satisfied only in its narrowed meaning and the epic-close gate must not close it.**
+
 ### L1 independent-review correction rulings — 2026-11-07
 
 Main authorized the `landing-1/review/triage.md` correction pass at `62faff63`:
@@ -162,7 +176,7 @@ below belong to `landing-1/ac15/review/triage.md`, not the older L1 review.
 #### AC8 — yank policy `warn | quarantine | auto-revoke` (D-20-1-08 A)
 
 1. `maos_registry::yank::YankPolicy` read by maos-bin from `MAOS_YANK_POLICY` (registered `UserFacing`; default `warn`), not a `RegistrySection` field. `warn` journals only; `quarantine` delivers a typed request and operator-visible record in L1; `auto-revoke` submits an operator-key-signed local CRL with origin `RegistryYank` through existing `apply_crl`.
-2. **L1 witnesses:** policy selection, typed request, signed propagation and request record, plus warn and auto-revoke behavior. **Final-kernel dependency, not claimed in L1:** quarantine's next mediated call refused while still loaded, using the AC11 KQ1 sticky fence. Main ruled this effect/witness into the final kernel landing on 2026-11-06; no KQ0 substitute.
+2. **L1 witnesses:** policy selection, typed request, signed propagation and request record, plus warn and auto-revoke behavior. **Final-kernel dependency, not claimed in L1:** quarantine's next mediated call refused while still loaded, using the AC11 KQ1 capability-mediated fence. Main ruled this effect/witness into the final kernel landing on 2026-11-06; no KQ0 substitute.
 3. **Plant:** ignore policy selection ⇒ the typed quarantine-request vector red in L1; the sticky-effect vector belongs to the final kernel landing.
 
 #### AC9 — a lapsed or revoked promotion reaches operators as a vetter yank (D9; D-20-1-10 A)
@@ -177,11 +191,11 @@ below belong to `landing-1/ac15/review/triage.md`, not the older L1 review.
 2. **Local witnesses:** typed different-publisher refusal and restart; durable pin/version refusal after uninstall and legacy-generation import; two actual admission processes with recycled PID force K1→K2 sidecar replacement and refuse K1's spill. The original hand-bound witness did not cover production binding; review's production-binding mutation now does.
 3. **Plant (one, local):** bind identity to `spirit_id` only ⇒ the spill vector red.
 
-#### AC11 — FR13 quarantine isolates and never kills (D04 A; D-20-1-02 A) ◆ FLAG-Winston
+#### AC11 — FR13 quarantine: capability-mediated fence that never kills; NOT isolation (D04 A; D-20-1-02 A; ruling `q`) ◆ FLAG-Winston
 
 1. Kernel: `kq1-sticky-quarantine.diff` shape — the CRL `Quarantine` arm (`applier.rs:160-197`) sets the quarantine fence, journals `spirit.quarantined`, and spawns no drain/terminate; `is_paused` honours quarantine at every fence site (`capability/mod.rs:203,319,345`); a director `resume` cannot lift it; `unload` ends it (`scheduler_loop.rs:572`).
-2. **Hostile-effect witness (local, kernel):** `crates/maos-kernel-core/tests/quarantine_fr13_20_1.rs` — a fixture Spirit declaring `[on_revocation] action = "quarantine"` receives a CRL; it then attempts an MCP tool call, an inference call, a memory write and a token verification ⇒ each refused (`CapError::Revoked`), nothing reaches the effect, the Spirit is still loaded and Running past the old drain deadline; pause→resume leaves it fenced; unload clears it. Red at HEAD (terminated after the deadline; mediated calls succeed until then).
-3. `docs/invariants/I5.md:11` FR13 → witnessed by this test; `tests/coverage-matrix.yaml:366-371` FR13 note updated; architecture `4-kernel-design.md:661` sentence corrected.
+2. **Hostile-effect witness (local, kernel):** `crates/maos-kernel-core/tests/quarantine_fr13_20_1.rs` — a fixture Spirit declaring `[on_revocation] action = "quarantine"` receives a CRL; it then attempts an MCP tool call, an inference call, a `MemWrite` token issuance (memory-by-token) and a token verification ⇒ each refused (`CapError::Revoked`), nothing reaches the MCP/inference effect; private/shared memory writes and scalar mutation are **not** fenced and are not claimed; the Spirit is still loaded and Running past the old drain deadline; pause→resume leaves it fenced; unload clears it. Red at HEAD (terminated after the deadline; mediated calls succeed until then).
+3. `docs/invariants/I5.md:11` FR13 stays `asserted` (ADR-037; operator ruling `q` narrows the claim, so there is nothing to flip); `tests/coverage-matrix.yaml` FR13/FR37/FR59 notes, ADR-056, `crates/maos-registry/SECURITY.md` and architecture `4-kernel-design.md:661` state the narrowed, non-isolation scope.
 4. **Plant (one, local):** restore drain-then-terminate in the arm ⇒ AC11.2 red.
 5. **Hosted T3 leg:** a T3 Worker Spirit quarantined by CRL — its next mediated action refused; whether its container keeps running activity is recorded (measurement owed 4); if it does, the record names it.
 6. Pins: both kernel pins, content hashes; HISTORY rows cite this key; FLAG-Winston decision record (precedent `20-3c-flag-winston-decision.md`).
@@ -992,8 +1006,7 @@ red; they are not witnesses (the policy-matrix red is the separate log). The fir
 was split into the four vectors above before the retained run.
 
 **Exact pins.** `kernel-core-baseline.toml` 26889 -> **26967**, set hash `1eb6670a...` -> `06386b44...5e5f`, four file
-digests; `kloc.toml` kernel 21073 -> **21141**, bin 38362 -> **38392** (+30, inside the 20-1b bin ceiling 35671:
-35586 + 85 room, 55 left), audit 8286 -> **8297** (+11: one FR4 `WRITER_SHAPES` entry for the new bin receipt writer plus the renamed kernel marker intent/key; inside the 20-11 ceiling 8313 and the 20-1b audit correction ceiling 8204 = 8179 + 25), `_aggregate_hardfail` 202506 -> **202615** (clean aggregate 202614 on a `git archive HEAD` copy
+digests; `kloc.toml` kernel 21073 -> **21141**, bin 38362 -> **38392** (+30, a draw against 20-1b's own rebased bin room: ceiling 35671 on its base 35586 = 85; not an absolute comparison with the live pin), audit 8286 -> **8297** (+11: one FR4 `WRITER_SHAPES` entry for the new bin receipt writer plus the renamed kernel marker intent/key; a draw against 20-1b's audit correction room, ceiling 8204 on base 8179 = 25, and below the 20-11 ceiling 8313), `_aggregate_hardfail` 202506 -> **202615** (clean aggregate 202614 on a `git archive HEAD` copy
 overlaid with the landing; the local tree's untracked operator files inflate the in-tree figure and are excluded);
 `kernel_pin_content_hash_16_0.rs` 26889 -> 26967 (x4); `recovery_lane_ceiling_rule.rs` 21_073 -> 21_141;
 `kernel-surface-v0.1-beta.json` one `CapabilityRegistryAdapter` hash. `kernel-api-classes.toml` unchanged.
@@ -1011,7 +1024,39 @@ the documented `erasure_million_20_11` AC5 1M oracle (42.6 s, owner 20-7 rows al
 `check-serde-error-handling` is red on one line that exists at HEAD (`main.rs:11092`, `5ff0ead1`), not caused here
 (deferred row, owner 20-11).
 
-**Cleanup.** After a process probe (no cargo active): own `/tmp/t201b` removed (2,129,133,568 allocated bytes) and 185 stale incremental sessions pruned (3,887,570,944 allocated bytes; newest session per crate and anything touched within 2 h kept) — `landing-2/cleanup.json`.
+### Landing 2 r1 — review corrections under ruling `q` — 2026-11-12
+
+Base: local HEAD `692b1e59` (20-8 kernel landing on top of `608735d2`); kernel unchanged at 27,009 / 21,178 (this round adds
+no kernel code). Reviews persisted verbatim: `landing-2/review/gpt-review.md`, `security.md`; evidence `landing-2/r1/`.
+
+| Item | Change | Red at HEAD (`landing-2/r1/red-head/`) | Plant (`landing-2/r1/plants/`) |
+|---|---|---|---|
+| GPT P2 | historical `spirit.quarantine_requested` shape kept beside `spirit.quarantined` (`fr4_classifier.rs`); `fr4_classifier_16_2.rs::historical_and_current_quarantine_rows_are_non_calls_in_both_projections` (both rows non-call through `to_fr4_plain` and `to_fr4_ndjson`; four lookalikes fail closed) | `red-fr4.log` (`Call` at HEAD) | `fr4-historical-prefix` |
+| GLM F-2 | `YankRuntime::on_rejected` dedups by (sequence, reason hash), bounded 8192, verified cursor untouched; `yank_policy_20_1b.rs::a_parked_invalid_row_is_journaled_once_across_polls_f2` (6 polls: one row per sequence; a changed reason journals) | `red-f2.log` | `f2-no-dedup` |
+| Hosted serde | `main.rs` kind-3 scan: explicit match, non-empty non-JSON payload -> named gap, empty kernel marker rows unclassified; `erasure_inventory_20_11.rs::review_serde_non_json_kind3_row_is_a_named_gap`; `check-serde-error-handling` green | `red-serde.log` | `serde-silent-default` |
+| Hosted ac6 worker | `erasure_live_20_11.rs`: fire-wait gated `if !worker`; `scheduled_invocations` = `Removed{count:1}` (researcher) / `VerifiedEmpty` (worker: SCB bundle has no schedules, `removed(0)`) | researcher variant green locally; worker variant **skipped locally (no T3 substrate), unverified** | `erasure-live-researcher-expects-empty` |
+| Size ruling `size` | limit 33,554,432 -> **35,651,584 B (34 MiB)** in `tests/integration/onb_nfr2_timing.sh` and `xtask/src/prepush.rs`; `xtask/tests/binary_size_limit_pin_20_1b.rs` pins both | `red-size.log` | `size-prepush-old-limit` |
+| F-4 | kernel poller: NOT edited (ruling `q`); deferred row | - | - |
+
+Deviation from the handoff wording, stated: the kind-3 gap applies to non-empty non-JSON payloads only, because kernel
+termination markers are kind-3 rows with an **empty** payload by construction (`halt/termination.rs` `marker`); treating them
+as gaps turned five existing `erasure_inventory_20_11` witnesses red (observed, then corrected).
+
+Pins: `maos-bin` 38415 -> **38446** (+31), `maos-audit` 8297 -> **8308** (+11), `_aggregate_hardfail` 202677 -> **202719**
+(clean aggregate 202718); xtask 45379 and the kernel unchanged. Correction of an earlier wording: the "inside 35671 / inside
+8204" statements compared draws with the live pins; they are draws against 20-1b's own rebased rooms (bin 85, audit 25;
+cumulative +61 and +22). The intermediate `landing-2/diff/bin-ac8-effect.diff` is not the committed patch (it still carries
+receipt `origin`/`cause` fields the committed code dropped); `608735d2` is authoritative.
+
+**r1 observed verification** (`landing-2/r1/commands.md`): fr4 23/23, yank policy 12/12, erasure inventory 25/25, size pin + prepush
+tests green; five plants red and restored; no-default verb table 7/7; clippy exits 0 with the ratchet at 1331 / 869 and no
+diagnostic on r1 lines; all gates incl. `check-serde-error-handling`, `invariant-lock` and `check-fkcs` exit 0; clean-overlay
+`kloc-check` exits 0 (aggregate 202718). The one workspace nextest run: 6015 run / 6013 passed / 2 failed — the documented AC5 1M
+oracle (unchanged, not retried) and `coverage_matrix_20_3b`, caused by my own unquoted `: ` in the FR13 coverage note; fixed and
+the three coverage-matrix binaries re-run green (targeted re-run only). **Unverified:** the T3 worker variant of
+`ac6_running_t3_worker_uninstall_proves_live_inventory` and its binary Σ < 30 s (hosted only), hosted CI, `prepush`.
+
+**Cleanup (landing 2 original).** After a process probe (no cargo active): own `/tmp/t201b` removed (2,129,133,568 allocated bytes) and 185 stale incremental sessions pruned (3,887,570,944 allocated bytes; newest session per crate and anything touched within 2 h kept) — `landing-2/cleanup.json`.
 
 **Not claimed / still open.** AC11.5 hosted T3 leg; AC15 hosted TLS/dev/macOS legs; hosted run, prepush and the
 independent review; restart persistence of quarantine (the fence is an in-memory pid set: a reload after a restart is

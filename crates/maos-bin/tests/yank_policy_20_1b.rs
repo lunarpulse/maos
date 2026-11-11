@@ -813,6 +813,70 @@ fn rejected_vetter_row_does_not_hide_later_publisher_yank_p1() {
     std::env::remove_var("MAOS_AUDIT_KEY");
 }
 
+/// 20-1b security F-2 — a registry parks one invalid row ahead of the verified cursor.
+/// Every poll redelivers it; it is journaled once per (sequence, reason), never per poll,
+/// while the verified cursor stays untouched.
+#[test]
+fn a_parked_invalid_row_is_journaled_once_across_polls_f2() {
+    let _env = ENV.lock().unwrap();
+    let tmp = tempfile::tempdir().unwrap();
+    std::env::set_var("HOME", tmp.path());
+    let world = world(&tmp.path().join("world"));
+    let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
+        world.cap.clone(),
+        world.tl.clone(),
+        world.scheduler.clone(),
+        world.applier.clone(),
+        YankPolicy::Warn,
+        "http://127.0.0.1:20101/mcp".into(),
+    ));
+    let mut parked = YankEntry::new(
+        "not-installed".into(),
+        "1.0.0".into(),
+        0,
+        "untrusted".into(),
+    );
+    parked.sequence = 1;
+    let mut second = YankEntry::new("other-name".into(), "1.0.0".into(), 0, "untrusted".into());
+    second.sequence = 2;
+    let poller = maos_registry::yank::YankPoller::new(
+        Arc::new(FixtureYanks(vec![parked.clone(), second])),
+        observer.clone(),
+        "http://127.0.0.1:20101/mcp".into(),
+    );
+    for _ in 0..6 {
+        assert_eq!(poller.poll_once().unwrap(), 0);
+    }
+    assert_eq!(poller.last_seen_ns(), 0, "the verified cursor never moves");
+    let rows = entries(&world.tl);
+    let count = |sequence: u64| {
+        rows.iter()
+            .filter(|row| row["sequence"] == sequence && row.get("reason").is_some())
+            .count()
+    };
+    assert_eq!(
+        count(1),
+        1,
+        "parked row journaled once across 6 polls: {rows:?}"
+    );
+    assert_eq!(
+        count(2),
+        1,
+        "a second parked row is journaled once too: {rows:?}"
+    );
+    // A changed reason for the same sequence is new information and is journaled.
+    maos_registry::yank::YankObserver::on_rejected(&*observer, &parked, "a different reason")
+        .unwrap();
+    assert_eq!(count(1), 1, "unchanged rows stay deduplicated");
+    assert_eq!(
+        entries(&world.tl)
+            .iter()
+            .filter(|r| r["sequence"] == 1)
+            .count(),
+        2
+    );
+    std::env::remove_var("MAOS_AUDIT_KEY");
+}
 #[test]
 fn uninstalled_unsigned_row_never_advances_authenticated_cursor_f1() {
     let _env = ENV.lock().unwrap();

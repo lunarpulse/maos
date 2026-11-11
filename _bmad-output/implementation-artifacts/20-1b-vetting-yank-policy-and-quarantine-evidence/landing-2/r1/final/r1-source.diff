@@ -1,0 +1,499 @@
+diff --git a/crates/maos-audit/src/fr4_classifier.rs b/crates/maos-audit/src/fr4_classifier.rs
+index 34ace436..d2f21984 100644
+--- a/crates/maos-audit/src/fr4_classifier.rs
++++ b/crates/maos-audit/src/fr4_classifier.rs
+@@ -417,6 +417,18 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
+             ("quarantined", PayloadType::Bool),
+         ]),
+     },
++    WriterShapeEntry {
++        // Persisted pre-20-1b marker (same site): the table is permanent.
++        site: ("applier.rs", "apply_crl", 1),
++        kind: 7,
++        token: TokenColumn::Absent,
++        intent: WriterIntent::Exact("spirit.quarantine_requested"),
++        shape: Some(&[
++            ("spirit_id", PayloadType::Str),
++            ("spirit_pid", PayloadType::SpiritPidEqualsRow),
++            ("quarantine_requested", PayloadType::Bool),
++        ]),
++    },
+     WriterShapeEntry {
+         site: ("yank_policy.rs", "policy_request", 0),
+         kind: 7,
+diff --git a/crates/maos-audit/tests/fr4_classifier_16_2.rs b/crates/maos-audit/tests/fr4_classifier_16_2.rs
+index fe6e73c5..920c430b 100644
+--- a/crates/maos-audit/tests/fr4_classifier_16_2.rs
++++ b/crates/maos-audit/tests/fr4_classifier_16_2.rs
+@@ -290,6 +290,14 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
+             1,
+             "quarantine",
+         ),
++        (
++            "capability.invocation",
++            None,
++            "spirit.quarantine_requested",
++            r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":true}"#,
++            1,
++            "persisted pre-20-1b quarantine request marker (historical)",
++        ),
+         (
+             "capability.invocation",
+             None,
+@@ -1269,6 +1277,80 @@ fn real_forget_tombstones_survive_replay_sealed_and_trajectory_export() {
+ /// row) is a delegation message, not a call: the `--spirit` plain view renders
+ /// it instead of ending in `Fr4SchemaViolation`. A token-bearing `TaskAssign`
+ /// still projects as a call, so nothing leaves the NDJSON feed.
++/// 20-1b review P2 — Transparency Logs written by the pre-20-1b CRL quarantine arm
++/// carry `spirit.quarantine_requested`; the table is permanent, so those rows keep
++/// classifying as non-calls beside the current `spirit.quarantined` rows, through
++/// both FR4 projections. Lookalikes that do not match a measured shape fail closed.
++#[test]
++fn historical_and_current_quarantine_rows_are_non_calls_in_both_projections() {
++    let historical = tokenless(
++        "capability.invocation",
++        "spirit.quarantine_requested",
++        1,
++        r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":true}"#,
++    );
++    let current = tokenless(
++        "capability.invocation",
++        "spirit.quarantined",
++        1,
++        r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantined":true}"#,
++    );
++    for row in [&historical, &current] {
++        assert_eq!(
++            classify_fr4_row(row),
++            Fr4RowDisposition::NonCallKernelEvent,
++            "{row:?}"
++        );
++    }
++    let mut plain = Vec::new();
++    to_fr4_plain(vec![historical.clone(), current.clone()], &mut plain)
++        .expect("both quarantine markers render in the plain view");
++    let plain = String::from_utf8(plain).unwrap();
++    assert!(plain.contains("spirit.quarantine_requested") && plain.contains("spirit.quarantined"));
++    let mut ndjson = Vec::new();
++    to_fr4_ndjson(vec![historical.clone(), current.clone()], &mut ndjson)
++        .expect("both quarantine markers are omitted, not violations");
++    assert!(ndjson.is_empty(), "non-calls emit no NDJSON line");
++
++    let lookalikes = [
++        tokenless(
++            "capability.invocation",
++            "spirit.quarantine_requested",
++            2,
++            r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":true}"#,
++        ),
++        tokenless(
++            "capability.invocation",
++            "spirit.quarantine_requested",
++            1,
++            r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":"yes"}"#,
++        ),
++        tokenless(
++            "capability.invocation",
++            "spirit.quarantine_requested",
++            1,
++            r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":true,"x":1}"#,
++        ),
++        tokenless(
++            "capability.invocation",
++            "spirit.quarantine_requested:forged",
++            1,
++            r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":true}"#,
++        ),
++    ];
++    for row in &lookalikes {
++        assert_eq!(classify_fr4_row(row), Fr4RowDisposition::Call, "{row:?}");
++        assert!(
++            to_fr4_ndjson(vec![row.clone()], Vec::new()).is_err(),
++            "{row:?}"
++        );
++        assert!(
++            to_fr4_plain(vec![row.clone()], Vec::new()).is_err(),
++            "{row:?}"
++        );
++    }
++}
++
+ #[test]
+ fn tokenless_task_assign_is_a_non_call_and_a_token_bearing_one_still_projects() {
+     let seed = tokenless("task.assign", "Standard", 3, "recall mediation payload");
+diff --git a/crates/maos-bin/src/env_contract.rs b/crates/maos-bin/src/env_contract.rs
+index 73ed4379..42cc83cd 100644
+--- a/crates/maos-bin/src/env_contract.rs
++++ b/crates/maos-bin/src/env_contract.rs
+@@ -13,7 +13,7 @@ pub enum EnvStability {
+ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
+     EnvVar {
+         name: "MAOS_YANK_POLICY",
+-        purpose: "Registry yank policy: warn (default), quarantine (sticky kernel fence on the matched running Spirit), auto-revoke",
++        purpose: "Registry yank policy: warn (default), quarantine (capability-mediated per-pid fence on the matched running Spirit; not isolation), auto-revoke",
+         stability: EnvStability::UserFacing,
+     },
+     EnvVar {
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index 70b128df..103e6ed0 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -11088,7 +11088,21 @@ fn orphaned_halts(
+         for (boot, kind, intent, untokened, kernel_row, text) in
+             rows.into_iter().take(HALT_SCAN_ROWS)
+         {
+-            let value: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
++            let value: serde_json::Value = match serde_json::from_str(&text) {
++                Ok(value) => value,
++                // Kernel termination markers are kind-3 rows with an empty payload
++                // by construction (`halt/termination.rs` `marker`): nothing to classify.
++                Err(_) if kind == 3 && !text.trim().is_empty() => {
++                    let gap = format!(
++                        "halt scan of pid {pid}: a kind-3 row payload is not JSON; not classified"
++                    );
++                    if !gaps.contains(&gap) {
++                        gaps.push(gap);
++                    }
++                    continue;
++                }
++                Err(_) => serde_json::Value::Null,
++            };
+             if kind == 3 {
+                 match (
+                     kernel_row,
+diff --git a/crates/maos-bin/src/yank_policy.rs b/crates/maos-bin/src/yank_policy.rs
+index a8585d78..ad0b5233 100644
+--- a/crates/maos-bin/src/yank_policy.rs
++++ b/crates/maos-bin/src/yank_policy.rs
+@@ -16,6 +16,8 @@ pub struct YankRuntime {
+     applier: Arc<maos_kernel_core::revocation::RevocationApplier>,
+     policy: YankPolicy,
+     observed: Mutex<BTreeMap<(u32, String, String), bool>>,
++    /// sequence -> hash of the last journaled rejection reason (bounded).
++    rejected: Mutex<BTreeMap<u64, u64>>,
+     registry_uri: String,
+     clock: fn() -> Result<u64, String>,
+ }
+@@ -35,6 +37,7 @@ impl YankRuntime {
+             applier,
+             policy,
+             observed: Mutex::new(BTreeMap::new()),
++            rejected: Mutex::new(BTreeMap::new()),
+             registry_uri,
+             clock: maos_registry::yank_auth::now_unix_ms,
+         }
+@@ -399,6 +402,24 @@ impl YankObserver for YankRuntime {
+         Ok(YankDisposition::Verified)
+     }
+     fn on_rejected(&self, entry: &YankEntry, reason: &str) -> Result<(), RegistryError> {
++        // A parked row is redelivered every poll: journal each (sequence, reason) once.
++        let hash = std::hash::BuildHasher::hash_one(
++            &std::hash::BuildHasherDefault::<std::collections::hash_map::DefaultHasher>::default(),
++            reason,
++        );
++        {
++            let mut seen = self
++                .rejected
++                .lock()
++                .map_err(|e| RegistryError::Transport(e.to_string()))?;
++            if seen.get(&entry.sequence) == Some(&hash) {
++                return Ok(());
++            }
++            if seen.len() >= 8192 {
++                seen.clear();
++            }
++            seen.insert(entry.sequence, hash);
++        }
+         let label = if reason.starts_with("yank-sequence-anomaly") {
+             "yank-sequence-anomaly"
+         } else {
+diff --git a/crates/maos-bin/tests/erasure_inventory_20_11.rs b/crates/maos-bin/tests/erasure_inventory_20_11.rs
+index c9142db4..bfe60025 100644
+--- a/crates/maos-bin/tests/erasure_inventory_20_11.rs
++++ b/crates/maos-bin/tests/erasure_inventory_20_11.rs
+@@ -1145,6 +1145,37 @@ fn review_f2_malformed_orphan_id_is_a_named_gap_not_a_failed_uninstall() {
+     );
+     verify(&proof);
+ }
++/// check-serde-error-handling: a kind-3 row whose payload is not JSON is a named gap,
++/// never a silently defaulted `Null` that classifies as "nothing to see".
++#[test]
++fn review_serde_non_json_kind3_row_is_a_named_gap() {
++    let f = Fixture::new();
++    f.seed(1, "hello-spirit", 7, true);
++    raise_halt(&f, 1, 7, "hello-spirit", "real-serde-20-11");
++    forge_kernel_shaped(&f, 1, 7, b"this payload is not json");
++    let out = f.run();
++    assert_eq!(
++        out.status.code(),
++        Some(0),
++        "{}",
++        String::from_utf8_lossy(&out.stdout)
++    );
++    let proof = f.proof(&out);
++    let halts = category(&proof, "pending_halts");
++    assert_eq!(halts["status"]["status"], "CoverageGap", "{halts}");
++    assert!(
++        halts["status"]["reason"]
++            .as_str()
++            .is_some_and(|r| r.contains("a kind-3 row payload is not JSON; not classified")),
++        "{halts}"
++    );
++    assert_eq!(
++        receipts_of(&f, "real-serde-20-11"),
++        ["unplanned_crash"],
++        "valid halts still close"
++    );
++    verify(&proof);
++}
+ #[test]
+ fn review_f1_spirit_submitted_halt_frames_are_not_invocations() {
+     let f = Fixture::new();
+diff --git a/crates/maos-bin/tests/erasure_live_20_11.rs b/crates/maos-bin/tests/erasure_live_20_11.rs
+index c1daf5cf..d9d845be 100644
+--- a/crates/maos-bin/tests/erasure_live_20_11.rs
++++ b/crates/maos-bin/tests/erasure_live_20_11.rs
+@@ -181,18 +181,23 @@ fn exercise(worker: bool) {
+         .expect("canonical live digest")
+         .digest_frame_id;
+     drop(stores);
+-    // The schedule is firing (AC4.1) before the Spirit is uninstalled.
+-    let firing = Instant::now() + Duration::from_secs(60);
+-    while !h::rows(home)
+-        .iter()
+-        .any(|r| r.1 == pid && r.2 == "schedule.fire:daily")
+-    {
+-        assert!(
+-            Instant::now() < firing,
+-            "the schedule never fired: {}",
+-            diagnostics(&live)
+-        );
+-        std::thread::sleep(Duration::from_millis(40));
++    // The schedule is firing (AC4.1) before the Spirit is uninstalled. A standalone
++    // `maos run` cli_wrapper Worker binds `SpiritManifestBundle { on_crash, supervision,
++    // ..Default::default() }` (`worker_spawn.rs`): its SCB carries no `[[schedule]]`, so no
++    // fire can ever be awaited for it.
++    if !worker {
++        let firing = Instant::now() + Duration::from_secs(60);
++        while !h::rows(home)
++            .iter()
++            .any(|r| r.1 == pid && r.2 == "schedule.fire:daily")
++        {
++            assert!(
++                Instant::now() < firing,
++                "the schedule never fired: {}",
++                diagnostics(&live)
++            );
++            std::thread::sleep(Duration::from_millis(40));
++        }
+     }
+     let output = h::ctl(&ctl, home, &["uninstall", &id]);
+     assert!(
+@@ -225,15 +230,26 @@ fn exercise(worker: bool) {
+         "{:?}",
+         status("pending_halts")
+     );
+-    // AC4: the firing schedule's SCB, buckets and stamp are gone.
+-    assert!(
+-        matches!(
+-            status("scheduled_invocations"),
+-            maos_audit::erasure::proof::CategoryStatus::Removed { count: 1 }
+-        ),
+-        "{:?}",
+-        status("scheduled_invocations")
+-    );
++    // AC4: the firing schedule's SCB, buckets and stamp are gone. The Worker's SCB has no
++    // schedule ids, and the cascade's `removed(0)` is `VerifiedEmpty` (`main.rs` `removed`).
++    let scheduled = status("scheduled_invocations");
++    if worker {
++        assert!(
++            matches!(
++                scheduled,
++                maos_audit::erasure::proof::CategoryStatus::VerifiedEmpty
++            ),
++            "{scheduled:?}"
++        );
++    } else {
++        assert!(
++            matches!(
++                scheduled,
++                maos_audit::erasure::proof::CategoryStatus::Removed { count: 1 }
++            ),
++            "{scheduled:?}"
++        );
++    }
+     assert!(proof
+         .erased_frame_proofs
+         .iter()
+diff --git a/crates/maos-bin/tests/yank_policy_20_1b.rs b/crates/maos-bin/tests/yank_policy_20_1b.rs
+index f5a735bc..3ec149e8 100644
+--- a/crates/maos-bin/tests/yank_policy_20_1b.rs
++++ b/crates/maos-bin/tests/yank_policy_20_1b.rs
+@@ -813,6 +813,70 @@ fn rejected_vetter_row_does_not_hide_later_publisher_yank_p1() {
+     std::env::remove_var("MAOS_AUDIT_KEY");
+ }
+ 
++/// 20-1b security F-2 — a registry parks one invalid row ahead of the verified cursor.
++/// Every poll redelivers it; it is journaled once per (sequence, reason), never per poll,
++/// while the verified cursor stays untouched.
++#[test]
++fn a_parked_invalid_row_is_journaled_once_across_polls_f2() {
++    let _env = ENV.lock().unwrap();
++    let tmp = tempfile::tempdir().unwrap();
++    std::env::set_var("HOME", tmp.path());
++    let world = world(&tmp.path().join("world"));
++    let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
++        world.cap.clone(),
++        world.tl.clone(),
++        world.scheduler.clone(),
++        world.applier.clone(),
++        YankPolicy::Warn,
++        "http://127.0.0.1:20101/mcp".into(),
++    ));
++    let mut parked = YankEntry::new(
++        "not-installed".into(),
++        "1.0.0".into(),
++        0,
++        "untrusted".into(),
++    );
++    parked.sequence = 1;
++    let mut second = YankEntry::new("other-name".into(), "1.0.0".into(), 0, "untrusted".into());
++    second.sequence = 2;
++    let poller = maos_registry::yank::YankPoller::new(
++        Arc::new(FixtureYanks(vec![parked.clone(), second])),
++        observer.clone(),
++        "http://127.0.0.1:20101/mcp".into(),
++    );
++    for _ in 0..6 {
++        assert_eq!(poller.poll_once().unwrap(), 0);
++    }
++    assert_eq!(poller.last_seen_ns(), 0, "the verified cursor never moves");
++    let rows = entries(&world.tl);
++    let count = |sequence: u64| {
++        rows.iter()
++            .filter(|row| row["sequence"] == sequence && row.get("reason").is_some())
++            .count()
++    };
++    assert_eq!(
++        count(1),
++        1,
++        "parked row journaled once across 6 polls: {rows:?}"
++    );
++    assert_eq!(
++        count(2),
++        1,
++        "a second parked row is journaled once too: {rows:?}"
++    );
++    // A changed reason for the same sequence is new information and is journaled.
++    maos_registry::yank::YankObserver::on_rejected(&*observer, &parked, "a different reason")
++        .unwrap();
++    assert_eq!(count(1), 1, "unchanged rows stay deduplicated");
++    assert_eq!(
++        entries(&world.tl)
++            .iter()
++            .filter(|r| r["sequence"] == 1)
++            .count(),
++        2
++    );
++    std::env::remove_var("MAOS_AUDIT_KEY");
++}
+ #[test]
+ fn uninstalled_unsigned_row_never_advances_authenticated_cursor_f1() {
+     let _env = ENV.lock().unwrap();
+diff --git a/crates/maos-kernel-core/tests/quarantine_fr13_20_1.rs b/crates/maos-kernel-core/tests/quarantine_fr13_20_1.rs
+index 08146ddd..0765f620 100644
+--- a/crates/maos-kernel-core/tests/quarantine_fr13_20_1.rs
++++ b/crates/maos-kernel-core/tests/quarantine_fr13_20_1.rs
+@@ -1,13 +1,15 @@
+ #![forbid(unsafe_code)]
+ 
+-//! Story 20-1b AC11 (D-20-1-02 A, KQ1) — FR13 quarantine isolates and never kills.
++//! Story 20-1b AC11 (D-20-1-02 A, KQ1) — FR13 quarantine is a capability-mediated
++//! fence and never kills. It is NOT isolation (operator ruling `q`, 2026-11-12).
+ //!
+ //! A fixture Spirit declaring `[on_revocation] action = "quarantine"` receives a
+-//! CRL. From then on every mediated action of its pid (MCP, inference, memory
+-//! issuance, token verification) fails closed with `CapError::Revoked`, the
+-//! Spirit stays loaded and Running past the old drain deadline, a director
+-//! pause -> resume cannot lift the fence, and unload ends it. A bystander the CRL
+-//! does not name is untouched.
++//! CRL. From then on every capability-mediated action of its pid (MCP, inference,
++//! `MemWrite` token issuance, token verification) fails closed with
++//! `CapError::Revoked`, the Spirit stays loaded and Running past the old drain
++//! deadline, a director pause -> resume cannot lift the fence, and unload ends it.
++//! A bystander the CRL does not name is untouched. Private/shared memory writes,
++//! scalar mutation, DRR/native IAC and IO, hooks and telemetry are not fenced here.
+ //!
+ //! Run: `cargo nextest run -p maos-kernel-core --test quarantine_fr13_20_1`
+ 
+diff --git a/crates/maos-registry/SECURITY.md b/crates/maos-registry/SECURITY.md
+index 4aa39840..2fcf08b2 100644
+--- a/crates/maos-registry/SECURITY.md
++++ b/crates/maos-registry/SECURITY.md
+@@ -170,8 +170,13 @@ than silently disabling expiry. Shell/worker/oneshot drains join timer/poller
+ owners before supervisor stop, unload and audit drain. A portable AST guard checks
+ all seven release sites and eleven named drain arms, including the shared macro.
+ 
+-`MAOS_YANK_POLICY=warn` (default) records the event. `quarantine` records a typed
+-`quarantine-requested` outcome; **L1 does not claim its isolation effect**. The final
+-KQ1 kernel landing supplies the sticky fence. `auto-revoke` signs an exact-version
++`MAOS_YANK_POLICY=warn` (default) records the event. `quarantine` fences the running
++Spirit that a signed yank matches (kernel KQ1) and journals one `spirit.quarantined`
++receipt. **This is not isolation:** only capability-mediated actions (issue, verify,
++recheck: MCP, inference, memory-by-token, IAC-by-token) are refused; private and shared
++memory writes, scalar mutation, DRR/native IAC and IO, hooks and telemetry are not
++fenced. The fence is per-pid and in memory and is shed by restart, unload, swap and
++reload, and a consumed yank row is never re-applied (the CRL path is durable).
++`auto-revoke` signs an exact-version
+ local CRL with origin `RegistryYank` and invokes the existing applier, preserving
+ the Spirit's declared revocation action rather than implementing a second applier.
+diff --git a/tests/integration/onb_nfr2_timing.sh b/tests/integration/onb_nfr2_timing.sh
+index 3e994a31..daf37994 100755
+--- a/tests/integration/onb_nfr2_timing.sh
++++ b/tests/integration/onb_nfr2_timing.sh
+@@ -112,7 +112,7 @@ if [ "$actual_intro" != "$expected_intro" ]; then
+     exit 1
+ fi
+ 
+-# Step 5: Binary size gate — stripped maos-bin ≤32MiB (AC4) — blocking, deterministic
++# Step 5: Binary size gate — stripped maos-bin ≤34MiB (AC4) — blocking, deterministic
+ echo "--- Checking binary size ---"
+ strip target/release/maos
+ bin_size=$(stat -c%s target/release/maos)
+@@ -173,7 +173,11 @@ bin_size=$(stat -c%s target/release/maos)
+ # serialization/collection monomorphisations, not a new dependency; see
+ # _bmad-output/implementation-artifacts/18-4-evidence/binary-size-attribution.md.
+ # No re-base: use the maos-bin-only release codegen-units=1 override instead.
+-max_size=33554432  # 32 MiB — Epic-16 retrospective measured re-baseline (2026-09-20)
++# 2026-11-12: operator ruling (ask `size`) raises the limit 32 MiB -> 34 MiB = 35,651,584 B.
++# The binary grew +119,808 B past 33,554,432 since 89b64566 (unattributed by `nm`/`size` here;
++# attribution stays an open deferred row), so the 2026-09-20 "attribute before re-basing" rule is
++# recorded as waived by the operator for this one raise, not met.
++max_size=35651584  # 34 MiB — operator ruling `size`, 2026-11-12
+ echo "maos-bin stripped size: ${bin_size} bytes (limit: ${max_size})"
+ if [ "$bin_size" -gt "$max_size" ]; then
+     echo "ERROR: AC4 binary size violation: ${bin_size} bytes > ${max_size} bytes limit"
+diff --git a/xtask/src/prepush.rs b/xtask/src/prepush.rs
+index fd957232..84b5ff3d 100644
+--- a/xtask/src/prepush.rs
++++ b/xtask/src/prepush.rs
+@@ -481,7 +481,7 @@ fn binary_size(root: &Path, report: &mut Report, closure: &BTreeSet<String>) {
+     if !size_trigger(&report.changed_paths, closure) {
+         return report.add(
+             "binary-size",
+-            "release maos <= 33554432 B",
++            "release maos <= 35651584 B",
+             "skip",
+             "no Cargo.toml, Cargo.lock, maos-bin or transitive local dependency changes",
+         );
+@@ -506,8 +506,8 @@ fn binary_size(root: &Path, report: &mut Report, closure: &BTreeSet<String>) {
+         let stripped = temp.path().join("maos");
+         capture_command(command(root, "strip", "-o").arg(&stripped).arg(source))?;
+         let actual = fs::metadata(stripped).map_err(|e| e.to_string())?.len();
+-        if actual > 33_554_432 {
+-            return Err(format!("expected <= 33554432 B, actual {actual} B"));
++        if actual > 35_651_584 {
++            return Err(format!("expected <= 35651584 B, actual {actual} B"));
+         }
+         Ok(())
+     })();

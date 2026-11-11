@@ -418,6 +418,18 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         ]),
     },
     WriterShapeEntry {
+        // Persisted pre-20-1b marker (same site): the table is permanent.
+        site: ("applier.rs", "apply_crl", 1),
+        kind: 7,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("spirit.quarantine_requested"),
+        shape: Some(&[
+            ("spirit_id", PayloadType::Str),
+            ("spirit_pid", PayloadType::SpiritPidEqualsRow),
+            ("quarantine_requested", PayloadType::Bool),
+        ]),
+    },
+    WriterShapeEntry {
         site: ("yank_policy.rs", "policy_request", 0),
         kind: 7,
         token: TokenColumn::Absent,

@@ -293,6 +293,14 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
         (
             "capability.invocation",
             None,
+            "spirit.quarantine_requested",
+            r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":true}"#,
+            1,
+            "persisted pre-20-1b quarantine request marker (historical)",
+        ),
+        (
+            "capability.invocation",
+            None,
             "spirit.quarantined",
             r#"{"spirit_id":"running","spirit_pid":1,"quarantined":true}"#,
             1,
@@ -1269,6 +1277,80 @@ fn real_forget_tombstones_survive_replay_sealed_and_trajectory_export() {
 /// row) is a delegation message, not a call: the `--spirit` plain view renders
 /// it instead of ending in `Fr4SchemaViolation`. A token-bearing `TaskAssign`
 /// still projects as a call, so nothing leaves the NDJSON feed.
+/// 20-1b review P2 — Transparency Logs written by the pre-20-1b CRL quarantine arm
+/// carry `spirit.quarantine_requested`; the table is permanent, so those rows keep
+/// classifying as non-calls beside the current `spirit.quarantined` rows, through
+/// both FR4 projections. Lookalikes that do not match a measured shape fail closed.
+#[test]
+fn historical_and_current_quarantine_rows_are_non_calls_in_both_projections() {
+    let historical = tokenless(
+        "capability.invocation",
+        "spirit.quarantine_requested",
+        1,
+        r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":true}"#,
+    );
+    let current = tokenless(
+        "capability.invocation",
+        "spirit.quarantined",
+        1,
+        r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantined":true}"#,
+    );
+    for row in [&historical, &current] {
+        assert_eq!(
+            classify_fr4_row(row),
+            Fr4RowDisposition::NonCallKernelEvent,
+            "{row:?}"
+        );
+    }
+    let mut plain = Vec::new();
+    to_fr4_plain(vec![historical.clone(), current.clone()], &mut plain)
+        .expect("both quarantine markers render in the plain view");
+    let plain = String::from_utf8(plain).unwrap();
+    assert!(plain.contains("spirit.quarantine_requested") && plain.contains("spirit.quarantined"));
+    let mut ndjson = Vec::new();
+    to_fr4_ndjson(vec![historical.clone(), current.clone()], &mut ndjson)
+        .expect("both quarantine markers are omitted, not violations");
+    assert!(ndjson.is_empty(), "non-calls emit no NDJSON line");
+
+    let lookalikes = [
+        tokenless(
+            "capability.invocation",
+            "spirit.quarantine_requested",
+            2,
+            r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":true}"#,
+        ),
+        tokenless(
+            "capability.invocation",
+            "spirit.quarantine_requested",
+            1,
+            r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":"yes"}"#,
+        ),
+        tokenless(
+            "capability.invocation",
+            "spirit.quarantine_requested",
+            1,
+            r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":true,"x":1}"#,
+        ),
+        tokenless(
+            "capability.invocation",
+            "spirit.quarantine_requested:forged",
+            1,
+            r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":true}"#,
+        ),
+    ];
+    for row in &lookalikes {
+        assert_eq!(classify_fr4_row(row), Fr4RowDisposition::Call, "{row:?}");
+        assert!(
+            to_fr4_ndjson(vec![row.clone()], Vec::new()).is_err(),
+            "{row:?}"
+        );
+        assert!(
+            to_fr4_plain(vec![row.clone()], Vec::new()).is_err(),
+            "{row:?}"
+        );
+    }
+}
+
 #[test]
 fn tokenless_task_assign_is_a_non_call_and_a_token_bearing_one_still_projects() {
     let seed = tokenless("task.assign", "Standard", 3, "recall mediation payload");

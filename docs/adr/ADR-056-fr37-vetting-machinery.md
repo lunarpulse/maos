@@ -111,9 +111,13 @@ The FKCS conformance review that discharged decision D8 (`epic-14-preflight-deci
   The issuer and operator-root-signed attestation-revocation-list writer live in
   `maos-spirit-cli`; `vet issue`/`vet revoke` do not enroll a vetter implicitly.
   Running expiry/revocation uses the yank cadence and preserves cause labels.
-  Quarantine requests in L1 did not claim the isolation effect; 20-1b landing 2 (final kernel
-  landing, KQ1) delivers it: the `quarantine` policy fences each signed-yank-matched running
-  Spirit through the kernel sticky fence and journals one `spirit.quarantined` receipt.
+  Quarantine requests in L1 had no effect; 20-1b landing 2 (final kernel landing, KQ1) adds a
+  capability-mediated fence: the `quarantine` policy fences each signed-yank-matched running
+  Spirit (issue, verify and recheck: MCP, inference, memory-by-token, IAC-by-token) and journals one
+  `spirit.quarantined` receipt. Private and shared memory writes, scalar mutation, DRR/native IAC and
+  IO, hooks and telemetry are not fenced; the fence is per-pid and in memory and is shed by restart,
+  unload, swap and reload; a consumed yank row is never re-applied (the CRL path is durable). It is
+  not isolation (operator ruling `q`, 2026-11-12).
 
 ## Amendment — 20-1b L1 independent-review corrections (2026-11-07)
 
@@ -147,7 +151,7 @@ cadence is 300 seconds. Network work cannot hold boot/shutdown or the audit drai
 open. One bad Spirit or rejected withdrawal does not starve another observation,
 and retrying an effect does not repeat its terminal observation.
 The correction landing has zero kernel delta (26,841 physical / 21,042 tokei);
-quarantine was still a typed request only at that landing; its effect arrived at 20-1b landing 2 (kernel 26,967 physical / 21,141 tokei).
+quarantine was still a typed request only at that landing; its capability-mediated fence (not isolation) arrived at 20-1b landing 2 (kernel 26,967 physical / 21,141 tokei).
 
 ## Amendment — AC15 authenticated first contact and yank heads
 

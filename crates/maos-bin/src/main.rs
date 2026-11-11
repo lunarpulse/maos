@@ -11088,7 +11088,21 @@ fn orphaned_halts(
         for (boot, kind, intent, untokened, kernel_row, text) in
             rows.into_iter().take(HALT_SCAN_ROWS)
         {
-            let value: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
+            let value: serde_json::Value = match serde_json::from_str(&text) {
+                Ok(value) => value,
+                // Kernel termination markers are kind-3 rows with an empty payload
+                // by construction (`halt/termination.rs` `marker`): nothing to classify.
+                Err(_) if kind == 3 && !text.trim().is_empty() => {
+                    let gap = format!(
+                        "halt scan of pid {pid}: a kind-3 row payload is not JSON; not classified"
+                    );
+                    if !gaps.contains(&gap) {
+                        gaps.push(gap);
+                    }
+                    continue;
+                }
+                Err(_) => serde_json::Value::Null,
+            };
             if kind == 3 {
                 match (
                     kernel_row,

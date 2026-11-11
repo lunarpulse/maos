@@ -57,14 +57,36 @@ the current surface: one changed, none added, none removed); the new `pub fn`s a
 | set hash | `1eb6670a...400bd` | `06386b442acc7a7241442eea761ba406a3e8ee8527a73030044d8a89c3224e5f` |
 | file digests | | `capability/mod.rs`, `revocation/applier.rs`, `revocation/poller.rs`, `scheduler/scheduler_loop.rs` |
 | `xtask/kloc.toml` `maos-kernel-core` | 21073 | **21141** |
-| `xtask/kloc.toml` `maos-bin` | 38362 | **38392** (+30, inside the 20-1b bin ceiling 35671: 35586 + 85 room, 55 remaining) |
-| `xtask/kloc.toml` `maos-audit` | 8286 | **8297** (+11: the FR4 `WRITER_SHAPES` entry the new bin receipt writer requires and the renamed kernel marker; inside the 20-11 ceiling 8313 and the 20-1b audit correction ceiling 8204 = exact 8179 + 25) |
+| `xtask/kloc.toml` `maos-bin` | 38362 | **38392** (+30; a draw against 20-1b's own rebased bin room: ceiling 35671 on its base 35586 = 85, not an absolute comparison with the live pin) |
+| `xtask/kloc.toml` `maos-audit` | 8286 | **8297** (+11: the FR4 `WRITER_SHAPES` entry the new bin receipt writer requires and the renamed kernel marker; a draw against 20-1b's audit correction room, ceiling 8204 on base 8179 = 25, and below the 20-11 ceiling 8313) |
 | `xtask/kloc.toml` `_aggregate_hardfail` | 202506 | **202615** (clean aggregate 202614 = +68 kernel +30 bin +11 audit, + 1) |
 | `xtask/tests/kernel_pin_content_hash_16_0.rs` | 26889 x4 | 26967 x4 |
 | `xtask/tests/recovery_lane_ceiling_rule.rs` | 21_073 | 21_141 |
 
 Clean figures are from a `git archive HEAD` copy overlaid with the landing's files (local untracked operator files
 excluded).
+
+## Scope narrowed by operator ruling `q` (2026-11-12)
+
+The independent reviews (`landing-2/review/`) showed the delivered fence is **capability-mediated only**. The operator ruled
+narrow: KQ1 stays as ruled, no kernel code is added (kernel unchanged), and the claim is: *capability-mediated actions
+(issue/verify/recheck: MCP, inference, memory-by-token, IAC-by-token) are fenced; private/shared memory writes, scalar
+mutation, DRR/native IAC/IO, hooks and telemetry are NOT fenced; the fence is per-pid in memory and is shed by restart,
+unload, swap and reload; a consumed yank row is never re-applied (the CRL path is durable).* "Isolation" wording is removed.
+The gaps are rule-10 deferred rows triggered by a priced follow-up the operator must price ("quarantine closure": memory/scalar
+fences + durable/load-time yank quarantine + operator release verb + distinct `quarantined` readback, kernel +30..+80
+tokei, unmeasured). Whether the original grant's FR13 wording promised more than this is the operator's call; no extra
+kernel line is spent here.
+
+### r1 kernel-free corrections (kernel pins unchanged by this round)
+
+| Pin | Before r1 | After r1 | Driver |
+|---|---:|---:|---|
+| `maos-bin` | 38415 | **38446** (+31) | yank rejected-row dedup (F-2), kind-3 serde match |
+| `maos-audit` | 8297 | **8308** (+11) | historical `spirit.quarantine_requested` shape kept (GPT P2) |
+| `_aggregate_hardfail` | 202677 | **202719** | clean aggregate 202718 + 1 |
+
+Cumulative 20-1b draws against its own rebased rooms: bin +30 +31 = +61 of 85; audit +11 +11 = +22 of 25.
 
 ## Not delivered by this row (disclosed)
 

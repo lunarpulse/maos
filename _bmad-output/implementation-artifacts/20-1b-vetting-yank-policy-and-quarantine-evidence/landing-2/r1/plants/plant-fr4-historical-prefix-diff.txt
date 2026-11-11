@@ -1,0 +1,11 @@
+--- /tmp/t201bk/keep-fr4-historical-prefix	2026-11-11 15:23:33.663648750 +0000
++++ /home/lunarpulse/dev_ws/crates/maos-audit/src/fr4_classifier.rs	2026-11-11 15:29:36.901155684 +0000
+@@ -422,7 +422,7 @@
+         site: ("applier.rs", "apply_crl", 1),
+         kind: 7,
+         token: TokenColumn::Absent,
+-        intent: WriterIntent::Exact("spirit.quarantine_requested"),
++        intent: WriterIntent::Prefix("spirit.quarantine_requested"),
+         shape: Some(&[
+             ("spirit_id", PayloadType::Str),
+             ("spirit_pid", PayloadType::SpiritPidEqualsRow),

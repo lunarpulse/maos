@@ -16,6 +16,8 @@ pub struct YankRuntime {
     applier: Arc<maos_kernel_core::revocation::RevocationApplier>,
     policy: YankPolicy,
     observed: Mutex<BTreeMap<(u32, String, String), bool>>,
+    /// sequence -> hash of the last journaled rejection reason (bounded).
+    rejected: Mutex<BTreeMap<u64, u64>>,
     registry_uri: String,
     clock: fn() -> Result<u64, String>,
 }
@@ -35,6 +37,7 @@ impl YankRuntime {
             applier,
             policy,
             observed: Mutex::new(BTreeMap::new()),
+            rejected: Mutex::new(BTreeMap::new()),
             registry_uri,
             clock: maos_registry::yank_auth::now_unix_ms,
         }
@@ -399,6 +402,24 @@ impl YankObserver for YankRuntime {
         Ok(YankDisposition::Verified)
     }
     fn on_rejected(&self, entry: &YankEntry, reason: &str) -> Result<(), RegistryError> {
+        // A parked row is redelivered every poll: journal each (sequence, reason) once.
+        let hash = std::hash::BuildHasher::hash_one(
+            &std::hash::BuildHasherDefault::<std::collections::hash_map::DefaultHasher>::default(),
+            reason,
+        );
+        {
+            let mut seen = self
+                .rejected
+                .lock()
+                .map_err(|e| RegistryError::Transport(e.to_string()))?;
+            if seen.get(&entry.sequence) == Some(&hash) {
+                return Ok(());
+            }
+            if seen.len() >= 8192 {
+                seen.clear();
+            }
+            seen.insert(entry.sequence, hash);
+        }
         let label = if reason.starts_with("yank-sequence-anomaly") {
             "yank-sequence-anomaly"
         } else {

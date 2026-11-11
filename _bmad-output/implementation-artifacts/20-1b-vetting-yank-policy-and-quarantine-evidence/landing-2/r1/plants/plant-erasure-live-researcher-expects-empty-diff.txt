@@ -1,0 +1,11 @@
+--- /tmp/t201bk/keep-erasure-live-researcher-expects-empty	2026-11-11 15:27:50.695955818 +0000
++++ /home/lunarpulse/dev_ws/crates/maos-bin/tests/erasure_live_20_11.rs	2026-11-11 15:30:02.552091824 +0000
+@@ -233,7 +233,7 @@
+     // AC4: the firing schedule's SCB, buckets and stamp are gone. The Worker's SCB has no
+     // schedule ids, and the cascade's `removed(0)` is `VerifiedEmpty` (`main.rs` `removed`).
+     let scheduled = status("scheduled_invocations");
+-    if worker {
++    if !worker {
+         assert!(
+             matches!(
+                 scheduled,

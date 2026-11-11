@@ -112,7 +112,7 @@ if [ "$actual_intro" != "$expected_intro" ]; then
     exit 1
 fi
 
-# Step 5: Binary size gate — stripped maos-bin ≤32MiB (AC4) — blocking, deterministic
+# Step 5: Binary size gate — stripped maos-bin ≤34MiB (AC4) — blocking, deterministic
 echo "--- Checking binary size ---"
 strip target/release/maos
 bin_size=$(stat -c%s target/release/maos)
@@ -173,7 +173,11 @@ bin_size=$(stat -c%s target/release/maos)
 # serialization/collection monomorphisations, not a new dependency; see
 # _bmad-output/implementation-artifacts/18-4-evidence/binary-size-attribution.md.
 # No re-base: use the maos-bin-only release codegen-units=1 override instead.
-max_size=33554432  # 32 MiB — Epic-16 retrospective measured re-baseline (2026-09-20)
+# 2026-11-12: operator ruling (ask `size`) raises the limit 32 MiB -> 34 MiB = 35,651,584 B.
+# The binary grew +119,808 B past 33,554,432 since 89b64566 (unattributed by `nm`/`size` here;
+# attribution stays an open deferred row), so the 2026-09-20 "attribute before re-basing" rule is
+# recorded as waived by the operator for this one raise, not met.
+max_size=35651584  # 34 MiB — operator ruling `size`, 2026-11-12
 echo "maos-bin stripped size: ${bin_size} bytes (limit: ${max_size})"
 if [ "$bin_size" -gt "$max_size" ]; then
     echo "ERROR: AC4 binary size violation: ${bin_size} bytes > ${max_size} bytes limit"

@@ -1145,6 +1145,37 @@ fn review_f2_malformed_orphan_id_is_a_named_gap_not_a_failed_uninstall() {
     );
     verify(&proof);
 }
+/// check-serde-error-handling: a kind-3 row whose payload is not JSON is a named gap,
+/// never a silently defaulted `Null` that classifies as "nothing to see".
+#[test]
+fn review_serde_non_json_kind3_row_is_a_named_gap() {
+    let f = Fixture::new();
+    f.seed(1, "hello-spirit", 7, true);
+    raise_halt(&f, 1, 7, "hello-spirit", "real-serde-20-11");
+    forge_kernel_shaped(&f, 1, 7, b"this payload is not json");
+    let out = f.run();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let proof = f.proof(&out);
+    let halts = category(&proof, "pending_halts");
+    assert_eq!(halts["status"]["status"], "CoverageGap", "{halts}");
+    assert!(
+        halts["status"]["reason"]
+            .as_str()
+            .is_some_and(|r| r.contains("a kind-3 row payload is not JSON; not classified")),
+        "{halts}"
+    );
+    assert_eq!(
+        receipts_of(&f, "real-serde-20-11"),
+        ["unplanned_crash"],
+        "valid halts still close"
+    );
+    verify(&proof);
+}
 #[test]
 fn review_f1_spirit_submitted_halt_frames_are_not_invocations() {
     let f = Fixture::new();

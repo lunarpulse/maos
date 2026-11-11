@@ -170,8 +170,13 @@ than silently disabling expiry. Shell/worker/oneshot drains join timer/poller
 owners before supervisor stop, unload and audit drain. A portable AST guard checks
 all seven release sites and eleven named drain arms, including the shared macro.
 
-`MAOS_YANK_POLICY=warn` (default) records the event. `quarantine` records a typed
-`quarantine-requested` outcome; **L1 does not claim its isolation effect**. The final
-KQ1 kernel landing supplies the sticky fence. `auto-revoke` signs an exact-version
+`MAOS_YANK_POLICY=warn` (default) records the event. `quarantine` fences the running
+Spirit that a signed yank matches (kernel KQ1) and journals one `spirit.quarantined`
+receipt. **This is not isolation:** only capability-mediated actions (issue, verify,
+recheck: MCP, inference, memory-by-token, IAC-by-token) are refused; private and shared
+memory writes, scalar mutation, DRR/native IAC and IO, hooks and telemetry are not
+fenced. The fence is per-pid and in memory and is shed by restart, unload, swap and
+reload, and a consumed yank row is never re-applied (the CRL path is durable).
+`auto-revoke` signs an exact-version
 local CRL with origin `RegistryYank` and invokes the existing applier, preserving
 the Spirit's declared revocation action rather than implementing a second applier.

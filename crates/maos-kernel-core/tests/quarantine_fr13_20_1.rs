@@ -1,13 +1,15 @@
 #![forbid(unsafe_code)]
 
-//! Story 20-1b AC11 (D-20-1-02 A, KQ1) — FR13 quarantine isolates and never kills.
+//! Story 20-1b AC11 (D-20-1-02 A, KQ1) — FR13 quarantine is a capability-mediated
+//! fence and never kills. It is NOT isolation (operator ruling `q`, 2026-11-12).
 //!
 //! A fixture Spirit declaring `[on_revocation] action = "quarantine"` receives a
-//! CRL. From then on every mediated action of its pid (MCP, inference, memory
-//! issuance, token verification) fails closed with `CapError::Revoked`, the
-//! Spirit stays loaded and Running past the old drain deadline, a director
-//! pause -> resume cannot lift the fence, and unload ends it. A bystander the CRL
-//! does not name is untouched.
+//! CRL. From then on every capability-mediated action of its pid (MCP, inference,
+//! `MemWrite` token issuance, token verification) fails closed with
+//! `CapError::Revoked`, the Spirit stays loaded and Running past the old drain
+//! deadline, a director pause -> resume cannot lift the fence, and unload ends it.
+//! A bystander the CRL does not name is untouched. Private/shared memory writes,
+//! scalar mutation, DRR/native IAC and IO, hooks and telemetry are not fenced here.
 //!
 //! Run: `cargo nextest run -p maos-kernel-core --test quarantine_fr13_20_1`
 

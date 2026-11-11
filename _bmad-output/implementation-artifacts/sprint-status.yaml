@@ -357,6 +357,10 @@ development_status:
   # uncommitted, awaiting review: kernel 26967/21141 (+78/+68 = grant, T0 identical to creation prototype; x2 ceiling
   # re-based 27045/21209, shared STOP 21250), one CapabilityRegistryAdapter surface-hash refresh (ADR-066), bin 38392 (+30,
   # inside 35671 ceiling), audit 8297 (+11, FR4 writer-shape entry), aggregate hardfail 202615. Failing-before + plants per AC11/AC12/AC8 in landing-2/.
+  # 2026-11-12 ruling q (narrow): the fence is capability-mediated ONLY (not isolation); no kernel code added; gaps are rule-10
+  # deferred rows behind a priced quarantine-closure follow-up (kernel +30..+80 tokei, unmeasured). r1 kernel-free fixes
+  # (FR4 historical shape, yank rejected-row dedup, kind-3 serde gap, ac6 worker variant, size limit 34 MiB per ask size):
+  # bin 38446, audit 8308, hardfail 202719. 20-1b NOT done; epic-close must not close it.
   # Status NOT flipped: AC11.5 hosted T3 leg, AC15 hosted TLS/dev/macOS legs, hosted run, prepush/review, quarantine restart
   # persistence and the ADR-037 I5 flip are open (deferred-work 20-1b landing 2 section); CLOSED @commit stamps are Main-owned.
   # RULED 2026-11-02 (ask s202): D-20-2-01…14 as recommended, D09 A confirmed; kernel 0; ceilings bin 33534, xtask 44860, aggregate 192316. The creation note below is historical.
