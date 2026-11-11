@@ -20,7 +20,7 @@ not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21
 Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
 
 
-Status: done
+Status: in-progress  <!-- reverted from done 2026-11-11 per GPT review (landing-2/review): completion evidence outstanding: hosted discipline run on the final tree, prescribed prepush or operator exception, L2 review disposition, commit-qualified deferred closures (@251dc692), closing-tree ratchet result -->
 
 <!-- Created 2026-11-02 at a8af3215 (main, one docs commit ahead of origin/main 47631284; `git log -1 -- crates xtask` = 47631284) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30). Preflight D06 is OPEN; D-20-4-01…11 are PROPOSED, not ruled — the operator rules; a different ruling rewrites only the clauses marked with that row. No cargo ran (parent rule): cites re-read at HEAD (`creation/cites-a8af3215.md`); kernel and kloc by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`); the epic's AC1 shell line run on the prebuilt binary in an isolated home (`creation/runtime/`). Stale E20 §20-4 cites are corrected through `creation/records-owed.md` §A. -->
 
