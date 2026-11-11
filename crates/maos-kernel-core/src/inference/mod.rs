@@ -402,28 +402,45 @@ impl InferencePort for InferencePortAdapter {
                     .unwrap_or_default()
                     .as_nanos() as u64;
 
-                // F8 — principal attribution at emission (R2 / SR-4).
-                let principal_ids = self
-                    .transparency_log
-                    .principal_ids_for_spirit_pid(req.spirit_pid)
+                // Story 20-14 — FR64: the scope the root bound to the verified token at
+                // mint; never read from the request (anti-spoof).
+                let scope = self
+                    .capabilities
+                    .tokens()
+                    .cost_scope(&req.capability_token.token_id)
                     .unwrap_or_default();
-                let (principal, confidence) = match principal_ids.as_slice() {
-                    [] => (
-                        maos_domain::cost::PrincipalRef::Unattributed,
-                        maos_domain::cost::AttributionConfidence::Unknown,
+                // F8 — principal attribution at emission (R2 / SR-4): the bound session
+                // principal, else the write-target proxy as the tagged fallback.
+                use maos_domain::cost::{AttributionConfidence, AttributionSource, PrincipalRef};
+                let (principal, confidence, source) = match scope.session_principal {
+                    Some(principal_id) => (
+                        PrincipalRef::Resolved { principal_id },
+                        AttributionConfidence::Exact,
+                        AttributionSource::SessionPrincipal,
                     ),
-                    [one] => (
-                        maos_domain::cost::PrincipalRef::Resolved {
-                            principal_id: one.clone(),
-                        },
-                        maos_domain::cost::AttributionConfidence::Exact,
-                    ),
-                    many => (
-                        maos_domain::cost::PrincipalRef::Ambiguous {
-                            count: many.len() as u32,
-                        },
-                        maos_domain::cost::AttributionConfidence::Ambiguous,
-                    ),
+                    None => {
+                        let (principal, confidence) = match self
+                            .transparency_log
+                            .principal_ids_for_spirit_pid(req.spirit_pid)
+                            .unwrap_or_default()
+                            .as_slice()
+                        {
+                            [] => (PrincipalRef::Unattributed, AttributionConfidence::Unknown),
+                            [one] => (
+                                PrincipalRef::Resolved {
+                                    principal_id: one.clone(),
+                                },
+                                AttributionConfidence::Exact,
+                            ),
+                            many => (
+                                PrincipalRef::Ambiguous {
+                                    count: many.len() as u32,
+                                },
+                                AttributionConfidence::Ambiguous,
+                            ),
+                        };
+                        (principal, confidence, AttributionSource::WriteTargetProxy)
+                    }
                 };
 
                 let mut dimensions = std::collections::BTreeMap::new();
@@ -436,20 +453,23 @@ impl InferencePort for InferencePortAdapter {
                     resp.usage.output_tokens as i64,
                 );
 
-                let cost_payload = maos_domain::cost::CostAttributionPayload {
-                    schema_version: 1,
-                    timestamp_ns: now_ns,
-                    spirit_pid: req.spirit_pid,
-                    provider: resp.provider_attribution.provider_id.clone(),
-                    model: resp
-                        .provider_attribution
-                        .model_id
-                        .clone()
-                        .unwrap_or_default(),
-                    principal,
-                    attribution_source: maos_domain::cost::AttributionSource::WriteTargetProxy,
-                    attribution_confidence: confidence,
-                    dimensions,
+                let cost_payload = maos_domain::cost::CostFrameBody {
+                    payload: maos_domain::cost::CostAttributionPayload {
+                        schema_version: 2,
+                        timestamp_ns: now_ns,
+                        spirit_pid: req.spirit_pid,
+                        provider: resp.provider_attribution.provider_id.clone(),
+                        model: resp
+                            .provider_attribution
+                            .model_id
+                            .clone()
+                            .unwrap_or_default(),
+                        principal,
+                        attribution_source: source,
+                        attribution_confidence: confidence,
+                        dimensions,
+                    },
+                    task_ref: scope.task_ref,
                 };
                 if let Ok(cost_bytes) = serde_json::to_vec(&cost_payload) {
                     let _cost_token = self.transparency_log.insert_frame_event(

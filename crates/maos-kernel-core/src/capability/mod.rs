@@ -279,6 +279,12 @@ impl CapabilityRegistryAdapter {
         self.tokens.get_scope(token_id)
     }
 
+    /// Story 20-14 — the cap-token ring: the root binds attribution scopes on it
+    /// and the inference emission reads them by the verified token id.
+    pub fn tokens(&self) -> &CapTokensShardRing {
+        &self.tokens
+    }
+
     /// Story 4.2 — write a tagged scalar to the per-Spirit slot store
     /// and publish a `ScalarTapEvent` to the telemetry stream.
     pub fn set_scalar(

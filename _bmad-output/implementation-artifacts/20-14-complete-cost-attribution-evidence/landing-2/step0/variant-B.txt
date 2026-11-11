@@ -1,0 +1,7 @@
+## variant B on git archive HEAD 8144bc02 (touched, rustfmt'd)
+### kloc-check
+{'aggregate': 202781, 'kernel': 21201, 'capability': 1444, 'over_budget': ['aggregate 202781 >= 202751', 'maos-capability 1444 > 1433', 'maos-kernel-core 21201 > 21181']}
+### check-kernel-baseline
+{'actual-lines': 27039, 'pinned-lines': 27014, 'changed': ['capability/mod.rs', 'inference/mod.rs'], 'added': [], 'removed': []}
+### check-service-boundary
+{'passed': True, 'violations': []}

@@ -310,8 +310,13 @@ escapes backslashes, control and bidirectional-format characters and truncates
 each field to its first 256 input characters (escapes can make the printed field
 longer); NDJSON is not escaped. A provider/model without a pricing entry is
 priced at 0 with a Warnings line.
-Root task and session binding is pending the final kernel landing, so existing
-writers still emit schema 1 and proxy attribution.
+The root binds one task per shell turn (`shell.turn:<id>`), per Butler,
+Orchestrator or Researcher seam pass (`<spirit>.pass:<id>`) and for the one-shot
+hello run (`hello-spirit.run:<id>`), and, when `MAOS_SESSION_PRINCIPAL` is set at
+boot, that session principal; such frames are schema 2 with `task_ref` and
+`attribution_source: session_principal`. A malformed value (a `:` or a control
+character) refuses the boot; unset or blank binds none and the write-target proxy
+attributes, tagged `write_target_proxy`. Frames written before 20-14 stay schema 1.
 
 In the JSON report, `per_spirit_attributable_fraction` has one entry per
 boot-local Spirit, keyed `<boot_nonce>:<pid>` (both unsigned decimal, for example

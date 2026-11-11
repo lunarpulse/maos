@@ -299,8 +299,13 @@ model별로 묶습니다. plain 출력도 가능합니다. 보고서는 관측 �
 백슬래시, 제어 문자, 양방향 서식 문자를 이스케이프하고 각 필드를 처음 256개
 입력 문자로 자르며(이스케이프로 출력이 더 길어질 수 있음) NDJSON은 이스케이프하지
 않습니다. 가격 항목이 없는 provider/model은 0으로 계산되고 Warnings 줄이 출력됩니다.
-root task와 session 바인딩은 최종 kernel landing을 기다립니다. 기존 writer는 여전히 schema 1과
-proxy 귀속을 기록합니다.
+root는 shell turn마다(`shell.turn:<id>`), Butler·Orchestrator·Researcher seam pass마다
+(`<spirit>.pass:<id>`), 그리고 one-shot hello 실행마다(`hello-spirit.run:<id>`) task 하나를
+바인딩하고, 부팅 시 `MAOS_SESSION_PRINCIPAL`이 설정되어 있으면 그 세션 principal도
+바인딩합니다. 이런 frame은 `task_ref`와 `attribution_source: session_principal`을 가진
+schema 2입니다. 잘못된 값(`:` 또는 제어 문자)은 부팅을 거부하며, 미설정 또는 공백이면
+바인딩하지 않고 write-target proxy가 `write_target_proxy`로 표시되어 귀속합니다.
+20-14 이전에 기록된 frame은 schema 1로 남습니다.
 
 JSON 보고서의 `per_spirit_attributable_fraction`은 부팅 단위 Spirit마다 한 항목이며
 키는 `<boot_nonce>:<pid>`(둘 다 부호 없는 십진수, 예: `"12:7"`)입니다. 다른 부팅의

@@ -30,6 +30,7 @@ pub mod shard;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+use maos_domain::cost::CostScope;
 use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope, TokenId};
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::capability::CapError;
@@ -114,6 +115,8 @@ pub struct CapTokensShardRing {
     signing_key: Ed25519SigningKey,
     boot_nonce: u64,
     audit: cap_audit::Sender,
+    /// Story 20-14 — root-bound attribution scopes, keyed by the token they ride.
+    cost_scopes: parking_lot::RwLock<std::collections::HashMap<TokenId, CostScope>>,
 }
 
 impl std::fmt::Debug for CapTokensShardRing {
@@ -141,6 +144,7 @@ impl CapTokensShardRing {
             signing_key,
             boot_nonce,
             audit,
+            cost_scopes: Default::default(),
         }
     }
 
@@ -264,6 +268,19 @@ impl CapTokensShardRing {
         let shard_idx = shard::hash_token_id(token_id);
         let shard = &self.shards[shard_idx];
         shard.get(token_id).map(|s| s.scope)
+    }
+
+    /// Story 20-14 — bind a root attribution scope to a token; scopes of tokens
+    /// the ring no longer holds are pruned on the way in.
+    pub fn bind_cost_scope(&self, token_id: TokenId, scope: CostScope) {
+        let mut scopes = self.cost_scopes.write();
+        scopes.retain(|id, _| self.get_scope(id).is_some());
+        scopes.insert(token_id, scope);
+    }
+
+    /// Story 20-14 — the scope bound to `token_id`, if any.
+    pub fn cost_scope(&self, token_id: &TokenId) -> Option<CostScope> {
+        self.cost_scopes.read().get(token_id).cloned()
     }
 
     /// Revoke a single token. Slow-path (single token, not the verify hot

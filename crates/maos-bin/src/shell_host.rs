@@ -49,6 +49,8 @@ pub struct ShellHost {
     /// The SAME operator door `maosctl halt resolve` reaches (D-16-2-C):
     /// one mechanism, two surfaces.
     door: Arc<dyn OperatorCommandPort>,
+    /// Story 20-14 — the boot's session principal, bound to every turn's task.
+    session_principal: Option<String>,
     #[cfg(feature = "network")]
     installed: Option<(
         Arc<crate::installed_spirits::InstalledSpirits>,
@@ -78,6 +80,7 @@ impl ShellHost {
             halt_registry,
             memory,
             door,
+            session_principal: None,
             #[cfg(feature = "network")]
             installed: None,
         }
@@ -92,10 +95,51 @@ impl ShellHost {
         self.installed = Some((installed, iac));
         self
     }
+
+    /// Story 20-14 — bind the boot's session principal (FR64).
+    pub fn with_session_principal(mut self, principal: Option<String>) -> Self {
+        self.session_principal = principal;
+        self
+    }
     /// The context key the kernel's `KernelHaltResolver` writes the resolution
     /// text under (`resolver.rs` — the Story 4.3 delivery channel).
     fn context_key(halt_id: &str) -> String {
         format!("halt_context::{halt_id}")
+    }
+}
+
+/// Story 20-14 (FR64, D-20-14-01 A) — bind the composition root's attribution scope to a
+/// freshly minted Inference Port token: the task is `<prefix>:<ulid>`, the session principal is
+/// the boot's. Reachable only from the root; no Spirit, request or frame feeds either value.
+pub fn bind_task_scope(
+    capability: &CapabilityRegistryAdapter,
+    token: &CapabilityToken,
+    prefix: &str,
+    session_principal: Option<&str>,
+) {
+    capability.tokens().bind_cost_scope(
+        token.token_id,
+        maos_domain::cost::CostScope {
+            task_ref: Some(format!("{prefix}:{}", ulid::Ulid::new())),
+            session_principal: session_principal.map(str::to_owned),
+        },
+    );
+}
+
+/// Story 20-14 (D-20-14-04 A) — `MAOS_SESSION_PRINCIPAL` under the D-19-2-08 A rule: unset or
+/// blank binds none; a set value has no `:` and no control character; a non-UTF-8 or malformed
+/// value refuses the boot.
+pub fn parse_session_principal(raw: Option<std::ffi::OsString>) -> Result<Option<String>, String> {
+    let Some(raw) = raw else { return Ok(None) };
+    let principal = raw
+        .into_string()
+        .map_err(|raw| format!("MAOS_SESSION_PRINCIPAL {raw:?} is not valid UTF-8"))?;
+    match principal {
+        blank if blank.trim().is_empty() => Ok(None),
+        bad if bad.chars().any(|c| c == ':' || c.is_control()) => Err(format!(
+            "MAOS_SESSION_PRINCIPAL {bad:?} must have no `:` or control character"
+        )),
+        principal => Ok(Some(principal)),
     }
 }
 
@@ -110,7 +154,7 @@ impl maos_shell::ShellHost for ShellHost {
     }
 
     fn issue_turn_token(&self) -> Result<CapabilityToken, CapError> {
-        self.capability.issue_with_mediation(
+        let token = self.capability.issue_with_mediation(
             self.spirit_pid,
             Scope::ProviderInfer {
                 provider: self.default_provider.clone(),
@@ -118,7 +162,15 @@ impl maos_shell::ShellHost for ShellHost {
             60,        // ttl_secs
             [0u8; 32], // posture_hash (deterministic fallback)
             IntentClass::Standard,
-        )
+        )?;
+        // One shell turn is one task (FR64, D-20-14-01 A), bound at mint.
+        bind_task_scope(
+            &self.capability,
+            &token,
+            "shell.turn",
+            self.session_principal.as_deref(),
+        );
+        Ok(token)
     }
 
     fn record_turn(&self, token: &CapabilityToken, payload: &[u8]) -> Result<(), CapError> {

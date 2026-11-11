@@ -4201,6 +4201,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(principal) = &principal {
         let _ = butler_principal.set(principal.clone());
     }
+    // Story 20-14 (FR64, D-20-14-04 A) — the boot's session principal, read once, from the
+    // operator's environment only (never a request, manifest, Spirit or frame); bound by the
+    // root into every Inference Port task it opens. A malformed value refuses the boot.
+    let session_principal =
+        maos_bin::shell_host::parse_session_principal(std::env::var_os("MAOS_SESSION_PRINCIPAL"))
+            .map_err(|error| format!("maos: {error}"))?;
     // Story 18-1 (review ruling D-18-1-R1) — the Butler seam every Butler of
     // this root attaches (boot arm, door load, hot-swap successor): bound
     // under `--live` and every explicit mode (unset mode stays deterministic,
@@ -4214,12 +4220,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let capability = Arc::downgrade(&capability);
             let enterprise_runtime = enterprise_runtime.clone();
             let enterprise_pdp_runtime = enterprise_pdp_runtime.clone();
+            let session_principal = session_principal.clone();
+            let spirit_names = Arc::clone(&pid_by_spirit_id);
             Arc::new(move |pid, provider: &str| {
-                issue_enterprise_governed_capability(
-                    capability
-                        .upgrade()
-                        .ok_or("token issue failed: root shut down")?
-                        .as_ref(),
+                let capability = capability
+                    .upgrade()
+                    .ok_or("token issue failed: root shut down")?;
+                let token = issue_enterprise_governed_capability(
+                    capability.as_ref(),
                     enterprise_runtime.as_deref(),
                     enterprise_pdp_runtime.as_ref(),
                     pid,
@@ -4230,7 +4238,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     [0u8; 32],
                     IntentClass::Standard,
                 )
-                .map_err(|e| format!("token issue failed: {e}"))
+                .map_err(|e| format!("token issue failed: {e}"))?;
+                // One seam pass is one task (D-20-14-01 A): `<spirit>.pass:<ulid>`.
+                let spirit = spirit_names
+                    .read()
+                    .ok()
+                    .and_then(|names| {
+                        names
+                            .iter()
+                            .find(|(_, p)| **p == pid)
+                            .map(|(n, _)| n.clone())
+                    })
+                    .unwrap_or_else(|| format!("pid{pid}"));
+                maos_bin::shell_host::bind_task_scope(
+                    &capability,
+                    &token,
+                    &format!("{spirit}.pass"),
+                    session_principal.as_deref(),
+                );
+                Ok(token)
             })
         },
         digest: Arc::new(butler::MorningDigestRenderer::new(
@@ -4630,7 +4656,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Arc::clone(&memory),
                 door_port,
             )
-            .with_installed(Arc::clone(&installed_spirits), Arc::clone(&iac));
+            .with_installed(Arc::clone(&installed_spirits), Arc::clone(&iac))
+            .with_session_principal(session_principal.clone());
             // D-16-2-B I/O seam: production passes a fresh `BufReader` over
             // stdin (NOT `stdin().lock()` — a MutexGuard is not `Send` and
             // the reader moves to its own thread in D-16-2-D) and `stdout()`
@@ -9727,6 +9754,13 @@ description = "smoke test spirit successor"
             IntentClass::Standard,
         )
         .map_err(|e| format!("failed to issue capability token: {e}"))?;
+        // The one-shot hello run is one task (D-20-14-01 A).
+        maos_bin::shell_host::bind_task_scope(
+            capability.as_ref(),
+            &token,
+            "hello-spirit.run",
+            session_principal.as_deref(),
+        );
 
         // Print token_id for downstream test observability (Story 3.4 AC4).
         let token_id_hex: String = token

@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "actual-lines": 27040,
+  "pinned-lines": 27040,
+  "baseline-file": "/home/lunarpulse/dev_ws/xtask/kernel-core-baseline.toml",
+  "file-set-entries": 95,
+  "set-hash": "5551f890778559fae278287f86d18cfecb3e801ca74c5e182bb24d8889ff2524",
+  "pinned-set-hash": "5551f890778559fae278287f86d18cfecb3e801ca74c5e182bb24d8889ff2524",
+  "changed": [],
+  "added": [],
+  "removed": []
+}

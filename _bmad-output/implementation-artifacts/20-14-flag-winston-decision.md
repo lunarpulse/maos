@@ -65,3 +65,19 @@ implements KT plus the root binding sites last, re-measures formatted code, and 
 (`src_lines`, the `capability/mod.rs` and `inference/mod.rs` content hashes, an EOF HISTORY row) and `xtask/kloc.toml`
 `maos-kernel-core` exactly, each HISTORY row's first segment citing this key with `->` (D11 A). Unused room is not
 reserved. Any `crates/maos-kernel-core/src` change outside KT's two files is STOP.
+
+## L2 landing record — 2026-11-12 (implemented locally; uncommitted; awaiting the hosted run and review)
+
+**Ruled row used:** D-20-14-02 B (KT, token-bound scope), D-20-14-03 B (no request field), grant +35 physical / +25 tokei priced at `8c809f9c` (x2 ceilings; shared STOP 21250).
+**T0 re-cut at the live base 27014 / 21181** on a `git archive HEAD` copy, including the `CostFrameBody` wrapper hunk the creation prototype did not price
+(`landing-2/evidence.md`, `landing-2/step0/`):
+
+| Shape | Kernel | maos-capability | Surface gate |
+|---|---|---|---|
+| A: field on `CapabilityRegistryAdapter` | +38 / +28 -> 27052 / 21209 | 0 | RED (struct hash moves; second refresh not granted) -> rejected |
+| **B (landed)**: map on `CapTokensShardRing` + inherent accessor `CapabilityRegistryAdapter::tokens()` | **+26 / +20 -> 27040 / 21201** (priced +25/+20 at the copy) | +11 (1433 -> 1444) | GREEN, no surface-hash refresh |
+
+Changed kernel files: `capability/mod.rs` (+6, accessor), `inference/mod.rs` (+20, emission: scope read by the verified token id, session principal -> `Resolved` / `SessionPrincipal` / `Exact`, proxy only as the
+tagged fallback, `CostFrameBody` schema 2 with `task_ref`). `kernel-core-baseline.toml`: `src_lines` 27040, the two content hashes and `set_hash` adopted from `--emit-pin`, HISTORY first segment citing this key with `->`.
+Cumulative measured tokei **21201**, 49 under the shared STOP 21250, 799 under the ADR-069 alarm 22000. **maos-capability ceiling 1433 -> 1444 is an orchestrator-adjudicated overdraft requested by the coder
+(creation grant: 0) and is PENDING Main's ruling.** No file added or removed (95); no change outside KT's two kernel files.

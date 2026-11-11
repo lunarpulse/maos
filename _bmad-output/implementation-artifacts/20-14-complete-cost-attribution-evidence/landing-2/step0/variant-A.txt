@@ -1,0 +1,7 @@
+## variant A on git archive HEAD 8144bc02 (touched, rustfmt'd)
+### kloc-check
+{'aggregate': 202778, 'kernel': 21209, 'capability': 1433, 'over_budget': ['aggregate 202778 >= 202751', 'maos-kernel-core 21209 > 21181']}
+### check-kernel-baseline
+{'actual-lines': 27052, 'pinned-lines': 27014, 'changed': ['capability/mod.rs', 'inference/mod.rs'], 'added': [], 'removed': []}
+### check-service-boundary
+{'passed': False, 'violations': ["NFR-Test-2 violation: removed public kernel symbol 'maos_kernel_core::capability::CapabilityRegistryAdapter' — kernel surface is monotonically additive within a major version (see ABI Stability Triple)"]}

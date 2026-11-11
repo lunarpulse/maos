@@ -1,0 +1,7 @@
+## variant base on git archive HEAD 8144bc02 (touched, rustfmt'd)
+### kloc-check
+{'aggregate': 202750, 'kernel': 21181, 'capability': 1433, 'over_budget': []}
+### check-kernel-baseline
+{'actual-lines': 27014, 'pinned-lines': 27014, 'changed': [], 'added': [], 'removed': []}
+### check-service-boundary
+{'passed': True, 'violations': []}

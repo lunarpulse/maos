@@ -244,6 +244,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_SESSION_PRINCIPAL",
+        purpose: "The session principal a root binds to every Inference Port task it opens this boot, journaled on each cost-attribution frame as `attribution_source: session_principal` (FR64); operator-asserted at boot, not an authenticated end user; unset or blank ⇒ none bound and the write-target proxy attributes; a set value must have no `:` and no control character — a non-UTF-8 or malformed value refuses the boot (Story 20-14 D-20-14-04 A)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_SPIRIT_ID",
         purpose: "Spirit identifier for one-shot lifecycle verbs",
         stability: EnvStability::UserFacing,

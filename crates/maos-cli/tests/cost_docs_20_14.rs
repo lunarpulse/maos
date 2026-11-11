@@ -30,13 +30,16 @@ fn operator_cost_guides_disclose_limits() {
             "<boot_nonce>:<pid>",
             "[REDACTED]",
             "from_spirit_id",
+            "MAOS_SESSION_PRINCIPAL",
+            "shell.turn",
         ] {
             assert!(guide.contains(term), "{heading}: missing {term}");
         }
     }
     let adr = include_str!("../../../docs/adr/ADR-046-cost-attribution-and-reconciliation.md");
     assert!(adr.contains("root-bound `task_ref`"));
-    assert!(adr.contains("landing is pending"));
+    assert!(adr.contains("`MAOS_SESSION_PRINCIPAL` is journaled as `session_principal`"));
+    assert!(!adr.contains("landing is pending"));
 }
 
 #[test]

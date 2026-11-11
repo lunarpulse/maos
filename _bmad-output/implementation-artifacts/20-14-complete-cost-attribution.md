@@ -519,6 +519,20 @@ case- and normalization-sensitive for every frame kind (GLM F-1), Spirit-name co
 Pins: CLI 6603 -> 6609 (ceiling 6610), iac 8726 -> 8770 under an **orchestrator-adjudicated D02 A overdraft, disclosed to the operator: iac ceiling 8728 -> 8770** (before: pin 8726 /
 ceiling 8728; after: measured 8770, zero headroom), audit 8227, aggregate 199198, hardfail 199199 (<= 199378). The existing kernel hash fixtures changed from `deadbeef`/`cafe` to 64-hex digests.
 
+**L2 kernel landing (2026-11-12, implemented locally, uncommitted; awaiting the hosted run and review; story stays `in-progress`; evidence
+`20-14-complete-cost-attribution-evidence/landing-2/evidence.md`, raw red/plant/green logs beside it).** STEP 0 re-cut KT on a `git archive HEAD` copy at the live base 27014/21181
+including the `CostFrameBody` wrapper: the prototyped field on `CapabilityRegistryAdapter` measured +38/+28 and turned `check-service-boundary` RED (a second surface-hash
+refresh, not granted), so shape B was landed instead: the root-bound `CostScope` map lives on `CapTokensShardRing` in maos-capability (`bind_cost_scope`/`cost_scope`, pruned on bind) and
+the kernel gains one inherent accessor `CapabilityRegistryAdapter::tokens()`; the emission reads the scope by the verified token id, a bound session principal is
+`Resolved`/`SessionPrincipal`/`Exact` (proxy not queried), otherwise the proxy stays the tagged fallback; the frame is `CostFrameBody` schema 2 with `task_ref`.
+Root binding (`maos-bin`): `MAOS_SESSION_PRINCIPAL` (UserFacing env row; unset/blank none, `:` / control / non-UTF-8 refuse the boot) and `bind_task_scope` at the shell turn
+(`shell.turn:<ulid>`), the seam per-pass mint (`<spirit>.pass:<ulid>`) and the one-shot hello run (`hello-spirit.run:<ulid>`); the smoke mint and spawned-session leases are classified
+not-bound. Pins: kernel 27014/21181 -> 27040/21201 (+26/+20; x2 ceiling 21221; shared STOP 21250, 49 left), maos-capability 1433 -> 1444 (the creation grant allowed it 0: **the +11
+ceiling is an orchestrator-adjudicated overdraft requested by the coder and PENDING Main's ruling**), maos-bin 38475 -> 38549 (inside the +250 L2 allowance), aggregate 202855 / hardfail 202856.
+Witnesses: kernel `cost_attribution_20_14.rs` (4), bin `cost_attribution_20_14.rs` (6, real `maos` + `maosctl`), 8 plants with raw logs. The ADR-046 and the three guides now state the binding has landed;
+`tests/coverage-matrix.yaml` FR64/NFR-Cost-1 name the witnesses (no gate claimed). AC1-AC3 and AC6 are implemented with local witnesses and are NOT closed: hosted run, review,
+`abi-diff` on a clean tree (it refuses a dirty one) and the remaining T0 items are open; hosted/Apple/Windows legs unverified.
+
 ### File List
 
 - `crates/maos-domain/src/cost.rs`, `crates/maos-domain/tests/cost_frame_20_14.rs`,
@@ -546,6 +560,10 @@ ceiling 8728; after: measured 8770, zero headroom), audit 8227, aggregate 199198
   (invisible-character table), new `crates/maos-bin/tests/forget_governance_20_14.rs`, kernel/iac/CLI test files, guides, ADR-046 §8, `xtask/kloc.toml`,
   `20-14-complete-cost-attribution-evidence/landing-1/review/correction-round3*`.
 
+- L2: `crates/maos-capability/src/cap_tokens/mod.rs`, `crates/maos-kernel-core/src/{capability,inference}/mod.rs`, `crates/maos-kernel-core/tests/cost_attribution_20_14.rs`,
+  `crates/maos-bin/src/{shell_host.rs,main.rs,env_contract.rs}`, `crates/maos-bin/tests/cost_attribution_20_14.rs`, `xtask/{kernel-core-baseline.toml,kloc.toml}`,
+  `xtask/tests/{kernel_pin_content_hash_16_0.rs,recovery_lane_ceiling_rule.rs}`, the three guides, ADR-046, `tests/coverage-matrix.yaml`, `crates/maos-cli/tests/cost_docs_20_14.rs`, records and
+  `20-14-complete-cost-attribution-evidence/landing-2/`.
 ## Change Log
 
 - 2026-11-03: Story created at `8c809f9c` (ready-for-dev; D-20-14-01…11 PROPOSED). Measured: two shell sessions under
@@ -563,3 +581,5 @@ ceiling 8728; after: measured 8770, zero headroom), audit 8227, aggregate 199198
 - 2026-11-10: L1 correction round 2 (CR1–CR3, GLM F-1/F-2): value-only scrub for kinds 28/29 incl. provider/model values, backslash and bidi escaping, guide and ADR trade-off text, false kind-28 "no principal nexus" claim withdrawn; pins CLI 6603 (inside the 6610 overdraft), iac 8726, hardfail 199149.
 
 - 2026-11-11: L1 correction round 3 (R2-1, R2-2, escaped-value discovery, digest form, F-4): see Completion Notes; iac ceiling 8728 -> 8770 (orchestrator-adjudicated D02 A overdraft, disclosed to the operator); pins CLI 6609, iac 8770, hardfail 199199.
+
+- 2026-11-12: L2 kernel landing implemented locally (KT shape B, root binding, env row, witnesses, docs); kernel 21201 / 27040; maos-capability 1444 pending adjudication; status stays `in-progress` until the hosted run and review.
