@@ -543,7 +543,7 @@ the composition root per the §A5 gate (no duplicate adapter instances).
 The 12-step `initiate_swap` protocol:
 1. Resolve spirit_id → predecessor_pid
 2. Snapshot predecessor SCB for saga rollback
-3. I14 gate — `validate_swap_halt_continuity` (Story 4.5 wrapper)
+3. I14 gate — `validate_swap_halt_continuity` (Story 4.5 wrapper); then (Story 20-8, FR8) the successor must still declare every `[swap_invariants]` entry the predecessor declared, else `HotSwapError::SwapInvariantDropped` (saga `RestorePredecessor`, before any hook; structural, not a state-preservation proof)
 4. Fire `on_swap_out` hook
 5. Call `snapshot()` → CBOR state blob
 6. Decode + validate envelope (same-major vs cross-major)

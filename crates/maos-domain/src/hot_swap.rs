@@ -94,6 +94,10 @@ pub enum HotSwapError {
     #[error("halt-continuity violation: {0}")]
     HaltContinuityViolation(#[from] HaltContinuityError),
 
+    /// Story 20-8 (FR8) — the successor drops a declared swap invariant.
+    #[error("swap invariant dropped by the successor: {invariant}")]
+    SwapInvariantDropped { invariant: String },
+
     #[error(
         "schema incompatible: predecessor {predecessor_version} vs successor {successor_version}"
     )]

@@ -14,7 +14,10 @@ use std::path::{Path, PathBuf};
 
 use maos_bin::operator_door::{check_upgrade_abi, ManifestSnapshot, UpgradeFailure};
 use maos_cohort::{resolve_migration_chain, MigrationCandidate, MigrationPlan};
-use maos_kernel_core::lifecycle::{UpgradeOrchestrator, UpgradePolicy, UpgradeReport};
+use maos_domain::hot_swap::HotSwapError;
+use maos_kernel_core::lifecycle::{
+    UpgradeError, UpgradeOrchestrator, UpgradePolicy, UpgradeReport,
+};
 use sha2::{Digest, Sha256};
 
 pub fn create_plan(
@@ -105,6 +108,7 @@ pub async fn upgrade_with_plan_guard(
         code: "migration_target_mismatch",
         detail: "persisted plan does not execute the requested target snapshot; re-plan".into(),
         invalid: true,
+        conflict: false,
     };
     if !bound {
         return Err(target_mismatch());
@@ -218,6 +222,7 @@ async fn upgrade_hop(
                 expected.map_or("requested successor", |hop| hop.version.as_str())
             ),
             invalid: true,
+            conflict: false,
         });
     }
     let snapshot = ManifestSnapshot::new(text.as_bytes()).map_err(|error| error.to_string())?;
@@ -225,7 +230,15 @@ async fn upgrade_hop(
     let report = orchestrator
         .upgrade(spirit_id, &snapshot.0, policy)
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| match &error {
+            UpgradeError::HotSwap(HotSwapError::SwapInvariantDropped { .. }) => UpgradeFailure {
+                code: "swap_invariant_dropped",
+                detail: error.to_string(),
+                invalid: false,
+                conflict: true,
+            },
+            _ => error.to_string().into(),
+        })?;
     committed(&text);
     Ok(report)
 }

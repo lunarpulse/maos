@@ -1,0 +1,14 @@
+--- crates/maos-kernel-core/src/lifecycle/upgrade.rs (orig)
++++ crates/maos-kernel-core/src/lifecycle/upgrade.rs (plant)
+@@ -387,11 +387,6 @@
+     // Story 20-8 (FR8) — the successor's declaration, read at schema >= 7 as at admission.
+     let swap_invariants = root
+         .get("swap_invariants")
+-        .filter(|_| {
+-            class
+-                .as_ref()
+-                .is_some_and(|c| c.manifest_schema_version >= FR8_DECLARATIONS_SINCE_SCHEMA)
+-        })
+         .and_then(|v| toml::to_string(v).ok())
+         .map(|s| SwapInvariantsSection::from_toml_str(&s))
+         .transpose()?;

@@ -610,6 +610,7 @@ impl GatedManifest {
             on_revocation: self.on_revocation.clone(),
             supervision: self.supervision.clone(),
             schedules: self.schedules.clone(),
+            swap_invariants: self.swap_invariants.clone(),
             ..Default::default()
         }
     }

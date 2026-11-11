@@ -1,0 +1,16 @@
+{
+  "passed": false,
+  "actual-lines": 27009,
+  "pinned-lines": 26967,
+  "baseline-file": "/home/lunarpulse/dev_ws/xtask/kernel-core-baseline.toml",
+  "file-set-entries": 95,
+  "set-hash": "aca977c8123a25e345df6fd22bf3cd13d9b6e3ad32f1e578fd3a322f3fd1806d",
+  "pinned-set-hash": "06386b442acc7a7241442eea761ba406a3e8ee8527a73030044d8a89c3224e5f",
+  "changed": [
+    "hot_swap/coordinator.rs",
+    "lifecycle/upgrade.rs",
+    "scheduler/control_block.rs"
+  ],
+  "added": [],
+  "removed": []
+}

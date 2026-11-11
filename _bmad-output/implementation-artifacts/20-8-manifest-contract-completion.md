@@ -22,7 +22,7 @@ not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21
 Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
 
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Created 2026-11-03 at 8c809f9c (main; `git log -1 -- crates xtask` = 8c809f9c) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30); D-18-7-11 A (2026-10-26, the received item). D-20-8-01…12 are PROPOSED, not ruled. The operator rules them; a different ruling rewrites only the clauses marked with that row. No cargo ran (parent rule). Cites were re-read in a `git archive 8c809f9c` copy (`creation/cites-8c809f9c.md`), because the working tree carries Dev204L1's uncommitted 20-4 L1 edits. Kernel and kloc were measured by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`); prototypes are saved as diffs and were never applied. Stale E20 §20-8 cites were corrected in place (`creation/records-owed.md` §A). -->
 
@@ -354,6 +354,17 @@ Every AC names a failing-before witness and a plant. **local** = hermetic on the
 4. Pins: `xtask/kernel-core-baseline.toml` (src_lines, content hashes of `control_block.rs`, `upgrade.rs`, `coordinator.rs`, set hash) and `xtask/kloc.toml:264`
    exact, HISTORY rows citing this key with `->`. Re-base on whichever of 20-1b/20-4/20-11 landed first. Update `20-8-flag-winston-decision.md` with the landed figure.
 
+   **LANDED (L2, 2026-11-11, Dev208K, base `608735d2`; uncommitted, awaiting review).** The creation diff no longer applied; it was re-cut by hand at the live
+   kernel 26967 / 21141 (T0 on a `git archive HEAD` copy): the shape is `ks-kernel-only.diff`'s plus the AC8.1 schema-7 read rule. Measured **+42 physical /
+   +37 tokei** (kernel **27009 / 21178**, 95 files) against the priced +38 / +33: +4 / +4 over because the creation prototype parsed `[swap_invariants]` at any
+   schema (a schema-6 successor's declaration would have been honoured at swap while ignored at admission); inside the ×2 ceiling re-based onto the live base
+   (27043 / 21207) and the shared STOP 21250 (72 left). Domain 10217 (+2), bin 38415 (+23: `bundle()` +1, door mapping +22), aggregate hardfail 202677.
+   One surface-hash refresh, the symbol the grant names: `SpiritManifestBundle` `e295e7ff…` → `ca1ac1ec…` (`check-service-boundary` flagged only it).
+   Door mapping: `UpgradeFailure.conflict` + `migration_plan::upgrade_hop` ⇒ `409 swap_invariant_dropped` (the kernel error's text names the invariant).
+   Witnesses: `crates/maos-kernel-core/tests/swap_invariants_20_8.rs` (3 vectors) and `crates/maos-bin/tests/one_daemon_one_door_16_1.rs::ac8_20_8_a_dropped_swap_invariant_is_a_typed_409_and_the_predecessor_keeps_serving`;
+   failing-before, plants and exact figures in `20-8-manifest-contract-completion-evidence/landing-2/` and `20-8-flag-winston-decision.md`. The refusal is
+   structural only; precheck does not report it and no WASM-component witness exists (two deferred rows, `deferred-work.md` § "Deferred from: Story 20-8 landing 2").
+
 #### AC9 — records
 
 1. `tests/coverage-matrix.yaml:922-928` FR8 names AC1/AC2/AC3/AC4/AC8 witnesses. FR39 (`:656-666`) and FR57 (`:834`) note the WASM reach (AC6).
@@ -371,8 +382,8 @@ Every AC names a failing-before witness and a plant. **local** = hermetic on the
 - [x] **T5 — Explanation label (AC5).** Docs text; deferred row stays open.
 - [ ] **T6 — WIT 2.3 + bridge + TS (AC6).** Implementation and local skill witness exist; genuine 2.1/2.2 guest execution and hosted TS proof remain unverified.
 - [ ] **T7 — L1 landing (D-20-8-01 A).** Exact pins inside the ruled envelope. Gates: `check-manifest-schema-version`, `check-stability-matrix`, `gen-abi-docs --check`, `check-equiv-fixture-provenance`, `abi-diff`, `kloc-check`, `check-kernel-baseline` (unchanged), `check-service-boundary`, `check-corpus`, `check-env-contract` (no new variable expected), `check-dev-record-completeness`, `check-epic-close-coherence`, `check-exit-commands`, `check-decision-register`, `prepush`. One hosted discipline run on the final tree + AC7 plant. Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
-- [ ] **T8 — Kernel (AC8)** under the ruled row: red-before test, the shape, door mapping, plant.
-- [ ] **T9 — L2 landing + records (AC9).** Kernel pins + hashes (re-base); FLAG-Winston record updated; `cargo test -p maos-kernel-core --lib`; hosted run; ledger closure; coverage; docs.
+- [x] **T8 — Kernel (AC8)** under the ruled row: red-before test, the shape, door mapping, plant. Done 2026-11-11 (landing 2).
+- [ ] **T9 — L2 landing + records (AC9).** Kernel pins + hashes, FLAG-Winston record, `cargo test -p maos-kernel-core --lib`, coverage and docs are done (landing 2). Open: the hosted run (AC7 legs + plant), review, the ledger closure `CLOSED <date> by 20-8 @<commit>` (Main-owned), and the 20-8-owned deferred rows (D-18-7-11 charter, `[explanation_shape]`, I13 opt-in default, `precheck` verdict).
 
 ## Dev Notes
 
@@ -497,6 +508,8 @@ E20@HEAD:7,55-61,81,256-262; PF `epic-20-preflight-2026-10-30.md:82,126,141,242-
 
 `openai-codex/gpt-6.1-terra` (L1 implementation). The independent review must use a different model family under the 2026-11-09 rule.
 
+`anthropic/claude-sonnet-5-5` (L2 final kernel landing, AC8, Dev208K). Reviewers are OpenAI/GLM family.
+
 ### Completion Notes List
 
 - Implemented the L1 schema-7 declarations and degradation, pre-pid single declaration writer, verified publisher carriage, skill admission checks, I13 recipient promotion enforcement and WIT 2.3 skill bridge. The declaration row means only “declared”; I2 failure remains fail-stop and a later refusal has a separate record. This one-directional clarification of ruling A is disclosed to the operator.
@@ -505,6 +518,9 @@ E20@HEAD:7,55-61,81,256-262; PF `epic-20-preflight-2026-10-30.md:82,126,141,242-
 - The original L1 standalone workspace run exited 100 (5,841/5,847) and its prepush timed out at 3,000 s; see L1 evidence. The separately prescribed review-correction workspace run exited 100 (5,835/5,854; 19 failures), and its single frozen-tree prepush also timed out at 3,000 s without JSON. The workspace failures include verifier dependency and stale fixture preparation omissions, catalog/FKCS drift corrected afterward, and the recorded 20-7 1M timing observation. No final-tree workspace pass or completed prepush is claimed; `review/workspace-observations.md` and the same-run JUnit retain the results.
 - AC8 and kernel work remain L2; explanation-shape enforcement and external-author J6 are not claimed. No status flip is made by this L1.
 - Independent-review corrections and observed witnesses are recorded in `20-8-manifest-contract-completion-evidence/landing-1/review/correction-evidence.md`; genuine 2.1 and 2.2 guests, hosted T2 and clean-tree ABI diff remain unverified. I13 no-set behavior remains opt-in, accepted as a risk until a future default-deny policy story. `recipient_promotion_set_checks_stored_lineage_before_enqueue` is the L1 I13 witness; no invariant documentation was changed.
+- **L2 (2026-11-11, Dev208K, base `608735d2`).** AC8 landed under FLAG-Winston KS: T0 re-cut +42/+37 versus the priced +38/+33 (the AC8.1 schema-7 read rule the creation prototype lacked), inside the ×2 ceiling and the shared STOP; kernel 27009 / 21178, set hash `aca977c8…`, one `SpiritManifestBundle` surface hash refresh. The coordinator refuses after the halt-continuity gate and before `on_swap_out` (saga `RestorePredecessor`, typed `HotSwapError::SwapInvariantDropped`, journaled `HotSwapAborted` + `hot_swap.aborted`), the successor parser reads the section at schema ≥ 7, the SCB carries the declaration, and the door maps the error to `409 swap_invariant_dropped`. Red-before: compile-red at HEAD, then the behavioural red (field + parser, no check ⇒ the drop vector swaps, exit 101). Four plants (kernel check, schema rule, door mapping, kernel check over the door) red and restored by copy-back + `cmp` + `touch`. Evidence, commands and exits: `20-8-manifest-contract-completion-evidence/landing-2/`.
+- Unverified at this landing: AC7 hosted T2 legs and plant, genuine 2.1/2.2 guests, the hosted discipline run, the spawned (WASM) hop's refusal end to end (deferred to 20-9), and the dry-run `precheck` verdict (deferred row owned by this story). The status stays `in-progress`.
+- L2 verification (observed, `…-evidence/landing-2/commands.md`): kernel `--lib` 253/253; the new kernel vectors 3/3 and the door vector 1/1; workspace clippy + ratchet clean; no-default verb table 7/7; every named gate passes except `check-serde-error-handling` (the pre-existing 20-11 violation at `main.rs:11091`, owned by 20-11) and `abi-diff` (refuses a dirty tree; clean post-commit run owed); the ONE final-tree workspace nextest ran 6011 tests, 6010 passed, 1 failed (`erasure_million_20_11` AC5 1M oracle, the documented 20-7-owned timing/I/O row, not retried). `prepush` and every hosted leg were not run.
 
 ### File List
 
@@ -518,6 +534,8 @@ E20@HEAD:7,55-61,81,256-262; PF `epic-20-preflight-2026-10-30.md:82,126,141,242-
 - `tests/coverage-matrix.yaml` — FR8, FR39 and FR57 L1 witness and deferred-proof notes.
 - `_bmad-output/planning-artifacts/epics/{epic-20-ship-it-w5.md,requirements-inventory.md}` — L1 status and remaining-proof clarifications.
 - `.config/nextest.toml`; `xtask/{abi-ratifications.toml,kloc.toml,test-budgets.toml,src/build_test_fixtures.rs,src/check_manifest_schema_version.rs}`; `_bmad-output/implementation-artifacts/{20-8-manifest-contract-completion.md,20-8-flag-winston-decision.md,deferred-work.md,sprint-status.yaml,20-8-manifest-contract-completion-evidence/landing-1/,20-8-manifest-contract-completion-evidence/ci/}`.
+- L2: `crates/maos-kernel-core/src/{hot_swap/coordinator.rs,lifecycle/upgrade.rs,scheduler/control_block.rs}`; `crates/maos-kernel-core/tests/swap_invariants_20_8.rs`; `crates/maos-domain/src/hot_swap.rs`; `crates/maos-bin/src/{admission.rs,main.rs,migration_plan.rs,operator_door.rs}`; `crates/maos-bin/tests/one_daemon_one_door_16_1.rs`.
+- L2 pins and records: `xtask/{kernel-core-baseline.toml,kloc.toml}`; `xtask/tests/{kernel_pin_content_hash_16_0.rs,recovery_lane_ceiling_rule.rs}`; `docs/ci-baselines/kernel-surface-v0.1-beta.json`; `docs-site/docs/{manifest/v7.md,cookbook/wasm-component-spirit.md}` and the Korean counterparts; `tests/coverage-matrix.yaml`; `_bmad-output/implementation-artifacts/{20-8-manifest-contract-completion.md,20-8-flag-winston-decision.md,deferred-work.md,sprint-status.yaml,20-8-manifest-contract-completion-evidence/landing-2/}`; `_bmad-output/planning-artifacts/{epics/epic-20-ship-it-w5.md,epic-20-preflight-2026-10-30.md}`.
 
 ### Change Log
 
@@ -525,3 +543,4 @@ E20@HEAD:7,55-61,81,256-262; PF `epic-20-preflight-2026-10-30.md:82,126,141,242-
 - 2026-11-03: Operator ruled D-20-8-01…12 all as recommended (ask `d_batch4`): each row selects A. Kernel KS and the per-crate envelope are ruled; ceilings bind at the applicable dev start after re-baselining, with L2 kernel last. Creation-time history above is retained.
 - 2026-11-09: L1 kernel-free implementation, `ac13i2` and `enc208` rulings, one-directional admission clarification, exact pins and disclosed orchestrator-adjudicated domain overdraft. Hosted proof is authored, not run; L2 remains open.
 - 2026-11-09: Review corrections, independently reviewed FKCS skill-limit re-pin, explicit workspace and prepush limitations, and catalog documentation.
+- 2026-11-11: L2 final kernel landing (AC8): KS re-cut and landed at +42/+37, door `409 swap_invariant_dropped`, exact kernel pins and one surface-hash refresh, failing-before and plants, records. Status `ready-for-dev` → `in-progress`; hosted AC7, review and the ledger closure remain.

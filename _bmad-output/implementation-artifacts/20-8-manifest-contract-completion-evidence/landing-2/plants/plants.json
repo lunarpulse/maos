@@ -1,0 +1,30 @@
+[
+ {
+  "name": "kernel-check-dropped",
+  "file": "crates/maos-kernel-core/src/hot_swap/coordinator.rs",
+  "exit": 101,
+  "seconds": 4.7,
+  "restore_cmp_rc": 0
+ },
+ {
+  "name": "schema7-filter-dropped",
+  "file": "crates/maos-kernel-core/src/lifecycle/upgrade.rs",
+  "exit": 101,
+  "seconds": 4.3,
+  "restore_cmp_rc": 0
+ },
+ {
+  "name": "door-mapping-dropped",
+  "file": "crates/maos-bin/src/migration_plan.rs",
+  "exit": 101,
+  "seconds": 21.7,
+  "restore_cmp_rc": 0
+ },
+ {
+  "name": "door-kernel-check-dropped",
+  "file": "crates/maos-kernel-core/src/hot_swap/coordinator.rs",
+  "exit": 101,
+  "seconds": 26.5,
+  "restore_cmp_rc": 0
+ }
+]

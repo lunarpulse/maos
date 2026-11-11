@@ -1,0 +1,114 @@
+diff --git a/crates/maos-bin/src/admission.rs b/crates/maos-bin/src/admission.rs
+index 4694cff3..4af4d376 100644
+--- a/crates/maos-bin/src/admission.rs
++++ b/crates/maos-bin/src/admission.rs
+@@ -610,6 +610,7 @@ impl GatedManifest {
+             on_revocation: self.on_revocation.clone(),
+             supervision: self.supervision.clone(),
+             schedules: self.schedules.clone(),
++            swap_invariants: self.swap_invariants.clone(),
+             ..Default::default()
+         }
+     }
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index 7364dbcd..70b128df 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -10324,6 +10324,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
+                         code: "vetting_precondition_failed",
+                         detail,
+                         invalid: true,
++                        conflict: false,
+                     },
+                 )?;
+                 // The final hop is the door's private snapshot; its `artifact` stays where the
+diff --git a/crates/maos-bin/src/migration_plan.rs b/crates/maos-bin/src/migration_plan.rs
+index 93a52612..6eb897e1 100644
+--- a/crates/maos-bin/src/migration_plan.rs
++++ b/crates/maos-bin/src/migration_plan.rs
+@@ -14,7 +14,10 @@ use std::path::{Path, PathBuf};
+ 
+ use maos_bin::operator_door::{check_upgrade_abi, ManifestSnapshot, UpgradeFailure};
+ use maos_cohort::{resolve_migration_chain, MigrationCandidate, MigrationPlan};
+-use maos_kernel_core::lifecycle::{UpgradeOrchestrator, UpgradePolicy, UpgradeReport};
++use maos_domain::hot_swap::HotSwapError;
++use maos_kernel_core::lifecycle::{
++    UpgradeError, UpgradeOrchestrator, UpgradePolicy, UpgradeReport,
++};
+ use sha2::{Digest, Sha256};
+ 
+ pub fn create_plan(
+@@ -105,6 +108,7 @@ pub async fn upgrade_with_plan_guard(
+         code: "migration_target_mismatch",
+         detail: "persisted plan does not execute the requested target snapshot; re-plan".into(),
+         invalid: true,
++        conflict: false,
+     };
+     if !bound {
+         return Err(target_mismatch());
+@@ -218,6 +222,7 @@ async fn upgrade_hop(
+                 expected.map_or("requested successor", |hop| hop.version.as_str())
+             ),
+             invalid: true,
++            conflict: false,
+         });
+     }
+     let snapshot = ManifestSnapshot::new(text.as_bytes()).map_err(|error| error.to_string())?;
+@@ -225,7 +230,15 @@ async fn upgrade_hop(
+     let report = orchestrator
+         .upgrade(spirit_id, &snapshot.0, policy)
+         .await
+-        .map_err(|error| error.to_string())?;
++        .map_err(|error| match &error {
++            UpgradeError::HotSwap(HotSwapError::SwapInvariantDropped { .. }) => UpgradeFailure {
++                code: "swap_invariant_dropped",
++                detail: error.to_string(),
++                invalid: false,
++                conflict: true,
++            },
++            _ => error.to_string().into(),
++        })?;
+     committed(&text);
+     Ok(report)
+ }
+diff --git a/crates/maos-bin/src/operator_door.rs b/crates/maos-bin/src/operator_door.rs
+index 5495c00a..70888f79 100755
+--- a/crates/maos-bin/src/operator_door.rs
++++ b/crates/maos-bin/src/operator_door.rs
+@@ -279,6 +279,8 @@ pub struct UpgradeFailure {
+     pub code: &'static str,
+     pub detail: String,
+     pub invalid: bool,
++    /// A state conflict (409): the request was valid and the kernel refused it.
++    pub conflict: bool,
+ }
+ 
+ impl UpgradeFailure {
+@@ -288,6 +290,11 @@ impl UpgradeFailure {
+                 code: self.code.into(),
+                 detail: self.detail,
+             }
++        } else if self.conflict {
++            OperatorOutcome::Conflict {
++                code: self.code.into(),
++                detail: self.detail,
++            }
+         } else {
+             OperatorOutcome::Failed {
+                 code: self.code.into(),
+@@ -303,6 +310,7 @@ impl From<String> for UpgradeFailure {
+             code: "upgrade_failed",
+             detail,
+             invalid: false,
++            conflict: false,
+         }
+     }
+ }
+@@ -324,6 +332,7 @@ pub fn check_upgrade_abi(
+         code,
+         detail,
+         invalid: true,
++        conflict: false,
+     };
+     let text = std::str::from_utf8(target)
+         .map_err(|error| invalid("target_manifest_unparseable", error.to_string()))?;

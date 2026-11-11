@@ -1053,8 +1053,12 @@ coverage:
       `recipient_promotion_set_checks_stored_lineage_before_enqueue` is the I13 witness.
       The signed install publisher/digest/tamper witness is
       `wasm_skill_authoring_20_8::signed::installed_signed_manifest_journals_verified_publisher_and_rejects_tamper`.
-      A declaration is not proof of admission. Hosted T2 proof remains unverified;
-      AC8 swap-invariant refusal is open for the final kernel landing.
+      A declaration is not proof of admission. Hosted T2 proof remains unverified.
+      Story 20-8 L2 (AC8): `swap_invariants_20_8` (maos-kernel-core; a hot swap
+      refuses a successor that drops a predecessor-declared swap invariant before
+      any hook fires) and `one_daemon_one_door_16_1::ac8_20_8_a_dropped_swap_invariant_is_a_typed_409_and_the_predecessor_keeps_serving`
+      (door `409 swap_invariant_dropped`). The check is structural, not a proof that
+      state survived; `HotSwapCoordinator::precheck` does not report it.
   FR9:
     gates:
       - journal_survives_cold_restart

@@ -502,7 +502,32 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26967
+src_lines = 27009
+# HISTORY: 20-8-manifest-contract-completion landing 2 (20-8 L2, final kernel
+# landing), FLAG-Winston KS (D-20-8-07 A, ruled 2026-11-03 ask d_batch4; grant
+# +38 physical / +33 tokei priced at 8c809f9c from 26841 / 21042 with x2
+# ceilings, re-based onto the live base 27043 physical / 21207 tokei inside the
+# shared STOP 21250): exact formatted 26967 -> 27009 (+42 physical), tokei 21141
+# -> 21178 (+37), 95 files, none added or removed. T0 re-cut the creation
+# prototype by hand on a `git archive HEAD` copy at the live base: +42 / +37,
+# +4 / +4 over the priced figures only because the creation prototype lacked
+# the AC8.1 schema-7 read rule (the successor parser reads [swap_invariants]
+# only at manifest_schema_version >= FR8_DECLARATIONS_SINCE_SCHEMA, as the
+# admission gate does). SpiritManifestBundle gains `swap_invariants`
+# (+ Default); load_bundle_from_file parses the section; the hot-swap
+# coordinator refuses, after the halt-continuity gate and before on_swap_out,
+# a successor that does not declare every invariant the predecessor declared
+# (saga RestorePredecessor, HotSwapError::SwapInvariantDropped, journaled
+# HotSwapAborted + hot_swap.aborted receipt). One surface-hash refresh (ADR-066
+# hand-edit): the `SpiritManifestBundle` struct hash in
+# docs/ci-baselines/kernel-surface-v0.1-beta.json e295e7ff... -> ca1ac1ec...
+# (a public field; the gate flagged only that symbol, which the grant names; no
+# new class row, the `use` entry is unchanged). Changed files:
+# hot_swap/coordinator.rs, lifecycle/upgrade.rs, scheduler/control_block.rs;
+# digests and set_hash adopted from `--emit-pin`. Cumulative measured tokei
+# 21178 (shared STOP 21250, 72 left; ADR-069 alarm 22000 / envelope 23000
+# untouched). 20-9's open kernel rows (coordinator.rs expect window, archive.rs
+# atomic record) are NOT touched by this landing.
 # HISTORY: 20-1b-vetting-yank-policy-and-quarantine landing 2 (20-1b L2, final
 # kernel landing), FLAG-Winston R = KQ1 + P (ruled 2026-11-01/02 ask rows201,
 # D-20-1-02 A + D-20-1-03 A; L1 re-base ruled Main 2026-11-06): exact formatted
@@ -1011,7 +1036,7 @@ src_lines = 26967
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "06386b442acc7a7241442eea761ba406a3e8ee8527a73030044d8a89c3224e5f"
+set_hash = "aca977c8123a25e345df6fd22bf3cd13d9b6e3ad32f1e578fd3a322f3fd1806d"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -1030,7 +1055,7 @@ set_hash = "06386b442acc7a7241442eea761ba406a3e8ee8527a73030044d8a89c3224e5f"
 "halt/resolver.rs" = "3756181d4a06e121fdd3b63818b45d20205e6acb9b43cc18fb5ad82c93ac6b1f"
 "halt/termination.rs" = "ad56de586651f8f69a9c860374a0a0c0b7242501a25792a54423cfb9ec278097"
 "hot_swap/archive.rs" = "a6e4ea60193e182b2dad8edeb793d3de366ef95b0be30e8c85756af78aeb7ddb"
-"hot_swap/coordinator.rs" = "cf4975c85db6ee84d00f43b603d4b2653e54b6f9058ce40f2e88307dd903dea9"
+"hot_swap/coordinator.rs" = "9e8b70c8c877d2d499c2544f11fc2e28e1a2c193cfcab336a9f4c9d8d43e5e7d"
 "hot_swap/migrator.rs" = "1c72d4b472310fcc36f80521d25ab3da72691fc99b79c1b258bdd75ab5a53b88"
 "hot_swap/mod.rs" = "d378c979b9338914bdb50d507ddc7826c0f5852a4364e4736fde3a7d9e35e5a6"
 "hot_swap/post_swap_monitor.rs" = "5f1ef159078b114c29e220651a7b37fcf266921bdbead7f358d2b9dec67b3ac0"
@@ -1050,7 +1075,7 @@ set_hash = "06386b442acc7a7241442eea761ba406a3e8ee8527a73030044d8a89c3224e5f"
 "lifecycle/cli_wrapper/mod.rs" = "048746e1d08c93a64aba4745a532883a96899526bf825ff7f67eb3d2ee2270d5"
 "lifecycle/cli_wrapper/runtime.rs" = "3a7c5986c4b7578b7d600be694eb097bc6eebafc479704e4ca690b4c44b5c59c"
 "lifecycle/mod.rs" = "b4d995c3b6887d905790611f4145f1ea8eb349e0dc73a923d13e56abcd09d335"
-"lifecycle/upgrade.rs" = "9c315e76975a2b92b2305afad058b895c184bd641fb78d7621691104b08862f9"
+"lifecycle/upgrade.rs" = "b737cc53a76d3b4c9cc78c770fe9cf434f077e1374ca563d18c872bd30a8c9a9"
 "mcp/mod.rs" = "12604548a8daa78a2786b820733f4639f06759f893856745027c8083c8a42bfd"
 "memory/for_spirit.rs" = "6d58364f78f6026a8fe203f161964eb724bd2fa82f43146c3c3d8b605e1ce95a"
 "memory/mod.rs" = "779cf99f4fcc57c1243d33375508a92285a8e2533965701f58df3c8639226d4c"
@@ -1072,7 +1097,7 @@ set_hash = "06386b442acc7a7241442eea761ba406a3e8ee8527a73030044d8a89c3224e5f"
 "revocation/poller.rs" = "f435357e9dfc217fb958dbf277a5c74c87940149934898436b537e635a69812e"
 "revocation/rules.rs" = "726b27e55d5fff3e1cbd9ca2c1cf38494dfd272fbe586c1a0ed869c760366f44"
 "revocation/version_match.rs" = "b225bac84b6e2529cab18b4dadbc271f0c0ff487eaca4f11e23a49ea0ccf5046"
-"scheduler/control_block.rs" = "f7e6e26447ecf9822244956dbd341e96472f7d81edc0c644732d414c3d4c6ed5"
+"scheduler/control_block.rs" = "a21b3c874728f5ad5f78f11b0cd649acb2c0916dfa70db0a4f0d00fc7a13c00b"
 "scheduler/hook_dispatch.rs" = "11276d17fcc7bae976cd8c812ce8c4ca296b0bf06c130aae6716e1ce8a567e32"
 "scheduler/idle_watchdog.rs" = "07901b89eab3911e6cc23df9d383ba6fee5547c43bbc028fe6eedcacadeffdc7"
 "scheduler/kernel_ctx.rs" = "4fb780685c375ddf4115da9d9712dbafea52d8b2c4bd7b15a77059907127f807"

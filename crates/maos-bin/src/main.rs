@@ -10324,6 +10324,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                         code: "vetting_precondition_failed",
                         detail,
                         invalid: true,
+                        conflict: false,
                     },
                 )?;
                 // The final hop is the door's private snapshot; its `artifact` stays where the

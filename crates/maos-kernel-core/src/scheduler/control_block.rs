@@ -216,6 +216,8 @@ pub struct SpiritManifestBundle {
     /// `Some` ⇒ `budget.time_cap_seconds` is the per-Spirit hook cap. The kernel
     /// holds the value but never learns *what* the budget bounds (no LLM types).
     pub budget: Option<crate::security::manifest::Budget>,
+    /// Story 20-8 (FR8) — the `[swap_invariants]` a swap reads from the live SCB.
+    pub swap_invariants: Option<crate::security::manifest::SwapInvariantsSection>,
 }
 
 impl Default for SpiritManifestBundle {
@@ -233,6 +235,7 @@ impl Default for SpiritManifestBundle {
             schedules: SchedulesSection::default(),
             gateways: GatewaysSection::default(),
             budget: None,
+            swap_invariants: None,
         }
     }
 }

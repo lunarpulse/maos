@@ -1,0 +1,1 @@
+{"passed":false,"violation_count":1,"violations":[{"file":"crates/maos-bin/src/main.rs","line":11091,"serde_call":"serde_json::from_str","forbidden_method":"unwrap_or_default","snippet":"let value: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();"}]}

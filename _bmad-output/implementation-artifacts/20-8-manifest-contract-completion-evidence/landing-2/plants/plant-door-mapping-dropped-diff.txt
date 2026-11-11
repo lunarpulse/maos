@@ -1,0 +1,11 @@
+--- crates/maos-bin/src/migration_plan.rs (orig)
++++ crates/maos-bin/src/migration_plan.rs (plant)
+@@ -231,7 +231,7 @@
+         .upgrade(spirit_id, &snapshot.0, policy)
+         .await
+         .map_err(|error| match &error {
+-            UpgradeError::HotSwap(HotSwapError::SwapInvariantDropped { .. }) => UpgradeFailure {
++            UpgradeError::HotSwap(HotSwapError::SwapInvariantDropped { .. }) if false => UpgradeFailure {
+                 code: "swap_invariant_dropped",
+                 detail: error.to_string(),
+                 invalid: false,

@@ -384,6 +384,17 @@ pub(crate) fn load_bundle_from_file(
         .and_then(|v| toml::to_string(v).ok())
         .map(|s| crate::security::manifest::Budget::from_toml_str(&s))
         .transpose()?;
+    // Story 20-8 (FR8) — the successor's declaration, read at schema >= 7 as at admission.
+    let swap_invariants = root
+        .get("swap_invariants")
+        .filter(|_| {
+            class
+                .as_ref()
+                .is_some_and(|c| c.manifest_schema_version >= FR8_DECLARATIONS_SINCE_SCHEMA)
+        })
+        .and_then(|v| toml::to_string(v).ok())
+        .map(|s| SwapInvariantsSection::from_toml_str(&s))
+        .transpose()?;
 
     // Story 6.4 — `[[schedule]]` array-of-tables. The raw section parser
     // reads the array under the `schedule` key; we synthesize a doc that
@@ -425,5 +436,6 @@ pub(crate) fn load_bundle_from_file(
         schedules,
         gateways,
         budget,
+        swap_invariants,
     })
 }

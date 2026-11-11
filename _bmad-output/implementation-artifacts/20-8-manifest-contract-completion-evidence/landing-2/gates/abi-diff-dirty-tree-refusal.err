@@ -1,0 +1,49 @@
+abi-diff: could not run: error: Your local changes to the following files would be overwritten by checkout:
+	_bmad-output/implementation-artifacts/deferred-work.md
+	_bmad-output/implementation-artifacts/sprint-status.yaml
+	_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md
+	_bmad-output/planning-artifacts/epic-20-preflight-2026-10-30.md
+	_bmad-output/planning-artifacts/epics/epic-20-ship-it-w5.md
+	crates/maos-bin/src/main.rs
+	crates/maos-bin/tests/one_daemon_one_door_16_1.rs
+	docs/ci-baselines/kernel-surface-v0.1-beta.json
+	tests/coverage-matrix.yaml
+	xtask/kernel-core-baseline.toml
+	xtask/kloc.toml
+	xtask/tests/kernel_pin_content_hash_16_0.rs
+	xtask/tests/recovery_lane_ceiling_rule.rs
+Please commit your changes or stash them before you switch branches.
+Aborting
+[graphify] Branch switched - rebuilding knowledge graph (code files)...
+[graphify watch] 5669 file(s) not classified (no supported extension or shebang), skipped: .dockerignore, .env_example, .gitattributes, .gitignore, .gitkeep, .nojekyll (+5663 more)
+  AST extraction: 100/421 uncached files (23%) [32 workers]
+  AST extraction: 200/421 uncached files (47%) [32 workers]
+  AST extraction: 300/421 uncached files (71%) [32 workers]
+  AST extraction: 400/421 uncached files (95%) [32 workers]
+  AST extraction: 421/421 uncached files (100%) [32 workers]
+  warning: 1 file(s) had syntax errors and may be partially extracted: packaging/homebrew/maos.rb (first error at line 3, 1 symbol(s) extracted)
+  warning: 191 code file(s) yielded no symbols (0.27 MB) — a data file, or source this extractor models no symbols for: _bmad-output/implementation-artifacts/20-13-pluggable-crypto-provider-selection-evidence/creation/gatesim.py, _bmad-output/implementation-artifacts/20-15-evidence/ci/tools/totals.py, _bmad-output/implementation-artifacts/20-15-evidence/creation/job-pricing.method.py, _bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/coverage-matrix-replica.py, _bmad-output/implementation-artifacts/20-3c-audit-truth-and-halt-receipt-residuals-evidence/creation/runtime/endpoint-reproduction.py (+186 more)
+[graphify watch] community set changed since labeling (1996 saved labels, 2030 communities now; renamed 637 community(ies) by their hub). Run `graphify label` to refresh names with the LLM.
+[graphify] backed up curated graph (5 files) -> 2026-11-11/
+Graph has 45189 nodes (above 5000 limit). Building aggregated community view...
+graph.html written (aggregated: 2030 community nodes, 5804 cross-community edges)
+Tip: run with --obsidian for full node-level detail.
+[graphify watch] Rebuilt: 45189 nodes, 87434 edges, 2030 communities
+[graphify watch] graph.json, graph.html and GRAPH_REPORT.md updated in graphify-out
+Error: Failed to `git checkout c2beedb40b981eb943edf3e213649d79936c7f22`, see error message on stdout/stderr.
+
+Stack backtrace:
+   0: <anyhow::Error>::msg::<alloc::string::String>
+   1: cargo_public_api::git_utils::git_checkout
+   2: cargo_public_api::git_checkout
+   3: <cargo_public_api::api_source::Commit as cargo_public_api::api_source::ApiSource>::obtain_api
+   4: cargo_public_api::main_
+   5: cargo_public_api::main
+   6: std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), anyhow::Error>, core::result::Result<(), anyhow::Error>>
+   7: std::rt::lang_start::<core::result::Result<(), anyhow::Error>>::{closure#0}
+   8: std::rt::lang_start_internal
+   9: main
+  10: <unknown>
+  11: __libc_start_main
+  12: _start (exit status: 1)
+

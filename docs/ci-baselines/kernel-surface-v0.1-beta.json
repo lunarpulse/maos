@@ -870,7 +870,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::scheduler::control_block::SpiritManifestBundle",
-      "signature_hash": "e295e7fffe26972153318a8af8c3c0302b23094d00657e51a9cb130e9d3d8a62"
+      "signature_hash": "ca1ac1ecb01a93d73c5e2513534f414d56955a1f3a693eb417f9f874cc5dc8cd"
     },
     {
       "kind": "struct",

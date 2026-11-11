@@ -187,6 +187,33 @@ impl HotSwapCoordinator {
             }
         }
 
+        // Story 20-8 (FR8) — the successor keeps every invariant the predecessor
+        // declared; refused before any hook fires.
+        let dropped = pre_swap_runtime
+            .manifest
+            .swap_invariants
+            .iter()
+            .flat_map(|section| &section.preserve)
+            .find(|name| {
+                !successor_manifest
+                    .swap_invariants
+                    .iter()
+                    .any(|section| section.preserve.contains(name))
+            });
+        if let Some(invariant) = dropped {
+            saga.compensate(
+                SagaCompensation::RestorePredecessor {
+                    reason: format!("swap invariant dropped: {invariant}"),
+                },
+                &self.tl,
+                &self.journal,
+            )
+            .await;
+            return Err(HotSwapError::SwapInvariantDropped {
+                invariant: invariant.clone(),
+            });
+        }
+
         // Step 4: Fire on_swap_out hook.
         saga.advance_to(SagaPhase::SwapOutFired);
         let swap_out_result = self.dispatcher.fire_on_swap_out(&predecessor_scb).await;

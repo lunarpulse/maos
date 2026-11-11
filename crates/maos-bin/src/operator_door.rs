@@ -279,12 +279,19 @@ pub struct UpgradeFailure {
     pub code: &'static str,
     pub detail: String,
     pub invalid: bool,
+    /// A state conflict (409): the request was valid and the kernel refused it.
+    pub conflict: bool,
 }
 
 impl UpgradeFailure {
     pub fn into_outcome(self) -> OperatorOutcome {
         if self.invalid {
             OperatorOutcome::Invalid {
+                code: self.code.into(),
+                detail: self.detail,
+            }
+        } else if self.conflict {
+            OperatorOutcome::Conflict {
                 code: self.code.into(),
                 detail: self.detail,
             }
@@ -303,6 +310,7 @@ impl From<String> for UpgradeFailure {
             code: "upgrade_failed",
             detail,
             invalid: false,
+            conflict: false,
         }
     }
 }
@@ -324,6 +332,7 @@ pub fn check_upgrade_abi(
         code,
         detail,
         invalid: true,
+        conflict: false,
     };
     let text = std::str::from_utf8(target)
         .map_err(|error| invalid("target_manifest_unparseable", error.to_string()))?;

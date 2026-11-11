@@ -1,0 +1,103 @@
+diff --git a/crates/maos-domain/src/hot_swap.rs b/crates/maos-domain/src/hot_swap.rs
+index ab0b2cf8..0779f2a2 100644
+--- a/crates/maos-domain/src/hot_swap.rs
++++ b/crates/maos-domain/src/hot_swap.rs
+@@ -94,6 +94,10 @@ pub enum HotSwapError {
+     #[error("halt-continuity violation: {0}")]
+     HaltContinuityViolation(#[from] HaltContinuityError),
+ 
++    /// Story 20-8 (FR8) — the successor drops a declared swap invariant.
++    #[error("swap invariant dropped by the successor: {invariant}")]
++    SwapInvariantDropped { invariant: String },
++
+     #[error(
+         "schema incompatible: predecessor {predecessor_version} vs successor {successor_version}"
+     )]
+diff --git a/crates/maos-kernel-core/src/hot_swap/coordinator.rs b/crates/maos-kernel-core/src/hot_swap/coordinator.rs
+index ace5fdc4..43b67f30 100644
+--- a/crates/maos-kernel-core/src/hot_swap/coordinator.rs
++++ b/crates/maos-kernel-core/src/hot_swap/coordinator.rs
+@@ -187,6 +187,33 @@ impl HotSwapCoordinator {
+             }
+         }
+ 
++        // Story 20-8 (FR8) — the successor keeps every invariant the predecessor
++        // declared; refused before any hook fires.
++        let dropped = pre_swap_runtime
++            .manifest
++            .swap_invariants
++            .iter()
++            .flat_map(|section| &section.preserve)
++            .find(|name| {
++                !successor_manifest
++                    .swap_invariants
++                    .iter()
++                    .any(|section| section.preserve.contains(name))
++            });
++        if let Some(invariant) = dropped {
++            saga.compensate(
++                SagaCompensation::RestorePredecessor {
++                    reason: format!("swap invariant dropped: {invariant}"),
++                },
++                &self.tl,
++                &self.journal,
++            )
++            .await;
++            return Err(HotSwapError::SwapInvariantDropped {
++                invariant: invariant.clone(),
++            });
++        }
++
+         // Step 4: Fire on_swap_out hook.
+         saga.advance_to(SagaPhase::SwapOutFired);
+         let swap_out_result = self.dispatcher.fire_on_swap_out(&predecessor_scb).await;
+diff --git a/crates/maos-kernel-core/src/lifecycle/upgrade.rs b/crates/maos-kernel-core/src/lifecycle/upgrade.rs
+index ea7850cd..8da13a29 100644
+--- a/crates/maos-kernel-core/src/lifecycle/upgrade.rs
++++ b/crates/maos-kernel-core/src/lifecycle/upgrade.rs
+@@ -384,6 +384,17 @@ pub(crate) fn load_bundle_from_file(
+         .and_then(|v| toml::to_string(v).ok())
+         .map(|s| crate::security::manifest::Budget::from_toml_str(&s))
+         .transpose()?;
++    // Story 20-8 (FR8) — the successor's declaration, read at schema >= 7 as at admission.
++    let swap_invariants = root
++        .get("swap_invariants")
++        .filter(|_| {
++            class
++                .as_ref()
++                .is_some_and(|c| c.manifest_schema_version >= FR8_DECLARATIONS_SINCE_SCHEMA)
++        })
++        .and_then(|v| toml::to_string(v).ok())
++        .map(|s| SwapInvariantsSection::from_toml_str(&s))
++        .transpose()?;
+ 
+     // Story 6.4 — `[[schedule]]` array-of-tables. The raw section parser
+     // reads the array under the `schedule` key; we synthesize a doc that
+@@ -425,5 +436,6 @@ pub(crate) fn load_bundle_from_file(
+         schedules,
+         gateways,
+         budget,
++        swap_invariants,
+     })
+ }
+diff --git a/crates/maos-kernel-core/src/scheduler/control_block.rs b/crates/maos-kernel-core/src/scheduler/control_block.rs
+index e3c083cc..0adc2a0e 100644
+--- a/crates/maos-kernel-core/src/scheduler/control_block.rs
++++ b/crates/maos-kernel-core/src/scheduler/control_block.rs
+@@ -216,6 +216,8 @@ pub struct SpiritManifestBundle {
+     /// `Some` ⇒ `budget.time_cap_seconds` is the per-Spirit hook cap. The kernel
+     /// holds the value but never learns *what* the budget bounds (no LLM types).
+     pub budget: Option<crate::security::manifest::Budget>,
++    /// Story 20-8 (FR8) — the `[swap_invariants]` a swap reads from the live SCB.
++    pub swap_invariants: Option<crate::security::manifest::SwapInvariantsSection>,
+ }
+ 
+ impl Default for SpiritManifestBundle {
+@@ -233,6 +235,7 @@ impl Default for SpiritManifestBundle {
+             schedules: SchedulesSection::default(),
+             gateways: GatewaysSection::default(),
+             budget: None,
++            swap_invariants: None,
+         }
+     }
+ }
