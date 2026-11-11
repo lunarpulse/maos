@@ -77,6 +77,12 @@ pub const SUBSCRIPTION_GRANTED: &str = "governance:telemetry-subscription:grante
 pub const SUBSCRIPTION_REVOKED: &str = "governance:telemetry-subscription:revoked";
 /// Consecutive hook panics after which a runtime object is quarantined.
 pub const QUARANTINE_AFTER_CONSECUTIVE_PANICS: u32 = 3;
+/// Consecutive deliveries past 80% of its budget after which a subscriber is quarantined.
+pub const QUARANTINE_AFTER_CONSECUTIVE_SLOW: u32 = 3;
+/// The longest the pump waits for one subscriber's telemetry hook, however large its manifest
+/// budget: a notification not handled in this time (or in 95% of the hook's own cap, when that
+/// is smaller) is an overrun, so one subscriber can never stall the pump for its whole cap.
+pub const TELEMETRY_WALL: Duration = Duration::from_secs(5);
 /// Records the activity sink queues ahead of the writer before it counts
 /// overflow.
 pub const ACTIVITY_QUEUE_CAPACITY: usize = 4096;
@@ -156,6 +162,8 @@ struct Subscriber {
     /// change under a queued blocking hook. Rebuilt only at runtime cutover.
     target: Option<Arc<SpiritControlBlock>>,
     strikes: u32,
+    /// Consecutive deliveries that used more than 80% of the hook's budget.
+    slow: u32,
     quarantined: bool,
     /// A grant row is outstanding for this pid.
     granted: bool,
@@ -324,6 +332,7 @@ impl Shared {
             entry.object = Some(Arc::downgrade(&snapshot.spirit_obj));
             entry.target = None;
             entry.strikes = 0;
+            entry.slow = 0;
             entry.quarantined = false;
         }
         let class = class_of(snapshot);
@@ -388,7 +397,23 @@ impl Shared {
             return;
         }
         match outcome {
-            HookOutcome::Fired { .. } | HookOutcome::BudgetWarning80 { .. } => entry.strikes = 0,
+            HookOutcome::Fired { .. } => {
+                entry.strikes = 0;
+                entry.slow = 0;
+            }
+            HookOutcome::BudgetWarning80 { .. } => {
+                entry.strikes = 0;
+                entry.slow += 1;
+                if entry.slow >= QUARANTINE_AFTER_CONSECUTIVE_SLOW {
+                    let why = format!(
+                        "{} used over 80% of its budget {} times in a row",
+                        hook.name(),
+                        entry.slow
+                    );
+                    let class = entry.class.clone();
+                    self.quarantine(pid, entry, &class, &why);
+                }
+            }
             HookOutcome::Panicked {
                 panic_payload_preview,
             } => {
@@ -420,13 +445,17 @@ impl Shared {
         }
     }
 
-    async fn deliver(&self, event: &ScalarTapEvent) {
+    /// Deliver one event to every eligible subscriber. The dispatches run side by side, each
+    /// held to a wall budget strictly inside its own cap ([`TELEMETRY_WALL`]); an overrun is
+    /// accounted as the budget overrun it is, so a slow subscriber stalls neither the others
+    /// nor the events behind this one.
+    async fn deliver(self: &Arc<Self>, event: &ScalarTapEvent) {
         let pids: Vec<u32> = self.registry().keys().copied().collect();
         if pids.is_empty() {
             return;
         }
-        let payload = match serde_json::to_vec(event) {
-            Ok(payload) => payload,
+        let payload: Arc<[u8]> = match serde_json::to_vec(event) {
+            Ok(payload) => payload.into(),
             Err(error) => {
                 eprintln!("maos: telemetry pump: event encode failed: {error}");
                 self.counters
@@ -435,6 +464,7 @@ impl Shared {
                 return;
             }
         };
+        let mut deliveries = tokio::task::JoinSet::new();
         for pid in pids {
             let Some(scb) = self.scb(pid) else {
                 self.unregister(pid, "unloaded");
@@ -443,6 +473,13 @@ impl Shared {
             };
             let snapshot = scb.runtime_snapshot();
             let object = Arc::clone(&snapshot.spirit_obj);
+            let cap = snapshot
+                .manifest
+                .budget
+                .as_ref()
+                .map_or(TELEMETRY_WALL.as_secs(), |budget| {
+                    u64::from(budget.time_cap_seconds)
+                });
             let target = {
                 let mut registry = self.registry();
                 let Some(entry) = registry.get_mut(&pid) else {
@@ -460,18 +497,39 @@ impl Shared {
                 self.counters.ineligible.fetch_add(1, Ordering::Relaxed);
                 continue;
             };
-            self.counters.in_flight.fetch_add(1, Ordering::Relaxed);
-            let outcome = dispatcher.fire_on_telemetry_event(&target, &payload).await;
-            self.counters.in_flight.fetch_sub(1, Ordering::Relaxed);
-            let counter = match &outcome {
-                HookOutcome::Fired { .. } | HookOutcome::BudgetWarning80 { .. } => {
-                    &self.counters.delivered
-                }
-                HookOutcome::SkippedManifest => &self.counters.skipped_manifest,
-                _ => &self.counters.failed,
-            };
-            counter.fetch_add(1, Ordering::Relaxed);
-            self.account(pid, &object, Hook::Telemetry, Some(&event.tag), &outcome);
+            let (shared, payload, tag) =
+                (Arc::clone(self), Arc::clone(&payload), event.tag.clone());
+            deliveries.spawn(async move {
+                let wall = Duration::from_millis(cap.saturating_mul(950)).min(TELEMETRY_WALL);
+                shared.counters.in_flight.fetch_add(1, Ordering::Relaxed);
+                let outcome = match tokio::time::timeout(
+                    wall,
+                    dispatcher.fire_on_telemetry_event(&target, &payload),
+                )
+                .await
+                {
+                    Ok(outcome) => outcome,
+                    Err(_) => HookOutcome::BudgetExceeded {
+                        wall_ns: u64::try_from(wall.as_nanos()).unwrap_or(u64::MAX),
+                        cap_seconds: cap,
+                    },
+                };
+                shared.counters.in_flight.fetch_sub(1, Ordering::Relaxed);
+                let counter = match &outcome {
+                    HookOutcome::Fired { .. } | HookOutcome::BudgetWarning80 { .. } => {
+                        &shared.counters.delivered
+                    }
+                    HookOutcome::SkippedManifest => &shared.counters.skipped_manifest,
+                    _ => &shared.counters.failed,
+                };
+                counter.fetch_add(1, Ordering::Relaxed);
+                shared.account(pid, &object, Hook::Telemetry, Some(&tag), &outcome);
+            });
+        }
+        while let Some(joined) = deliveries.join_next().await {
+            if let Err(error) = joined {
+                eprintln!("maos: telemetry pump: a delivery task failed: {error}");
+            }
         }
     }
 
@@ -942,6 +1000,7 @@ impl HookPump {
             object: None,
             target: None,
             strikes: 0,
+            slow: 0,
             quarantined: false,
             granted: false,
             class: String::new(),

@@ -4351,6 +4351,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             Vec::new()
         };
+    // Story 20-9 — builds what a spawned session's dependencies hang on, for every root that
+    // arms swap handles. It only borrows: the handles that keep the result are owned by the
+    // supervisor, so no composition-root local outlives the audit drain through it.
+    #[cfg(feature = "wasm-host")]
+    let make_swap_session = || -> maos_bin::spawned_lifecycle::SessionBuilder {
+        let (capability, security, iac) = (
+            Arc::clone(&capability),
+            Arc::clone(&security),
+            Arc::clone(&iac),
+        );
+        let (journal, log_recall) = (
+            Arc::clone(&transparency_log),
+            Arc::clone(&log_recall_adapter),
+        );
+        let (lifecycle_journal, pids) =
+            (Arc::clone(&shared_journal), Arc::clone(&pid_by_spirit_id));
+        let (enterprise, pdp, skill) = (
+            enterprise_runtime.clone(),
+            enterprise_pdp_runtime.clone(),
+            wasm_skill.clone(),
+        );
+        Arc::new(move |supervisor| maos_bin::spirit_session::SessionDeps {
+            supervisor,
+            capability: Arc::clone(&capability),
+            security: Arc::clone(&security),
+            iac: Arc::clone(&iac),
+            journal: Arc::clone(&journal),
+            log_recall: Arc::clone(&log_recall),
+            lifecycle_journal: Arc::clone(&lifecycle_journal),
+            pid_by_spirit_id: Arc::clone(&pids),
+            enterprise: enterprise.clone(),
+            pdp: pdp.clone(),
+            skill: skill.clone(),
+        })
+    };
     #[allow(unused_mut)]
     let mut installed_supervision: Option<maos_bin::supervision::RootSupervision> = None;
     #[cfg(feature = "wasm-host")]
@@ -4366,6 +4401,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc::clone(&notification_dispatcher),
             boot_nonce,
         ));
+    }
+    // Story 20-9 — an installed component's root arms the same swap handles `maos run` does,
+    // so the door can upgrade it in place (and cold-swap-restore it from its own origin).
+    #[cfg(feature = "wasm-host")]
+    if let (Some(root), Some(host)) = (installed_supervision.as_ref(), spirit_host.as_ref()) {
+        maos_bin::spawned_lifecycle::SwapHandles::arm(
+            root.supervisor(),
+            host,
+            &make_swap_session(),
+            &hosted_sessions,
+            &swap_slot,
+        );
     }
     let installed_spirits = Arc::new(
         maos_bin::installed_spirits::InstalledSpirits::boot(
@@ -4892,42 +4939,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // the door's cold swap admits a component's successor and hosts its session.
         #[cfg(feature = "wasm-host")]
         if let Some(host) = spirit_host.as_ref() {
-            let (capability, security, iac) = (
-                Arc::clone(&capability),
-                Arc::clone(&security),
-                Arc::clone(&iac),
+            maos_bin::spawned_lifecycle::SwapHandles::arm(
+                &root_worker_supervision,
+                host,
+                &make_swap_session(),
+                &hosted_sessions,
+                &swap_slot,
             );
-            let (journal, log_recall) = (
-                Arc::clone(&transparency_log),
-                Arc::clone(&log_recall_adapter),
-            );
-            let (lifecycle_journal, pids) =
-                (Arc::clone(&shared_journal), Arc::clone(&pid_by_spirit_id));
-            let (enterprise, pdp, skill) = (
-                enterprise_runtime.clone(),
-                enterprise_pdp_runtime.clone(),
-                wasm_skill.clone(),
-            );
-            let handles = Arc::new(maos_bin::spawned_lifecycle::SwapHandles {
-                supervisor: Arc::downgrade(&root_worker_supervision),
-                host: Arc::clone(host),
-                session: Arc::new(move |supervisor| maos_bin::spirit_session::SessionDeps {
-                    supervisor,
-                    capability: Arc::clone(&capability),
-                    security: Arc::clone(&security),
-                    iac: Arc::clone(&iac),
-                    journal: Arc::clone(&journal),
-                    log_recall: Arc::clone(&log_recall),
-                    lifecycle_journal: Arc::clone(&lifecycle_journal),
-                    pid_by_spirit_id: Arc::clone(&pids),
-                    enterprise: enterprise.clone(),
-                    pdp: pdp.clone(),
-                    skill: skill.clone(),
-                }),
-                hosted: Arc::clone(&hosted_sessions),
-            });
-            swap_slot.set(&handles);
-            root_worker_supervision.keep_swap_handles(handles);
         }
         // Story 19-6 (D-19-6-01/05 A) — a crashed Worker's orphan reaches its
         // local originator, and the supervisor's disposition executor shares
@@ -6858,6 +6876,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 digest.render_logged(pid);
                 butler_rollover = Some((Arc::clone(digest), pid));
             }
+            // Story 20-9 — `maos run` of a component awaits its session below and never reaches
+            // the serving tail that starts the idle, schedule and consolidate callers: start them
+            // around the session, and join them in the teardown before supervision stops.
+            #[cfg(feature = "wasm-host")]
+            let mut spawned_callers = spawned_core.is_some().then(|| {
+                maos_bin::spawned_lifecycle::LifecycleCallers::start(
+                    &scheduler,
+                    &transparency_log,
+                    &capability,
+                    &hook_pump,
+                )
+            });
             #[cfg(feature = "wasm-host")]
             let spawned_result: Option<Result<(), Box<dyn std::error::Error>>> =
                 if let Some(core) = spawned_core {
@@ -7162,6 +7192,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if let Some(port) = operator_door_port.take() {
                     port.drain_started_tasks().await;
+                }
+                #[cfg(feature = "wasm-host")]
+                if let Some(callers) = spawned_callers.take() {
+                    callers.shutdown().await;
                 }
                 // Story 17-4 (AC2.6) — the hook pump is joined before unload.
                 hook_pump.shutdown().await;
@@ -10454,15 +10488,12 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                 },
             );
         }
-        // The artifact must still be where the Spirit was launched from, or the restore of a
-        // refused cold swap would leave the Spirit absent.
+        // The artifact must still be where the Spirit was launched from (and stay inside that
+        // directory), or the restore of a refused cold swap would leave the Spirit absent.
         let artifact = gated.class_section.artifact.as_deref().unwrap_or_default();
-        origin.join(artifact).canonicalize().map_err(|error| {
+        maos_bin::spirit_session::resolve_artifact(origin, artifact).map_err(|error| {
             maos_bin::admission::AdmissionRefusal::ClassBuild {
-                detail: format!(
-                    "component artifact {artifact:?} under {}: {error}",
-                    origin.display()
-                ),
+                detail: format!("under {}: {error}", origin.display()),
             }
         })?;
         Ok(gated)

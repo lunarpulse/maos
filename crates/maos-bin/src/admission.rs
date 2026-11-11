@@ -1425,6 +1425,20 @@ async fn rollback(deps: &AdmissionDeps<'_>, pid: u32, spirit_id: &str) {
     remove_pid_by_spirit_id(deps, spirit_id);
 }
 
+/// Undo an admission whose component never started (Story 20-9): its session has ended, which
+/// may already have unloaded the SCB; otherwise the SCB is unloaded here. Either way the id's
+/// promotion set and pid binding are released so a restore can re-admit it.
+pub(crate) async fn unwind_admitted(deps: &AdmissionDeps<'_>, pid: u32, spirit_id: &str) {
+    if deps.scheduler.resolve_pid(spirit_id) == Some(pid) {
+        rollback(deps, pid, spirit_id).await;
+    } else {
+        if let Some(iac) = deps.iac {
+            iac.unregister_promotion_set(spirit_id);
+        }
+        remove_pid_by_spirit_id(deps, spirit_id);
+    }
+}
+
 /// Story 19-5 (D-19-5-04/05 A) — ADR-020 / FR11: refuse a load whose archived
 /// predecessor is cross-major and undeclared (`EMigratorMissing`).
 ///

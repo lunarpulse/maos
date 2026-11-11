@@ -1778,6 +1778,8 @@ mod worker {
             );
             #[cfg(feature = "wasm-host")]
             core.note_spirit_object(&spirit);
+            #[cfg(feature = "wasm-host")]
+            core.lifecycle().expect_session();
             Ok((core, spirit))
         }
 
@@ -2713,6 +2715,15 @@ mod worker {
                 Ok(LifecycleReply::Declined(detail)) => panic!("lifecycle_declined: {detail}"),
                 Ok(LifecycleReply::Failed(detail)) => panic!("lifecycle_failed: {detail}"),
                 Ok(reply) => reply,
+                // A trigger the session could not even start in half its budget lost to another
+                // hook's export, not to a fault of its own: dropped, never a panic or a strike.
+                Err(code) if code == crate::spawned_lifecycle::BUSY => {
+                    eprintln!(
+                        "maos: lifecycle trigger dropped: '{}' stayed busy",
+                        self.core.spirit_id().escape_debug()
+                    );
+                    LifecycleReply::Unsupported
+                }
                 Err(code) => panic!("lifecycle_{code}"),
             }
         }

@@ -28,6 +28,12 @@ const FLOOD_FRAMES: usize = 65;
 /// Diagnostic lines past the session's per-session row budget (256).
 const NOISY_LINES: usize = 300;
 
+fn flood() -> ExitCode {
+    let mut diagnostics = io::stderr().lock();
+    while writeln!(diagnostics, "flood: diagnostics that never stop").is_ok() {}
+    ExitCode::from(1)
+}
+
 fn main() -> ExitCode {
     let mode = match parse_mode() {
         Ok(mode) => mode,
@@ -39,6 +45,10 @@ fn main() -> ExitCode {
     if let Some(code) = mode.strip_prefix("exit-before-ready-") {
         return ExitCode::from(code.parse::<u8>().unwrap_or(64));
     }
+    if mode == "stderr-flood" {
+        // Never `Ready`: a runner that only writes diagnostics, for as long as anyone reads.
+        return flood();
+    }
     let stdout = io::stdout();
     let mut writer = BufWriter::new(stdout.lock());
     if write_frame(&mut writer, &[]).is_err() {
@@ -46,6 +56,11 @@ fn main() -> ExitCode {
     }
     if mode == "ready-then-exit" {
         return ExitCode::SUCCESS;
+    }
+    if mode == "probe-flood" {
+        // `Ready`, then no reply to the first request: only diagnostics, forever.
+        let _ = writer.flush();
+        return flood();
     }
     let stdin = io::stdin();
     let mut reader = BufReader::new(stdin.lock());

@@ -1,0 +1,5 @@
+# final tree
+== rows by intent (log.recall = a lifecycle export ran its recall import; schedule.fire:tick = the schedule caller)
+log.recall: 379
+schedule.fire:tick: 60
+recall payloads: {b'{"limit":1,"cursor_present":false}': 1, b'{"limit":4,"cursor_present":false}': 60, b'{"limit":2,"cursor_present":false}': 318}

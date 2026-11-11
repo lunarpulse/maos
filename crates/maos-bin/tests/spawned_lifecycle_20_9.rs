@@ -10,7 +10,7 @@ mod world;
 
 use maos_kernel_core::iac::transparency_log::FrameKind as TlKind;
 use std::time::{Duration, Instant};
-use world::{manifest, Running, World, ALL_HOOKS, ID};
+use world::{manifest, manifest_capped, Running, World, ALL_HOOKS, ID};
 
 /// `[[schedule]]`: cadence 1 s (10 ms under `MAOS_SCHEDULE_FAST`), no token minted.
 const TICK: &str = "[[schedule]]\nid = \"tick\"\ncadence_secs = 1\npayload_b64 = \"dGljaw==\"\nprincipal_revocability = false\n";
@@ -254,4 +254,93 @@ fn admission_carries_schedule_for_every_form_and_refuses_a_malformed_entry_typed
         refusal.to_string().starts_with("[schedule] section"),
         "{refusal}"
     );
+}
+// GLM F1 — one subscriber that sits in its telemetry hook for seconds does not hold back the
+// other subscribers of the same event (the pump delivers side by side).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn one_slow_telemetry_subscriber_does_not_stall_the_others() {
+    let mut world = World::bare().await;
+    let listing = |world: &World, name: &str| {
+        world.write(
+            &format!("{name}.toml"),
+            &manifest(
+                name,
+                "1.0.0",
+                "lifecycle_probe.wasm",
+                &["on_telemetry_event"],
+                "",
+            ),
+        )
+    };
+    let (slow_path, fast_path) = (listing(&world, "slow-sub"), listing(&world, "fast-sub"));
+    // The slow one is admitted first, so a sequential pump would serve it first.
+    let (slow, fast) = (world.start(&slow_path).await, world.start(&fast_path).await);
+    world.turn("slow-sub", "sleep-in telemetry 3").await;
+    world
+        .capability
+        .set_scalar(902, "emitter", "queue.depth", 0.5, "test")
+        .unwrap();
+    let began = Instant::now();
+    loop {
+        let report = world.turn("fast-sub", "").await;
+        if World::count(&report, "telemetry") >= 1 {
+            assert!(report.contains("last telemetry=queue.depth@"), "{report}");
+            break;
+        }
+        assert!(
+            began.elapsed() < Duration::from_millis(1_800),
+            "the fast subscriber still waits for the slow one after {:?}:\n{report}",
+            began.elapsed()
+        );
+    }
+    world.pump.flush().await.unwrap();
+    assert!(
+        world
+            .rows(
+                TlKind::GovernanceEvent,
+                "governance:telemetry-subscription:revoked"
+            )
+            .is_empty(),
+        "a subscriber inside its budget keeps its grant"
+    );
+    world.scheduler.unload(slow.pid).await.unwrap();
+    world.supervisor.stop_binding(slow.pid);
+    let _ = tokio::time::timeout(Duration::from_secs(20), slow.session).await;
+    stop(world, fast).await;
+}
+
+// GLM F1 — a trigger that cannot even start while another export holds the session is dropped
+// without a panic: it is not charged for the budget the other hook used.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_hook_that_cannot_start_behind_another_export_is_dropped_without_a_strike() {
+    use maos_kernel_core::scheduler::HookOutcome;
+    let mut world = World::bare().await;
+    let path = world.write(
+        "overlap.toml",
+        &manifest_capped(
+            ID,
+            "1.0.0",
+            "lifecycle_probe.wasm",
+            &["on_idle", "on_consolidate"],
+            "",
+            6,
+        ),
+    );
+    let running = world.start(&path).await;
+    world
+        .turn(ID, "sleep-in idle 4\nsleep-in consolidate 4")
+        .await;
+    let (scb, dispatcher) = (world.scb(ID), world.scheduler.dispatcher_arc());
+    // `idle` holds the session for 4 s of its 6 s; `consolidate` queues behind it, could not
+    // start in the 3 s it may wait, and would have needed 4 s more than the cap allows.
+    let (idle, consolidate) = tokio::join!(dispatcher.fire_on_idle(&scb), async {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        dispatcher.fire_on_consolidate(&scb, &[]).await
+    });
+    assert!(matches!(idle, HookOutcome::Fired { .. }), "{idle:?}");
+    assert!(
+        matches!(consolidate, HookOutcome::Fired { .. }),
+        "the hook that lost the session is not a fault: {consolidate:?}"
+    );
+    stop(world, running).await;
 }

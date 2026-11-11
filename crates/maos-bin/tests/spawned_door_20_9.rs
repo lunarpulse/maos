@@ -41,10 +41,17 @@ struct Daemon {
     /// The operator's directory: manifests and the artifact they name sit side by side.
     package: PathBuf,
     child: Option<Child>,
+    /// Set for the daemon and the door client alike.
+    env: Vec<(&'static str, &'static str)>,
 }
 
 impl Daemon {
     fn boot() -> Self {
+        Self::boot_with(&[], "")
+    }
+
+    /// `extra` is appended to the first manifest (more sections).
+    fn boot_with(env: &[(&'static str, &'static str)], extra: &str) -> Self {
         let scratch = tempfile::tempdir().expect("scratch");
         let home = scratch.path().join("maos-home");
         let package = scratch.path().join("package");
@@ -59,6 +66,7 @@ impl Daemon {
             home,
             package,
             child: None,
+            env: env.to_vec(),
         };
         let init = daemon
             .command(&maos())
@@ -70,7 +78,12 @@ impl Daemon {
             "maos init: {}",
             String::from_utf8_lossy(&init.stderr)
         );
-        let v1 = daemon.write("v1.toml", "1.0.0", "lifecycle_probe.wasm");
+        let v1 = daemon.package.join("v1.toml");
+        std::fs::write(
+            &v1,
+            manifest(ID, "1.0.0", "lifecycle_probe.wasm", &ALL_HOOKS, extra),
+        )
+        .unwrap();
         let _ = beside("maos-wasm-runner");
         let child = daemon
             .command(&maos())
@@ -92,6 +105,9 @@ impl Daemon {
             .env("XDG_DATA_HOME", self.scratch.path().join("xdg"))
             .env("MAOS_NOTIFY_DISABLE", "1")
             .current_dir(workspace_root());
+        for (key, value) in &self.env {
+            command.env(key, value);
+        }
         command
     }
 
@@ -99,6 +115,23 @@ impl Daemon {
         let path = self.package.join(name);
         std::fs::write(&path, manifest(ID, version, artifact, &ALL_HOOKS, "")).unwrap();
         path
+    }
+    /// SIGTERM the daemon and wait for it to leave; `None` if it is still there after 30 s.
+    fn terminate(&mut self) -> Option<std::process::ExitStatus> {
+        let mut child = self.child.take()?;
+        let _ = Command::new("kill")
+            .args(["-TERM", &child.id().to_string()])
+            .status();
+        let until = Instant::now() + Duration::from_secs(30);
+        while Instant::now() < until {
+            if let Ok(Some(status)) = child.try_wait() {
+                return Some(status);
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let _ = child.kill();
+        let _ = child.wait();
+        None
     }
 
     fn ctl(&self, args: &[&str]) -> std::process::Output {
@@ -297,4 +330,83 @@ fn a_cli_wrapper_target_is_not_a_spirit_form_and_a_component_is_untouched() {
     }
     assert_eq!(daemon.pid(), pid, "the component keeps its pid");
     assert_eq!(daemon.field("lifecycle_state").as_deref(), Some("Running"));
+}
+/// `[[schedule]]`: cadence 1 s (40 ms poll and 10 ms under `MAOS_SCHEDULE_FAST`).
+const TICK: &str = "[[schedule]]\nid = \"tick\"\ncadence_secs = 1\npayload_b64 = \"dGljaw==\"\nprincipal_revocability = false\n";
+
+// GPT #1 — `maos run <component>` awaits the component's session and never reaches the
+// serving tail, so the idle, schedule and consolidate callers must be started around it. The
+// probe's `recall` import in each export asks for a page whose size names the export (idle 1,
+// consolidate 2, schedule 4), and the log records that size in its `log.recall` row, so the
+// daemon's own Transparency Log shows which triggers reached the guest.
+#[test]
+fn a_component_run_by_maos_run_receives_the_idle_schedule_and_consolidate_triggers() {
+    let mut daemon = Daemon::boot_with(
+        &[("MAOS_IDLE_FAST", "1"), ("MAOS_SCHEDULE_FAST", "1")],
+        TICK,
+    );
+    let heard = |limit: u32| {
+        daemon.rows().iter().any(|(intent, payload)| {
+            intent == "log.recall" && payload.contains(&format!("\"limit\":{limit}"))
+        })
+    };
+    let until = Instant::now() + Duration::from_secs(40);
+    let mut missing = vec![("idle", 1), ("consolidate", 2), ("schedule", 4)];
+    while !missing.is_empty() && Instant::now() < until {
+        missing.retain(|(_, limit)| !heard(*limit));
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    assert!(
+        missing.is_empty(),
+        "these triggers never reached the component: {missing:?}\ndaemon: {}",
+        daemon.stderr()
+    );
+    assert!(
+        daemon
+            .rows()
+            .iter()
+            .any(|(intent, _)| intent == "schedule.fire:tick"),
+        "the schedule caller journaled its fire"
+    );
+    // The callers are joined on teardown: the root leaves promptly and drains its writer.
+    let status = daemon.terminate();
+    let stderr = daemon.stderr();
+    assert!(
+        status.is_some(),
+        "the root outlived SIGTERM by 30 s:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("drain timed out"),
+        "a lifecycle caller outlived the teardown:\n{stderr}"
+    );
+}
+
+// GPT #3 — an artifact that exists but is not a component. The successor's admission used to
+// return as soon as its session task was spawned, so the door reported `completed` and never
+// restored the predecessor.
+#[test]
+fn a_cold_swap_to_an_existing_invalid_component_is_reverted_and_the_predecessor_serves() {
+    let daemon = Daemon::boot();
+    let first = daemon.pid();
+    std::fs::write(
+        daemon.package.join("broken.wasm"),
+        b"\0asm\x01\0\0\0not a component",
+    )
+    .unwrap();
+    let broken = daemon.write("v2.toml", "1.1.0", "broken.wasm");
+    let output = daemon.upgrade(&broken, "cold-swap");
+    let reply = text(&output);
+    assert!(
+        !output.status.success()
+            && reply.contains("cold_swap_reverted")
+            && reply.contains("HTTP 409"),
+        "{reply}\ndaemon: {}",
+        daemon.stderr()
+    );
+    daemon.await_running();
+    assert_ne!(daemon.pid(), first, "the restore is at a new pid");
+    assert!(
+        daemon.rows().iter().any(|(intent, payload)| intent == "spirit.upgrade" && payload.contains("\"reverted\"")),
+        "the reverted outcome is journaled"
+    );
 }

@@ -53,6 +53,18 @@ pub fn fast_clocks() {
 
 /// `extra` is appended verbatim (more sections); `hooks` empty means every hook is allowed.
 pub fn manifest(name: &str, version: &str, artifact: &str, hooks: &[&str], extra: &str) -> String {
+    manifest_capped(name, version, artifact, hooks, extra, 30)
+}
+
+/// [`manifest`] with `[budget].time_cap_seconds = cap`.
+pub fn manifest_capped(
+    name: &str,
+    version: &str,
+    artifact: &str,
+    hooks: &[&str],
+    extra: &str,
+    cap: u32,
+) -> String {
     let hooks = hooks
         .iter()
         .map(|hook| format!("\"{hook}\""))
@@ -76,7 +88,7 @@ allowed_max = "assistive"
 required_fields = ["introduction"]
 [budget]
 context_window_size = 4096
-time_cap_seconds = 30
+time_cap_seconds = {cap}
 [resources]
 fd_max = 64
 [sandbox]
@@ -113,6 +125,25 @@ impl maos_host::SpiritHostPort for Host {
         &self,
         request: &maos_host::SpiritLaunchRequest,
     ) -> Result<maos_host::SpiritLaunchPlan, maos_host::SpiritHostError> {
+        // `hostile-MODE.wasm` stands for a component whose runner misbehaves (a `hostile-twin`
+        // mode): the real child, spawned through the real sandboxed path.
+        let named = std::path::Path::new(&request.artifact)
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if let Some(mode) = named
+            .strip_prefix("hostile-")
+            .and_then(|rest| rest.strip_suffix(".wasm"))
+        {
+            return Ok(maos_host::SpiritLaunchPlan {
+                program: fixtures::fixture("hostile-twin")
+                    .to_string_lossy()
+                    .into_owned(),
+                argv: vec!["--mode".into(), mode.into()],
+                env: vec![],
+                wire: maos_host::WireShape::ContentLengthCbor,
+            });
+        }
         Ok(maos_host::SpiritLaunchPlan {
             program: self.0.to_string_lossy().into_owned(),
             argv: vec![
@@ -160,7 +191,17 @@ pub struct World {
 }
 
 impl World {
+    /// A root with the kernel's own callers running (idle, schedule, consolidate).
     pub async fn new() -> Self {
+        Self::build(true).await
+    }
+
+    /// A root whose hooks only fire when a vector fires them: no watchdog runs.
+    pub async fn bare() -> Self {
+        Self::build(false).await
+    }
+
+    async fn build(callers: bool) -> Self {
         fast_clocks();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path();
@@ -248,22 +289,24 @@ impl World {
         std::mem::forget(cap_audit::CapAuditWriter::spawn(audit_rx, Arc::clone(&tl)));
         let pump = Arc::new(HookPump::new(&scheduler, &telemetry, Arc::clone(&tl)));
         let cancel = CancellationToken::new();
-        // The real callers, as `main.rs` spawns them.
-        Arc::new(IdleWatchdog::new(
-            scheduler.scbs(),
-            scheduler.dispatcher_arc(),
-        ))
-        .spawn(cancel.child_token());
-        Arc::new(
-            ScheduleWatchdog::new(
+        // The real callers, as `main.rs` spawns them (a bare world fires its hooks by hand).
+        let consolidation = callers.then(|| {
+            Arc::new(IdleWatchdog::new(
                 scheduler.scbs(),
                 scheduler.dispatcher_arc(),
-                Arc::clone(&tl),
+            ))
+            .spawn(cancel.child_token());
+            Arc::new(
+                ScheduleWatchdog::new(
+                    scheduler.scbs(),
+                    scheduler.dispatcher_arc(),
+                    Arc::clone(&tl),
+                )
+                .with_capability(Arc::clone(&capability)),
             )
-            .with_capability(Arc::clone(&capability)),
-        )
-        .spawn(cancel.child_token());
-        let consolidation = ConsolidationWatchdog::spawn(&pump, ConsolidationCadence::from_env());
+            .spawn(cancel.child_token());
+            ConsolidationWatchdog::spawn(&pump, ConsolidationCadence::from_env())
+        });
         let session: Arc<
             dyn Fn(Arc<maos_bin::supervision::WorkerSupervisor>) -> SessionDeps + Send + Sync,
         > = {
@@ -341,6 +384,8 @@ impl World {
                 "echo_2_3.wasm",
                 std::fs::read(frozen("echo_spirit_2_3_0.wasm")).unwrap(),
             ),
+            ("hostile-stderr-flood.wasm", Vec::new()),
+            ("hostile-probe-flood.wasm", Vec::new()),
         ] {
             std::fs::write(path.join(name), bytes).unwrap();
         }
@@ -365,7 +410,7 @@ impl World {
             cancel,
             seen: 0,
             root: Some(root),
-            consolidation: Some(consolidation),
+            consolidation,
         }
     }
 
@@ -373,6 +418,17 @@ impl World {
         let path = self.dir.path().join(name);
         std::fs::write(&path, text).unwrap();
         path
+    }
+    /// The SCB of the loaded `spirit`.
+    pub fn scb(&self, spirit: &str) -> Arc<maos_kernel_core::scheduler::SpiritControlBlock> {
+        let pid = self.scheduler.resolve_pid(spirit).expect("a loaded spirit");
+        self.scheduler
+            .scbs()
+            .read()
+            .unwrap()
+            .get(&pid)
+            .cloned()
+            .expect("its SCB")
     }
 
     /// `maos run`'s standalone arm for a component: gate, prepare, admit, start, run.

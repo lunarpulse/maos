@@ -300,6 +300,48 @@ impl Spirit for SlowOnTelemetry {
         std::thread::sleep(Duration::from_millis(1_500));
     }
 }
+/// A subscriber whose telemetry hook finishes inside its budget, but past 80% of it.
+struct NearBudgetOnTelemetry;
+impl Spirit for NearBudgetOnTelemetry {
+    fn on_telemetry_event(&self, _ctx: &mut Ctx, _payload: &TelemetryEventPayload<'_>) {
+        std::thread::sleep(Duration::from_millis(1_750));
+    }
+}
+
+// GLM F1 — a subscriber that always finishes just inside its budget (between 80% and the
+// pump's 95%) used to reset its strikes every time and was never quarantined.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn repeated_budget_warnings_quarantine_the_subscriber() {
+    let world = World::new();
+    let manifest = OBSERVER_MANIFEST.replace("time_cap_seconds = 10", "time_cap_seconds = 2");
+    let pid = world
+        .admit(
+            &manifest,
+            make_spirit_obj(NearBudgetOnTelemetry),
+            StartPolicy::StartNow,
+        )
+        .await
+        .unwrap();
+    for value in [0.1, 0.2] {
+        world.emit(value).await;
+        assert_eq!(
+            world.subscription_rows().last(),
+            Some(&row(pid, true, "admitted")),
+            "two near-budget deliveries are not yet a quarantine"
+        );
+    }
+    world.emit(0.3).await;
+    assert_eq!(
+        world.subscription_rows().last(),
+        Some(&row(
+            pid,
+            false,
+            "quarantined: on_telemetry_event used over 80% of its budget 3 times in a row"
+        ))
+    );
+    world.emit(0.4).await;
+    assert_eq!(world.pump.stats(), stats(3, 1, 0));
+}
 
 /// A Spirit whose `on_start` panics: admission is granted, start fails.
 struct PanicsOnStart;

@@ -1,0 +1,5 @@
+# baseline fc7373f0 (scratch build /tmp/base209-target)
+== rows by intent (log.recall = a lifecycle export ran its recall import; schedule.fire:tick = the schedule caller)
+log.recall: 0
+schedule.fire:tick: 0
+recall payloads: {}

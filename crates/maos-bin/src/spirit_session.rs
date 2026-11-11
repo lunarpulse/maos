@@ -100,6 +100,37 @@ pub fn manifest_launch(
     manifest_launch_in(host, gated, manifest, origin, once)
 }
 
+/// The component a manifest's `artifact` names, resolved against `origin`. Only a relative path
+/// whose real location stays inside `origin` resolves: an absolute path, a `..` climb, or a
+/// symlink out of the directory is refused typed, so the runner's read grant and the code that
+/// runs under the admitted sandbox are the operator's named directory's and nothing else's.
+pub fn resolve_artifact(
+    origin: &std::path::Path,
+    artifact: &str,
+) -> Result<std::path::PathBuf, SessionError> {
+    let escape = |why: &str| SessionError::ArtifactEscapesOrigin(format!("{artifact:?} {why}"));
+    let relative = std::path::Path::new(artifact);
+    if relative.is_absolute()
+        || relative
+            .components()
+            .any(|part| matches!(part, std::path::Component::ParentDir))
+    {
+        return Err(escape("is not a path inside the manifest's directory"));
+    }
+    let root = origin
+        .canonicalize()
+        .map_err(|error| SessionError::Bridge(format!("{}: {error}", origin.display())))?;
+    let resolved = root
+        .join(relative)
+        .canonicalize()
+        .map_err(|error| SessionError::Bridge(format!("{artifact:?}: {error}")))?;
+    if resolved.starts_with(&root) {
+        Ok(resolved)
+    } else {
+        Err(escape("resolves outside the manifest's directory"))
+    }
+}
+
 /// [`manifest_launch`] with the artifact resolved against `origin`, not the manifest's own
 /// directory: the door stages a successor's bytes in a private file, and its artifact stays
 /// where the operator named it.
@@ -115,10 +146,7 @@ pub fn manifest_launch_in(
         .artifact
         .as_ref()
         .ok_or(SessionError::Protocol("WASM manifest has no artifact"))?;
-    let artifact = origin
-        .join(artifact)
-        .canonicalize()
-        .map_err(|error| SessionError::Bridge(error.to_string()))?;
+    let artifact = resolve_artifact(origin, artifact)?;
     let plan = host
         .resolve_launch(&maos_host::SpiritLaunchRequest {
             form: maos_host::SpiritForm::WasmComponent,
@@ -217,6 +245,8 @@ pub enum SessionError {
     UnrepresentableFrame,
     #[error("swap_reverted_after_retire: the post-swap monitor restored a predecessor whose child was retired")]
     SwapReverted,
+    #[error("artifact_escapes_origin: component artifact {0}")]
+    ArtifactEscapesOrigin(String),
 }
 
 struct Recipient {
@@ -327,6 +357,9 @@ fn retire(deps: &SessionDeps, pid: u32, old: LiveWorker) {
 /// One lifecycle export in flight on the child: its hook awaits `answer` (a probe has none).
 struct Pending {
     answer: Option<std::sync::mpsc::SyncSender<Answer>>,
+    /// The hook's call state: its reply is delivered, and a snapshot's fence set, only if the
+    /// hook is still waiting when the reply arrives (a probe has no hook).
+    state: Option<Arc<crate::spawned_lifecycle::CallState>>,
     request: LifecycleRequest,
 }
 
@@ -568,7 +601,7 @@ pub async fn run_admitted_session(
                                 .ok_or(SessionError::Protocol("session stdin already closed"))?
                                 .send(body)
                                 .map_err(|error| SessionError::Bridge(error.to_string()))?;
-                            pending = Some(Pending { answer: Some(call.answer), request: call.request });
+                            pending = Some(Pending { answer: Some(call.answer), state: Some(call.state), request: call.request });
                         }
                     }
                 }
@@ -604,7 +637,7 @@ pub async fn run_admitted_session(
                                 .ok_or(SessionError::Protocol("session stdin already closed"))?
                                 .send(probe)
                                 .map_err(|error| SessionError::Bridge(error.to_string()))?;
-                            pending = Some(Pending { answer: None, request: LifecycleRequest::Probe });
+                            pending = Some(Pending { answer: None, state: None, request: LifecycleRequest::Probe });
                             deadline = Some((Instant::now() + turn_budget, "lifecycle probe"));
                         } else if active {
                             deps.supervisor.complete_turn(live.binding.core());
@@ -628,16 +661,23 @@ pub async fn run_admitted_session(
                             };
                             let reply = lifecycle_wire::decode_reply(&bytes).map_err(SessionError::Codec)?;
                             deadline = None;
+                            // A hook that already stopped waiting leaves its reply unconsumed.
+                            let wanted = match &done.state {
+                                Some(state) => state.answer(),
+                                None => true,
+                            };
                             match (&done.request, &reply) {
                                 (LifecycleRequest::Probe, LifecycleReply::Supported(supported)) =>
                                     link.set_supported(*supported),
                                 (LifecycleRequest::Probe, _) =>
                                     return Err(SessionError::Protocol("unexpected probe reply")),
-                                // The predecessor's state is now taken: no more work until the swap resolves.
-                                (LifecycleRequest::Snapshot, LifecycleReply::State(_)) => link.set_fenced(true),
+                                // The predecessor's state is now taken: no more work until the swap
+                                // resolves. A snapshot its caller gave up on fences nothing.
+                                (LifecycleRequest::Snapshot, LifecycleReply::State(_)) if wanted =>
+                                    link.set_fenced(true),
                                 _ => {}
                             }
-                            if let Some(answer) = done.answer {
+                            if let Some(answer) = done.answer.filter(|_| wanted) {
                                 let _ = answer.send(Answer::Reply(reply));
                             }
                             continue;

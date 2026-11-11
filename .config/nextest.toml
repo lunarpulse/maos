@@ -55,6 +55,7 @@ binary_id(xtask::example_spirit_regen_integration)
 | binary_id(maos-bin::spawned_lifecycle_20_9)
 | binary_id(maos-bin::spawned_swap_20_9)
 | binary_id(maos-bin::spawned_door_20_9)
+| binary_id(maos-bin::spawned_installed_20_9)
 """
 test-group = "serial"
 # AC15 real TLS/CLI and 20-8 skill witnesses share the owned serial resource

@@ -53,6 +53,7 @@ jobs:
         run: >
           cargo nextest run --locked -p maos-bin --features maos-bin/wasm-host
           --test spawned_lifecycle_20_9 --test spawned_swap_20_9 --test spawned_door_20_9
+          --test spawned_installed_20_9
           --test hook_pump_17_4 --test wasm_form_admission_17_3b --test root_shutdown_unload_16_3
           --test one_daemon_one_door_16_1
   check-wasm-form-equiv:

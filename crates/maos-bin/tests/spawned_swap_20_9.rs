@@ -17,7 +17,7 @@ use maos_kernel_core::iac::transparency_log::FrameKind as TlKind;
 use maos_kernel_core::lifecycle::UpgradePolicy;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use world::{manifest, Running, World, ALL_HOOKS, ID};
+use world::{manifest, manifest_capped, Running, World, ALL_HOOKS, ID};
 
 const MIGRATING: &str = "[hot_swap]\nstate_schema_uri = \"urn:probe\"\nstate_schema_version = 131073\n[migrates_from]\nversions = [\"1.0.x\"]\n";
 // (v1 of the migrator vector declares no [hot_swap]: schema 1, major 0; MIGRATING is major 2.)
@@ -454,4 +454,273 @@ async fn a_swap_refused_after_snapshot_releases_the_predecessor_which_keeps_serv
         "still the predecessor:\n{report}"
     );
     settle(world, running).await;
+}
+/// A manifest of `ID` at `version` for `artifact`, under a `cap` second budget.
+fn capped(world: &World, version: &str, artifact: &str, cap: u32) -> PathBuf {
+    world.write(
+        &format!("{artifact}-{version}.toml"),
+        &manifest_capped(ID, version, artifact, &ALL_HOOKS, "", cap),
+    )
+}
+
+/// Live processes whose command line names `mode` as a `hostile-twin` mode.
+fn twins(mode: &str) -> Vec<u32> {
+    let needle = format!("--mode {mode}");
+    std::fs::read_dir("/proc")
+        .unwrap()
+        .flatten()
+        .filter_map(|entry| {
+            let pid: u32 = entry.file_name().to_str()?.parse().ok()?;
+            let cmdline = std::fs::read(entry.path().join("cmdline")).ok()?;
+            String::from_utf8_lossy(&cmdline)
+                .replace('\0', " ")
+                .contains(&needle)
+                .then_some(pid)
+        })
+        .collect()
+}
+
+// GPT #4 — the coordinator accepts a manifest-skipped `swap-in` as success, but only a `swap-in`
+// that reaches the guest hands the child over: the factory refuses before anything is fenced.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_successor_whose_manifest_disables_on_swap_in_is_refused_and_the_predecessor_keeps_serving(
+) {
+    let mut world = World::new().await;
+    let v1 = v(&world, "v1.toml", "1.0.0", "lifecycle_probe.wasm", "");
+    let without: Vec<&str> = ALL_HOOKS
+        .iter()
+        .copied()
+        .filter(|hook| *hook != "on_swap_in")
+        .collect();
+    let v2 = world.write(
+        "v2.toml",
+        &manifest(ID, "2.0.0", "lifecycle_probe.wasm", &without, ""),
+    );
+    let running = world.start(&v1).await;
+    world.turn(ID, "").await;
+    let error = world
+        .upgrade(&v2, UpgradePolicy::HotSwap)
+        .await
+        .expect_err("a successor that cannot be handed the state is refused");
+    assert!(error.contains("swap_hook_disabled"), "{error}");
+    let report = world.turn(ID, "").await;
+    assert!(
+        report.contains("swap-in=-") && World::count(&report, "frames") == 2,
+        "the predecessor still takes frame turns:\n{report}"
+    );
+    settle(world, running).await;
+}
+
+// GPT #5 — a snapshot queued behind an active turn answers after its caller's deadline: the
+// reply must not fence a predecessor the failed swap already released.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_snapshot_answered_after_its_callers_deadline_does_not_fence_the_predecessor() {
+    let mut world = World::bare().await;
+    let (v1, v2) = (
+        capped(&world, "1.0.0", "lifecycle_probe.wasm", 3),
+        capped(&world, "2.0.0", "lifecycle_probe.wasm", 3),
+    );
+    let running = world.start(&v1).await;
+    // The next `snapshot` takes 2 s, and a 2 s turn keeps the session busy while it queues:
+    // it starts at about 2 s, answers at about 4 s, and its caller gave up at 3 s.
+    world.turn(ID, "sleep-in snapshot 2").await;
+    world.send(ID, "sleep 2").await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    world
+        .upgrade(&v2, UpgradePolicy::HotSwap)
+        .await
+        .expect_err("the snapshot missed its caller's deadline");
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    let busy = world
+        .report(Duration::from_secs(15))
+        .await
+        .expect("the busy turn reports");
+    assert_eq!(World::count(&busy, "frames"), 2, "{busy}");
+    let report = world.turn(ID, "").await;
+    assert!(
+        World::count(&report, "frames") == 3 && report.contains("swap-in=-"),
+        "the predecessor was fenced by a snapshot nobody was waiting for:\n{report}"
+    );
+    settle(world, running).await;
+}
+
+// GPT #6 — a prewarm guest that only writes diagnostics (before `Ready`, or in place of a
+// probe reply) is refused at its own cap, and its child is gone.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_prewarm_guest_that_never_stops_writing_diagnostics_is_refused_at_its_cap() {
+    let mut world = World::bare().await;
+    let running = world
+        .start(&capped(&world, "1.0.0", "lifecycle_probe.wasm", 2))
+        .await;
+    world.turn(ID, "").await;
+    for mode in ["stderr-flood", "probe-flood"] {
+        let successor = capped(&world, "2.0.0", &format!("hostile-{mode}.wasm"), 2);
+        let (orchestrator, staged, handle) = (
+            std::sync::Arc::clone(&world.orchestrator),
+            world.staged.clone(),
+            tokio::runtime::Handle::current(),
+        );
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let started = Instant::now();
+        // The factory runs synchronously: a stuck one must not take the vector down with it.
+        std::thread::spawn(move || {
+            let result = handle.block_on(async {
+                staged.stage(successor.clone());
+                let result = orchestrator
+                    .upgrade(ID, &successor, UpgradePolicy::HotSwap)
+                    .await;
+                staged.take();
+                result.map(|_| ()).map_err(|error| error.to_string())
+            });
+            let _ = tx.send(result);
+        });
+        let result = tokio::time::timeout(Duration::from_secs(12), rx)
+            .await
+            .unwrap_or_else(|_| {
+                panic!("`{mode}`: the swap outlasted the successor's 2 s cap by 10 s")
+            })
+            .expect("the swap thread");
+        let error = result.expect_err(mode);
+        assert!(
+            error.contains("spawned_swap_launch_failed") && error.contains("deadline"),
+            "{mode}: {error}"
+        );
+        assert!(
+            started.elapsed() < Duration::from_secs(8),
+            "{mode}: refused after {:?}",
+            started.elapsed()
+        );
+        let until = Instant::now() + Duration::from_secs(5);
+        while !twins(mode).is_empty() && Instant::now() < until {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        assert_eq!(twins(mode), Vec::<u32>::new(), "{mode}: the child is gone");
+        let report = world.turn(ID, "").await;
+        assert!(
+            report.contains("swap-in=-"),
+            "{mode}: the predecessor serves:\n{report}"
+        );
+    }
+    settle(world, running).await;
+}
+
+// GPT #7 — the predecessor's child is being retired (its shutdown is slow) while the committed
+// successor waits for adoption: a hook dispatched then queues for the successor's session.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_hook_dispatched_in_the_committed_handover_gap_reaches_the_successor_once() {
+    let mut world = World::bare().await;
+    let v1 = v(&world, "v1.toml", "1.0.0", "lifecycle_probe.wasm", "");
+    let v2 = v(&world, "v2.toml", "2.0.0", "lifecycle_probe.wasm", "");
+    let running = world.start(&v1).await;
+    world.turn(ID, "sleep-in shutdown 3").await;
+    world
+        .upgrade(&v2, UpgradePolicy::HotSwap)
+        .await
+        .expect("the swap commits");
+    let outcome = world
+        .scheduler
+        .dispatcher_arc()
+        .fire_on_idle(&world.scb(ID))
+        .await;
+    assert!(
+        matches!(
+            outcome,
+            maos_kernel_core::scheduler::HookOutcome::Fired { .. }
+        ),
+        "{outcome:?}"
+    );
+    let report = world.turn(ID, "").await;
+    assert!(
+        report.contains("swap-in=1"),
+        "the successor serves:\n{report}"
+    );
+    assert_eq!(
+        World::count(&report, "idle"),
+        1,
+        "exactly one guest invocation, none lost to the gap:\n{report}"
+    );
+    settle(world, running).await;
+}
+
+// GPT #3 (in-process half) — a component that is refused while starting leaves no SCB behind,
+// and the predecessor is re-admitted through the same path.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_component_that_cannot_start_is_unwound_and_refused_by_its_cold_swap_admission() {
+    let mut world = World::bare().await;
+    let v1 = v(&world, "v1.toml", "1.0.0", "lifecycle_probe.wasm", "");
+    std::fs::write(world.dir.path().join("broken.wasm"), b"not a component").unwrap();
+    let broken = v(&world, "v2.toml", "1.1.0", "broken.wasm", "");
+    let running = world.start(&v1).await;
+    world.scheduler.unload(running.pid).await.unwrap();
+    world.supervisor.stop_binding(running.pid);
+    let _ = tokio::time::timeout(Duration::from_secs(20), running.session).await;
+    let refusal = admit(&world, broken)
+        .await
+        .expect_err("a component the runner refuses never completes its admission");
+    assert!(
+        refusal.to_string().contains("spawned_start_failed"),
+        "{refusal}"
+    );
+    assert_eq!(
+        world.scheduler.resolve_pid(ID),
+        None,
+        "the refused admission left no SCB"
+    );
+    let restored = admit(&world, v1)
+        .await
+        .expect("the predecessor is re-admitted");
+    let report = world.turn(ID, "").await;
+    assert_eq!(World::count(&report, "counter"), 1, "{report}");
+    world.scheduler.unload(restored.pid).await.unwrap();
+    world.supervisor.stop_binding(restored.pid);
+    world.finish().await;
+}
+
+// GLM F2 — an artifact that resolves outside the manifest's directory (a symlinked directory
+// here: `..` and absolute paths are already refused by the manifest) is refused typed.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn an_artifact_that_resolves_outside_its_directory_is_refused_typed() {
+    let world = World::bare().await;
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::copy(
+        world::fixtures::fixture("lifecycle_probe.wasm"),
+        outside.path().join("probe.wasm"),
+    )
+    .unwrap();
+    std::os::unix::fs::symlink(outside.path(), world.dir.path().join("linked")).unwrap();
+    let linked = v(&world, "v1.toml", "1.0.0", "linked/probe.wasm", "");
+    let refusal = admit(&world, linked.clone())
+        .await
+        .expect_err("the symlink leaves the manifest's directory");
+    assert!(
+        refusal.to_string().contains("artifact_escapes_origin"),
+        "{refusal}"
+    );
+    assert_eq!(world.scheduler.resolve_pid(ID), None, "nothing was loaded");
+    // The launch resolution itself, for a path the manifest parser would already have refused.
+    let text = std::fs::read_to_string(&linked).unwrap();
+    let mut gated = maos_bin::admission::gate_manifest(&text, &|_| false).unwrap();
+    std::fs::create_dir(world.dir.path().join("sub")).unwrap();
+    let absolute = outside
+        .path()
+        .join("probe.wasm")
+        .to_string_lossy()
+        .into_owned();
+    for escaping in ["../lifecycle_probe.wasm", absolute.as_str()] {
+        gated.class_section.artifact = Some(escaping.to_owned());
+        let error = maos_bin::spirit_session::manifest_launch_in(
+            &*world.handles.host,
+            &gated,
+            &linked,
+            &world.dir.path().join("sub"),
+            false,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("{escaping}: resolved"));
+        assert!(
+            error.to_string().contains("artifact_escapes_origin"),
+            "{escaping}: {error}"
+        );
+    }
+    world.finish().await;
 }

@@ -204,6 +204,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {
+        name: "MAOS_ARCHIVE_DIR",
+        purpose: "Test-only: the FR11 spirit-archive root (default `$XDG_DATA_HOME/maos/spirit-archives`); read by maos-audit's default_archive_dir, so a vector keeps the operator's archive untouched",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
         name: "MAOS_IDLE_FAST",
         purpose: "Test-only idle fast mode: presence (any value, even empty or \"0\") sets a 40 ms consolidation poll and divides idle windows by 100 (hook_pump ConsolidationCadence; the kernel IdleWatchdog reads the same name)",
         stability: EnvStability::HarnessOnly,

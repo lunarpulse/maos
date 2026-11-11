@@ -17,7 +17,7 @@ Failing-before at HEAD: a scratch `git archive HEAD` copy (`/tmp/head209`, own t
 
 ## Final focused runs
 
-`final-wasm-host.log` (29/29: `wit_corpus` + `lifecycle_runner_20_9`) and `final-bin-focused.log` (the first run; one failure, see below) predate the corrections. The authoritative final-tree runs are the workspace log and `final-20-9-focused.log` written after the last edit (see the end of this file).
+`final-wasm-host.log` (29/29: `wit_corpus` + `lifecycle_runner_20_9`) and `final-bin-focused.log` (the first run; one failure, see below) predate the corrections. The authoritative final-tree runs are the workspace log and, after the review corrections, `review-corrections/final-focused.log` (the earlier citation of a `final-20-9-focused.log` named a file that was never written; corrected 2026-11-11). The corrections' own evidence is `review-corrections/evidence.md`.
 
 Defects found and fixed in this landing (review of the parked WIP):
 - **Test pollution of the user's FR11 archive.** `MAOS_HOME` does not move `default_archive_dir()` (`$XDG_DATA_HOME`/`$HOME/.local/share/maos/spirit-archives`), so the bin vectors wrote `lifecycle-probe` into the real archive and then failed `MigratorMissing` against it. `fast_clocks` now sets a per-process `MAOS_ARCHIVE_DIR`; the stray `~/.local/share/maos/spirit-archives/lifecycle-probe` (created 2026-11-11 by these runs) was removed. The cold-swap vector uses same-major successor versions (a cross-major admission needs a migrator).

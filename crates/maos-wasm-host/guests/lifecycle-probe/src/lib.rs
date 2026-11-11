@@ -9,10 +9,15 @@
 //! - `report` (also the default for an empty script): emit the counts below.
 //! - `sleep SECONDS`: this turn stays busy that long (a swap waits for the turn boundary).
 //! - `sleep-idle SECONDS`: the next `idle` sleeps that long (a budget-overrun probe).
+//! - `sleep-in NAME SECONDS`: the next call of that lifecycle export (or `shutdown`) stays busy
+//!   that long.
 //! - `fail NAME` / `decline NAME`: the next call of that lifecycle export returns
 //!   `failed` / `declined`. NAME is idle, consolidate, telemetry, schedule, pause, resume,
 //!   snapshot, swap-in or migrate.
 //! - `to SPIRIT`: address the report to this Spirit.
+//!
+//! Each export's `recall` import asks for `export_limit` entries (idle 1, consolidate 2,
+//! telemetry 3, schedule 4), and the log's own `log.recall` row records that limit.
 //!
 //! Output is one TelemetryEvent (`event-type = lifecycle.probe`) whose data is:
 //! `counts idle=I consolidate=C telemetry=T schedule=S pause=P resume=R frames=F`,
@@ -40,7 +45,7 @@ struct State {
     counter: u64,
     swapped_in: Option<u64>,
     migrated: Option<u64>,
-    sleep_idle: u64,
+    naps: Vec<(String, u64)>,
     fail: Vec<(String, bool)>,
     imports: BTreeMap<&'static str, bool>,
     last_telemetry: Option<String>,
@@ -52,17 +57,43 @@ thread_local! { static STATE: RefCell<State> = RefCell::new(State::default()); }
 
 struct LifecycleProbe;
 
+/// The `recall` import of each export asks for a page of this many entries, and the log's
+/// `log.recall` audit row carries that limit, so a daemon's own Transparency Log names the
+/// triggers that reached the guest (stderr is not available to a guest under the runner).
+fn export_limit(name: &str) -> u32 {
+    match name {
+        "idle" => 1,
+        "consolidate" => 2,
+        "telemetry" => 3,
+        "schedule" => 4,
+        _ => 9,
+    }
+}
+
 fn imports_answered(name: &'static str) {
     let filter = RecallFilter {
         kind: None,
         since_ns: None,
         until_ns: None,
-        limit: 1,
+        limit: export_limit(name),
         cursor: None,
         intent_filter: None,
     };
     let answered = !matches!(recall::recall(&filter), Err(RecallError::Unavailable));
     STATE.with(|state| state.borrow_mut().imports.insert(name, answered));
+    nap(name);
+}
+
+/// A scripted busy spell for `name`, consumed once.
+fn nap(name: &str) {
+    let seconds = STATE.with(|state| {
+        let mut state = state.borrow_mut();
+        let at = state.naps.iter().position(|(n, _)| n == name)?;
+        Some(state.naps.remove(at).1)
+    });
+    if let Some(seconds) = seconds {
+        busy(seconds);
+    }
 }
 
 /// A scripted refusal for `name`, consumed once.
@@ -164,7 +195,11 @@ impl Guest for LifecycleProbe {
                 }
                 (Some("sleep-idle"), Some(seconds)) => {
                     let seconds = seconds.parse().unwrap_or(0);
-                    STATE.with(|state| state.borrow_mut().sleep_idle = seconds);
+                    STATE.with(|state| state.borrow_mut().naps.push(("idle".into(), seconds)));
+                }
+                (Some("sleep-in"), Some(name)) => {
+                    let seconds = words.next().and_then(|word| word.parse().ok()).unwrap_or(0);
+                    STATE.with(|state| state.borrow_mut().naps.push((name.to_owned(), seconds)));
                 }
                 (Some(verb @ ("fail" | "decline")), Some(name)) => STATE.with(|state| {
                     state.borrow_mut().fail.push((name.to_owned(), verb == "fail"));
@@ -189,16 +224,14 @@ impl Guest for LifecycleProbe {
     fn on_start() -> Result<(), Halt> {
         Ok(())
     }
-    fn on_shutdown() {}
+    fn on_shutdown() {
+        nap("shutdown");
+    }
 }
 
 impl LifecycleGuest for LifecycleProbe {
     fn idle() -> Result<(), LifecycleError> {
         imports_answered("idle");
-        let sleep = STATE.with(|state| std::mem::take(&mut state.borrow_mut().sleep_idle));
-        if sleep > 0 {
-            busy(sleep);
-        }
         bump("idle", |s| &mut s.idle)
     }
     fn consolidate(batch: Vec<u8>) -> Result<(), LifecycleError> {

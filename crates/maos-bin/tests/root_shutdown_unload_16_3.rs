@@ -64,7 +64,8 @@ mod t3_substrate;
 #[path = "support/yank_audit.rs"]
 mod yank_audit;
 
-/// Every explicit root audit-sender release must follow a joined yank owner.
+/// Every explicit root audit-sender release must follow a joined yank owner, and the run arm's
+/// idle/schedule/consolidate callers (Story 20-9) must be joined before its unload.
 #[test]
 fn every_audit_sender_release_joins_the_yank_owner() {
     let source = include_str!("../src/main.rs");
@@ -73,6 +74,10 @@ fn every_audit_sender_release_joins_the_yank_owner() {
     assert!(
         audit.has_expected_main_arms(),
         "root teardown arms changed: {audit:?}"
+    );
+    assert!(
+        audit.callers_started && audit.callers_joined,
+        "the run arm starts its lifecycle callers and joins them: {audit:?}"
     );
 }
 

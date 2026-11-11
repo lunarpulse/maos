@@ -4,6 +4,10 @@ pub struct Report {
     pub releases: Vec<String>,
     pub drains: Vec<String>,
     pub errors: Vec<String>,
+    /// A `LifecycleCallers::start` was seen (the run arm's idle/schedule/consolidate callers).
+    pub callers_started: bool,
+    /// ... and a `callers.shutdown()` that joins them was seen after it.
+    pub callers_joined: bool,
 }
 impl Report {
     pub fn has_expected_main_arms(&self) -> bool {
@@ -199,8 +203,19 @@ pub fn inspect(source: &str) -> Report {
                     .is_some_and(|part| part.ident == "unload_all_loaded")
                 {
                     self.require_join("unload");
+                    if self.report.callers_started && !self.report.callers_joined {
+                        self.report.errors.push(format!(
+                            "{}: unload before lifecycle callers join",
+                            self.label
+                        ));
+                    }
                 }
                 let parts = &path.path.segments;
+                if let [.., owner, start] = path.path.segments.iter().collect::<Vec<_>>()[..] {
+                    if owner.ident == "LifecycleCallers" && start.ident == "start" {
+                        self.report.callers_started = true;
+                    }
+                }
                 let drop = path.path.is_ident("drop")
                     || (parts.len() == 3
                         && (parts[0].ident == "std" || parts[0].ident == "core")
@@ -221,6 +236,9 @@ pub fn inspect(source: &str) -> Report {
             syn::visit::visit_expr_call(self, call);
         }
         fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
+            if call.method == "shutdown" && named(&call.receiver, "callers") {
+                self.report.callers_joined = true;
+            }
             if call.method == "stop_and_join" {
                 self.require_join("supervisor stop");
             }

@@ -4,7 +4,7 @@
 //! slot its session drains one export at a time. The pre-warmed successor of a swap is the
 //! exception: it has no session yet, so its `migrate` and `swap-in` run inline on its own child,
 //! and a committed `swap-in` hands that child to the predecessor's session.
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, RecvTimeoutError, SyncSender, TrySendError};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
@@ -21,17 +21,61 @@ use crate::supervision::BindingCore;
 /// What a hook learns when its session did not answer.
 pub const SESSION_ENDED: &str = "session_ended";
 pub const DEADLINE: &str = "deadline";
+/// A trigger that found its session busy for half its budget: dropped, never a strike.
+pub const BUSY: &str = "busy";
 
 pub enum Answer {
     Reply(LifecycleReply),
     SessionEnded,
 }
 
-/// One queued export. `cancelled` is set by a hook that stopped waiting.
+/// How far one queued export got. A hook that gives up and the session that answers race for
+/// a started call and exactly one wins, so a snapshot answered after its hook's deadline can
+/// never re-fence a predecessor the failed swap already released.
+pub struct CallState(AtomicU8);
+
+impl CallState {
+    const QUEUED: u8 = 0;
+    const STARTED: u8 = 1;
+    const CANCELLED: u8 = 2;
+    const ANSWERED: u8 = 3;
+
+    fn new() -> Arc<Self> {
+        Arc::new(Self(AtomicU8::new(Self::QUEUED)))
+    }
+
+    fn advance(&self, from: u8, to: u8) -> bool {
+        self.0
+            .compare_exchange(from, to, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    }
+
+    /// Session: the call goes to the guest. `false`: its hook gave up while it was queued.
+    pub fn start(&self) -> bool {
+        self.advance(Self::QUEUED, Self::STARTED)
+    }
+
+    /// Session: claim the right to deliver the reply. `false`: its hook stopped waiting, and
+    /// the reply must change nothing.
+    pub fn answer(&self) -> bool {
+        self.advance(Self::STARTED, Self::ANSWERED)
+    }
+
+    fn cancel_queued(&self) -> bool {
+        self.advance(Self::QUEUED, Self::CANCELLED)
+    }
+
+    /// Hook: stop waiting. `false`: the session already claimed the reply, which is on its way.
+    fn cancel(&self) -> bool {
+        self.cancel_queued() || self.advance(Self::STARTED, Self::CANCELLED)
+    }
+}
+
+/// One queued export.
 pub struct Call {
     pub request: LifecycleRequest,
     pub answer: SyncSender<Answer>,
-    pub cancelled: Arc<AtomicBool>,
+    pub state: Arc<CallState>,
 }
 
 /// What a successor launches under: the predecessor's admitted sandbox (never widened by a
@@ -64,49 +108,58 @@ pub struct Handover {
 }
 
 impl Prewarm {
-    /// One request/reply on a child nobody else is serving. Stderr is drained and dropped.
+    /// The next stdout frame of a child nobody else is serving, never past `deadline`. Stderr
+    /// is drained and dropped, but every line is a turn of this loop, so a guest that never
+    /// stops writing diagnostics cannot outlast its cap; a frame that arrives late is refused.
+    fn next_stdout(&mut self, deadline: Instant) -> Result<Vec<u8>, String> {
+        loop {
+            let left = deadline.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return Err(DEADLINE.into());
+            }
+            match self
+                .bridge
+                .poll_frame(left.min(Duration::from_millis(20)))
+                .map_err(|error| format!("child_poll: {error}"))?
+            {
+                BridgePoll::Idle | BridgePoll::Data(SubStream::Stderr, _) => {}
+                BridgePoll::Closed => return Err("child_closed".into()),
+                BridgePoll::Data(SubStream::Stdout, bytes) => {
+                    return if Instant::now() > deadline {
+                        Err(DEADLINE.into())
+                    } else {
+                        Ok(bytes)
+                    };
+                }
+            }
+        }
+    }
+
+    /// One request/reply on a child nobody else is serving.
     pub fn exchange(
         &mut self,
         request: &LifecycleRequest,
         cap: Duration,
     ) -> Result<LifecycleReply, String> {
+        let deadline = Instant::now() + cap;
         let body = wire::encode_request(request).map_err(|error| format!("encode: {error}"))?;
         self.writer
             .write_frame(&body)
             .map_err(|error| format!("child_write: {error}"))?;
-        let deadline = Instant::now() + cap;
-        loop {
-            match self
-                .bridge
-                .poll_frame(Duration::from_millis(20))
-                .map_err(|error| format!("child_poll: {error}"))?
-            {
-                BridgePoll::Idle if Instant::now() >= deadline => return Err(DEADLINE.into()),
-                BridgePoll::Idle | BridgePoll::Data(SubStream::Stderr, _) => {}
-                BridgePoll::Closed => return Err("child_closed".into()),
-                BridgePoll::Data(SubStream::Stdout, bytes) if wire::is_reply(&bytes) => {
-                    return wire::decode_reply(&bytes).map_err(|error| format!("decode: {error}"))
-                }
-                BridgePoll::Data(SubStream::Stdout, _) => return Err("child_protocol".into()),
-            }
+        let bytes = self.next_stdout(deadline)?;
+        if !wire::is_reply(&bytes) {
+            return Err("child_protocol".into());
         }
+        wire::decode_reply(&bytes).map_err(|error| format!("decode: {error}"))
     }
 
     /// Wait for the runner's empty `Ready` control frame.
     pub fn await_ready(&mut self, cap: Duration) -> Result<(), String> {
-        let deadline = Instant::now() + cap;
-        loop {
-            match self
-                .bridge
-                .poll_frame(Duration::from_millis(20))
-                .map_err(|error| format!("child_poll: {error}"))?
-            {
-                BridgePoll::Idle if Instant::now() >= deadline => return Err(DEADLINE.into()),
-                BridgePoll::Idle | BridgePoll::Data(SubStream::Stderr, _) => {}
-                BridgePoll::Closed => return Err("child_closed".into()),
-                BridgePoll::Data(SubStream::Stdout, bytes) if bytes.is_empty() => return Ok(()),
-                BridgePoll::Data(SubStream::Stdout, _) => return Err("child_protocol".into()),
-            }
+        let bytes = self.next_stdout(Instant::now() + cap)?;
+        if bytes.is_empty() {
+            Ok(())
+        } else {
+            Err("child_protocol".into())
         }
     }
 }
@@ -122,6 +175,8 @@ pub struct LifecycleLink {
     probed: Condvar,
     closed: AtomicBool,
     attached: AtomicBool,
+    /// A committed successor's child is waiting for the predecessor's session to adopt it.
+    awaiting: AtomicBool,
     fenced: AtomicBool,
     swap: Mutex<Option<SwapContext>>,
     prewarm: Mutex<Option<Prewarm>>,
@@ -145,6 +200,7 @@ impl LifecycleLink {
             probed: Condvar::new(),
             closed: AtomicBool::new(false),
             attached: AtomicBool::new(false),
+            awaiting: AtomicBool::new(false),
             fenced: AtomicBool::new(false),
             swap: Mutex::new(None),
             prewarm: Mutex::new(None),
@@ -157,6 +213,12 @@ impl LifecycleLink {
     /// The longest a hook waits: the Spirit's `[budget].time_cap_seconds`, the dispatcher's cap.
     pub fn set_cap(&self, cap: Duration) {
         *locked(&self.cap) = cap;
+    }
+
+    /// A session will drain this link (a spawned core, before that session has started): its
+    /// triggers queue for it rather than vanish as no-ops. The cap, not the queue, bounds them.
+    pub fn expect_session(&self) {
+        self.awaiting.store(true, Ordering::Release);
     }
 
     /// A session now drains this link: triggers reach the guest, never past `cap`.
@@ -189,17 +251,28 @@ impl LifecycleLink {
             return Ok(reply);
         }
         // A core no session drives (a `[cli_wrapper]` Worker, or a spawned core before its
-        // session starts) has nothing to run: its triggers are no-ops, as they were.
-        if !self.attached.load(Ordering::Acquire) || *locked(&self.supported) == Some(false) {
+        // session starts) has nothing to run: its triggers are no-ops, as they were. A
+        // committed successor awaiting adoption is not that: its hooks queue for its session.
+        let driven = self.attached.load(Ordering::Acquire) || self.awaiting.load(Ordering::Acquire);
+        if !driven || *locked(&self.supported) == Some(false) {
             return Ok(LifecycleReply::Unsupported);
         }
-        let deadline = Instant::now() + cap;
+        // A trigger that cannot even start in half its budget is dropped without a strike:
+        // the budget it missed is the busy session's, and the hook that holds it is charged
+        // for that. A snapshot waits behind the active turn for the whole cap.
+        let queue_share = if matches!(request, LifecycleRequest::Snapshot) {
+            cap
+        } else {
+            cap / 2
+        };
+        let began = Instant::now();
+        let (deadline, queue_deadline) = (began + cap, began + queue_share);
         let (answer, reply) = sync_channel(1);
-        let cancelled = Arc::new(AtomicBool::new(false));
+        let state = CallState::new();
         let mut call = Call {
             request,
             answer,
-            cancelled: Arc::clone(&cancelled),
+            state: Arc::clone(&state),
         };
         loop {
             if self.closed.load(Ordering::Acquire) {
@@ -207,11 +280,11 @@ impl LifecycleLink {
             }
             match self.tx.try_send(call) {
                 Ok(()) => break,
-                Err(TrySendError::Full(back)) if Instant::now() < deadline => {
+                Err(TrySendError::Full(back)) if Instant::now() < queue_deadline => {
                     call = back;
                     std::thread::sleep(Duration::from_millis(5));
                 }
-                Err(TrySendError::Full(_)) => return Err(DEADLINE.into()),
+                Err(TrySendError::Full(_)) => return Err(BUSY.into()),
                 Err(TrySendError::Disconnected(_)) => return Err(SESSION_ENDED.into()),
             }
         }
@@ -222,25 +295,30 @@ impl LifecycleLink {
                 // A session that ended after this call queued (its `close` drained first) never
                 // answers: fail now, not at the cap.
                 Err(RecvTimeoutError::Disconnected) => return Err(SESSION_ENDED.into()),
-                Err(RecvTimeoutError::Timeout) if self.closed.load(Ordering::Acquire) => {
-                    cancelled.store(true, Ordering::Release);
-                    return Err(SESSION_ENDED.into());
+                Err(RecvTimeoutError::Timeout) => {
+                    let now = Instant::now();
+                    if self.closed.load(Ordering::Acquire) && state.cancel() {
+                        return Err(SESSION_ENDED.into());
+                    }
+                    if now >= queue_deadline && state.cancel_queued() {
+                        return Err(BUSY.into());
+                    }
+                    if now >= deadline && state.cancel() {
+                        return Err(DEADLINE.into());
+                    }
                 }
-                Err(RecvTimeoutError::Timeout) if Instant::now() >= deadline => {
-                    cancelled.store(true, Ordering::Release);
-                    return Err(DEADLINE.into());
-                }
-                Err(RecvTimeoutError::Timeout) => {}
             }
         }
     }
 
     /// The successor's `swap-in` succeeded: its child now belongs to the predecessor's session.
+    /// Until that session adopts it, this link's hooks queue for it rather than vanish.
     fn commit(&self, core: &Arc<BindingCore>) {
         let Some(predecessor) = locked(&self.predecessor).take() else {
             return;
         };
         if let Some(prewarm) = locked(&self.prewarm).take() {
+            self.awaiting.store(true, Ordering::Release);
             *locked(&predecessor.handover) = Some(Handover {
                 core: Arc::clone(core),
                 prewarm,
@@ -257,7 +335,7 @@ impl LifecycleLink {
     pub fn take(&self) -> Option<Call> {
         let rx = locked(&self.rx);
         while let Ok(call) = rx.try_recv() {
-            if !call.cancelled.load(Ordering::Acquire) {
+            if call.state.start() {
                 return Some(call);
             }
         }
@@ -364,7 +442,7 @@ impl HostedSessions {
     }
 }
 
-type SessionBuilder = Arc<
+pub type SessionBuilder = Arc<
     dyn Fn(Arc<crate::supervision::WorkerSupervisor>) -> crate::spirit_session::SessionDeps
         + Send
         + Sync,
@@ -397,13 +475,36 @@ impl SwapSlot {
 }
 
 impl SwapHandles {
+    /// Root-owned setup shared by every composition that arms supervision (`maos run`, and a
+    /// serving or shell root that boots installed components): the swap handles go to the slot
+    /// the door reads and to the supervisor that owns them.
+    pub fn arm(
+        supervisor: &Arc<crate::supervision::WorkerSupervisor>,
+        host: &Arc<dyn maos_host::SpiritHostPort>,
+        session: &SessionBuilder,
+        hosted: &Arc<HostedSessions>,
+        slot: &SwapSlot,
+    ) {
+        let handles = Arc::new(SwapHandles {
+            supervisor: Arc::downgrade(supervisor),
+            host: Arc::clone(host),
+            session: Arc::clone(session),
+            hosted: Arc::clone(hosted),
+        });
+        slot.set(&handles);
+        supervisor.keep_swap_handles(handles);
+    }
+
     /// The spawned session of `spirit_id` a swap would replace, if there is one.
     pub fn target(&self, spirit_id: &str) -> Option<Arc<BindingCore>> {
         self.supervisor.upgrade()?.spawned_target(spirit_id)
     }
 
     /// A cold swap's admission of a component (D-20-9-12 A): the one spawned admission path
-    /// `InstalledSpirits::boot` uses, at a new pid, with its session hosted by this root.
+    /// `InstalledSpirits::boot` uses, at a new pid, with its session hosted by this root. It
+    /// returns only once the component answered its lifecycle probe (its runner is `Ready` and
+    /// its start succeeded); a component that never starts is unwound — session stopped and
+    /// joined, SCB unloaded — and refused, so the door can restore the predecessor.
     pub async fn admit_spawned(
         &self,
         deps: &crate::admission::AdmissionDeps<'_>,
@@ -436,23 +537,56 @@ impl SwapHandles {
             &mut |pid| bound.bind_scheduler_pid(pid),
         )
         .await?;
-        let session = (self.session)(supervisor);
+        let session = (self.session)(Arc::clone(&supervisor));
         let (id, hold) = (gated.spirit_id.clone(), self.hosted.hold());
-        let started = admitted.clone();
-        tokio::spawn(async move {
+        let (started, link, budget) = (
+            admitted.clone(),
+            Arc::clone(core.lifecycle()),
+            launch.turn_budget,
+        );
+        let mut task = Some(tokio::spawn(async move {
             let _hold = hold;
-            if let Err(error) =
-                crate::spirit_session::run_admitted_session(session, started, core, launch).await
-            {
+            let result =
+                crate::spirit_session::run_admitted_session(session, started, core, launch).await;
+            if let Err(error) = &result {
                 eprintln!("maos: spirit '{id}' session ended: {error}");
             }
-        });
-        Ok(admitted)
+            result.map(|_| ())
+        }));
+        let until = Instant::now() + budget + READY_GRACE;
+        let failure = loop {
+            if link.wait_supported(Duration::ZERO).is_some() {
+                return Ok(admitted);
+            }
+            if task.as_ref().is_some_and(|task| task.is_finished()) {
+                break match task.take() {
+                    Some(task) => match task.await {
+                        Ok(Err(error)) => error.to_string(),
+                        Ok(Ok(())) => "the session ended before the component was ready".into(),
+                        Err(error) => error.to_string(),
+                    },
+                    None => String::new(),
+                };
+            }
+            if Instant::now() >= until {
+                break "the component did not become ready in time".into();
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        };
+        if let Some(task) = task {
+            supervisor.stop_binding(admitted.pid);
+            let _ = tokio::time::timeout(Duration::from_secs(10), task).await;
+        }
+        crate::admission::unwind_admitted(deps, admitted.pid, &gated.spirit_id).await;
+        Err(class_build(format!("spawned_start_failed: {failure}")))
     }
 }
 
 /// How long a successor's pre-warm waits for the predecessor's own lifecycle probe.
 const PROBE_WAIT: Duration = Duration::from_secs(5);
+
+/// Slack past a component's start budget before a cold swap gives up waiting for its probe.
+const READY_GRACE: Duration = Duration::from_secs(5);
 
 /// The spawned arm of the successor factory (D-20-9-09). Every refusal comes before any
 /// coordinator step, so the predecessor keeps running, unchanged. It admits the successor
@@ -483,6 +617,21 @@ pub fn spawned_successor(
         return Err(format!(
             "swap_form_mismatch: '{}' is a spawned Spirit and the successor is {:?}",
             class.name, class.forms
+        ));
+    }
+    let enabled: Vec<&str> = manifest
+        .lifecycle
+        .enabled_hooks
+        .iter()
+        .map(|hook| hook.as_str())
+        .collect();
+    // The coordinator treats a manifest-skipped `swap-in` as a successful swap, but only a
+    // `swap-in` that reaches the guest hands the child over: refuse before anything is fenced.
+    if !maos_spirit_abi::lifecycle::kernel_invocation_allowed(&enabled, "on_swap_in") {
+        return Err(format!(
+            "swap_hook_disabled: the successor's [lifecycle].enabled_hooks omits on_swap_in, so '{}' \
+             could not be handed the predecessor's state",
+            class.name
         ));
     }
     let target = supervisor.spawned_target(&class.name).ok_or_else(|| {
@@ -574,4 +723,60 @@ pub fn spawned_successor(
             emit_manifest_declaration_outcome(&tl, &attempt, outcome);
         });
     Ok(object)
+}
+
+/// The kernel callers of a spawned component's idle, schedule and consolidate triggers. A
+/// serving root starts them in its serving tail; `maos run` awaits the component's session
+/// instead and never reaches it, so it starts them around that session and joins them before
+/// it stops supervision (the telemetry pump has its own owner).
+pub struct LifecycleCallers {
+    cancel: tokio_util::sync::CancellationToken,
+    watchdogs: Vec<(&'static str, tokio::task::JoinHandle<()>)>,
+    consolidation: crate::hook_pump::ConsolidationWatchdog,
+}
+
+impl LifecycleCallers {
+    pub fn start(
+        scheduler: &maos_kernel_core::scheduler::SpiritSchedulerAdapter,
+        tl: &Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+        capability: &Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+        hooks: &crate::hook_pump::HookPump,
+    ) -> Self {
+        use maos_kernel_core::scheduler::{IdleWatchdog, ScheduleWatchdog};
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let idle = Arc::new(IdleWatchdog::new(
+            scheduler.scbs(),
+            scheduler.dispatcher_arc(),
+        ))
+        .spawn(cancel.child_token());
+        let schedule = Arc::new(
+            ScheduleWatchdog::new(scheduler.scbs(), scheduler.dispatcher_arc(), Arc::clone(tl))
+                .with_capability(Arc::clone(capability)),
+        )
+        .spawn(cancel.child_token());
+        Self {
+            cancel,
+            watchdogs: vec![("IdleWatchdog", idle), ("ScheduleWatchdog", schedule)],
+            consolidation: crate::hook_pump::ConsolidationWatchdog::spawn(
+                hooks,
+                crate::hook_pump::ConsolidationCadence::from_env(),
+            ),
+        }
+    }
+
+    /// Stop and join every caller; each holds the scheduler and the capability registry, so
+    /// the audit writer cannot drain while one runs.
+    pub async fn shutdown(self) {
+        self.cancel.cancel();
+        for (name, handle) in self.watchdogs {
+            match tokio::time::timeout(Duration::from_secs(5), handle).await {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => {
+                    eprintln!("maos: {name} task returned error during drain: {error}")
+                }
+                Err(_) => eprintln!("maos: {name} drain timed out after 5s"),
+            }
+        }
+        self.consolidation.shutdown().await;
+    }
 }
