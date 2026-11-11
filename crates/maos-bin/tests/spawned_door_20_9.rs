@@ -116,6 +116,13 @@ impl Daemon {
         std::fs::write(&path, manifest(ID, version, artifact, &ALL_HOOKS, "")).unwrap();
         path
     }
+
+    /// As [`Self::write`], with `extra` (more manifest sections) appended.
+    fn write_extra(&self, name: &str, version: &str, artifact: &str, extra: &str) -> PathBuf {
+        let path = self.package.join(name);
+        std::fs::write(&path, manifest(ID, version, artifact, &ALL_HOOKS, extra)).unwrap();
+        path
+    }
     /// SIGTERM the daemon and wait for it to leave; `None` if it is still there after 30 s.
     fn terminate(&mut self) -> Option<std::process::ExitStatus> {
         let mut child = self.child.take()?;
@@ -409,4 +416,35 @@ fn a_cold_swap_to_an_existing_invalid_component_is_reverted_and_the_predecessor_
         daemon.rows().iter().any(|(intent, payload)| intent == "spirit.upgrade" && payload.contains("\"reverted\"")),
         "the reverted outcome is journaled"
     );
+}
+
+// GPT r2 #2 — the successor is cross-major with a permitted forward migration, and its
+// component never starts. Its FR11 record must not outlive the failed attempt: the restore of
+// the original (no reverse migrator) is judged against the original's own record.
+#[test]
+fn a_cross_major_successor_that_never_starts_is_reverted_not_left_absent() {
+    let daemon = Daemon::boot();
+    let first = daemon.pid();
+    std::fs::write(
+        daemon.package.join("broken.wasm"),
+        b"\0asm\x01\0\0\0not a component",
+    )
+    .unwrap();
+    let broken = daemon.write_extra(
+        "v2.toml",
+        "2.0.0",
+        "broken.wasm",
+        "[hot_swap]\nstate_schema_uri = \"urn:probe\"\nstate_schema_version = 131073\n[migrates_from]\nversions = [\"1.0.x\"]\n",
+    );
+    let output = daemon.upgrade(&broken, "cold-swap");
+    let reply = text(&output);
+    assert!(
+        !output.status.success()
+            && reply.contains("cold_swap_reverted")
+            && reply.contains("HTTP 409"),
+        "{reply}\ndaemon: {}",
+        daemon.stderr()
+    );
+    daemon.await_running();
+    assert_ne!(daemon.pid(), first, "the restore is at a new pid");
 }

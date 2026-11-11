@@ -674,7 +674,7 @@ pub async fn run_admitted_session(
                                 // The predecessor's state is now taken: no more work until the swap
                                 // resolves. A snapshot its caller gave up on fences nothing.
                                 (LifecycleRequest::Snapshot, LifecycleReply::State(_)) if wanted =>
-                                    link.set_fenced(true),
+                                    link.fence_for_snapshot(),
                                 _ => {}
                             }
                             if let Some(answer) = done.answer.filter(|_| wanted) {

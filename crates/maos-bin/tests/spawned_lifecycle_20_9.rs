@@ -344,3 +344,140 @@ async fn a_hook_that_cannot_start_behind_another_export_is_dropped_without_a_str
     );
     stop(world, running).await;
 }
+
+// GPT r2 #3, GLM R2 — a telemetry event that arrives while a 6 s frame turn holds a 30 s
+// component is dropped as contention: no quarantine, and it never runs after the fact.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_telemetry_event_behind_a_long_turn_is_dropped_without_quarantine_or_a_late_run() {
+    let mut world = World::bare().await;
+    let path = world.write(
+        "busy.toml",
+        &manifest(
+            ID,
+            "1.0.0",
+            "lifecycle_probe.wasm",
+            &["on_telemetry_event"],
+            "",
+        ),
+    );
+    let running = world.start(&path).await;
+    world.send(ID, "sleep 6").await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    world
+        .capability
+        .set_scalar(903, "emitter", "queue.depth", 0.5, "test")
+        .unwrap();
+    world.pump.flush().await.unwrap();
+    assert!(
+        world
+            .rows(
+                TlKind::GovernanceEvent,
+                "governance:telemetry-subscription:revoked"
+            )
+            .is_empty(),
+        "a subscriber that merely waited behind a turn keeps its grant"
+    );
+    let busy = world
+        .report(Duration::from_secs(15))
+        .await
+        .expect("the long turn reports");
+    assert_eq!(World::count(&busy, "frames"), 1, "{busy}");
+    let after = world.turn(ID, "").await;
+    assert_eq!(
+        World::count(&after, "telemetry"),
+        0,
+        "the dropped event must not run once the turn ends:\n{after}"
+    );
+    assert_eq!(
+        world.pump.stats().delivered,
+        0,
+        "a delivery dropped for contention is not a delivery (nor a clean run)"
+    );
+    stop(world, running).await;
+}
+
+// GLM R1 — one subscriber stuck in `on_consolidate` does not hold the others' consolidation.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn one_slow_consolidating_subscriber_does_not_stall_the_others_passes() {
+    let mut world = World::new().await;
+    let listing = |world: &World, name: &str| {
+        world.write(
+            &format!("{name}.toml"),
+            &manifest(
+                name,
+                "1.0.0",
+                "lifecycle_probe.wasm",
+                &["on_consolidate"],
+                "",
+            ),
+        )
+    };
+    let (slow_path, fast_path) = (listing(&world, "slow-con"), listing(&world, "fast-con"));
+    let (slow, fast) = (world.start(&slow_path).await, world.start(&fast_path).await);
+    world.turn("slow-con", "sleep-in consolidate 4").await;
+    let before = World::count(&world.turn("fast-con", "").await, "consolidate");
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let after = World::count(&world.turn("fast-con", "").await, "consolidate");
+    assert!(
+        after >= before + 3,
+        "the fast subscriber consolidated {} times in 2 s while the slow one slept",
+        after - before
+    );
+    world.scheduler.unload(slow.pid).await.unwrap();
+    world.supervisor.stop_binding(slow.pid);
+    let _ = tokio::time::timeout(Duration::from_secs(20), slow.session).await;
+    stop(world, fast).await;
+}
+
+// GLM R1 — the privacy notices of a forget go out side by side: a subscriber that holds its
+// notice for seconds does not hold the others' (or the erasure's completion, past its wall).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn forget_notices_reach_every_subscriber_side_by_side() {
+    let mut world = World::bare().await;
+    let listing = |world: &World, name: &str| {
+        world.write(
+            &format!("{name}.toml"),
+            &manifest(
+                name,
+                "1.0.0",
+                "lifecycle_probe.wasm",
+                &["on_consolidate"],
+                "",
+            ),
+        )
+    };
+    let (slow_path, fast_path) = (listing(&world, "slow-fg"), listing(&world, "fast-fg"));
+    let (slow, fast) = (world.start(&slow_path).await, world.start(&fast_path).await);
+    world.turn("slow-fg", "sleep-in consolidate 3").await;
+    let mut forgotten = world
+        .memory
+        .forget_with_reason("root-forget-209", None)
+        .unwrap();
+    if let maos_domain::memory::ForgetOutcome::Erased {
+        redacted_principal_frame_ids,
+        ..
+    } = &mut forgotten
+    {
+        redacted_principal_frame_ids.push(hex::encode([0xA1; 16]));
+    } else {
+        panic!("an unheld forget erases");
+    }
+    let (tl, pump) = (
+        std::sync::Arc::clone(&world.tl),
+        std::sync::Arc::clone(&world.pump),
+    );
+    let notices = tokio::spawn(async move {
+        maos_bin::hook_pump::HookPump::finish_forget(&tl, &forgotten, Some(&pump)).await
+    });
+    tokio::time::sleep(Duration::from_millis(1_500)).await;
+    let heard = World::count(&world.turn("fast-fg", "").await, "consolidate");
+    assert_eq!(
+        heard, 1,
+        "the fast subscriber took its notice while the slow one held its own"
+    );
+    notices.await.unwrap();
+    world.scheduler.unload(slow.pid).await.unwrap();
+    world.supervisor.stop_binding(slow.pid);
+    let _ = tokio::time::timeout(Duration::from_secs(20), slow.session).await;
+    stop(world, fast).await;
+}

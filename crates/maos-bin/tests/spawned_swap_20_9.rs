@@ -724,3 +724,90 @@ async fn an_artifact_that_resolves_outside_its_directory_is_refused_typed() {
     }
     world.finish().await;
 }
+
+// GPT r2 #1 — the dispatcher's own timeout (the predecessor's SCB budget) fires before the
+// blocking hook's link deadline, the coordinator refuses and drops the successor, and the
+// snapshot reply arrives between the two deadlines: it must not fence the predecessor again.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_snapshot_answered_after_the_dispatcher_gave_up_but_before_the_link_does_fences_nothing()
+{
+    let mut world = World::bare().await;
+    let (v1, v2) = (
+        capped(&world, "1.0.0", "lifecycle_probe.wasm", 30),
+        capped(&world, "2.0.0", "lifecycle_probe.wasm", 30),
+    );
+    let running = world.start(&v1).await;
+    world.turn(ID, "sleep-in snapshot 3").await;
+    // The dispatcher now times a snapshot out after 2 s; the link still waits 30 s.
+    let scb = world.scb(ID);
+    let mut runtime = scb.runtime_snapshot();
+    runtime.manifest.budget.as_mut().unwrap().time_cap_seconds = 2;
+    scb.replace_runtime(runtime);
+    world
+        .upgrade(&v2, UpgradePolicy::HotSwap)
+        .await
+        .expect_err("the dispatcher refused the slow snapshot");
+    tokio::time::sleep(Duration::from_millis(2_500)).await;
+    let report = world.turn(ID, "").await;
+    assert!(
+        World::count(&report, "frames") == 2 && report.contains("swap-in=-"),
+        "the refused predecessor still takes frame turns:\n{report}"
+    );
+    settle(world, running).await;
+}
+
+// GPT r2 #2 — a cross-major successor that passes the migrator gate but never starts must not
+// leave its FR11 record behind: the restore of the original is judged against the original's.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_cross_major_component_that_never_starts_leaves_the_predecessors_archive_current() {
+    let mut world = World::bare().await;
+    let v1 = v(&world, "v1.toml", "1.0.0", "lifecycle_probe.wasm", "");
+    std::fs::write(world.dir.path().join("broken.wasm"), b"not a component").unwrap();
+    let broken = v(&world, "v2.toml", "2.0.0", "broken.wasm", MIGRATING);
+    let running = world.start(&v1).await;
+    world.scheduler.unload(running.pid).await.unwrap();
+    world.supervisor.stop_binding(running.pid);
+    let _ = tokio::time::timeout(Duration::from_secs(20), running.session).await;
+    let refusal = admit(&world, broken)
+        .await
+        .expect_err("the component never starts");
+    assert!(
+        refusal.to_string().contains("spawned_start_failed"),
+        "{refusal}"
+    );
+    let restored = admit(&world, v1)
+        .await
+        .expect("the original is restored: no archive record names the version that never ran");
+    let report = world.turn(ID, "").await;
+    assert_eq!(World::count(&report, "counter"), 1, "{report}");
+    world.scheduler.unload(restored.pid).await.unwrap();
+    world.supervisor.stop_binding(restored.pid);
+    world.finish().await;
+}
+
+// GPT r2 #5 — the failed pid's hook-pump registration (and its grant) is withdrawn at once, not
+// at the next scalar write.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_failed_spawned_admission_withdraws_its_hook_registration() {
+    let world = World::bare().await;
+    std::fs::write(world.dir.path().join("broken.wasm"), b"not a component").unwrap();
+    let listing = world.write(
+        "listing.toml",
+        &manifest(ID, "1.0.0", "broken.wasm", &["on_telemetry_event"], ""),
+    );
+    admit(&world, listing)
+        .await
+        .expect_err("the component never starts");
+    let revoked = world.rows(
+        TlKind::GovernanceEvent,
+        "governance:telemetry-subscription:revoked",
+    );
+    assert!(
+        revoked
+            .iter()
+            .any(|row| String::from_utf8_lossy(&row.payload_redacted)
+                .contains("spawned-start-failed")),
+        "the grant row is revoked by the unwind, not left for a later event"
+    );
+    world.finish().await;
+}

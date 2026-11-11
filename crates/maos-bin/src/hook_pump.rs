@@ -77,12 +77,17 @@ pub const SUBSCRIPTION_GRANTED: &str = "governance:telemetry-subscription:grante
 pub const SUBSCRIPTION_REVOKED: &str = "governance:telemetry-subscription:revoked";
 /// Consecutive hook panics after which a runtime object is quarantined.
 pub const QUARANTINE_AFTER_CONSECUTIVE_PANICS: u32 = 3;
-/// Consecutive deliveries past 80% of its budget after which a subscriber is quarantined.
-pub const QUARANTINE_AFTER_CONSECUTIVE_SLOW: u32 = 3;
+/// Slow telemetry deliveries (over 80% of the budget) among a subscriber's last five after which
+/// it is quarantined. Counted over telemetry only, and a fast delivery does not erase them.
+pub const QUARANTINE_AFTER_SLOW_OF_LAST_FIVE: u32 = 3;
+const SLOW_MASK: u8 = 0b1_1111;
 /// The longest the pump waits for one subscriber's telemetry hook, however large its manifest
 /// budget: a notification not handled in this time (or in 95% of the hook's own cap, when that
 /// is smaller) is an overrun, so one subscriber can never stall the pump for its whole cap.
 pub const TELEMETRY_WALL: Duration = Duration::from_secs(5);
+/// The same bound for one subscriber's `on_consolidate` (the watchdog's pass and the privacy
+/// notices of a forget): a subscriber cannot stall either for its whole manifest budget.
+pub const CONSOLIDATE_WALL: Duration = Duration::from_secs(30);
 /// Records the activity sink queues ahead of the writer before it counts
 /// overflow.
 pub const ACTIVITY_QUEUE_CAPACITY: usize = 4096;
@@ -162,8 +167,8 @@ struct Subscriber {
     /// change under a queued blocking hook. Rebuilt only at runtime cutover.
     target: Option<Arc<SpiritControlBlock>>,
     strikes: u32,
-    /// Consecutive deliveries that used more than 80% of the hook's budget.
-    slow: u32,
+    /// The last five telemetry deliveries, newest in bit 0: 1 = over 80% of the budget.
+    slow_history: u8,
     quarantined: bool,
     /// A grant row is outstanding for this pid.
     granted: bool,
@@ -332,7 +337,7 @@ impl Shared {
             entry.object = Some(Arc::downgrade(&snapshot.spirit_obj));
             entry.target = None;
             entry.strikes = 0;
-            entry.slow = 0;
+            entry.slow_history = 0;
             entry.quarantined = false;
         }
         let class = class_of(snapshot);
@@ -399,19 +404,23 @@ impl Shared {
         match outcome {
             HookOutcome::Fired { .. } => {
                 entry.strikes = 0;
-                entry.slow = 0;
+                if matches!(hook, Hook::Telemetry) {
+                    entry.slow_history = (entry.slow_history << 1) & SLOW_MASK;
+                }
             }
             HookOutcome::BudgetWarning80 { .. } => {
                 entry.strikes = 0;
-                entry.slow += 1;
-                if entry.slow >= QUARANTINE_AFTER_CONSECUTIVE_SLOW {
-                    let why = format!(
-                        "{} used over 80% of its budget {} times in a row",
-                        hook.name(),
-                        entry.slow
-                    );
-                    let class = entry.class.clone();
-                    self.quarantine(pid, entry, &class, &why);
+                if matches!(hook, Hook::Telemetry) {
+                    entry.slow_history = ((entry.slow_history << 1) | 1) & SLOW_MASK;
+                    let slow = entry.slow_history.count_ones();
+                    if slow >= QUARANTINE_AFTER_SLOW_OF_LAST_FIVE {
+                        let why = format!(
+                            "{} used over 80% of its budget in {slow} of its last 5 deliveries",
+                            hook.name()
+                        );
+                        let class = entry.class.clone();
+                        self.quarantine(pid, entry, &class, &why);
+                    }
                 }
             }
             HookOutcome::Panicked {
@@ -500,21 +509,23 @@ impl Shared {
             let (shared, payload, tag) =
                 (Arc::clone(self), Arc::clone(&payload), event.tag.clone());
             deliveries.spawn(async move {
-                let wall = Duration::from_millis(cap.saturating_mul(950)).min(TELEMETRY_WALL);
                 shared.counters.in_flight.fetch_add(1, Ordering::Relaxed);
-                let outcome = match tokio::time::timeout(
-                    wall,
-                    dispatcher.fire_on_telemetry_event(&target, &payload),
+                let (outcome, busy) = fire_walled(
+                    &dispatcher,
+                    &target,
+                    pid,
+                    Hook::Telemetry,
+                    &payload,
+                    cap,
+                    TELEMETRY_WALL,
                 )
-                .await
-                {
-                    Ok(outcome) => outcome,
-                    Err(_) => HookOutcome::BudgetExceeded {
-                        wall_ns: u64::try_from(wall.as_nanos()).unwrap_or(u64::MAX),
-                        cap_seconds: cap,
-                    },
-                };
+                .await;
                 shared.counters.in_flight.fetch_sub(1, Ordering::Relaxed);
+                if busy {
+                    // Dropped for contention: not delivered, and neither a strike nor a clean run.
+                    shared.counters.ineligible.fetch_add(1, Ordering::Relaxed);
+                    return;
+                }
                 let counter = match &outcome {
                     HookOutcome::Fired { .. } | HookOutcome::BudgetWarning80 { .. } => {
                         &shared.counters.delivered
@@ -769,12 +780,14 @@ impl HookPump {
         let mut undelivered = Vec::new();
         if let Some(pump) = pump {
             let pids: Vec<_> = pump.shared.registry().keys().copied().collect();
+            let mut jobs = Vec::new();
             for pid in pids {
                 let Some(scb) = pump.shared.scb(pid) else {
                     undelivered.push(pid);
                     continue;
                 };
                 let snapshot = scb.runtime_snapshot();
+                let cap = cap_of(&snapshot, CONSOLIDATE_WALL);
                 let target = {
                     let mut registry = pump.shared.registry();
                     let Some(entry) = registry.get_mut(&pid) else {
@@ -812,16 +825,45 @@ impl HookPump {
                     redistill: addressed.clone(),
                 })
                 .map_err(|e| e.to_string())?;
-                let hook = match pump.shared.dispatcher.upgrade() {
-                    Some(dispatcher) => Some(dispatcher.fire_on_consolidate(&target, &bytes).await),
-                    None => None,
-                };
+                jobs.push((pid, addressed, target, cap, bytes));
+            }
+            // Side by side, each inside its own wall. A subscriber that never answers (a
+            // quarantined one still gets the notice, deliberately) holds the erasure's completion
+            // for the wall, not for its manifest budget; a notice it did not take is undelivered.
+            let mut notices = tokio::task::JoinSet::new();
+            if let Some(dispatcher) = pump.shared.dispatcher.upgrade() {
+                for (pid, _, target, cap, bytes) in &jobs {
+                    let (dispatcher, target) = (Arc::clone(&dispatcher), Arc::clone(target));
+                    let (pid, cap, bytes) = (*pid, *cap, bytes.clone());
+                    notices.spawn(async move {
+                        let hook = fire_walled(
+                            &dispatcher,
+                            &target,
+                            pid,
+                            Hook::Consolidate,
+                            &bytes,
+                            cap,
+                            CONSOLIDATE_WALL,
+                        )
+                        .await;
+                        (pid, hook)
+                    });
+                }
+            }
+            let mut fired = BTreeMap::new();
+            while let Some(done) = notices.join_next().await {
+                if let Ok((pid, hook)) = done {
+                    fired.insert(pid, hook);
+                }
+            }
+            for (pid, addressed, ..) in jobs {
                 let completed = matches!(
-                    hook,
-                    Some(
+                    fired.get(&pid),
+                    Some((
                         HookOutcome::Fired { .. }
-                            | HookOutcome::BudgetWarning80 { fired: true, .. }
-                    )
+                            | HookOutcome::BudgetWarning80 { fired: true, .. },
+                        false
+                    ))
                 );
                 // Privacy purges bypass ordinary consolidation quarantine accounting.
                 if !completed {
@@ -919,23 +961,46 @@ impl HookPump {
                 .map_err(|error| error.to_string())?;
                 let dispatcher = pump.shared.dispatcher.upgrade();
                 let pids: Vec<_> = pump.shared.registry().keys().copied().collect();
+                let mut notices = tokio::task::JoinSet::new();
+                let mut asked = Vec::new();
                 for pid in pids {
-                    let hook = match (pump.shared.scb(pid), &dispatcher) {
+                    match (pump.shared.scb(pid), &dispatcher) {
                         (Some(scb), Some(dispatcher)) => {
-                            Some(dispatcher.fire_on_consolidate(&scb, &bytes).await)
+                            asked.push(pid);
+                            let cap = cap_of(&scb.runtime_snapshot(), CONSOLIDATE_WALL);
+                            let (dispatcher, bytes) = (Arc::clone(dispatcher), bytes.clone());
+                            notices.spawn(async move {
+                                let hook = fire_walled(
+                                    &dispatcher,
+                                    &scb,
+                                    pid,
+                                    Hook::Consolidate,
+                                    &bytes,
+                                    cap,
+                                    CONSOLIDATE_WALL,
+                                )
+                                .await;
+                                (pid, hook)
+                            });
                         }
-                        _ => None,
-                    };
-                    if !matches!(
-                        hook,
-                        Some(
-                            HookOutcome::Fired { .. }
-                                | HookOutcome::BudgetWarning80 { fired: true, .. }
-                        )
-                    ) {
-                        undelivered.push(pid);
+                        _ => undelivered.push(pid),
                     }
                 }
+                let mut taken = Vec::new();
+                while let Some(done) = notices.join_next().await {
+                    if let Ok((
+                        pid,
+                        (
+                            HookOutcome::Fired { .. }
+                            | HookOutcome::BudgetWarning80 { fired: true, .. },
+                            false,
+                        ),
+                    )) = done
+                    {
+                        taken.push(pid);
+                    }
+                }
+                undelivered.extend(asked.into_iter().filter(|pid| !taken.contains(pid)));
             }
             match tokio::task::block_in_place(|| tl.certify_erasure(&mut sweep)) {
                 Ok(true) => break,
@@ -1000,7 +1065,7 @@ impl HookPump {
             object: None,
             target: None,
             strikes: 0,
-            slow: 0,
+            slow_history: 0,
             quarantined: false,
             granted: false,
             class: String::new(),
@@ -1170,13 +1235,30 @@ impl ConsolidationWatchdog {
         let token = cancel.clone();
         let task = tokio::spawn(async move {
             let mut interval = tokio::time::interval(cadence.poll);
+            // A subscriber's pass runs under its own wall and may outlast a tick; its pid is
+            // skipped until it ends, so one slow subscriber never holds the others' passes.
+            let mut passes = tokio::task::JoinSet::new();
+            let mut inflight = std::collections::BTreeSet::new();
             loop {
                 tokio::select! {
                     biased;
                     _ = token.cancelled() => break,
-                    _ = interval.tick() => consolidate_once(&shared, cadence).await,
+                    Some(done) = passes.join_next() => match done {
+                        Ok(pid) => {
+                            inflight.remove(&pid);
+                        }
+                        Err(error) => {
+                            eprintln!("maos: consolidation pass task failed: {error}");
+                            inflight.clear();
+                        }
+                    },
+                    _ = interval.tick() => {
+                        consolidate_once(&shared, cadence, &mut passes, &mut inflight).await
+                    }
                 }
             }
+            // Shutdown joins every in-flight pass (each is bounded by its wall).
+            while passes.join_next().await.is_some() {}
         });
         Self {
             cancel,
@@ -1201,9 +1283,17 @@ impl ConsolidationWatchdog {
     }
 }
 
-async fn consolidate_once(shared: &Shared, cadence: ConsolidationCadence) {
+async fn consolidate_once(
+    shared: &Arc<Shared>,
+    cadence: ConsolidationCadence,
+    passes: &mut tokio::task::JoinSet<u32>,
+    inflight: &mut std::collections::BTreeSet<u32>,
+) {
     let pids: Vec<u32> = shared.registry().keys().copied().collect();
     for pid in pids {
+        if inflight.contains(&pid) {
+            continue;
+        }
         let Some(scb) = shared.scb(pid) else {
             shared.unregister(pid, "unloaded");
             continue;
@@ -1221,6 +1311,7 @@ async fn consolidate_once(shared: &Shared, cadence: ConsolidationCadence) {
             continue;
         }
         let object = Arc::clone(&snapshot.spirit_obj);
+        let cap = cap_of(&snapshot, CONSOLIDATE_WALL);
         let target = {
             let mut registry = shared.registry();
             let Some(entry) = registry.get_mut(&pid) else {
@@ -1235,21 +1326,94 @@ async fn consolidate_once(shared: &Shared, cadence: ConsolidationCadence) {
         let Some(dispatcher) = shared.dispatcher.upgrade() else {
             return;
         };
-        let outcome = dispatcher.fire_on_consolidate(&target, &[]).await;
-        drop(dispatcher);
-        if !matches!(outcome, HookOutcome::SkippedManifest) {
-            if let Some(entry) = shared.registry().get_mut(&pid) {
-                if entry
-                    .object
-                    .as_ref()
-                    .is_some_and(|weak| same_object(weak, &object))
-                {
-                    entry.last_consolidate_ns = monotonic_now_ns();
+        // Side by side, each inside its own wall: one subscriber cannot hold the others' pass.
+        let shared = Arc::clone(shared);
+        inflight.insert(pid);
+        passes.spawn(async move {
+            let (outcome, busy) = fire_walled(
+                &dispatcher,
+                &target,
+                pid,
+                Hook::Consolidate,
+                &[],
+                cap,
+                CONSOLIDATE_WALL,
+            )
+            .await;
+            drop(dispatcher);
+            if busy {
+                return pid;
+            }
+            if !matches!(outcome, HookOutcome::SkippedManifest) {
+                if let Some(entry) = shared.registry().get_mut(&pid) {
+                    if entry
+                        .object
+                        .as_ref()
+                        .is_some_and(|weak| same_object(weak, &object))
+                    {
+                        entry.last_consolidate_ns = monotonic_now_ns();
+                    }
                 }
             }
-        }
-        shared.account(pid, &object, Hook::Consolidate, None, &outcome);
+            shared.account(pid, &object, Hook::Consolidate, None, &outcome);
+            pid
+        });
     }
+}
+
+/// The hook budget (`time_cap_seconds`) of the runtime a snapshot was taken of.
+fn cap_of(snapshot: &ScbRuntimeSnapshot, default: Duration) -> u64 {
+    snapshot
+        .manifest
+        .budget
+        .as_ref()
+        .map_or(default.as_secs(), |budget| {
+            u64::from(budget.time_cap_seconds)
+        })
+}
+
+/// Triggers a spawned subscriber's session dropped for contention so far.
+fn busy_drops(pid: u32) -> u64 {
+    #[cfg(all(feature = "network", feature = "wasm-host"))]
+    {
+        crate::spawned_lifecycle::busy_drops(pid)
+    }
+    #[cfg(not(all(feature = "network", feature = "wasm-host")))]
+    {
+        let _ = pid;
+        0
+    }
+}
+
+/// One hook dispatch held to a wall strictly inside the hook's own cap (and `limit`). An overrun
+/// is the budget overrun it is; a dispatch a busy session dropped before the hook ever started is
+/// reported as such (`true`), and the caller charges nothing for it.
+async fn fire_walled(
+    dispatcher: &HookDispatcher,
+    target: &SpiritControlBlock,
+    pid: u32,
+    hook: Hook,
+    payload: &[u8],
+    cap: u64,
+    limit: Duration,
+) -> (HookOutcome, bool) {
+    let wall = Duration::from_millis(cap.saturating_mul(950)).min(limit);
+    let before = busy_drops(pid);
+    let fire = async {
+        match hook {
+            Hook::Telemetry => dispatcher.fire_on_telemetry_event(target, payload).await,
+            Hook::Consolidate => dispatcher.fire_on_consolidate(target, payload).await,
+        }
+    };
+    let outcome = match tokio::time::timeout(wall, fire).await {
+        Ok(outcome) => outcome,
+        Err(_) => HookOutcome::BudgetExceeded {
+            wall_ns: u64::try_from(wall.as_nanos()).unwrap_or(u64::MAX),
+            cap_seconds: wall.as_secs().max(1),
+        },
+    };
+    let busy = matches!(outcome, HookOutcome::Fired { .. }) && busy_drops(pid) > before;
+    (outcome, busy)
 }
 
 /// What the activity writer has done so far.

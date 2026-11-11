@@ -4,6 +4,7 @@
 //! slot its session drains one export at a time. The pre-warmed successor of a swap is the
 //! exception: it has no session yet, so its `migrate` and `swap-in` run inline on its own child,
 //! and a committed `swap-in` hands that child to the predecessor's session.
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, RecvTimeoutError, SyncSender, TrySendError};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
@@ -178,6 +179,11 @@ pub struct LifecycleLink {
     /// A committed successor's child is waiting for the predecessor's session to adopt it.
     awaiting: AtomicBool,
     fenced: AtomicBool,
+    /// The live swap attempt this link (as predecessor) is being replaced in. A snapshot fences
+    /// the predecessor only while its attempt is live, and the successor's drop ends the attempt
+    /// and unfences under this same lock, so a reply that arrives after a refused swap fences
+    /// nothing.
+    attempt: Mutex<Option<Arc<AtomicBool>>>,
     swap: Mutex<Option<SwapContext>>,
     prewarm: Mutex<Option<Prewarm>>,
     predecessor: Mutex<Option<Arc<LifecycleLink>>>,
@@ -202,6 +208,7 @@ impl LifecycleLink {
             attached: AtomicBool::new(false),
             awaiting: AtomicBool::new(false),
             fenced: AtomicBool::new(false),
+            attempt: Mutex::new(None),
             swap: Mutex::new(None),
             prewarm: Mutex::new(None),
             predecessor: Mutex::new(None),
@@ -259,11 +266,14 @@ impl LifecycleLink {
         }
         // A trigger that cannot even start in half its budget is dropped without a strike:
         // the budget it missed is the busy session's, and the hook that holds it is charged
-        // for that. A snapshot waits behind the active turn for the whole cap.
-        let queue_share = if matches!(request, LifecycleRequest::Snapshot) {
-            cap
-        } else {
-            cap / 2
+        // for that. A telemetry or consolidate trigger gives up inside the pump's own wall for
+        // it, so the pump never charges a subscriber for time it spent queued. A snapshot waits
+        // behind the active turn for the whole cap.
+        let queue_share = match request {
+            LifecycleRequest::Snapshot => cap,
+            LifecycleRequest::Telemetry { .. } => cap.min(crate::hook_pump::TELEMETRY_WALL) / 2,
+            LifecycleRequest::Consolidate { .. } => cap.min(crate::hook_pump::CONSOLIDATE_WALL) / 2,
+            _ => cap / 2,
         };
         let began = Instant::now();
         let (deadline, queue_deadline) = (began + cap, began + queue_share);
@@ -370,6 +380,18 @@ impl LifecycleLink {
         self.fenced.store(fenced, Ordering::Release);
     }
 
+    /// The snapshot was taken: fence the predecessor, unless the swap attempt it was taken for
+    /// already ended (the successor was dropped, which released the fence for good).
+    pub fn fence_for_snapshot(&self) {
+        let attempt = locked(&self.attempt);
+        if attempt
+            .as_ref()
+            .is_some_and(|live| live.load(Ordering::Acquire))
+        {
+            self.fenced.store(true, Ordering::Release);
+        }
+    }
+
     pub fn fenced(&self) -> bool {
         self.fenced.load(Ordering::Acquire)
     }
@@ -397,15 +419,32 @@ impl LifecycleLink {
     ) {
         self.set_cap(prewarm.turn_budget);
         *locked(&self.prewarm) = Some(prewarm);
+        *locked(&predecessor.attempt) = Some(Arc::new(AtomicBool::new(true)));
         *locked(&self.predecessor) = Some(Arc::clone(predecessor));
         *locked(&self.outcome) = Some(Box::new(outcome));
     }
+}
+
+/// Triggers the session was too busy to start, per spirit pid (pids are never reused). The pump
+/// reads it to tell a delivery that was dropped for contention from one that ran.
+static BUSY_DROPS: Mutex<BTreeMap<u32, u64>> = Mutex::new(BTreeMap::new());
+
+pub fn note_busy(pid: u32) {
+    *locked(&BUSY_DROPS).entry(pid).or_default() += 1;
+}
+
+pub fn busy_drops(pid: u32) -> u64 {
+    locked(&BUSY_DROPS).get(&pid).copied().unwrap_or(0)
 }
 
 impl Drop for LifecycleLink {
     /// A successor that is dropped before its `swap-in` committed releases its predecessor.
     fn drop(&mut self) {
         if let Some(predecessor) = locked(&self.predecessor).take() {
+            let mut attempt = locked(&predecessor.attempt);
+            if let Some(live) = attempt.take() {
+                live.store(false, Ordering::Release);
+            }
             predecessor.set_fenced(false);
         }
         if let Some(outcome) = locked(&self.outcome).take() {
@@ -513,7 +552,7 @@ impl SwapHandles {
         manifest: &std::path::Path,
         origin: &std::path::Path,
     ) -> Result<crate::admission::Admitted, crate::admission::AdmissionRefusal> {
-        use crate::admission::{load_admit_start, AdmissionRefusal, StartPolicy};
+        use crate::admission::{load_admit_start_unarchived, AdmissionRefusal, StartPolicy};
         let class_build = |detail: String| AdmissionRefusal::ClassBuild { detail };
         let supervisor =
             self.supervisor
@@ -528,7 +567,7 @@ impl SwapHandles {
             .prepare_spawned(&gated.spirit_id, &gated.bundle())
             .map_err(|error| class_build(error.to_string()))?;
         let bound = Arc::clone(&core);
-        let admitted = load_admit_start(
+        let admitted = load_admit_start_unarchived(
             deps,
             gated,
             object,
@@ -556,6 +595,8 @@ impl SwapHandles {
         let until = Instant::now() + budget + READY_GRACE;
         let failure = loop {
             if link.wait_supported(Duration::ZERO).is_some() {
+                // Only a component that started is the version the FR11 archive names.
+                crate::admission::archive_admitted(&maos_audit::default_archive_dir(), gated);
                 return Ok(admitted);
             }
             if task.as_ref().is_some_and(|task| task.is_finished()) {

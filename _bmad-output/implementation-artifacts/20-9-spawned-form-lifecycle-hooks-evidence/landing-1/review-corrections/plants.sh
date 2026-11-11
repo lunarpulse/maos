@@ -5,7 +5,8 @@
 set -u
 cd /home/lunarpulse/dev_ws
 LABEL=$1; FILTER=$2; shift 2
-OUT=_bmad-output/implementation-artifacts/20-9-spawned-form-lifecycle-hooks-evidence/landing-1/review-corrections/plants/$LABEL.log
+R=_bmad-output/implementation-artifacts/20-9-spawned-form-lifecycle-hooks-evidence/landing-1/review-corrections
+OUT=${PLANT_DIR:-$R/plants}/$LABEL.log
 BK=/tmp/209-plantbk-$LABEL; rm -rf "$BK"; mkdir -p "$BK"
 : > "$OUT"; FILES=()
 for spec in "$@"; do

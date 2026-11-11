@@ -1166,6 +1166,33 @@ pub async fn load_admit_start(
     start: StartPolicy,
     on_loaded: &mut (dyn FnMut(u32) + Send),
 ) -> Result<Admitted, AdmissionRefusal> {
+    admit_inner(deps, gated, spirit_obj, boot_nonce, start, on_loaded, true).await
+}
+
+/// [`load_admit_start`] without the FR11 archive record (Story 20-9): a spawned component's start
+/// completes asynchronously, so the caller commits the record with [`archive_admitted`] only once
+/// it started. A component that never starts then leaves the predecessor's record the newest, and
+/// the restore of the predecessor is judged against it, not against a version that never ran.
+pub async fn load_admit_start_unarchived(
+    deps: &AdmissionDeps<'_>,
+    gated: &GatedManifest,
+    spirit_obj: Arc<dyn AnySpiritObj>,
+    boot_nonce: u64,
+    start: StartPolicy,
+    on_loaded: &mut (dyn FnMut(u32) + Send),
+) -> Result<Admitted, AdmissionRefusal> {
+    admit_inner(deps, gated, spirit_obj, boot_nonce, start, on_loaded, false).await
+}
+
+async fn admit_inner(
+    deps: &AdmissionDeps<'_>,
+    gated: &GatedManifest,
+    spirit_obj: Arc<dyn AnySpiritObj>,
+    boot_nonce: u64,
+    start: StartPolicy,
+    on_loaded: &mut (dyn FnMut(u32) + Send),
+    archive_now: bool,
+) -> Result<Admitted, AdmissionRefusal> {
     let early_gates = (|| {
         if let Some(providers) = &gated.providers {
             check_provider_pins(providers, deps.providers)?;
@@ -1320,7 +1347,9 @@ pub async fn load_admit_start(
     emit_manifest_declaration_outcome(deps.transparency_log, &attempt_id, "admitted");
     // Story 19-5 (D-19-5-03 A) — only a GRANTED admission leaves the FR11
     // identity record a later cross-major load is checked against.
-    archive_admitted(&archive_root, gated);
+    if archive_now {
+        archive_admitted(&archive_root, gated);
+    }
 
     deps.pid_by_spirit_id
         .write()
@@ -1428,7 +1457,11 @@ async fn rollback(deps: &AdmissionDeps<'_>, pid: u32, spirit_id: &str) {
 /// Undo an admission whose component never started (Story 20-9): its session has ended, which
 /// may already have unloaded the SCB; otherwise the SCB is unloaded here. Either way the id's
 /// promotion set and pid binding are released so a restore can re-admit it.
+#[cfg(all(feature = "network", feature = "wasm-host"))]
 pub(crate) async fn unwind_admitted(deps: &AdmissionDeps<'_>, pid: u32, spirit_id: &str) {
+    if let Some(hooks) = deps.hooks {
+        hooks.unregister(pid, "spawned-start-failed");
+    }
     if deps.scheduler.resolve_pid(spirit_id) == Some(pid) {
         rollback(deps, pid, spirit_id).await;
     } else {

@@ -336,11 +336,80 @@ async fn repeated_budget_warnings_quarantine_the_subscriber() {
         Some(&row(
             pid,
             false,
-            "quarantined: on_telemetry_event used over 80% of its budget 3 times in a row"
+            "quarantined: on_telemetry_event used over 80% of its budget in 3 of its last 5 deliveries"
         ))
     );
     world.emit(0.4).await;
     assert_eq!(world.pump.stats(), stats(3, 1, 0));
+}
+
+/// Telemetry slow on every other delivery (past 80% of a 2 s budget), consolidation always quick.
+struct AlternatingTelemetry {
+    calls: AtomicU32,
+    consolidations: Arc<AtomicU32>,
+}
+impl Spirit for AlternatingTelemetry {
+    fn on_telemetry_event(&self, _ctx: &mut Ctx, _payload: &TelemetryEventPayload<'_>) {
+        if self.calls.fetch_add(1, Ordering::SeqCst) % 2 == 0 {
+            std::thread::sleep(Duration::from_millis(1_750));
+        }
+    }
+    fn on_consolidate(&self, _ctx: &mut Ctx, _payload: &ConsolidatePayload<'_>) {
+        self.consolidations.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+// GPT r2 #4, GLM R3 — the near-budget count is over a subscriber's telemetry only: a quick
+// consolidation between two events, and a quick telemetry delivery between two slow ones, do
+// not erase it. Slow, quick, slow, quick, slow quarantines on the fifth.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn three_slow_telemetry_deliveries_of_the_last_five_quarantine_whatever_runs_between() {
+    let world = World::new();
+    let consolidations = Arc::new(AtomicU32::new(0));
+    let manifest = with_window(
+        &OBSERVER_MANIFEST.replace("time_cap_seconds = 10", "time_cap_seconds = 2"),
+        100,
+    );
+    let pid = world
+        .admit(
+            &manifest,
+            make_spirit_obj(AlternatingTelemetry {
+                calls: AtomicU32::new(0),
+                consolidations: Arc::clone(&consolidations),
+            }),
+            StartPolicy::StartNow,
+        )
+        .await
+        .unwrap();
+    let dog = fast(&world.pump);
+    for (index, value) in [0.1, 0.2, 0.3, 0.4].into_iter().enumerate() {
+        world.emit(value).await;
+        // A consolidation (a quick `Fired`) lands between this event and the next.
+        let seen = consolidations.load(Ordering::SeqCst);
+        let until = Instant::now() + Duration::from_secs(5);
+        while consolidations.load(Ordering::SeqCst) == seen && Instant::now() < until {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert!(
+            consolidations.load(Ordering::SeqCst) > seen,
+            "no consolidation after event {index}"
+        );
+        assert_eq!(
+            world.subscription_rows().last(),
+            Some(&row(pid, true, "admitted")),
+            "not yet quarantined after event {index}"
+        );
+    }
+    world.emit(0.5).await;
+    assert_eq!(
+        world.subscription_rows().last(),
+        Some(&row(
+            pid,
+            false,
+            "quarantined: on_telemetry_event used over 80% of its budget in 3 of its last 5 deliveries"
+        ))
+    );
+    dog.shutdown().await;
 }
 
 /// A Spirit whose `on_start` panics: admission is granted, start fails.

@@ -205,7 +205,14 @@ impl World {
         fast_clocks();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path();
-        let tl = Arc::new(TransparencyLogAdapter::open(&path.join("tl.sqlite"), NONCE).unwrap());
+        let tl = Arc::new(
+            TransparencyLogAdapter::open_with_global_legal_holds(
+                &path.join("tl.sqlite"),
+                &path.join("tl.sqlite"),
+                NONCE,
+            )
+            .unwrap(),
+        );
         maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&path.join("tl.sqlite"))
             .unwrap();
         let lookup = Arc::new(RwLock::new(BTreeMap::new()));
