@@ -170,6 +170,53 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         })
     }
 
+    /// Story 20-9 (D-12 A) — the spawned admission path a cold swap re-admits a component
+    /// through (`prepare_spawned` → `load_admit_start` → the spawned session), at a new pid.
+    /// `origin` is the directory the manifest's relative `artifact` resolves against: the
+    /// door passes a private snapshot of the manifest bytes. `maosctl load` of a component
+    /// stays refused: only a cold swap reaches this.
+    #[cfg(feature = "network")]
+    async fn load_spawned(
+        &self,
+        _manifest: &Path,
+        _origin: &Path,
+    ) -> Result<crate::admission::Admitted, crate::admission::AdmissionRefusal> {
+        Err(
+            crate::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
+                surface: "operator door",
+            },
+        )
+    }
+
+    /// A spawned predecessor's retained manifest passes the same structural gates, and its
+    /// artifact is still where it was admitted from, so this root's runner can launch it.
+    #[cfg(feature = "network")]
+    fn prepare_spawned_restore(
+        &self,
+        _manifest: &Path,
+        _text: &str,
+        _origin: &Path,
+    ) -> Result<crate::admission::GatedManifest, crate::admission::AdmissionRefusal> {
+        Err(
+            crate::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
+                surface: "operator door",
+            },
+        )
+    }
+
+    /// Where the live spawned session of `spirit_id` was launched from (see
+    /// [`Self::load_spawned`]); `None` when it has no session.
+    #[cfg(feature = "network")]
+    fn spawned_origin(&self, _spirit_id: &str) -> Option<PathBuf> {
+        None
+    }
+
+    /// Keeps the root alive while a cold swap replaces the one session it hosts.
+    #[cfg(feature = "network")]
+    fn hold_hosted_sessions(&self) -> Option<Box<dyn std::any::Any + Send>> {
+        None
+    }
+
     /// Story 19-5 — immutable text of the last admitted/committed incarnation.
     /// `None` refuses a cold swap before unload; the original path is not a
     /// restore source because an operator may overwrite or remove it.
@@ -385,33 +432,41 @@ pub type WorkerRevokeStopHook =
 /// halt — the AC4 root-E falsifier). The door stages the path here just before
 /// invoking the upgrade and clears it after.
 #[derive(Clone, Default)]
-pub struct SuccessorManifestSlot(Arc<Mutex<Option<PathBuf>>>);
+pub struct SuccessorManifestSlot {
+    path: Arc<Mutex<Option<PathBuf>>>,
+    /// Story 20-9 — where a staged component's relative `artifact` resolves (the door stages
+    /// manifest bytes in a private file; the artifact stays in the operator's directory).
+    origin: Arc<Mutex<Option<PathBuf>>>,
+}
+
+const POISONED: &str =
+    "successor manifest slot: poisoned — a prior panic left upgrade staging inconsistent";
 
 impl SuccessorManifestSlot {
     pub fn stage(&self, path: PathBuf) {
-        *self.0.lock().expect(
-            "successor manifest slot: poisoned — a prior panic left upgrade staging inconsistent",
-        ) = Some(path);
+        *self.path.lock().expect(POISONED) = Some(path);
+        *self.origin.lock().expect(POISONED) = None;
+    }
+
+    /// Stage `path` whose relative `artifact` resolves against `origin`.
+    pub fn stage_at(&self, path: PathBuf, origin: PathBuf) {
+        *self.path.lock().expect(POISONED) = Some(path);
+        *self.origin.lock().expect(POISONED) = Some(origin);
     }
 
     pub fn take(&self) -> Option<PathBuf> {
-        self.0
-            .lock()
-            .expect(
-                "successor manifest slot: poisoned — a prior panic left upgrade staging inconsistent",
-            )
-            .take()
+        self.origin.lock().expect(POISONED).take();
+        self.path.lock().expect(POISONED).take()
     }
 
     /// Read WITHOUT clearing: the factory may be consulted per hop while the
     /// door owns the slot's lifecycle (it clears with [`Self::take`]).
     pub fn peek(&self) -> Option<PathBuf> {
-        self.0
-            .lock()
-            .expect(
-                "successor manifest slot: poisoned — a prior panic left upgrade staging inconsistent",
-            )
-            .clone()
+        self.path.lock().expect(POISONED).clone()
+    }
+
+    pub fn peek_origin(&self) -> Option<PathBuf> {
+        self.origin.lock().expect(POISONED).clone()
     }
 }
 
@@ -1358,7 +1413,12 @@ impl DoorInner {
             #[cfg(feature = "network")]
             UpgradePolicyRequest::ColdSwap => {
                 return self
-                    .cold_swap(spirit_id, &snapshot.0, &target_version)
+                    .cold_swap(
+                        spirit_id,
+                        &snapshot.0,
+                        target_path.parent().unwrap_or(Path::new(".")),
+                        &target_version,
+                    )
                     .await
             }
             #[cfg(not(feature = "network"))]
@@ -1408,6 +1468,7 @@ impl DoorInner {
         &self,
         spirit_id: &str,
         target: &Path,
+        target_origin: &Path,
         successor_version: &str,
     ) -> OperatorOutcome {
         use maos_domain::invariants::i10::LifecycleEvent;
@@ -1449,25 +1510,66 @@ impl DoorInner {
         let predecessor_version = self
             .loaded_version(spirit_id)
             .unwrap_or_else(|| "unknown".into());
-        let restorable = self
-            .private_ops
-            .prepare_spirit(&restore_manifest.0, &predecessor_manifest)
-            .map_err(|error| format!("{}: {error}", error.code()))
-            .and_then(|(gated, _)| {
-                if gated.spirit_id == spirit_id
-                    && gated.class_section.version == predecessor_version
-                {
-                    Ok(())
+        let spawned = crate::admission::is_spawned_form(&predecessor_manifest);
+        // A cold swap keeps the form (the successor of a component is a component): the
+        // restore must go back through the path the predecessor came in by.
+        let target_spawned = std::fs::read_to_string(target)
+            .is_ok_and(|text| crate::admission::is_spawned_form(&text));
+        if target_spawned != spawned {
+            let form = |spawned: bool| {
+                if spawned {
+                    "a component"
                 } else {
-                    Err("retained manifest identity/version differs from live SCB".into())
+                    "an in-process Spirit"
                 }
-            });
+            };
+            return OperatorOutcome::Conflict {
+                code: "swap_form_mismatch".into(),
+                detail: format!(
+                    "'{spirit_id}' is {} and the target is {}; refused before unload",
+                    form(spawned),
+                    form(target_spawned)
+                ),
+            };
+        }
+        let restore_origin = if spawned {
+            self.private_ops.spawned_origin(spirit_id)
+        } else {
+            None
+        };
+        let restorable = match (spawned, restore_origin.as_deref()) {
+            (true, Some(origin)) => self.private_ops.prepare_spawned_restore(
+                &restore_manifest.0,
+                &predecessor_manifest,
+                origin,
+            ),
+            (true, None) => Err(crate::admission::AdmissionRefusal::ClassBuild {
+                detail: "the live component session records no launch directory".into(),
+            }),
+            (false, _) => self
+                .private_ops
+                .prepare_spirit(&restore_manifest.0, &predecessor_manifest)
+                .map(|(gated, _)| gated),
+        }
+        .map_err(|error| format!("{}: {error}", error.code()))
+        .and_then(|gated| {
+            if gated.spirit_id == spirit_id && gated.class_section.version == predecessor_version {
+                Ok(())
+            } else {
+                Err("retained manifest identity/version differs from live SCB".into())
+            }
+        });
         if let Err(detail) = restorable {
             return OperatorOutcome::Conflict {
                 code: "cold_swap_unrestorable".into(),
                 detail,
             };
         }
+        // A spawned predecessor's session ends with its unload; the root stays up across the
+        // swap so the successor's session, started below, has a root to run under.
+        let _hold = spawned
+            .then(|| self.private_ops.hold_hosted_sessions())
+            .flatten();
         let unloaded = self.scheduler.unload(pid).await;
         self.stop_worker_after_unload(pid).await;
         if let Err(error) = unloaded {
@@ -1477,33 +1579,38 @@ impl DoorInner {
             };
         }
         self.private_ops.forget_promotion_set(spirit_id);
-        let (outcome, journal, result) = match self.admit_and_start(spirit_id, target).await {
-            Ok(new_pid) => ("completed", Some(LifecycleEvent::Upgrade), Ok(new_pid)),
-            Err(refused) => match self.admit_and_start(spirit_id, &restore_manifest.0).await {
-                Ok(restored) => (
-                    "reverted",
-                    None,
-                    Err(OperatorOutcome::Conflict {
-                        code: "cold_swap_reverted".into(),
-                        detail: format!(
-                            "successor refused: {refused}; predecessor {predecessor_version} \
+        let target_origin = spawned.then_some(target_origin);
+        let (outcome, journal, result) =
+            match self.admit_and_start(spirit_id, target, target_origin).await {
+                Ok(new_pid) => ("completed", Some(LifecycleEvent::Upgrade), Ok(new_pid)),
+                Err(refused) => match self
+                    .admit_and_start(spirit_id, &restore_manifest.0, restore_origin.as_deref())
+                    .await
+                {
+                    Ok(restored) => (
+                        "reverted",
+                        None,
+                        Err(OperatorOutcome::Conflict {
+                            code: "cold_swap_reverted".into(),
+                            detail: format!(
+                                "successor refused: {refused}; predecessor {predecessor_version} \
                              restored at pid {restored}"
-                        ),
-                    }),
-                ),
-                Err(restore) => (
-                    "failed",
-                    Some(LifecycleEvent::Unload),
-                    Err(OperatorOutcome::Failed {
-                        code: "cold_swap_failed".into(),
-                        detail: format!(
-                            "successor refused: {refused}; restore refused: {restore}; spirit \
+                            ),
+                        }),
+                    ),
+                    Err(restore) => (
+                        "failed",
+                        Some(LifecycleEvent::Unload),
+                        Err(OperatorOutcome::Failed {
+                            code: "cold_swap_failed".into(),
+                            detail: format!(
+                                "successor refused: {refused}; restore refused: {restore}; spirit \
                              '{spirit_id}' is not loaded"
-                        ),
-                    }),
-                ),
-            },
-        };
+                            ),
+                        }),
+                    ),
+                },
+            };
         // The row the kernel orchestrator writes for hot swap, same shape.
         let payload = serde_json::json!({
             "spirit_id": spirit_id,
@@ -1553,12 +1660,19 @@ impl DoorInner {
     /// failure is a refusal like any other, unwound by `unload` (as the
     /// triple's own rollback does) so the restore can re-admit the id.
     #[cfg(feature = "network")]
-    async fn admit_and_start(&self, spirit_id: &str, manifest: &Path) -> Result<u32, String> {
-        let admitted = self
-            .private_ops
-            .load_spirit(manifest, None)
-            .await
-            .map_err(|refusal| format!("{}: {refusal}", refusal.code()))?;
+    async fn admit_and_start(
+        &self,
+        spirit_id: &str,
+        manifest: &Path,
+        component_origin: Option<&Path>,
+    ) -> Result<u32, String> {
+        // Story 20-9 (D-12 A) — a component is admitted, and started, through the spawned
+        // admission path (its session is the Spirit's start), relative to its own directory.
+        let admitted = match component_origin {
+            Some(origin) => self.private_ops.load_spawned(manifest, origin).await,
+            None => self.private_ops.load_spirit(manifest, None).await,
+        }
+        .map_err(|refusal| format!("{}: {refusal}", refusal.code()))?;
         if admitted.spirit_id != spirit_id {
             let unwound = self.scheduler.unload(admitted.pid).await;
             if unwound.is_ok() {
@@ -1568,6 +1682,10 @@ impl DoorInner {
                 "target_manifest_mismatch: admitted {}; unwind: {unwound:?}",
                 admitted.spirit_id
             ));
+        }
+        if component_origin.is_some() {
+            // `admit_spawned` started it: the session is the start.
+            return Ok(admitted.pid);
         }
         if let Err(error) = self.scheduler.start(admitted.pid).await {
             let unwound = self.scheduler.unload(admitted.pid).await;

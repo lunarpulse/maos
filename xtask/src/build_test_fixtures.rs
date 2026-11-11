@@ -261,6 +261,7 @@ fn fixtures(root: &Path, target: &Path, fixture_dir: &Path, release: bool) -> Ve
         guest("echo-spirit", "echo-spirit", "echo_spirit.wasm"),
         guest("routed-relay", "routed-relay", "routed_relay.wasm"),
         guest("recall-probe", "recall-probe", "recall_probe.wasm"),
+        guest("lifecycle-probe", "lifecycle-probe", "lifecycle_probe.wasm"),
         guest("compat-echo-2-0", "compat-echo-2-0", "compat_echo_2_0.wasm"),
         Fixture {
             name: "equiv-native-twin",

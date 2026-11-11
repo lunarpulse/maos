@@ -1,7 +1,8 @@
 # example-spirit-ts
 
 A TypeScript MAOS Spirit example that builds a `wasm-component` implementing
-`maos:spirit@2.3.0`.
+`maos:spirit@2.4.0` (world `spirit-lifecycle`: the frame exports plus the optional
+`lifecycle` export).
 
 ## Requirements
 
@@ -121,9 +122,10 @@ drift check reads only committed scaffold inputs.
 
 The schema-7 manifest grants `[capabilities.required.log]` with `recall = true`
 and `fetch = true`. During `handleFrame`, the guest imports
-`maos:spirit/recall@2.3.0`, recalls up to 16 entries, then fetches the inbound
-frame id before echoing the frame. These imports are available only during
-`handleFrame`, not lifecycle hooks.
+`maos:spirit/recall@2.4.0`, recalls up to 16 entries, then fetches the inbound
+frame id before echoing the frame. These imports are available during `handleFrame`
+and the `idle`, `consolidate`, `telemetry` and `schedule` lifecycle exports; `pause`,
+`resume`, `snapshot`, `swap-in` and `migrate` are import-free.
 
 No pre-approved skill is required to launch the example.
 The example's first `handleFrame` calls

@@ -103,7 +103,7 @@ MAOS Spirit ABI는 14개의 라이프사이클 훅을 정의합니다. kernel은
 - `on_telemetry_event`: 훅 펌프는 해당 루트의 모든 `scalar.tap` 쓰기(`halt.context_provided` 같은 마커 포함)를 각 발행자의 쓰기 순서대로 전달합니다. 수신 대상은 어드미션된 컴파일 내장 Spirit 중 현재 클래스가 `observer`이고 상태가 `Running`인 모든 Spirit입니다. 이벤트의 `seq`는 한 루트 안에서 고유한 저장소 쓰기 식별 레이블이며, 시계나 정렬 키가 아닙니다.
 - `on_consolidate`: 어드미션된 모든 컴파일 내장 Spirit은 `Running` 상태에서 인바운드 프레임을 받지 않는 동안 자신의 `[scheduling].idle_window_ms`마다 한 번씩 빈 페이로드("지금 큐레이션하라")를 받습니다.
 
-스폰된 형태(WASM 컴포넌트와 CLI Worker)는 두 훅 모두 받지 않습니다. 두 훅 모두 `enabled_hooks`와 격리 상태를 따릅니다.
+`[cli_wrapper]` Worker는 Spirit 형태가 아니며 두 훅 모두 받지 않습니다. WASM 컴포넌트는 `lifecycle` export를 통해 두 훅을 모두 받습니다([아래](#spawned-wasm-component-spirits)). 텔레메트리 구독은 `on_telemetry_event`를 명시적으로 나열할 때만 이루어집니다. 두 훅 모두 `enabled_hooks`와 격리 상태를 따릅니다.
 
 텔레메트리 구독 권한은 manifest 필드가 아니라 운영자가 컴파일 내장 Observer 클래스를 어드미션하는 데서 나옵니다. 모든 부여/회수는 구독자의 pid에 `governance:telemetry-subscription:granted` / `governance:telemetry-subscription:revoked` 행으로 감사 기록되며, `maos audit query --spirit <id>`에서 볼 수 있습니다.
 
@@ -118,3 +118,31 @@ Observer 활동은 크기가 제한된 출력 큐를 사용하므로 훅은 진�
 모든 훅은 kernel과 상호작용하는 단일 표면인 `&mut Ctx`를 받습니다. 재정의하지 않은 훅은 no-op입니다.
 
 `[lifecycle].enabled_hooks` manifest 필드는 최적화이자 안전 선언입니다: kernel에 발화할 훅을 알려줍니다. 생략하거나 비워 두면 모든 훅이 활성화됩니다. 특정 훅을 나열하면 kernel이 나열되지 않은 훅의 디스패치를 건너뛰어 오버헤드를 줄이고 Spirit의 공격 표면을 좁힙니다. `on_swap_out`, `snapshot`, `migrate`를 포함한 14개 훅 이름을 모두 허용하므로, 훅을 명시적으로 나열한 Spirit도 핫스왑할 수 있습니다.
+
+## Spawned WASM component Spirits
+
+`maos:spirit@2.4.0`에 맞춰 빌드한 `wasm-component` Spirit은 선택적인 `maos:spirit/lifecycle` 인터페이스(world `spirit-lifecycle`)를 export할 수 있습니다. 그러면 kernel은 컴파일 내장 Spirit과 같은 디스패처, `enabled_hooks` 게이트, 예산, 격리 규칙으로 해당 컴포넌트에 도달합니다. export가 없는 컴포넌트(2.0–2.3 컴포넌트 전부, 또는 world `spirit`로 빌드한 것)는 계속 실행되며 호출되지 않을 뿐입니다. kernel의 probe에는 "lifecycle 없음"으로 응답합니다.
+
+| 트리거 (프로덕션 호출자) | Export |
+|---|---|
+| 유휴 구간 (idle watchdog) | `idle()` |
+| 통합 구간 (consolidation watchdog) | `consolidate(batch)` |
+| `scalar.tap` 쓰기 (훅 펌프) | `telemetry(event)` |
+| `[[schedule]]` 발화 (schedule watchdog) | `schedule(payload)` |
+| 일시 정지 / 재개 | `pause()` / `resume()` |
+| 핫스왑 | 선행 버전에서 `snapshot()`, 이어서 후속 버전에서 `swap-in(state)` (`--policy migrator`에서는 `migrate(state)`가 먼저) |
+
+- **한 번에 하나의 export, 프레임 턴 중에는 절대 호출하지 않음.** 대기 중인 프레임 턴이 트리거보다 먼저 처리되므로, 바쁜 트리거 호출자가 메일박스를 굶기지 못합니다.
+- **예산.** 각 export는 `[budget].time_cap_seconds`와 자체 명령어 fuel 아래에서 실행됩니다. 초과한 export는 kernel의 예산 초과 행을 만들고 세션이 끝납니다(자식 프로세스 종료, `spirit.lifecycle.deadline` 기록).
+- **실패.** 모든 export는 `result<_, lifecycle-error>`(`declined(string)` 또는 `failed(string)`)를 반환합니다. 디스패처는 거부를 패닉한 훅으로 기록하고 평소의 회계를 적용합니다. 어떤 export도 프레임을 내보내지 않습니다. kernel 트리거에는 인바운드 intent 계보가 없으므로, 효과는 import나 다음 프레임 턴을 통해 일어납니다. 훅 ABI는 게스트에 capability 토큰을 전달하지 않습니다.
+- **import.** `idle`, `consolidate`, `telemetry`, `schedule`은 `recall`, `context`, `skills`를 호출할 수 있으며, export마다 턴당 recall 한도에 집계됩니다. `pause`, `resume`, `snapshot`, `swap-in`, `migrate`는 import가 불가능(`unavailable`)하므로, 스왑 단계는 스왑 시점의 로그에 의존하지 않습니다.
+- **텔레메트리는 명시적 나열이 필요합니다.** 컴포넌트는 `[lifecycle].enabled_hooks`가 `on_telemetry_event`를 명시할 때만 `telemetry`를 받습니다. 빈 목록은 구독하지 않습니다(다른 모든 훅과 다릅니다). 같은 `governance:telemetry-subscription:granted` / `…:revoked` 행이 기록됩니다.
+- **스케줄.** `[[schedule]]` 항목은 모든 형태에 대해 어드미션 시점에 전달되므로, 컴포넌트의 스케줄은 첫 시작부터 발화합니다. Story 20-9의 kernel 랜딩(두 번째 랜딩) 전까지는, 선언된 부수 효과 권한이 거부된 예약 발화도 토큰 없이 실행됩니다.
+
+### Hot swap, upgrade and cold swap
+
+`maosctl spirit upgrade <id> --to <manifest>`는 컴포넌트를 제자리에서 교체합니다. 후속 버전도 컴포넌트여야 하고(`swap_form_mismatch`), 운영자가 이 pid에 어드미션한 범위를 넘는 capability를 선언할 수 없으며(`swap_capability_widened`), 두 버전 모두 `lifecycle`을 export해야 합니다(`spawned_swap_unsupported`. 실행 중인 컴포넌트가 아직 시작 중이면 `spawned_swap_not_ready`이므로 다시 시도하십시오). 아티팩트는 대상 manifest 옆에서 해석됩니다. 이 거부는 모두 무엇이든 교체되기 전에 일어나며, 실행 중인 버전은 계속 서비스합니다.
+
+후속 버전은 먼저 실행되고 probe됩니다. 이후 스왑은 턴 경계를 기다립니다. 진행 중인 턴은 자신의 lease 아래에서 선행 버전에서 끝나고, `snapshot`이 만들어지며, 후속 버전이 `swap-in`으로 받습니다. pid, 그 pid가 가진 모든 capability 토큰, 작업 메모리, 보류 중인 halt가 유지됩니다. 선행 버전의 자식 프로세스는 토큰을 회수하지 않고 은퇴합니다. 커밋된 스왑을 스왑 후 모니터가 되돌리면 선행 버전의 자식 프로세스는 이미 사라진 상태이므로, 세션은 기록되는 사유 `swap_reverted_after_retire`로 끝나고 Spirit은 언로드됩니다. 자동으로 복원되지 않습니다.
+
+`--policy cold-swap`은 데몬이 컴포넌트를 부팅할 때 쓰는 것과 같은 어드미션 경로로 후속 버전을 새 pid에 어드미션합니다. 토큰은 언로드로 회수되고 상태는 이어지지 않습니다. 후속 버전이 거부되면 보존된 manifest로 선행 버전을 또 다른 새 pid에 복원합니다(`cold_swap_reverted`). `[cli_wrapper]` 대상은 Spirit 형태가 아니며 `cli_wrapper_is_not_a_spirit_form`을 유지합니다.

@@ -1,6 +1,6 @@
-import type { IacFrame } from "maos:spirit/spirit@2.3.0";
-import { recall, fetch } from "maos:spirit/recall@2.3.0";
-import { author } from "maos:spirit/skills@2.3.0";
+import type { IacFrame } from "maos:spirit/spirit-lifecycle@2.4.0";
+import { recall, fetch } from "maos:spirit/recall@2.4.0";
+import { author } from "maos:spirit/skills@2.4.0";
 
 import { halt } from "./halt.js";
 
@@ -80,3 +80,43 @@ export function onShutdown(): void {
   started = false;
   authored = false;
 }
+
+let idles = 0;
+
+const text = new TextEncoder();
+const plain = new TextDecoder();
+
+/**
+ * The optional `maos:spirit/lifecycle@2.4.0` export (Story 20-9). The kernel calls one
+ * export at a time, under the manifest's `[budget].time_cap_seconds`, and never during a
+ * `handleFrame` turn. A Spirit without this export keeps working: it is simply never called.
+ *
+ * Every export returns `result<_, lifecycle-error>`; `jco` omits the wrapper, so success
+ * returns the value and a refusal throws `{ tag: "declined" | "failed", val: reason }`.
+ * None of them emits frames. `idle`, `consolidate`, `telemetry` and `schedule` may call
+ * `recall`, `context` and `skills`; `pause`, `resume`, `snapshot`, `swap-in` and `migrate`
+ * are import-free, so a hot swap never depends on the log.
+ */
+export const lifecycle = {
+  idle(): void {
+    idles += 1;
+  },
+  consolidate(_batch: Uint8Array): void {},
+  telemetry(_event: unknown): void {},
+  schedule(_payload: Uint8Array): void {},
+  pause(): void {},
+  resume(): void {},
+  /** The state this Spirit chooses to carry across a hot swap (at a turn boundary). */
+  snapshot(): Uint8Array {
+    return text.encode(String(idles));
+  },
+  /** The successor continues from the predecessor's snapshot (after `migrate`, if any). */
+  swapIn(state: Uint8Array): void {
+    const carried = Number(plain.decode(state));
+    idles = Number.isFinite(carried) ? carried : 0;
+  },
+  /** `--policy migrator`: turn a predecessor's snapshot into this version's state. */
+  migrate(state: Uint8Array): Uint8Array {
+    return state;
+  },
+};

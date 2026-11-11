@@ -21,7 +21,9 @@ fn typescript_authoring_imports_match_the_current_wit_package() {
         .find_map(|line| line.strip_prefix("package maos:spirit@"))
         .and_then(|version| version.strip_suffix(';'))
         .expect("root WIT must declare the maos:spirit package version");
-    let spirit = format!("\"maos:spirit/spirit@{package}\"");
+    // The template and example target `world spirit-lifecycle` (Story 20-9), whose generated
+    // declaration module carries the world's name.
+    let spirit = format!("\"maos:spirit/spirit-lifecycle@{package}\"");
     let recall = format!("\"maos:spirit/recall@{package}\"");
     let readme_package = format!("`maos:spirit@{package}`");
     let readme_recall = format!("`maos:spirit/recall@{package}`");

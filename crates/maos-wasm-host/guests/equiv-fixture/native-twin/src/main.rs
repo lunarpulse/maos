@@ -74,6 +74,22 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
+        // A session probes the runner's lifecycle export at start (Story 20-9); the twin has none.
+        if maos_wasm_host::lifecycle_wire::is_request(&frame_bytes) {
+            use maos_wasm_host::lifecycle_wire::{self as wire, LifecycleReply, LifecycleRequest};
+            let reply = match wire::decode_request(&frame_bytes) {
+                Ok(LifecycleRequest::Probe) => LifecycleReply::Supported(false),
+                _ => LifecycleReply::Unsupported,
+            };
+            let sent = wire::encode_reply(&reply)
+                .map_err(|_| ())
+                .and_then(|body| write_frame(&mut writer, &body).map_err(|_| ()));
+            if sent.is_err() {
+                return ExitCode::from(1);
+            }
+            let _ = writer.flush();
+            continue;
+        }
 
         let mut frame: IacFrame = match decode_cbor(&frame_bytes) {
             Ok(f) => f,

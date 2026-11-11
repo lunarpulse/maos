@@ -1,7 +1,8 @@
 # {{crate_name}}
 
 A TypeScript MAOS Spirit scaffold that builds a `wasm-component` implementing
-`maos:spirit@2.3.0`.
+`maos:spirit@2.4.0` (world `spirit-lifecycle`: the frame exports plus the optional
+`lifecycle` export).
 
 ## Requirements
 
@@ -91,12 +92,14 @@ truncated with a marker.
 
 The schema-7 manifest grants `[capabilities.required.log]` with `recall = true`
 and `fetch = true`. During `handleFrame`, the guest imports
-`maos:spirit/recall@2.3.0`, recalls up to 16 entries, then fetches the inbound
-frame id before echoing the frame. These imports are available only during
-`handleFrame`, not lifecycle hooks.
+`maos:spirit/recall@2.4.0`, recalls up to 16 entries, then fetches the inbound
+frame id before echoing the frame. These imports are available during
+`handleFrame` and inside the lifecycle exports `idle`, `consolidate`, `telemetry`
+and `schedule`; `pause`, `resume`, `snapshot`, `swap-in` and `migrate` are
+import-free.
 
 The template does not require a pre-approved skill to launch.
-`skills.author` and `skills.propose` run only inside `handleFrame` and return
+`skills.author` and `skills.propose` run only inside `handleFrame` and the lifecycle exports `idle`, `consolidate`, `telemetry` and `schedule`, and return
 `capability-denied`, `refused(code)` or `unavailable`. The host binds identity
 and telemetry; skills are never auto-admitted and no content import is offered.
 The explanation declaration is journaled, not enforced.
@@ -109,3 +112,16 @@ recall; `payload-available = false` means a header-only entry. A fetch returning
 are normal fetch outcomes. Imported result errors carry their variant in
 `.payload`; all recall errors and other fetch errors (including
 `capability-denied` and `unavailable`) propagate.
+
+## Lifecycle and hot swap
+
+The scaffold exports `lifecycle` (`maos:spirit/lifecycle@2.4.0`), so the kernel's
+budgeted triggers reach it (`idle`, `consolidate`, `telemetry`, `schedule`, `pause`,
+`resume`) and `maosctl spirit upgrade <name> --to <manifest>` swaps it in place: the
+pid, held capability tokens and working memory survive, and the state `snapshot`
+returns reaches the successor's `swap-in` (`migrate` first under
+`--policy migrator`). A refused swap leaves the running version untouched.
+`telemetry` arrives only if `[lifecycle].enabled_hooks` lists `on_telemetry_event`.
+To opt out, drop the `lifecycle` export and build with `--world-name spirit`: the
+Spirit then keeps running but cannot be swapped in place
+(`spawned_swap_unsupported`).

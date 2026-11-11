@@ -308,3 +308,11 @@ adr_ref = "ADR-031,ADR-045,ADR-060"
 status = "ratified"
 covered_changes = ["maos:spirit@2.3.0", "skills", "queued", "skill-error"]
 ratified_at = "2026-11-03"
+
+[[ratification]]
+proposal_id = "20-9-wit-spirit-2.4.0"
+summary = "Additive optional lifecycle export (idle, consolidate, telemetry, schedule, pause, resume, snapshot, swap-in, migrate) in a new spirit-lifecycle world; old guests unchanged"
+adr_ref = "ADR-031,ADR-045,ADR-060"
+status = "ratified"
+covered_changes = ["maos:spirit@2.4.0", "lifecycle", "lifecycle-error", "telemetry-event", "spirit-lifecycle"]
+ratified_at = "2026-11-10"

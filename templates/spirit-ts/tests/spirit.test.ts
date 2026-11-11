@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
-vi.mock("maos:spirit/recall@2.3.0", () => ({
+vi.mock("maos:spirit/recall@2.4.0", () => ({
   recall: vi.fn(),
   fetch: vi.fn(),
 }));
-vi.mock("maos:spirit/skills@2.3.0", () => ({ author: vi.fn() }));
+vi.mock("maos:spirit/skills@2.4.0", () => ({ author: vi.fn() }));
 
-import { recall, fetch } from "maos:spirit/recall@2.3.0";
-import { author } from "maos:spirit/skills@2.3.0";
-import { handleFrame, onShutdown, onStart } from "../src/index.js";
+import { recall, fetch } from "maos:spirit/recall@2.4.0";
+import { author } from "maos:spirit/skills@2.4.0";
+import { handleFrame, lifecycle, onShutdown, onStart } from "../src/index.js";
 
 // Imported WIT result errors are wrapped by componentize-js in this shape.
 function componentError(tag: string): Error {
@@ -92,5 +92,25 @@ describe("WASM component guest", () => {
     const error = { tag: "scope-violation" };
     vi.mocked(fetch).mockImplementation(() => { throw error; });
     expect(() => handleFrame(frame)).toThrow(expect.objectContaining(error));
+  });
+});
+
+describe("lifecycle export", () => {
+  it("hands the successor the predecessor's snapshot", () => {
+    lifecycle.swapIn(new TextEncoder().encode("0"));
+    lifecycle.idle();
+    lifecycle.idle();
+    const state = lifecycle.snapshot();
+    expect(new TextDecoder().decode(state)).toBe("2");
+    lifecycle.swapIn(state);
+    lifecycle.idle();
+    expect(new TextDecoder().decode(lifecycle.snapshot())).toBe("3");
+  });
+
+  it("treats a corrupt snapshot as no state and migrates unchanged", () => {
+    lifecycle.swapIn(new TextEncoder().encode("not a number"));
+    expect(new TextDecoder().decode(lifecycle.snapshot())).toBe("0");
+    const state = new Uint8Array([1, 2, 3]);
+    expect(lifecycle.migrate(state)).toEqual(state);
   });
 });

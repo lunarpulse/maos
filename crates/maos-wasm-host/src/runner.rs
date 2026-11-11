@@ -15,7 +15,7 @@
 //! 1. Parse CLI arguments and create a fuel-metered wasmtime engine.
 //! 2. Compile the component under a watchdog, then reject an incompatible
 //!    `maos:spirit/frames` import before instantiation.
-//! 3. Instantiate it against the `maos:spirit@2.3.0` bindings, call
+//! 3. Instantiate it against the `maos:spirit@2.4.0` bindings, call
 //!    `on-start`, and exchange typed frames with `handle-frame`.
 //! 4. On EOF or a guest-returned `Halt`, call `on-shutdown` and use the
 //!    cause-distinguishing exit codes below.
@@ -42,7 +42,9 @@ use wasmtime::component::{Component, Linker};
 use wasmtime::{Config, Engine, Store};
 
 use maos_wasm_host::host_state::HostState;
-use maos_wasm_host::wit_guest::{self, legacy as legacy_guest};
+use maos_wasm_host::lifecycle_wire::{self, LifecycleReply, LifecycleRequest};
+use maos_wasm_host::recall_wire::WireBytes;
+use maos_wasm_host::wit_guest::{self, legacy as legacy_guest, lifecycle as lifecycle_guest};
 
 /// Distinguishable exit codes so the parent (kernel) can attribute the kill
 /// cause from the exit status alone, without parsing stderr text. AC4/D6:
@@ -79,7 +81,7 @@ fn main() -> ExitCode {
         Err(RunError::IncompatibleWorld(import)) => {
             eprintln!(
                 "maos-wasm-runner: IncompatibleWorld: component imports {import}; \
-                 this runner implements maos:spirit@2.3.0"
+                 this runner implements maos:spirit@2.4.0"
             );
             ExitCode::from(RunnerExit::IncompatibleWorld as u8)
         }
@@ -260,9 +262,8 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
     // 2.0/2.1 have the same export schema, but its input enums are closed:
     // select their bindings before instantiation rather than widening them.
     macro_rules! run_guest {
-        ($bindings:path, $pump:ident) => {{
-    use $bindings as bindings;
-    let spirit = match bindings::Spirit::instantiate(&mut store, &component, &linker) {
+        ($spirit:ty, $pump:ident) => {{
+    let spirit = match <$spirit>::instantiate(&mut store, &component, &linker) {
         Ok(spirit) => spirit,
         Err(error) => {
             let error_message = error.to_string();
@@ -270,7 +271,7 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
                 return Err(RunError::OutOfFuel);
             }
             return Err(RunError::InvalidComponent(format!(
-                "component does not conform to maos:spirit@2.3.0 (instantiate failed): {error_message}"
+                "component does not conform to maos:spirit@2.4.0 (instantiate failed): {error_message}"
             )));
         }
     };
@@ -331,9 +332,11 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
                 .is_some_and(|version| matches!(version.split('.').nth(1), Some("0" | "1")))
         });
     if legacy {
-        run_guest!(maos_wasm_host::wit_guest::legacy, pump_legacy)
+        run_guest!(legacy_guest::Spirit, pump_legacy)
+    } else if exports_lifecycle(&component, &engine) {
+        run_guest!(lifecycle_guest::SpiritLifecycle, pump_lifecycle)
     } else {
-        run_guest!(maos_wasm_host::wit_guest, pump_frames)
+        run_guest!(wit_guest::Spirit, pump_frames)
     }
 }
 
@@ -361,21 +364,36 @@ fn compile_with_timeout(engine: &Engine, bytes: Vec<u8>) -> Result<Component, Ru
     }
 }
 
-/// Reject unsupported major versions of Spirit host interfaces.
-/// Semver-compatible 2.0–2.2 imports resolve against the 2.3 definitions.
+/// Reject unsupported major versions of Spirit host interfaces and of the `lifecycle` export.
+/// Semver-compatible 2.0–2.3 imports resolve against the 2.4 definitions.
 fn incompatible_spirit_import(component: &Component, engine: &Engine) -> Option<String> {
+    let ty = component.component_type();
+    let major_is_not_2 = |name: &str, version: &str| -> Option<String> {
+        let major = version.split('.').next()?.parse::<u64>().ok()?;
+        (major != 2).then(|| name.to_owned())
+    };
+    let import = ty.imports(engine).find_map(|(name, _)| {
+        let version = name
+            .strip_prefix("maos:spirit/frames@")
+            .or_else(|| name.strip_prefix("maos:spirit/recall@"))
+            .or_else(|| name.strip_prefix("maos:spirit/context@"))
+            .or_else(|| name.strip_prefix("maos:spirit/skills@"))?;
+        major_is_not_2(name, version)
+    });
+    import.or_else(|| {
+        ty.exports(engine).find_map(|(name, _)| {
+            major_is_not_2(name, name.strip_prefix("maos:spirit/lifecycle@")?)
+        })
+    })
+}
+
+/// The component exports `maos:spirit/lifecycle` (any 2.x): the runner selects the
+/// `spirit-lifecycle` bindings.
+fn exports_lifecycle(component: &Component, engine: &Engine) -> bool {
     component
         .component_type()
-        .imports(engine)
-        .find_map(|(name, _)| {
-            let version = name
-                .strip_prefix("maos:spirit/frames@")
-                .or_else(|| name.strip_prefix("maos:spirit/recall@"))
-                .or_else(|| name.strip_prefix("maos:spirit/context@"))
-                .or_else(|| name.strip_prefix("maos:spirit/skills@"))?;
-            let major = version.split('.').next()?.parse::<u64>().ok()?;
-            (major != 2).then(|| name.to_owned())
-        })
+        .exports(engine)
+        .any(|(name, _)| name.starts_with("maos:spirit/lifecycle@2."))
 }
 
 fn classify_trap(err: wasmtime::Error) -> RunError {
@@ -387,17 +405,22 @@ fn classify_trap(err: wasmtime::Error) -> RunError {
     RunError::Other(format!("guest call failed: {err:#}"))
 }
 
-// Both versions retain identical fuel, protocol, atomicity and trap handling.
+// Every world retains identical fuel, protocol, atomicity and trap handling.
 macro_rules! frame_pump {
-    ($name:ident, $bindings:ident, $bridge:path) => {
-fn $name(store: &mut Store<HostState>, spirit: &$bindings::Spirit, fuel: u64) -> Result<(), RunError> {
+    ($name:ident, $spirit:ty, $halt:path, $bridge:path, $lifecycle:path) => {
+fn $name(store: &mut Store<HostState>, spirit: &$spirit, fuel: u64) -> Result<(), RunError> {
     use $bridge as frame_bridge;
+    use $halt as HaltKind;
     loop {
         let frame_bytes = match maos_frame_codec::read_frame(&mut store.data_mut().reader) {
             Ok(Some(b)) => b,
             Ok(None) => return Ok(()), // Clean EOF — Halt::Voluntary.
             Err(e) => return Err(RunError::Other(format!("stdin read error: {e}"))),
         };
+        if lifecycle_wire::is_request(&frame_bytes) {
+            serve_lifecycle(store, spirit, fuel, &frame_bytes, $lifecycle)?;
+            continue;
+        }
 
         let domain_frame: maos_domain::frame::IacFrame =
             maos_wasm_host::codec::decode_cbor(&frame_bytes)
@@ -418,7 +441,7 @@ fn $name(store: &mut Store<HostState>, spirit: &$bindings::Spirit, fuel: u64) ->
         store.data_mut().in_export = false;
         let emitted = match result {
             Ok(Ok(frames)) => frames,
-            Ok(Err($bindings::maos::spirit::frames::Halt::Voluntary)) => {
+            Ok(Err(HaltKind::Voluntary)) => {
                 maos_frame_codec::write_frame(&mut store.data_mut().writer, &[])
                     .map_err(|e| RunError::Other(format!("TurnComplete write: {e}")))?;
                 return turn_result(store);
@@ -458,12 +481,142 @@ fn $name(store: &mut Store<HostState>, spirit: &$bindings::Spirit, fuel: u64) ->
 }
     };
 }
-frame_pump!(pump_frames, wit_guest, maos_wasm_host::frame_bridge);
+frame_pump!(
+    pump_frames,
+    wit_guest::Spirit,
+    wit_guest::maos::spirit::frames::Halt,
+    maos_wasm_host::frame_bridge,
+    unsupported_lifecycle
+);
+frame_pump!(
+    pump_lifecycle,
+    wit_guest::lifecycle::SpiritLifecycle,
+    wit_guest::maos::spirit::frames::Halt,
+    maos_wasm_host::frame_bridge,
+    call_lifecycle
+);
 frame_pump!(
     pump_legacy,
-    legacy_guest,
-    maos_wasm_host::frame_bridge::legacy
+    legacy_guest::Spirit,
+    legacy_guest::maos::spirit::frames::Halt,
+    maos_wasm_host::frame_bridge::legacy,
+    unsupported_lifecycle
 );
+
+/// A guest without the `lifecycle` export answers `Probe` with `Supported(false)` and every
+/// trigger with `Unsupported`, and no export is called.
+fn unsupported_lifecycle<S>(
+    _store: &mut Store<HostState>,
+    _spirit: &S,
+    request: LifecycleRequest,
+) -> Result<LifecycleReply, RunError> {
+    Ok(match request {
+        LifecycleRequest::Probe => LifecycleReply::Supported(false),
+        _ => LifecycleReply::Unsupported,
+    })
+}
+
+fn clip(detail: String) -> String {
+    detail
+        .chars()
+        .take(maos_wasm_host::lifecycle_wire::MAX_DETAIL_CHARS)
+        .collect()
+}
+
+/// One lifecycle export per request, under the per-export fuel the caller set. A trap is the
+/// poisoned instance's error exit and is never retried.
+fn call_lifecycle(
+    store: &mut Store<HostState>,
+    spirit: &lifecycle_guest::SpiritLifecycle,
+    request: LifecycleRequest,
+) -> Result<LifecycleReply, RunError> {
+    use lifecycle_guest::exports::maos::spirit::lifecycle::{LifecycleError, TelemetryEvent};
+    fn unit(
+        result: wasmtime::Result<Result<(), LifecycleError>>,
+    ) -> wasmtime::Result<LifecycleReply> {
+        Ok(match result? {
+            Ok(()) => LifecycleReply::Done,
+            Err(LifecycleError::Declined(detail)) => LifecycleReply::Declined(clip(detail)),
+            Err(LifecycleError::Failed(detail)) => LifecycleReply::Failed(clip(detail)),
+        })
+    }
+    fn blob(
+        result: wasmtime::Result<Result<Vec<u8>, LifecycleError>>,
+    ) -> wasmtime::Result<LifecycleReply> {
+        Ok(match result? {
+            Ok(bytes) => LifecycleReply::State(WireBytes(bytes)),
+            Err(LifecycleError::Declined(detail)) => LifecycleReply::Declined(clip(detail)),
+            Err(LifecycleError::Failed(detail)) => LifecycleReply::Failed(clip(detail)),
+        })
+    }
+    if matches!(request, LifecycleRequest::Probe) {
+        return Ok(LifecycleReply::Supported(true));
+    }
+    let guest = spirit.maos_spirit_lifecycle();
+    store.data_mut().in_export = request.imports_allowed();
+    let result = match request {
+        LifecycleRequest::Probe => return Ok(LifecycleReply::Supported(true)),
+        LifecycleRequest::Idle => unit(guest.call_idle(&mut *store)),
+        LifecycleRequest::Consolidate { batch } => {
+            unit(guest.call_consolidate(&mut *store, &batch.0))
+        }
+        LifecycleRequest::Telemetry {
+            seq,
+            spirit_id,
+            tag,
+            value,
+            timestamp_ms,
+        } => unit(guest.call_telemetry(
+            &mut *store,
+            &TelemetryEvent {
+                seq,
+                spirit_id,
+                tag,
+                value,
+                timestamp_ms,
+            },
+        )),
+        LifecycleRequest::Schedule { payload } => {
+            unit(guest.call_schedule(&mut *store, &payload.0))
+        }
+        LifecycleRequest::Pause => unit(guest.call_pause(&mut *store)),
+        LifecycleRequest::Resume => unit(guest.call_resume(&mut *store)),
+        LifecycleRequest::Snapshot => blob(guest.call_snapshot(&mut *store)),
+        LifecycleRequest::SwapIn { state } => unit(guest.call_swap_in(&mut *store, &state.0)),
+        LifecycleRequest::Migrate { state } => blob(guest.call_migrate(&mut *store, &state.0)),
+    };
+    store.data_mut().in_export = false;
+    result.map_err(|trap| {
+        // Machine-readable stage, as for a `handle-frame` trap.
+        eprintln!("{{\"event\":\"guest_export_failed\",\"export\":\"lifecycle\",\"stage\":\"canonical-call\"}}");
+        classify_trap(trap)
+    })
+}
+
+/// Answer one in-band lifecycle request: per-export fuel, one tagged reply, never a
+/// `TurnComplete`. A reply too large for one record is a typed `Failed`, not a truncation.
+fn serve_lifecycle<S>(
+    store: &mut Store<HostState>,
+    spirit: &S,
+    fuel: u64,
+    body: &[u8],
+    call: fn(&mut Store<HostState>, &S, LifecycleRequest) -> Result<LifecycleReply, RunError>,
+) -> Result<(), RunError> {
+    let request = lifecycle_wire::decode_request(body)
+        .map_err(|e| RunError::Other(format!("lifecycle request decode error: {e}")))?;
+    store
+        .set_fuel(fuel)
+        .map_err(|e| RunError::Other(e.to_string()))?;
+    let reply = call(store, spirit, request)?;
+    turn_result(store)?;
+    let encoded = lifecycle_wire::encode_reply(&reply)
+        .or_else(|_| {
+            lifecycle_wire::encode_reply(&LifecycleReply::Failed("reply_too_large".into()))
+        })
+        .map_err(|e| RunError::Other(format!("lifecycle reply encode error: {e}")))?;
+    maos_frame_codec::write_frame(&mut store.data_mut().writer, &encoded)
+        .map_err(|e| RunError::Other(format!("lifecycle reply write: {e}")))
+}
 
 fn turn_result(store: &Store<HostState>) -> Result<(), RunError> {
     if store.data().recall_broken {

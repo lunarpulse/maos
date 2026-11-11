@@ -1,0 +1,186 @@
+# Branch-only recipe. Copy to .github/workflows on ci/20-9-verify; not installed on main.
+# UNVERIFIED: no hosted run exists. AC6 (TypeScript example hot swap on release builds, the
+# swap-in-removed plant) and the macOS / Windows compile legs are hosted-only.
+name: 20-9 L1 hosted proof
+on:
+  push:
+    branches: ['ci/20-9-verify']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  componentize-js:
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Template and example at WIT 2.4.0 (spirit-lifecycle world)
+        run: |
+          set -euo pipefail
+          cmp wit/spirit.wit templates/spirit-ts/wit/spirit.wit
+          cmp wit/spirit.wit examples/example-spirit-ts/wit/spirit.wit
+          (cd templates/spirit-ts && npm ci && npm test)
+          (cd examples/example-spirit-ts && npm ci && npm test && npm run build && npm run componentize)
+  wasm-host-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - run: cargo run --locked -p xtask -- build-test-fixtures
+      - name: AC1 runner and WIT corpus
+        run: cargo nextest run --locked -p maos-wasm-host --test wit_corpus --test lifecycle_runner_20_9
+      - name: AC2-AC5 triggers, swap, cold swap and the real door
+        env:
+          MAOS_17_2_CGROUP_MODE: undelegated
+        run: >
+          cargo nextest run --locked -p maos-bin --features maos-bin/wasm-host
+          --test spawned_lifecycle_20_9 --test spawned_swap_20_9 --test spawned_door_20_9
+          --test hook_pump_17_4 --test wasm_form_admission_17_3b --test root_shutdown_unload_16_3
+          --test one_daemon_one_door_16_1
+  check-wasm-form-equiv:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo run --locked -p xtask -- build-test-fixtures
+      - run: cargo run --locked -p xtask -- check-equiv-fixture-provenance --json
+      - run: cargo run --locked -p xtask -- check-wasm-form-equiv --json
+  epic-20-exit-swap:
+    needs: [componentize-js, wasm-host-tests]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        swap_in: [declared, removed-plant]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the example (componentized WITHOUT the lifecycle export in the plant case) and the RELEASE production surfaces
+        env:
+          SWAP_IN_CASE: ${{ matrix.swap_in }}
+        run: |
+          set -euo pipefail
+          (cd examples/example-spirit-ts && npm ci && npm run build && npm run componentize)
+          if [ "$SWAP_IN_CASE" = removed-plant ]; then
+            # `swap-in` cannot be dropped alone: `lifecycle` is exported whole or not at all. The
+            # plant componentizes the same build against the plain `spirit` world, which has no
+            # lifecycle export (the guest a swap must refuse typed).
+            (cd examples/example-spirit-ts && npx componentize-js dist/index.js --wit wit --world-name spirit --disable http fetch-event -o dist/spirit.wasm)
+          fi
+          cargo build --locked --release -p maos-bin --features wasm-host --bin maos
+          cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner
+          cargo build --locked --release -p maos-cli --bin maosctl
+      - name: Boot v1, drive idle, hot-swap to v+1 at the same pid
+        shell: bash
+        env:
+          SWAP_IN_CASE: ${{ matrix.swap_in }}
+        run: |
+          set -euo pipefail
+          target="$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          export PATH="$target/release:$PATH"
+          scratch="$(mktemp -d)"
+          export HOME="$scratch/home" MAOS_HOME="$scratch/home/.maos" XDG_DATA_HOME="$scratch/home/.local/share" XDG_CONFIG_HOME="$scratch/home/.config" XDG_RUNTIME_DIR="$scratch/run" MAOS_IDLE_FAST=1 MAOS_NOTIFY_DISABLE=1
+          mkdir -p "$HOME" "$XDG_RUNTIME_DIR" "$scratch/package/dist"
+          cp examples/example-spirit-ts/dist/spirit.wasm "$scratch/package/dist/spirit.wasm"
+          cp examples/example-spirit-ts/manifest.toml "$scratch/package/v1.toml"
+          sed 's/^version = "0.1.0"/version = "0.2.0"/' examples/example-spirit-ts/manifest.toml > "$scratch/package/v2.toml"
+          grep -q '^version = "0.2.0"' "$scratch/package/v2.toml"
+          maos init --plain
+          maos run "$scratch/package/v1.toml" > daemon.out 2> daemon.err &
+          daemon=$!
+          trap 'kill -TERM "$daemon" 2>/dev/null || true; wait "$daemon" 2>/dev/null || true' EXIT
+          ok=0
+          for i in $(seq 1 1200); do
+            if maosctl spirit inspect example-spirit-ts 2>/dev/null | grep -q '^lifecycle_state: Running'; then ok=1; break; fi
+            sleep 0.1
+          done
+          [ "$ok" -eq 1 ] || { cat daemon.err; exit 1; }
+          pid_before="$(maosctl spirit inspect example-spirit-ts | sed -n 's/^pid: //p')"
+          sleep 5   # MAOS_IDLE_FAST: the example's `idle` export runs at least once
+          set +e
+          maosctl spirit upgrade example-spirit-ts --to "$scratch/package/v2.toml" --policy hot-swap > swap.out 2>&1
+          status=$?
+          set -e
+          cat swap.out
+          if [ "$SWAP_IN_CASE" = removed-plant ]; then
+            # The plant: no swap-in export => typed refusal before anything is replaced.
+            test "$status" -ne 0
+            grep -F 'spawned_swap_unsupported' swap.out
+          else
+            test "$status" -eq 0
+            pid_after="$(maosctl spirit inspect example-spirit-ts | sed -n 's/^pid: //p')"
+            test "$pid_before" = "$pid_after"
+            maosctl audit query --intent governance:manifest-declaration > declarations.ndjson
+            python3 - <<'PY'
+          import json
+          rows = [json.loads(l) for l in open("declarations.ndjson") if l.strip()]
+          ver = [r for r in rows if '"0.2.0"' in r.get("payload", "")]
+          assert len(ver) == 1, ver
+          PY
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 20-9-hosted-swap-${{ matrix.swap_in }}
+          path: |
+            daemon.out
+            daemon.err
+            swap.out
+            declarations.ndjson
+  portability:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-14, target: aarch64-apple-darwin}
+          - {os: windows-2022, target: x86_64-pc-windows-msvc}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --locked --workspace --all-targets --target ${{ matrix.target }}
+      - run: cargo check --locked -p maos-bin --all-targets --features maos-bin/wasm-host --target ${{ matrix.target }}
+  no-default-features:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --locked -p maos-bin --no-default-features --test verb_table_15_3

@@ -1,0 +1,10 @@
+maos run exit=124
+== stdout
+{"event":"spirit_loaded","spirit_id":"lifecycle-probe","pid":1,"child_pid":1049444,"ready":true}
+== stderr (tail)
+maos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)
+maos: yank cadence=300s policy=warn registry-fetch=disabled
+maos: root supervision armed
+maos: escape-anomaly consumer wired (Story 17-10, ADR-024)
+maos: escape-anomaly consumer stopped (final scan: 0 anomaly line(s), 0 failed scan(s))
+Error: Child(Signaled { signal: 15 })

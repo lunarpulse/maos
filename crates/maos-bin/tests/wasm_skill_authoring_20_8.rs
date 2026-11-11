@@ -17,7 +17,7 @@ fn default_build_checks_the_versioned_skill_import() {
             .as_ref()
             .unwrap()
             .to_string(),
-        "2.3.0"
+        "2.4.0"
     );
     let world = resolve
         .worlds
@@ -289,6 +289,7 @@ author_self = {granted}
             once: true,
             initial_frame: Some(seed(script)),
             scopes,
+            origin: std::path::PathBuf::new(),
         };
         let deps = SessionDeps {
             supervisor: Arc::clone(&supervisor),

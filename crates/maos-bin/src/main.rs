@@ -3325,6 +3325,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let factory_scheduler = Arc::clone(&scheduler);
     let factory_activity_sink = hook_pump.activity_sink();
     let factory_redistill_sink = hook_pump.redistill_sink();
+    #[cfg(feature = "wasm-host")]
+    let swap_slot = maos_bin::spawned_lifecycle::SwapSlot::default();
+    #[cfg(feature = "wasm-host")]
+    let factory_swap_slot = swap_slot.clone();
+    #[cfg(feature = "wasm-host")]
+    let hosted_sessions: Arc<maos_bin::spawned_lifecycle::HostedSessions> = Arc::default();
     let successor_factory: Arc<dyn maos_kernel_core::lifecycle::SuccessorSpiritFactory> = Arc::new(
         move |manifest: &maos_kernel_core::scheduler::SpiritManifestBundle| {
             let class = manifest.class.as_ref().ok_or_else(|| {
@@ -3332,14 +3338,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     reason: "successor manifest lacks [class]".into(),
                 }
             })?;
-            // This factory cannot adopt a live spawned-session binding.
-            if !class.forms.iter().any(|form| form == "rust-inproc") {
+            // Story 20-9 — a swap replaces a spawned Spirit with a spawned successor, and an
+            // in-process one with an in-process successor; the form never changes at a pid.
+            let successor_spawned = !class.forms.iter().any(|form| form == "rust-inproc");
+            #[cfg(feature = "wasm-host")]
+            let handles = factory_swap_slot.get();
+            #[cfg(feature = "wasm-host")]
+            let predecessor_spawned = handles
+                .as_ref()
+                .is_some_and(|handles| handles.target(&class.name).is_some());
+            #[cfg(not(feature = "wasm-host"))]
+            let predecessor_spawned = false;
+            if predecessor_spawned != successor_spawned {
                 return Err(
                     maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
-                        reason: maos_bin::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
-                            surface: "hot-swap successor",
-                        }
-                        .to_string(),
+                        reason: format!(
+                            "swap_form_mismatch: '{}' is {} and the successor is {}",
+                            class.name,
+                            if predecessor_spawned {
+                                "spawned"
+                            } else {
+                                "in-process"
+                            },
+                            if successor_spawned {
+                                "spawned"
+                            } else {
+                                "in-process"
+                            },
+                        ),
+                    },
+                );
+            }
+            #[cfg(feature = "wasm-host")]
+            if let Some(handles) = handles.as_deref().filter(|_| successor_spawned) {
+                // The pre-warm blocks on the successor's runner start; keep the runtime moving.
+                return tokio::task::block_in_place(|| {
+                    maos_bin::spawned_lifecycle::spawned_successor(
+                        handles,
+                        &factory_transparency_log,
+                        manifest,
+                        factory_successor_slot.peek(),
+                        factory_successor_slot.peek_origin(),
+                    )
+                })
+                .map_err(|reason| {
+                    maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory { reason }
+                });
+            }
+            if successor_spawned {
+                return Err(
+                    maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+                        reason: "spawned_swap_unsupported: this root hosts no WASM runner".into(),
                     },
                 );
             }
@@ -3549,6 +3598,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }),
             hooks: Arc::clone(&hook_pump),
             butler_principal: Arc::clone(&butler_principal),
+            #[cfg(feature = "wasm-host")]
+            swap_slot: swap_slot.clone(),
         });
         let door = Arc::new(maos_bin::operator_door::OperatorDoor::new(
             Arc::clone(&scheduler),
@@ -4328,7 +4379,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 journal: &shared_journal,
                 memory: &memory,
                 pid_by_spirit_id: &pid_by_spirit_id,
-                hooks: None,
+                hooks: Some(&*hook_pump),
             },
             &selected_crypto,
             boot_nonce,
@@ -4837,6 +4888,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .expect("root supervision was just armed")
                 .supervisor(),
         );
+        // Story 20-9 — a spawned predecessor's swap launches its successor through these, and
+        // the door's cold swap admits a component's successor and hosts its session.
+        #[cfg(feature = "wasm-host")]
+        if let Some(host) = spirit_host.as_ref() {
+            let (capability, security, iac) = (
+                Arc::clone(&capability),
+                Arc::clone(&security),
+                Arc::clone(&iac),
+            );
+            let (journal, log_recall) = (
+                Arc::clone(&transparency_log),
+                Arc::clone(&log_recall_adapter),
+            );
+            let (lifecycle_journal, pids) =
+                (Arc::clone(&shared_journal), Arc::clone(&pid_by_spirit_id));
+            let (enterprise, pdp, skill) = (
+                enterprise_runtime.clone(),
+                enterprise_pdp_runtime.clone(),
+                wasm_skill.clone(),
+            );
+            let handles = Arc::new(maos_bin::spawned_lifecycle::SwapHandles {
+                supervisor: Arc::downgrade(&root_worker_supervision),
+                host: Arc::clone(host),
+                session: Arc::new(move |supervisor| maos_bin::spirit_session::SessionDeps {
+                    supervisor,
+                    capability: Arc::clone(&capability),
+                    security: Arc::clone(&security),
+                    iac: Arc::clone(&iac),
+                    journal: Arc::clone(&journal),
+                    log_recall: Arc::clone(&log_recall),
+                    lifecycle_journal: Arc::clone(&lifecycle_journal),
+                    pid_by_spirit_id: Arc::clone(&pids),
+                    enterprise: enterprise.clone(),
+                    pdp: pdp.clone(),
+                    skill: skill.clone(),
+                }),
+                hosted: Arc::clone(&hosted_sessions),
+            });
+            swap_slot.set(&handles);
+            root_worker_supervision.keep_swap_handles(handles);
+        }
         // Story 19-6 (D-19-6-01/05 A) — a crashed Worker's orphan reaches its
         // local originator, and the supervisor's disposition executor shares
         // the root's resolver. Host B's cohort arm installs neither (D-07 A).
@@ -6730,8 +6822,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     journal: &shared_journal,
                     memory: &memory,
                     pid_by_spirit_id: &pid_by_spirit_id,
-                    // Story 17-4 — the WASM arm (`kind == None`) never registers.
-                    hooks: kind.is_some().then_some(&*hook_pump),
+                    // Story 20-9 — a spawned form registers too (consolidate; telemetry only
+                    // when its manifest lists it).
+                    hooks: Some(&*hook_pump),
                 },
                 &gated,
                 spirit_obj,
@@ -6829,6 +6922,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut once_interrupted = false;
                 let once_result: Result<(), Box<dyn std::error::Error>> = async {
                     if let Some(result) = spawned_result {
+                        // Story 20-9 — a cold swap replaces the session this root hosts: the
+                        // root outlives it while a swap is in flight or a successor session runs.
+                        #[cfg(feature = "wasm-host")]
+                        hosted_sessions.wait_idle().await;
                         return result;
                     }
                     // A signal that arrived BEFORE the pass means the pass never
@@ -8198,7 +8295,7 @@ description = "smoke test spirit successor"
                 &dummy_manifest_path,
                 &dummy_manifest_path,
                 maos_kernel_core::lifecycle::UpgradePolicy::HotSwap,
-                |path| {
+                |path, _source| {
                     enforce_vetted_upgrade_precondition("smoke-spirit", path, Default::default())
                         .map_err(Into::into)
                 },
@@ -10049,6 +10146,9 @@ struct BinPrivateOpsImpl {
     hooks: Arc<maos_bin::hook_pump::HookPump>,
     /// Story 19-2 (D-19-2-08 A) — the boot-bound Butler principal.
     butler_principal: Arc<std::sync::OnceLock<String>>,
+    /// Story 20-9 — the root's spawned-form handles, filled once its supervision is armed.
+    #[cfg(feature = "wasm-host")]
+    swap_slot: maos_bin::spawned_lifecycle::SwapSlot,
 }
 
 #[cfg(feature = "network")]
@@ -10140,7 +10240,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
             target_manifest,
             original_target,
             policy,
-            |path| {
+            |path, source| {
                 enforce_vetted_upgrade_precondition(spirit_id, path, evidence).map_err(
                     |detail| maos_bin::operator_door::UpgradeFailure {
                         code: "vetting_precondition_failed",
@@ -10148,7 +10248,20 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                         invalid: true,
                     },
                 )?;
-                self.successor_manifest_slot.stage(path.to_path_buf());
+                // The final hop is the door's private snapshot; its `artifact` stays where the
+                // operator named the target. An intermediate hop is the plan's own file.
+                let origin = if source == target_manifest {
+                    original_target
+                } else {
+                    source
+                }
+                .parent()
+                .map_or_else(
+                    || std::path::PathBuf::from("."),
+                    std::path::Path::to_path_buf,
+                );
+                self.successor_manifest_slot
+                    .stage_at(path.to_path_buf(), origin);
                 Ok(())
             },
             |text| self.record_upgraded_manifest(spirit_id, text),
@@ -10272,6 +10385,103 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
             &gated.manifest_toml,
         );
         Ok(admitted)
+    }
+
+    #[cfg(feature = "wasm-host")]
+    async fn load_spawned(
+        &self,
+        manifest: &std::path::Path,
+        origin: &std::path::Path,
+    ) -> Result<maos_bin::admission::Admitted, maos_bin::admission::AdmissionRefusal> {
+        let text = maos_bin::admission::read_manifest(manifest)?;
+        let gated = self.prepare_spawned_restore(manifest, &text, origin)?;
+        let handles = self.swap_slot.get().ok_or(
+            maos_bin::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
+                surface: "operator door",
+            },
+        )?;
+        let admitted = handles
+            .admit_spawned(
+                &maos_bin::admission::AdmissionDeps {
+                    providers: self.provider_catalog.get(),
+                    iac: Some(&self.iac),
+                    scheduler: &self.scheduler,
+                    security: &self.security,
+                    transparency_log: &self.transparency_log,
+                    journal: &self.shared_journal,
+                    memory: &self.memory,
+                    pid_by_spirit_id: &self.pid_by_spirit_id,
+                    hooks: Some(&self.hooks),
+                },
+                self.spirit_build.boot_nonce,
+                &gated,
+                manifest,
+                origin,
+            )
+            .await
+            .map_err(|refusal| {
+                maos_bin::admission::emit_structural_rejection(
+                    &self.transparency_log,
+                    &text,
+                    &refusal,
+                );
+                refusal
+            })?;
+        record_admitted_manifest(
+            &self.admitted_manifests,
+            &gated.spirit_id,
+            &gated.manifest_toml,
+        );
+        Ok(admitted)
+    }
+
+    #[cfg(feature = "wasm-host")]
+    fn prepare_spawned_restore(
+        &self,
+        manifest: &std::path::Path,
+        manifest_toml: &str,
+        origin: &std::path::Path,
+    ) -> Result<maos_bin::admission::GatedManifest, maos_bin::admission::AdmissionRefusal> {
+        let mut gated = maos_bin::admission::gate_manifest(manifest_toml, &|_| false)?;
+        gated.bind_registry_package_at(manifest)?;
+        if let Some(section) = &gated.providers {
+            maos_bin::admission::check_provider_pins(section, self.provider_catalog.get())?;
+        }
+        if self.swap_slot.get().is_none() {
+            return Err(
+                maos_bin::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
+                    surface: "operator door",
+                },
+            );
+        }
+        // The artifact must still be where the Spirit was launched from, or the restore of a
+        // refused cold swap would leave the Spirit absent.
+        let artifact = gated.class_section.artifact.as_deref().unwrap_or_default();
+        origin.join(artifact).canonicalize().map_err(|error| {
+            maos_bin::admission::AdmissionRefusal::ClassBuild {
+                detail: format!(
+                    "component artifact {artifact:?} under {}: {error}",
+                    origin.display()
+                ),
+            }
+        })?;
+        Ok(gated)
+    }
+
+    #[cfg(feature = "wasm-host")]
+    fn spawned_origin(&self, spirit_id: &str) -> Option<std::path::PathBuf> {
+        self.swap_slot
+            .get()?
+            .target(spirit_id)?
+            .lifecycle()
+            .swap_context()
+            .map(|context| context.origin)
+    }
+
+    #[cfg(feature = "wasm-host")]
+    fn hold_hosted_sessions(&self) -> Option<Box<dyn std::any::Any + Send>> {
+        let handles = self.swap_slot.get()?;
+        Some(Box::new(handles.hosted.hold()))
     }
 
     fn admitted_manifest(&self, spirit_id: &str) -> Option<Arc<String>> {

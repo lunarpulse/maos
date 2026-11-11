@@ -84,6 +84,9 @@ pub mod researcher_root;
 pub mod shell_host;
 #[cfg(feature = "network")]
 pub mod skill_authoring;
+/// Story 20-9 — spawned-form lifecycle triggers and the state-preserving swap.
+#[cfg(all(feature = "network", feature = "wasm-host"))]
+pub mod spawned_lifecycle;
 #[cfg(all(feature = "network", feature = "wasm-host"))]
 pub mod spirit_session;
 /// Story 16-3 — Worker supervision (the Worker's SCB, its exit observer, its

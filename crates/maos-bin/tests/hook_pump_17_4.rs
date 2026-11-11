@@ -505,31 +505,42 @@ async fn a_refused_admission_or_a_failed_start_leaves_no_registration() {
     );
 }
 
+/// Story 20-9 (D-20-9-07 A): a spawned form is registered with the pump when the caller passes
+/// it (the consolidation watchdog reaches it), but it is subscribed to `scalar.tap` only by
+/// listing `on_telemetry_event` explicitly. An empty `enabled_hooks` subscribes nothing, and a
+/// component's class NAME (here `observer`) confers nothing.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn a_spawned_form_never_registers_even_when_the_caller_passes_the_pump() {
-    let world = World::new();
+async fn a_spawned_form_registers_but_telemetry_needs_an_explicit_listing() {
+    let silent = World::new();
     let mut gated =
         gate_manifest(OBSERVER_MANIFEST, &|name| KNOWN_CLASS_NAMES.contains(&name)).unwrap();
     gated.class_section.forms = vec!["wasm-component".into()];
+    assert!(gated.lifecycle.enabled_hooks.is_empty());
     let sink = Arc::new(Recorded::default());
-    let pid = world
+    let pid = silent
         .admit_gated(&gated, observer_with(&sink), StartPolicy::StartNow)
         .await
-        .expect("the spawned-form admission itself is granted");
-    assert!(world.subscription_rows().is_empty());
-
-    let watchdog = ConsolidationWatchdog::spawn(
-        &world.pump,
-        ConsolidationCadence {
-            poll: Duration::from_millis(10),
-            window_divisor: 1_000,
-        },
+        .expect("the spawned-form admission is granted");
+    assert!(
+        silent.subscription_rows().is_empty(),
+        "an empty list subscribes nothing"
     );
-    world.emit(0.1).await;
-    tokio::time::sleep(Duration::from_millis(200)).await;
-    watchdog.shutdown().await;
-    assert_eq!(world.pump.stats(), PumpStats::default());
-    assert!(sink.0.lock().unwrap().is_empty(), "pid {pid} got a hook");
+    silent.emit(0.1).await;
+    assert!(
+        sink.scalar_seqs().is_empty(),
+        "pid {pid} got telemetry through its class name"
+    );
+
+    let listing = World::new();
+    gated.lifecycle.enabled_hooks = vec!["on_telemetry_event".into()];
+    let sink = Arc::new(Recorded::default());
+    let pid = listing
+        .admit_gated(&gated, observer_with(&sink), StartPolicy::StartNow)
+        .await
+        .expect("the spawned-form admission is granted");
+    assert_eq!(listing.subscription_rows(), [row(pid, true, "admitted")]);
+    let delivered = listing.emit(0.2).await;
+    assert_eq!(sink.scalar_seqs(), [delivered]);
 }
 
 #[derive(Debug)]

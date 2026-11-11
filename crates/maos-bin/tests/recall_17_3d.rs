@@ -400,6 +400,7 @@ fn launch_with_fixture(
         once,
         context_window: Default::default(),
         scopes: Vec::new(),
+        origin: std::path::PathBuf::new(),
         initial_frame: Some(frame),
     }
 }

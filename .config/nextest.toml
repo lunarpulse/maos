@@ -52,10 +52,15 @@ binary_id(xtask::example_spirit_regen_integration)
 | binary_id(maos-bin::crypto_provider_t3_20_13)
 | binary_id(maos-bin::crypto_real_shell_20_13)
 | binary_id(maos-bin::crypto_real_boot_20_13)
+| binary_id(maos-bin::spawned_lifecycle_20_9)
+| binary_id(maos-bin::spawned_swap_20_9)
+| binary_id(maos-bin::spawned_door_20_9)
 """
 test-group = "serial"
 # AC15 real TLS/CLI and 20-8 skill witnesses share the owned serial resource
-# group; the two 20-8 binaries have separately owned 31s exceptions.
+# group; the two 20-8 binaries have separately owned 31s exceptions. The 20-9 binaries
+# (wasm-host only) run real runner children against fixed idle/schedule/revert windows
+# (MAOS_*_FAST) and a real daemon: serial, and each binary stays inside the 30 s default.
 
 [profile.ci]
 fail-fast = false

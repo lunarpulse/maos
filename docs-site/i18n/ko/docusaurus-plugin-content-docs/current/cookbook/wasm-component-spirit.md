@@ -76,7 +76,7 @@ bus 전송에는 `[capabilities.required.iac]`를 선언하세요. kernel은 전
 선언과 저널 기록만 하며, 결정 프레임에 설명 본문이 없어 **강제되지
 않습니다**. kernel landing 전에는 swap invariant도 선언만 하고 검사하지 않습니다.
 
-추가된 `maos:spirit/skills@2.3.0`의 `author(document)`와
+추가된 `maos:spirit/skills@2.4.0`의 `author(document)`와
 `propose(target-id, target-version, diff)`는 `handle-frame` 안에서만 호출할
 수 있습니다. 오류는 `capability-denied`, 안정적인 거부 코드인
 `refused(code)`, `unavailable`입니다. host가 pid, class, telemetry를
@@ -84,7 +84,7 @@ bus 전송에는 `[capabilities.required.iac]`를 선언하세요. kernel은 전
 
 ## 참여한 frame 회상하기
 
-`maos:spirit@2.3.0` world는 두 함수를 제공하는 `maos:spirit/recall@2.3.0`을 import합니다.
+`maos:spirit@2.4.0` world는 두 함수를 제공하는 `maos:spirit/recall@2.4.0`을 import합니다.
 
 ```wit
 recall: func(filter: recall-filter) -> result<recall-page, recall-error>;
@@ -93,7 +93,7 @@ fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
 
 `recall`은 payload가 아닌 메타데이터를 반환합니다. 필터에는 선택적인 kind, 시간 범위, cursor, 정확히 일치하는 intent와 0~1024 범위의 `limit`을 지정할 수 있습니다. kind 문자열은 `TaskAssign`처럼 `FrameKindLabel`의 정확한 표기를 사용합니다. 반환된 불투명 `next-cursor`를 전달하면 이어서 조회할 수 있습니다. 응답 크기 제한에 맞추기 위해 페이지가 요청한 limit보다 짧을 수 있습니다. `fetch`는 16바이트 frame id를 받아 저장된 redacted payload를 자르지 않고 메타데이터 및 frame origin과 함께 반환합니다.
 
-두 함수는 **`handle-frame` 안에서만** 사용할 수 있습니다(TypeScript에서는 `handleFrame`). `on-start`, `on-shutdown` 또는 그 밖의 위치에서 호출하면 `unavailable`을 반환합니다. recall은 runner의 기존 stdio 채널을 사용하며 디스크립터, 소켓, 시스템 호출을 추가하지 않습니다.
+두 함수는 **`handle-frame` 안에서만** 사용할 수 있습니다(TypeScript에서는 `handleFrame`). `lifecycle`을 export하는 component라면 `idle`, `consolidate`, `telemetry`, `schedule` 안에서도 사용할 수 있습니다(아래). `on-start`, `on-shutdown`, `pause`, `resume`, `snapshot`, `swap-in`, `migrate` 또는 그 밖의 위치에서 호출하면 `unavailable`을 반환합니다. recall은 runner의 기존 stdio 채널을 사용하며 디스크립터, 소켓, 시스템 호출을 추가하지 않습니다.
 
 로컬 범위는 **현재 데몬 실행의 참여자만**입니다. Spirit은 자신이 보냈거나 **기록된 수신자인** 공개 가능한 bus frame(raw kind 0–6)과 MCP invocation(kind 18)을 회상할 수 있습니다. 라우팅된 전달은 consent gate가 설치된 경우 이를 통과하고, Spirit id가 승인된 incarnation map으로 해석되는 승인된 로컬 수신 주소(`host_id = None`)만 기록합니다. 해석 결과는 저널 기록이나 큐 삽입 전에 스냅샷으로 고정하며, 역할만으로는 참여자가 되지 않습니다. 감사 행, 비참여자 행, 이전 데몬 실행의 행은 제외되고 이를 fetch하면 `scope-violation`을 반환합니다. 이전 incarnation은 설계상 회상할 수 없으므로 재시작을 넘어 정보를 유지하려면 memory tier와 distillate를 사용하세요. native와 WASM Spirit은 동일한 kernel 중재 `MediatedLogRecall`을 사용합니다. cross-wall recall은 참여자 범위가 아닌 발신자 범위를 유지합니다.
 
@@ -124,18 +124,20 @@ fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
 경로별 오류, 전달 의미와 명시된 한계(incarnation 범위, 새 Worker 용량,
 설정 불가능한 예산, 문자열 오류만 제공하는 호출자, 감사 전용 schedule token)를
 확인하세요. 이는 ADR-016의 context-token 신호가 아닙니다. 그 신호는 guest가
-`maos:spirit/context@2.3.0` `report(used-tokens)`로 자기 token 수를 보고한 뒤
+`maos:spirit/context@2.4.0` `report(used-tokens)`로 자기 token 수를 보고한 뒤
 `handle-frame`으로 받는 kernel의 `context-pressure` / `context-limit` 프레임이며,
 daemon이 pid와 승인된 window를 고정합니다(`18-5-context-token-budget-accounting`).
 
-2.3 runner에는 2.0–2.2 component용 binding이 유지됩니다. 로컬 증거는
-2.0만 실행하며 실제 2.1 및 2.2 guest의 호환성은 아직 검증되지 않았습니다.
-인스턴스화 전에 기존의 닫힌 enum export binding을 선택하고 같은 frame pump를
-공유합니다. context kind나 payload는 이전 스키마로 낮출 수 없으며,
+2.4 runner에는 2.0–2.3 component용 binding이 유지됩니다. 로컬 증거는
+2.0과 동결된 2.2, 2.3 빌드를 실행하며 실제 2.1 guest의 호환성은 아직
+검증되지 않았습니다. 인스턴스화 전에 기존 export binding을 선택하고 같은 frame
+pump를 공유합니다. `lifecycle` export가 없는 guest에 대한 lifecycle 요청은 어떤
+export도 호출하지 않고 `unsupported`로 응답합니다. context kind나 payload는 닫힌
+2.0/2.1 스키마로 낮출 수 없으며,
 `retract.original-kind` 또는 `consent-rupture.original-kind` 안의 context kind도
 동일합니다. runner는 번호를 바꾸거나 신호를 버리는 대신 typed
 unrepresentable-frame 종료 코드 5로 거부합니다. 새 context 프레임을 받으려면
-2.2 component를 사용하세요.
+2.2 이상 component를 사용하세요.
 
 데몬은 승인된 호출자 identity와 boot nonce를 사용합니다. guest는 identity나 token을 제공하지 않습니다. 검증을 통과하고 허용된 호출마다 새 capability를 발급하고, 데이터를 공개하기 전에 token이 포함된 invocation 감사 행을 기록한 뒤 token을 폐기합니다. 모든 거부는 정확히 하나의 governance receipt인 `log.recall.refused:<code>` 또는 `log.fetch.refused:<code>`를 기록하며, `<code>`는 WIT 오류 case 이름입니다. 검증이나 발급 단계의 거부는 invocation 행 없이 receipt만 기록합니다. 빈 페이지를 포함한 성공 호출에는 거부 receipt가 추가되지 않습니다. 이 감사 행 자체는 회상할 수 없습니다.
 
@@ -143,9 +145,15 @@ unrepresentable-frame 종료 코드 5로 거부합니다. 새 context 프레임�
 
 in-band 프로토콜 위반은 `recall.channel.closed:protocol-violation`을 기록하고 세션을 종료합니다. 잘못된 응답을 받으면 runner는 `unavailable`을 반환하고, 이후 recall I/O를 중단하고, 현재 export를 마친 뒤 타입화된 `recall protocol desync` 오류로 종료합니다. 반면 EOF이면 export 이후 정상 종료합니다.
 
+## Lifecycle 트리거와 hot swap (`maos:spirit@2.4.0`)
+
+`spirit-lifecycle` world는 위의 frame export에 선택적 export `maos:spirit/lifecycle`을 하나 더합니다. 이를 구현하면 kernel의 예산이 있는 트리거(`idle`, `consolidate`, `telemetry`, `schedule`, `pause`, `resume`)를 받고 제자리에서 교체할 수 있습니다. `maosctl spirit upgrade <name> --to <manifest>`는 pid, 그 pid가 가진 capability token, 작업 메모리를 유지하고, `snapshot`이 반환한 상태를 후속 버전의 `swap-in`에 전달합니다(`--policy migrator`에서는 `migrate`가 먼저). world `spirit`로 빌드한 guest나 2.0–2.3 component는 그대로 실행되며 호출되지 않습니다. 이 경우 swap은 무엇이든 교체되기 전에 `spawned_swap_unsupported`로 거부됩니다. 생성된 scaffold는 `lifecycle`(`idle`, `snapshot`, `swap-in`)을 export하므로 게시된 버전도 같은 방식으로 upgrade할 수 있습니다.
+
+모든 lifecycle export는 `result<_, lifecycle-error>`를 반환하고 프레임을 내보내지 않습니다. `idle`, `consolidate`, `telemetry`, `schedule`은 `recall`, `context`, `skills` import를 사용할 수 있고, `pause`, `resume`, `snapshot`, `swap-in`, `migrate`는 사용할 수 없습니다. 각 export는 `[budget].time_cap_seconds` 아래에서 실행됩니다. 트리거 표, 타입화된 swap 거부, cold swap, 스왑 후 되돌림 동작은 [Lifecycle Hooks](./lifecycle-hooks#spawned-wasm-component-spirits)를 참고하세요.
+
 ## Discussion
 
-manifest는 형식별 결과 전에 모든 섹션을 검증합니다. 게시된/default MAOS 빌드는 Hold 2가 `wasm-host` engine을 비활성화하는 동안 이 형식을 `wasm_engine_off`로 거부합니다. `--features wasm-host`로 만든 빌드는 `maos run`을 통해 격리된 T2 runner(`maos` 옆에 설치된 `maos-wasm-runner`) 안에서 component를 실행합니다. 격리된 runner가 제공하지 않는 in-process 기능(operator door, topology, hot-swap 후속 Spirit)은 `spawned_surface_unsupported`로 거부됩니다. 이는 알 수 없는 class나 형식이 아니라 의도적인 타입화된 거부입니다.
+manifest는 형식별 결과 전에 모든 섹션을 검증합니다. 게시된/default MAOS 빌드는 Hold 2가 `wasm-host` engine을 비활성화하는 동안 이 형식을 `wasm_engine_off`로 거부합니다. `--features wasm-host`로 만든 빌드는 `maos run`을 통해 격리된 T2 runner(`maos` 옆에 설치된 `maos-wasm-runner`) 안에서 component를 실행합니다. 격리된 runner가 제공하지 않는 in-process 기능(component의 `maosctl load`와 topology)은 `spawned_surface_unsupported`로 거부됩니다. component의 swap, upgrade, cold swap은 `maosctl spirit upgrade`로 수행합니다(아래). 이는 알 수 없는 class나 형식이 아니라 의도적인 타입화된 거부입니다.
 
 생성된 TypeScript guest는 world의 `onStart`, `handleFrame`, `onShutdown` export를 구현합니다. guest 코드에서 halt하려면 `throw { tag: "fault", val: "<reason>" }` 값을 throw하세요. host는 이 형태를 `Halt::Fault`로 매핑합니다. guest의 WASI stdout/stderr(`console.log` 포함)는 runner의 stderr로 전달되어 `spirit.diagnostic` 행으로 journal에 기록됩니다. 이는 신뢰할 수 없는 guest 텍스트로 취급하세요. 세션마다 256행 / 64 KiB로 제한되고 초과분은 `dropped_diagnostics`에 집계되며, 너무 긴 줄은 표시와 함께 잘리고 frame이 되지 않습니다.
 

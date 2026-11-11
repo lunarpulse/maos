@@ -121,6 +121,31 @@ mod wit_ast {
     pub fn skill_errors() -> Vec<String> {
         variant_case_names("skill-error")
     }
+    pub fn lifecycle_errors() -> Vec<String> {
+        variant_case_names("lifecycle-error")
+    }
+    pub fn lifecycle_functions() -> Vec<String> {
+        let r = resolve();
+        r.interfaces
+            .iter()
+            .find(|(_, interface)| interface.name.as_deref() == Some("lifecycle"))
+            .map(|(_, interface)| interface.functions.keys().cloned().collect())
+            .unwrap_or_else(|| panic!("no `interface lifecycle` in wit/spirit.wit"))
+    }
+    pub fn world_exports_lifecycle(world: &str) -> bool {
+        let r = resolve();
+        let (_, world) = r
+            .worlds
+            .iter()
+            .find(|(_, candidate)| candidate.name == world)
+            .unwrap_or_else(|| panic!("no `world {world}` in wit/spirit.wit"));
+        world.exports.iter().any(|(key, _)| match key {
+            wit_parser::WorldKey::Interface(id) => {
+                r.interfaces[*id].name.as_deref() == Some("lifecycle")
+            }
+            wit_parser::WorldKey::Name(_) => false,
+        })
+    }
     pub fn record_names() -> Vec<String> {
         all_record_names()
     }
@@ -204,8 +229,8 @@ fn corpus_covers_all_record_types() {
     let records = wit_ast::record_names();
     assert_eq!(
         records.len(),
-        28,
-        "must cover all 28 record types from the parsed .wit AST, got {records:?}"
+        29,
+        "must cover all 29 record types from the parsed .wit AST, got {records:?}"
     );
     // Every field is also mechanically counted — adding a field to any
     // record without updating this list of expectations trips a test.
@@ -238,6 +263,7 @@ fn corpus_covers_all_record_types() {
         ("context-envelope", 4),
         ("context-status", 4),
         ("queued", 2),
+        ("telemetry-event", 5),
     ];
     for (name, expected) in expected_field_counts {
         assert_eq!(
@@ -254,6 +280,28 @@ fn skill_errors_are_the_final_2_3_vocabulary() {
         wit_ast::skill_errors(),
         ["capability-denied", "refused", "unavailable"]
     );
+}
+
+#[test]
+fn lifecycle_interface_is_the_nine_exports_in_its_own_world() {
+    assert_eq!(wit_ast::lifecycle_errors(), ["declined", "failed"]);
+    assert_eq!(
+        wit_ast::lifecycle_functions(),
+        [
+            "idle",
+            "consolidate",
+            "telemetry",
+            "schedule",
+            "pause",
+            "resume",
+            "snapshot",
+            "swap-in",
+            "migrate"
+        ]
+    );
+    // Additive: `world spirit` is unchanged and only `spirit-lifecycle` exports the interface.
+    assert!(!wit_ast::world_exports_lifecycle("spirit"));
+    assert!(wit_ast::world_exports_lifecycle("spirit-lifecycle"));
 }
 
 #[test]

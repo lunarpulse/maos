@@ -352,6 +352,7 @@ fn echo_launch(spirit_id: &str) -> SessionLaunch {
         once: true,
         context_window: Default::default(),
         scopes: Vec::new(),
+        origin: std::path::PathBuf::new(),
         initial_frame: Some(IacFrame {
             frame_id: ulid::Ulid::new().to_bytes(),
             timestamp_ns: 1,
@@ -644,6 +645,7 @@ async fn eight_real_admitted_forms_use_trusted_sender_policy_not_echoed_claims()
                         once: true,
                         context_window: Default::default(),
                         scopes: Vec::new(),
+                        origin: std::path::PathBuf::new(),
                         initial_frame: Some(seed),
                     },
                 )
@@ -918,6 +920,7 @@ async fn run_hostile_twin_in(
                 once: true,
                 context_window: Default::default(),
                 scopes: Vec::new(),
+                origin: std::path::PathBuf::new(),
                 initial_frame: Some(seed),
             },
         ),
@@ -1523,6 +1526,7 @@ async fn assert_hostile_lifting(aliases: bool, count: usize, exhausts: bool) {
             once: true,
             context_window: Default::default(),
             scopes: Vec::new(),
+            origin: std::path::PathBuf::new(),
             initial_frame: Some(seed),
         },
     )
@@ -1649,6 +1653,7 @@ async fn actual_runner_sigsys_reaches_escape_consumer_but_planned_stop_does_not(
                 once: false,
                 context_window: Default::default(),
                 scopes: Vec::new(),
+                origin: std::path::PathBuf::new(),
                 initial_frame: None,
             },
         ));
@@ -1842,6 +1847,7 @@ async fn repeated_mailbox_exports_survive_idle_without_an_active_task_or_stall()
             once: false,
             context_window: Default::default(),
             scopes: Vec::new(),
+            origin: std::path::PathBuf::new(),
             initial_frame: Some(seed(1)),
         },
     ));
@@ -2119,6 +2125,7 @@ async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_form
                     once: true,
                     context_window: Default::default(),
                     scopes: Vec::new(),
+                    origin: std::path::PathBuf::new(),
                     initial_frame: Some(seed),
                 },
             )

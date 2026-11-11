@@ -159,6 +159,8 @@ struct Subscriber {
     quarantined: bool,
     /// A grant row is outstanding for this pid.
     granted: bool,
+    /// The class the outstanding grant was issued under.
+    class: String,
     /// Monotonic ns of the last consolidation that was not `SkippedManifest`
     /// (seeded at registration).
     last_consolidate_ns: u64,
@@ -228,6 +230,29 @@ fn class_of(snapshot: &ScbRuntimeSnapshot) -> &str {
         .class
         .as_ref()
         .map_or("", |class| class.name.as_str())
+}
+
+/// Who receives `scalar.tap` writes: an Observer-class compiled-in Spirit, and (Story 20-9,
+/// D-20-9-07) a spawned form whose manifest lists `on_telemetry_event` explicitly. An empty
+/// `enabled_hooks` is the kernel's default-allow for every other hook, and subscribes
+/// nothing here; a component's class NAME confers nothing (only the operator admitting the
+/// compiled-in class grants the Observer right).
+fn receives_telemetry(snapshot: &ScbRuntimeSnapshot) -> bool {
+    let spawned = snapshot
+        .manifest
+        .class
+        .as_ref()
+        .is_some_and(|class| class.forms == ["wasm-component"]);
+    if spawned {
+        snapshot
+            .manifest
+            .lifecycle
+            .enabled_hooks
+            .iter()
+            .any(|hook| hook.as_str() == "on_telemetry_event")
+    } else {
+        class_of(snapshot) == OBSERVER_CLASS
+    }
 }
 
 impl Shared {
@@ -302,9 +327,10 @@ impl Shared {
             entry.quarantined = false;
         }
         let class = class_of(snapshot);
-        let eligible = class == OBSERVER_CLASS && !entry.quarantined;
+        let eligible = receives_telemetry(snapshot) && !entry.quarantined;
         if eligible && !entry.granted {
             entry.granted = true;
+            entry.class = class.to_owned();
             self.subscription_row(pid, &entry.spirit_id, class, true, "eligible");
         } else if !eligible && entry.granted {
             entry.granted = false;
@@ -317,7 +343,7 @@ impl Shared {
             return;
         };
         if entry.granted {
-            self.subscription_row(pid, &entry.spirit_id, OBSERVER_CLASS, false, reason);
+            self.subscription_row(pid, &entry.spirit_id, &entry.class, false, reason);
         }
     }
 
@@ -379,12 +405,14 @@ impl Shared {
                 entry.strikes += 1;
                 if entry.strikes >= QUARANTINE_AFTER_CONSECUTIVE_PANICS {
                     let why = format!("{} panicked {} times in a row", hook.name(), entry.strikes);
-                    self.quarantine(pid, entry, OBSERVER_CLASS, &why);
+                    let class = entry.class.clone();
+                    self.quarantine(pid, entry, &class, &why);
                 }
             }
             HookOutcome::BudgetExceeded { cap_seconds, .. } => {
                 let why = format!("{} exceeded its {cap_seconds} s budget", hook.name());
-                self.quarantine(pid, entry, OBSERVER_CLASS, &why);
+                let class = entry.class.clone();
+                self.quarantine(pid, entry, &class, &why);
             }
             HookOutcome::SkippedManifest
             | HookOutcome::DeferredToNextStory
@@ -916,15 +944,17 @@ impl HookPump {
             strikes: 0,
             quarantined: false,
             granted: false,
+            class: String::new(),
             last_consolidate_ns: monotonic_now_ns(),
         };
         let snapshot = self.shared.scb(pid).map(|scb| scb.runtime_snapshot());
         if let Some(snapshot) = &snapshot {
             entry.object = Some(Arc::downgrade(&snapshot.spirit_obj));
-            if class_of(snapshot) == OBSERVER_CLASS {
+            if receives_telemetry(snapshot) {
                 entry.granted = true;
+                entry.class = class_of(snapshot).to_owned();
                 self.shared
-                    .subscription_row(pid, spirit_id, OBSERVER_CLASS, true, "admitted");
+                    .subscription_row(pid, spirit_id, class_of(snapshot), true, "admitted");
             }
         }
         self.shared.registry().insert(pid, entry);

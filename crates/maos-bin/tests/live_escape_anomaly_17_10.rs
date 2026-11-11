@@ -355,6 +355,7 @@ async fn run(dir: &Path, forbidden: bool) -> Run {
             once: false,
             context_window: Default::default(),
             scopes: Vec::new(),
+            origin: std::path::PathBuf::new(),
             initial_frame: None,
         },
     ));

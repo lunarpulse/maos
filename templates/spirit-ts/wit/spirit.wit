@@ -1,5 +1,6 @@
-// `maos:spirit@2.3.0` — lossless frames, participant-scoped log recall,
-// Spirit-self-reported context budgets and governed skill authoring.
+// `maos:spirit@2.4.0` — lossless frames, participant-scoped log recall,
+// Spirit-self-reported context budgets, governed skill authoring and the
+// optional `lifecycle` export (kernel triggers and the state-preserving swap).
 //
 // Story 11.1a, ADR-031 §3: this WIT is the typed face a WASM Spirit author
 // binds against (wit-bindgen, `jco guest-types`). The host serializes and
@@ -18,6 +19,10 @@
 // Story 18-5 (ADR-016, `18-5-AC3-wit-spirit-2.2.0`) adds the kernel-written
 // `context-pressure`/`context-limit` frames and the `context` report import.
 // Story 20-8 adds governed skill authoring and proposal imports.
+// Story 20-9 (`20-9-wit-spirit-2.4.0`) adds the optional `lifecycle` export in
+// its own world: a component that exports it receives the kernel's budgeted
+// triggers and takes part in a state-preserving swap; every older guest runs
+// unchanged and is answered `unsupported`.
 //
 // Every byte of this file feeds the four provenance-pinned components'
 // `source_sha256` (`tests/fixtures/wasm/equiv-fixtures.provenance.toml`): an
@@ -28,7 +33,7 @@
 //   FramePayload / IacFrame  — crates/maos-domain/src/frame.rs
 //   Scope                    — crates/maos-domain/src/invariants/i1.rs
 
-package maos:spirit@2.3.0;
+package maos:spirit@2.4.0;
 
 interface frames {
     // ── FrameKind (identity.rs:30-79) ──────────────────────────────────
@@ -378,6 +383,36 @@ interface skills {
     propose: func(target-id: string, target-version: string, diff: string) -> result<queued, skill-error>;
 }
 
+// FR55 parity for a spawned Spirit. Every export returns `result<_, lifecycle-error>`
+// and none emits frames: effects go through the imports, which are callable only
+// inside `idle`, `consolidate`, `telemetry` and `schedule` (counted per export);
+// `pause`, `resume`, `snapshot`, `swap-in` and `migrate` are import-free, so a
+// swap step never depends on the log. The host calls one export at a time, and
+// never while a `handle-frame` turn is active.
+interface lifecycle {
+    use frames.{halt};
+
+    record telemetry-event {
+        seq: u64,
+        spirit-id: string,
+        tag: string,
+        value: f64,
+        timestamp-ms: u64,
+    }
+
+    variant lifecycle-error { declined(string), failed(string) }
+
+    idle: func() -> result<_, lifecycle-error>;
+    consolidate: func(batch: list<u8>) -> result<_, lifecycle-error>;
+    telemetry: func(event: telemetry-event) -> result<_, lifecycle-error>;
+    schedule: func(payload: list<u8>) -> result<_, lifecycle-error>;
+    pause: func() -> result<_, lifecycle-error>;
+    resume: func() -> result<_, lifecycle-error>;
+    snapshot: func() -> result<list<u8>, lifecycle-error>;
+    swap-in: func(state: list<u8>) -> result<_, lifecycle-error>;
+    migrate: func(state: list<u8>) -> result<list<u8>, lifecycle-error>;
+}
+
 // The Spirit world a WASM-component author implements. The host
 // (maos-wasm-host's `maos-wasm-runner`) drives it: feeds inbound frames decoded
 // from the ADR-032 stdio stream, and writes the guest's emitted frames back to
@@ -399,4 +434,11 @@ world spirit {
     // host → guest: lifecycle hooks (mirror the native form's boot/shutdown).
     export on-start: func() -> result<_, halt>;
     export on-shutdown: func();
+}
+
+// The world of a Spirit that also exports `lifecycle`. The runner selects these
+// bindings by export presence; `world spirit` stays the contract of every guest.
+world spirit-lifecycle {
+    include spirit;
+    export lifecycle;
 }

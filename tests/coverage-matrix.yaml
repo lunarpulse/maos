@@ -359,6 +359,19 @@ coverage:
     corpora: []
     phase: v0.3
     valid_until: '2027-05-12'
+    notes: |
+      Story 20-9 L1 (spawned forms): a hot swap or upgrade of a wasm-component Spirit keeps
+      its pid, capability tokens, working memory and the state it snapshots, and every
+      refusal is typed before anything is replaced. Witnesses:
+      crates/maos-bin/tests/spawned_swap_20_9.rs
+      (a_hot_swap_keeps_the_pid_tokens_memory_and_state_and_waits_for_the_active_turn,
+      the_migrator_policy_hands_the_successor_the_predecessors_state,
+      every_refusal_is_typed_before_the_coordinator_and_the_predecessor_keeps_serving,
+      a_revert_after_the_predecessor_child_retired_ends_the_session_typed,
+      a_cold_swap_admits_at_a_new_pid_resets_state_and_restores_a_refused_successor) and the
+      real door in crates/maos-bin/tests/spawned_door_20_9.rs. Hosted legs (AC6) are
+      unverified until the ci/20-9-verify recipe runs. The Worker keeps
+      cli_wrapper_is_not_a_spirit_form.
   FR11:
     gates: []
     corpora: []
@@ -563,6 +576,12 @@ coverage:
     corpora: []
     phase: v0.5
     valid_until: '2027-05-12'
+    notes: |
+      Story 20-9 L1 (AC3): [[schedule]] is carried at admission for every form, not only for
+      a hot-swap successor (admission_carries_schedule_for_every_form_and_refuses_a_malformed_entry_typed
+      and each_kernel_trigger_reaches_its_lifecycle_export_through_its_caller in
+      crates/maos-bin/tests/spawned_lifecycle_20_9.rs). The refused-poll observer and the
+      suppression of an unauthorized fire (AC7, AC8) are 20-9 L2 (kernel) and not yet landed.
   FR27:
     gates: []
     corpora: []
@@ -863,6 +882,14 @@ coverage:
       exit line 5 (discipline.yml `epic-17-exit`, both x64 images);
       [lifecycle].enabled_hooks accepts all 14 ABI hooks
       (crates/maos-manifest/tests/lifecycle_hook_parity_17_4.rs).
+      Story 20-9 L1: a wasm-component Spirit receives idle, consolidate, telemetry, schedule,
+      pause and resume through WorkerSpirit and the session's lifecycle turns under the
+      manifest's budgets (maos:spirit@2.4.0 `lifecycle` interface;
+      crates/maos-wasm-host/tests/lifecycle_runner_20_9.rs, crates/maos-wasm-host/tests/wit_corpus.rs,
+      crates/maos-bin/tests/spawned_lifecycle_20_9.rs). Telemetry reaches a spawned guest only
+      when its manifest lists on_telemetry_event explicitly
+      (crates/maos-bin/tests/hook_pump_17_4.rs
+      a_spawned_form_registers_but_telemetry_needs_an_explicit_listing).
   FR56:
     gates: []
     corpora: []

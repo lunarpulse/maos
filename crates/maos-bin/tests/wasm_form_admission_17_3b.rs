@@ -368,11 +368,11 @@ fn maosctl_upgrade_refuses_wasm_successor_before_replacing_the_loaded_spirit() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         !output.status.success(),
-        "a spawned successor must not enter the in-process hot-swap: {stderr}"
+        "a spawned successor must not replace an in-process Spirit: {stderr}"
     );
     assert!(
-        stderr.contains("spawned_surface_unsupported") && stderr.contains("hot-swap successor"),
-        "the successor must be refused as an unsupported spawned surface, got: {stderr}"
+        stderr.contains("swap_form_mismatch"),
+        "a form change at a pid is refused as a typed form mismatch (Story 20-9), got: {stderr}"
     );
     assert_eq!(
         root.roster(),

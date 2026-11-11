@@ -54,3 +54,9 @@ re-measures the formatted code and pins `xtask/kernel-core-baseline.toml` (`src_
 and `xtask/kloc.toml:264` exactly. Each HISTORY row cites this key with `->` (D11 A). Unused room is not reserved. A measured
 figure above the ceiling, or a re-based cumulative above the ruled STOP, is STOP plus a new D-row. Any
 `crates/maos-kernel-core/src` change outside `schedule_watchdog.rs` (and `coordinator.rs` under KW) is STOP.
+
+## Landing 1 (kernel-free) — 2026-11-11
+
+L1 (AC1–AC5: WIT 2.4.0 lifecycle world, spawned triggers, `[[schedule]]` at admission, spawned hot swap/upgrade, door cold swap) is implemented at `fc7373f0`, uncommitted, awaiting review. **No kernel line was written.** `check-kernel-baseline` exits 0 against the unchanged pins (kernel-core 26841 physical / 21042 tokei, `kloc-check` per-crate 21042); `crates/maos-kernel-core/src` is untouched. The ruled row R (D-20-9-13 A + D-20-9-14 A: `poll_once` observer and D07 A suppression) is **not** landed: AC7 and AC8 stay with L2, and the interim state (the FW-10 untokened fire still proceeds) is labelled in `docs-site/docs/cookbook/lifecycle-hooks.md`. The kernel grant, the shared 21250 STOP and the L2 ceilings are unchanged; L2 re-measures and re-pins exactly.
+
+L1 kloc (exact after `cargo fmt --all`, `kloc-check --json`): maos-bin 36234 → 37350 (+1116; re-based ceiling 38422), maos-wasm-host 2538 → 3103 (+565; 3348), xtask 44935 → 44936 (+1; 44980), aggregate 199198 → 200880 (hardfail 200881; ceiling 202209). Domain 10203, iac 8770 and the kernel are unchanged.

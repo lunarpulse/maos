@@ -17,6 +17,7 @@ use maos_domain::invariants::i1::Scope;
 use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i8::A2AIntent;
 use maos_frame_codec::{read_frame, write_frame};
+use maos_wasm_host::lifecycle_wire::{self, LifecycleReply, LifecycleRequest};
 use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId};
 use maos_wasm_host::codec::{decode_cbor, encode_cbor};
 
@@ -49,13 +50,28 @@ fn main() -> ExitCode {
     let stdin = io::stdin();
     let mut reader = BufReader::new(stdin.lock());
     loop {
-        let inbound: IacFrame = match read_frame(&mut reader) {
-            Ok(Some(body)) => match decode_cbor(&body) {
-                Ok(frame) => frame,
-                Err(_) => return ExitCode::from(1),
-            },
+        let body = match read_frame(&mut reader) {
+            Ok(Some(body)) => body,
             Ok(None) => return ExitCode::SUCCESS,
             Err(_) => return ExitCode::from(1),
+        };
+        // A session probes the runner's lifecycle export at start (Story 20-9): this twin has
+        // none, as the runner answers for a guest without the export.
+        if lifecycle_wire::is_request(&body) {
+            let reply = match lifecycle_wire::decode_request(&body) {
+                Ok(LifecycleRequest::Probe) => LifecycleReply::Supported(false),
+                _ => LifecycleReply::Unsupported,
+            };
+            let Ok(reply) = lifecycle_wire::encode_reply(&reply) else {
+                return ExitCode::from(1);
+            };
+            if write_frame(&mut writer, &reply).is_err() {
+                return ExitCode::from(1);
+            }
+            continue;
+        }
+        let Ok(inbound) = decode_cbor::<IacFrame>(&body) else {
+            return ExitCode::from(1);
         };
         if mode == "exit-after-ready-3" {
             return ExitCode::from(3);

@@ -209,13 +209,20 @@ fn exercise(worker: bool) {
         &maos_audit::sealed_export::derive_pubkey(&[0x61; 32]),
     )
     .expect("verifiable live bundle");
+    // Story 20-9 AC3 carries `[[schedule]]` at admission, so the watchdog fires `daily` while
+    // the Spirit lives. After the uninstall completed it must never fire again.
+    let fires = || {
+        h::rows(home)
+            .iter()
+            .filter(|r| r.1 == pid && r.2 == "schedule.fire:daily")
+            .count()
+    };
+    let settled = fires();
     for _ in 0..5 {
         std::thread::sleep(Duration::from_millis(150));
         assert!(
-            !h::rows(home)
-                .iter()
-                .any(|r| r.1 == pid && r.2 == "schedule.fire:daily"),
-            "T0 schedule-admission premise changed; remeasure AC6"
+            fires() <= settled,
+            "a forgotten Spirit's schedule fired again after the uninstall completed"
         );
     }
     assert!(

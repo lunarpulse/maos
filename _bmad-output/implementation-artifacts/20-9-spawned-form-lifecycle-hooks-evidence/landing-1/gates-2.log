@@ -1,0 +1,6 @@
+check-kernel-baseline=0
+check-dev-record-completeness=1
+check-epic-close-coherence=0
+check-exit-commands=0
+check-decision-register=0
+gen-abi-docs --check=0

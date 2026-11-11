@@ -104,7 +104,7 @@ In a serving `maos run` root (not `--once`), the host dispatches two hooks:
 - `on_telemetry_event`: the hook pump delivers every `scalar.tap` write in that root, including markers such as `halt.context_provided`, in each emitter's write order to every admitted compiled-in Spirit whose live class is `observer` while it is `Running`. An event's `seq` is a store-write identity label, unique within one root — not a clock or an ordering key.
 - `on_consolidate`: every admitted compiled-in Spirit receives an empty payload ("curate now") once per its own `[scheduling].idle_window_ms` while `Running` and receiving no inbound frames.
 
-Spawned forms (WASM components and CLI Workers) receive neither hook. Both hooks respect `enabled_hooks` and quarantine.
+A `[cli_wrapper]` Worker is not a Spirit form and receives neither hook. A WASM component receives both through its `lifecycle` export ([below](#spawned-wasm-component-spirits)); it is subscribed to telemetry only by listing `on_telemetry_event` explicitly. Both hooks respect `enabled_hooks` and quarantine.
 
 The telemetry subscription right comes from the operator admitting the compiled-in Observer class, not a manifest field. Every grant/revoke is audited as a `governance:telemetry-subscription:granted` / `governance:telemetry-subscription:revoked` row at the subscriber's pid, visible in `maos audit query --spirit <id>`.
 
@@ -119,3 +119,31 @@ Observer activity uses a bounded output queue: hooks never write diagnostics or 
 Every hook receives `&mut Ctx` — the single surface for interacting with the kernel. Hooks you do not override are no-ops.
 
 The `[lifecycle].enabled_hooks` manifest field is an optimisation and a safety declaration: it tells the kernel which hooks to fire. If you omit it or leave it empty, all hooks are enabled. If you list specific hooks, the kernel skips dispatch for unlisted ones, reducing overhead and narrowing the Spirit's attack surface. All 14 hook names are accepted, including `on_swap_out`, `snapshot`, and `migrate`, so a Spirit that lists its hooks explicitly can be hot-swapped.
+
+## Spawned WASM component Spirits
+
+A `wasm-component` Spirit built against `maos:spirit@2.4.0` can export the optional `maos:spirit/lifecycle` interface (world `spirit-lifecycle`). The kernel then reaches it through the same dispatcher, `enabled_hooks` gate, budgets and quarantine as a compiled-in Spirit. A component without the export (any 2.0–2.3 component, or one built against world `spirit`) keeps running and is simply never called; it answers the kernel's probe as "no lifecycle".
+
+| Trigger (production caller) | Export |
+|---|---|
+| Idle window (idle watchdog) | `idle()` |
+| Consolidation window (consolidation watchdog) | `consolidate(batch)` |
+| `scalar.tap` write (hook pump) | `telemetry(event)` |
+| `[[schedule]]` fire (schedule watchdog) | `schedule(payload)` |
+| Pause / resume | `pause()` / `resume()` |
+| Hot swap | `snapshot()` on the predecessor, then `swap-in(state)` on the successor (`migrate(state)` first under `--policy migrator`) |
+
+- **One export at a time, never during a frame turn.** A queued frame turn is served before a trigger, so a busy trigger caller cannot starve the mailbox.
+- **Budgets.** Each export runs under `[budget].time_cap_seconds` and its own instruction fuel. An export that overruns yields the kernel's budget-exceeded row, and the session ends (the child is killed, `spirit.lifecycle.deadline` is journaled).
+- **Failure.** Every export returns `result<_, lifecycle-error>` (`declined(string)` or `failed(string)`); the dispatcher records a refusal as a panicked hook and applies its usual accounting. No export emits frames: a kernel trigger has no inbound intent lineage, so effects go through imports or the next frame turn. The hook ABI hands the guest no capability token.
+- **Imports.** `idle`, `consolidate`, `telemetry` and `schedule` may call `recall`, `context` and `skills`, counted per export against the per-turn recall limit. `pause`, `resume`, `snapshot`, `swap-in` and `migrate` are import-free (`unavailable`), so a swap step never depends on the log at swap time.
+- **Telemetry needs an explicit listing.** A component is delivered `telemetry` only when `[lifecycle].enabled_hooks` names `on_telemetry_event`; an empty list does not subscribe (unlike every other hook). The same `governance:telemetry-subscription:granted` / `…:revoked` rows are written.
+- **Schedules.** `[[schedule]]` entries are carried at admission for every form, so a component's schedule fires from its first start. Until the kernel landing of Story 20-9 (its second landing), a scheduled fire whose declared side-effect authority is refused still runs without a token.
+
+### Hot swap, upgrade and cold swap
+
+`maosctl spirit upgrade <id> --to <manifest>` swaps a component in place. The successor must be a component too (`swap_form_mismatch`), must not declare any capability beyond what the operator admitted for this pid (`swap_capability_widened`), and both versions must export `lifecycle` (`spawned_swap_unsupported`; `spawned_swap_not_ready` while the running component is still starting, so retry). Its artifact is resolved next to the target manifest. Every one of these refusals comes before anything is replaced, and the running version keeps serving.
+
+The successor is launched and probed first. The swap then waits for the turn boundary: an active turn finishes on the predecessor under its own leases, `snapshot` is taken, and the successor receives it through `swap-in`. The pid, every capability token the pid holds, the working memory and a pending halt survive; the predecessor's child is retired without revoking tokens. If the post-swap monitor reverts a committed swap, the predecessor's child is already gone, so the session ends with the journaled reason `swap_reverted_after_retire` and the Spirit is unloaded; nothing restores it automatically.
+
+`--policy cold-swap` admits the successor at a new pid through the same admission path the daemon boots a component with: tokens are revoked by the unload and no state is carried. A refused successor restores the predecessor from its retained manifest at another new pid (`cold_swap_reverted`). A `[cli_wrapper]` target is not a Spirit form and keeps `cli_wrapper_is_not_a_spirit_form`.

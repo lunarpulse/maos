@@ -76,7 +76,7 @@ declared and journaled, **not enforced** because no decision frame has an
 explanation body. Until the kernel landing, swap invariants are also
 declared-only and are not checked at swap.
 
-The additive `maos:spirit/skills@2.3.0` import offers `author(document)` and
+The additive `maos:spirit/skills@2.4.0` import offers `author(document)` and
 `propose(target-id, target-version, diff)` only inside `handle-frame`.
 `capability-denied` means authority was refused; `refused(code)` is a stable
 port refusal; `unavailable` covers calls outside the export or absent host
@@ -85,7 +85,7 @@ No skill-content import exists and admission remains operator-only.
 
 ## Recall frames you participated in
 
-The `maos:spirit@2.3.0` world imports `maos:spirit/recall@2.3.0`, which provides two functions:
+The `maos:spirit@2.4.0` world imports `maos:spirit/recall@2.4.0`, which provides two functions:
 
 ```wit
 recall: func(filter: recall-filter) -> result<recall-page, recall-error>;
@@ -94,7 +94,7 @@ fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
 
 `recall` returns metadata, not payloads. Its filter accepts an optional kind, time bounds, cursor, and exact intent, plus a `limit` from 0 through 1024. Kind strings use the exact `FrameKindLabel` spelling, such as `TaskAssign`. Pass the returned opaque `next-cursor` to resume; a page may be shorter than the requested limit to fit the reply budget. `fetch` takes a 16-byte frame id and returns the stored redacted payload without truncation, metadata, and frame origin.
 
-Both functions are available **only inside `handle-frame`** (`handleFrame` in TypeScript). Calls from `on-start`, `on-shutdown`, or elsewhere return `unavailable`. Recall uses the runner's existing stdio channel; it adds no descriptor, socket, or syscall.
+Both functions are available **only inside `handle-frame`** (`handleFrame` in TypeScript) and, for a component that exports `lifecycle`, inside `idle`, `consolidate`, `telemetry` and `schedule` (below). Calls from `on-start`, `on-shutdown`, `pause`, `resume`, `snapshot`, `swap-in`, `migrate` or elsewhere return `unavailable`. Recall uses the runner's existing stdio channel; it adds no descriptor, socket, or syscall.
 
 Local scope is **participant-only within this daemon run**: a Spirit can recall disclosable bus frames (raw kinds 0–6) and MCP invocations (kind 18) that it sent **or for which it is a recorded recipient**. Routed delivery records only admitted local addressees (`host_id = None`) accepted by the consent gate, if installed, whose Spirit id resolves through the admitted-incarnation map. Resolution is snapshotted before journaling or enqueueing; a role never confers participation. Audit rows, non-participant rows, and earlier daemon runs are omitted; fetching them returns `scope-violation`. Earlier incarnations are not recallable by design; use memory tiers and distillates across restarts. Native and WASM Spirits use the same kernel-mediated `MediatedLogRecall`. Cross-wall recall stays emitter-scoped, not participant-scoped.
 
@@ -127,17 +127,19 @@ scope, fresh Worker capacity, non-configurable budget, string-only callers and
 audit-only schedule tokens). These are not ADR-016 context-token signals:
 those arrive as kernel `context-pressure` / `context-limit` frames through
 `handle-frame` after the guest reports its own count with
-`maos:spirit/context@2.3.0` `report(used-tokens)`; the daemon binds the pid and
+`maos:spirit/context@2.4.0` `report(used-tokens)`; the daemon binds the pid and
 the admitted window (`18-5-context-token-budget-accounting`).
 
-The 2.3 runner retains bindings for existing 2.0–2.2 components; the local
-compatibility witness exercises 2.0, while genuine 2.1 and 2.2 guests remain
-unverified. It selects their original closed-enum export bindings before
-instantiation and shares the same frame pump. A context kind or payload cannot
-be lowered into that older schema, including a context kind nested in
+The 2.4 runner retains bindings for existing 2.0–2.3 components; the local
+compatibility witnesses exercise 2.0 and frozen 2.2 and 2.3 builds, while a
+genuine 2.1 guest remains unverified. It selects their original export bindings
+before instantiation and shares the same frame pump. A lifecycle request to a
+guest without the `lifecycle` export is answered `unsupported` without calling
+any export. A context kind or payload cannot be lowered into the closed 2.0/2.1
+schema, including a context kind nested in
 `retract.original-kind` or `consent-rupture.original-kind`; the runner refuses
 it with the typed unrepresentable-frame exit (5), rather than renumbering it
-or dropping the signal. Use a 2.2 component to receive the new context frames.
+or dropping the signal. Use a 2.2 or newer component to receive the new context frames.
 
 The daemon binds the caller's admitted identity and boot nonce; the guest supplies neither identity nor token. Each validated, admitted call receives a freshly minted capability, writes a token-bearing invocation audit row before data is disclosed, and revokes the token afterward. Every refusal writes exactly one governance receipt, `log.recall.refused:<code>` or `log.fetch.refused:<code>`, where `<code>` is the WIT error case name. Validation and mint refusals write a receipt without an invocation row. Successful calls, including empty pages, add no refusal receipt. These audit rows are not themselves recallable.
 
@@ -145,9 +147,15 @@ A consent refusal writes exactly one `log.fetch.refused:consent-withheld` receip
 
 An in-band protocol violation writes `recall.channel.closed:protocol-violation` and ends the session. An invalid reply makes the runner return `unavailable`, stop further recall I/O, finish the current export, and exit with a typed `recall protocol desync` error; EOF instead ends normally after the export.
 
+## Lifecycle triggers and hot swap (`maos:spirit@2.4.0`)
+
+The `spirit-lifecycle` world adds one optional export, `maos:spirit/lifecycle`, to the frame exports above. Implement it to receive the kernel's budgeted triggers (`idle`, `consolidate`, `telemetry`, `schedule`, `pause`, `resume`) and to be swappable in place: `maosctl spirit upgrade <name> --to <manifest>` keeps the pid, the capability tokens the pid holds and its working memory, and hands the state your `snapshot` returns to the successor's `swap-in` (`migrate` first under `--policy migrator`). A guest built against world `spirit`, or any 2.0–2.3 component, runs unchanged and is never called; it is then refused a swap as `spawned_swap_unsupported` before anything is replaced. The generated scaffold exports `lifecycle` (`idle`, `snapshot`, `swap-in`) so a published version can be upgraded the same way.
+
+Every lifecycle export returns `result<_, lifecycle-error>` and emits no frames. `idle`, `consolidate`, `telemetry` and `schedule` may use the `recall`, `context` and `skills` imports; `pause`, `resume`, `snapshot`, `swap-in` and `migrate` may not. Each runs under `[budget].time_cap_seconds`. See [Lifecycle Hooks](./lifecycle-hooks#spawned-wasm-component-spirits) for the trigger table, the typed swap refusals, cold swap and the post-swap revert behaviour.
+
 ## Discussion
 
-The manifest validates every section before its form-specific result. A published/default MAOS build refuses this form as `wasm_engine_off` while Hold 2 keeps the `wasm-host` engine disabled. A build made with `--features wasm-host` launches the component through `maos run` inside the contained T2 runner (`maos-wasm-runner`, installed next to `maos`). In-process surfaces the contained runner does not provide — the operator door, topology, and a hot-swap successor — are refused as `spawned_surface_unsupported`. These are intentional typed refusals, not an unknown class or unknown form.
+The manifest validates every section before its form-specific result. A published/default MAOS build refuses this form as `wasm_engine_off` while Hold 2 keeps the `wasm-host` engine disabled. A build made with `--features wasm-host` launches the component through `maos run` inside the contained T2 runner (`maos-wasm-runner`, installed next to `maos`). In-process surfaces the contained runner does not provide — `maosctl load` of a component and topology — are refused as `spawned_surface_unsupported`; a component is swapped, upgraded and cold-swapped through `maosctl spirit upgrade` (below). These are intentional typed refusals, not an unknown class or unknown form.
 
 The generated TypeScript guest implements the world's `onStart`, `handleFrame`, and `onShutdown` exports. To halt from guest code, throw the value `throw { tag: "fault", val: "<reason>" }`; the host maps that shape to `Halt::Fault`. Guest WASI stdout/stderr (including `console.log`) is routed to the runner's stderr and journaled as `spirit.diagnostic` rows. Treat them as untrusted guest text: they are bounded per session (256 rows / 64 KiB, overflow counted in `dropped_diagnostics`), over-long lines are truncated with a marker, and they never become frames.
 

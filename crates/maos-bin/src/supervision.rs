@@ -246,7 +246,7 @@ pub async fn finish_serving_shutdown(
 mod worker {
     use std::future::Future;
     use std::path::PathBuf;
-    use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex, Weak};
     use std::time::{Duration, Instant};
 
@@ -265,6 +265,21 @@ mod worker {
     use maos_kernel_core::supervision::CrashDetector;
     use maos_spirit_abi::ctx::Ctx;
     use maos_spirit_abi::lifecycle::Spirit;
+    #[cfg(feature = "wasm-host")]
+    use maos_spirit_abi::lifecycle::{
+        ConsolidatePayload, MigratorError, SchedulePayload, SwapInPayload, TelemetryEventPayload,
+    };
+
+    #[cfg(feature = "wasm-host")]
+    use crate::spawned_lifecycle::LifecycleLink;
+    #[cfg(feature = "wasm-host")]
+    use maos_domain::invariants::i7::ScalarTapEvent;
+    #[cfg(feature = "wasm-host")]
+    use maos_kernel_core::scheduler::control_block::AnySpiritObj;
+    #[cfg(feature = "wasm-host")]
+    use maos_wasm_host::lifecycle_wire::{LifecycleReply, LifecycleRequest};
+    #[cfg(feature = "wasm-host")]
+    use maos_wasm_host::recall_wire::WireBytes;
 
     use super::exit_observation::{
         self, ExitFacts, ExitObservation, ObserveOutcome, ObservedChild, SignalOutcome,
@@ -775,9 +790,26 @@ mod worker {
         /// Story 19-2 — the container is frozen. Its own lock is held across
         /// the runtime verb so a teardown waits for, then undoes, a freeze.
         frozen: Mutex<bool>,
+        /// Story 20-9 — the lifecycle triggers of a spawned session, and its swap context.
+        #[cfg(feature = "wasm-host")]
+        lifecycle: Arc<LifecycleLink>,
+        /// Address of the `Spirit` object the SCB holds for this core (revert detection).
+        #[cfg(feature = "wasm-host")]
+        spirit_object: AtomicUsize,
     }
 
     impl BindingCore {
+        #[cfg(feature = "wasm-host")]
+        pub fn lifecycle(&self) -> &Arc<LifecycleLink> {
+            &self.lifecycle
+        }
+
+        #[cfg(feature = "wasm-host")]
+        pub(crate) fn note_spirit_object(&self, object: &Arc<dyn AnySpiritObj>) {
+            self.spirit_object
+                .store(Arc::as_ptr(object).cast::<()>() as usize, Ordering::Release);
+        }
+
         /// The Worker's SCB id — `worker`, `worker-2`, …
         pub fn spirit_id(&self) -> &str {
             &self.spirit_id
@@ -1418,6 +1450,14 @@ mod worker {
             self.core.spirit_id()
         }
 
+        /// A committed swap retired this core's child: the SCB lives on under the successor's
+        /// core, so nothing is classified, dispositioned or unloaded here.
+        #[cfg(feature = "wasm-host")]
+        pub fn release_for_swap(mut self) {
+            self.armed = false;
+            self.registry.retire(&self.core);
+        }
+
         /// Classify from the runtime-client status and retained T3 facts.
         /// This consumes the guard's responsibility: it disarms before any
         /// fallible work so Drop cannot repeat abandon after this path begins.
@@ -1656,6 +1696,11 @@ mod worker {
         boot_nonce: u64,
         root_shutdown: tokio_util::sync::CancellationToken,
         seams: SupervisorSeams,
+        /// Story 20-9 — what a spawned swap needs from the root. Owned here, not by the door or
+        /// the successor factory (which hold a `Weak`): the closure inside captures
+        /// `audit_tx` owners, and the root's teardown drops the supervisor before the audit drain.
+        #[cfg(feature = "wasm-host")]
+        swap_handles: std::sync::OnceLock<Arc<crate::spawned_lifecycle::SwapHandles>>,
     }
 
     impl WorkerSupervisor {
@@ -1704,6 +1749,10 @@ mod worker {
                 counters: Arc::clone(&self.counters),
                 seams: self.seams.clone(),
                 frozen: Mutex::new(false),
+                #[cfg(feature = "wasm-host")]
+                lifecycle: LifecycleLink::new(),
+                #[cfg(feature = "wasm-host")]
+                spirit_object: AtomicUsize::new(0),
             })
         }
 
@@ -1727,6 +1776,8 @@ mod worker {
             let spirit = maos_kernel_core::scheduler::control_block::make_spirit_obj(
                 WorkerSpirit::new(Arc::clone(&core)),
             );
+            #[cfg(feature = "wasm-host")]
+            core.note_spirit_object(&spirit);
             Ok((core, spirit))
         }
 
@@ -1757,6 +1808,33 @@ mod worker {
                 return Err(WorkerSupervisionError::WorkerStopping);
             }
             Ok(binding)
+        }
+
+        /// The root hands its swap handles to the supervisor, which owns them (Story 20-9).
+        #[cfg(feature = "wasm-host")]
+        pub fn keep_swap_handles(&self, handles: Arc<crate::spawned_lifecycle::SwapHandles>) {
+            let _ = self.swap_handles.set(handles);
+        }
+
+        /// The live spawned session of `spirit_id` that a swap may replace (Story 20-9).
+        #[cfg(feature = "wasm-host")]
+        pub fn spawned_target(&self, spirit_id: &str) -> Option<Arc<BindingCore>> {
+            self.registry.active().into_iter().find(|core| {
+                core.spirit_id() == spirit_id && core.lifecycle().swap_context().is_some()
+            })
+        }
+
+        /// Whether the SCB at this core's pid still holds this core's `Spirit` object. After a
+        /// committed swap, `false` is the post-swap monitor having restored the predecessor.
+        #[cfg(feature = "wasm-host")]
+        pub fn holds_spirit_object(&self, core: &BindingCore) -> bool {
+            let scbs = self.exec.scheduler.scbs();
+            let map = scbs.read().unwrap_or_else(|error| error.into_inner());
+            map.get(&core.spirit_pid()).is_some_and(|scb| {
+                let object = scb.runtime_snapshot().spirit_obj;
+                Arc::as_ptr(&object).cast::<()>() as usize
+                    == core.spirit_object.load(Ordering::Acquire)
+            })
         }
 
         /// Only an active mailbox export belongs in the progress watchdog ledger.
@@ -1849,6 +1927,8 @@ mod worker {
                 boot_nonce,
                 root_shutdown,
                 seams: SupervisorSeams::default(),
+                #[cfg(feature = "wasm-host")]
+                swap_handles: std::sync::OnceLock::new(),
             }
         }
 
@@ -2610,10 +2690,11 @@ mod worker {
 
     /// The `Spirit` a Worker's SCB holds.
     ///
-    /// Its ONLY job is `on_unload`: `maosctl unload worker` (and every
-    /// `unload_all_loaded` at teardown) must actually END the child, not just
-    /// flip an SCB state. Every other hook keeps the trait's default no-op — a
-    /// subprocess Worker has no in-process behaviour to run.
+    /// Its `on_unload` ENDS the child (`maosctl unload worker` and every `unload_all_loaded`
+    /// must actually stop it, not flip an SCB state). A spawned WASM Spirit's other hooks are
+    /// its lifecycle exports (Story 20-9): each sends one request to its session. A
+    /// subprocess `[cli_wrapper]` Worker's `lifecycle` link has no session, and its hooks are
+    /// never fired.
     pub struct WorkerSpirit {
         core: Arc<BindingCore>,
     }
@@ -2622,9 +2703,99 @@ mod worker {
         fn new(core: Arc<BindingCore>) -> Self {
             Self { core }
         }
+
+        /// One lifecycle export of a spawned Spirit, never waiting past the hook budget.
+        /// `Unsupported` is a no-op; every other failure is the typed panic a `Spirit` hook
+        /// reports as `HookOutcome::Panicked` (Story 20-9 AC2).
+        #[cfg(feature = "wasm-host")]
+        fn lifecycle(&self, request: LifecycleRequest) -> LifecycleReply {
+            match self.core.lifecycle().call(&self.core, request) {
+                Ok(LifecycleReply::Declined(detail)) => panic!("lifecycle_declined: {detail}"),
+                Ok(LifecycleReply::Failed(detail)) => panic!("lifecycle_failed: {detail}"),
+                Ok(reply) => reply,
+                Err(code) => panic!("lifecycle_{code}"),
+            }
+        }
     }
 
     impl Spirit for WorkerSpirit {
+        #[cfg(feature = "wasm-host")]
+        fn on_idle(&self, _ctx: &mut Ctx) {
+            self.lifecycle(LifecycleRequest::Idle);
+        }
+
+        #[cfg(feature = "wasm-host")]
+        fn on_consolidate<'a>(&self, _ctx: &mut Ctx, payload: &ConsolidatePayload<'a>) {
+            self.lifecycle(LifecycleRequest::Consolidate {
+                batch: WireBytes(payload.batch_data.to_vec()),
+            });
+        }
+
+        #[cfg(feature = "wasm-host")]
+        fn on_telemetry_event<'a>(&self, _ctx: &mut Ctx, payload: &TelemetryEventPayload<'a>) {
+            match serde_json::from_slice::<ScalarTapEvent>(payload.event_data) {
+                Ok(event) => {
+                    self.lifecycle(LifecycleRequest::Telemetry {
+                        seq: event.seq,
+                        spirit_id: event.spirit_id,
+                        tag: event.tag,
+                        value: event.value,
+                        timestamp_ms: event.timestamp,
+                    });
+                }
+                Err(error) => panic!("lifecycle_telemetry_undecodable: {error}"),
+            }
+        }
+
+        #[cfg(feature = "wasm-host")]
+        fn on_schedule<'a>(&self, _ctx: &mut Ctx, payload: &SchedulePayload<'a>) {
+            self.lifecycle(LifecycleRequest::Schedule {
+                payload: WireBytes(payload.schedule_data.to_vec()),
+            });
+        }
+
+        #[cfg(feature = "wasm-host")]
+        fn on_pause(&self, _ctx: &mut Ctx) {
+            self.lifecycle(LifecycleRequest::Pause);
+        }
+
+        #[cfg(feature = "wasm-host")]
+        fn on_resume(&self, _ctx: &mut Ctx) {
+            self.lifecycle(LifecycleRequest::Resume);
+        }
+
+        #[cfg(feature = "wasm-host")]
+        fn on_swap_in<'a>(&self, _ctx: &mut Ctx, payload: &SwapInPayload<'a>) {
+            self.lifecycle(LifecycleRequest::SwapIn {
+                state: WireBytes(payload.predecessor_state.to_vec()),
+            });
+        }
+
+        /// The guest's own state, taken at a turn boundary. A guest without the export has no
+        /// state to hand over, and the swap is refused before this is reached.
+        #[cfg(feature = "wasm-host")]
+        fn snapshot(&self, _ctx: &mut Ctx) -> Vec<u8> {
+            match self.lifecycle(LifecycleRequest::Snapshot) {
+                LifecycleReply::State(state) => state.0,
+                _ => panic!("spawned_swap_unsupported"),
+            }
+        }
+
+        #[cfg(feature = "wasm-host")]
+        fn migrate(&self, _ctx: &mut Ctx, state: &[u8]) -> Result<Vec<u8>, MigratorError> {
+            let request = LifecycleRequest::Migrate {
+                state: WireBytes(state.to_vec()),
+            };
+            match self.core.lifecycle().call(&self.core, request) {
+                Ok(LifecycleReply::State(migrated)) => Ok(migrated.0),
+                Ok(LifecycleReply::Declined(detail)) | Ok(LifecycleReply::Failed(detail)) => {
+                    Err(MigratorError::new_internal(format!("lifecycle: {detail}")))
+                }
+                Ok(_) => Err(MigratorError::new_internal("spawned_swap_unsupported")),
+                Err(code) => Err(MigratorError::new_internal(format!("lifecycle_{code}"))),
+            }
+        }
+
         /// Stop the runtime-client pidfd and owned CID. `on_unload` runs under
         /// a hook budget and never recurses into `unload`.
         fn on_unload(&self, _ctx: &mut Ctx) {

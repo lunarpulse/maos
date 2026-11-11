@@ -1,0 +1,66 @@
+== check-kernel-baseline
+   |
+   = note: `ConformanceSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+check-kernel-baseline: PASSED (maos-kernel-core/src = 26841 lines, 95 files, pinned 26841)
+exit=0
+== check-dev-record-completeness
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1552: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1600: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1604: ownerless and open, with a recorded disposition
+check-dev-record-completeness: PASSED (199 done-status stories checked)
+exit=0
+== check-epic-close-coherence
+   |
+   = note: `ConformanceSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+check-epic-close-coherence: PASSED (21 epics re-derived against pin 26841)
+exit=0
+== check-exit-commands
+   |
+   = note: `ConformanceSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+check-exit-commands: PASS (2 epics, 2 blocks, 10 tokens resolved, 0 owed)
+exit=0
+== check-decision-register
+   = note: `ConformanceSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+check-decision-register: 23 rows, 6 open
+  D19: deadline UNQUERYABLE (not green, not satisfied) — UNQUERYABLE — "before the next `j1-*` story leaves `ready-for-dev`" was SELF-VOIDING: 2c is the lane closer and there is no next `j1-*` story. It bound at the round-table or never.
+exit=0
+== check-env-contract
+   |
+   = note: `ConformanceSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+check-env-contract: PASS (122 maos-bin/src MAOS_* vars registered, 0 violations; workspace-wide env surface is Story 21-4 / xtask env-contract.toml — D-I)
+exit=0
+== check-equiv-fixture-provenance
+   |
+   = note: `ConformanceSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+check-equiv-fixture-provenance: PASSED (4 fixtures in sync with source, WIT, and manifest)
+exit=0
+== check-manifest-schema-version
+   |
+   = note: `ConformanceSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+check-manifest-schema-version: PASSED (current=7, min=1, max=7)
+exit=0
+== gen-abi-docs --check
+   = note: `ConformanceSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+ Documenting maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.71s
+exit=0
+== stability-matrix --check
+   |
+   = note: `ConformanceSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+stability-matrix: PASS — STABILITY.md in sync with workspace state; 0 undocumented deprecations; §Export present (non-stub)
+exit=0
+== check-wasm-form-equiv
+   |
+   = note: `ConformanceSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+check-wasm-form-equiv: PASSED — oracle green (base: 19 passed/0 failed, anti-canned: 22 passed/0 failed); BLOCKING at v1_5
+exit=0

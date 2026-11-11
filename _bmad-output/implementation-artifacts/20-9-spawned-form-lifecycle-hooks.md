@@ -20,7 +20,7 @@ not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21
 Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
 
 
-Status: ready-for-dev
+Status: in-progress (L1 kernel-free implemented 2026-11-11 at `fc7373f0`, uncommitted, awaiting review; L2 kernel last, AC7/AC8/AC9 open)
 
 <!-- Created 2026-11-03 at 8c809f9c (main; `git log -1 -- crates xtask` = 8c809f9c) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30); D07 A (2026-11-01, ask rows203c, "decided at 20-9"); D-19-5-10 C (2026-10-28, ask w3_19_5_d10, the received FR10 clause); R5 (2026-10-24, the two watchdog items); D-20-3c-01 A (I14 owner). D-20-9-01…16 were ruled 2026-11-03 by the operator (ask d_batch4), all as recommended A; D-20-14-12 C (ask d2014_12) sets the joint targeted STOP described below. Grants bind at dev start after remeasurement/rebase. No cargo ran (parent rule). Cites were re-read in a `git archive 8c809f9c` copy (`creation/cites-8c809f9c.md`), because the working tree carries Dev204L1's uncommitted 20-4 L1 edits. Kernel and kloc were measured by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`). Prototypes are saved as diffs and were never applied. Stale E20 §20-9 cites were corrected in place (`creation/records-owed.md` §A). Builds on 20-8 (ruled as recommended 2026-11-03, created the same day): WIT `maos:spirit@2.3.0`, manifest schema 7, `emit_manifest_declaration_event`, `SpiritManifestBundle.swap_invariants` / `HotSwapError::SwapInvariantDropped` (20-8 §Contract for 20-9). -->
 
@@ -371,14 +371,14 @@ ruling rewrites only the affected clauses. Every AC names a failing-before witne
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight.** Apply the recorded operator rulings on D-20-9-01…16 and remeasure/rebase the grants at dev start; tracker → `in-progress`. Confirm 20-8 L1 has landed (D-02). Run `creation/measurements.md` "Not measured here" 1–2: compile R and `sched`; confirm that `bindgen!` `with:` remaps and WIT `include` work on the locked wasmtime 48.0.8. Re-measure every cite this story touches (rule 9). `admission.rs`/`main.rs` move with 20-4 L1 and 20-8 L1, and `schedule_watchdog.rs` moves with 20-11 L2. A measured figure above the ruled envelope, or a T0 result contradicting a ruled option, is STOP + D-row.
-- [ ] **T1 — WIT 2.4 + runner (AC1).** WIT, ratification, lifecycle wire, binding selection, guest, fixtures, vectors, plant.
-- [ ] **T2 — Spawned triggers (AC2).** `WorkerSpirit` forwarding, session lifecycle turns, registration, `spawned_lifecycle_20_9.rs`, plant.
-- [ ] **T3 — Schedules at admission (AC3).** `sched` re-cut, vectors, plant.
-- [ ] **T4 — Spawned hot swap / upgrade (AC4).** Factory arm, pre-warm, child switch, retire, revert detection, `spawned_swap_20_9.rs`, plant.
-- [ ] **T5 — Cold swap + Worker (AC5).** Door spawned path, vectors, plant.
-- [ ] **T6 — TS + docs (AC1.5).** Template/example, cookbook en + ko, `gen-abi-docs`.
-- [ ] **T7 — L1 landing (D-01 A).** Exact pins inside the ruled envelope. Gates: `check-equiv-fixture-provenance`, `abi-diff`, `gen-abi-docs --check`, `check-stability-matrix`, `check-manifest-schema-version` (unchanged at 7), `kloc-check`, `check-kernel-baseline` (unchanged), `check-service-boundary`, `check-corpus`, `check-env-contract` (no new variable expected), `check-dev-record-completeness`, `check-epic-close-coherence`, `check-exit-commands`, `check-decision-register`, `prepush`. One hosted discipline run on the final tree + the AC6 plant. Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
+- [x] **T0 — Preflight.** Rulings applied; grants re-based (bin 38422, wasm-host 3348, xtask 44980, aggregate 202209; pins at start bin 36234, wasm-host 2538, xtask 44935, aggregate 199198). 20-8 L1 is in the tree (WIT 2.3.0). The T0 compile checks passed: `bindgen!` `with:` remaps and WIT `include` work on wasmtime 48.0.8 (`spirit-lifecycle` world, `lifecycle_runner_20_9`). The `[[schedule]]` re-cut compiled inside bin.
+- [x] **T1 — WIT 2.4 + runner (AC1).** WIT, ratification, lifecycle wire, binding selection, guest, fixtures, vectors, plant. Plant observed red.
+- [x] **T2 — Spawned triggers (AC2).** `WorkerSpirit` forwarding, session lifecycle turns, registration, `spawned_lifecycle_20_9.rs`, plant observed red.
+- [x] **T3 — Schedules at admission (AC3).** `sched` re-cut, vectors, plant observed red.
+- [x] **T4 — Spawned hot swap / upgrade (AC4).** Factory arm, pre-warm, child switch, retire, revert detection, `spawned_swap_20_9.rs`, door vector, plant observed red.
+- [x] **T5 — Cold swap + Worker (AC5).** Door spawned path, in-process and door vectors (`spawned_door_20_9.rs`), plant observed red.
+- [x] **T6 — TS + docs (AC1.5).** Template/example at `spirit-lifecycle`, cookbook en + ko, `gen-abi-docs --check` green. The TS legs on node 22/24 are hosted-only.
+- [ ] **T7 — L1 landing (D-01 A).** Pins exact and inside the envelope; gates run (see Dev Agent Record); hosted discipline run and the AC6 plant outstanding (branch-only recipe `20-9-spawned-form-lifecycle-hooks-evidence/ci/ci-20-9-verify.yml`, unverified). No commit or push without the operator.
 - [ ] **T8 — Kernel (AC7, AC8)** under the ruled rows: red-before tests, R re-cut, plants.
 - [ ] **T9 — L2 landing + records (AC9).** Kernel pins + hashes (re-base); FLAG record updated; `cargo test -p maos-kernel-core --lib`; hosted run; ledger closure; coverage; docs.
 
@@ -504,14 +504,40 @@ ADR-002, ADR-013, ADR-017, ADR-020, ADR-030, ADR-031, ADR-060, ADR-069.
 
 ## Dev Agent Record
 
-Not started. Filled at dev start (model, wall-clock per plant, file list, change log).
+### Agent Model Used
+
+**Model:** anthropic/claude-sonnet-5-5 (dev agents `Dev209L1`, `Dev209L1b`, `Dev209L1c`).
+
+**Landing 1 (kernel-free: AC1–AC5; AC6 hosted-only).** Models: `Dev209L1`, `Dev209L1b` (parked WIP), `Dev209L1c` (the landing): anthropic/claude-sonnet-5-5. Base `fc7373f0`; nothing committed. Evidence: `20-9-spawned-form-lifecycle-hooks-evidence/landing-1/evidence.md` (witness table with raw before/plant logs, measurements, gates, limitations); hosted recipe `20-9-spawned-form-lifecycle-hooks-evidence/ci/ci-20-9-verify.yml` (branch-only, unverified).
+
+**What landed.** `maos:spirit@2.4.0` (`interface lifecycle`, `world spirit-lifecycle`; ratification `20-9-wit-spirit-2.4.0`; the four provenance-pinned components re-issued, two frozen 2.2/2.3 echo guests kept under `tests/fixtures/wasm/frozen/`). `maos-wasm-host`: `lifecycle_wire`, binding selection by export presence, `Unsupported` for a guest without the export, `guests/lifecycle-probe`. `maos-bin`: `spawned_lifecycle.rs` (`LifecycleLink`, `SwapHandles`/`SwapSlot` weak handle, `spawned_successor`, `HostedSessions`), `WorkerSpirit` forwarding for nine hooks with a typed panic on `Declined`/`Failed`/ended/deadline, session lifecycle turns (a queued frame turn first; a probe at start; `snapshot` fences the predecessor), child hand-over and `retire` (no `revoke_all_for_pid`), `swap_reverted_after_retire`, the door's cold swap through `admit_spawned`, `[[schedule]]` carried at admission, `swap_form_mismatch` / `swap_capability_widened` / `spawned_swap_unsupported` / `spawned_swap_not_ready`, the artifact directory (`origin`) carried through hot and cold swap, telemetry for a spawned form only on an explicit `on_telemetry_event` listing. TS template and example export `lifecycle`; EN/KO cookbook pages updated.
+
+**Corrections to this story's premises (observed).**
+- AC1.3 "At HEAD the guest fails to instantiate": false. The 2.4.0 component `include`s `spirit`, so HEAD instantiates it (`landing-1/failing-before-head-probe-ac1.log`); what HEAD lacks is any path that calls a lifecycle export. The failing-before is by code (`failing-before-head-code.log`) plus the plant.
+- AC4.5 / AC5.3 failing-before captured against real HEAD binaries through the door with a frozen 2.3 component (`failing-before-head-door-echo-2_3.log`): hot swap `spawned_surface_unsupported: hot-swap successor … (HTTP 500)`, cold swap `cold_swap_unrestorable … (HTTP 409)`.
+- AC6.2 plant "the example drops its swap-in export": `lifecycle` is exported whole or not at all, so the recipe componentizes the same build against the plain `spirit` world (no lifecycle export) and expects `spawned_swap_unsupported`.
+- The FR11 archive is not under `MAOS_HOME` (`default_archive_dir` resolves `$XDG_DATA_HOME`/`$HOME`); the bin vectors set `MAOS_ARCHIVE_DIR` per process. The first WIP runs wrote `lifecycle-probe` into the operator's real archive; removed.
+- Existing tests updated for the new truth (not weakened): `erasure_live_20_11` (`[[schedule]]` is now carried at admission, so `schedule.fire:daily` occurs while the Spirit lives; the assertion is now "never again after the uninstall completed"), `wasm_skill_authoring_20_8` (2.4.0), `wit_copies_17_3b` (the world-named declaration module of `spirit-lifecycle`), `cohort_daemon_smoke_13_5c` (39 → 40 scanned files: `spawned_lifecycle.rs`), `hook_pump_17_4` (`a_spawned_form_registers_but_telemetry_needs_an_explicit_listing`), `wasm_form_admission_17_3b`.
+
+**Observed verification (exact commands and results are in the evidence).** Plants AC1–AC5 each red (raw logs `plant-ac1..5.log`), restored byte-for-byte; every focused vector green at the end; gates exit 0 (`kloc-check`, `check-kernel-baseline`, `check-dev-record-completeness`, `check-epic-close-coherence`, `check-exit-commands`, `check-decision-register`, `check-env-contract`, `check-equiv-fixture-provenance`, `check-manifest-schema-version`, `gen-abi-docs --check`, `stability-matrix --check`, `check-wasm-form-equiv`, `invariant-lock --changed-files`, `check-fkcs`); `clippy --workspace --all-targets` exit 0 and `clippy-ratchet` 1327 / 867 (baseline 1383 / 897); workspace nextest and the feature-on `maos-bin` run: see `evidence.md` §Workspace. `prepush` was not run (it wraps the workspace run and the gates already run individually).
+
+**kloc (exact, after `cargo fmt --all`).** maos-bin 36234 → 37350, maos-wasm-host 2538 → 3103, xtask 44935 → 44936, aggregate 199198 → 200880 (`_aggregate_hardfail` 200881); all inside the re-based D-20-9-16 A ceilings 38422 / 3348 / 44980 / 202209. Kernel, domain and iac unchanged; no kernel line.
+
+**Not done (open).** AC6 and every hosted-only leg (recipe unverified); L2 (AC7, AC8, AC9 closure: `deferred-work.md:1260` / `:1275`, kernel pins, FLAG landed figure, ADR-013/-030 FW-10 sentences, `docs/invariants/I14.md`: not edited in L1, ADR-037 invariant-lock would demand a phase commitment; the routed FR53 witness named in this story is `spawned_swap_20_9::a_hot_swap_keeps_the_pid_tokens_memory_and_state_and_waits_for_the_active_turn`, which asserts the carried halt, and in `tests/coverage-matrix.yaml`).
 
 ### File List
 
 - Creation: this story; `20-9-flag-winston-decision.md`; `20-9-spawned-form-lifecycle-hooks-evidence/creation/*`; records per `creation/records-owed.md`.
+- WIT / ABI: `wit/spirit.wit`; `xtask/abi-ratifications.toml`; `tests/fixtures/wasm/{echo_spirit_component,equiv_*}.wasm`, `equiv-fixtures.provenance.toml`, `tests/fixtures/wasm/frozen/*`; `xtask/src/build_test_fixtures.rs`.
+- maos-wasm-host: `src/{lib,runner,wit_guest}.rs`, new `src/lifecycle_wire.rs`, new `guests/lifecycle-probe/*`, `tests/wit_corpus.rs`, new `tests/lifecycle_runner_20_9.rs`, `tests/wit_copies_17_3b.rs`.
+- maos-bin: new `src/spawned_lifecycle.rs`; `src/{admission,hook_pump,lib,main,migration_plan,operator_door,spirit_session,supervision}.rs`; tests: new `spawned_lifecycle_20_9.rs`, `spawned_swap_20_9.rs`, `spawned_door_20_9.rs`, `support/spawned_world_20_9.rs`; updated `hook_pump_17_4`, `live_escape_anomaly_17_10`, `participant_recall_17_8`, `recall_17_3d`, `spawned_scope_17_3c`, `wasm_form_admission_17_3b`, `wasm_skill_authoring_20_8`, `cohort_daemon_smoke_13_5c`, `erasure_live_20_11`.
+- TS and docs: `templates/spirit-ts/*`, `examples/example-spirit-ts/*` (WIT copy, `package.json`, `src/index.ts`, tests, READMEs); `docs-site/docs/cookbook/{lifecycle-hooks,wasm-component-spirit}.md` and the KO pair.
+- Records and gates: `.config/nextest.toml` (three serial binaries), `xtask/kloc.toml`, `tests/coverage-matrix.yaml` (FR10, FR26, FR55), `deferred-work.md` (§20-9 L1), `sprint-status.yaml`, `20-9-flag-winston-decision.md`, `20-9-spawned-form-lifecycle-hooks-evidence/{landing-1,ci}/*`.
 
 ### Change Log
 
 - 2026-11-03: Operator (ask `d_batch4`) ruled D-20-9-01…16 all as recommended A. Grants are ruled, binding at dev start after remeasurement/rebase. D-20-9-15 A sets targeted STOP 21,230 tokei for 20-9 L2; D-20-14-12 C (ask `d2014_12`) then sets JOINT targeted STOP 21,250 shared by 20-9 L2 + 20-14 L2, whose combined cumulative must not exceed 21,250. Shared STOP remains 21,209 for everything else; ADR-069 alarm 22,000 untouched.
 
 - 2026-11-03: Story created at `8c809f9c` (ready-for-dev; D-20-9-01…16 PROPOSED). Inventory measured: spawned SCBs already receive every kernel hook as a `WorkerSpirit` no-op; 17-4's callers exclude spawned pids; `[[schedule]]` is never carried at admission for any form; the spawned successor factory refuses; spawned cold swap refuses before unload; the refused poll is silent and the untokened fire proceeds. Kernel priced by reverted prototypes: R = KD07A-lean + KO-poll-x +16 / +21 recommended (KD07B-lean, KD07A-inline, KO-poll, KO-count, KO-row, KW priced); cumulative 21203 ≤ 21209 measured, ×2 ceiling 21224 above → D-20-9-15. Out-of-kernel measured: iac +39, bin +14 (schedules). E20 §20-9 cites corrected in place.
+
+- 2026-11-11: **L1 (kernel-free) implemented at `fc7373f0`, uncommitted** (Dev209L1c, completing Dev209L1/L1b's parked WIP): AC1–AC5 with plants observed red for each, failing-before captured against real HEAD binaries through the door; kloc bin 37350 / wasm-host 3103 / xtask 44936 / aggregate 200880 (hardfail 200881) inside the re-based ceilings; no kernel line; hosted AC6 and L2 (AC7, AC8, AC9) open; tracker `in-progress`. Premise corrections and review fixes (FR11 archive isolation, hook wait races, token assertion ordering, native test twins answering the lifecycle probe) are in the Dev Agent Record and `landing-1/evidence.md`.

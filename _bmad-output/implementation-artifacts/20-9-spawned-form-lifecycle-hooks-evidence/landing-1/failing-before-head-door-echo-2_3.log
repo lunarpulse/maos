@@ -1,0 +1,26 @@
+== inspect
+spirit_id: lifecycle-probe
+pid: 1
+boot_nonce: 3017587642772403952
+lifecycle_state: Running
+posture: Assistive
+posture_ceiling: Assistive
+== upgrade --policy hot-swap
+maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_surface_unsupported: hot-swap successor supports only rust-inproc Spirits (HTTP 500)
+exit=1
+== upgrade --policy cold-swap
+maosctl: spirit upgrade — cold_swap_unrestorable: spawned_surface_unsupported: spawned_surface_unsupported: operator door supports only rust-inproc Spirits (HTTP 409)
+exit=1
+== inspect after
+spirit_id: lifecycle-probe
+pid: 1
+boot_nonce: 3017587642772403952
+lifecycle_state: Running
+posture: Assistive
+posture_ceiling: Assistive
+== daemon stderr (tail)
+maos: yank cadence=300s policy=warn registry-fetch=disabled
+maos: root supervision armed
+maos: escape-anomaly consumer wired (Story 17-10, ADR-024)
+maos: escape-anomaly consumer stopped (final scan: 0 anomaly line(s), 0 failed scan(s))
+Error: Child(Signaled { signal: 9 })

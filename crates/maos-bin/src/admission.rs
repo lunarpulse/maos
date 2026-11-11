@@ -56,7 +56,7 @@ use maos_kernel_core::security::manifest::{
     Budget, CapabilitiesRequired, ClassSection, EpistemicPolicySection,
     HaltProtocolCompatibilitySection, HotSwapManifestSection, LifecycleSection,
     MigratesFromSection, OnCrashSection, OnRevocationSection, OutputShape, Posture, PostureSection,
-    ResourceCaps, SandboxConfig, SchedulingSection, SupervisionSection,
+    ResourceCaps, SandboxConfig, SchedulesSection, SchedulingSection, SupervisionSection,
 };
 use maos_kernel_core::security::SecurityManagerAdapter;
 
@@ -173,7 +173,7 @@ pub fn emit_manifest_declaration_event(
     Ok(attempt_id)
 }
 
-fn emit_manifest_declaration_outcome(
+pub fn emit_manifest_declaration_outcome(
     tl: &maos_kernel_core::iac::TransparencyLogAdapter,
     attempt_id: &str,
     outcome: &str,
@@ -552,6 +552,9 @@ pub struct GatedManifest {
     pub on_crash: Option<OnCrashSection>,
     pub on_revocation: Option<OnRevocationSection>,
     pub supervision: Option<SupervisionSection>,
+    /// Story 20-9 — `[[schedule]]`, carried so the ScheduleWatchdog sees an admitted Spirit's
+    /// entries (before, only a hot-swap successor's).
+    pub schedules: SchedulesSection,
     pub providers: Option<maos_kernel_core::security::ProvidersSection>,
     pub skills: Option<maos_manifest::SkillsSection>,
     pub explanation_shape: Option<maos_manifest::ExplanationShapeSection>,
@@ -606,6 +609,7 @@ impl GatedManifest {
             on_crash: self.on_crash.clone(),
             on_revocation: self.on_revocation.clone(),
             supervision: self.supervision.clone(),
+            schedules: self.schedules.clone(),
             ..Default::default()
         }
     }
@@ -667,6 +671,13 @@ pub fn read_manifest(path: &Path) -> Result<String, AdmissionRefusal> {
         detail: format!("{}: {error}", path.display()),
     })
 }
+
+/// Whether the manifest declares a spawned (`wasm-component`) form. An unparseable manifest
+/// is not one: the real gates own that refusal.
+pub fn is_spawned_form(text: &str) -> bool {
+    manifest_identity(text).is_ok_and(|class| class.forms == ["wasm-component"])
+}
+
 /// Extract the validated class identity without imposing admission-only
 /// mediation gates on an already accepted upgrade.
 pub fn manifest_identity(text: &str) -> Result<ClassSection, AdmissionRefusal> {
@@ -878,6 +889,19 @@ pub fn gate_manifest(
         }
         (None, None, None, None)
     };
+    // Story 20-9 — the array-of-tables, wrapped as the kernel's successor parser wraps it
+    // (`lifecycle/upgrade.rs`), so an admitted Spirit's schedule fires, not only a swapped one's.
+    let schedules = match root.get("schedule") {
+        Some(value) => {
+            let mut wrapper = toml::value::Table::new();
+            wrapper.insert("schedule".into(), value.clone());
+            toml::to_string(&wrapper)
+                .map_err(|error| error.to_string())
+                .and_then(|text| SchedulesSection::from_toml_str(&text).map_err(|e| e.to_string()))
+                .map_err(parse_err("schedule"))?
+        }
+        None => SchedulesSection::default(),
+    };
     // The component's manifest has now passed every structural gate. The
     // refusal is feature-selected because a published binary's engine closure
     // is an export-control property, not runtime configuration.
@@ -906,6 +930,7 @@ pub fn gate_manifest(
         on_revocation,
         supervision,
         providers,
+        schedules,
         skills,
         explanation_shape,
         intent_promotion_set,
@@ -1314,12 +1339,10 @@ pub async fn load_admit_start(
         );
     }
 
-    // Story 17-4 — register only after the granted admission and before
-    // `start`; a spawned form (WASM) never registers, whatever the caller
-    // passed. A failed start withdraws the registration below.
-    let hooks = deps
-        .hooks
-        .filter(|_| gated.require_in_process("hooks").is_ok());
+    // Story 17-4 / 20-9 — register only after the granted admission and before `start`. A
+    // spawned form registers too: the pump delivers it `consolidate`, and `telemetry` only
+    // when its manifest lists `on_telemetry_event`. A failed start withdraws the registration.
+    let hooks = deps.hooks;
     if let Some(hooks) = hooks {
         hooks.register(pid, &spirit_id);
     }

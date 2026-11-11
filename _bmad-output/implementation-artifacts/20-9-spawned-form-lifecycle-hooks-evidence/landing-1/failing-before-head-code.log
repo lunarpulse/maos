@@ -1,0 +1,78 @@
+# 20-9 L1 failing-before by code at HEAD fc7373f0 (scratch /tmp/head209, git archive). No test can compile at HEAD (the new vectors use new APIs); the HEAD binaries were exercised through the door in failing-before-head-door-echo-2_3.log and failing-before-head-probe-ac1.log.
+
+## AC1: the HEAD runner has no lifecycle wire (count of 'lifecycle' in runner.rs / lib.rs / wit)
+crates/maos-wasm-host/src/runner.rs: 2
+crates/maos-wasm-host/src/lib.rs: 0
+wit/spirit.wit: 1
+adapter.rs codec.rs config.rs frame_bridge.rs host_state.rs lib.rs recall_wire.rs runner.rs wit_guest.rs 
+## AC2: HEAD WorkerSpirit implements only on_unload
+    impl Spirit for WorkerSpirit {
+        /// Stop the runtime-client pidfd and owned CID. `on_unload` runs under
+        /// a hook budget and never recurses into `unload`.
+        fn on_unload(&self, _ctx: &mut Ctx) {
+            match &self.core.seams.on_unload_fault {
+                Some(OnUnloadFault::Panic) => panic!("injected Worker on_unload panic"),
+                Some(OnUnloadFault::Sleep(duration)) => std::thread::sleep(*duration),
+                None => {}
+            }
+            self.core.stop_session();
+        }
+    }
+## AC2: HEAD registration filter excludes spawned pids
+            .is_none_or(|url| url == registered.endpoint);
+        if !(pin_ok && url_ok) {
+            return Err(AdmissionRefusal::EndpointPinMismatch {
+                provider: config.id.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// An optional `[name]` section, serialized the way `gate_manifest` serializes
+/// every section and parsed by its manifest type. Absent ⇒ `None`; present and
+/// malformed ⇒ the gate-7 refusal.
+fn optional_section<T, E: std::fmt::Display>(
+    root: &toml::Value,
+    name: &'static str,
+    parse: fn(&str) -> Result<T, E>,
+) -> Result<Option<T>, AdmissionRefusal> {
+## AC3: HEAD bundle() has no schedules
+    pub fn bundle(&self) -> SpiritManifestBundle {
+        SpiritManifestBundle {
+            scheduling: self.scheduling.clone(),
+            lifecycle: self.lifecycle.clone(),
+            class: Some(self.class_section.clone()),
+            budget: self.budget.clone(),
+            hot_swap: self.hot_swap.clone(),
+            migrates_from: self.migrates_from.clone(),
+            halt_protocol_compatibility: self.halt_protocol_compatibility.clone(),
+            on_crash: self.on_crash.clone(),
+            on_revocation: self.on_revocation.clone(),
+            supervision: self.supervision.clone(),
+            ..Default::default()
+        }
+    }
+## AC3: grep schedules in HEAD admission.rs
+9://! the daemon constructs its scheduler with `security_manager: None`, so the
+32://! scheduler and unadmitted. At HEAD `maos run` simply returned the error out
+35://! therefore unwound through `scheduler.unload`, which is only possible at all
+53:use maos_kernel_core::scheduler::control_block::{AnySpiritObj, SpiritManifestBundle};
+54:use maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter;
+342:    /// The scheduler already holds this `spirit_id`; this is a state conflict,
+349:    /// The scheduler refused the load for a reason other than duplicate id.
+410:    /// True when the scheduler already holds this `spirit_id`. The door turns
+465:            Self::Load { detail } => write!(f, "scheduler refused the load: {detail}"),
+551:    /// sections a class Spirit declares; `None` keeps the scheduler default.
+
+## AC2: HEAD admission.rs hook registration (spawned excluded)
+302:/// form's boundary: `rust-inproc` declares `T0`; `wasm-component` declares
+321:    /// this binary. `rust-inproc` means first-party compiled-in (ADR-060).
+323:    /// Gate 6 — `rust-inproc` is compiled into this process and declares T0.
+433:                "unknown Spirit class '{name}' (known: {}) — `rust-inproc` admits \
+438:                write!(f, "rust-inproc requires sandbox tier T0, got {tier}")
+452:                "spawned_surface_unsupported: {surface} supports only rust-inproc Spirits",
+618:            .any(|form| form == "rust-inproc")
+774:        && class_section.forms.iter().any(|form| form == "rust-inproc")
+1324:        hooks.register(pid, &spirit_id);
+1339:                hooks.unregister(pid, "start-failed");

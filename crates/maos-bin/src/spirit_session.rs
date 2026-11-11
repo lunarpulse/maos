@@ -31,6 +31,7 @@ use crate::admission::Admitted;
 use crate::enterprise_identity::EnterpriseRuntime;
 use crate::enterprise_pdp_runtime::EnterprisePdpRuntime;
 use crate::recall_mediation::MediatedLogRecall;
+use crate::spawned_lifecycle::{Answer, SwapContext};
 use crate::supervision::{BindingCore, LiveWorker, WorkerSupervision, WorkerSupervisor};
 use crate::worker_spawn::{issue_enterprise_governed_capability, GovernedMintError};
 #[cfg(target_os = "linux")]
@@ -39,6 +40,7 @@ use maos_domain::invariants::i10::{
 };
 #[cfg(target_os = "linux")]
 use maos_kernel_core::capability::cap_tokens::monotonic_now_ns;
+use maos_wasm_host::lifecycle_wire::{self, LifecycleReply, LifecycleRequest};
 
 /// Guest frames one turn may emit before the session is a protocol violation.
 pub const MAX_FRAMES_PER_TURN: usize = 64;
@@ -81,6 +83,10 @@ pub struct SessionLaunch {
     pub once: bool,
     pub initial_frame: Option<IacFrame>,
     pub scopes: Vec<maos_domain::invariants::i1::Scope>,
+    /// The directory the manifest's relative `artifact` resolves against. A swap or cold swap
+    /// of this Spirit launches its successor, and restores it, relative to the same place
+    /// (Story 20-9): the door holds manifest bytes, not the operator's directory.
+    pub origin: PathBuf,
 }
 
 /// Resolve metadata before admission; component validation stays in the T2 child.
@@ -90,14 +96,26 @@ pub fn manifest_launch(
     manifest: &std::path::Path,
     once: bool,
 ) -> Result<SessionLaunch, SessionError> {
+    let origin = manifest.parent().unwrap_or(std::path::Path::new("."));
+    manifest_launch_in(host, gated, manifest, origin, once)
+}
+
+/// [`manifest_launch`] with the artifact resolved against `origin`, not the manifest's own
+/// directory: the door stages a successor's bytes in a private file, and its artifact stays
+/// where the operator named it.
+pub fn manifest_launch_in(
+    host: &dyn maos_host::SpiritHostPort,
+    gated: &crate::admission::GatedManifest,
+    manifest: &std::path::Path,
+    origin: &std::path::Path,
+    once: bool,
+) -> Result<SessionLaunch, SessionError> {
     let artifact = gated
         .class_section
         .artifact
         .as_ref()
         .ok_or(SessionError::Protocol("WASM manifest has no artifact"))?;
-    let artifact = manifest
-        .parent()
-        .unwrap_or(std::path::Path::new("."))
+    let artifact = origin
         .join(artifact)
         .canonicalize()
         .map_err(|error| SessionError::Bridge(error.to_string()))?;
@@ -148,6 +166,7 @@ pub fn manifest_launch(
         once,
         initial_frame,
         scopes: maos_manifest::capabilities_required_to_scopes(&gated.caps_required),
+        origin: origin.to_path_buf(),
     })
 }
 
@@ -196,6 +215,8 @@ pub enum SessionError {
     InvalidComponent,
     #[error("unrepresentable_frame: the runner refused an inbound frame its world cannot express")]
     UnrepresentableFrame,
+    #[error("swap_reverted_after_retire: the post-swap monitor restored a predecessor whose child was retired")]
+    SwapReverted,
 }
 
 struct Recipient {
@@ -247,6 +268,71 @@ struct DiagnosticBudget {
     bytes: usize,
 }
 
+/// Spawn the contained runner for `plan` under `sandbox`, plus a read grant on its artifact.
+/// The session and the swap's pre-warmed successor start a child the same way.
+pub(crate) fn spawn_runner(
+    mut sandbox: maos_kernel_core::security::sandbox::SandboxSpec,
+    plan: SpiritLaunchPlan,
+    artifact: Option<&PathBuf>,
+    spirit_id: &str,
+) -> Result<maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge, SessionError> {
+    if let Some(artifact) = artifact {
+        sandbox.declared_scopes.push(Scope::FsRead {
+            subtree: artifact.to_string_lossy().into_owned(),
+        });
+    }
+    let prefix_hash = argv_prefix_hash(&plan.argv);
+    spawn_and_bridge(BridgeSpawnSpec {
+        program: plan.program,
+        sandbox,
+        argv_prefix: plan.argv,
+        task_args: Vec::new(),
+        expected_argv_prefix_hash: prefix_hash,
+        from_spirit_id: spirit_id.to_owned(),
+        stdio_shape: CliWrapperStdioShape::JsonRpcOverStdio,
+        control_channel: CliWrapperControlChannel::Signals,
+        shutdown_signal: None,
+        channel_capacity: 1,
+        backpressure: Backpressure::Block,
+        env: plan.env,
+        t3: None,
+    })
+    .map_err(|error| SessionError::Bridge(error.to_string()))
+}
+
+/// A committed swap retires the predecessor child at a planned stop. Its pid, tokens and
+/// working memory now belong to the successor: nothing is revoked, and the SCB is not unloaded.
+fn retire(deps: &SessionDeps, pid: u32, old: LiveWorker) {
+    let LiveWorker {
+        binding,
+        mut bridge,
+    } = old;
+    let grace_end = Instant::now() + TERMINATION_GRACE;
+    while matches!(bridge.try_exit_cause(), Ok(None)) && Instant::now() < grace_end {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    if matches!(bridge.try_exit_cause(), Ok(None)) {
+        binding.core().stop_session();
+        let _ = bridge.kill();
+    }
+    let _ = bridge.wait_and_finalize(
+        &deps.journal,
+        pid,
+        Some(deps.capability.audit_sender()),
+        |_| {},
+    );
+    binding.release_for_swap();
+}
+
+/// One lifecycle export in flight on the child: its hook awaits `answer` (a probe has none).
+struct Pending {
+    answer: Option<std::sync::mpsc::SyncSender<Answer>>,
+    request: LifecycleRequest,
+}
+
+/// How long after a committed swap the session watches for the post-swap monitor reverting it.
+const REVERT_WATCH: Duration = Duration::from_secs(35);
+
 /// Run the actual child on a blocking worker while root supervision remains live.
 /// Every post-admission return owns an unload guard, including launch refusal.
 pub async fn run_admitted_session(
@@ -280,34 +366,15 @@ pub async fn run_admitted_session(
         // composition root neither seeds nor reads the manifest-derived table.
         let declared_sends: Vec<Scope> = admitted.sandbox.declared_scopes.iter()
             .filter(|scope| matches!(scope, Scope::IacSend { .. })).cloned().collect();
-        let mut sandbox = admitted.sandbox;
-        if let Some(artifact) = launch.component_artifact.as_ref() {
-            sandbox.declared_scopes.push(Scope::FsRead {
-                subtree: artifact.to_string_lossy().into_owned(),
-            });
-        }
+        let swap_sandbox = admitted.sandbox.clone();
         let mut recipient = Recipient {
             mailbox: Arc::clone(deps.iac.mailbox()),
             handle: deps.iac.register_spirit_typed(&SpiritId::from(admitted.spirit_id.as_str()))
                 .map_err(|error| SessionError::Mailbox(error.to_string()))?,
             id: admitted.spirit_id.clone(),
         };
-        let prefix_hash = argv_prefix_hash(&launch.plan.argv);
-        let bridge = spawn_and_bridge(BridgeSpawnSpec {
-            program: launch.plan.program,
-            sandbox,
-            argv_prefix: launch.plan.argv,
-            task_args: Vec::new(),
-            expected_argv_prefix_hash: prefix_hash,
-            from_spirit_id: admitted.spirit_id.clone(),
-            stdio_shape: CliWrapperStdioShape::JsonRpcOverStdio,
-            control_channel: CliWrapperControlChannel::Signals,
-            shutdown_signal: None,
-            channel_capacity: 1,
-            backpressure: Backpressure::Block,
-            env: launch.plan.env,
-            t3: None,
-        }).map_err(|error| SessionError::Bridge(error.to_string()))?;
+        let bridge = spawn_runner(admitted.sandbox, launch.plan, launch.component_artifact.as_ref(),
+            &admitted.spirit_id)?;
         let mut live = LiveWorker { binding, bridge };
         deps.supervisor.watch(live.binding.core(), live.bridge.child_pid());
         #[cfg(target_os = "linux")]
@@ -340,6 +407,12 @@ pub async fn run_admitted_session(
         };
         let mut ready = false;
         let mut active = false;
+        let mut link = Arc::clone(live.binding.core().lifecycle());
+        link.attach_session(launch.turn_budget);
+        link.set_swap_context(SwapContext { sandbox: swap_sandbox, origin: launch.origin.clone() });
+        let mut pending: Option<Pending> = None;
+        let mut turn_budget = launch.turn_budget;
+        let mut swapped_at: Option<Instant> = None;
         let result = (|| {
             let mut writer = live.bridge.take_frame_writer()
                 .map_err(|error| SessionError::Bridge(error.to_string()))?;
@@ -363,19 +436,26 @@ pub async fn run_admitted_session(
                 Arc::clone(&deps.security), Arc::clone(&deps.journal),
                 deps.enterprise.clone(), deps.pdp.clone(), admitted.spirit_id.clone(),
             );
-            // Story 18-5 (CR-3) — the root fixes the session's pid and window.
-            let spirit = maos_iac::adapter::context_signal::AdmittedSpirit {
-                pid: admitted.pid, spirit_id: admitted.spirit_id.as_str().into(), window: launch.context_window,
-            };
-            recall.context = Some(Arc::new(maos_iac::adapter::context_signal::ContextSignalAdapter::new(
-                Arc::clone(deps.capability.context_budget()), Arc::downgrade(&deps.iac),
-                Arc::clone(deps.iac.transparency_log()),
-                Arc::new(move || Some(spirit.clone())),
-            )));
             let pid = admitted.pid;
-            recall.skill = deps.skill.as_ref()
-                .map(|bind| bind(Arc::new(move || Some(pid)), &launch.scopes))
-                .transpose().map_err(SessionError::Bridge)?;
+            // Story 18-5 (CR-3) — the root fixes the session's pid and window; a committed
+            // swap rebinds them to the successor's manifest.
+            let bind_recall = |recall: &mut MediatedLogRecall,
+                               window: maos_kernel_core::capability::context_budget::ContextWindow,
+                               scopes: &[Scope]| -> Result<(), SessionError> {
+                let spirit = maos_iac::adapter::context_signal::AdmittedSpirit {
+                    pid, spirit_id: admitted.spirit_id.as_str().into(), window,
+                };
+                recall.context = Some(Arc::new(maos_iac::adapter::context_signal::ContextSignalAdapter::new(
+                    Arc::clone(deps.capability.context_budget()), Arc::downgrade(&deps.iac),
+                    Arc::clone(deps.iac.transparency_log()),
+                    Arc::new(move || Some(spirit.clone())),
+                )));
+                recall.skill = deps.skill.as_ref()
+                    .map(|bind| bind(Arc::new(move || Some(pid)), scopes))
+                    .transpose().map_err(SessionError::Bridge)?;
+                Ok(())
+            };
+            bind_recall(&mut recall, launch.context_window, &launch.scopes)?;
             let mut deadline = Some((Instant::now() + launch.turn_budget, "startup"));
             let runtime = tokio::runtime::Handle::current();
             loop {
@@ -384,16 +464,64 @@ pub async fn run_admitted_session(
                 }
                 if let Some((until, stage)) = deadline {
                     if Instant::now() >= until {
+                        if pending.is_some() {
+                            journal_session_event(&deps, admitted.pid, &admitted.spirit_id,
+                                "spirit.lifecycle.deadline", serde_json::json!({ "stage": stage }));
+                        }
                         return Err(SessionError::Deadline(stage));
                     }
                 }
-                if ready && !active && !draining {
+                if !active && pending.is_none() {
+                    if let Some(next) = link.take_handover() {
+                        // The successor's `swap-in` committed (Story 20-9 AC4): its child now
+                        // serves this pid. The predecessor child retires at a planned stop.
+                        tx.take();
+                        if let Some(thread) = writer_thread.take() {
+                            let _ = thread.join();
+                        }
+                        let crate::spawned_lifecycle::Handover { core: next_core, prewarm } = next;
+                        let next_writer = prewarm.writer;
+                        let binding = deps.supervisor.adopt_spawned(Arc::clone(&next_core))
+                            .map_err(|error| SessionError::Supervision(error.to_string()))?;
+                        retire(&deps, admitted.pid, std::mem::replace(&mut live,
+                            LiveWorker { binding, bridge: prewarm.bridge }));
+                        deps.supervisor.watch(live.binding.core(), live.bridge.child_pid());
+                        live.binding.core().mark_ready();
+                        let (next_tx, next_rx) = std::sync::mpsc::sync_channel::<Vec<u8>>(1);
+                        let mut next_writer = next_writer;
+                        writer_thread = Some(std::thread::Builder::new()
+                            .name(format!("spirit-frame-writer-{}", admitted.pid))
+                            .spawn(move || {
+                                for body in next_rx {
+                                    next_writer.write_frame(&body)?;
+                                }
+                                Ok::<(), std::io::Error>(())
+                            }).map_err(|error| SessionError::Bridge(error.to_string()))?);
+                        tx = Some(next_tx);
+                        link.close();
+                        link = Arc::clone(next_core.lifecycle());
+                        link.attach_session(prewarm.turn_budget);
+                        link.set_supported(true);
+                        turn_budget = prewarm.turn_budget;
+                        bind_recall(&mut recall, prewarm.context_window, &prewarm.scopes)?;
+                        report.child_pid = live.bridge.child_pid();
+                        swapped_at = Some(Instant::now());
+                    }
+                }
+                if swapped_at.is_some_and(|at| at.elapsed() < REVERT_WATCH)
+                    && !deps.supervisor.holds_spirit_object(live.binding.core())
+                {
+                    journal_session_event(&deps, admitted.pid, &admitted.spirit_id,
+                        "spirit.swap.reverted_after_retire", serde_json::json!({ "child_pid": report.child_pid }));
+                    return Err(SessionError::SwapReverted);
+                }
+                if ready && !active && !draining && pending.is_none() && !link.fenced() {
                     if let Some(frame) = initial_frame.take() {
                         let id = frame.frame_id;
-                        deliver_bounded(&deps, &runtime, Instant::now() + launch.turn_budget,
+                        deliver_bounded(&deps, &runtime, Instant::now() + turn_budget,
                             deps.iac.deliver_typed(frame, 0, None))?;
                         seed_id = launch.once.then_some(id);
-                        deadline = Some((Instant::now() + launch.turn_budget, "seed turn"));
+                        deadline = Some((Instant::now() + turn_budget, "seed turn"));
                     }
                     if let Some((_, frame)) = recipient.handle.try_recv()
                         .map_err(|error| SessionError::Mailbox(error.to_string()))?
@@ -415,7 +543,7 @@ pub async fn run_admitted_session(
                                     turn.inbound_clock = frame.logical_clock;
                                     turn.frames = 0;
                                     turn.recalls = 0;
-                                    deadline = Some((Instant::now() + launch.turn_budget, "active turn"));
+                                    deadline = Some((Instant::now() + turn_budget, "active turn"));
                                     tx.as_ref()
                                         .ok_or(SessionError::Protocol("session stdin already closed"))?
                                         .send(body)
@@ -425,12 +553,31 @@ pub async fn run_admitted_session(
                         }
                     }
                 }
+                // A queued frame turn goes first: a busy trigger caller must not starve the mailbox.
+                if ready && !active && !draining && pending.is_none() {
+                    if let Some(call) = link.take() {
+                        if link.fenced() {
+                            // After a swap's `snapshot` the predecessor does no more work.
+                            let _ = call.answer.send(Answer::Reply(LifecycleReply::Unsupported));
+                        } else {
+                            let body = lifecycle_wire::encode_request(&call.request)
+                                .map_err(SessionError::Codec)?;
+                            turn.recalls = 0;
+                            deadline = Some((Instant::now() + turn_budget, "lifecycle export"));
+                            tx.as_ref()
+                                .ok_or(SessionError::Protocol("session stdin already closed"))?
+                                .send(body)
+                                .map_err(|error| SessionError::Bridge(error.to_string()))?;
+                            pending = Some(Pending { answer: Some(call.answer), request: call.request });
+                        }
+                    }
+                }
                 match live.bridge.poll_frame(Duration::from_millis(20))
                     .map_err(|error| SessionError::Bridge(error.to_string()))?
                 {
                     BridgePoll::Idle => {}
                     BridgePoll::Closed => {
-                        if !ready || active {
+                        if !ready || active || pending.is_some() {
                             return Err(SessionError::UnexpectedEof);
                         }
                         if launch.once && report.turns == 0 {
@@ -445,12 +592,20 @@ pub async fn run_admitted_session(
                     BridgePoll::Data(SubStream::Stdout, bytes) if bytes.is_empty() => {
                         if !ready {
                             ready = true;
-                            deadline = None;
+                            // The probe below sets the next deadline.
                             live.binding.core().mark_ready();
                             println!("{}", serde_json::json!({
                                 "event": "spirit_loaded", "spirit_id": admitted.spirit_id,
                                 "pid": admitted.pid, "child_pid": report.child_pid, "ready": true,
                             }));
+                            let probe = lifecycle_wire::encode_request(&LifecycleRequest::Probe)
+                                .map_err(SessionError::Codec)?;
+                            tx.as_ref()
+                                .ok_or(SessionError::Protocol("session stdin already closed"))?
+                                .send(probe)
+                                .map_err(|error| SessionError::Bridge(error.to_string()))?;
+                            pending = Some(Pending { answer: None, request: LifecycleRequest::Probe });
+                            deadline = Some((Instant::now() + turn_budget, "lifecycle probe"));
                         } else if active {
                             deps.supervisor.complete_turn(live.binding.core());
                             revoke(&deps.capability, &mut leases)?;
@@ -460,15 +615,37 @@ pub async fn run_admitted_session(
                             if launch.once {
                                 draining = true;
                                 tx.take();
-                                deadline = Some((Instant::now() + launch.turn_budget, "shutdown"));
+                                deadline = Some((Instant::now() + turn_budget, "shutdown"));
                             }
                         } else {
                             return Err(SessionError::Protocol("unexpected empty control frame"));
                         }
                     }
                     BridgePoll::Data(SubStream::Stdout, bytes) => {
+                        if lifecycle_wire::is_reply(&bytes) {
+                            let Some(done) = pending.take() else {
+                                return Err(SessionError::Protocol("lifecycle reply without a request"));
+                            };
+                            let reply = lifecycle_wire::decode_reply(&bytes).map_err(SessionError::Codec)?;
+                            deadline = None;
+                            match (&done.request, &reply) {
+                                (LifecycleRequest::Probe, LifecycleReply::Supported(supported)) =>
+                                    link.set_supported(*supported),
+                                (LifecycleRequest::Probe, _) =>
+                                    return Err(SessionError::Protocol("unexpected probe reply")),
+                                // The predecessor's state is now taken: no more work until the swap resolves.
+                                (LifecycleRequest::Snapshot, LifecycleReply::State(_)) => link.set_fenced(true),
+                                _ => {}
+                            }
+                            if let Some(answer) = done.answer {
+                                let _ = answer.send(Answer::Reply(reply));
+                            }
+                            continue;
+                        }
                         if maos_wasm_host::recall_wire::is_tagged(&bytes) {
-                            let reply = if !ready || !active {
+                            let in_export = active
+                                || pending.as_ref().is_some_and(|p| p.request.imports_allowed());
+                            let reply = if !ready || !in_export {
                                 Err(crate::recall_mediation::ProtocolViolation("recall outside an active export"))
                             } else if turn.recalls >= MAX_RECALLS_PER_TURN {
                                 Err(crate::recall_mediation::ProtocolViolation("recall budget exceeded"))
@@ -512,6 +689,10 @@ pub async fn run_admitted_session(
                 }
             }
         })();
+        if let Some(Pending { answer: Some(answer), .. }) = pending.take() {
+            let _ = answer.send(Answer::SessionEnded);
+        }
+        link.close();
         // Whatever ended the loop, the child gets a bounded grace to leave by
         // itself (its stdin closed with the loop), then a planned stop, then a
         // kill: `wait_and_finalize` below can never block forever.
@@ -653,6 +834,26 @@ fn journal_undeliverable(
         "",
         None,
         "spirit.frame.undeliverable",
+        record.to_string().as_bytes(),
+        FrameOrigin::Kernel,
+    );
+}
+
+/// One journaled row for a session event that ends or changes the session (Story 20-9).
+fn journal_session_event(
+    deps: &SessionDeps,
+    pid: u32,
+    spirit_id: &str,
+    intent: &str,
+    record: serde_json::Value,
+) {
+    let _ = deps.journal.insert_frame_event_with_sender(
+        JournalKind::GovernanceEvent,
+        pid,
+        spirit_id,
+        "",
+        None,
+        intent,
         record.to_string().as_bytes(),
         FrameOrigin::Kernel,
     );

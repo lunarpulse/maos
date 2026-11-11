@@ -50,7 +50,7 @@ pub async fn upgrade_with_plan_guard(
     successor_manifest: &Path,
     original_target: &Path,
     policy: UpgradePolicy,
-    mut before_hop: impl FnMut(&Path) -> Result<(), UpgradeFailure>,
+    mut before_hop: impl FnMut(&Path, &Path) -> Result<(), UpgradeFailure>,
     mut committed: impl FnMut(&str),
 ) -> Result<Vec<UpgradeReport>, UpgradeFailure> {
     let Some((plan_path, mut plan)) = load_plan(spirit_id)? else {
@@ -198,7 +198,7 @@ async fn upgrade_hop(
     manifest: &Path,
     expected: Option<&MigrationCandidate>,
     policy: UpgradePolicy,
-    before_hop: &mut impl FnMut(&Path) -> Result<(), UpgradeFailure>,
+    before_hop: &mut impl FnMut(&Path, &Path) -> Result<(), UpgradeFailure>,
     committed: &mut impl FnMut(&str),
 ) -> Result<UpgradeReport, UpgradeFailure> {
     let text = std::fs::read_to_string(manifest)
@@ -221,7 +221,7 @@ async fn upgrade_hop(
         });
     }
     let snapshot = ManifestSnapshot::new(text.as_bytes()).map_err(|error| error.to_string())?;
-    before_hop(&snapshot.0)?;
+    before_hop(&snapshot.0, manifest)?;
     let report = orchestrator
         .upgrade(spirit_id, &snapshot.0, policy)
         .await
