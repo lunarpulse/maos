@@ -113,13 +113,14 @@ cryptographic primitive). The full determination, dual-use review, and BIS
 advisory citation are on file at `docs/compliance/eccn-classification.md`
 (NFR-Comp-1).
 
-This is an engineering classification, not legal export advice; it is **pending
-export-compliance counsel review before v1.0 enterprise distribution**.
+This is an engineering classification, not legal export advice; **no
+export-compliance counsel review was performed and no ECCN determination was made
+(operator ruling 2026-11-12: claim boundary; NFR-Comp-1 is not claimed as met)**.
 Operators and distributors must confirm applicability with their own counsel
 and the jurisdiction of distribution.
 
-The WASM host remains outside the shipped default closure while export Hold 2
-is open. A default binary validates a WASM-component manifest and reports
+The WASM host remains outside the shipped default closure; no ECCN determination
+was made (operator ruling 2026-11-12: claim boundary, not a GA precondition; NFR-Comp-1 not claimed as met). A default binary validates a WASM-component manifest and reports
 `wasm_engine_off`; it does not instantiate an engine. `crates/maos-bin/Cargo.toml`
 defines `default = ["network"]`; the `wasm-host` feature is opt-in and is the
 engineering precondition for the unresolved **5D002.c.1** classification.

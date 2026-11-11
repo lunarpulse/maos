@@ -31,10 +31,10 @@ and that the clock-start field is a real tag or an honest placeholder.
 
 ## When the clock starts
 
-Only `v1.0.0`, and only after both RELEASE-HOLDS holds clear
-([`RELEASE-HOLDS.md`](../../RELEASE-HOLDS.md): Hold 1 external pen-test, Hold 2 export
-classification). Cutting it is `ops-ga-tag-after-holds`, an operator row. A release
-candidate never starts it: `STABILITY.md` renders the release channel
+Only `v1.0.0`. [`RELEASE-HOLDS.md`](../../RELEASE-HOLDS.md) Holds 1–2 (external
+pen-test, export classification) are claim boundaries, not preconditions (operator
+ruling 2026-11-12); the release notes must state they were not performed. Cutting it
+is `ops-ga-tag-after-holds`, an operator row needing the human signing action. A release
 (`kernel_version`'s pre-release suffix — `-rc.N` is "release candidate — pre-release;
 LTS clock not started", no suffix is GA) so a reader cannot mistake an rc for the
 commitment.

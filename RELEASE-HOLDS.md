@@ -14,20 +14,32 @@
   Cortex line** — via merge-commit `439b59fd` (2026-08-11), closing 21/21
   stories with `product_claim: PROVEN` on four operator-lane substrate gates.
   All PRD journeys served.
-- **GA tag:** ⏳ **Held.** Blocked only by the two external items below. Neither
-  blocks further development, branch merges, or internal milestones.
+- **GA tag:** Holds 1–2 are **claim boundaries, not GA preconditions**
+  (operator ruling 2026-11-12). `v1.0.0` needs the engineering exits green and the
+  signed-tag step by whoever holds the key (an operator action AI agents cannot
+  perform); it may be cut without a pen-test or ECCN determination, but must say
+  so (see "GA-tag procedure").
 - **Signed pre-release:** `v0.1.0-alpha.1` and the `v1.0.0-rc.N` release candidates
-  are not GA tags and are unaffected by Holds 1–2 under this ledger's
-  development/GA scope above. Cut them only by following
+  are not GA tags. Cut them only by following
   `docs/release/tag-procedure.md`. A release candidate carries no LTS commitment and
-  starts no LTS clock; `v1.0.0` does (`docs/release/lts-policy.md`).
+  starts no LTS clock; `v1.0.0` does (`docs/release/lts-policy.md`). Per the
+  2026-11-12 ruling (`rc` = b) the rc ships with perf verdicts recorded ABSENT and
+  labelled in the release notes.
 
-## Holds
+## Claim boundaries — Holds 1–2 (not performed, not claimable)
 
-| # | Hold | Requirement | Owner | Status | GA effect |
-|---|------|-------------|-------|--------|-----------|
-| 1 | External penetration test | **NFR-Sec-7** — external pen-test report, **zero P0/P1 findings open at ship**. Triage by joint panel (pen-test lead + MAOS security owner); disagreement → PRD-author tiebreak. P0/P1 per OWASP Risk Rating Methodology, frozen at engagement start. | Security owner + external firm | ❌ Open (external, not yet scheduled) | **Blocks GA tag.** |
-| 2 | Export-control classification | **NFR-Comp-1** — ECCN classification letter on file; EAR99 vs 5D002 determination published in `STABILITY.md §Export`; dual-use review for kernel crypto primitives. | Export counsel + security owner | ❌ Open (external counsel review pending) | **Blocks GA tag** for any externally-published binary that includes the WASM engine. |
+> **OPERATOR RULING 2026-11-12 (ask answer `ga` = boundary).** Operator words:
+> "we are not doing NFR-Sec-7 and NFR-Comp-1 as we do not have resources and
+> companies to do that. same applies to ops-* work as no resources, only AI
+> agents we have." Holds 1–2 are no longer GA preconditions: they are explicit
+> claim boundaries. **No external penetration test was performed; no ECCN
+> determination was made; assurance is AI-agent review plus the hermetic CI
+> proof only.** The release may NOT claim NFR-Sec-7 or NFR-Comp-1 is met.
+
+| # | Boundary | Requirement (text retained; NOT met) | Owner | Status | GA effect |
+|---|----------|-------------|-------|--------|-----------|
+| 1 | External penetration test | **NFR-Sec-7** — external pen-test report, **zero P0/P1 findings open at ship**. Triage by joint panel (pen-test lead + MAOS security owner); disagreement → PRD-author tiebreak. P0/P1 per OWASP Risk Rating Methodology, frozen at engagement start. | Security owner + external firm | ⛔ Not performed (no resources/firm); NOT claimable | none (boundary) |
+| 2 | Export-control classification | **NFR-Comp-1** — ECCN classification letter on file; EAR99 vs 5D002 determination published in `STABILITY.md §Export`; dual-use review for kernel crypto primitives. | Export counsel + security owner | ⛔ No ECCN determination made (no counsel); NOT claimable | none (boundary) |
 
 ## Standing mitigations (in force now, not a GA precondition)
 
@@ -35,8 +47,8 @@
   (`crates/maos-bin/Cargo.toml`) is off-by-default and gates the vendored
   `wasmtime` engine. Off-by-default is the **export-control precondition for
   5D002.c.1** — the shipped default artifact carries no controlled crypto/WASM
-  engine, so internal builds and non-WASM distribution proceed while Hold 2 is
-  open. See `docs/compliance/export-counsel-precondition.md` and
+  engine, so internal builds and non-WASM distribution proceed while Boundary 2
+  (no ECCN determination) stands. See `docs/compliance/export-counsel-precondition.md` and
   `docs/compliance/eccn-classification.md`.
 
 ## Claim boundaries — v2.2 Reza line (in force now, not a GA precondition)
@@ -71,18 +83,25 @@
 | 19 | The four package recipes remain publication scaffolds: they still contain a `0.5.0` tag, the development release public key, or `PLACEHOLDER_SHA256_*`; AUR `pkgver` and RPM `Version:` also cannot contain the tag's hyphenated pre-release form directly. | That `v0.1.0-alpha.1` is installable through Homebrew, AUR, Debian, or RPM, or that those recipes are publication-ready. | `ops-brew-tap-and-aur-publication`; use `_tag=` in `PKGBUILD` and `%global tag` in `maos.spec` to decouple the download tag from normalized package versions. |
 | 20 | **Worker workspaces are not size-capped (Story 19-3; operator rulings `r19_3_disk` and `r19_3_hold_kind`, 2026-10-28).** Since 19-3 every T3 Worker run writes to a host-backed workspace (`--volume=<dir>:/workspace:rw,U`) that is kept after the Worker exits and has no size quota. Before 19-3 everything a Worker could write was tmpfs counted against its memory limit; now a runaway or prompt-injected Worker can write until the filesystem holding the workspaces root is full. By default that root is `<MAOS_HOME>/workspaces`, on the same filesystem as the MAOS home's audit store (the Transparency Log), so audit writes can fail with it; retained workspaces also accumulate across runs. **Mitigations in force (they do not cap anything):** `MAOS_WORKER_WORKSPACES_ROOT` (an absolute path) moves the workspaces root to a separate filesystem, off the audit store; after each Worker run `maos run` checks free space on the workspace's filesystem and, below 1 GiB, warns on stderr (`maos run: WARNING: Worker workspaces filesystem at <workspace> has <n> bytes free (below 1073741824); …`) — a warning, never a refusal, and not journaled; `maos purge` enumerates both `<MAOS_HOME>/workspaces` and a configured `MAOS_WORKER_WORKSPACES_ROOT`, and removes Worker-owned files with `podman unshare rm -rf --one-file-system` or reports them as residue. | That a Worker's disk use is bounded, that a Worker cannot exhaust the filesystem holding its workspaces root, or that the audit store is protected from a runaway Worker when the workspaces root is left at its default. The low-space warning is an operator signal, not a control. | A per-workspace size cap (filesystem project quota, or a size-capped mount with copy-out) enforced at the T3 Worker spawn, with a committed proven-red vector showing a Worker that writes past the cap cannot exhaust the host filesystem. Owner unscheduled. |
 
-## GA-tag procedure (do not tag until both clear)
+## GA-tag procedure (engineering exits green; Holds 1–2 no longer gate)
+
+> **OPERATOR RULING 2026-11-12:** Holds 1–2 are claim boundaries, not GA
+> preconditions. `v1.0.0` may be tagged without them. See "Claim boundaries —
+> Holds 1–2" above.
+
 This section governs GA tags only. The signed `v0.1.0-alpha.1` pre-release and the
-`v1.0.0-rc.N` release candidates follow `docs/release/tag-procedure.md` and may be
-cut while Holds 1–2 remain open, consistent with this ledger's Scope.
+`v1.0.0-rc.N` release candidates follow `docs/release/tag-procedure.md`.
 
-
-1. Hold 1: pen-test report received, joint-panel triage records **zero P0/P1
-   open**; attach report reference here.
-2. Hold 2: ECCN letter on file, `STABILITY.md §Export` reflects the final
-   EAR99/5D002 determination; export counsel signs off on WASM-inclusive
-   external publication (or that path stays flag-gated at GA).
-3. Only then cut the GA tag. Update this ledger's Status to reflect the tag.
+1. The engineering exits are green (the hermetic CI proof on the tagged tree;
+   `docs/release/tag-procedure.md`).
+2. The release notes and this ledger state plainly: **"no external penetration
+   test was performed; no ECCN determination was made; assurance is AI-agent
+   review plus the hermetic CI proof only"**, and the release does NOT claim
+   NFR-Sec-7 or NFR-Comp-1 is met.
+3. The WASM-engine-off-by-default standing mitigation is still in force.
+4. The signed-tag step needs whoever holds the signing key. That human/key part
+   is an **operator action that AI agents cannot perform**; this ledger does not
+   assume agents can sign. Update this ledger's Status to reflect the tag.
 
 ## Story 14-2 — mTLS rotation honesty clauses (2026-08-29)
 

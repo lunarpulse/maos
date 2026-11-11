@@ -5,9 +5,9 @@
 
 This procedure cuts a pre-release tag: `vX.Y.Z-rc.N` (the `v1.0.0-rc.N` line), and
 it is the procedure that cut `v0.1.0-alpha.1` (Story 15-4; the alpha-specific
-history is kept below and marked). A pre-release is not the GA tag governed by
-Holds 1–2 in [`RELEASE-HOLDS.md`](../../RELEASE-HOLDS.md). Those holds do not
-block it, and a release candidate starts no LTS clock.
+history is kept below and marked). A pre-release is not the GA tag; Holds 1–2 in
+[`RELEASE-HOLDS.md`](../../RELEASE-HOLDS.md) are claim boundaries (no GA effect)
+and a release candidate starts no LTS clock.
 
 **Who runs this.** Every step is the operator's: agents never tag, sign, dispatch a
 workflow, write a ledger or publish. Nothing below was exercised by the Story 20-5
@@ -216,6 +216,9 @@ to the tap/AUR. Packages disable stripping and carry exactly the signed bytes.
 - The first alpha release did not ship working package recipes. Only a release
   produced by the corrected pipeline can claim the rendered package routes;
   tap/AUR accounts remain `ops-brew-tap-and-aur-publication`.
-- This procedure does not authorize a GA tag. GA remains blocked until both
-  holds in `RELEASE-HOLDS.md` are clear; `v1.0.0` is cut by `ops-ga-tag-after-holds`
-  and is the only tag that starts the LTS clock ([`lts-policy.md`](lts-policy.md)).
+- This procedure does not cut a GA tag. Per the operator ruling of 2026-11-12,
+  RELEASE-HOLDS Holds 1–2 (pen-test, ECCN) are claim boundaries, not GA
+  preconditions; `v1.0.0` needs the engineering exits green plus the signed-tag
+  step by whoever holds the key (an operator action AI agents cannot perform),
+  `ops-ga-tag-after-holds`, and is the only tag that starts the LTS clock
+  ([`lts-policy.md`](lts-policy.md)).
