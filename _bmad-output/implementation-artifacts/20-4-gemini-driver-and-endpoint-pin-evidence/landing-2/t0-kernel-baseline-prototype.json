@@ -1,0 +1,16 @@
+{
+  "passed": false,
+  "actual-lines": 26854,
+  "pinned-lines": 26841,
+  "baseline-file": "/tmp/t204l2/xtask/kernel-core-baseline.toml",
+  "file-set-entries": 95,
+  "set-hash": "2c22321948fb89df25f58b4abcb54e3ff81bd2c5ffa0c8f8429d27562164375b",
+  "pinned-set-hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+  "changed": [
+    "inference/mod.rs",
+    "io/mod.rs"
+  ],
+  "added": [],
+  "removed": []
+}
+kernel-core drifted from the pinned baseline

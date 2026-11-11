@@ -502,7 +502,18 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26841
+src_lines = 26854
+# HISTORY: 20-4-gemini-driver-and-endpoint-pin landing 2 (20-4 L2), FLAG-Winston
+# R = KA + KIO1 + KIO2 (ruled 2026-11-02, ask s204; D-20-4-06 A + D-20-4-07 A;
+# ceiling 26867 physical / 21060 tokei): exact formatted 26841 -> 26854 (+13
+# physical), tokei 21042 -> 21051 (+9), as the creation prototype measured and the
+# T0 re-cut on a `git archive` HEAD copy re-measured; 95 files, public surface
+# unchanged. KA: `bucket_key` interns `gemini` and `kimi` (inference/mod.rs; any
+# other id still `Unconfigured`); KIO1: a `BadHeader` transport error is named
+# without its header line (D:1297); KIO2: a non-2xx body over the 10 MiB cap is
+# cut at the cap and keeps its status, a 2xx over it is still `Decode` (D:1298)
+# (io/mod.rs). Digests and set_hash adopted from `--emit-pin`. Cumulative
+# measured tokei 21051 (shared STOP 21250, ADR-069 alarm 22000).
 # HISTORY: 20-7 landing 1 review corrections; D11 exact formatted re-pin:
 # 26841 physical / 21042 tokei, unchanged, 95 files and set hash unchanged.
 # No permanent kernel src edit: production signing correction is bench-only.
@@ -936,7 +947,7 @@ src_lines = 26841
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59"
+set_hash = "2c22321948fb89df25f58b4abcb54e3ff81bd2c5ffa0c8f8429d27562164375b"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -963,9 +974,9 @@ set_hash = "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59"
 "hot_swap/saga.rs" = "886994c9ab553372c85df2caf8de395c0b712b888656c030674babf12f8efc77"
 "hot_swap/state_codec.rs" = "8d1c62a7486582eb329b208bd4dca5280ac62d1462c89cdfb1d8691aaa3861dd"
 "iac.rs" = "18c0b4e562376fd5b6170fac0544bb3465c4fc452b46c702a8bc1c070d7a08bf"
-"inference/mod.rs" = "cbf9975f4c9da17c334df95be0cc2acced0f6a008cbcf249a01d963f7c1ff359"
+"inference/mod.rs" = "2ed62363003eff9c8e6364ad7464a7a22ba544f54daa836926b68aa178356746"
 "inference/router.rs" = "82135d50d4187cc946044802c9adb5d378e023440d790c8fd1e6ebe51cceee29"
-"io/mod.rs" = "5cff233b27aa9d79793bd4fcda34270d2c98439b0c50c47059a0ee4f0718f032"
+"io/mod.rs" = "57d2b794bb4cbae5deb1fbf3332132fe4a2e6b239b12a95fe5b9f48eb195619b"
 "isolation/mod.rs" = "a7f618dd75f7dd4115589dc7e9cd742e3f0f4c07d30d6f95b1cc494b5947813c"
 "isolation/runner.rs" = "3b4890261b2116d91efe15a9e0369ad8e1544b056a5286826ab7ee87ead593ff"
 "journal/mod.rs" = "ec7fa9c2b4508a5d339b6ffd6d0aac0030956c7c504ef9042582cc95f14c51bf"

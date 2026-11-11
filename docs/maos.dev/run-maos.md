@@ -173,11 +173,15 @@ K2 ids are vendor-deprecated and refused by `check-model-currency`. Kimi's succe
 requires a successful $1 top-up and has account-tier limits; see the
 [vendor limits](https://platform.kimi.ai/docs/pricing/limits).
 
-**20-4 landing boundary:** L1's Gemini/Kimi shell cassettes are explicitly `seed`;
+**20-4 landing boundary:** The Gemini/Kimi shell cassettes are explicitly `seed`;
 they prove selection and routing (`infer:gemini->replay:…`, `infer:kimi->replay:…`),
-not a vendor wire exchange. Fixture tests prove the wire shape. Until L2 widens
-the kernel's rate-limit id set, live/record/deterministic Gemini/Kimi calls fail
-closed as `Unconfigured`; no release tag belongs between these landings.
+not a vendor wire exchange. Fixture tests prove the wire shape. L2 (2026-11-11)
+widened the kernel's rate-limit id set to `gemini` and `kimi`, so live, record and
+deterministic calls pass the limiter; any other id still fails closed as
+`Unconfigured`. No vendor round trip is claimed until the operator records one
+(`ops-live-gemini-leg`, paid keys). The kernel IO adapter no longer echoes a
+rejected request header (a credential) and keeps a non-2xx status when the
+body exceeds 10 MiB.
 
 ### MCP server bearers
 

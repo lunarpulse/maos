@@ -276,7 +276,10 @@ fn kernel_core_ceiling_has_not_moved_under_the_easing() {
     // verification and wire use; inference/mod.rs spawns RateLimited delivery
     // instead of dropping its unpolled future. The +23 allowance is not headroom:
     // the ceiling is the measured +22.
-    const RATIFIED_AT_EASING: i64 = 21_042;
+    const RATIFIED_AT_EASING: i64 = 21_051;
+    // 20-4-gemini-driver-and-endpoint-pin landing 2, FLAG-Winston R = KA + KIO1 +
+    // KIO2 (ruled 2026-11-02, ask s204): exact formatted 21042 -> 21051 (+9),
+    // physical 26841 -> 26854 (+13), ceiling 21060; inference/mod.rs and io/mod.rs.
     // 20-7 landing 1, FLAG-Winston R = K1w + K2r (rows207), 2026-11-01/02:
     // exact formatted21011 -> 21042 (+31), physical26801 -> 26841 (+40), ceiling
     // 21073; t3/child.rs only. The 20-1b grant shares the 21011 base: the second

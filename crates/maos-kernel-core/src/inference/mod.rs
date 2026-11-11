@@ -97,6 +97,8 @@ impl InferencePortAdapter {
             "anthropic" => "anthropic",
             "openai" => "openai",
             "ollama" => "ollama",
+            "gemini" => "gemini",
+            "kimi" => "kimi",
             _ => return Err(InferenceError::Unconfigured),
         };
         // Recover the driver to read its credential_fingerprint.

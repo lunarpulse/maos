@@ -5,7 +5,7 @@ created: 2026-11-02
 context_commit: a8af3215
 baseline_commit: a8af3215
 security_sensitive: true
-kernel_grant: "RULED 2026-11-02 (ask s204; D-20-4-06 A + D-20-4-07 A; R = KA + KIO1 + KIO2): measured at a8af3215 from 26841 physical / 21042 tokei, +13 / +9. Ceilings (STOP above): kernel ≤ 26867 physical / 21060 tokei; L2 kernel last. The second or later kernel landing re-bases; cumulative STOP above 21209 tokei, ADR-069 alarm 22000; expected cumulative with 20-1b +68 and 20-11 +6 is 21125."
+kernel_grant: "RULED 2026-11-02 (ask s204; D-20-4-06 A + D-20-4-07 A; R = KA + KIO1 + KIO2): measured at a8af3215 from 26841 physical / 21042 tokei, +13 / +9. Ceilings (STOP above): kernel ≤ 26867 physical / 21060 tokei; L2 kernel last. The second or later kernel landing re-bases; cumulative STOP above 21209 tokei, ADR-069 alarm 22000; expected cumulative with 20-1b +68 and 20-11 +6 is 21125. L2 LANDED 2026-11-11: measured exactly +13 / +9 (26841 → 26854 physical, 21042 → 21051 tokei); ceilings unused; shared STOP is 21250 (see the supersession header)."
 kloc_grant: "RULED 2026-11-02 (ask s204; D-20-4-11 A; D02 A ×2 measured / ×3 unmeasured), L1 rebased by parent handoff 2026-11-03 at 8c809f9c. L1 ceilings (STOP above; exact pins; aggregate hardfail = measured + 1): maos-providers ≤ 1898; maos-bin ≤ 34643 = 34191 + 145×2 + 54×3; maos-domain ≤ 10115; maos-manifest ≤ 4610; xtask ≤ 44466; aggregate ≤ 193526 = 192519 + 1007. Kernel delta 0 in L1 (26841 physical / 21042 tokei); L2 retains kernel_grant and re-bases at its start. Creation-wide pricing is retained below as historical evidence. Every other crate 0."
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:67-71`): a kernel FLAG-Winston row (D-20-4-06/07), secrets handling (two new credentials, header redaction, AC3.4, AC8.1) and a refusing control (the endpoint pin, AC6). Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC1.1 (key placement), AC6 and AC8, Test Infrastructure on glm-5.3 (standing policy; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
@@ -20,7 +20,7 @@ not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21
 Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
 
 
-Status: ready-for-dev
+Status: done
 
 <!-- Created 2026-11-02 at a8af3215 (main, one docs commit ahead of origin/main 47631284; `git log -1 -- crates xtask` = 47631284) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30). Preflight D06 is OPEN; D-20-4-01…11 are PROPOSED, not ruled — the operator rules; a different ruling rewrites only the clauses marked with that row. No cargo ran (parent rule): cites re-read at HEAD (`creation/cites-a8af3215.md`); kernel and kloc by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`); the epic's AC1 shell line run on the prebuilt binary in an isolated home (`creation/runtime/`). Stale E20 §20-4 cites are corrected through `creation/records-owed.md` §A. -->
 
@@ -253,17 +253,17 @@ different ruling. Every AC names a failing-before witness and a plant. **local**
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight.** Operator rulings on D06 and D-20-4-01…11 recorded; tracker → `in-progress`. Run `creation/measurements.md` "Not measured here" 1–7 (item 6 classifies the admission sites; item 7 the vendor ids/prices). Re-measure every cite this story touches (rule 9). A measured figure above the ruled envelope, or a T0 result contradicting a ruled option, is STOP + D-row.
+- [x] **T0 — Preflight.** Operator rulings on D06 and D-20-4-01…11 recorded; tracker → `in-progress`. Run `creation/measurements.md` "Not measured here" 1–7 (item 6 classifies the admission sites; item 7 the vendor ids/prices). Re-measure every cite this story touches (rule 9). A measured figure above the ruled envelope, or a T0 result contradicting a ruled option, is STOP + D-row. *(L1 T0: `landing-1/preflight.md`, `admission-sites.md`; D-20-4-12 B. L2 T0: kernel row R re-measured on a reverted prototype, `landing-2/t0-measurement.md`, exactly the grant. The tracker went `ready-for-dev` → `done` at L2 without an `in-progress` interlude; no status flip was permitted at L1.)*
 - [x] **T1 — Gemini driver (AC1.1–1.4).** `gemini.rs`, recording transport, five fixtures, round-trip test, plant.
 - [x] **T2 — Kimi (AC2).** `compatible`, fixtures, test, plant.
 - [x] **T3 — Keys, registration, default, credential check (AC3, AC1.5).** `SecretKey`, env rows, purge labels, builder, replay ids, selector, hello-spirit declarations, the two seed cassettes, `provider_selection_20_4.rs`, plant.
 - [x] **T4 — Currency (AC4).** Data, price rows, scan extension, vectors, plant.
 - [x] **T5 — Per-Spirit selection (AC5).** `[providers]` read, declared check, fallback refusal, binding sites, `admit_spirit` argument, manifest ids/tests, witness, plant.
 - [x] **T6 — Endpoint pin (AC6).** Endpoint table, `check_provider_pins` at each production site, refusal codes, air-gap vector, witness, plant, operator doc.
-- [ ] **T7 — L1 landing (D-20-4-08 A).** Exact pins inside the ruled envelope; `check-env-contract`, `check-model-currency`, `kloc-check`, `check-kernel-baseline` (unchanged), `check-service-boundary`, `check-corpus`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; one hosted discipline run on the final tree + plants. Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
-- [ ] **T8 — Kernel id set (AC7)** under the ruled row: red-before test, KA, plant.
-- [ ] **T9 — Kernel IO (AC8)** under the ruled row: two red-before tests, KIO1, KIO2, two plants.
-- [ ] **T10 — L2 landing + records (AC9).** Both kernel pins + content hashes `inference/mod.rs`, `io/mod.rs` (re-base on 20-1b if it landed first); FLAG-Winston decision record (precedent `20-7-flag-winston-decision.md`); `cargo test -p maos-kernel-core --lib`; hosted run; ledger closures; coverage; docs.
+- [x] **T7 — L1 landing (D-20-4-08 A).** Exact pins inside the ruled envelope; `check-env-contract`, `check-model-currency`, `kloc-check`, `check-kernel-baseline` (unchanged), `check-service-boundary`, `check-corpus`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; one hosted discipline run on the final tree + plants. Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator. *(Local gates green; prepush NOT green under load, rule-10 rows owner 20-7. Hosted discipline run `41815429165` on the L1 correction commit exposed two regressions that were fixed (Hosted-1 section); the post-fix hosted rerun and the `ci/ci-20-4-verify.yml` recipe have **not** been executed — UNVERIFIED, labelled in every L2 record.)*
+- [x] **T8 — Kernel id set (AC7)** under the ruled row: red-before test, KA, plant. *(`landing-2/plants.md`.)*
+- [x] **T9 — Kernel IO (AC8)** under the ruled row: two red-before tests, KIO1, KIO2, two plants. *(`landing-2/plants.md`.)*
+- [x] **T10 — L2 landing + records (AC9).** Both kernel pins + content hashes `inference/mod.rs`, `io/mod.rs` (re-base on 20-1b if it landed first); FLAG-Winston decision record (precedent `20-7-flag-winston-decision.md`); `cargo test -p maos-kernel-core --lib`; hosted run; ledger closures; coverage; docs. *(Done locally; **the hosted run is not executed — UNVERIFIED**; 20-1b has not landed, so no re-base was needed.)*
 
 ## Dev Notes
 
@@ -381,6 +381,81 @@ PRD `functional-requirements.md:26`; `tests/coverage-matrix.yaml:566-570`; `docs
 ADR-005 (provider drivers), ADR-064 (replay selector), ADR-069 (`:35-46`).
 
 ## Dev Agent Record
+
+### Landing 2 — kernel row R (2026-11-11)
+
+Agent: `anthropic/claude-sonnet-5-5` (`Dev204L2`), working-tree base `89b64566` (= origin/main). No commit, push,
+git mutation or hosted/live call. Evidence: [landing-2/](20-4-gemini-driver-and-endpoint-pin-evidence/landing-2/)
+([T0](20-4-gemini-driver-and-endpoint-pin-evidence/landing-2/t0-measurement.md),
+[plants](20-4-gemini-driver-and-endpoint-pin-evidence/landing-2/plants.md),
+[commands](20-4-gemini-driver-and-endpoint-pin-evidence/landing-2/command-results.md)).
+
+**T0 (kernel row R re-measured before any repo edit).** `git log a8af3215..HEAD -- crates/maos-kernel-core/src` is empty, so the
+creation prototype `r-ka-kio1-kio2-bundle.diff` (never compiled at creation) was re-cut on a `git archive HEAD` copy: it applied
+unchanged, compiled in the repo, and measured **26854 physical (+13) / 21051 tokei (+9)** — exactly the grant (ceilings 26867 /
+21060; shared STOP 21250; ADR-069 alarm 22000). No STOP; no priced need.
+
+**Implementation (the granted shapes only).** `inference/mod.rs` `bucket_key` interns `gemini` and `kimi` (KA; any other id still
+`Unconfigured`). `io/mod.rs`: `http_post_exchange` maps a `ureq` `BadHeader` transport error to
+`ureq POST <url>: invalid request header (value withheld)` (KIO1, D:1297); `read_capped(.., truncate)` cuts a non-2xx body at
+the 10 MiB cap and keeps its status while a 2xx (and every GET) over the cap is still `Decode` (KIO2, D:1298). No public item moved
+(`check-service-boundary` rc 0 with no surface or class edit; `check-fkcs` incl. `kernel-abi-diff` green); no `ProviderError`
+variant added; I2 fail-stop untouched; no panic/unwrap; `docs/invariants/*.md` untouched.
+
+| AC | Witness (`name:line`) | Red at HEAD (raw log `logs/red-before-head.log`) | Plant (named; `logs/plant-*.log`) | Final |
+|---|---|---|---|---|
+| AC7 | `inference_provider_ids_20_4.rs:175` `gemini_and_kimi_pass_the_limiter_and_consume_their_own_bucket` (limiter installed; asserts `Ok`, driver ran once, bucket `(id, fingerprint)` consumed) | `:181` `gemini must pass the rate-limit id set, got Unconfigured` | drop the `gemini` arm ⇒ red at `:181` | green |
+| AC7 | `inference_provider_ids_20_4.rs:212` `every_provider_id_the_root_can_register_passes_the_limiter` (every `maos_providers::PROVIDER_IDS` id) | `:218` `gemini is in PROVIDER_IDS but the kernel refuses it` | same plant ⇒ red at `:218` | green |
+| AC7 | `inference_provider_ids_20_4.rs:197` `an_id_outside_the_closed_set_stays_unconfigured_and_never_runs_a_driver` (`bedrock`) | passes at HEAD (fail-closed control) | green under every plant | green |
+| AC8.1 | `io_redaction_and_status_20_4.rs:55` `a_header_ureq_rejects_is_never_echoed_in_the_error` (`Authorization: Bearer sk-secret\u{1}tail`, loopback URL) | `:67` `Bad Header: invalid header 'Authorization: Bearer sk-secrettail'` | revert KIO1 ⇒ red at `:67` | green |
+| AC8.2 | `io_redaction_and_status_20_4.rs:82` `a_non_2xx_body_over_the_cap_is_cut_and_keeps_its_status` (401 and 503 with 10 MiB + 1; `Ok`, status kept, body = cap) | `:90` `Err(decode error: response body exceeds 10485760 byte limit)` | revert KIO2 ⇒ red at `:90` | green |
+
+The 2xx-over-the-cap `Decode` half of AC8.2 is the unchanged `io_exchange_18_8.rs` (POST, GET, exactly-cap `Ok`), green. The three
+plants were copied over the real files, run, copied back with `cmp` rc 0 and `touch`; the tree diff afterwards was only the intended
+one. Each kernel IO row has no other falsifier: plant 2 leaves AC8.2 green and plant 3 leaves AC8.1 green.
+
+**Exact pins (after `cargo fmt --all`).** Kernel **26854 physical / 21051 tokei**, 95 files, set hash
+`2c22321948fb89df25f58b4abcb54e3ff81bd2c5ffa0c8f8429d27562164375b` (was `db39bc4a…`), `inference/mod.rs`
+`2ed62363003eff9c8e6364ad7464a7a22ba544f54daa836926b68aa178356746`, `io/mod.rs`
+`57d2b794bb4cbae5deb1fbf3332132fe4a2e6b239b12a95fe5b9f48eb195619b`. Pin sets moved together:
+`xtask/kernel-core-baseline.toml` (`src_lines` 26854 still on line 505, HISTORY directly below it, set hash, two digests),
+`xtask/kloc.toml` kernel row 21042 → 21051 and `_aggregate_hardfail` 202113 → 202122 (= clean measured aggregate 202121 + 1; first
+HISTORY segments cite this key with `->`), `xtask/tests/kernel_pin_content_hash_16_0.rs` (26841 → 26854 ×4),
+`xtask/tests/recovery_lane_ceiling_rule.rs` (`RATIFIED_AT_EASING` 21_042 → 21_051 + comment). The surface JSON and
+`kernel-api-classes.toml` are unchanged (no public symbol moved). Clean aggregate, measured both in-tree and on a `git archive HEAD`
+copy overlaid with the landing files: 202121, `over_budget []`. FLAG-Winston decision record updated with measured vs granted
+(precedent 20-7): [`20-4-flag-winston-decision.md`](20-4-flag-winston-decision.md).
+
+**Records (AC9).** `tests/coverage-matrix.yaml` FR3 names the AC1/AC2/AC5/AC6 (L1) and AC7/AC8 (L2) witnesses; `docs/maos.dev/run-maos.md` and
+`docs/runbooks/provisioning-checklist.md` state L2 landed (the keys, `MAOS_DEFAULT_PROVIDER`, `[providers]` and the pin's hash
+definition and boundary were landed with L1); `docs-site` has no Gemini/Kimi page and was not touched (EN/KO twins unchanged;
+`kernel` stays untranslated if one is added). `deferred-work.md` D:1297 (BadHeader) and D:1298 (status loss) are `CLOSED 2026-11-11`
+with the witnesses above — the commit hash is `@<commit>` to be recorded by Main at commit time (working tree base `89b64566`).
+`ops-live-gemini-leg` (tracker, epic E20 ops row) records that L2 landed and record mode can run once the operator has paid keys.
+Epic mirrors (`epic-20-ship-it-w5.md` stories row and §20-4, preflight row) carry the L2 note. The creation-time §A epic corrections were already applied
+(`creation/records-owed.md`).
+
+**Observed verification** (full table with exact commands: `command-results.md`):
+`cargo test --locked -p maos-kernel-core --lib` rc 0, 253 passed; the two new binaries 5/5 rc 0 (and 15/15 with the unchanged
+`io_exchange_18_8` + `inference_fallback_authz_18_1`); `xtask` pin tests 37/37; `check-kernel-baseline`, `check-service-boundary`,
+`check-env-contract`, `check-dev-record-completeness`, `check-epic-close-coherence`, `check-exit-commands`,
+`check-decision-register`, `check-dev-model-tier`, `check-corpus`, `invariant-lock --changed-files` and `check-fkcs` (own cell) rc 0; `kloc-check` rc 0 (kernel
+21051, aggregate 202121); workspace clippy rc 0 + ratchet rc 0 (1328 / 868 vs hosted 1383 / 897; nothing on the landing lines); no-default
+`verb_table_15_3` 7/7; **one workspace nextest, profile `ci`: 5976 run, 5973 passed, 3 failed, 137 skipped** — `erasure_million_20_11` (documented 20-7/20-11 local failure, not
+retried or widened) and two reds that exist independent of this landing: `xtask::d11_xtask_ceiling_ratchet`
+`the_live_xtask_ceiling_cites_a_real_sprint_story` / `the_retirement_row_matches_its_exact_story_arrow` (`Err(MissingStory)`: the xtask row's first
+HISTORY segment, written by `89b64566`, cites no complete sprint story key with `->`; neither the xtask row nor its sprint-story arrow lines were touched here).
+
+**UNVERIFIED / not run (labelled, not claimed):** a hosted discipline run on the L2 tree and the `ci/ci-20-4-verify.yml` recipe; the macOS/Windows
+legs (the change is portable ureq code, no cfg); `prepush` (skipped: its workspace leg is the nextest above, the L1 prepush was non-green under load with 20-7-owned
+advisories); the live Gemini/Kimi vendor round trips and their cassette recording (operator legs behind `ops-live-gemini-leg`, paid keys absent);
+the L2 code-review pass (DIFFICULT tier; reviewers per the story's review plan).
+
+**Cleanup:** after the last cargo run, a `/proc` executable scan found no cargo/rustc/nextest/clippy/xtask process. Removed 1402 stale
+`debug/incremental/<crate>/s-*` sessions (newest per crate and anything touched within two hours kept: 4012; flock probe skipped 0) and the
+own `/tmp/t204l2*` scratch (archive copies, plant variants, metadata); no `deps`/`build`/fingerprint directory, target override or clean.
+Observed `du -s -B1`: `/mnt/build/cargo-maos` 134424629248 → 125725839360 (**8698789888 bytes**), `/tmp` 5051678720 → 3697233920
+(**1354444800 bytes**, includes concurrent activity); [cleanup.json](20-4-gemini-driver-and-endpoint-pin-evidence/landing-2/cleanup.json).
 
 ### Landing 1 — resumed implementation, kernel-free (2026-11-03)
 
@@ -796,7 +871,7 @@ the AC1 shell line run on the prebuilt binary (`creation/runtime/`); vendor docs
 
 ### Agent Model Used
 
-anthropic/claude-opus-5-5 (creation).
+anthropic/claude-opus-5-5 (creation); openai-codex/gpt-6.1-sol (`Dev204L1`, landing 1 and corrections); anthropic/claude-sonnet-5-5 (`Dev204L2`, landing 2).
 
 ### Debug Log References
 
@@ -806,15 +881,35 @@ Full outputs and JUnit are retained under the adjacent `logs/` and landing direc
 
 ### Completion Notes List
 
-AC1–AC6 are implemented and their focused witnesses are green. Kernel/L2,
-paid vendor calls and hosted execution are not claimed. The L1 section above
-records both green full matrices and the non-green prescribed prepush; no
-status flip, commit or push was made.
+AC1–AC6 (L1) and AC7/AC8 (L2) are implemented and their witnesses are green (L2: red-before at HEAD, three named plants red and
+restored, final green). AC9 records are applied; D:1297 and D:1298 are closed with witnesses. The story is `done` per D-20-4-08 A.
+Not claimed: paid vendor calls (operator legs, `ops-live-gemini-leg`), hosted execution on the L2 tree, a green prepush, the L2 review pass.
+The Landing 2 section above has the witness table, exact pins and the observed verification.
 
 ### File List
 
-[Owned paths only](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/files-changed.txt);
+L1: [owned paths only](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/files-changed.txt);
 concurrent stories' files are excluded and the shared-ledger hunk is identified.
+L2 ([files-changed.txt](20-4-gemini-driver-and-endpoint-pin-evidence/landing-2/files-changed.txt)):
+
+- Modified: `crates/maos-kernel-core/src/inference/mod.rs`
+- Modified: `crates/maos-kernel-core/src/io/mod.rs`
+- New: `crates/maos-kernel-core/tests/inference_provider_ids_20_4.rs`
+- New: `crates/maos-kernel-core/tests/io_redaction_and_status_20_4.rs`
+- Modified: `xtask/kernel-core-baseline.toml`
+- Modified: `xtask/kloc.toml`
+- Modified: `xtask/tests/kernel_pin_content_hash_16_0.rs`
+- Modified: `xtask/tests/recovery_lane_ceiling_rule.rs`
+- Modified: `tests/coverage-matrix.yaml`
+- Modified: `docs/maos.dev/run-maos.md`
+- Modified: `docs/runbooks/provisioning-checklist.md`
+- Modified: `_bmad-output/implementation-artifacts/deferred-work.md`
+- Modified: `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- Modified: `_bmad-output/implementation-artifacts/20-4-flag-winston-decision.md`
+- Modified: `_bmad-output/planning-artifacts/epics/epic-20-ship-it-w5.md`
+- Modified: `_bmad-output/planning-artifacts/epic-20-preflight-2026-10-30.md`
+- Modified: `_bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin.md`
+- New: `_bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-2/` (evidence)
 
 ## Change Log
 
@@ -822,3 +917,4 @@ concurrent stories' files are excluded and the shared-ledger hunk is identified.
 - 2026-11-02: Operator rulings recorded (ask s204): D06 D and D-20-4-01…11 as recommended; kernel R = KA + KIO1 + KIO2 and ceilings per frontmatter. Status remains ready-for-dev.
 - 2026-11-03: L1 T0 STOP recorded as D-20-4-12 after the official Kimi notice restricted K2 access and announced retirement; incomplete source edits reversed, baseline envelope and missing-target witness preserved. No status flip or L1 completion claim.
 - 2026-11-03: D-20-4-12 B selected `kimi-k3.1-pro`; L1 AC1–AC6 implemented, six restored plants and final local matrices recorded, exact rebased pins landed with kernel unchanged. Hosted/live recipe cut with SHA-256 but not pushed. Loaded prepush failures and unchanged-budget advisories retained under rule 10; no story status flip or L2 closure.
+- 2026-11-11: L2 (kernel) landed under the granted R = KA + KIO1 + KIO2: measured 26841 → 26854 physical / 21042 → 21051 tokei, both pins and content hashes re-minted, AC7/AC8 witnesses red-before / plant-red / green, D:1297 and D:1298 closed with witnesses, FR3 coverage and docs updated; status `done` per D-20-4-08 A with the hosted run on the L2 tree, loaded-run prepush and live vendor legs labelled UNVERIFIED.

@@ -1,0 +1,17 @@
+_bmad-output/implementation-artifacts/20-4-flag-winston-decision.md
+_bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin.md
+_bmad-output/implementation-artifacts/deferred-work.md
+_bmad-output/implementation-artifacts/sprint-status.yaml
+_bmad-output/planning-artifacts/epic-20-preflight-2026-10-30.md
+_bmad-output/planning-artifacts/epics/epic-20-ship-it-w5.md
+crates/maos-kernel-core/src/inference/mod.rs
+crates/maos-kernel-core/src/io/mod.rs
+docs/maos.dev/run-maos.md
+docs/runbooks/provisioning-checklist.md
+tests/coverage-matrix.yaml
+xtask/kernel-core-baseline.toml
+xtask/kloc.toml
+xtask/tests/kernel_pin_content_hash_16_0.rs
+xtask/tests/recovery_lane_ceiling_rule.rs
+crates/maos-kernel-core/tests/inference_provider_ids_20_4.rs
+crates/maos-kernel-core/tests/io_redaction_and_status_20_4.rs

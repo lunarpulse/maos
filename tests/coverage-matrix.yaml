@@ -608,9 +608,13 @@ coverage:
       attribution in kimi_round_trip_test.rs; real-root selection and per-Spirit
       primary/fallback witnesses in crates/maos-bin/tests/provider_selection_20_4.rs;
       endpoint assertion/hash refusal and air-gap vectors in
-      crates/maos-bin/tests/provider_endpoint_pin_20_4.rs. Seed shell cassettes
-      prove routing, not a vendor round-trip. Live Gemini/Kimi remain blocked
-      by the kernel rate-limit id set until L2; Bedrock remains deferred.
+      crates/maos-bin/tests/provider_endpoint_pin_20_4.rs. 20-4 L2 (kernel, FLAG-Winston
+      R = KA + KIO1 + KIO2): rate-limit id set and PROVIDER_IDS parity in
+      crates/maos-kernel-core/tests/inference_provider_ids_20_4.rs; header-credential
+      redaction and non-2xx status at the 10 MiB cap in
+      crates/maos-kernel-core/tests/io_redaction_and_status_20_4.rs. Seed shell cassettes
+      prove routing, not a vendor round-trip; live Gemini/Kimi stay operator legs
+      (`ops-live-gemini-leg`); Bedrock remains deferred.
   FR30:
     gates: []
     corpora: []

@@ -1,0 +1,23 @@
+{
+ "removed": 1402,
+ "kept": 4012,
+ "skipped_lock": [],
+ "cutoff": 1794385742.0671759,
+ "cargo_maos_bytes_before": 134424629248,
+ "cargo_maos_bytes_after": 125725839360,
+ "cargo_maos_freed": 8698789888,
+ "tmp_bytes_before": 5051678720,
+ "tmp_bytes_after": 3697233920,
+ "tmp_freed": 1354444800,
+ "method": "du -s -B1; /proc exe scan (cargo|rustc|nextest|clippy|xtask) empty before and re-checked before each removal; per crate incremental dir kept the newest s-* session and any session with a descendant mtime within 2h; flock LOCK_NB probe on <session>.lock; no deps/build/fingerprint dir touched; no target override or clean",
+ "own_scratch_removed": [
+  "/tmp/t204l2",
+  "/tmp/t204l2-clean",
+  "/tmp/t204l2-plants",
+  "/tmp/t204l2-ws",
+  "/tmp/t204l2-kb.json",
+  "/tmp/t204l2-kloc.json",
+  "/tmp/t204l2-changed.txt",
+  "/tmp/t204l2-prune.json"
+ ]
+}
