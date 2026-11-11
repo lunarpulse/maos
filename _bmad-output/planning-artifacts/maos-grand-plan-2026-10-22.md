@@ -146,3 +146,120 @@ These rows supersede older forecasts/sequence assumptions only for the named sto
 
 Later kernel landings re-base on exact landed pins. Expected measured cumulative: 21042 + 68 (20-1b) + 9 (20-4) + 6 (20-11) + 33 (20-8) + 25 (20-14) − 1 (20-13) + 21 (20-9) = **21203** tokei. Shared STOP **21209**; D-20-9-15 A (ask `d_batch4`, 2026-11-03) sets **21230 for 20-9 L2**; D-20-14-12 C (ask `d2014_12`, 2026-11-03) sets **21250 for the combined 20-9 L2 + 20-14 L2 cumulative**. ADR-069 alarm **22000** unchanged. These are planning records, not landing measurements; kernel requests bind at dev start.
 
+## 2026-11-12 status addendum: Epic 20 delivery roadmap, history and open items
+
+Written at HEAD `1fd26dcc` (local equals `origin/main`; `git log origin/main..HEAD` was empty when checked). Everything above is unchanged. This addendum supersedes earlier statements only where a dated line says so: the Part I/II status words for Epic 20 (e.g. "ready-for-dev" for 20-2/20-13, "backlog" for 20-1b) are superseded by the tracker values below. Sources: `git log`, [tracker](../implementation-artifacts/sprint-status.yaml), each story file and evidence directory, `xtask/kernel-core-baseline.toml` HISTORY, `deferred-work.md`, and `gh run list/view` read on 2026-11-11/12. Anything I could not confirm is marked **unverified** or **[INFERENCE]**. Story-file `Status:` lines for 20-1b, 20-2, 20-7 and 20-13 still read `backlog`/`ready-for-dev` and are stale against the tracker (not edited here).
+
+### (a) Epic 20 story table
+
+Commits are on `main` unless marked. "Landing" = a commit that carried code; "corr" = review-correction commit; "hosted" = a commit that fixed a hosted-run failure. Models are what the story's Dev Agent Record / review artifacts name; where a record names none, that is stated. Review layers are counted from the review files present in the evidence directories.
+
+| Story | Tracker status | Landings (shas) | Remaining | Dev model(s) / reviews | Pins at landing |
+|---|---|---|---|---|---|
+| 20-1a registry publish/install exit path | done (2026-11-04) | `850e4c00` (candidate), `8143326b` (corr), `47631284`, `d3e3f586`, `ac1fc12a` (hosted), `03ee4a4e` (inherited-deferral record) | none; F4/F5/F6/mutation auth moved to 20-1b. Main discipline `41910498869` @ `cb0abc06` recorded NOT fully green (known 20-7 flake + cascade). Hosted verify `41521253027` green per tracker | creation opus-5-5; impl `openai-codex/gpt-6.1-sol`. Review plan in story: opus-5.5 Blind/Edge/Acceptance, glm Test-Infra (planned, outcome files not located) | kernel 0 |
+| 20-1b vetting/yank/quarantine | **in-progress** (was backlog; reconciled 2026-11-12) | L1 `62faff63`, corr `c656a6e7`; AC15 `f9921251`, corr `a13140b8`; L2 final kernel `608735d2`; r1 `a2bbd687` (hosted fixes, quarantine claims narrowed) | AC11.5 hosted T3 leg; AC15 hosted TLS/dev/macOS legs; hosted run; prepush + independent review of r1; quarantine restart persistence and memory/scalar/release-verb/readback gaps (deferred rows, "quarantine closure" follow-up); ADR-037 I5 flip. Not done | L1 `gpt-6.1-sol`; L2 `anthropic/claude-sonnet-5-5` (Dev201bK). Reviews: L1 blind/edge/acceptance/security + triage; AC15 triage + security; L2 `gpt-review` + `security` (the AC15 and L2 review notes are in `9e8c7737` and the L2 evidence) | L1 kernel 26841/21042 unchanged; L2 kernel 26967/21141; r1 bin 38446, audit 8308, hardfail 202719 |
+| 20-2 deb/air-gap/docker/formula | **in-progress** (was ready-for-dev; reconciled) | `93d39cc7` (candidate), `ebf2ab03` (corr), `fd4f60f1`, `96a1dce2`, `d84b83dd`, `bdfc1430` (hosted-1..4) | operator publication legs (Homebrew tap/AUR, Docker Hub credentials, signed attachments); closing review/record. Branch-only verify run `42308080980` (workflow ci-20-2-verify @ `21431e39`, branch `ci/20-2-verify`) concluded success per `gh`; not recorded in the story | creation opus-5-5; impl `gpt-6.1-sol` (Dev202). Reviews: triage of 4 layers (blind/edge/acceptance/test-infra), security layer by orchestrator | candidate: bin 34823, xtask 44673, aggregate 194099; kernel 0 |
+| 20-3a gate honesty | done (2026-10-17) | `389a07e9`..`39cd7966` | none | per story (not re-read here) | n/a |
+| 20-3b gate retirement | done (2026-10-30) | `2e694cd6`, `00ddd7d3` (L2), `714a1428`, closing `3341f9e4` | tracker: final run `41243340929` 184/189, NOT fully green (known 20-7 flakes); AC2 generator not built (NO-GO) | per story (not re-read here) | kernel 26793/20992, xtask 42841, aggregate 188451 (tracker) |
+| 20-3c audit truth / halt residuals | done (2026-11-01) | `ffd19698`, `a41a143f` (L2 kernel), `1a1b11f3`, `42489813` | none; final run `41305010381` 189/189 (tracker) | per story (not re-read here) | kernel 26801/21011 |
+| 20-4 gemini driver + endpoint pin | in-progress (done flip reverted 2026-11-11, `345ae30f`) | L1 `2752e750`, corr `73e7afbc`, hosted `cb0abc06`; L2 kernel `251dc692` | hosted run on the final tree; prepush or exception; L2 review disposition; commit-qualified deferred closures; live Gemini/Kimi operator legs (paid keys absent) | creation opus-5-5; L1 `gpt-6.1-sol` (Dev204L1); L2 sonnet-5-5 (Dev204L2). Reviews: L1 layered triage + security; L2 GPT review (named in the revert) | L1 bin 34504, providers 1679, aggregate 193140; L2 kernel 26854/21051 |
+| 20-5 v1.0-rc tag + LTS rule | in-progress | L1 `0e455c4e` (candidate), corr `e322c7ad` | release-environment provisioning (check-rc-readiness red until the operator provisions it); RC tag/clock operator-lane; waits for 20-7 L2 (D-20-5-09 A); hosted legs unverified | creation opus-5-5; L1 sonnet-5-5 (Dev205L1). Reviews: GPT (3 P2) + GLM security (1 HIGH/4 MEDIUM/4 LOW/1 INFO per story note); 1 round | xtask 45333, aggregate 202018 (hardfail 202019); after `89b64566` follow-up xtask 45379, aggregate clean 202112 |
+| 20-6 macOS compile guard | done (2026-10-07) | `86d5f8f0`, `f88a1968`, `d371b5a4` | none | per story (not re-read here) | n/a |
+| 20-7 stable-runner perf gates | in-progress | L1 `1fd4de31`, corr `9f64dd02`, rulings/hosted record `a8af3215` | L2 shadow/binding (needs `ops-stable-perf-runner`, §O O1-O7; O3/O7 are operator prerequisites, O4 rootless podman perf host); owns timing/I/O half of AC5/EC-13 and the 20-7-owned flake family | not re-read here | kernel 26801/21011 -> 26841/21042 (+40/+31) |
+| 20-8 manifest contract completion | in-progress | L1 `5610f9d6`, corr `37baeedf`, hosted `be3b9763`; L2 final kernel `692b1e59`, corr `1fd26dcc` | AC7 hosted T2 legs + plant; genuine 2.1/2.2 guests; hosted discipline on the landed tree; review of `1fd26dcc`; deferred rows (precheck gap, below-schema-7 sections, serialization) | L1 `openai-codex/gpt-6.1-terra`; L2 sonnet-5-5 (Dev208K). Reviews: L1 4 layers (`Review208L1`, review notes `64bf998d`); L2 `gpt-review` + `security` | L1 bin 35914, manifest 4738, domain 10198, xtask 44700, aggregate 198235; L2 kernel 27009/21178 then 27014/21181, bin 38475, aggregate 202750 |
+| 20-9 spawned-form lifecycle hooks | in-progress | L1 `9f03064b`; corr `c8e5d035`, `f56959c2`, `fba6af2a`, `459a606a`; hosted `89b64566` | L2: AC7, AC8 (kernel row R +16/+21 priced), AC9; hosted AC6; hosted proof of the L1 tree | sonnet-5-5 (Dev209L1/L1b/L1c; the correction rounds name Dev209L1d). Reviews: GPT x4 (`gpt-review`, r2, r3, r4) and GLM-5.3 security x4 | r4 bin 38019; r5 bin 38061, wasm-host 3143; tree aggregate hardfail 202067 at `459a606a`, 202113 after the follow-up (hosted-followup evidence) |
+| 20-10 purge residue removal | done (2026-11-04) | `75538bf7`, `16c35ef0`, `8c809f9c`, `ef134444`, `76efc19d` | none; hosted verify `41815301963` 7/7 green (tracker); proof-retention policy ownerless/open | creation opus-5-5; impl `gpt-6.1-sol`; the record says no independent review claimed | bin 34191 at initial landing, kernel unchanged |
+| 20-11 erasure inventory closure | in-progress | L1 `cbed4dad`, corr `88c7277c`, hosted `063c13cf`; L2 kernel `689a6a53`, corr `5ff0ead1`, r3 `c2beedb4` | AC5/EC-13 (hosted serial pass of the 1M vector at unchanged deadlines); AC6 live T3 leg; private/index hold lease (needs its own grant); hosted run of the final tree | creation opus-5-5; L1 `gpt-6.1-sol` (Dev2011b); L2 dev id Dev2011k, model not named in the record I read. Reviews: L1 4-layer triage; L2 `gpt-review` + `gpt-review-r3`, `security` + `security-r3` | L2 kernel 26880/21069; corr 26891/21075; r3 26889/21073, domain 10215, bin 38362, hardfail 202506 |
+| 20-12 test-cost budget | done (2026-10-23) | `1c463d2f`, `e1d09f0b`, `a4cb586d` | none | dev opus-5-5; review `claude-fable-5-1` non-author (tracker) | xtask +1432 ratified |
+| 20-13 pluggable crypto provider | **in-progress** (was ready-for-dev; reconciled) | L1 `a2e37988`, corr `a6b557c0`, hosted `a44c76d9` | AC7 kernel row KT3 (L2, last); hosted legs unverified (Apple toolchain, T3) | creation opus-5-5; the record names no L1 implementer. Reviews: 1 round of 4 layers (`reviewer` x3 + `light-reviewer`) + security note | aggregate 198835 (hardfail 198836); kernel 26841/21042 unchanged |
+| 20-14 complete cost attribution | in-progress | L1 `f68c7de6`; corr `2ae11192`, `553336f6`, `fc7373f0`; hosted `f8b236a8`; review notes `6b81204e`, `29f9a3ea`, `870117ee` | L2 kernel AC1-AC3 (KT +35/+25 priced) and AC6 closure; hosted recipe unverified | creation opus-5-5; the record names no L1 implementer. Reviews: initial 4 layers + GLM-5.3 security; OpenAI correction reviews x3 | after round 3: domain 10215, CLI 6609 (ceiling 6610), iac 8770, hardfail 199199; kernel unchanged |
+| 20-15 build-once nextest archive | done (2026-10-28) | `d0b20053`..`b35c9284` | none; landing run `40609213235` 191/191 | per story (not re-read here) | xtask +38, conmon kernel +11/+9 |
+| 20-16 prepush drift gate | done (2026-10-28) | with 20-15 | none | per story (not re-read here) | xtask +1020 (exactly at STOP), kernel 0 |
+
+Model policy, as the records show it: creation records are `anthropic/claude-opus-5-5`; implementation records name `openai-codex/gpt-6.1-sol` (20-1a, 20-1b L1, 20-2, 20-4 L1, 20-10, 20-11 L1), `gpt-6.1-terra` (20-8 L1) and, from 2026-11-11 records onward, `anthropic/claude-sonnet-5-5` (20-1b L2, 20-4 L2, 20-5, 20-8 L2, 20-9). The 20-8 record states the 2026-11-09 rule that the independent reviewer must be a different family; reviewer artifacts name OpenAI "gpt" and GLM-5.3 (security). Earlier reviewer/dev model changes (sonnet/haiku/opus) were not reconstructed beyond these records; **unverified**: the exact 2026-11-09 effective date of "Sonnet-5.5 dev agents" (the first record I found that names it is dated 2026-11-11).
+
+### (b) Kernel ledger
+
+Measured physical/tokei, from `xtask/kernel-core-baseline.toml` HISTORY (95 files throughout):
+
+| Event (commit) | physical | tokei | delta |
+|---|---|---|---|
+| 20-3c L2 (`a41a143f`) | 26801 | 21011 | +8/+19 |
+| 20-7 L1 (`1fd4de31`) base for Epic-20 ledger | 26841 | 21042 | +40/+31 |
+| 20-4 L2 (`251dc692`) | 26854 | 21051 | +13/+9 |
+| 20-11 L2 (`689a6a53`) | 26880 | 21069 | +26/+18 |
+| 20-11 L2 review corrections (`5ff0ead1`, ask `s2` = allow) | 26891 | 21075 | +11/+6 |
+| 20-11 L2 round 3 (`c2beedb4`) | 26889 | 21073 | -2/-2 |
+| 20-1b L2 (`608735d2`) | 26967 | 21141 | +78/+68 (= grant) |
+| 20-8 L2 (`692b1e59`) | 27009 | 21178 | +42/+37 (priced +38/+33) |
+| 20-8 L2 corrections (`1fd26dcc`) | 27014 | 21181 | +5/+3 |
+
+Limits: shared STOP **21250** for the whole cumulative measured ledger at each landing (operator ask `halt_grant`, 2026-11-04; supersedes the former 21209 / 20-9-only 21230 / joint 21250 exception). 21250 - 21181 = **69 tokei left**. ADR-069: alarm 22,000 and envelope 23,000 "production lines" (ADR-069 text; I read these as the tokei measure, since physical 27,014 already exceeds 23,000; the assignment text called 23,000 "physical", which I could not confirm); 22,000 - 21,181 = 819. The 20-8 L2 relies on x2 ceiling 27043/21207 and 20-1b on 27045/21209, both inside 21250.
+
+Remaining kernel rows with the priced figures in the stories (planning, not measured): 20-14 L2 AC1-AC3 KT +35 physical / +25 tokei; 20-13 L2 AC7 KT3 +1 / -1; 20-9 L2 row R +16 / +21; 20-9's other open kernel rows named in the 20-8 baseline entry (coordinator.rs expect window, archive.rs atomic record) are unpriced; 20-11 private/index hold lease is unpriced and needs its own grant; 20-8 precheck invariant gap needs an operator-ruled priced row (unpriced); 20-4 has no open kernel row that I found. The quarantine-closure follow-up is forecast +30..+80 tokei, **unmeasured** [INFERENCE]. Derived arithmetic [INFERENCE]: 21181 + 25 - 1 + 21 = 21226 (24 under the STOP) before any quarantine-closure work; with it 21256..21306, i.e. above 21250, so that follow-up needs either a re-ruled STOP or must land before the others.
+
+Operator-ruled surface-hash refreshes (ADR-066 hand-edits in `docs/ci-baselines/kernel-surface-v0.1-beta.json`, each one symbol): `HaltRegistry` (20-11 L2: `b6d65243...` -> `a917eddc...`), `ScheduleWatchdog` (20-11 review corrections, ask `s2`: `2feabbd7...` -> `5e58c7d5...`), `CapabilityRegistryAdapter` (20-1b L2: `bb8e817f...` -> `6e32a642...`), `SpiritManifestBundle` (20-8 L2: `e295e7ff...` -> `ca1ac1ec...`). 20-4 L2 changed no public surface.
+
+### (c) Hosted state
+
+`gh run list --branch main --workflow discipline --limit 12` (all `push` events) showed **12 of 12 concluded `failure`** (2026-11-08 to 2026-11-11), none fully green. The last fully green discipline run recorded in the tracker is `41305010381` (20-3c, 2026-11-01); I did not search for later green runs outside this list.
+
+| Run | Commit | Red jobs (from `gh run view`) | Recorded cause / status |
+|---|---|---|---|
+| `43034068630` | `c2beedb4` | check-perf-counts, onb-nfr2-timing, check-serde-error-handling, release-dry-run x2 (amd64, arm64), check-multi-tenant-loom, workspace-test-suite, check-test-budget, v1-0-ship-gate, v1-5-ship-gate, aggregate | Only the ac6 worker-variant 60 s wait is recorded (deferred-work row, fixed in `a2bbd687`, **hosted result unverified**). The subject of `a2bbd687` names further fixes (FR4 historical shape, yank rejected-row dedup, serde gate, 34 MiB size limit); mapping them to individual red jobs is [INFERENCE] |
+| `43000183420` | `89b64566` | cargo-deny, workspace-test-suite, ship gates, aggregate | cargo-deny: RUSTSEC-2026-0486 (rustix) seen in the failed log; `c402c29b` bumps rustix 1.1.4 -> 1.1.6 (lock-only; "cargo deny clean locally", hosted unverified). workspace-test-suite: the failed log shows `xtask/tests/d11_xtask_ceiling_ratchet.rs` assertions "current xtask grant is unauthorized" / "a ceiling above retirement requires a later authorized grant" (my grep of the log may be partial; no fix is recorded, **still unverified/possibly still red**) |
+| `42987393747` | `459a606a` | check-dev-model-tier, check-test-budget, wasm-host-tests x4, ship gates, aggregate | Diagnosed and fixed in `89b64566` (evidence `20-9-...-evidence/hosted-followup-42987393747/`): sonnet-5-5 allowlist (ask `tier`), `lifecycle_probe.wasm` missing from the producer list, `hook_pump_17_4` budget 56 s; those three jobs are absent from the next run's red list |
+| `42955256177` | `59b51a5e` | check-multi-tenant-loom, ship gates, aggregate | cause not recorded in the repo; the loom whole-package leg runs the 1M vector (ruling `m1`, `89b64566` skips it) [INFERENCE] |
+| `42948802707` | `f8b236a8` | check-multi-tenant-loom, workspace-test-suite, ship gates | not recorded |
+| `42935031860` | `fc7373f0` | cgroup-ceiling x8, wasm-host-tests x4, ship gates | count pins 23 -> 24 fixed by `f8b236a8` (spawned_scope_17_3c) and `59b51a5e` (cgroup_ceiling_workflow_17_2); wasm-host cause not recorded |
+| `42913419818` | `a44c76d9` | check-multi-tenant-loom, ship gates | not recorded |
+| `42807966928` | `a6b557c0` | journey-hermetic-tier-1, check-multi-tenant-loom, workspace-test-suite, ship gates | no-home regression (fixed `a44c76d9`); `journey_forget_18_6` pending outcome, cause unknown (ownerless-and-open row) |
+| `42722028970` | `be3b9763` | workspace-test-suite, cgroup-ceiling-delegated (26.04-arm), ship gates | stale recall workflow-shape counts and an ARM descendant in state `X` (20-13 story note) |
+| `42707262457` | `37baeedf` | cargo-deny, windows-check, macos-check, check-ko-coverage, wasm-host-tests x4, ship gates | cargo-deny RUSTSEC-2026-0459 (`libsqlite3-sys 0.28.0`, ignored in `be3b9763`); recall wire/ko glossary fixes in `be3b9763` |
+| `42533166219` | `a13140b8` | workspace-test-suite, ship gates | known 20-7 snapshot-owner timing family; the 100k and 1M AC5 vectors passed (tracker) |
+| `42464850336` | `f9921251` | epic-20-exit, workspace-test-suite, ship gates | not recorded (`a13140b8` subject mentions an epic-20-exit dev-mode fix) |
+
+Newest push `1fd26dcc`: discipline `43104682092` was **queued** (docs-site and perf in progress, journal-append and multi-provider queued) when I read it, so its outcome is **unknown**. The pushes of `608735d2`, `692b1e59` and `a2bbd687` have no run of their own on `main` in the list I read (they appear to have been pushed together with `1fd26dcc`; [INFERENCE]), so the landed kernel rows for 20-1b and 20-8 have **no hosted result yet**. Green or unverified: journal-append was green and perf skipped for `c2beedb4`; every hosted leg of 20-4 L2, 20-11 L2, 20-1b L2, 20-8 L2, 20-9, 20-13 and 20-14 beyond the above is unverified.
+
+### (d) Known open items and operator lane
+
+- **AC5/EC-13 1M oracle (20-11).** Evidence `20-11-erasure-inventory-closure-evidence/landing-1/ac5-investigation/README.md`: not a regression after L1; the handler's wall time is about 21 s on this host's overlay `/tmp` (15.53 s on btrfs; hosted first completion 15.54 s) while the oracle allows `route_budget()` 10 s + one more 10 s = 20 s, so it fails locally on nearly every run and passes only on a faster host (hosted serial pass `42533166219`). Stays open until a hosted serial pass on the final tree; loom leg skips this one test (ruling `m1`).
+- **20-7 L2** (O1-O7, `ops-stable-perf-runner`; the 20-5 rc waits for it, D-20-5-09 A).
+- **`release` environment protection**: unverified (`GET .../environments/release` returned 404 per the deferred-work F3 row; a second row from the 20-5 L1 review); `check-rc-readiness` is red until provisioned; the T3 fuzz-ledger trust anchor is an unsigned JSON on a mutable branch (20-5 GLM F4/F1 row).
+- **Purge deletes erasure-proofs vs NFR-Aud-12**: ownerless-and-open, dispositioned by the 20-10 closing record (2026-11-04); the operator has not ruled.
+- **rusqlite >= 0.39 bump** (RUSTSEC-2026-0459 ignored; 7 crates; trigger = first story that bumps it).
+- **Cohort daemon skips installed-package boot re-verification**: a potential security question for the operator, ownerless-and-open.
+- **Quarantine closure follow-up** (ruling `q` = `narrow`, 2026-11-12): the fence is capability-mediated only, not isolation; five deferred rows; kernel +30..+80 tokei unmeasured; needs its own FLAG-Winston row and prototype.
+- **Binary size limit 32 -> 34 MiB (35,651,584 B)**: ruled (ask `size`, 2026-11-12) and implemented in `a2bbd687` (`onb_nfr2_timing.sh`, `prepush.rs`, pin test); hosted verification pending with that push.
+- **Dev-model allowlist** gains `sonnet-5-5` (ask `tier` = allow, 2026-11-11, `89b64566`); the next run no longer lists check-dev-model-tier as red.
+- **Precheck / degraded rows**: `HotSwapCoordinator::precheck` reports neither a dropped swap invariant (20-8, needs an operator-ruled priced kernel row) nor the successor's real accepted versions (20-3c-era row); `AuditDropReason::Full` counts a failed `RateLimited` delivery; all ownerless-and-open unless noted.
+- **Privacy limits rows** (20-14): principal matcher is case/zero-width/normalization-sensitive (GLM F-1); Spirit-name columns are outside erasure (GLM F-3; owner 20-14 L2 AC3.4 plus an ADR-045 follow-up).
+- **Operator's untracked `spikes/` and `*gpui*` files** are not committed and inflate a local `kloc-check`; the 20-9 hosted-followup evidence measures "clean" pins on a `git archive HEAD` copy for that reason (e.g. aggregate clean 202112 vs local totals).
+
+### (e) Operator rulings, 2026-11-04 to 2026-11-12
+
+Only rulings whose record I found are listed with date and effect. Orchestrator ("Main") adjudications are listed separately because they are not operator rulings.
+
+| Date | Ask | Effect |
+|---|---|---|
+| 2026-11-04 | `halt_grant` | D-20-11-11 A / O4 (+16/+12 kernel, +4 domain); shared STOP 21250 for the whole cumulative ledger |
+| 2026-11-04 | `halt_landing` | 20-11 L1 = AC1, AC2, AC4-AC7 kernel-free; AC3 moves to the final KS + O4 kernel landing |
+| 2026-11-04 | `d205` | D-20-5-01...16 as recommended (D02 A ceilings; D-20-5-09 A rc waits for 20-7 L2; ignored advisories need a row with an owner or "ownerless and open") |
+| 2026-11-06 | `f1b` | inherited F4/F5/F6 and mutation auth become 20-1b AC14-AC17 |
+| 2026-11-07 | `f5rows` | D-20-1b-01/02/03 A/A/A (URI-bound registry signing key, rustls transport, BOTH-end dev opt-in); AC15 second kernel-free pass |
+| 2026-11-08 | (ask ids unrecorded) | 20-1b AC15 review: D4 operator "configured CA replaces public roots, otherwise bundled Mozilla"; D5 operator "exact CLI 6429 confirmed, former 6856 reserve forfeited" (tracker; ids `ac15d1/4/5` not found) |
+| 2026-11-09 | `ac13i2` A | keep I2 fail-stop; journal 20-8 declarations before pid issuance |
+| 2026-11-09 | `enc208` A | declaration digest/publisher in colon-delimited hex, exact-byte decoder |
+| 2026-11-09 | `i13doc` A | `docs/invariants/I13.md` stays untouched (ADR-037 invariant-lock) |
+| 2026-11-11 | `tier` = allow | `sonnet-5-5` allowlisted in `check-dev-model-tier`; 20-9/20-5 records unchanged |
+| 2026-11-11 | `m1` option 3 only | loom whole-package leg skips only the 1M vector |
+| 2026-11-11 | `s2` = allow | 20-11 L2 correction kernel growth (26891/21075) inside the 26893/21078 ceiling |
+| 2026-11-12 | `q` = narrow | quarantine = capability-mediated fence only; no kernel code added; gaps are deferred rows |
+| 2026-11-12 | `size` = raise | binary size limit 32 -> 34 MiB |
+
+Named in the assignment but **no record found in the repository (date and effect unverified, not listed above)**: `d2`..`d5`, `o1`..`o6`, `secf2`, `p5w`, `p13w`, `d1w`, `ac15d1/4/5` (see the 2026-11-08 row), `push14`..`push27`, and the "push approvals pattern". Orchestrator adjudications disclosed to the operator: 2026-11-09 20-8 domain ceiling 10174 -> 10205; 2026-11-10 D-20-13-17 (ring-direct evaluation); 2026-11-11 20-9 correction rounds 3-5 and the 20-11 round 3 overdraft; 20-14 CLI/iac/domain ceiling overdrafts; 20-1b AC15 rebase at `c656a6e7`.
+
+### (f) Incidents, recorded honestly
+
+- **Deleted 20-5 untracked files.** The 20-5 landing record states the untracked files were lost and rebuilt from the agent transcript, with logs regenerated (20-5 story, Landing 1 Verification). The root cause is not further documented in the repository.
+- **Amended-commit mishap, unrequested pin-fix push, pathspec mistake.** Reported by Main in this assignment, not independently documented in the repository: (1) an amended commit swept WIP into a notes commit and was repaired before the push; (2) `59b51a5e` (cgroup_ceiling_workflow_17_2 expected-count 23 -> 24, authored 2026-11-11 03:49 UTC, confirmed by `git log` and by the hosted run `42955256177` on it) was pushed without a fresh ask; (3) a pathspec mistake left a commit without its code, amended before push. I verified only that `59b51a5e` exists and was pushed; the other two details are unverified.
