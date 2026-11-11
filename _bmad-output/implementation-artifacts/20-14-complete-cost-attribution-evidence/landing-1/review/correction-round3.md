@@ -14,7 +14,7 @@ value form (no key-name exemption); inherited (a)/(b) closed; F-4 escape table; 
   The old `*hash` suffix heuristic is gone. `register_schema_lifecycle` (the single ingress of the operator door and `maos governance-admit`) rejects non-canonical digests.
 - Discovery SQL: `(kind IN (28,29) OR instr(payload_redacted, ...) > 0)`, so escaped spellings reach decoded selection; other kinds keep the raw prefilter and the bounded window scan.
 - Corrected statements: round 2's "keys, tags and hashes never change" and "discovery, replacement and certification cannot diverge" were false (see `correction-round2.md`).
-- `maos-cli` `cost_terminal_field` escapes the Unicode Cf class, U+061C, U+180E, U+FEFF, tag characters and variation selectors (table `INVISIBLE`) besides controls, backslash and the round-2 ranges.
+- `maos-cli` `cost_terminal_field` escapes the code points of its `INVISIBLE` table (Cf and variation-selector entries incl. U+061C, U+180E, U+FEFF, tag characters, U+FE0F, U+E0100) besides controls, backslash and the round-2 ranges; it does **not** escape every Cf or Variation_Selector code point (U+110BD, U+110CD, U+13430–1343F, U+1BCA0–1BCA3, U+1D173–1D17A, U+180B–180D, U+180F; pre-existing, deferred).
 
 ## Patch / witness table
 

@@ -513,7 +513,7 @@ R2-1/R2-2: kind-28 typed fields are preserved by envelope and value form (never 
 `decode_declaration_bytes` (`crates/maos-bin/tests/forget_governance_20_14.rs`). Inherited: kinds 28/29 bypass the SQL `instr` prefilter so escaped spellings
 (`\u0061lice`, `ali\"ce`) reach decoded selection in discovery, replacement and certification (initial snapshot and late hook); exempt hash fields (`sha256`, `supersedes`,
 `schema_content_hash`) are exempt only as 64-hex digests and `register_schema_lifecycle` (operator door and CLI) rejects non-canonical digests. GLM F-4: `cost_terminal_field`
-escapes the Cf class, U+061C, U+180E, U+FEFF, tag characters and variation selectors. The round-2 real-session plants were re-run after rebuilding `maosctl` so the receipt
+escapes the code points of its `INVISIBLE` table (Cf and variation-selector entries incl. U+061C, U+180E, U+FEFF, tag characters, U+FE0F, U+E0100), **not every Cf or Variation_Selector code point**: U+110BD, U+110CD, U+13430–1343F, U+1BCA0–1BCA3, U+1D173–1D17A, U+180B–180D and U+180F are unescaped (pre-existing, not a regression; deferred in `deferred-work.md`, 20-14 round-3 group). The round-2 real-session plants were re-run after rebuilding `maosctl` so the receipt
 assertion is what fails. **Operator-visible privacy limits, deferred (owner this story's landing 2 / ADR-045 follow-up, `deferred-work.md`):** the principal matcher is
 case- and normalization-sensitive for every frame kind (GLM F-1), Spirit-name columns are outside erasure (GLM F-3), whole-value label replacement is accepted policy (GLM F-2).
 Pins: CLI 6603 -> 6609 (ceiling 6610), iac 8726 -> 8770 under an **orchestrator-adjudicated D02 A overdraft, disclosed to the operator: iac ceiling 8728 -> 8770** (before: pin 8726 /
