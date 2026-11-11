@@ -13,10 +13,13 @@ no-default-features = false
 feature-depth = 1
 
 [advisories]
-# All entries below are `unmaintained` advisories (NOT `vulnerability` class) for
-# transitive or frozen-ABI dependencies with no safe upgrade. Each is documented;
-# none masks a security vulnerability. FLAG-Winston/John: ratify, and schedule the
-# two migrations called out below.
+# Every entry below but RUSTSEC-2026-0459 is an `unmaintained` advisory (NOT
+# `vulnerability` class) for a transitive or frozen-ABI dependency with no safe upgrade.
+# RUSTSEC-2026-0459 (bundled SQLite, CVE-2026-119375) IS a vulnerability-class advisory,
+# ignored on the narrower ground stated at its entry. Each ignore is documented by a
+# deferred-work.md row (`check-rc-readiness` refuses an ignored id without one, matched
+# as a whole token); a row is not a ratification. FLAG-Winston/John: ratify, and
+# schedule the migrations called out below.
 ignore = [
     # serde_cbor 0.11.2 — archived/unmaintained. It is the canonical-CBOR encoder
     # for the FROZEN ComplianceClaim ABI (maos-compliance/canonical_cbor.rs) and

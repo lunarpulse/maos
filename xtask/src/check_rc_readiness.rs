@@ -17,10 +17,11 @@ const DEFERRED_WORK: &str = "_bmad-output/implementation-artifacts/deferred-work
 /// (no `--tag`); the operator's `--tag` run needs it `done` like every other `20-*` key.
 const OWN_KEY: &str = "20-5-v1-0-rc-tag-and-lts-rule";
 /// Provisioning rows an rc needs `present` (`provisioning-checklist.md`).
-const PROVISIONED: [&str; 3] = [
+const PROVISIONED: [&str; 4] = [
     "MAOS_RELEASE_PUBKEY",
     "RELEASE_SIGNING_KEY",
     "fuzz-ledger branch permission",
+    "release environment protection evidence",
 ];
 
 #[derive(Debug, Serialize)]
@@ -144,7 +145,10 @@ fn deny_leg(deny: &str, deferred: &str) -> Result<Leg, String> {
     let documented = |id: &str| {
         deferred.lines().any(|line| {
             let line = line.trim_start();
-            (line.starts_with("- ") || line.starts_with('|')) && line.contains(id)
+            (line.starts_with("- ") || line.starts_with('|'))
+                && line
+                    .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-'))
+                    .any(|token| token == id)
         })
     };
     let undocumented: Vec<&str> = ignored

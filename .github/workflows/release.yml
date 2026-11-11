@@ -111,35 +111,69 @@ jobs:
       checks: read
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Require the tagged commit to be on main
+        run: |
+          set -euo pipefail
+          # Review GLM F3: every gate below is compiled from the tagged tree, so a tag on an
+          # unreviewed side-branch commit must be refused before any of them runs.
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
+            echo "release refused: $GITHUB_SHA is not an ancestor of origin/main"; exit 1
+          fi
+      - name: Classify the tag (fail closed)
+        id: tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # Review GLM F2: the ONE decision point. Every control below reads `kind`; any tag
+          # that is not exactly an rc, a GA or the explicit v0.x alpha line is refused.
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then kind=rc
+          elif [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then kind=ga
+          elif [[ "$TAG" =~ ^v0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]; then kind=alpha
+          else
+            echo "release refused: tag '$TAG' is not vX.Y.Z, vX.Y.Z-rc.N or the v0.x.y-alpha.N line"; exit 1
+          fi
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
       - name: Require rc tree readiness (rc tags only)
-        if: contains(github.ref_name, '-rc.')
+        if: steps.tag.outputs.kind == 'rc'
         env:
           TAG: ${{ github.ref_name }}
         run: cargo run --locked -p xtask -- check-rc-readiness --tag "$TAG"
       - name: Require successful main discipline aggregate
         env:
           GH_TOKEN: ${{ github.token }}
-          REF_NAME: ${{ github.ref_name }}
+          KIND: ${{ steps.tag.outputs.kind }}
         run: |
           set -euo pipefail
           # Story 20-5 AC4: a release candidate or GA tag also needs a complete T3 fuzz
           # chain (3 targets x 5 links x >= 24 h measured) for this exact SHA in the
           # `fuzz-ledger` branch; the operator dispatches `fuzz-prerelease` before
-          # tagging. Other pre-releases (the alpha line) keep the aggregate-only rule.
+          # tagging. The alpha line keeps the aggregate-only rule; an unclassified kind
+          # is refused (it cannot reach here through the classify step).
           fuzz_args=()
-          case "$REF_NAME" in
-            *-rc.*) fuzz_args=(--fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json") ;;
-            *-*) ;;
-            *) fuzz_args=(--fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json") ;;
+          case "$KIND" in
+            rc|ga) fuzz_args=(--fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json") ;;
+            alpha) ;;
+            *) echo "release refused: unclassified tag kind '$KIND'"; exit 1 ;;
           esac
           if [ "${#fuzz_args[@]}" -gt 0 ]; then
-            gh api -H "Accept: application/vnd.github.raw+json" "repos/${{ github.repository }}/contents/fuzz-ledger.json?ref=fuzz-ledger" > "$RUNNER_TEMP/fuzz-ledger.json"
+            # Review GLM F4: the consumed ledger commit is logged and pinned, so the file
+            # that was judged is identifiable after the branch moves. (The ledger is still
+            # unsigned and operator-owned: see the deferred-work row.)
+            tip="$(gh api "repos/${{ github.repository }}/commits/fuzz-ledger" --jq .sha)"
+            echo "fuzz-ledger tip consumed: $tip"
+            gh api -H "Accept: application/vnd.github.raw+json" "repos/${{ github.repository }}/contents/fuzz-ledger.json?ref=$tip" > "$RUNNER_TEMP/fuzz-ledger.json"
           fi
-          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=aggregate&status=completed&filter=latest" |
+          # Review GLM F6: no status filter, so a newer run still in progress is the run
+          # judged (and refused) instead of an older green one.
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=aggregate&filter=latest" |
             cargo run --locked -p xtask -- check-release-precondition "${fuzz_args[@]}"
       - uses: actions/download-artifact@v4
         with:

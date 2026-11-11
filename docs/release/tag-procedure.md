@@ -56,7 +56,7 @@ Run these checks against the exact commit that will be tagged:
    repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
    gh api -H "Accept: application/vnd.github.raw+json" \
      "repos/${repo}/contents/fuzz-ledger.json?ref=fuzz-ledger" > fuzz-ledger.json
-   gh api "repos/${repo}/commits/${candidate_sha}/check-runs?check_name=aggregate&status=completed&filter=latest" \
+   gh api "repos/${repo}/commits/${candidate_sha}/check-runs?check_name=aggregate&filter=latest" \
      | cargo run --locked -p xtask -- check-release-precondition --fuzz-ledger fuzz-ledger.json
    ```
 
@@ -68,7 +68,9 @@ Run these checks against the exact commit that will be tagged:
    dispatch exists (0 T3 records when measured 2026-11-04).
 
    The perf-ledger leg (`check-perf-verdict`, Story 20-7 AC11.2) joins this step
-   when 20-7 lands it. The aggregate server-side filter is mandatory and matches
+   when 20-7 lands it. The aggregate server-side `check_name=aggregate&filter=latest` filter is mandatory
+   (no `status=completed` filter: a newer run still in progress is the run judged and
+   refused, never hidden behind an older green one) and matches
    the query the `Require successful main discipline aggregate` step runs in
    `.github/workflows/release.yml` `sign-and-publish`: the check-runs list defaults to
    30 entries per page while `discipline.yml` declares 161 jobs, so an
@@ -90,8 +92,11 @@ Run these checks against the exact commit that will be tagged:
    `check-rc-readiness` is green only when: the workspace version is `X.Y.Z-rc.N`
    and equals `$tag` sans the `v`; STABILITY.md is in sync; every `20-*` story in
    `sprint-status.yaml` is `done` (with `--tag`, Story 20-5's own key included);
-   the `MAOS_RELEASE_PUBKEY`, `RELEASE_SIGNING_KEY` and `fuzz-ledger branch
-   permission` rows of the provisioning checklist are `present`; and every
+   the `MAOS_RELEASE_PUBKEY`, `RELEASE_SIGNING_KEY`, `fuzz-ledger branch
+   permission` and `release environment protection evidence` rows of the
+   provisioning checklist are `present` (the last is `absent` until the operator
+   configures required reviewers, no self-review/bypass and tag restrictions on the
+   `release` environment, so this gate stays red until then); and every
    `deny.toml` ignored RUSTSEC id has a `deferred-work.md` row. `release.yml`
    runs the same command with `--tag` before signing when the ref is an rc tag.
 

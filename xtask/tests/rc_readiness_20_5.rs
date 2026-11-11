@@ -48,6 +48,7 @@ const CHECKLIST: &str = "| Item | Consumer | Behavior | Row | State |
 | `MAOS_RELEASE_PUBKEY` | release.yml | hard fail | `ops-provisioning-secrets-and-accounts` | `present` |
 | `RELEASE_SIGNING_KEY` | release.yml | hard fail | `ops-provisioning-secrets-and-accounts` | `present` |
 | `fuzz-ledger branch permission` | collector | hard fail | `ops-provisioning-secrets-and-accounts` | `present` |
+| `release environment protection evidence` | release.yml | publication unprotected | `ops-provisioning-secrets-and-accounts` | `present` |
 | `DOCKERHUB_TOKEN` | container.yml | skipped | `ops-provisioning-secrets-and-accounts` | `absent` |
 ";
 
@@ -266,6 +267,7 @@ fn the_provisioning_leg_needs_every_row_present() {
         "`MAOS_RELEASE_PUBKEY`",
         "`RELEASE_SIGNING_KEY`",
         "`fuzz-ledger branch permission`",
+        "`release environment protection evidence`",
     ] {
         // Not `present`.
         let dir = fixture();
@@ -307,6 +309,13 @@ fn the_deny_leg_reds_on_an_ignored_advisory_without_a_deferred_row() {
         dir.path(),
         "_bmad-output/implementation-artifacts/deferred-work.md",
         &format!("{DEFERRED}\nSee RUSTSEC-2099-0001 in passing.\n"),
+    );
+    assert_only_red(&check(dir.path(), None), "deny-ignores");
+    // Review GLM F5: the id must match as a whole token, not as a prefix of a longer id.
+    write(
+        dir.path(),
+        "_bmad-output/implementation-artifacts/deferred-work.md",
+        &format!("{DEFERRED}- **other advisory** (RUSTSEC-2099-00012, RUSTSEC-2099-0001x) — Ownerless and open.\n"),
     );
     assert_only_red(&check(dir.path(), None), "deny-ignores");
     write(

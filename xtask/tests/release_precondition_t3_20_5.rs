@@ -330,16 +330,16 @@ fn the_release_job_passes_the_fuzz_ledger_to_the_precondition_for_rc_and_ga_tags
         "the precondition receives the ledger: {run}"
     );
     assert!(
-        run.contains("contents/fuzz-ledger.json?ref=fuzz-ledger"),
+        run.contains("contents/fuzz-ledger.json?ref="),
         "the ledger is fetched read-only from the ledger branch: {run}"
     );
     assert!(
-        run.contains("check_name=aggregate&status=completed&filter=latest"),
-        "the aggregate leg is unchanged: {run}"
+        run.contains("check_name=aggregate&filter=latest"),
+        "the aggregate leg keeps its server-side latest filter: {run}"
     );
     assert!(
-        run.contains("*-rc.*") && run.contains("*-*)"),
-        "rc and GA tags require the chain, other pre-releases keep the aggregate-only precondition: {run}"
+        run.contains("rc|ga)") && run.contains("alpha)"),
+        "rc and GA kinds require the chain, the alpha kind keeps the aggregate-only precondition: {run}"
     );
 }
 
@@ -348,10 +348,7 @@ fn the_release_job_runs_rc_readiness_before_signing_for_rc_tags_only() {
     let release = workflow("release.yml");
     let steps = steps(&release, "sign-and-publish");
     let (readiness, step) = step_named(&steps, "Require rc tree readiness (rc tags only)");
-    assert_eq!(
-        step["if"].as_str(),
-        Some("contains(github.ref_name, '-rc.')")
-    );
+    assert_eq!(step["if"].as_str(), Some("steps.tag.outputs.kind == 'rc'"));
     let run = step["run"].as_str().unwrap();
     assert!(
         run.contains("check-rc-readiness") && run.contains("--tag \"$TAG\""),

@@ -4,8 +4,13 @@
 #   1. the exact `gh api` fetch release.yml uses for fuzz-ledger.json works against the live
 #      `fuzz-ledger` branch, and `check-release-precondition --fuzz-ledger` REFUSES while the branch
 #      holds no complete T3 chain for the SHA (0 T3 records when measured 2026-11-04/11-11);
-#   2. `check-rc-readiness` runs hosted and reports its five legs (it exits non-zero until L2;
-#      the step asserts the non-zero exit and prints the legs, it never turns red legs green).
+#   2. `check-rc-readiness` runs hosted and reports its five legs (it exits 1 until L2; the step
+#      asserts the refusal status and validates the report, it never turns red legs green).
+# Each judgment step is preceded by a build step that must succeed, requires the gate's own exit
+# status (1) and a diagnostic or report that proves the gate ran: a compile failure, an old binary
+# that rejects the option, an always-green regression or malformed output each fail the step
+# (`xtask/tests/release_gates_20_5r1.rs` runs these scripts against stand-in binaries).
+# After the L2 landing the expected readiness status flips to 0 and this recipe must be re-cut.
 # The operator-lane chain itself (dispatch of fuzz-prerelease at the candidate SHA) is NOT simulated.
 name: 20-5 L1 hosted proof
 on:
@@ -24,22 +29,32 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
+      - name: Build xtask (this step must succeed)
+        run: cargo build --locked -p xtask
       - name: Fetch the live ledger exactly as release.yml does
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          tip="$(gh api "repos/${{ github.repository }}/commits/fuzz-ledger" --jq .sha)"
+          echo "fuzz-ledger tip consumed: $tip"
           gh api -H "Accept: application/vnd.github.raw+json" \
-            "repos/${{ github.repository }}/contents/fuzz-ledger.json?ref=fuzz-ledger" > "$RUNNER_TEMP/fuzz-ledger.json"
+            "repos/${{ github.repository }}/contents/fuzz-ledger.json?ref=$tip" > "$RUNNER_TEMP/fuzz-ledger.json"
           python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print('schema', d['schema_version'], 'records', len(d['records']), 'T3', sum(r['tier']=='T3' for r in d['records']))" "$RUNNER_TEMP/fuzz-ledger.json"
-      - name: The leg refuses (a refusal is the PASS of this step)
+      - name: The leg refuses (the gate's own refusal is the PASS of this step)
         run: |
           set -uo pipefail
           printf '{"check_runs":[{"name":"aggregate","status":"completed","conclusion":"success","head_sha":"%s"}]}' "$GITHUB_SHA" > "$RUNNER_TEMP/check-runs.json"
-          if cargo run --locked -p xtask -- check-release-precondition --check-runs "$RUNNER_TEMP/check-runs.json" --fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json"; then
-            echo "UNEXPECTED: the precondition passed without a complete T3 chain for $GITHUB_SHA"; exit 1
+          status=0
+          out="$(target/debug/xtask check-release-precondition --check-runs "$RUNNER_TEMP/check-runs.json" --fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json" 2>&1)" || status=$?
+          printf '%s\n' "$out"
+          if [ "$status" -ne 1 ]; then
+            echo "UNEXPECTED: the gate exited $status; a T3 refusal exits 1"; exit 1
           fi
-          echo "refused as required"
+          case "$out" in
+            *"no complete T3 fuzz chain"*"$GITHUB_SHA"*) echo "refused as required" ;;
+            *) echo "UNEXPECTED: exit 1 without the missing-T3-chain diagnostic for $GITHUB_SHA"; exit 1 ;;
+          esac
   rc-readiness-reports-its-legs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -49,10 +64,23 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
-      - name: Report the five legs (non-zero until the L2 landing is a fact)
+      - name: Build xtask (this step must succeed)
+        run: cargo build --locked -p xtask
+      - name: Report the five legs (a red tree is the expected state until the L2 landing)
         run: |
           set -uo pipefail
-          cargo run --locked -p xtask -- check-rc-readiness --json | tee "$RUNNER_TEMP/readiness.json"
-          status=${PIPESTATUS[0]}
-          python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print({l['leg']: l['passed'] for l in d['legs']})" "$RUNNER_TEMP/readiness.json"
-          echo "check-rc-readiness exit=$status (red legs are reported, never waived)"
+          status=0
+          target/debug/xtask check-rc-readiness --json > "$RUNNER_TEMP/readiness.json" || status=$?
+          if [ "$status" -ne 1 ]; then
+            echo "UNEXPECTED: check-rc-readiness exited $status; a red tree exits 1"; exit 1
+          fi
+          python3 - "$RUNNER_TEMP/readiness.json" <<'PY'
+          import json, sys
+          report = json.load(open(sys.argv[1]))
+          assert report.get("gate") == "check-rc-readiness", report
+          legs = report["legs"]
+          expected = ["version", "stability-matrix", "epic-20-stories", "provisioning", "deny-ignores"]
+          assert [leg["leg"] for leg in legs] == expected, legs
+          assert report["passed"] is False and not all(leg["passed"] for leg in legs), report
+          print({leg["leg"]: leg["passed"] for leg in legs})
+          PY

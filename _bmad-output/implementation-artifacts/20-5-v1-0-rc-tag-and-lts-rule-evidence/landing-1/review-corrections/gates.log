@@ -1,0 +1,56 @@
+=== check-kernel-baseline
+check-kernel-baseline: PASSED (maos-kernel-core/src = 26841 lines, 95 files, pinned 26841)
+exit=0
+=== check-dev-record-completeness
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1652: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1654: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1655: ownerless and open, with a recorded disposition
+check-dev-record-completeness: PASSED (199 done-status stories checked)
+exit=0
+=== check-epic-close-coherence
+check-epic-close-coherence: PASSED (21 epics re-derived against pin 26841)
+exit=0
+=== check-exit-commands
+check-exit-commands: PASS (2 epics, 2 blocks, 10 tokens resolved, 0 owed)
+exit=0
+=== check-decision-register
+check-decision-register: 23 rows, 6 open
+  D19: deadline UNQUERYABLE (not green, not satisfied) — UNQUERYABLE — "before the next `j1-*` story leaves `ready-for-dev`" was SELF-VOIDING: 2c is the lane closer and there is no next `j1-*` story. It bound at the round-table or never.
+exit=0
+=== check-env-contract
+check-env-contract: PASS (123 maos-bin/src MAOS_* vars registered, 0 violations; workspace-wide env surface is Story 21-4 / xtask env-contract.toml — D-I)
+exit=0
+=== check-abi-ratification
+check-abi-ratification: PASS (no ABI changes — base case)
+exit=0
+=== stability-matrix --check
+stability-matrix: PASS — STABILITY.md in sync with workspace state; 0 undocumented deprecations; §Export present (non-stub)
+exit=0
+=== error-catalog-check
+error-catalog-check: PASS — 70 E* items registered, 70 discovered in source
+exit=0
+=== check-manifest-schema-version
+check-manifest-schema-version: PASSED (current=7, min=1, max=7)
+exit=0
+=== gen-abi-docs --check
+ Documenting maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.98s
+exit=0
+=== check-breaking-md
+check-breaking-md: PASS — 3 dated entries with migration paths
+exit=0
+=== check-workspace-count
+check-workspace-count: PASSED (actual=58, declared=58)
+exit=0
+=== check-fkcs --json
+{"gate":"check-fkcs","passed":true,"oracle_green":true,"advisory":false,"blocking_now":false,"ship_phase":"v1_5","disposition":{"v1_0":"advisory","v1_5":"advisory","v2_0":"blocking"},"legs":[{"label":"frozen-tag-consistency","passed":1,"failed":0,"ran":true,"attempted":true,"green":true},{"label":"d
+exit=0
+=== invariant-lock --changed-files /tmp/d205/changed.txt
+invariant-lock: PASSED
+exit=0
+=== kloc-check on a copy without the operator's untracked spikes/gpui-operator-shell + *gpui* files
+kloc-check failed
+False 202240 ['aggregate 202240 >= 202019', '(unknown:spikes) 366 > 244']
+{'xtask': 45333, 'maos-bin': 38019, 'maos-domain': 10211, 'maos-manifest': 4765, 'maos-spirit-abi': 1045, 'maos-kernel-core': 21042, 'maos-wasm-host': 3137}
+=== kloc-check on the working tree (includes the foreign files)
+False 202240 ['aggregate 202240 >= 202019', '(unknown:spikes) 366 > 244']

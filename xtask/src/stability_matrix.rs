@@ -385,13 +385,9 @@ fn lts_clock_start(workspace_root: &Path) -> Result<String, String> {
     let (tag, sha) = (field("clock_start_tag")?, field("clock_start_sha")?);
     let sha_ok =
         matches!(sha.len(), 40 | 64) && sha.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'));
-    let tag_ok = !tag.is_empty()
-        && tag
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b".-_".contains(&b));
-    if !(sha_ok && tag_ok) {
+    if !(sha_ok && tag == "v1.0.0") {
         return Err(format!(
-            "{RELEASE_CHANNEL_RECORD}: clock_start_sha must be a lowercase hex commit id and clock_start_tag a plain tag name"
+            "{RELEASE_CHANNEL_RECORD}: clock_start_sha must be a lowercase hex commit id and clock_start_tag exactly `v1.0.0` (a release candidate or any other tag never starts the v1.0 clock)"
         ));
     }
     Ok(format!("`{sha}` (tag `{tag}`)"))
@@ -581,6 +577,26 @@ mod tests {
             assert!(
                 render(&tmp).is_err(),
                 "a malformed record is a loud error, never the placeholder: {malformed}"
+            );
+        }
+        // Review GPT-1 / GLM F7: only the GA tag `v1.0.0` starts the v1.0 clock; a valid
+        // SHA paired with a release candidate, an alpha or an unrelated tag is refused.
+        for tag in [
+            "v1.0.0-rc.1",
+            "v1.0.0-rc.9",
+            "v0.1.0-alpha.1",
+            "v1.5.0",
+            "1.0.0",
+            "v1.0.0-",
+        ] {
+            std::fs::write(
+                tmp.join("xtask/release-channel.toml"),
+                format!("[lts]\nclock_start_tag = \"{tag}\"\nclock_start_sha = \"{sha}\"\n"),
+            )
+            .unwrap();
+            assert!(
+                render(&tmp).is_err(),
+                "a record naming {tag} must not start the v1.0 LTS clock"
             );
         }
     }

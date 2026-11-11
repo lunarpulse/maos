@@ -1,0 +1,3 @@
+# kloc-check --json run from the root of a copy without the operator's untracked spikes/gpui-operator-shell and *gpui* files (the section of gates.log with the same title ran from the repo cwd and measured the working tree: aggregate 202240 = 202018 + 222 foreign)
+True 202018 []
+{'xtask': 45333, 'maos-bin': 38019, 'maos-domain': 10211, 'maos-manifest': 4765, 'maos-spirit-abi': 1045, 'maos-kernel-core': 21042, 'maos-wasm-host': 3137}

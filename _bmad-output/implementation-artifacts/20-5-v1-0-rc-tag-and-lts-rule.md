@@ -525,6 +525,16 @@ Evidence: `20-5-v1-0-rc-tag-and-lts-rule-evidence/landing-1/evidence.md` (witnes
 
 **Not done.** Hosted legs and every operator-lane step (unverified); L2 (AC1, AC8, AC9).
 
+### Landing 1 review corrections (2026-11-11, `Dev205L1`, anthropic/claude-sonnet-5-5), HEAD `fba6af2a`
+
+Two independent reviews of the candidate commit are persisted verbatim under `20-5-v1-0-rc-tag-and-lts-rule-evidence/landing-1/review/` (`gpt-review.md`: 3 P2, "incorrect"; `security.md`: GLM-5.3, 1 HIGH, 4 MEDIUM, 4 LOW, 1 INFO). Evidence, failing-before, plants and the disposition table: `landing-1/review-corrections/evidence.md`.
+
+- **Fixed with a failing-before and a plant each:** the LTS clock record accepts only `v1.0.0` (GPT-1 / F7); the hosted recipe builds in its own mandatory step, requires the gate's own exit status and a diagnostic or validated five-leg report, and its scripts are executed against stand-in binaries (GPT-2, GPT-3); `check-rc-readiness` audits the `release environment protection evidence` row and so is red on the real tree until the operator provisions it (F1); one fail-closed tag classification step that every later control reads (F2); the tagged commit must be an ancestor of `origin/main` before any gate runs (F3); the consumed ledger tip commit is logged and the file fetched at that commit (F4, partial); the aggregate query has no `status=completed` filter (F6); deny-ignore ids match as whole tokens and the false `deny.toml` header is corrected (F5, partial).
+- **Deferred with rows (rule 10):** unsigned ledger / environment protection / run-id cross-check (owner `ops-provisioning-secrets-and-accounts`, follow-up 20-5 L2); class-aware deny leg and the darwin cargo-deny target; legs that read committed markdown (F8); mutable action pins (F9, pre-existing); non-table `[cli_wrapper]` typing (F10, INFO).
+- **Honest misses found on the way:** the first recipe-refusal plant stayed green (the diagnostic check alone covered the status check), so two "refusal text with a failing status" vectors were added and the plant re-run red; the first aggregate-step vector was racy (`pipefail` SIGPIPE from a stand-in `cargo` that did not drain stdin).
+- **kloc:** xtask 45315 -> 45333 (+18, ceiling 45527); aggregate 202018 (hardfail 202019, ceiling 202125); others unchanged; kernel unchanged.
+- **Verification:** workspace nextest 5967 run, 5965 passed, 2 unrelated failures (the operator's untracked `spikes/` in `kloc_check_runs_on_workspace`; the known 1M-row `erasure_million_20_11` timing row owned by 20-7); all gates, clippy and the ratchet green; `verb_table_15_3` no-default 7/7. Hosted and operator-lane items remain unverified.
+
 ### File List (landing 1)
 
 xtask: `src/{check_rc_readiness (new),check_release_precondition,stability_matrix,check_error_catalog,main}.rs`, `error-catalog.toml`, `abi-ratifications.toml`, `kloc.toml`, tests `release_precondition_t3_20_5.rs`, `rc_readiness_20_5.rs` (new). Crates: `maos-spirit-abi/src/lib.rs`, `maos-domain/src/cli_wrapper.rs`, `maos-manifest/src/manifest.rs` + `tests/cli_wrapper_schema_20_5.rs`, `maos-bin/src/worker_spawn.rs` + `tests/{cli_wrapper_schema_20_5 (new),worker_manifests_2a,cookbook_manifests_17_3b}.rs`, `spirits/worker/{manifest*.toml,tests/spirit_smoke.rs}`. Workflows: `release.yml`, `fuzz-prerelease.yml`. Docs: `STABILITY.md`, `docs/release/{lts-policy (new),tag-procedure}.md`, `RELEASE-HOLDS.md`, `docs/runbooks/{fuzz-cadence,provisioning-checklist}.md`, `docs/errors/error-catalog.json`, `tests/coverage-matrix.yaml`, `deny.toml`, `deferred-work.md`, `sprint-status.yaml`, docs-site (topology, manifest v3/v5, cookbook, 44 error pages + new page + TierNotGranted, troubleshoot, ko twins, `abi/v1/constants.md` + ko, `route-manifest.json`, `scripts/gate-routes.js`, `tests/playwright/manifest.ts`). Evidence: `landing-1/`, `ci/ci-20-5-verify.yml` (unverified recipe).
@@ -536,6 +546,8 @@ xtask: `src/{check_rc_readiness (new),check_release_precondition,stability_matri
 ### File List
 
 ## Change Log
+
+- 2026-11-11: **L1 review corrections** (Dev205L1): GPT 3 P2 and GLM 1 HIGH / 4 MEDIUM / 4 LOW / 1 INFO dispositioned (fixed with failing-before + plants, or deferred with rows); tag classification and main-ancestry added to `release.yml`; readiness now audits the release-environment row; recipe rewritten and executed in tests; xtask 45333, aggregate 202018.
 
 - 2026-11-11: **L1 (kernel-free AC2–AC7) implemented at `f56959c2`, uncommitted** (Dev205L1): ceilings re-based onto the exact pins (xtask 45527 / aggregate 202125 …); landed xtask 45315, aggregate 201814; red/plant logs under `landing-1/`; workspace nextest run (2 unrelated failures), prepush skipped; hosted and operator-lane steps unverified; tracker → `in-progress`.
 

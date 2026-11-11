@@ -55,7 +55,9 @@ clock_start_tag = "v1.0.0"
 clock_start_sha = "<40-hex SHA of the v1.0.0 tag commit>"
 ```
 
-then regenerates and verifies:
+(`clock_start_tag` must be exactly `v1.0.0`: a record naming a release candidate, an
+alpha or any other tag is a loud error, so an rc can never render a clock-start), then
+regenerates and verifies:
 
 ```bash
 cargo run --locked -p xtask -- stability-matrix
