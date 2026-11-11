@@ -1998,7 +1998,7 @@ impl TransparencyLogAdapter {
         } else {
             "SELECT frame_id,kind,spirit_pid,boot_nonce,payload_redacted,timestamp_ns \
              FROM transparency_log NOT INDEXED WHERE rowid>?2 AND rowid<=?3 \
-             AND instr(payload_redacted,CAST(?1 AS BLOB))>0 \
+             AND (kind IN (28,29) OR instr(payload_redacted,CAST(?1 AS BLOB))>0) \
              AND intent NOT IN ('principal.forget','principal.forget.held','distillate.redacted') \
              AND intent NOT LIKE 'principal.uninstall.%'"
         };
@@ -2266,13 +2266,52 @@ impl TransparencyLogAdapter {
         }
     }
 
-    /// Value-only erasure shared by discovery, replacement and certification: object keys, tags
-    /// and hashes never change; kind 29 reaches only identity and label values, kind 28 any value.
+    fn is_digest(text: &str) -> bool {
+        text.len() == 64 && text.bytes().all(|b| b.is_ascii_hexdigit())
+    }
+
+    /// The one erasure predicate for kinds 28 and 29 (discovery, replacement, certification).
+    /// Typed governance fields bound to their envelope and valid value form (the tag, the ABI
+    /// ratification status, the canonical manifest fingerprint and publisher key) are set aside and
+    /// restored; everything else is value-scrubbed by `walk`. Returns whether a value matched.
     fn scrub(kind: i64, v: &mut serde_json::Value, who: &[impl AsRef<str>]) -> bool {
+        use maos_domain::governance::decode_declaration_bytes as decode;
+        const TAGS: &str = "AbiExtension VetterKey SchemaLifecycle ModelProvenance TelemetrySubscription ManifestDeclaration";
+        const PATHS: &str =
+            "/event/governance_type /event/status /event/manifest_sha256 /event/publisher";
+        let at = |p: &str| v.pointer(p).and_then(|t| t.as_str()).unwrap_or_default();
+        let tag = at("/event/governance_type");
+        let canonical = |p| tag == "ManifestDeclaration" && decode(at(p)).is_some();
+        let allowed = [
+            TAGS.split(' ').any(|t| t == tag),
+            tag == "AbiExtension"
+                && ["proposed", "ratified", "rejected"].contains(&at("/event/status")),
+            canonical("/event/manifest_sha256"),
+            canonical("/event/publisher"),
+        ];
+        let held: Vec<_> = PATHS
+            .split(' ')
+            .zip(allowed)
+            .filter(|(_, ok)| *ok && kind == 28)
+            .filter_map(|(p, _)| v.pointer_mut(p).map(|slot| (p, std::mem::take(slot))))
+            .collect();
+        let hit = Self::walk(kind, v, who);
+        held.into_iter().for_each(|(p, held)| {
+            v.pointer_mut(p)
+                .map(|slot| *slot = held)
+                .unwrap_or_default()
+        });
+        hit
+    }
+
+    /// Value-only erasure: object keys never change; kind 29 reaches only identity and label
+    /// values, kind 28 every value except fixed receipt fields and canonical digests.
+    fn walk(kind: i64, v: &mut serde_json::Value, who: &[impl AsRef<str>]) -> bool {
         use maos_domain::memory::principal_id_occurs as seen;
         use serde_json::Value::{Array, Object, String as Text};
         const LABELS: &str = "principal principal_id task_ref session_principal provider model";
-        const FIXED: &str = "event kernel_verdict sha256 supersedes trusted_intent trusted_origin";
+        const FIXED: &str = "event kernel_verdict trusted_intent trusted_origin";
+        const DIGESTS: &str = "sha256 supersedes schema_content_hash";
         let listed = |names: &str, key: &str| names.split(' ').any(|name| name == key);
         let mut hit = false;
         match v {
@@ -2280,14 +2319,16 @@ impl TransparencyLogAdapter {
                 *s = "[REDACTED]".into();
                 hit = true;
             }
-            Array(a) => a.iter_mut().for_each(|i| hit |= Self::scrub(kind, i, who)),
+            Array(a) => a.iter_mut().for_each(|i| hit |= Self::walk(kind, i, who)),
             Object(m) => m
                 .iter_mut()
                 .filter(|(k, i)| match kind {
                     29 => listed(LABELS, k),
-                    _ => !(i.is_string() && (k.ends_with("hash") || listed(FIXED, k))),
+                    _ => !i.as_str().is_some_and(|t| {
+                        listed(FIXED, k) || listed(DIGESTS, k) && Self::is_digest(t)
+                    }),
                 })
-                .for_each(|(_, i)| hit |= Self::scrub(kind, i, who)),
+                .for_each(|(_, i)| hit |= Self::walk(kind, i, who)),
             _ => {}
         }
         hit
@@ -3077,6 +3118,15 @@ impl TransparencyLogAdapter {
         if entry.ratified_by.is_empty() {
             return Err(AuditError::SqliteWriteFatal(
                 rusqlite::Error::InvalidParameterName("ratified_by must not be empty".into()),
+            ));
+        }
+        let digests = [
+            Some(entry.schema_content_hash.as_str()),
+            entry.supersedes_hash.as_deref(),
+        ];
+        if !digests.iter().flatten().all(|t| Self::is_digest(t)) {
+            return Err(AuditError::Serialization(
+                "schema digests must be 64 hex digits".into(),
             ));
         }
         let payload = maos_domain::governance::GovernanceEventPayload {

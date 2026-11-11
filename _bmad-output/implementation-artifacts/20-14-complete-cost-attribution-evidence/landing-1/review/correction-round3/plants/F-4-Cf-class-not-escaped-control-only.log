@@ -1,0 +1,212 @@
+# plant: F-4 Cf class not escaped (control only)
+# file: crates/maos-cli/src/subcommands.rs
+# command: cargo test -p maos-cli --lib cost_report 2>&1
+# rc: 101
+# restored+cmp identical: True
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1434:21
+     |
+1434 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+warning: unused variable: `file_name`
+   --> crates/maos-eval/src/distillate_corpus.rs:106:17
+    |
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:198:27
+    |
+198 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-registry` (lib) generated 4 warnings (run `cargo fix --lib -p maos-registry` to apply 4 suggestions)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: calls to `std::mem::drop` with a value that implements `Copy` does nothing
+    --> crates/maos-iac/src/adapter/transparency_log.rs:2300:35
+     |
+2300 |             .for_each(|(p, held)| drop(v.pointer_mut(p).map(|slot| *slot = held)));
+     |                                   ^^^^^-----------------------------------------^
+     |                                        |
+     |                                        argument has type `std::option::Option<()>`
+     |
+     = note: use `let _ = ...` to ignore the expression or result
+     = note: `#[warn(dropping_copy_types)]` on by default
+
+   Compiling maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort)
+warning: methods `accept_consent` and `outbound_consent_context` are never used
+   --> crates/maos-cohort/src/state.rs:388:19
+    |
+206 | impl CohortManifestState {
+    | ------------------------ methods in this implementation
+...
+388 |     pub(crate) fn accept_consent(
+    |                   ^^^^^^^^^^^^^^
+...
+408 |     pub(crate) fn outbound_consent_context(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-iac` (lib) generated 4 warnings (run `cargo fix --lib -p maos-iac` to apply 3 suggestions)
+warning: `maos-cohort` (lib) generated 1 warning
+   Compiling maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+warning: unused variable: `hidden`
+    --> crates/maos-cli/src/subcommands.rs:5056:9
+     |
+5056 |     let hidden = |c: char| {
+     |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_hidden`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-cli` (lib test) generated 1 warning (run `cargo fix --lib -p maos-cli --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.51s
+     Running unittests src/lib.rs (target/debug/deps/maos_cli-67b5b32641a04652)
+
+running 8 tests
+test subcommands::cost_report_review_20_14::plain_escape_is_injective_for_backslashes_and_hides_bidi_overrides ... FAILED
+test subcommands::cost_report_review_20_14::unpriced_rows_warn ... ok
+test subcommands::cost_report_review_20_14::extreme_costs_do_not_silently_wrap ... ok
+test subcommands::tests::cost_report_reads_payload_not_intent ... ok
+test subcommands::cost_report_review_20_14::names_and_fractions_are_boot_local_and_unnamed_falls_back ... ok
+test subcommands::tests::cost_report_separates_task_source_and_boot_names ... ok
+test subcommands::cost_report_review_20_14::report_rejects_pid_mismatch_and_distinguishes_absent_task ... ok
+test subcommands::cost_report_review_20_14::plain_report_escapes_control_characters_and_caps_fields ... FAILED
+
+failures:
+
+---- subcommands::cost_report_review_20_14::plain_escape_is_injective_for_backslashes_and_hides_bidi_overrides stdout ----
+
+thread 'subcommands::cost_report_review_20_14::plain_escape_is_injective_for_backslashes_and_hides_bidi_overrides' (628987) panicked at crates/maos-cli/src/../tests/support/cost_report_review_20_14.rs:203:9:
+assertion `left == right` failed
+  left: "x\u{ad}y"
+ right: "x\\u{ad}y"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- subcommands::cost_report_review_20_14::plain_report_escapes_control_characters_and_caps_fields stdout ----
+
+thread 'subcommands::cost_report_review_20_14::plain_report_escapes_control_characters_and_caps_fields' (628988) panicked at crates/maos-cli/src/../tests/support/cost_report_review_20_14.rs:135:5:
+assertion failed: !text.chars().any(|c|
+            c != '\n' &&
+                (c.is_control() || c == '\u{2028}' || c == '\u{2029}'))
+
+
+failures:
+    subcommands::cost_report_review_20_14::plain_escape_is_injective_for_backslashes_and_hides_bidi_overrides
+    subcommands::cost_report_review_20_14::plain_report_escapes_control_characters_and_caps_fields
+
+test result: FAILED. 6 passed; 2 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p maos-cli --lib`

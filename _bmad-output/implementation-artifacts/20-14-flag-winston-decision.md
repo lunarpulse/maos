@@ -30,6 +30,9 @@ stays at its 8728 pin; aggregate 199146 inside the rebased 199378. No kernel
 line; kernel pins 26841/21042 unchanged. **Round 2 (CR1–CR3):** CLI re-measured 6603
 (inside the same orchestrator-adjudicated overdraft ceiling 6610, disclosed to the
 operator), iac 8726 (down 2; ceiling 8728 unchanged), aggregate 199148, hardfail 199149.
+**Round 3 (R2-1/R2-2, GLM F-4):** CLI 6609 (inside 6610); iac ceiling raised 8728 -> 8770 as an
+orchestrator-adjudicated D02 A overdraft, disclosed to the operator (before: pin 8726 / ceiling
+8728; after: measured 8770, zero headroom); aggregate 199198, hardfail 199199. No kernel line.
 **Precedent:** `20-4-flag-winston-decision.md`, `20-7-flag-winston-decision.md`.
 
 ## Decision requested

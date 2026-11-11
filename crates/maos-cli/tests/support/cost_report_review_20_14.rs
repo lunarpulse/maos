@@ -176,8 +176,28 @@ fn plain_escape_is_injective_for_backslashes_and_hides_bidi_overrides() {
     assert_eq!(cost_terminal_field(spelled), "alice\\\\u{85}");
     assert_ne!(cost_terminal_field(real), cost_terminal_field(spelled));
     assert_eq!(cost_terminal_field("a\\\\b"), "a\\\\\\\\b");
+    assert_eq!(cost_terminal_field("résumé 日本語 ok"), "résumé 日本語 ok");
     for c in [
-        '\u{200b}', '\u{200f}', '\u{202a}', '\u{202e}', '\u{2066}', '\u{2069}',
+        '\u{ad}',
+        '\u{600}',
+        '\u{61c}',
+        '\u{180e}',
+        '\u{200b}',
+        '\u{200f}',
+        '\u{202a}',
+        '\u{202e}',
+        '\u{2060}',
+        '\u{2066}',
+        '\u{2069}',
+        '\u{206a}',
+        '\u{fe00}',
+        '\u{fe0f}',
+        '\u{feff}',
+        '\u{fff9}',
+        '\u{e0001}',
+        '\u{e0020}',
+        '\u{e0100}',
+        '\u{e01ef}',
     ] {
         let shown = cost_terminal_field(&format!("x{c}y"));
         assert_eq!(shown, format!("x\\u{{{:x}}}y", c as u32));

@@ -360,7 +360,26 @@ fn receipt(goal: &str, scope: &str) -> String {
     )
 }
 
-const LIFECYCLE: &str = r#"{"recorded_at_ns":1,"effective_at_ns":2,"event":{"SchemaLifecycle":{"schema_id":"s","schema_content_hash":"deadbeef","supersedes":"cafe","version":1,"ratified_by":"ADR-045"}}}"#;
+const H1: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const H2: &str = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
+
+fn typed_abi(summary: &str) -> String {
+    use maos_domain::governance::{
+        AbiExtensionProposal, GovernanceEventKind, GovernanceEventPayload, RatificationStatus,
+    };
+    serde_json::to_string(&GovernanceEventPayload {
+        recorded_at_ns: 1,
+        effective_at_ns: 2,
+        event: GovernanceEventKind::AbiExtension(AbiExtensionProposal {
+            proposal_id: "p1".into(),
+            summary: summary.into(),
+            adr_ref: "ADR-045".into(),
+            status: RatificationStatus::Ratified,
+            covered_changes: vec!["GovernanceEvent".into()],
+        }),
+    })
+    .unwrap()
+}
 
 #[test]
 fn governance_receipts_are_value_scrubbed_with_dependent_closure() {
@@ -375,7 +394,11 @@ fn governance_receipts_are_value_scrubbed_with_dependent_closure() {
         7,
         &receipt("review bob profile", "principal:bob:profile"),
     );
-    let abi = s.raw(FrameKind::GovernanceEvent, 7, r#"{"recorded_at_ns":1,"effective_at_ns":2,"event":{"AbiExtension":{"proposal_id":"p1","summary":"alice requested the extension","adr_ref":"ADR-045","status":"ratified","covered_changes":["GovernanceEvent"]}}}"#);
+    let abi = s.raw(
+        FrameKind::GovernanceEvent,
+        7,
+        &typed_abi("alice requested the extension"),
+    );
     let digest = s.digest(7, vec![alice], "neutral digest of a receipt");
     let before = s
         .log
@@ -408,7 +431,9 @@ fn governance_receipts_are_value_scrubbed_with_dependent_closure() {
         kept["decisions"][0]["scope"]["MemRead"]["scope"],
         "[REDACTED]"
     );
-    assert_eq!(s.body(abi)["event"]["AbiExtension"]["adr_ref"], "ADR-045");
+    assert_eq!(s.body(abi)["event"]["adr_ref"], "ADR-045");
+    assert_eq!(s.body(abi)["event"]["status"], "ratified");
+    assert_eq!(s.body(abi)["event"]["governance_type"], "AbiExtension");
     assert_eq!(
         before,
         s.log
@@ -421,22 +446,14 @@ fn governance_receipts_are_value_scrubbed_with_dependent_closure() {
 
 #[test]
 fn governance_fixed_discriminators_and_hashes_never_select_a_frame() {
-    for subject in [
-        "allow",
-        "standard",
-        "SpiritAuto",
-        "event",
-        "claims",
-        "deadbeef",
-        "cafe",
-    ] {
+    for subject in ["allow", "standard", "SpiritAuto", "event", "claims", H1, H2] {
         let s = Scene::new();
         let receipt = s.raw(
             FrameKind::GovernanceEvent,
             7,
             &receipt("review bob profile", "principal:bob:profile"),
         );
-        let lifecycle = s.raw(FrameKind::GovernanceEvent, 7, LIFECYCLE);
+        let lifecycle = s.raw(FrameKind::GovernanceEvent, 7, &lifecycle(H1, Some(H2)));
         let read = |id| {
             s.log
                 .query_frame_by_id(id)
@@ -709,4 +726,153 @@ fn an_unrelated_forget_does_not_treat_partial_redaction_as_prior_erasure() {
     );
     assert_ne!(s.body(digest)["redacted"], true);
     assert_eq!(s.body(partial)["tokens"], 42);
+}
+
+#[test]
+fn escaped_spellings_reach_decoded_selection_in_kinds_28_and_29() {
+    let quoted = r#"ali"ce"#;
+    let cases: [(&str, String, FrameKind); 4] = [
+        (
+            quoted,
+            serde_json::json!({"claims": {"payload": {"TaskAssign": {"goal": format!("review {quoted} profile")}}}}).to_string(),
+            FrameKind::GovernanceEvent,
+        ),
+        (
+            "alice",
+            r#"{"claims":{"payload":{"TaskAssign":{"goal":"review \u0061lice profile"}}}}"#.into(),
+            FrameKind::GovernanceEvent,
+        ),
+        (
+            quoted,
+            serde_json::json!({"principal": {"kind": "Resolved", "principal_id": "carol"}, "provider": "p", "model": format!("ft:{quoted}:job"), "dimensions": {"tokens_in": 42}}).to_string(),
+            FrameKind::CostAttribution,
+        ),
+        (
+            "alice",
+            r#"{"principal":{"kind":"Resolved","principal_id":"carol"},"provider":"p","model":"ft:\u0061lice:job","dimensions":{"tokens_in":42}}"#.into(),
+            FrameKind::CostAttribution,
+        ),
+    ];
+    for (subject, body, kind) in cases {
+        let s = Scene::new();
+        let target = s.raw(kind, 7, &body);
+        let control = s.raw(
+            kind,
+            8,
+            &body.replace("ali", "bob").replace("\\u0061lice", "bob"),
+        );
+        let digest = s.digest(7, vec![target], "neutral digest");
+        let before = s
+            .log
+            .query_frame_by_id(control)
+            .unwrap()
+            .unwrap()
+            .payload_redacted;
+        s.memory.forget_with_reason(subject, None).unwrap();
+        let text = s.body(target).to_string();
+        assert!(
+            text.contains("[REDACTED]") && !text.contains("ali"),
+            "{subject}: {text}"
+        );
+        assert_eq!(s.body(digest)["original_kind"], "Distillate", "{subject}");
+        assert_eq!(
+            before,
+            s.log
+                .query_frame_by_id(control)
+                .unwrap()
+                .unwrap()
+                .payload_redacted
+        );
+    }
+}
+
+fn lifecycle(hash: &str, supersedes: Option<&str>) -> String {
+    use maos_domain::governance::{
+        GovernanceEventKind, GovernanceEventPayload, SchemaLifecyclePayload,
+    };
+    serde_json::to_string(&GovernanceEventPayload {
+        recorded_at_ns: 1,
+        effective_at_ns: 2,
+        event: GovernanceEventKind::SchemaLifecycle(SchemaLifecyclePayload {
+            schema_id: "s".into(),
+            schema_content_hash: hash.into(),
+            supersedes: supersedes.map(str::to_owned),
+            version: 1,
+            ratified_by: "ADR-045".into(),
+        }),
+    })
+    .unwrap()
+}
+
+#[test]
+fn exempt_hash_fields_are_exempt_only_in_canonical_digest_form() {
+    let digest = "0123456789abcdef".repeat(4);
+    let s = Scene::new();
+    let personal = s.raw(
+        FrameKind::GovernanceEvent,
+        7,
+        &lifecycle("review alice", Some("alice again")),
+    );
+    let canonical = s.raw(
+        FrameKind::GovernanceEvent,
+        7,
+        &lifecycle(&digest, Some(&digest)),
+    );
+    let before = s
+        .log
+        .query_frame_by_id(canonical)
+        .unwrap()
+        .unwrap()
+        .payload_redacted;
+    s.memory.forget_with_reason("alice", None).unwrap();
+    let body = s.body(personal);
+    assert_eq!(body["event"]["schema_content_hash"], "[REDACTED]");
+    assert_eq!(body["event"]["supersedes"], "[REDACTED]");
+    assert_eq!(body["event"]["governance_type"], "SchemaLifecycle");
+    assert_eq!(
+        before,
+        s.log
+            .query_frame_by_id(canonical)
+            .unwrap()
+            .unwrap()
+            .payload_redacted
+    );
+    // A principal equal to a canonical digest cannot select or damage its frame.
+    s.memory.forget_with_reason(&digest, None).unwrap();
+    assert_eq!(
+        before,
+        s.log
+            .query_frame_by_id(canonical)
+            .unwrap()
+            .unwrap()
+            .payload_redacted
+    );
+}
+
+#[test]
+fn schema_lifecycle_ingress_rejects_noncanonical_digests() {
+    let s = Scene::new();
+    let entry =
+        |hash: &str, supersedes: Option<&str>| maos_domain::governance::SchemaRegistryEntry {
+            schema_id: "s".into(),
+            version: 1,
+            effective_at_ns: 1,
+            supersedes_hash: supersedes.map(str::to_owned),
+            ratified_by: "ADR-045".into(),
+            recorded_at_ns: 2,
+            schema_content_hash: hash.into(),
+        };
+    let digest = "0123456789abcdef".repeat(4);
+    assert!(s
+        .log
+        .register_schema_lifecycle(&entry("review alice", None))
+        .is_err());
+    assert!(s
+        .log
+        .register_schema_lifecycle(&entry(&digest, Some("alice")))
+        .is_err());
+    assert!(s
+        .log
+        .register_schema_lifecycle(&entry(&digest, Some(&digest)))
+        .is_ok());
 }

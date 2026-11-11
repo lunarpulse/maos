@@ -7,7 +7,7 @@ baseline_commit: 8c809f9c
 security_sensitive: true
 kernel_grant: "RULED (operator 2026-11-03, ask d_batch4; D-20-14-02 B + D-20-14-03 B; FLAG-Winston, `20-14-flag-winston-decision.md`): KT token-bound cost scope measured at 8c809f9c from 26841 physical / 21042 tokei, +35 / +25. Creation-priced ceilings (STOP above): kernel ≤ 26911 physical / 21092 tokei; L2 kernel last. Binding at dev start only after re-base onto then-landed pins and cumulative room; the later kernel lander re-bases. Recorded cumulative measured 21203; this story at ×2 21228; both 20-9 and 20-14 at ×2 21249. D-20-14-12 C (ask d2014_12) grants joint targeted STOP 21250 for 20-9 L2 + 20-14 L2 only; shared STOP 21209 for everything else; D-20-9-15 A retains 21230 as 20-9 single-story ceiling; ADR-069 alarm 22000 untouched."
 kloc_grant: "RULED (operator 2026-11-03, ask d_batch4) (D-20-14-09 A; D02 A ×2 measured / ×3 unmeasured). Creation-priced ceilings (STOP above; pins re-fixed exactly at landing; aggregate hardfail = measured + 1; each ceiling is HEAD + allowance and re-bases onto the exact pins at landing): kernel ≤ 26911 / 21092; maos-domain ≤ 10101; maos-cli ≤ 6524; maos-audit ≤ 7779; maos-bin ≤ 34441; aggregate ≤ 192974. Binding at dev start only after re-base onto then-landed pins; creation-wide pricing below is historical evidence, not a reservation. Every other crate 0."
-landing_1_grant: "D02 A rebase: domain 10198 + 2 = 10200; CLI 6429 + 95 = 6524; audit 8179 + 58 = 8237; bin 36225 + 250 = 36475; aggregate 198914 + 455 = 199369; kernel unchanged 26841/21042. Orchestrator-adjudicated overdrafts, disclosed to the operator: domain 10200 -> 10215 (d1408 wrapper, initial 10207 + 8); CLI 6524 -> 6545 (formatted report and new in-source witness, measured 6528 + 17). Review corrections (security F1-F8 + triage P1-P4), orchestrator-adjudicated overdraft D02 A, disclosed to the operator: CLI ceiling 6545 -> 6610 (before: pin 6529 / ceiling 6545; after: measured 6599 formatted, ceiling 6610); audit stays inside 8237 (measured 8227); iac unchanged at its 8728 pin; domain 10203 inside the standing 10215 overdraft; aggregate measured 199146 inside the rebased 199378, hardfail 199147. Later 20-9 and 20-5 domain draws re-base onto the exact landed pin."
+landing_1_grant: "D02 A rebase: domain 10198 + 2 = 10200; CLI 6429 + 95 = 6524; audit 8179 + 58 = 8237; bin 36225 + 250 = 36475; aggregate 198914 + 455 = 199369; kernel unchanged 26841/21042. Orchestrator-adjudicated overdrafts, disclosed to the operator: domain 10200 -> 10215 (d1408 wrapper, initial 10207 + 8); CLI 6524 -> 6545 (formatted report and new in-source witness, measured 6528 + 17). Review corrections (security F1-F8 + triage P1-P4), orchestrator-adjudicated overdraft D02 A, disclosed to the operator: CLI ceiling 6545 -> 6610 (before: pin 6529 / ceiling 6545; after: measured 6599 formatted, ceiling 6610); audit stays inside 8237 (measured 8227); iac 8728 -> 8770 for round 3 (R2-1/R2-2, escaped-value discovery, digest form): orchestrator-adjudicated D02 A overdraft, disclosed to the operator (before: pin 8726 / ceiling 8728; after: measured 8770, ceiling 8770); round-3 CLI measured 6609 inside 6610; domain 10203 inside the standing 10215 overdraft; aggregate measured 199146 inside the rebased 199378, hardfail 199147. Later 20-9 and 20-5 domain draws re-base onto the exact landed pin."
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:67-71`): a kernel FLAG-Winston row (D-20-14-02), an attesting audit-record writer (the cost frame, rule 11) and an anti-spoof principal source (AC3). Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC2.3 (no Spirit reaches the scope binding), AC3 (principal source, SR-3, SR-4) and D-20-14-04, Test Infrastructure on glm-5.3 (standing policy; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
 
@@ -496,7 +496,7 @@ The schema-1 absent-task assertion that had not been run now reads `none (schema
 `20-14-complete-cost-attribution-evidence/landing-1/review/correction-round2.md`, raw red/plant/green logs under `review/correction-round2/`).**
 Round 1 had swapped over-erasure for under-erasure. CR1: kind-28 governance frames are not exempt (ADR-045 has no blanket D5; the note is
 `ModelProvenancePayload`-only); kinds 28/29 now share one value-only scrub for discovery, body replacement and the late-window certification predicate
-(keys, enum tags, hashes and fixed receipt discriminators never touched; kind 28 scrubs every other nested string value). CR2/F-1: a kind-29 frame is
+(round-2 wording "keys, enum tags, hashes and fixed receipt discriminators never touched" was false for typed governance tags/status/manifest fingerprint; corrected in round 3 below; kind 28 scrubs every other nested string value). CR2/F-1: a kind-29 frame is
 selected by whole-token value matches in `principal_id`, `task_ref`, `session_principal`, `provider` or `model`, and provider/model values are scrubbed
 too (priced as unpriced afterwards); a principal equal to a real provider name erases that value in every frame carrying it, documented in ADR-046 §8 and
 the guides. CR3/F-2: `cost_terminal_field` escapes backslashes and bidirectional-format ranges; guides document the `<boot_nonce>:<pid>` fraction keys and
@@ -504,6 +504,20 @@ the guides. CR3/F-2: `cost_terminal_field` escapes backslashes and bidirectional
 kernel forget vectors, late-append hooks in `erasure_races_20_11.rs`, CLI vectors. Pins: CLI 6599 -> 6603 (inside the 6610 orchestrator-adjudicated overdraft,
 disclosed to the operator), iac 8728 -> 8726, audit 8227, aggregate 199148, hardfail 199149. The existing F2 fixture values changed (`provider`/`model`
 values now `anthropic`/`claude-x`) because key-name values would now legitimately match as values; its assertions are unchanged.
+
+**L1 correction round 3 (2026-11-11; GPT `correction-review-r2.md` R2-1/R2-2 + inherited limits, GLM `Sec2014R2` F-1..F-4; evidence
+`20-14-complete-cost-attribution-evidence/landing-1/review/correction-round3.md`, raw red/plant/green logs under `review/correction-round3/`).**
+R2-1/R2-2: kind-28 typed fields are preserved by envelope and value form (never by key name): `/event/governance_type` (valid variant), the ABI `/event/status`
+(valid enum), the ManifestDeclaration `/event/manifest_sha256` and `/event/publisher` (canonical colon-hex); witnessed through the real producers
+(`emit_vetter_key_event`, `emit_abi_extension_event`, `emit_manifest_declaration_event`) and the consuming decoders `maos_audit::load_ratification_frames` and
+`decode_declaration_bytes` (`crates/maos-bin/tests/forget_governance_20_14.rs`). Inherited: kinds 28/29 bypass the SQL `instr` prefilter so escaped spellings
+(`\u0061lice`, `ali\"ce`) reach decoded selection in discovery, replacement and certification (initial snapshot and late hook); exempt hash fields (`sha256`, `supersedes`,
+`schema_content_hash`) are exempt only as 64-hex digests and `register_schema_lifecycle` (operator door and CLI) rejects non-canonical digests. GLM F-4: `cost_terminal_field`
+escapes the Cf class, U+061C, U+180E, U+FEFF, tag characters and variation selectors. The round-2 real-session plants were re-run after rebuilding `maosctl` so the receipt
+assertion is what fails. **Operator-visible privacy limits, deferred (owner this story's landing 2 / ADR-045 follow-up, `deferred-work.md`):** the principal matcher is
+case- and normalization-sensitive for every frame kind (GLM F-1), Spirit-name columns are outside erasure (GLM F-3), whole-value label replacement is accepted policy (GLM F-2).
+Pins: CLI 6603 -> 6609 (ceiling 6610), iac 8726 -> 8770 under an **orchestrator-adjudicated D02 A overdraft, disclosed to the operator: iac ceiling 8728 -> 8770** (before: pin 8726 /
+ceiling 8728; after: measured 8770, zero headroom), audit 8227, aggregate 199198, hardfail 199199 (<= 199378). The existing kernel hash fixtures changed from `deadbeef`/`cafe` to 64-hex digests.
 
 ### File List
 
@@ -528,6 +542,9 @@ values now `anthropic`/`claude-x`) because key-name values would now legitimatel
 - Round 2: `crates/maos-bin/tests/spawned_scope_17_3c.rs` (helper parametrized by directory/seed; real-session forget witness), `crates/maos-iac/src/adapter/transparency_log.rs`
   (shared value-only scrub), the erasure-race, forget-cascade and CLI report test files, the three guides, ADR-046 §8, `xtask/kloc.toml`,
   `20-14-complete-cost-attribution-evidence/landing-1/review/correction-round2*`.
+- Round 3: `crates/maos-iac/src/adapter/transparency_log.rs` (typed keep-list, canonical digest form, prefilter bypass, ingress validation), `crates/maos-cli/src/subcommands.rs`
+  (invisible-character table), new `crates/maos-bin/tests/forget_governance_20_14.rs`, kernel/iac/CLI test files, guides, ADR-046 §8, `xtask/kloc.toml`,
+  `20-14-complete-cost-attribution-evidence/landing-1/review/correction-round3*`.
 
 ## Change Log
 
@@ -544,3 +561,5 @@ values now `anthropic`/`claude-x`) because key-name values would now legitimatel
 - 2026-11-10: L1 review corrections applied (see Completion Notes); status `in-progress`; CLI ceiling 6545 -> 6610 (orchestrator-adjudicated overdraft, disclosed to the operator); pins CLI 6599, audit 8227, hardfail 199147.
 
 - 2026-11-10: L1 correction round 2 (CR1–CR3, GLM F-1/F-2): value-only scrub for kinds 28/29 incl. provider/model values, backslash and bidi escaping, guide and ADR trade-off text, false kind-28 "no principal nexus" claim withdrawn; pins CLI 6603 (inside the 6610 overdraft), iac 8726, hardfail 199149.
+
+- 2026-11-11: L1 correction round 3 (R2-1, R2-2, escaped-value discovery, digest form, F-4): see Completion Notes; iac ceiling 8728 -> 8770 (orchestrator-adjudicated D02 A overdraft, disclosed to the operator); pins CLI 6609, iac 8770, hardfail 199199.

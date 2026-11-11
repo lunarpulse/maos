@@ -14,7 +14,10 @@ The round-1 claim "governance events carry no principal nexus (ADR-045 D5)" in t
 and never touches object keys. Kind 29 traverses only the keys `principal principal_id task_ref session_principal provider model` (so `kind`/`Resolved` tags,
 `dimensions`, `schema_version`, `attribution_source` are untouched). Kind 28 traverses every nested value except string values under fixed receipt fields
 (`event kernel_verdict trusted_intent trusted_origin`), hashes (`*hash`, `sha256`, `supersedes`). `subject_in_frame` (scan filter and certification) is
-`scrub` on a throwaway parse, so discovery, replacement and certification cannot diverge; unparseable kind-28/29 bodies keep the old whole-body test and the tombstone.
+`scrub` on a throwaway parse; unparseable kind-28/29 bodies keep the old whole-body test and the tombstone.
+**[CORRECTED in round 3: see `correction-round3.md`]** Two statements here were false: (1) "keys, tags and hashes never change": the kind-28 traversal rewrote the typed
+`governance_type` tag, the ABI `status` and the manifest fingerprint of real governance frames (R2-1, R2-2); (2) "discovery, replacement and certification cannot diverge": the SQL
+`instr(payload_redacted, ...)` prefilter in discovery still excluded escaped spellings that certification decoded (inherited, now closed by letting kinds 28/29 bypass it).
 Non-28/29 kinds are not parsed.
 
 Accepted trade-offs (documented in ADR-046 §8 and the three guides): a principal equal to a real provider/model name erases that value in every frame carrying it;

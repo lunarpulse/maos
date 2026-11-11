@@ -323,7 +323,11 @@ with `[REDACTED]` (whole-token matches; keys, schema tags and token counts stay)
 so a redacted model or provider is priced as unpriced afterwards. A principal id
 equal to a real provider or model name therefore erases that value in every frame
 that carries it. Kernel governance receipts that quote the principal are
-value-scrubbed the same way.
+value-scrubbed the same way, while governance event tags, ratification statuses
+and manifest fingerprints are kept. Known limits: matching is exact and
+case-sensitive (case variants such as `ALICE@x`, zero-width infixes and homoglyphs
+of a principal id are not found, and the forget is still reported complete), and
+Spirit-name columns (`from_spirit_id`, `to_spirit_id`, recipients) are not erased.
 
 NFR-Cost-1's per-Spirit, task and principal dimensions concern token spend;
 CPU time and storage I/O are planned for v1.1 (ADR-046 R6). The ≥98% aggregate

@@ -602,7 +602,7 @@ fn review_non_poisoning_schema_panic_rolls_back_the_open_transaction() {
         supersedes_hash: None,
         ratified_by: "ADR-044".into(),
         recorded_at_ns: 2,
-        schema_content_hash: "review-content-hash".into(),
+        schema_content_hash: "0123456789abcdef".repeat(4),
     };
     let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let _ = log.register_schema_lifecycle(&entry);
@@ -838,4 +838,29 @@ fn review_descending_correlation_query_selects_the_latest_report() {
         latest[0].frame_id, ids[1],
         "DESC applied only to the frame-id tie breaker, selecting the oldest report"
     );
+}
+
+#[test]
+fn review_round3_late_escaped_spellings_are_erased_before_certification() {
+    for (kind, body, subject) in [
+        (
+            FrameKind::GovernanceEvent,
+            &br#"{"claims":{"payload":{"TaskAssign":{"goal":"review \u0061lice profile"}}}}"#[..],
+            "alice",
+        ),
+        (
+            FrameKind::GovernanceEvent,
+            &br#"{"claims":{"payload":{"TaskAssign":{"goal":"review ali\"ce profile"}}}}"#[..],
+            "ali\"ce",
+        ),
+        (
+            FrameKind::CostAttribution,
+            &br#"{"principal":{"kind":"Resolved","principal_id":"carol"},"provider":"p","model":"ft:ali\"ce:job","dimensions":{"tokens_in":1}}"#[..],
+            "ali\"ce",
+        ),
+    ] {
+        let (ids, id, value) = late_matching_append(kind, body, subject);
+        assert_eq!(ids, vec![format!("{:032x}", u128::from_be_bytes(id))], "{subject}");
+        assert!(value.to_string().contains("[REDACTED]") && !value.to_string().contains("ali"), "{value}");
+    }
 }

@@ -29,6 +29,7 @@ fn operator_cost_guides_disclose_limits() {
             "per_spirit_attributable_fraction",
             "<boot_nonce>:<pid>",
             "[REDACTED]",
+            "from_spirit_id",
         ] {
             assert!(guide.contains(term), "{heading}: missing {term}");
         }

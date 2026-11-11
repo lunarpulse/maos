@@ -1,0 +1,630 @@
+# plant: R2-1a typed governance_type not preserved
+# file: crates/maos-iac/src/adapter/transparency_log.rs
+# command: cargo test -p maos-bin --features network --test forget_governance_20_14 2>&1
+# rc: 101
+# restored+cmp identical: True
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1434:21
+     |
+1434 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+warning: unused import: `DecisionId`
+  --> crates/maos-acp/src/server.rs:13:45
+   |
+13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+   |                                             ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `other`
+   --> crates/maos-acp/src/server.rs:223:25
+    |
+223 |                         other => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+warning: unused variable: `halt_id`
+  --> crates/maos-director-surface/src/halt_ui.rs:59:9
+   |
+59 |         halt_id: HaltId,
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `file_name`
+   --> crates/maos-eval/src/distillate_corpus.rs:106:17
+    |
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:198:27
+    |
+198 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-registry` (lib) generated 4 warnings (run `cargo fix --lib -p maos-registry` to apply 4 suggestions)
+warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+  --> crates/maos-spirit-cli/src/signing.rs:27:7
+   |
+27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-spirit-cli` (lib) generated 1 warning
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `TAGS` is never used
+    --> crates/maos-iac/src/adapter/transparency_log.rs:2279:15
+     |
+2279 |         const TAGS: &str = "AbiExtension VetterKey SchemaLifecycle ModelProvenance TelemetrySubscription ManifestDeclaration";
+     |               ^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: calls to `std::mem::drop` with a value that implements `Copy` does nothing
+    --> crates/maos-iac/src/adapter/transparency_log.rs:2300:35
+     |
+2300 |             .for_each(|(p, held)| drop(v.pointer_mut(p).map(|slot| *slot = held)));
+     |                                   ^^^^^-----------------------------------------^
+     |                                        |
+     |                                        argument has type `std::option::Option<()>`
+     |
+     = note: use `let _ = ...` to ignore the expression or result
+     = note: `#[warn(dropping_copy_types)]` on by default
+
+   Compiling maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+   Compiling maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort)
+warning: methods `accept_consent` and `outbound_consent_context` are never used
+   --> crates/maos-cohort/src/state.rs:388:19
+    |
+206 | impl CohortManifestState {
+    | ------------------------ methods in this implementation
+...
+388 |     pub(crate) fn accept_consent(
+    |                   ^^^^^^^^^^^^^^
+...
+408 |     pub(crate) fn outbound_consent_context(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+   |
+13 | use maos_domain::frame::EpistemicHaltPayload;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `test-introspection`
+   --> crates/maos-kernel-core/src/capability/mod.rs:487:21
+    |
+487 |     #[cfg(any(test, feature = "test-introspection"))]
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `HaltJournal`
+  --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+   |
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+   |                                  ^^^^^^^^^^^
+
+warning: private item shadows public glob re-export
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+  --> crates/maos-kernel-core/src/iac.rs:13:9
+   |
+13 | pub use maos_iac::*;
+   |         ^^^^^^^^^^^
+note: but the private item here shadows it
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `crate::capability::WorkingMemoryStore`
+  --> crates/maos-kernel-core/src/inference/mod.rs:23:5
+   |
+23 | use crate::capability::WorkingMemoryStore;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+   |
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i1::TokenId`
+  --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+   |
+60 | use maos_domain::invariants::i1::TokenId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LifecycleEntry`
+  --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+   |
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+   |                                                                 ^^^^^^^^^^^^^^
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+   |
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+   |                                                           ^^^^^^^
+
+warning: unused import: `McpRequest`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+   |
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+   |                                                                         ^^^^^^^^^^
+
+warning: unused import: `Path`
+  --> crates/maos-kernel-core/src/memory/private.rs:13:17
+   |
+13 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `AtomicU64`
+ --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                         ^^^^^^^^^
+
+warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+   |
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `DispositionOutcome`
+  --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+   |
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+   |                 ^^^^^^^^^^^^^^^^^^
+
+   Compiling maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+   Compiling maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest)
+warning: unreachable pattern
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+    |                     ----------------------------- matches some of the same values
+330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+    |                     --------------- matches some of the same values
+331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+    |                     ----------- matches some of the same values
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_providers::Provider`
+  --> crates/maos-kernel-core/src/inference/mod.rs:29:5
+   |
+29 | use maos_providers::Provider;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `event`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+   |
+66 |         let event = self
+   |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spirit_id`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+   |
+69 |     spirit_id: &str,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+
+warning: unused variable: `spirit_pid`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+   |
+70 |     spirit_pid: u32,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+
+warning: variable does not need to be mutable
+   --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:622:9
+    |
+622 |     let mut child = spawn_child(&mut spec, &argv)?;
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `e`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+    |
+161 |                         Err(e) => {
+    |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `ctx`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+    |
+132 |             let ctx = GatewayCtx {
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+
+warning: unused variable: `now_ns`
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:196:13
+    |
+196 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+
+warning: value assigned to `owned_guard` is never read
+   --> crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:401:27
+    |
+401 |     let mut owned_guard = None;
+    |                           ^^^^ this value is reassigned later and never used
+...
+455 |     owned_guard = Some(SandboxedContainerChild::own(
+    |     ----------- `owned_guard` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `total`
+  --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+   |
+22 |     let total = drained_tasks.len();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+warning: field `boot_nonce` is never read
+   --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+    |
+ 95 | pub struct KernelHaltResolver {
+    |            ------------------ field in this struct
+...
+101 |     boot_nonce: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `next_frame_counter` is never read
+  --> crates/maos-kernel-core/src/memory/mod.rs:82:5
+   |
+77 | pub struct MemoryManagerAdapter {
+   |            -------------------- field in this struct
+...
+82 |     next_frame_counter: AtomicU64,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: method `mint_frame_id` is never used
+   --> crates/maos-kernel-core/src/memory/mod.rs:665:8
+    |
+115 | impl MemoryManagerAdapter {
+    | ------------------------- method in this implementation
+...
+665 |     fn mint_frame_id(&self) -> [u8; 16] {
+    |        ^^^^^^^^^^^^^
+
+warning: field `kind` is never read
+  --> crates/maos-kernel-core/src/memory/private.rs:46:5
+   |
+44 | struct DiskCandidate {
+   |        ------------- field in this struct
+45 |     name: String,
+46 |     kind: ValueKind,
+   |     ^^^^
+
+warning: field `iac_rt_metrics` is never read
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+   |
+32 | pub struct SelfTelemetryAggregator {
+   |            ----------------------- field in this struct
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+   |     ^^^^^^^^^^^^^^
+
+warning: associated function `resolution_label` is never used
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+   |
+38 | impl SelfTelemetryAggregator {
+   | ---------------------------- associated function in this implementation
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: associated function `kind_to_str` is never used
+  --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+   |
+38 | impl SharedMemoryStore {
+   | ---------------------- associated function in this implementation
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+   |        ^^^^^^^^^^^
+
+warning: method `build_kernel_ctx` is never used
+   --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:141:8
+    |
+ 70 | impl HookDispatcher {
+    | ------------------- method in this implementation
+...
+141 |     fn build_kernel_ctx<'a>(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `attestation` is never read
+  --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+   |
+34 | pub struct VerifiedImageAttestation {
+   |            ------------------------ field in this struct
+35 |     attestation: T3ImageAttestation,
+   |     ^^^^^^^^^^^
+   |
+   = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+   |
+23 | pub struct ProgressWatchdog {
+   |            ---------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+   |
+23 | pub struct SilentFailureDetector {
+   |            --------------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-iac` (lib) generated 5 warnings (run `cargo fix --lib -p maos-iac` to apply 3 suggestions)
+warning: `maos-cohort` (lib) generated 1 warning
+   Compiling maos-control v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-control)
+   Compiling maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench)
+   Compiling maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell)
+warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+  --> crates/maos-control/src/lib.rs:17:11
+   |
+17 | use ring::constant_time;
+   |           ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+    --> crates/maos-control/src/lib.rs:1064:28
+     |
+1064 |             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
+     |                            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-control` (lib) generated 2 warnings
+   Compiling maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+    --> crates/maos-bin/src/cross_team_crossing.rs:1014:5
+     |
+1014 | use maos_kernel_core::memory::MemoryManagerAdapter;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-kernel-core` (lib) generated 37 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 21 suggestions)
+warning: `maos-bin` (lib) generated 1 warning (run `cargo fix --lib -p maos-bin` to apply 1 suggestion)
+warning: unused import: `MemoryManagerPort`
+  --> crates/maos-bin/tests/forget_governance_20_14.rs:11:44
+   |
+11 | use maos_domain::ports::{DistillationPort, MemoryManagerPort};
+   |                                            ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_mcp::McpClient`
+    --> crates/maos-bin/src/main.rs:1381:9
+     |
+1381 |     use maos_mcp::McpClient as _;
+     |         ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `EnvVar` is never constructed
+ --> crates/maos-bin/src/env_contract.rs:1:12
+  |
+1 | pub struct EnvVar {
+  |            ^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: enum `EnvStability` is never used
+ --> crates/maos-bin/src/env_contract.rs:8:10
+  |
+8 | pub enum EnvStability {
+  |          ^^^^^^^^^^^^
+
+warning: constant `MAOS_ENV_REGISTRY` is never used
+  --> crates/maos-bin/src/env_contract.rs:13:11
+   |
+13 | pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
+   |           ^^^^^^^^^^^^^^^^^
+
+warning: function `lookup` is never used
+   --> crates/maos-bin/src/env_contract.rs:663:8
+    |
+663 | pub fn lookup(name: &str) -> Option<&'static EnvVar> {
+    |        ^^^^^^
+
+warning: `maos-bin` (test "forget_governance_20_14") generated 1 warning (run `cargo fix --test "forget_governance_20_14" -p maos-bin` to apply 1 suggestion)
+warning: `maos-bin` (bin "maos") generated 5 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.34s
+     Running tests/forget_governance_20_14.rs (target/debug/deps/forget_governance_20_14-d19346d427a6928b)
+
+running 4 tests
+test a_personal_declaration_field_changes_alone_beside_the_same_fingerprint ... ok
+test typed_governance_survives_a_forget_of_its_own_discriminators ... FAILED
+test personal_values_are_erased_while_the_typed_envelope_stays_decodable ... ok
+test a_fingerprint_group_as_the_forget_subject_keeps_the_manifest_fingerprint ... ok
+
+failures:
+
+---- typed_governance_survives_a_forget_of_its_own_discriminators stdout ----
+
+thread 'typed_governance_survives_a_forget_of_its_own_discriminators' (600988) panicked at crates/maos-bin/tests/forget_governance_20_14.rs:167:9:
+assertion `left == right` failed: VetterKey
+  left: ([([1, 161, 199, 255, 250, 87, 108, 206, 137, 214, 0, 110, 25, 147, 12, 193], [123, 34, 114, 101, 99, 111, 114, 100, 101, 100, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 49, 56, 51, 56, 51, 48, 48, 55, 49, 44, 34, 101, 102, 102, 101, 99, 116, 105, 118, 101, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 49, 56, 51, 56, 51, 48, 48, 55, 49, 44, 34, 101, 118, 101, 110, 116, 34, 58, 123, 34, 103, 111, 118, 101, 114, 110, 97, 110, 99, 101, 95, 116, 121, 112, 101, 34, 58, 34, 86, 101, 116, 116, 101, 114, 75, 101, 121, 34, 44, 34, 115, 112, 105, 114, 105, 116, 95, 105, 100, 34, 58, 34, 119, 111, 114, 107, 101, 114, 34, 44, 34, 118, 101, 114, 115, 105, 111, 110, 34, 58, 34, 49, 46, 48, 46, 48, 34, 44, 34, 97, 100, 109, 105, 116, 116, 101, 100, 34, 58, 116, 114, 117, 101, 44, 34, 101, 102, 102, 101, 99, 116, 105, 118, 101, 95, 116, 105, 101, 114, 34, 58, 34, 108, 111, 99, 97, 108, 34, 44, 34, 106, 111, 117, 114, 110, 97, 108, 95, 110, 111, 116, 101, 34, 58, 34, 97, 100, 109, 105, 116, 116, 101, 100, 34, 125, 125]), ([1, 161, 199, 255, 250, 98, 122, 61, 58, 99, 107, 22, 40, 57, 178, 240], [123, 34, 114, 101, 99, 111, 114, 100, 101, 100, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 49, 57, 52, 48, 49, 55, 56, 57, 51, 44, 34, 101, 102, 102, 101, 99, 116, 105, 118, 101, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 49, 57, 52, 48, 49, 55, 56, 57, 51, 44, 34, 101, 118, 101, 110, 116, 34, 58, 123, 34, 103, 111, 118, 101, 114, 110, 97, 110, 99, 101, 95, 116, 121, 112, 101, 34, 58, 34, 86, 101, 116, 116, 101, 114, 75, 101, 121, 34, 44, 34, 115, 112, 105, 114, 105, 116, 95, 105, 100, 34, 58, 34, 111, 116, 104, 101, 114, 34, 44, 34, 118, 101, 114, 115, 105, 111, 110, 34, 58, 34, 50, 46, 48, 46, 48, 34, 44, 34, 97, 100, 109, 105, 116, 116, 101, 100, 34, 58, 102, 97, 108, 115, 101, 44, 34, 101, 102, 102, 101, 99, 116, 105, 118, 101, 95, 116, 105, 101, 114, 34, 58, 34, 108, 111, 99, 97, 108, 34, 44, 34, 106, 111, 117, 114, 110, 97, 108, 95, 110, 111, 116, 101, 34, 58, 34, 114, 101, 106, 101, 99, 116, 101, 100, 34, 125, 125]), ([1, 161, 199, 255, 250, 108, 141, 67, 218, 182, 145, 147, 60, 86, 113, 202], [123, 34, 114, 101, 99, 111, 114, 100, 101, 100, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 50, 48, 52, 53, 53, 50, 55, 50, 53, 44, 34, 101, 102, 102, 101, 99, 116, 105, 118, 101, 95, 97, 116, 95, 110, 115, 34, 58, 50, 44, 34, 101, 118, 101, 110, 116, 34, 58, 123, 34, 103, 111, 118, 101, 114, 110, 97, 110, 99, 101, 95, 116, 121, 112, 101, 34, 58, 34, 65, 98, 105, 69, 120, 116, 101, 110, 115, 105, 111, 110, 34, 44, 34, 112, 114, 111, 112, 111, 115, 97, 108, 95, 105, 100, 34, 58, 34, 112, 49, 34, 44, 34, 115, 117, 109, 109, 97, 114, 121, 34, 58, 34, 110, 101, 117, 116, 114, 97, 108, 32, 115, 117, 109, 109, 97, 114, 121, 34, 44, 34, 97, 100, 114, 95, 114, 101, 102, 34, 58, 34, 65, 68, 82, 45, 48, 52, 53, 34, 44, 34, 115, 116, 97, 116, 117, 115, 34, 58, 34, 114, 97, 116, 105, 102, 105, 101, 100, 34, 44, 34, 99, 111, 118, 101, 114, 101, 100, 95, 99, 104, 97, 110, 103, 101, 115, 34, 58, 91, 34, 71, 111, 118, 101, 114, 110, 97, 110, 99, 101, 69, 118, 101, 110, 116, 34, 93, 125, 125]), ([1, 161, 199, 255, 250, 119, 182, 232, 91, 64, 112, 136, 239, 91, 10, 219], [123, 34, 114, 101, 99, 111, 114, 100, 101, 100, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 50, 49, 53, 48, 57, 55, 57, 55, 54, 44, 34, 101, 102, 102, 101, 99, 116, 105, 118, 101, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 50, 49, 53, 48, 57, 55, 57, 55, 54, 44, 34, 101, 118, 101, 110, 116, 34, 58, 123, 34, 103, 111, 118, 101, 114, 110, 97, 110, 99, 101, 95, 116, 121, 112, 101, 34, 58, 34, 77, 97, 110, 105, 102, 101, 115, 116, 68, 101, 99, 108, 97, 114, 97, 116, 105, 111, 110, 34, 44, 34, 115, 112, 105, 114, 105, 116, 95, 105, 100, 34, 58, 34, 98, 117, 116, 108, 101, 114, 34, 44, 34, 97, 116, 116, 101, 109, 112, 116, 95, 105, 100, 34, 58, 34, 48, 49, 77, 55, 51, 90, 90, 89, 75, 81, 68, 83, 52, 87, 53, 78, 83, 75, 83, 71, 53, 69, 74, 57, 49, 86, 34, 44, 34, 111, 117, 116, 99, 111, 109, 101, 34, 58, 34, 100, 101, 99, 108, 97, 114, 101, 100, 34, 44, 34, 118, 101, 114, 115, 105, 111, 110, 34, 58, 34, 48, 46, 49, 46, 48, 34, 44, 34, 109, 97, 110, 105, 102, 101, 115, 116, 95, 115, 104, 97, 50, 53, 54, 34, 58, 34, 99, 49, 102, 100, 58, 48, 49, 98, 102, 58, 52, 98, 56, 102, 58, 97, 101, 99, 56, 58, 101, 53, 57, 98, 58, 53, 101, 51, 55, 58, 57, 99, 52, 49, 58, 97, 51, 55, 56, 58, 102, 54, 56, 53, 58, 99, 100, 52, 98, 58, 97, 101, 54, 101, 58, 51, 54, 53, 55, 58, 57, 52, 102, 97, 58, 53, 97, 98, 53, 58, 54, 100, 98, 48, 58, 101, 97, 56, 98, 34, 44, 34, 112, 117, 98, 108, 105, 115, 104, 101, 114, 34, 58, 34, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 34, 44, 34, 100, 101, 99, 108, 97, 114, 101, 100, 34, 58, 91, 93, 44, 34, 115, 107, 105, 108, 108, 95, 105, 100, 115, 34, 58, 91, 93, 125, 125]), ([1, 161, 199, 255, 250, 128, 178, 68, 206, 219, 195, 173, 94, 28, 123, 252], [123, 34, 101, 118, 101, 110, 116, 34, 58, 34, 115, 112, 97, 119, 110, 101, 100, 95, 102, 114, 97, 109, 101, 95, 97, 117, 116, 104, 111, 114, 105, 122, 97, 116, 105, 111, 110, 34, 44, 34, 99, 108, 97, 105, 109, 115, 34, 58, 123, 34, 112, 97, 121, 108, 111, 97, 100, 34, 58, 123, 34, 84, 97, 115, 107, 65, 115, 115, 105, 103, 110, 34, 58, 123, 34, 103, 111, 97, 108, 34, 58, 34, 114, 101, 118, 105, 101, 119, 32, 98, 111, 98, 32, 112, 114, 111, 102, 105, 108, 101, 34, 125, 125, 125, 125])], [123, 34, 107, 105, 110, 100, 34, 58, 34, 100, 105, 115, 116, 105, 108, 108, 97, 116, 101, 34, 44, 34, 100, 105, 114, 101, 99, 116, 95, 115, 111, 117, 114, 99, 101, 95, 108, 111, 103, 95, 114, 101, 102, 34, 58, 91, 34, 48, 49, 97, 49, 58, 99, 55, 102, 102, 58, 102, 97, 56, 48, 58, 98, 50, 52, 52, 58, 99, 101, 100, 98, 58, 99, 51, 97, 100, 58, 53, 101, 49, 99, 58, 55, 98, 102, 99, 34, 93, 44, 34, 115, 111, 117, 114, 99, 101, 95, 108, 111, 103, 95, 114, 101, 102, 34, 58, 91, 34, 48, 49, 97, 49, 58, 99, 55, 102, 102, 58, 102, 97, 56, 48, 58, 98, 50, 52, 52, 58, 99, 101, 100, 98, 58, 99, 51, 97, 100, 58, 53, 101, 49, 99, 58, 55, 98, 102, 99, 34, 93, 44, 34, 100, 105, 115, 116, 105, 108, 108, 97, 116, 105, 111, 110, 95, 100, 101, 112, 116, 104, 34, 58, 49, 44, 34, 105, 110, 116, 101, 110, 116, 95, 108, 105, 110, 101, 97, 103, 101, 34, 58, 91, 34, 115, 112, 105, 114, 105, 116, 46, 102, 114, 97, 109, 101, 46, 97, 117, 116, 104, 111, 114, 105, 122, 97, 116, 105, 111, 110, 34, 93, 44, 34, 100, 105, 103, 101, 115, 116, 95, 102, 114, 97, 109, 101, 95, 105, 100, 34, 58, 34, 48, 48, 48, 48, 58, 48, 48, 48, 48, 58, 48, 48, 48, 48, 58, 48, 48, 48, 48, 58, 48, 48, 48, 48, 58, 48, 48, 48, 48, 58, 48, 48, 48, 48, 58, 48, 48, 48, 48, 34, 44, 34, 100, 105, 103, 101, 115, 116, 95, 112, 97, 121, 108, 111, 97, 100, 34, 58, 123, 34, 84, 101, 120, 116, 34, 58, 34, 110, 101, 117, 116, 114, 97, 108, 32, 100, 105, 103, 101, 115, 116, 34, 125, 44, 34, 115, 101, 103, 109, 101, 110, 116, 95, 104, 105, 110, 116, 34, 58, 110, 117, 108, 108, 125])
+ right: ([([1, 161, 199, 255, 250, 87, 108, 206, 137, 214, 0, 110, 25, 147, 12, 193], [123, 34, 114, 101, 99, 111, 114, 100, 101, 100, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 49, 56, 51, 56, 51, 48, 48, 55, 49, 44, 34, 101, 102, 102, 101, 99, 116, 105, 118, 101, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 49, 56, 51, 56, 51, 48, 48, 55, 49, 44, 34, 101, 118, 101, 110, 116, 34, 58, 123, 34, 103, 111, 118, 101, 114, 110, 97, 110, 99, 101, 95, 116, 121, 112, 101, 34, 58, 34, 91, 82, 69, 68, 65, 67, 84, 69, 68, 93, 34, 44, 34, 115, 112, 105, 114, 105, 116, 95, 105, 100, 34, 58, 34, 119, 111, 114, 107, 101, 114, 34, 44, 34, 118, 101, 114, 115, 105, 111, 110, 34, 58, 34, 49, 46, 48, 46, 48, 34, 44, 34, 97, 100, 109, 105, 116, 116, 101, 100, 34, 58, 116, 114, 117, 101, 44, 34, 101, 102, 102, 101, 99, 116, 105, 118, 101, 95, 116, 105, 101, 114, 34, 58, 34, 108, 111, 99, 97, 108, 34, 44, 34, 106, 111, 117, 114, 110, 97, 108, 95, 110, 111, 116, 101, 34, 58, 34, 97, 100, 109, 105, 116, 116, 101, 100, 34, 125, 44, 34, 114, 101, 100, 97, 99, 116, 101, 100, 34, 58, 116, 114, 117, 101, 44, 34, 114, 101, 100, 97, 99, 116, 105, 111, 110, 95, 114, 101, 97, 115, 111, 110, 34, 58, 34, 103, 100, 112, 114, 45, 102, 111, 114, 103, 101, 116, 34, 125]), ([1, 161, 199, 255, 250, 98, 122, 61, 58, 99, 107, 22, 40, 57, 178, 240], [123, 34, 114, 101, 99, 111, 114, 100, 101, 100, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 49, 57, 52, 48, 49, 55, 56, 57, 51, 44, 34, 101, 102, 102, 101, 99, 116, 105, 118, 101, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 49, 57, 52, 48, 49, 55, 56, 57, 51, 44, 34, 101, 118, 101, 110, 116, 34, 58, 123, 34, 103, 111, 118, 101, 114, 110, 97, 110, 99, 101, 95, 116, 121, 112, 101, 34, 58, 34, 91, 82, 69, 68, 65, 67, 84, 69, 68, 93, 34, 44, 34, 115, 112, 105, 114, 105, 116, 95, 105, 100, 34, 58, 34, 111, 116, 104, 101, 114, 34, 44, 34, 118, 101, 114, 115, 105, 111, 110, 34, 58, 34, 50, 46, 48, 46, 48, 34, 44, 34, 97, 100, 109, 105, 116, 116, 101, 100, 34, 58, 102, 97, 108, 115, 101, 44, 34, 101, 102, 102, 101, 99, 116, 105, 118, 101, 95, 116, 105, 101, 114, 34, 58, 34, 108, 111, 99, 97, 108, 34, 44, 34, 106, 111, 117, 114, 110, 97, 108, 95, 110, 111, 116, 101, 34, 58, 34, 114, 101, 106, 101, 99, 116, 101, 100, 34, 125, 44, 34, 114, 101, 100, 97, 99, 116, 101, 100, 34, 58, 116, 114, 117, 101, 44, 34, 114, 101, 100, 97, 99, 116, 105, 111, 110, 95, 114, 101, 97, 115, 111, 110, 34, 58, 34, 103, 100, 112, 114, 45, 102, 111, 114, 103, 101, 116, 34, 125]), ([1, 161, 199, 255, 250, 108, 141, 67, 218, 182, 145, 147, 60, 86, 113, 202], [123, 34, 114, 101, 99, 111, 114, 100, 101, 100, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 50, 48, 52, 53, 53, 50, 55, 50, 53, 44, 34, 101, 102, 102, 101, 99, 116, 105, 118, 101, 95, 97, 116, 95, 110, 115, 34, 58, 50, 44, 34, 101, 118, 101, 110, 116, 34, 58, 123, 34, 103, 111, 118, 101, 114, 110, 97, 110, 99, 101, 95, 116, 121, 112, 101, 34, 58, 34, 65, 98, 105, 69, 120, 116, 101, 110, 115, 105, 111, 110, 34, 44, 34, 112, 114, 111, 112, 111, 115, 97, 108, 95, 105, 100, 34, 58, 34, 112, 49, 34, 44, 34, 115, 117, 109, 109, 97, 114, 121, 34, 58, 34, 110, 101, 117, 116, 114, 97, 108, 32, 115, 117, 109, 109, 97, 114, 121, 34, 44, 34, 97, 100, 114, 95, 114, 101, 102, 34, 58, 34, 65, 68, 82, 45, 48, 52, 53, 34, 44, 34, 115, 116, 97, 116, 117, 115, 34, 58, 34, 114, 97, 116, 105, 102, 105, 101, 100, 34, 44, 34, 99, 111, 118, 101, 114, 101, 100, 95, 99, 104, 97, 110, 103, 101, 115, 34, 58, 91, 34, 71, 111, 118, 101, 114, 110, 97, 110, 99, 101, 69, 118, 101, 110, 116, 34, 93, 125, 125]), ([1, 161, 199, 255, 250, 119, 182, 232, 91, 64, 112, 136, 239, 91, 10, 219], [123, 34, 114, 101, 99, 111, 114, 100, 101, 100, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 50, 49, 53, 48, 57, 55, 57, 55, 54, 44, 34, 101, 102, 102, 101, 99, 116, 105, 118, 101, 95, 97, 116, 95, 110, 115, 34, 58, 49, 55, 57, 52, 51, 53, 54, 56, 48, 52, 50, 49, 53, 48, 57, 55, 57, 55, 54, 44, 34, 101, 118, 101, 110, 116, 34, 58, 123, 34, 103, 111, 118, 101, 114, 110, 97, 110, 99, 101, 95, 116, 121, 112, 101, 34, 58, 34, 77, 97, 110, 105, 102, 101, 115, 116, 68, 101, 99, 108, 97, 114, 97, 116, 105, 111, 110, 34, 44, 34, 115, 112, 105, 114, 105, 116, 95, 105, 100, 34, 58, 34, 98, 117, 116, 108, 101, 114, 34, 44, 34, 97, 116, 116, 101, 109, 112, 116, 95, 105, 100, 34, 58, 34, 48, 49, 77, 55, 51, 90, 90, 89, 75, 81, 68, 83, 52, 87, 53, 78, 83, 75, 83, 71, 53, 69, 74, 57, 49, 86, 34, 44, 34, 111, 117, 116, 99, 111, 109, 101, 34, 58, 34, 100, 101, 99, 108, 97, 114, 101, 100, 34, 44, 34, 118, 101, 114, 115, 105, 111, 110, 34, 58, 34, 48, 46, 49, 46, 48, 34, 44, 34, 109, 97, 110, 105, 102, 101, 115, 116, 95, 115, 104, 97, 50, 53, 54, 34, 58, 34, 99, 49, 102, 100, 58, 48, 49, 98, 102, 58, 52, 98, 56, 102, 58, 97, 101, 99, 56, 58, 101, 53, 57, 98, 58, 53, 101, 51, 55, 58, 57, 99, 52, 49, 58, 97, 51, 55, 56, 58, 102, 54, 56, 53, 58, 99, 100, 52, 98, 58, 97, 101, 54, 101, 58, 51, 54, 53, 55, 58, 57, 52, 102, 97, 58, 53, 97, 98, 53, 58, 54, 100, 98, 48, 58, 101, 97, 56, 98, 34, 44, 34, 112, 117, 98, 108, 105, 115, 104, 101, 114, 34, 58, 34, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 58, 57, 97, 57, 97, 34, 44, 34, 100, 101, 99, 108, 97, 114, 101, 100, 34, 58, 91, 93, 44, 34, 115, 107, 105, 108, 108, 95, 105, 100, 115, 34, 58, 91, 93, 125, 125]), ([1, 161, 199, 255, 250, 128, 178, 68, 206, 219, 195, 173, 94, 28, 123, 252], [123, 34, 101, 118, 101, 110, 116, 34, 58, 34, 115, 112, 97, 119, 110, 101, 100, 95, 102, 114, 97, 109, 101, 95, 97, 117, 116, 104, 111, 114, 105, 122, 97, 116, 105, 111, 110, 34, 44, 34, 99, 108, 97, 105, 109, 115, 34, 58, 123, 34, 112, 97, 121, 108, 111, 97, 100, 34, 58, 123, 34, 84, 97, 115, 107, 65, 115, 115, 105, 103, 110, 34, 58, 123, 34, 103, 111, 97, 108, 34, 58, 34, 114, 101, 118, 105, 101, 119, 32, 98, 111, 98, 32, 112, 114, 111, 102, 105, 108, 101, 34, 125, 125, 125, 125])], [123, 34, 107, 105, 110, 100, 34, 58, 34, 100, 105, 115, 116, 105, 108, 108, 97, 116, 101, 34, 44, 34, 100, 105, 114, 101, 99, 116, 95, 115, 111, 117, 114, 99, 101, 95, 108, 111, 103, 95, 114, 101, 102, 34, 58, 91, 34, 48, 49, 97, 49, 58, 99, 55, 102, 102, 58, 102, 97, 56, 48, 58, 98, 50, 52, 52, 58, 99, 101, 100, 98, 58, 99, 51, 97, 100, 58, 53, 101, 49, 99, 58, 55, 98, 102, 99, 34, 93, 44, 34, 115, 111, 117, 114, 99, 101, 95, 108, 111, 103, 95, 114, 101, 102, 34, 58, 91, 34, 48, 49, 97, 49, 58, 99, 55, 102, 102, 58, 102, 97, 56, 48, 58, 98, 50, 52, 52, 58, 99, 101, 100, 98, 58, 99, 51, 97, 100, 58, 53, 101, 49, 99, 58, 55, 98, 102, 99, 34, 93, 44, 34, 100, 105, 115, 116, 105, 108, 108, 97, 116, 105, 111, 110, 95, 100, 101, 112, 116, 104, 34, 58, 49, 44, 34, 105, 110, 116, 101, 110, 116, 95, 108, 105, 110, 101, 97, 103, 101, 34, 58, 91, 34, 115, 112, 105, 114, 105, 116, 46, 102, 114, 97, 109, 101, 46, 97, 117, 116, 104, 111, 114, 105, 122, 97, 116, 105, 111, 110, 34, 93, 44, 34, 100, 105, 103, 101, 115, 116, 95, 102, 114, 97, 109, 101, 95, 105, 100, 34, 58, 34, 48, 48, 48, 48, 58, 48, 48, 48, 48, 58, 48, 48, 48, 48, 58, 48, 48, 48, 48, 58, 48, 48, 48, 48, 58, 48, 48, 48, 48, 58, 48, 48, 48, 48, 58, 48, 48, 48, 48, 34, 44, 34, 100, 105, 103, 101, 115, 116, 95, 112, 97, 121, 108, 111, 97, 100, 34, 58, 123, 34, 84, 101, 120, 116, 34, 58, 34, 110, 101, 117, 116, 114, 97, 108, 32, 100, 105, 103, 101, 115, 116, 34, 125, 44, 34, 115, 101, 103, 109, 101, 110, 116, 95, 104, 105, 110, 116, 34, 58, 110, 117, 108, 108, 125])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    typed_governance_survives_a_forget_of_its_own_discriminators
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.80s
+
+error: test failed, to rerun pass `-p maos-bin --test forget_governance_20_14`

@@ -5048,15 +5048,23 @@ fn build_cost_report(
     }
 }
 
+/// Code point ranges (`lo hi`, hex) of the Unicode Cf format class, tag characters and variation selectors.
+const INVISIBLE: &str = "ad ad 600 605 61c 61c 6dd 6dd 70f 70f 890 891 8e2 8e2 180e 180e 200b 200f 2028 202e 2060 206f fe00 fe0f feff feff fff9 fffb e0001 e007f e0100 e01ef";
+
 fn cost_terminal_field(value: &str) -> String {
     use std::fmt::Write;
+    let hidden = |c: char| {
+        let mut bounds = INVISIBLE
+            .split(' ')
+            .filter_map(|h| u32::from_str_radix(h, 16).ok());
+        std::iter::from_fn(|| bounds.next().zip(bounds.next()))
+            .any(|(lo, hi)| (lo..=hi).contains(&(c as u32)))
+    };
     let mut out = String::new();
     for c in value.chars().take(256) {
         if c == '\\' {
             out.push_str("\\\\");
-        } else if c.is_control()
-            || matches!(c, '\u{200b}'..='\u{200f}' | '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
-        {
+        } else if c.is_control() || hidden(c) {
             let _ = write!(out, "\\u{{{:x}}}", c as u32);
         } else {
             out.push(c);

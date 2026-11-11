@@ -1,0 +1,100 @@
+# command: cargo test -p maos-iac --lib erasure_races_20_11
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability)
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: `maos-iac` (lib test) generated 3 warnings (run `cargo fix --lib -p maos-iac --tests` to apply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.84s
+     Running unittests src/lib.rs (/mnt/build/cargo-maos/debug/deps/maos_iac-a5d44970fcecaea4)
+
+running 17 tests
+test adapter::transparency_log::erasure_races_20_11::review_descending_correlation_query_selects_the_latest_report ... ok
+test adapter::transparency_log::erasure_races_20_11::review_cached_frame_insert_reuses_the_indexed_program ... ok
+test adapter::transparency_log::erasure_races_20_11::review_round2_late_governance_receipt_is_erased_before_certification ... ok
+test adapter::transparency_log::erasure_races_20_11::review_round2_late_cost_label_value_is_erased_before_certification ... ok
+test adapter::transparency_log::erasure_races_20_11::review_cost_schema_token_does_not_block_late_certification ... ok
+test adapter::transparency_log::erasure_races_20_11::review_legacy_receipt_order_is_timestamp_then_frame_id_after_closure ... ok
+test adapter::transparency_log::erasure_races_20_11::review_f13_sustained_matching_writer_returns_pending_at_the_fixed_pass_cap ... ok
+test adapter::transparency_log::erasure_races_20_11::review_legacy_direct_parent_closure_reads_each_snapshot_window_once ... ok
+test adapter::transparency_log::erasure_races_20_11::review_round3_late_escaped_spellings_are_erased_before_certification ... ok
+test adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed ... ok
+test adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction ... ok
+test adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed ... ok
+test adapter::transparency_log::erasure_races_20_11::review_f13_scan_snapshot_does_not_chase_a_sustained_writer ... ok
+test adapter::transparency_log::erasure_races_20_11::review_p1_append_after_the_final_partial_page_is_not_left_unscrubbed ... ok
+test adapter::transparency_log::erasure_races_20_11::review_f7_cross_process_replaced_hold_is_not_released_by_a_stale_observation ... ok
+test adapter::transparency_log::erasure_races_20_11::review_f8_cross_process_hold_and_body_mutation_have_one_sqlite_order ... ok
+test adapter::transparency_log::erasure_races_20_11::review_marker_orders_independent_writer_commits_not_handler_return_time ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 103 filtered out; finished in 0.42s
+
+# rc: 0

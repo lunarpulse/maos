@@ -311,7 +311,10 @@ principal, task, session-principal, provider, model 값을 `[REDACTED]`로 바�
 단위 일치, 키·스키마 태그·토큰 수는 유지) 지워진 model/provider는 이후 가격 미등록으로
 계산됩니다. 실제 provider 또는 model 이름과 같은 principal id는 그 값을 담은 모든
 frame에서 해당 값을 지웁니다. principal을 인용하는 kernel 거버넌스 영수증도 같은
-방식으로 값만 지워집니다.
+방식으로 값만 지워지고 거버넌스 이벤트 태그, 승인 상태, manifest 지문은 유지됩니다.
+알려진 한계: 일치는 정확하고 대소문자를 구분하므로(`ALICE@x` 같은 대소문자 변형,
+폭이 없는 문자 삽입, 동형 문자는 찾지 못하며 forget은 여전히 완료로 보고됩니다)
+Spirit 이름 열(`from_spirit_id`, `to_spirit_id`, 수신자)은 지워지지 않습니다.
 
 NFR-Cost-1의 Spirit/task/principal 차원은 토큰 지출에 적용됩니다. CPU 시간과
 storage I/O는 v1.1 계획입니다(ADR-046 R6). 청구서와 전체 ≥98% 조정은 운영
