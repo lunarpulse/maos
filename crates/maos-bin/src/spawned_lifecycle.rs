@@ -4,7 +4,6 @@
 //! slot its session drains one export at a time. The pre-warmed successor of a swap is the
 //! exception: it has no session yet, so its `migrate` and `swap-in` run inline on its own child,
 //! and a committed `swap-in` hands that child to the predecessor's session.
-use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, RecvTimeoutError, SyncSender, TrySendError};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
@@ -17,6 +16,7 @@ use maos_kernel_core::lifecycle::cli_wrapper::runtime::{
 use maos_kernel_core::security::sandbox::SandboxSpec;
 use maos_wasm_host::lifecycle_wire::{self as wire, LifecycleReply, LifecycleRequest};
 
+use crate::invocation::{self, Invocation};
 use crate::supervision::BindingCore;
 
 /// What a hook learns when its session did not answer.
@@ -25,6 +25,16 @@ pub const DEADLINE: &str = "deadline";
 /// A trigger that found its session busy for half its budget: dropped, never a strike.
 pub const BUSY: &str = "busy";
 
+/// The longest a swap stage waits on a successor that has not yet been adopted: its pre-warm
+/// (`Ready`, the probe) and every exchange of its swap (`migrate`, `swap-in`), whatever budget
+/// its manifest declares, which may be a day. A stage the successor stays silent in fences the
+/// predecessor and holds the door's upgrade lock for this long, not for its manifest's budget.
+pub const PREWARM_WALL: Duration = Duration::from_secs(60);
+
+/// Slack a pump trigger's link deadline leaves past the pump's wall, so the pump accounts an
+/// overrun as the overrun it is before the link gives up on the export.
+const WALL_SLACK: Duration = Duration::from_secs(2);
+
 pub enum Answer {
     Reply(LifecycleReply),
     SessionEnded,
@@ -32,8 +42,14 @@ pub enum Answer {
 
 /// How far one queued export got. A hook that gives up and the session that answers race for
 /// a started call and exactly one wins, so a snapshot answered after its hook's deadline can
-/// never re-fence a predecessor the failed swap already released.
-pub struct CallState(AtomicU8);
+/// never re-fence a predecessor the failed swap already released. A snapshot also remembers the
+/// swap attempt it was taken for, and a pump dispatch its record, so the session can say which
+/// swap a reply belongs to and when the export really started.
+pub struct CallState {
+    phase: AtomicU8,
+    owner: Option<Arc<AtomicBool>>,
+    invocation: Option<Arc<Invocation>>,
+}
 
 impl CallState {
     const QUEUED: u8 = 0;
@@ -41,19 +57,27 @@ impl CallState {
     const CANCELLED: u8 = 2;
     const ANSWERED: u8 = 3;
 
-    fn new() -> Arc<Self> {
-        Arc::new(Self(AtomicU8::new(Self::QUEUED)))
+    fn new(owner: Option<Arc<AtomicBool>>, invocation: Option<Arc<Invocation>>) -> Arc<Self> {
+        Arc::new(Self {
+            phase: AtomicU8::new(Self::QUEUED),
+            owner,
+            invocation,
+        })
     }
 
     fn advance(&self, from: u8, to: u8) -> bool {
-        self.0
+        self.phase
             .compare_exchange(from, to, Ordering::AcqRel, Ordering::Acquire)
             .is_ok()
     }
 
     /// Session: the call goes to the guest. `false`: its hook gave up while it was queued.
     pub fn start(&self) -> bool {
-        self.advance(Self::QUEUED, Self::STARTED)
+        let started = self.advance(Self::QUEUED, Self::STARTED);
+        if let (true, Some(invocation)) = (started, &self.invocation) {
+            invocation.started();
+        }
+        started
     }
 
     /// Session: claim the right to deliver the reply. `false`: its hook stopped waiting, and
@@ -62,8 +86,17 @@ impl CallState {
         self.advance(Self::STARTED, Self::ANSWERED)
     }
 
+    /// The swap attempt a snapshot was taken for.
+    pub fn owner(&self) -> Option<&Arc<AtomicBool>> {
+        self.owner.as_ref()
+    }
+
     fn cancel_queued(&self) -> bool {
-        self.advance(Self::QUEUED, Self::CANCELLED)
+        let dropped = self.advance(Self::QUEUED, Self::CANCELLED);
+        if let (true, Some(invocation)) = (dropped, &self.invocation) {
+            invocation.dropped();
+        }
+        dropped
     }
 
     /// Hook: stop waiting. `false`: the session already claimed the reply, which is on its way.
@@ -142,7 +175,7 @@ impl Prewarm {
         request: &LifecycleRequest,
         cap: Duration,
     ) -> Result<LifecycleReply, String> {
-        let deadline = Instant::now() + cap;
+        let deadline = Instant::now() + cap.min(PREWARM_WALL);
         let body = wire::encode_request(request).map_err(|error| format!("encode: {error}"))?;
         self.writer
             .write_frame(&body)
@@ -156,7 +189,7 @@ impl Prewarm {
 
     /// Wait for the runner's empty `Ready` control frame.
     pub fn await_ready(&mut self, cap: Duration) -> Result<(), String> {
-        let bytes = self.next_stdout(Instant::now() + cap)?;
+        let bytes = self.next_stdout(Instant::now() + cap.min(PREWARM_WALL))?;
         if bytes.is_empty() {
             Ok(())
         } else {
@@ -251,6 +284,13 @@ impl LifecycleLink {
                 .map(|prewarm| prewarm.exchange(&request, cap))
         };
         if let Some(reply) = inline {
+            if reply.is_err() {
+                // A successor that failed an exchange is not served again: its child dies and
+                // the predecessor is released now, not when the coordinator's compensation
+                // finally drops this link.
+                drop(locked(&self.prewarm).take());
+                self.release_predecessor();
+            }
             let reply = reply?;
             if matches!(request, LifecycleRequest::SwapIn { .. }) && reply == LifecycleReply::Done {
                 self.commit(core);
@@ -269,16 +309,39 @@ impl LifecycleLink {
         // for that. A telemetry or consolidate trigger gives up inside the pump's own wall for
         // it, so the pump never charges a subscriber for time it spent queued. A snapshot waits
         // behind the active turn for the whole cap.
-        let queue_share = match request {
-            LifecycleRequest::Snapshot => cap,
-            LifecycleRequest::Telemetry { .. } => cap.min(crate::hook_pump::TELEMETRY_WALL) / 2,
-            LifecycleRequest::Consolidate { .. } => cap.min(crate::hook_pump::CONSOLIDATE_WALL) / 2,
+        let limit = match request {
+            LifecycleRequest::Telemetry { .. } => Some(crate::hook_pump::TELEMETRY_WALL),
+            LifecycleRequest::Consolidate { .. } => Some(crate::hook_pump::CONSOLIDATE_WALL),
+            _ => None,
+        };
+        let queue_share = match (&request, limit) {
+            (_, Some(limit)) => cap.min(limit) / 2,
+            (LifecycleRequest::Snapshot, None) => cap,
             _ => cap / 2,
         };
+        // A pump trigger is also cut loose at its wall (plus slack for the pump to account the
+        // overrun first): its hook is quarantined there, so it must not outlive the wall by
+        // the manifest's whole budget, which a shutdown would then have to wait out.
+        let to_deadline = limit.map_or(cap, |limit| cap.min(queue_share + limit + WALL_SLACK));
+        let pid = core.spirit_pid();
+        let (owner, invocation) = match &request {
+            LifecycleRequest::Snapshot => (locked(&self.attempt).clone(), None),
+            LifecycleRequest::Telemetry { seq, .. } => {
+                (None, invocation::claim(pid, invocation::TELEMETRY, *seq))
+            }
+            LifecycleRequest::Consolidate { batch } => (
+                None,
+                invocation::claim(pid, invocation::CONSOLIDATE, invocation::digest(&batch.0)),
+            ),
+            _ => (None, None),
+        };
+        if let Some(invocation) = &invocation {
+            invocation.queued();
+        }
         let began = Instant::now();
-        let (deadline, queue_deadline) = (began + cap, began + queue_share);
+        let (deadline, queue_deadline) = (began + to_deadline, began + queue_share);
         let (answer, reply) = sync_channel(1);
-        let state = CallState::new();
+        let state = CallState::new(owner, invocation);
         let mut call = Call {
             request,
             answer,
@@ -380,15 +443,15 @@ impl LifecycleLink {
         self.fenced.store(fenced, Ordering::Release);
     }
 
-    /// The snapshot was taken: fence the predecessor, unless the swap attempt it was taken for
-    /// already ended (the successor was dropped, which released the fence for good).
-    pub fn fence_for_snapshot(&self) {
+    /// The snapshot was taken for the swap attempt `owner`: fence the predecessor, unless that
+    /// attempt already ended (its successor was dropped, which released the fence for good) or a
+    /// later attempt replaced it, so a slow snapshot of a refused swap never fences the retry.
+    pub fn fence_for_snapshot(&self, owner: Option<&Arc<AtomicBool>>) {
         let attempt = locked(&self.attempt);
-        if attempt
-            .as_ref()
-            .is_some_and(|live| live.load(Ordering::Acquire))
-        {
-            self.fenced.store(true, Ordering::Release);
+        if let (Some(live), Some(owner)) = (attempt.as_ref(), owner) {
+            if Arc::ptr_eq(live, owner) && live.load(Ordering::Acquire) {
+                self.fenced.store(true, Ordering::Release);
+            }
         }
     }
 
@@ -425,21 +488,10 @@ impl LifecycleLink {
     }
 }
 
-/// Triggers the session was too busy to start, per spirit pid (pids are never reused). The pump
-/// reads it to tell a delivery that was dropped for contention from one that ran.
-static BUSY_DROPS: Mutex<BTreeMap<u32, u64>> = Mutex::new(BTreeMap::new());
-
-pub fn note_busy(pid: u32) {
-    *locked(&BUSY_DROPS).entry(pid).or_default() += 1;
-}
-
-pub fn busy_drops(pid: u32) -> u64 {
-    locked(&BUSY_DROPS).get(&pid).copied().unwrap_or(0)
-}
-
-impl Drop for LifecycleLink {
-    /// A successor that is dropped before its `swap-in` committed releases its predecessor.
-    fn drop(&mut self) {
+impl LifecycleLink {
+    /// End the swap attempt this (successor) link was installed for and release its
+    /// predecessor's fence, once: the first of a failed exchange and the link's drop does it.
+    fn release_predecessor(&self) {
         if let Some(predecessor) = locked(&self.predecessor).take() {
             let mut attempt = locked(&predecessor.attempt);
             if let Some(live) = attempt.take() {
@@ -447,6 +499,13 @@ impl Drop for LifecycleLink {
             }
             predecessor.set_fenced(false);
         }
+    }
+}
+
+impl Drop for LifecycleLink {
+    /// A successor that is dropped before its `swap-in` committed releases its predecessor.
+    fn drop(&mut self) {
+        self.release_predecessor();
         if let Some(outcome) = locked(&self.outcome).take() {
             outcome(false);
         }
@@ -592,7 +651,7 @@ impl SwapHandles {
             }
             result.map(|_| ())
         }));
-        let until = Instant::now() + budget + READY_GRACE;
+        let until = Instant::now() + budget.min(PREWARM_WALL) + READY_GRACE;
         let failure = loop {
             if link.wait_supported(Duration::ZERO).is_some() {
                 // Only a component that started is the version the FR11 archive names.

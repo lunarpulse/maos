@@ -48,8 +48,9 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock, Weak};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
+use crate::invocation;
 use maos_domain::invariants::i7::ScalarTapEvent;
 use maos_domain::memory::{
     ForgetNotice, ForgetOutcome, RedistillOutcome, RedistillPendingReason as Pending,
@@ -231,6 +232,9 @@ struct Shared {
     counters: Counters,
     stopped: AtomicBool,
     redistill_results: Mutex<BTreeMap<String, RedistillSlot>>,
+    /// Hooks that outran their wall and still run: the wall ends their accounting, never their
+    /// execution (dropping a dispatch would detach its blocking hook), so shutdown joins them.
+    parked: Mutex<tokio::task::JoinSet<()>>,
 }
 
 fn same_object(weak: &Weak<dyn AnySpiritObj>, live: &Arc<dyn AnySpiritObj>) -> bool {
@@ -269,6 +273,31 @@ fn receives_telemetry(snapshot: &ScbRuntimeSnapshot) -> bool {
 }
 
 impl Shared {
+    fn park(&self, run: JoinHandle<HookOutcome>) {
+        self.parked
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .spawn(async move {
+                let _ = run.await;
+            });
+    }
+
+    /// Join every parked hook, including any parked while joining.
+    async fn drain_parked(&self) {
+        loop {
+            let mut parked = std::mem::take(
+                &mut *self
+                    .parked
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner()),
+            );
+            if parked.is_empty() {
+                break;
+            }
+            while parked.join_next().await.is_some() {}
+        }
+    }
+
     fn registry(&self) -> std::sync::MutexGuard<'_, BTreeMap<u32, Subscriber>> {
         self.registry
             .lock()
@@ -508,16 +537,21 @@ impl Shared {
             };
             let (shared, payload, tag) =
                 (Arc::clone(self), Arc::clone(&payload), event.tag.clone());
+            let seq = event.seq;
             deliveries.spawn(async move {
                 shared.counters.in_flight.fetch_add(1, Ordering::Relaxed);
                 let (outcome, busy) = fire_walled(
-                    &dispatcher,
-                    &target,
+                    &shared,
+                    dispatcher,
+                    target,
                     pid,
-                    Hook::Telemetry,
-                    &payload,
-                    cap,
-                    TELEMETRY_WALL,
+                    payload,
+                    Dispatch {
+                        hook: Hook::Telemetry,
+                        seq,
+                        cap,
+                        limit: TELEMETRY_WALL,
+                    },
                 )
                 .await;
                 shared.counters.in_flight.fetch_sub(1, Ordering::Relaxed);
@@ -589,6 +623,7 @@ impl HookPump {
             counters: Counters::default(),
             stopped: AtomicBool::new(false),
             redistill_results: Mutex::default(),
+            parked: Mutex::default(),
         });
         let (flush_tx, flush_rx) = mpsc::unbounded_channel();
         let cancel = CancellationToken::new();
@@ -833,17 +868,22 @@ impl HookPump {
             let mut notices = tokio::task::JoinSet::new();
             if let Some(dispatcher) = pump.shared.dispatcher.upgrade() {
                 for (pid, _, target, cap, bytes) in &jobs {
-                    let (dispatcher, target) = (Arc::clone(&dispatcher), Arc::clone(target));
-                    let (pid, cap, bytes) = (*pid, *cap, bytes.clone());
+                    let (shared, dispatcher) = (Arc::clone(&pump.shared), Arc::clone(&dispatcher));
+                    let (pid, cap, target) = (*pid, *cap, Arc::clone(target));
+                    let bytes: Arc<[u8]> = Arc::from(bytes.as_slice());
                     notices.spawn(async move {
                         let hook = fire_walled(
-                            &dispatcher,
-                            &target,
+                            &shared,
+                            dispatcher,
+                            target,
                             pid,
-                            Hook::Consolidate,
-                            &bytes,
-                            cap,
-                            CONSOLIDATE_WALL,
+                            bytes,
+                            Dispatch {
+                                hook: Hook::Consolidate,
+                                seq: 0,
+                                cap,
+                                limit: CONSOLIDATE_WALL,
+                            },
                         )
                         .await;
                         (pid, hook)
@@ -968,16 +1008,22 @@ impl HookPump {
                         (Some(scb), Some(dispatcher)) => {
                             asked.push(pid);
                             let cap = cap_of(&scb.runtime_snapshot(), CONSOLIDATE_WALL);
-                            let (dispatcher, bytes) = (Arc::clone(dispatcher), bytes.clone());
+                            let (shared, dispatcher) =
+                                (Arc::clone(&pump.shared), Arc::clone(dispatcher));
+                            let bytes: Arc<[u8]> = Arc::from(bytes.as_slice());
                             notices.spawn(async move {
                                 let hook = fire_walled(
-                                    &dispatcher,
-                                    &scb,
+                                    &shared,
+                                    dispatcher,
+                                    scb,
                                     pid,
-                                    Hook::Consolidate,
-                                    &bytes,
-                                    cap,
-                                    CONSOLIDATE_WALL,
+                                    bytes,
+                                    Dispatch {
+                                        hook: Hook::Consolidate,
+                                        seq: 0,
+                                        cap,
+                                        limit: CONSOLIDATE_WALL,
+                                    },
                                 )
                                 .await;
                                 (pid, hook)
@@ -1135,6 +1181,8 @@ impl HookPump {
                 eprintln!("maos: telemetry pump task failed during shutdown: {error}");
             }
         }
+        // An overrun's hook still runs after its wall: it finishes before any grant is revoked.
+        self.shared.drain_parked().await;
         if !self.shared.stopped.swap(true, Ordering::AcqRel) {
             let pids: Vec<u32> = self.shared.registry().keys().copied().collect();
             for pid in pids {
@@ -1257,8 +1305,10 @@ impl ConsolidationWatchdog {
                     }
                 }
             }
-            // Shutdown joins every in-flight pass (each is bounded by its wall).
+            // Shutdown joins every in-flight pass (each is bounded by its wall) and every
+            // overrun the walls parked: nothing is unloaded under a hook that still runs.
             while passes.join_next().await.is_some() {}
+            shared.drain_parked().await;
         });
         Self {
             cancel,
@@ -1331,16 +1381,19 @@ async fn consolidate_once(
         inflight.insert(pid);
         passes.spawn(async move {
             let (outcome, busy) = fire_walled(
-                &dispatcher,
-                &target,
+                &shared,
+                dispatcher,
+                target,
                 pid,
-                Hook::Consolidate,
-                &[],
-                cap,
-                CONSOLIDATE_WALL,
+                Arc::from([]),
+                Dispatch {
+                    hook: Hook::Consolidate,
+                    seq: 0,
+                    cap,
+                    limit: CONSOLIDATE_WALL,
+                },
             )
             .await;
-            drop(dispatcher);
             if busy {
                 return pid;
             }
@@ -1372,47 +1425,78 @@ fn cap_of(snapshot: &ScbRuntimeSnapshot, default: Duration) -> u64 {
         })
 }
 
-/// Triggers a spawned subscriber's session dropped for contention so far.
-fn busy_drops(pid: u32) -> u64 {
-    #[cfg(all(feature = "network", feature = "wasm-host"))]
-    {
-        crate::spawned_lifecycle::busy_drops(pid)
-    }
-    #[cfg(not(all(feature = "network", feature = "wasm-host")))]
-    {
-        let _ = pid;
-        0
-    }
-}
-
-/// One hook dispatch held to a wall strictly inside the hook's own cap (and `limit`). An overrun
-/// is the budget overrun it is; a dispatch a busy session dropped before the hook ever started is
-/// reported as such (`true`), and the caller charges nothing for it.
-async fn fire_walled(
-    dispatcher: &HookDispatcher,
-    target: &SpiritControlBlock,
-    pid: u32,
+/// How one walled dispatch is asked for: the hook, the event's `seq` (a consolidation is
+/// identified by its batch instead), the hook's budget in seconds and the pump's own limit.
+struct Dispatch {
     hook: Hook,
-    payload: &[u8],
+    seq: u64,
     cap: u64,
     limit: Duration,
+}
+
+/// How often a walled dispatch looks at its clock.
+const WALL_POLL: Duration = Duration::from_millis(20);
+
+/// One hook dispatch held to a wall strictly inside the hook's own cap (and `limit`), counted
+/// from when its export starts, not from when it queued behind another. An overrun is the budget
+/// overrun it is; a dispatch a busy session dropped before the hook ever started is reported as
+/// such (`true`), and the caller charges nothing for it. The dispatch runs as its own task, so
+/// the wall ends the accounting and never the execution: an overrun's task is parked in
+/// `shared`, which drains it before anything is unloaded.
+async fn fire_walled(
+    shared: &Shared,
+    dispatcher: Arc<HookDispatcher>,
+    target: Arc<SpiritControlBlock>,
+    pid: u32,
+    payload: Arc<[u8]>,
+    dispatch: Dispatch,
 ) -> (HookOutcome, bool) {
+    let Dispatch {
+        hook,
+        seq,
+        cap,
+        limit,
+    } = dispatch;
     let wall = Duration::from_millis(cap.saturating_mul(950)).min(limit);
-    let before = busy_drops(pid);
-    let fire = async {
+    let (kind, tag) = match hook {
+        Hook::Telemetry => (invocation::TELEMETRY, seq),
+        Hook::Consolidate => (invocation::CONSOLIDATE, invocation::digest(&payload)),
+    };
+    let record = invocation::Registered::open(pid, kind, tag);
+    let began = Instant::now();
+    let mut run = tokio::spawn(async move {
         match hook {
-            Hook::Telemetry => dispatcher.fire_on_telemetry_event(target, payload).await,
-            Hook::Consolidate => dispatcher.fire_on_consolidate(target, payload).await,
+            Hook::Telemetry => dispatcher.fire_on_telemetry_event(&target, &payload).await,
+            Hook::Consolidate => dispatcher.fire_on_consolidate(&target, &payload).await,
+        }
+    });
+    let finished = loop {
+        let nap = match record.invocation().deadline(began, wall) {
+            Some(at) => match at.checked_duration_since(Instant::now()) {
+                Some(left) if !left.is_zero() => left.min(WALL_POLL),
+                _ => break None,
+            },
+            None => WALL_POLL,
+        };
+        tokio::select! {
+            joined = &mut run => break Some(joined),
+            _ = tokio::time::sleep(nap) => {}
         }
     };
-    let outcome = match tokio::time::timeout(wall, fire).await {
-        Ok(outcome) => outcome,
-        Err(_) => HookOutcome::BudgetExceeded {
-            wall_ns: u64::try_from(wall.as_nanos()).unwrap_or(u64::MAX),
-            cap_seconds: wall.as_secs().max(1),
+    let outcome = match finished {
+        Some(Ok(outcome)) => outcome,
+        Some(Err(error)) => HookOutcome::Panicked {
+            panic_payload_preview: error.to_string(),
         },
+        None => {
+            shared.park(run);
+            HookOutcome::BudgetExceeded {
+                wall_ns: u64::try_from(wall.as_nanos()).unwrap_or(u64::MAX),
+                cap_seconds: wall.as_secs().max(1),
+            }
+        }
     };
-    let busy = matches!(outcome, HookOutcome::Fired { .. }) && busy_drops(pid) > before;
+    let busy = matches!(outcome, HookOutcome::Fired { .. }) && record.invocation().was_dropped();
     (outcome, busy)
 }
 

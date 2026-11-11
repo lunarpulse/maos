@@ -2718,7 +2718,6 @@ mod worker {
                 // A trigger the session could not even start in half its budget lost to another
                 // hook's export, not to a fault of its own: dropped, never a panic or a strike.
                 Err(code) if code == crate::spawned_lifecycle::BUSY => {
-                    crate::spawned_lifecycle::note_busy(self.core.spirit_pid());
                     eprintln!(
                         "maos: lifecycle trigger dropped: '{}' stayed busy",
                         self.core.spirit_id().escape_debug()

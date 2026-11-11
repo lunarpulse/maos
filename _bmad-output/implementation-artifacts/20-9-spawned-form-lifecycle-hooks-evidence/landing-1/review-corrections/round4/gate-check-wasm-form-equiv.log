@@ -1,0 +1,1 @@
+{"gate":"check-wasm-form-equiv","passed":true,"oracle_green":true,"blocking_now":false,"ship_phase":"v1_5","disposition":{"v1_0":"advisory","v1_5":"advisory","v2_0":"blocking"},"base_passed":19,"base_failed":0,"fault_inject_passed":22,"fault_inject_failed":0,"oracle":"tiered-behavioral-deterministic"}

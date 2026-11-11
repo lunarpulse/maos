@@ -55,6 +55,8 @@ pub mod hook_pump;
 pub mod inference_mode;
 #[cfg(feature = "network")]
 pub mod installed_spirits;
+/// Story 20-9 — one pump dispatch as its spawned session's link sees it (started or dropped).
+pub mod invocation;
 /// Story 16-1 (D-16-1-N) — the operator door's port implementation over the
 /// daemon's real kernel objects, plus the store lock set (D-16-1-D). In the
 /// library, not `main.rs`, so `tests/operator_door_16_1.rs` drives the REAL

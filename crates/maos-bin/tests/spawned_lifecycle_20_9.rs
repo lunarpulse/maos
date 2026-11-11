@@ -429,6 +429,24 @@ async fn one_slow_consolidating_subscriber_does_not_stall_the_others_passes() {
     stop(world, fast).await;
 }
 
+/// An unheld forget of the test world's memory, with one late principal frame to scrub.
+fn erased_forget(world: &World) -> maos_domain::memory::ForgetOutcome {
+    let mut forgotten = world
+        .memory
+        .forget_with_reason("root-forget-209", None)
+        .unwrap();
+    if let maos_domain::memory::ForgetOutcome::Erased {
+        redacted_principal_frame_ids,
+        ..
+    } = &mut forgotten
+    {
+        redacted_principal_frame_ids.push(hex::encode([0xA1; 16]));
+    } else {
+        panic!("an unheld forget erases");
+    }
+    forgotten
+}
+
 // GLM R1 — the privacy notices of a forget go out side by side: a subscriber that holds its
 // notice for seconds does not hold the others' (or the erasure's completion, past its wall).
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -449,19 +467,7 @@ async fn forget_notices_reach_every_subscriber_side_by_side() {
     let (slow_path, fast_path) = (listing(&world, "slow-fg"), listing(&world, "fast-fg"));
     let (slow, fast) = (world.start(&slow_path).await, world.start(&fast_path).await);
     world.turn("slow-fg", "sleep-in consolidate 3").await;
-    let mut forgotten = world
-        .memory
-        .forget_with_reason("root-forget-209", None)
-        .unwrap();
-    if let maos_domain::memory::ForgetOutcome::Erased {
-        redacted_principal_frame_ids,
-        ..
-    } = &mut forgotten
-    {
-        redacted_principal_frame_ids.push(hex::encode([0xA1; 16]));
-    } else {
-        panic!("an unheld forget erases");
-    }
+    let forgotten = erased_forget(&world);
     let (tl, pump) = (
         std::sync::Arc::clone(&world.tl),
         std::sync::Arc::clone(&world.pump),
@@ -480,4 +486,121 @@ async fn forget_notices_reach_every_subscriber_side_by_side() {
     world.supervisor.stop_binding(slow.pid);
     let _ = tokio::time::timeout(Duration::from_secs(20), slow.session).await;
     stop(world, fast).await;
+}
+
+// GPT r3 #1 — a telemetry event that was dropped for contention while a forget's notice ran its
+// (successful) four seconds is the event's drop, not the notice's: the purge stays delivered.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_telemetry_drop_during_a_successful_forget_notice_leaves_the_purge_delivered() {
+    let mut world = World::bare().await;
+    let path = world.write(
+        "fg-busy.toml",
+        &manifest(
+            ID,
+            "1.0.0",
+            "lifecycle_probe.wasm",
+            &["on_consolidate", "on_telemetry_event"],
+            "",
+        ),
+    );
+    let running = world.start(&path).await;
+    world.turn(ID, "sleep-in consolidate 4").await;
+    let forgotten = erased_forget(&world);
+    let (tl, pump) = (
+        std::sync::Arc::clone(&world.tl),
+        std::sync::Arc::clone(&world.pump),
+    );
+    let notices = tokio::spawn(async move {
+        maos_bin::hook_pump::HookPump::finish_forget(&tl, &forgotten, Some(&pump)).await
+    });
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    // Queued behind the notice's 4 s export, the event gives up after 2.5 s and is dropped.
+    world
+        .capability
+        .set_scalar(903, "emitter", "queue.depth", 0.5, "test")
+        .unwrap();
+    world.pump.flush().await.unwrap();
+    let report = notices.await.unwrap();
+    assert_eq!(
+        report["purge_undelivered"],
+        serde_json::json!([]),
+        "the notice ran to completion; the event's drop is not its:\n{report}"
+    );
+    assert_eq!(
+        World::count(&world.turn(ID, "").await, "consolidate"),
+        1,
+        "the subscriber took the notice"
+    );
+    stop(world, running).await;
+}
+
+// GPT r3 #2 (spawned) — a telemetry export that outruns the pump's wall is cut loose by its link
+// soon after, not at the manifest's 60 s: shutdown, which joins what the wall parked, is not held
+// for the component's whole budget.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_telemetry_export_past_its_wall_is_cut_loose_so_shutdown_is_not_held_for_its_budget() {
+    let mut world = World::bare().await;
+    let path = world.write(
+        "held-telemetry.toml",
+        &manifest_capped(
+            ID,
+            "1.0.0",
+            "lifecycle_probe.wasm",
+            &["on_telemetry_event"],
+            "",
+            60,
+        ),
+    );
+    let running = world.start(&path).await;
+    world.turn(ID, "sleep-in telemetry 25").await;
+    world
+        .capability
+        .set_scalar(903, "emitter", "queue.depth", 0.5, "test")
+        .unwrap();
+    world.pump.flush().await.unwrap();
+    let began = std::time::Instant::now();
+    world.pump.shutdown().await;
+    assert!(
+        began.elapsed() < Duration::from_secs(12),
+        "shutdown waited {:?} for a hook the wall had already given up on",
+        began.elapsed()
+    );
+    stop(world, running).await;
+}
+
+// GLM r3 F4 — a telemetry export that queued behind the component's own frame turn and then ran
+// is held to its wall from its own start: two seconds of queue and four of run fit a 5 s wall.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_telemetry_export_that_queued_behind_a_turn_is_held_to_its_wall_from_its_own_start() {
+    let mut world = World::bare().await;
+    let path = world.write(
+        "queued-telemetry.toml",
+        &manifest(
+            ID,
+            "1.0.0",
+            "lifecycle_probe.wasm",
+            &["on_telemetry_event"],
+            "",
+        ),
+    );
+    let running = world.start(&path).await;
+    world.turn(ID, "sleep-in telemetry 4").await;
+    world.send(ID, "sleep 2").await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    world
+        .capability
+        .set_scalar(903, "emitter", "queue.depth", 0.5, "test")
+        .unwrap();
+    world.pump.flush().await.unwrap();
+    assert!(
+        world
+            .rows(
+                TlKind::GovernanceEvent,
+                "governance:telemetry-subscription:revoked"
+            )
+            .is_empty(),
+        "a subscriber that waited 2 s and ran 4 s inside a 5 s wall was quarantined for the wait"
+    );
+    assert_eq!(world.pump.stats().delivered, 1, "the event ran to its end");
+    stop(world, running).await;
 }

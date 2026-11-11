@@ -1214,6 +1214,71 @@ async fn shutdown_joins_an_in_flight_consolidation_instead_of_detaching_it() {
     );
 }
 
+/// Holds `on_consolidate` for 9.75 s under the manifest's 10 s budget, whose wall is 9.5 s.
+struct HeldConsolidation {
+    entered: Arc<AtomicBool>,
+    finished: Arc<AtomicBool>,
+}
+
+impl Spirit for HeldConsolidation {
+    fn on_consolidate(&self, _ctx: &mut Ctx, _payload: &ConsolidatePayload<'_>) {
+        if self.entered.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(9_750));
+        self.finished.store(true, Ordering::SeqCst);
+    }
+}
+
+// GPT r3 #2 — the wall ends a consolidation's accounting, never its execution: a hook that
+// outruns the pump's wall but not its own budget is still joined before shutdown returns, so
+// nothing is unloaded under it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_consolidation_past_its_wall_is_still_joined_before_shutdown_returns() {
+    let world = World::new();
+    let (entered, finished) = (
+        Arc::new(AtomicBool::new(false)),
+        Arc::new(AtomicBool::new(false)),
+    );
+    world
+        .admit(
+            &with_window(OBSERVER_MANIFEST, 100),
+            make_spirit_obj(HeldConsolidation {
+                entered: Arc::clone(&entered),
+                finished: Arc::clone(&finished),
+            }),
+            StartPolicy::StartNow,
+        )
+        .await
+        .unwrap();
+    let watchdog = fast(&world.pump);
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while !entered.load(Ordering::SeqCst) {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("the held consolidation never entered");
+    // The wall quarantines the subscriber while its hook still runs.
+    tokio::time::timeout(Duration::from_secs(15), async {
+        while world.subscription_rows().len() < 2 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("the wall never accounted the overrun");
+    assert!(
+        !finished.load(Ordering::SeqCst),
+        "the hook ended before its wall: the vector holds nothing"
+    );
+    watchdog.shutdown().await;
+    world.pump.shutdown().await;
+    assert!(
+        finished.load(Ordering::SeqCst),
+        "shutdown returned while the hook still ran: an unload now runs under it"
+    );
+}
+
 /// Keep both standard pipes saturated throughout emission AND writer shutdown.
 /// A subprocess isolates descriptor flags and prevents the test harness itself
 /// from consuming the bytes whose backpressure is the regression trigger.

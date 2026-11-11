@@ -811,3 +811,119 @@ async fn a_failed_spawned_admission_withdraws_its_hook_registration() {
     );
     world.finish().await;
 }
+
+// GPT r3 closure — a snapshot of a refused swap that is still running when the retry installs
+// its own attempt answers for the first attempt: it must not fence the retry, which would then
+// find its predecessor refusing the retry's own snapshot.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_slow_snapshot_of_a_refused_swap_does_not_fence_the_retry() {
+    let mut world = World::bare().await;
+    let (v1, v2) = (
+        capped(&world, "1.0.0", "lifecycle_probe.wasm", 30),
+        capped(&world, "2.0.0", "lifecycle_probe.wasm", 30),
+    );
+    let running = world.start(&v1).await;
+    world.turn(ID, "sleep-in snapshot 5").await;
+    let scb = world.scb(ID);
+    let budget = |seconds: u32| {
+        let mut runtime = scb.runtime_snapshot();
+        runtime.manifest.budget.as_mut().unwrap().time_cap_seconds = seconds;
+        scb.replace_runtime(runtime);
+    };
+    // The first attempt's snapshot (5 s) is refused by the dispatcher at 2 s; its export keeps
+    // running while the retry installs its attempt and queues its own snapshot behind it.
+    budget(2);
+    world
+        .upgrade(&v2, UpgradePolicy::HotSwap)
+        .await
+        .expect_err("the dispatcher refused the slow snapshot");
+    budget(30);
+    world
+        .upgrade(&v2, UpgradePolicy::HotSwap)
+        .await
+        .expect("the retry swaps: the first attempt's snapshot fenced nothing");
+    // The predecessor's session adopts the committed successor's child on its next poll; the
+    // retired predecessor child's own last report may still be unread, so read on to the first
+    // report of a child that was handed the state.
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let mut report = String::new();
+    for _ in 0..3 {
+        report = world.turn(ID, "").await;
+        if !report.contains("swap-in=-") {
+            break;
+        }
+    }
+    assert!(
+        !report.contains("swap-in=-"),
+        "no successor was handed the state:\n{report}"
+    );
+    settle(world, running).await;
+}
+
+/// A successor whose manifest declares a ten-minute budget and whose guest misbehaves in `mode`
+/// is refused at the pre-warm wall (60 s), its child is gone, and the predecessor serves.
+async fn refused_at_the_prewarm_wall(mode: &str) {
+    let mut world = World::bare().await;
+    let running = world
+        .start(&capped(&world, "1.0.0", "lifecycle_probe.wasm", 2))
+        .await;
+    world.turn(ID, "").await;
+    let successor = capped(&world, "2.0.0", &format!("hostile-{mode}.wasm"), 600);
+    let (orchestrator, staged, handle) = (
+        std::sync::Arc::clone(&world.orchestrator),
+        world.staged.clone(),
+        tokio::runtime::Handle::current(),
+    );
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let started = Instant::now();
+    // The factory runs synchronously: a stuck one must not take the vector down with it.
+    std::thread::spawn(move || {
+        let result = handle.block_on(async {
+            staged.stage(successor.clone());
+            let result = orchestrator
+                .upgrade(ID, &successor, UpgradePolicy::HotSwap)
+                .await;
+            staged.take();
+            result.map(|_| ()).map_err(|error| error.to_string())
+        });
+        let _ = tx.send(result);
+    });
+    let result = tokio::time::timeout(Duration::from_secs(80), rx)
+        .await
+        .unwrap_or_else(|_| panic!("`{mode}`: a silent successor held the swap past its 60 s wall"))
+        .expect("the swap thread");
+    let error = result.expect_err(mode);
+    assert!(
+        error.contains("spawned_swap_launch_failed") && error.contains("deadline"),
+        "{mode}: {error}"
+    );
+    assert!(
+        started.elapsed() >= Duration::from_secs(55),
+        "{mode}: refused after {:?}, before the wall",
+        started.elapsed()
+    );
+    let until = Instant::now() + Duration::from_secs(5);
+    while !twins(mode).is_empty() && Instant::now() < until {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert_eq!(twins(mode), Vec::<u32>::new(), "{mode}: the child is gone");
+    let report = world.turn(ID, "").await;
+    assert!(
+        report.contains("swap-in=-"),
+        "{mode}: the predecessor serves:\n{report}"
+    );
+    settle(world, running).await;
+}
+
+// GLM r3 F1 — pre-warm readiness: a successor that never becomes `Ready` is cut off at the wall,
+// not at its manifest's budget (which may be a day), while it holds the door's upgrade lock.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_successor_that_never_becomes_ready_is_refused_at_the_prewarm_wall() {
+    refused_at_the_prewarm_wall("stderr-flood").await;
+}
+
+// GLM r3 F1 — the pre-warm probe and every inline swap-stage exchange share the same wall.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_successor_that_never_answers_its_probe_is_refused_at_the_prewarm_wall() {
+    refused_at_the_prewarm_wall("probe-flood").await;
+}

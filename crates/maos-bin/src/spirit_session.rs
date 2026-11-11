@@ -672,9 +672,10 @@ pub async fn run_admitted_session(
                                 (LifecycleRequest::Probe, _) =>
                                     return Err(SessionError::Protocol("unexpected probe reply")),
                                 // The predecessor's state is now taken: no more work until the swap
-                                // resolves. A snapshot its caller gave up on fences nothing.
+                                // resolves. A snapshot its caller gave up on fences nothing, and a
+                                // snapshot of a refused swap never fences a later attempt.
                                 (LifecycleRequest::Snapshot, LifecycleReply::State(_)) if wanted =>
-                                    link.fence_for_snapshot(),
+                                    link.fence_for_snapshot(done.state.as_ref().and_then(|state| state.owner())),
                                 _ => {}
                             }
                             if let Some(answer) = done.answer.filter(|_| wanted) {
