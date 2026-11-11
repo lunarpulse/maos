@@ -285,10 +285,18 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
         (
             "capability.invocation",
             None,
-            "spirit.quarantine_requested",
-            r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":true}"#,
+            "spirit.quarantined",
+            r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantined":true}"#,
             1,
             "quarantine",
+        ),
+        (
+            "capability.invocation",
+            None,
+            "spirit.quarantined",
+            r#"{"spirit_id":"running","spirit_pid":1,"quarantined":true}"#,
+            1,
+            "registry-yank quarantine receipt (20-1b)",
         ),
         (
             "capability.invocation",

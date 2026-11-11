@@ -1,0 +1,30 @@
+    Checking maos-audit v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-audit)
+    Checking maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval)
+    Checking maos-loom-lite v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-loom-lite)
+    Checking butler v0.1.0 (/home/lunarpulse/dev_ws/spirits/butler)
+    Checking maos-siem v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-siem)
+    Checking maos-journey-test v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-journey-test)
+    Checking maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+    Checking maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+    Checking maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench)
+    Checking maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell)
+    Checking maos-control v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-control)
+    Checking maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+    Checking xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+    Checking maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+    Checking researcher v0.1.0 (/home/lunarpulse/dev_ws/spirits/researcher)
+    Checking observer v0.1.0 (/home/lunarpulse/dev_ws/spirits/observer)
+    Checking maos-pdp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-pdp)
+    Checking maos-spirit-hello v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-hello)
+    Checking orchestrator v0.1.0 (/home/lunarpulse/dev_ws/spirits/orchestrator)
+    Checking maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)
+    Checking maos-escape-detector v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-escape-detector)
+    Checking mira v1.5.0 (/home/lunarpulse/dev_ws/spirits/mira)
+    Checking maos-secrets v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-secrets)
+    Checking worker v0.1.0 (/home/lunarpulse/dev_ws/spirits/worker)
+    Checking architect v0.1.0 (/home/lunarpulse/dev_ws/spirits/architect)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5m 24s
+
+real	5m24.723s
+user	9m6.536s
+sys	6m22.413s

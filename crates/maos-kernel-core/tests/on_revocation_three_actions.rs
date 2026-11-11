@@ -242,10 +242,7 @@ async fn applier_executes_terminate_drain_and_quarantine_actions() {
             map.contains_key(&pids[1]),
             "drain must remain until deadline"
         );
-        assert!(
-            map.contains_key(&pids[2]),
-            "quarantine must remain until deadline"
-        );
+        assert!(map.contains_key(&pids[2]), "quarantine must remain loaded");
     }
     assert_eq!(
         fixture
@@ -257,20 +254,20 @@ async fn applier_executes_terminate_drain_and_quarantine_actions() {
             })
             .expect("query quarantine marker")
             .into_iter()
-            .filter(|frame| frame.intent == "spirit.quarantine_requested")
+            .filter(|frame| frame.intent == "spirit.quarantined")
             .count(),
         1
     );
 
-    // Let both deferred-action tasks register their timers before advancing
-    // the paused clock.
+    // Let the deferred drain task register its timer before advancing the
+    // paused clock.
     tokio::task::yield_now().await;
     tokio::time::advance(Duration::from_millis(10_001)).await;
     for _ in 0..100 {
         let both_unloaded = {
             let scbs = fixture.scheduler.scbs();
             let map = scbs.read().expect("spirits lock poisoned");
-            !map.contains_key(&pids[1]) && !map.contains_key(&pids[2])
+            !map.contains_key(&pids[1])
         };
         if both_unloaded {
             break;
@@ -282,8 +279,8 @@ async fn applier_executes_terminate_drain_and_quarantine_actions() {
         let map = scbs.read().expect("spirits lock poisoned");
         assert!(!map.contains_key(&pids[1]), "drain must unload at deadline");
         assert!(
-            !map.contains_key(&pids[2]),
-            "quarantine must unload at deadline"
+            map.contains_key(&pids[2]),
+            "quarantine is never unloaded by the old drain deadline"
         );
     }
     assert!(
@@ -300,19 +297,20 @@ async fn applier_executes_terminate_drain_and_quarantine_actions() {
             maos_domain::invariants::i1::IntentClass::Standard,
         )
         .expect("fresh incarnation has no exhausted context slot");
-    for pid in pids {
-        assert!(
-            fixture
-                .tl
-                .query_frames(FrameFilter {
-                    kind: Some(FrameKind::EpistemicHalt),
-                    spirit_pid: Some(pid),
-                    ..Default::default()
-                })
-                .expect("query termination receipts")
-                .len()
-                >= 2,
-            "each action must produce a termination receipt"
+    for (pid, terminated) in [(pids[0], true), (pids[1], true), (pids[2], false)] {
+        let receipts = fixture
+            .tl
+            .query_frames(FrameFilter {
+                kind: Some(FrameKind::EpistemicHalt),
+                spirit_pid: Some(pid),
+                ..Default::default()
+            })
+            .expect("query termination receipts")
+            .len();
+        assert_eq!(
+            receipts >= 2,
+            terminated,
+            "terminating actions produce receipts; quarantine terminates nothing"
         );
     }
 }

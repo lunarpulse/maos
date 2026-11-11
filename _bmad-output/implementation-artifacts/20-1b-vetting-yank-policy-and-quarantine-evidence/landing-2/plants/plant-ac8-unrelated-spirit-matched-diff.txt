@@ -1,0 +1,11 @@
+--- /tmp/t201b/keep-ac8-unrelated-spirit-matched	2026-11-11 14:09:03.703830471 +0000
++++ /home/lunarpulse/dev_ws/crates/maos-bin/src/yank_policy.rs	2026-11-11 14:09:03.704243072 +0000
+@@ -363,7 +363,7 @@
+             .map_err(|e| RegistryError::Transport(e.to_string()))?
+             .values()
+             .filter(|spirit| {
+-                spirit.spirit_id == entry.spirit_id.as_str()
++                true
+                     && spirit.current_state() == ScbLifecycleState::Running
+                     && spirit
+                         .runtime_snapshot()

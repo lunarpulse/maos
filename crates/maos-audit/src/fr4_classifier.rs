@@ -410,11 +410,22 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         site: ("applier.rs", "apply_crl", 1),
         kind: 7,
         token: TokenColumn::Absent,
-        intent: WriterIntent::Exact("spirit.quarantine_requested"),
+        intent: WriterIntent::Exact("spirit.quarantined"),
         shape: Some(&[
             ("spirit_id", PayloadType::Str),
             ("spirit_pid", PayloadType::SpiritPidEqualsRow),
-            ("quarantine_requested", PayloadType::Bool),
+            ("quarantined", PayloadType::Bool),
+        ]),
+    },
+    WriterShapeEntry {
+        site: ("yank_policy.rs", "policy_request", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("spirit.quarantined"),
+        shape: Some(&[
+            ("spirit_id", PayloadType::Str),
+            ("spirit_pid", PayloadType::SpiritPidEqualsRow),
+            ("quarantined", PayloadType::Bool),
         ]),
     },
     WriterShapeEntry {

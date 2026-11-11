@@ -1,0 +1,11 @@
+--- /tmp/t201b/keep-ac8-hostile-row-accepted	2026-11-11 14:09:09.804561542 +0000
++++ /home/lunarpulse/dev_ws/crates/maos-bin/src/yank_policy.rs	2026-11-11 14:09:28.740351613 +0000
+@@ -336,7 +336,7 @@
+             &self.registry_uri,
+             now,
+         ) {
+-            return Ok(YankDisposition::Rejected(reason));
++            eprintln!("{reason}");
+         }
+         let Some((pkg, directory)) = installed else {
+             self.record("yank-verified-not-actionable", entry)?;

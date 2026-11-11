@@ -570,6 +570,7 @@ impl SpiritSchedulerAdapter {
         self.capability.revoke_all_for_pid(spirit_pid);
         self.capability.context_budget().remove(spirit_pid);
         self.capability.set_paused(spirit_pid, false);
+        self.capability.set_quarantined(spirit_pid, false);
         {
             let mut spirits = self.spirits.write().unwrap();
             spirits.remove(&spirit_pid);

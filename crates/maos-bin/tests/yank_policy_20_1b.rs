@@ -26,6 +26,7 @@ static ENV: Mutex<()> = Mutex::new(());
 struct Spirit;
 impl maos_spirit_abi::lifecycle::Spirit for Spirit {}
 struct World {
+    cap: Arc<CapabilityRegistryAdapter>,
     scheduler: Arc<SpiritSchedulerAdapter>,
     applier: Arc<maos_kernel_core::revocation::RevocationApplier>,
     tl: Arc<TransparencyLogAdapter>,
@@ -86,7 +87,7 @@ fn world(path: &std::path::Path) -> World {
     );
     let applier = Arc::new(maos_kernel_core::revocation::RevocationApplier::new(
         scheduler.scbs(),
-        cap,
+        cap.clone(),
         scheduler.clone(),
         iac,
         halt,
@@ -95,6 +96,7 @@ fn world(path: &std::path::Path) -> World {
         telemetry,
     ));
     World {
+        cap,
         scheduler,
         applier,
         tl,
@@ -130,9 +132,12 @@ impl World {
     }
 }
 fn manifest() -> SpiritManifestBundle {
+    manifest_named("running")
+}
+fn manifest_named(name: &str) -> SpiritManifestBundle {
     SpiritManifestBundle {
         class: Some(ClassSection {
-            name: "running".into(),
+            name: name.into(),
             version: "1.0.0".into(),
             abi: "1.0".into(),
             manifest_schema_version: 1,
@@ -228,6 +233,7 @@ fn signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8() {
                 .unwrap();
             world.scheduler.start(pid).await.unwrap();
             let observer = maos_bin::yank_policy::YankRuntime::new(
+                world.cap.clone(),
                 world.tl.clone(),
                 world.scheduler.clone(),
                 world.applier.clone(),
@@ -286,10 +292,175 @@ fn signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8() {
                     world.scheduler.scbs().read().unwrap()[&pid].current_state(),
                     ScbLifecycleState::Running
                 );
+                assert_eq!(
+                    world.cap.is_paused(pid),
+                    policy == YankPolicy::Quarantine,
+                    "only the quarantine policy fences the still-loaded Spirit"
+                );
             }
             drop(observer);
             drop(world);
         }
+    });
+    std::env::remove_var("MAOS_AUDIT_KEY");
+}
+const REGISTRY: &str = "http://127.0.0.1:20101/mcp";
+fn signed_yank(name: &str, version: &str, uri: &str, signer: &[u8; 32]) -> YankEntry {
+    let mut entry = YankEntry::new(name.into(), version.into(), 0, "withdrawn".into());
+    entry.sequence = 1;
+    entry.origin = Some(YankOrigin::Publisher);
+    entry.authorization = maos_registry::yank_auth::YankAuthorization::sign(
+        signer,
+        maos_registry::yank_auth::YankScope {
+            name,
+            version,
+            reason: "withdrawn",
+            registry_uri: uri,
+        },
+        YankOrigin::Publisher,
+        String::new(),
+        10,
+    )
+    .unwrap();
+    entry
+}
+fn receipts(tl: &TransparencyLogAdapter, pid: u32) -> usize {
+    tl.query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
+        kind: Some(maos_kernel_core::iac::transparency_log::FrameKind::CapabilityInvocation),
+        spirit_pid: Some(pid),
+        ..Default::default()
+    })
+    .unwrap()
+    .into_iter()
+    .filter(|frame| frame.intent == "spirit.quarantined")
+    .count()
+}
+#[test]
+fn quarantine_policy_fences_only_the_signed_yank_target_and_stays_sticky_ac8() {
+    let _lock = ENV.lock().unwrap();
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        let tmp = tempfile::tempdir().unwrap();
+        install_fixture(tmp.path(), false);
+        let world = world(&tmp.path().join("world"));
+        let mut pids = Vec::new();
+        for name in ["running", "other"] {
+            let pid = world
+                .scheduler
+                .load(name, manifest_named(name), Spirit, 1)
+                .await
+                .unwrap();
+            world.scheduler.start(pid).await.unwrap();
+            pids.push(pid);
+        }
+        let (target, bystander) = (pids[0], pids[1]);
+        let observer = maos_bin::yank_policy::YankRuntime::new(
+            world.cap.clone(),
+            world.tl.clone(),
+            world.scheduler.clone(),
+            world.applier.clone(),
+            YankPolicy::Quarantine,
+            REGISTRY.into(),
+        );
+        let fenced = |pid| world.cap.is_paused(pid);
+
+        // A hostile registry cannot quarantine anything: a forged row, a row
+        // signed by an attacker, a row for a loaded but uninstalled name, and a
+        // row signed for another registry are all refused; a validly signed row
+        // for a version the Spirit is not running is verified but not actionable.
+        let mut forged = signed_yank("running", "1.0.0", REGISTRY, &trust::PUBLISHER);
+        forged.reason.push('!');
+        let attacker = signed_yank("running", "1.0.0", REGISTRY, &trust::VETTER);
+        let uninstalled = signed_yank("other", "1.0.0", REGISTRY, &trust::VETTER);
+        let rebound = signed_yank(
+            "running",
+            "1.0.0",
+            "http://evil.invalid/mcp",
+            &trust::PUBLISHER,
+        );
+        for hostile in [&forged, &attacker, &uninstalled, &rebound] {
+            assert!(
+                matches!(
+                    observer.on_yank(hostile).unwrap(),
+                    maos_registry::yank::YankDisposition::Rejected(_)
+                ),
+                "{hostile:?}"
+            );
+        }
+        let other_version = signed_yank("running", "2.0.0", REGISTRY, &trust::PUBLISHER);
+        assert!(matches!(
+            observer.on_yank(&other_version).unwrap(),
+            maos_registry::yank::YankDisposition::Verified
+        ));
+        assert!(!fenced(target) && !fenced(bystander));
+        assert_eq!(
+            receipts(&world.tl, target) + receipts(&world.tl, bystander),
+            0
+        );
+
+        // The authentic publisher yank fences exactly the yanked running Spirit.
+        let entry = signed_yank("running", "1.0.0", REGISTRY, &trust::PUBLISHER);
+        observer.on_yank(&entry).unwrap();
+        observer.on_yank(&entry).unwrap();
+        assert!(
+            world.cap.is_quarantined(target),
+            "the yanked Spirit is quarantined"
+        );
+        assert!(!fenced(bystander), "an unrelated Spirit is untouched");
+        assert_ne!(
+            world.cap.issue_with_mediation(
+                bystander,
+                maos_domain::invariants::i1::Scope::FsRead {
+                    subtree: "/tmp".into()
+                },
+                60,
+                [0; 32],
+                maos_domain::invariants::i1::IntentClass::Standard
+            ),
+            Err(maos_domain::ports::capability::CapError::Revoked)
+        );
+        assert_eq!(
+            world.cap.issue_with_mediation(
+                target,
+                maos_domain::invariants::i1::Scope::FsRead {
+                    subtree: "/tmp".into()
+                },
+                60,
+                [0; 32],
+                maos_domain::invariants::i1::IntentClass::Standard
+            ),
+            Err(maos_domain::ports::capability::CapError::Revoked),
+            "the next mediated call of the quarantined Spirit is refused"
+        );
+        assert_eq!(
+            receipts(&world.tl, target),
+            1,
+            "one typed receipt; the replay is deduplicated"
+        );
+        assert_eq!(receipts(&world.tl, bystander), 0);
+        let scbs = world.scheduler.scbs();
+        assert_eq!(
+            scbs.read().unwrap()[&target].current_state(),
+            ScbLifecycleState::Running,
+            "quarantine isolates and never kills"
+        );
+
+        // A director pause -> resume cannot lift it; unload ends it.
+        world.scheduler.pause(target).await.unwrap();
+        world.scheduler.resume(target).await.unwrap();
+        assert!(
+            world.cap.is_quarantined(target),
+            "resume leaves the quarantine"
+        );
+        world.scheduler.unload(target).await.unwrap();
+        assert!(!fenced(target), "unload clears the fence");
+        assert!(!fenced(bystander));
+        drop(observer);
+        drop(world);
     });
     std::env::remove_var("MAOS_AUDIT_KEY");
 }
@@ -313,6 +484,7 @@ fn expiry_and_vetter_revocation_observe_once_and_request_policy_ac9() {
                 .unwrap();
             world.scheduler.start(pid).await.unwrap();
             let observer = maos_bin::yank_policy::YankRuntime::new(
+                world.cap.clone(),
                 world.tl.clone(),
                 world.scheduler.clone(),
                 world.applier.clone(),
@@ -542,6 +714,7 @@ fn failing_auto_revoke_retries_policy_without_repeating_observation_p12() {
         .join();
         assert!(fault.is_err());
         let observer = maos_bin::yank_policy::YankRuntime::new(
+            world.cap.clone(),
             world.tl.clone(),
             world.scheduler.clone(),
             world.applier.clone(),
@@ -613,6 +786,7 @@ fn rejected_vetter_row_does_not_hide_later_publisher_yank_p1() {
     .unwrap();
     let world = world(&tmp.path().join("world"));
     let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
+        world.cap.clone(),
         world.tl.clone(),
         world.scheduler.clone(),
         world.applier.clone(),
@@ -646,6 +820,7 @@ fn uninstalled_unsigned_row_never_advances_authenticated_cursor_f1() {
     std::env::set_var("HOME", tmp.path());
     let world = world(&tmp.path().join("world"));
     let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
+        world.cap.clone(),
         world.tl.clone(),
         world.scheduler.clone(),
         world.applier.clone(),
@@ -711,6 +886,7 @@ fn corrupt_install_does_not_hide_another_spirits_expiry_p1() {
             .unwrap();
         world.scheduler.start(pid).await.unwrap();
         let observer = maos_bin::yank_policy::YankRuntime::new(
+            world.cap.clone(),
             world.tl.clone(),
             world.scheduler.clone(),
             world.applier.clone(),
@@ -746,6 +922,7 @@ fn poller_runtime_clock_and_cursor_restart_reach_expiry_p6() {
         let source = Arc::new(FixtureYanks(vec![signed_entry(1, YankOrigin::Publisher)]));
         for boot in 1..=2 {
             let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
+                world.cap.clone(),
                 world.tl.clone(), world.scheduler.clone(), world.applier.clone(),
                 YankPolicy::Warn, "http://127.0.0.1:20101/mcp".into()).with_clock(|| Ok(1000)));
             let poller = maos_registry::yank::YankPoller::new(source.clone(), observer,
@@ -783,6 +960,7 @@ fn no_registry_local_timer_discovers_promotion_installed_after_start_p11() {
         world.scheduler.start(pid).await.unwrap();
         let observer = Arc::new(
             maos_bin::yank_policy::YankRuntime::new(
+                world.cap.clone(),
                 world.tl.clone(),
                 world.scheduler.clone(),
                 world.applier.clone(),

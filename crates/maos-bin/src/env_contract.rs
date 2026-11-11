@@ -13,7 +13,7 @@ pub enum EnvStability {
 pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     EnvVar {
         name: "MAOS_YANK_POLICY",
-        purpose: "Registry yank policy: warn (default), quarantine request (effect final KQ1), auto-revoke",
+        purpose: "Registry yank policy: warn (default), quarantine (sticky kernel fence on the matched running Spirit), auto-revoke",
         stability: EnvStability::UserFacing,
     },
     EnvVar {

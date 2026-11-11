@@ -4461,6 +4461,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     let mut yank_poller_task = {
         let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
+            capability.clone(),
             transparency_log.clone(),
             scheduler.clone(),
             revocation_applier.clone(),
@@ -4481,9 +4482,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "disabled"
             }
         );
-        if yank_policy == maos_registry::yank::YankPolicy::Quarantine {
-            eprintln!("maos: quarantine requested only (effect lands with KQ1; not claimed in L1)");
-        }
         if let Some(source) = yank_source {
             maos_bin::yank_policy::PollTask::start(
                 Arc::new(maos_registry::yank::YankPoller::new(

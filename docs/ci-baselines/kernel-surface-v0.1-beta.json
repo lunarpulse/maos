@@ -580,7 +580,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::capability::CapabilityRegistryAdapter",
-      "signature_hash": "bb8e817f899c3d9b8a740ae970716199096a2219649b9da533c8602924932f4b"
+      "signature_hash": "6e32a6420eaa910da8a4593d8e423f8a85eaf9d17c0a9b1292f44c6e342c3197"
     },
     {
       "kind": "struct",

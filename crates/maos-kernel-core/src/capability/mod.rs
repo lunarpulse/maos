@@ -135,6 +135,9 @@ pub struct CapabilityRegistryAdapter {
     /// Story 19-2 (FR51 a) — pids the director paused: every mediated action
     /// (issuance and verification) of a fenced pid fails closed until resume.
     paused: std::sync::RwLock<std::collections::BTreeSet<u32>>,
+    /// FR13 (20-1) — pids a revocation or yank policy quarantined: fenced like a
+    /// pause, but a director resume does not lift it; only unload ends it.
+    quarantined: std::sync::RwLock<std::collections::BTreeSet<u32>>,
 }
 
 impl std::fmt::Debug for CapabilityRegistryAdapter {
@@ -177,6 +180,7 @@ impl CapabilityRegistryAdapter {
             telemetry,
             context: Arc::default(),
             paused: std::sync::RwLock::default(),
+            quarantined: std::sync::RwLock::default(),
         }
     }
 
@@ -348,9 +352,29 @@ impl CapabilityRegistryAdapter {
         self.tokens.verify(token, [0u8; 32], SandboxTier(0))
     }
 
-    /// Whether `spirit_pid` is fenced by a director pause.
+    /// Whether `spirit_pid` is fenced by a director pause or a quarantine.
     pub fn is_paused(&self, spirit_pid: u32) -> bool {
-        self.paused
+        self.is_quarantined(spirit_pid)
+            || self
+                .paused
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .contains(&spirit_pid)
+    }
+
+    /// FR13 (20-1) — quarantine (`true`) or release (`false`) `spirit_pid`.
+    pub fn set_quarantined(&self, spirit_pid: u32, quarantined: bool) {
+        let mut set = self.quarantined.write().unwrap_or_else(|e| e.into_inner());
+        if quarantined {
+            set.insert(spirit_pid);
+        } else {
+            set.remove(&spirit_pid);
+        }
+    }
+
+    /// Whether `spirit_pid` is quarantined (FR13).
+    pub fn is_quarantined(&self, spirit_pid: u32) -> bool {
+        self.quarantined
             .read()
             .unwrap_or_else(|e| e.into_inner())
             .contains(&spirit_pid)

@@ -387,7 +387,7 @@ coverage:
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
-    notes: asserted, owner 20-1b-vetting-yank-policy-and-quarantine; FR13 quarantine isolation is not proven by the FR31 principal-memory witness.
+    notes: asserted, owner 20-1b-vetting-yank-policy-and-quarantine. FR13 quarantine isolation is witnessed by crates/maos-kernel-core/tests/quarantine_fr13_20_1.rs (CRL arm fences every mediated action, never terminates, survives a director resume, ends at unload) and the signed-yank policy effect by crates/maos-bin/tests/yank_policy_20_1b.rs; the hosted T3 container leg is unverified and the invariant document I5 stays asserted under ADR-037.
   FR14:
     gates: []
     corpora: []
@@ -700,7 +700,9 @@ coverage:
       maos-bin/tests/one_daemon_one_door_16_1.rs. Actual poller/runtime clock,
       restart and no-registry late-install lapse observations:
       maos-bin/tests/yank_policy_20_1b.rs.
-      Sticky quarantine effect is not claimed until the final KQ1 landing.
+      Sticky quarantine effect (20-1b landing 2): the quarantine policy fences the
+      signed-yank-matched running Spirit only (quarantine_policy_fences_only_the_signed_yank_target_and_stays_sticky_ac8
+      in maos-bin/tests/yank_policy_20_1b.rs); hostile or unrelated rows fence nothing.
   FR38:
     gates: []
     corpora: []
@@ -947,7 +949,7 @@ coverage:
       both-end development controls. Authenticated mode detects network omission;
       unsigned loopback development and authority-signed fresh-client rollback
       stay outside that guarantee. Hosted TLS/dev and macOS legs are unverified.
-      Sticky quarantine effect awaits final KQ1; no accredited-vetter claim.
+      Sticky quarantine effect landed with 20-1b landing 2 (kernel KQ1); no accredited-vetter claim.
   FR6:
     gates: []
     corpora: []

@@ -691,6 +691,30 @@ fn ac1_sigterm_exits_promptly_and_drains_the_audit_channel() {
     );
 }
 
+/// Story 20-1b AC12 (D-20-1-03 A) — the revocation poller says a failure once.
+/// A fresh home has no `latest.signed.json`, so every poll fails; at the 100 ms
+/// test cadence a live root would otherwise print the same line on every tick.
+#[test]
+fn ac12_20_1b_a_failing_revocation_poll_is_printed_once() {
+    let mut root = Root::butler_with("poller-edge", &[("MAOS_REVOCATION_FAST", "1")]);
+    std::thread::sleep(Duration::from_secs(1));
+    let (_elapsed, stderr) = root.terminate();
+    let failures: Vec<&str> = stderr
+        .lines()
+        .filter(|line| line.starts_with("revocation poller: poll_once failed"))
+        .collect();
+    assert_eq!(
+        failures.len(),
+        1,
+        "one failure line for a persistent fault, not one per 100 ms tick: {stderr}"
+    );
+    assert!(
+        failures[0].contains("repeats counted until recovery"),
+        "the single line says repeats are counted: {}",
+        failures[0]
+    );
+}
+
 /// Story 17-10 review D2 — an error exit after a Spirit ran still reaches the
 /// teardown. The second topology entry repeats the first's `spirit_id` after
 /// the first was admitted and started; the root must stop the escape tail

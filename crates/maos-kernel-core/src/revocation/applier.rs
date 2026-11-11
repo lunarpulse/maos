@@ -121,8 +121,7 @@ impl RevocationApplier {
                 }
                 matched_count += 1;
                 revoked_count += 1;
-                let tokens_revoked =
-                    self.capability.revoke_all_for_pid(scb.pid);
+                let tokens_revoked = self.capability.revoke_all_for_pid(scb.pid);
                 tokens_revoked_total += tokens_revoked;
                 let in_flight_token_count = scb
                     .task_assignments_in_flight
@@ -141,34 +140,65 @@ impl RevocationApplier {
                     "in_flight_token_count": in_flight_token_count,
                     "action": runtime.on_revocation_action.as_str(),
                 }))
-                .map_err(|error| RevocationError::Deserialize(format!("payload serialize: {error}")))?;
+                .map_err(|error| {
+                    RevocationError::Deserialize(format!("payload serialize: {error}"))
+                })?;
                 self.tl.insert_frame_event(
-                    FrameKind::SpiritRevoked, scb.pid, None, "spirit.revoked", &payload_bytes, FrameOrigin::Kernel,
+                    FrameKind::SpiritRevoked,
+                    scb.pid,
+                    None,
+                    "spirit.revoked",
+                    &payload_bytes,
+                    FrameOrigin::Kernel,
                 );
 
                 let receipts = match runtime.on_revocation_action {
                     RevocationAction::TerminateImmediately => {
                         let receipts = terminate_spirit(
-                            &self.tl, &self.halt_registry, scb.pid, &scb.spirit_id,
-                            maos_domain::halt::TerminationKind::RevocationTerminated, scb.boot_nonce,
+                            &self.tl,
+                            &self.halt_registry,
+                            scb.pid,
+                            &scb.spirit_id,
+                            maos_domain::halt::TerminationKind::RevocationTerminated,
+                            scb.boot_nonce,
                         );
                         self.scheduler.unload(scb.pid).await.map_err(|error| {
-                            RevocationError::Io(format!("unload revoked spirit pid={}: {error}", scb.pid))
+                            RevocationError::Io(format!(
+                                "unload revoked spirit pid={}: {error}",
+                                scb.pid
+                            ))
                         })?;
                         receipts.len()
                     }
-                    RevocationAction::DrainThenTerminate | RevocationAction::Quarantine => {
-                        if runtime.on_revocation_action == RevocationAction::Quarantine {
-                            let marker_bytes = serde_json::to_vec(&serde_json::json!({
-                                "spirit_id": scb.spirit_id, "spirit_pid": scb.pid, "quarantine_requested": true,
-                            })).map_err(|error| RevocationError::Deserialize(format!("marker serialize: {error}")))?;
-                            self.tl.insert_frame_event(
-                                FrameKind::CapabilityInvocation, scb.pid, None, "spirit.quarantine_requested",
-                                &marker_bytes, FrameOrigin::Kernel,
-                            );
-                        }
-                        let deadline_ms = runtime.manifest.supervision.as_ref()
-                            .map(|supervision| u64::from(supervision.progress_threshold_ms).saturating_mul(2))
+                    // FR13 (20-1): quarantine = running, but no new tool calls. Every
+                    // mediated action of the pid fails closed; the Spirit stays loaded
+                    // for forensic inspection and is never terminated by this arm.
+                    RevocationAction::Quarantine => {
+                        self.capability.set_quarantined(scb.pid, true);
+                        let marker_bytes = serde_json::to_vec(&serde_json::json!({
+                            "spirit_id": scb.spirit_id, "spirit_pid": scb.pid, "quarantined": true,
+                        }))
+                        .map_err(|error| {
+                            RevocationError::Deserialize(format!("marker serialize: {error}"))
+                        })?;
+                        self.tl.insert_frame_event(
+                            FrameKind::CapabilityInvocation,
+                            scb.pid,
+                            None,
+                            "spirit.quarantined",
+                            &marker_bytes,
+                            FrameOrigin::Kernel,
+                        );
+                        0
+                    }
+                    RevocationAction::DrainThenTerminate => {
+                        let deadline_ms = runtime
+                            .manifest
+                            .supervision
+                            .as_ref()
+                            .map(|supervision| {
+                                u64::from(supervision.progress_threshold_ms).saturating_mul(2)
+                            })
                             .unwrap_or(60_000);
                         let tl = Arc::clone(&self.tl);
                         let halt_registry = Arc::clone(&self.halt_registry);
@@ -180,11 +210,17 @@ impl RevocationApplier {
                         let handle = tokio::spawn(async move {
                             tokio::time::sleep(std::time::Duration::from_millis(deadline_ms)).await;
                             let _ = terminate_spirit(
-                                &tl, &halt_registry, pid, &spirit_id,
-                                maos_domain::halt::TerminationKind::RevocationTerminated, boot_nonce,
+                                &tl,
+                                &halt_registry,
+                                pid,
+                                &spirit_id,
+                                maos_domain::halt::TerminationKind::RevocationTerminated,
+                                boot_nonce,
                             );
                             if let Err(error) = scheduler.unload(pid).await {
-                                eprintln!("revocation: deferred unload failed for pid={pid}: {error}");
+                                eprintln!(
+                                    "revocation: deferred unload failed for pid={pid}: {error}"
+                                );
                             }
                             if let Ok(mut drains) = active_drains.lock() {
                                 drains.remove(&pid);
@@ -198,19 +234,21 @@ impl RevocationApplier {
                     }
                     _ => {
                         return Err(RevocationError::UnsupportedAction(format!(
-                            "{:?}", runtime.on_revocation_action
+                            "{:?}",
+                            runtime.on_revocation_action
                         )));
                     }
                 };
 
                 halt_receipts_produced += receipts;
-                self.journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
-                    timestamp: monotonic_now_ns() / 1_000_000_000,
-                    lifecycle_event: LifecycleEvent::Revoked,
-                    spirit_id: scb.spirit_id.clone(),
-                    payload: None,
-                    effective_sandbox_tier: None,
-                }));
+                self.journal
+                    .append_transition(JournalEntry::Lifecycle(LifecycleEntry {
+                        timestamp: monotonic_now_ns() / 1_000_000_000,
+                        lifecycle_event: LifecycleEvent::Revoked,
+                        spirit_id: scb.spirit_id.clone(),
+                        payload: None,
+                        effective_sandbox_tier: None,
+                    }));
                 per_spirit.push(ApplyEntry {
                     spirit_id: scb.spirit_id.clone(),
                     spirit_pid: scb.pid,
@@ -224,7 +262,11 @@ impl RevocationApplier {
             }
 
             let latency_ns = monotonic_now_ns().saturating_sub(start_ns);
-            self.telemetry.record_iac_rt(Service::RevocationApplier, Outcome::Ok, latency_ns / 1000);
+            self.telemetry.record_iac_rt(
+                Service::RevocationApplier,
+                Outcome::Ok,
+                latency_ns / 1000,
+            );
             Ok(ApplyReport {
                 crl_id: crl.id,
                 origin: crl.origin,
@@ -235,7 +277,8 @@ impl RevocationApplier {
                 apply_latency_ns: latency_ns,
                 per_spirit,
             })
-        }.await;
+        }
+        .await;
 
         if result.is_err() {
             self.rules.remove_locked(crl.id);

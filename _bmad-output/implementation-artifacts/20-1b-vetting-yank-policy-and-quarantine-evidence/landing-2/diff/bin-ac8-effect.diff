@@ -1,0 +1,146 @@
+diff --git a/crates/maos-bin/src/env_contract.rs b/crates/maos-bin/src/env_contract.rs
+index c422726c..73ed4379 100644
+--- a/crates/maos-bin/src/env_contract.rs
++++ b/crates/maos-bin/src/env_contract.rs
+@@ -13,7 +13,7 @@ pub enum EnvStability {
+ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
+     EnvVar {
+         name: "MAOS_YANK_POLICY",
+-        purpose: "Registry yank policy: warn (default), quarantine request (effect final KQ1), auto-revoke",
++        purpose: "Registry yank policy: warn (default), quarantine (sticky kernel fence on the matched running Spirit), auto-revoke",
+         stability: EnvStability::UserFacing,
+     },
+     EnvVar {
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index 0c89d7c4..7364dbcd 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -4461,6 +4461,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+     );
+     let mut yank_poller_task = {
+         let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
++            capability.clone(),
+             transparency_log.clone(),
+             scheduler.clone(),
+             revocation_applier.clone(),
+@@ -4481,9 +4482,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                 "disabled"
+             }
+         );
+-        if yank_policy == maos_registry::yank::YankPolicy::Quarantine {
+-            eprintln!("maos: quarantine requested only (effect lands with KQ1; not claimed in L1)");
+-        }
+         if let Some(source) = yank_source {
+             maos_bin::yank_policy::PollTask::start(
+                 Arc::new(maos_registry::yank::YankPoller::new(
+diff --git a/crates/maos-bin/src/yank_policy.rs b/crates/maos-bin/src/yank_policy.rs
+index 314ec959..68ed38c7 100644
+--- a/crates/maos-bin/src/yank_policy.rs
++++ b/crates/maos-bin/src/yank_policy.rs
+@@ -1,7 +1,8 @@
+-//! Kernel-free yank decisions and running-promotion observation. Sticky quarantine
+-//! effects are deliberately owned by the final KQ1 landing, not a pause shim.
++//! Yank decisions and running-promotion observation. The quarantine policy fences a
++//! matched running Spirit through the kernel's sticky FR13 fence (20-1b KQ1).
+ use maos_domain::invariants::i3::FrameOrigin;
+ use maos_domain::ports::registry::{RegistryError, SignedPackage, YankEntry, YankOrigin};
++use maos_kernel_core::capability::CapabilityRegistryAdapter;
+ use maos_kernel_core::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
+ use maos_kernel_core::scheduler::{control_block::ScbLifecycleState, SpiritSchedulerAdapter};
+ use maos_registry::yank::{YankDisposition, YankObserver, YankPolicy, YankPolicyOutcome};
+@@ -9,6 +10,7 @@ use std::collections::BTreeMap;
+ use std::sync::{Arc, Mutex};
+ 
+ pub struct YankRuntime {
++    capability: Arc<CapabilityRegistryAdapter>,
+     tl: Arc<TransparencyLogAdapter>,
+     scheduler: Arc<SpiritSchedulerAdapter>,
+     applier: Arc<maos_kernel_core::revocation::RevocationApplier>,
+@@ -19,6 +21,7 @@ pub struct YankRuntime {
+ }
+ impl YankRuntime {
+     pub fn new(
++        capability: Arc<CapabilityRegistryAdapter>,
+         tl: Arc<TransparencyLogAdapter>,
+         scheduler: Arc<SpiritSchedulerAdapter>,
+         applier: Arc<maos_kernel_core::revocation::RevocationApplier>,
+@@ -26,6 +29,7 @@ impl YankRuntime {
+         registry_uri: String,
+     ) -> Self {
+         Self {
++            capability,
+             tl,
+             scheduler,
+             applier,
+@@ -58,15 +62,16 @@ impl YankRuntime {
+         version: &str,
+         origin: YankOrigin,
+         cause: &str,
++        pid: Option<u32>,
+     ) -> Result<YankPolicyOutcome, RegistryError> {
+         let outcome = self.policy.outcome();
+-        // This durable record precedes the effect. L1 never substitutes a resumable pause.
++        // This durable record precedes the effect.
+         self.record(
+             "registry-yank-policy",
+             &serde_json::json!({
+                 "spirit_id": name, "version": version, "origin": origin,
+                 "cause": cause, "outcome": outcome,
+-                "quarantine_effect": "final-kq1-landing-not-claimed-in-l1",
++                "quarantine_effect": "sticky-fence-on-matched-running-spirit",
+             }),
+         )?;
+         if outcome == YankPolicyOutcome::AutoRevokeRequested {
+@@ -79,6 +84,22 @@ impl YankRuntime {
+                 Err(error) => return Err(RegistryError::Transport(error.to_string())),
+             }
+         }
++        if let (YankPolicyOutcome::QuarantineRequested, Some(pid)) = (outcome, pid) {
++            self.capability.set_quarantined(pid, true);
++            let receipt = serde_json::to_vec(&serde_json::json!({
++                "spirit_id": name, "spirit_pid": pid, "quarantined": true,
++                "origin": origin, "cause": cause,
++            }))
++            .map_err(|e| RegistryError::Transport(e.to_string()))?;
++            let _logged = self.tl.insert_frame_event(
++                FrameKind::CapabilityInvocation,
++                pid,
++                None,
++                "spirit.quarantined",
++                &receipt,
++                FrameOrigin::Kernel,
++            );
++        }
+         Ok(outcome)
+     }
+     fn installed(name: &str) -> Result<Option<(SignedPackage, std::path::PathBuf)>, RegistryError> {
+@@ -138,7 +159,13 @@ impl YankRuntime {
+         }
+         // Journal dedupe precedes effects; retry failed effects without holding
+         // this mutex across the applier's asynchronous boundary.
+-        self.policy_request(pkg.spirit_id.as_str(), &pkg.version, origin, cause)?;
++        self.policy_request(
++            pkg.spirit_id.as_str(),
++            &pkg.version,
++            origin,
++            cause,
++            Some(spirit.pid),
++        )?;
+         self.observed
+             .lock()
+             .map_err(|e| RegistryError::Transport(e.to_string()))?
+@@ -348,7 +375,13 @@ impl YankObserver for YankRuntime {
+             .cloned()
+             .collect();
+         if spirits.is_empty() {
+-            self.policy_request(pkg.spirit_id.as_str(), &pkg.version, origin, &entry.reason)?;
++            self.policy_request(
++                pkg.spirit_id.as_str(),
++                &pkg.version,
++                origin,
++                &entry.reason,
++                None,
++            )?;
+         } else {
+             for spirit in spirits {
+                 self.request_for_running(

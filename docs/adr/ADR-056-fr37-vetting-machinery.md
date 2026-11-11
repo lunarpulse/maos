@@ -111,7 +111,9 @@ The FKCS conformance review that discharged decision D8 (`epic-14-preflight-deci
   The issuer and operator-root-signed attestation-revocation-list writer live in
   `maos-spirit-cli`; `vet issue`/`vet revoke` do not enroll a vetter implicitly.
   Running expiry/revocation uses the yank cadence and preserves cause labels.
-  Quarantine requests in L1 do not claim the final KQ1 isolation effect.
+  Quarantine requests in L1 did not claim the isolation effect; 20-1b landing 2 (final kernel
+  landing, KQ1) delivers it: the `quarantine` policy fences each signed-yank-matched running
+  Spirit through the kernel sticky fence and journals one `spirit.quarantined` receipt.
 
 ## Amendment — 20-1b L1 independent-review corrections (2026-11-07)
 
@@ -145,7 +147,7 @@ cadence is 300 seconds. Network work cannot hold boot/shutdown or the audit drai
 open. One bad Spirit or rejected withdrawal does not starve another observation,
 and retrying an effect does not repeat its terminal observation.
 The correction landing has zero kernel delta (26,841 physical / 21,042 tokei);
-quarantine is still a typed request only, with its effect reserved for final KQ1.
+quarantine was still a typed request only at that landing; its effect arrived at 20-1b landing 2 (kernel 26,967 physical / 21,141 tokei).
 
 ## Amendment — AC15 authenticated first contact and yank heads
 

@@ -1,0 +1,20 @@
+--- /tmp/t201b/keep-ac11-drain-in-arm	2026-11-11 14:08:29.436004587 +0000
++++ /home/lunarpulse/dev_ws/crates/maos-kernel-core/src/revocation/applier.rs	2026-11-11 14:08:36.719671444 +0000
+@@ -173,7 +173,7 @@
+                     // FR13 (20-1): quarantine = running, but no new tool calls. Every
+                     // mediated action of the pid fails closed; the Spirit stays loaded
+                     // for forensic inspection and is never terminated by this arm.
+-                    RevocationAction::Quarantine => {
++                    RevocationAction::Quarantine if false => {
+                         self.capability.set_quarantined(scb.pid, true);
+                         let marker_bytes = serde_json::to_vec(&serde_json::json!({
+                             "spirit_id": scb.spirit_id, "spirit_pid": scb.pid, "quarantined": true,
+@@ -191,7 +191,7 @@
+                         );
+                         0
+                     }
+-                    RevocationAction::DrainThenTerminate => {
++                    RevocationAction::DrainThenTerminate | RevocationAction::Quarantine => {
+                         let deadline_ms = runtime
+                             .manifest
+                             .supervision

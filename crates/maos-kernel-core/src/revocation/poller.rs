@@ -40,12 +40,22 @@ impl RevocationPoller {
         tokio::spawn(async move {
             let cadence = pick_poll_cadence();
             let mut interval = tokio::time::interval(cadence);
+            // D-18-0-12 B: print the first failure and the recovery, count the rest.
+            let mut failures: u64 = 0;
             loop {
                 tokio::select! {
                     _ = cancel.cancelled() => return,
-                    _ = interval.tick() => {
-                        if let Err(e) = self.poll_once().await {
-                            eprintln!("revocation poller: poll_once failed: {e}");
+                    _ = interval.tick() => match self.poll_once().await {
+                        Ok(()) if failures > 0 => {
+                            eprintln!("revocation poller: recovered after {failures} failed poll(s)");
+                            failures = 0;
+                        }
+                        Ok(()) => {}
+                        Err(e) => {
+                            failures += 1;
+                            if failures == 1 {
+                                eprintln!("revocation poller: poll_once failed: {e} (repeats counted until recovery)");
+                            }
                             self.telemetry.record_iac_error(
                                 Service::RevocationApplier,
                                 ErrorKind::App,

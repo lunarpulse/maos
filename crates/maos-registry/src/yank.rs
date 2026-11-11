@@ -61,7 +61,7 @@ impl std::str::FromStr for YankPolicy {
         }
     }
 }
-/// Typed request at the non-kernel boundary. Quarantine effects require final KQ1.
+/// Typed request at the non-kernel boundary; the daemon turns `QuarantineRequested` into the kernel KQ1 fence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum YankPolicyOutcome {

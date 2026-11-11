@@ -1,0 +1,11 @@
+--- /tmp/t201b/keep-ac8-effect-ignored	2026-11-11 14:06:56.522353850 +0000
++++ /home/lunarpulse/dev_ws/crates/maos-bin/src/yank_policy.rs	2026-11-11 14:08:51.449601625 +0000
+@@ -85,7 +85,7 @@
+             }
+         }
+         if let (YankPolicyOutcome::QuarantineRequested, Some(pid)) = (outcome, pid) {
+-            self.capability.set_quarantined(pid, true);
++            self.capability.set_quarantined(pid, false);
+             let receipt = serde_json::to_vec(&serde_json::json!({
+                 "spirit_id": name, "spirit_pid": pid, "quarantined": true,
+                 "origin": origin, "cause": cause,

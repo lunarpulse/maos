@@ -274,6 +274,8 @@ Shared Dev Notes (what changes by file, guardrails, proven-red controls, tests a
 
 `openai-codex/gpt-6.1-sol` — kernel-free landing-1 implementation.
 
+`anthropic/claude-sonnet-5-5` (Dev201bK) — landing 2, the final kernel landing (row R = KQ1 + P) and the AC8 quarantine effect, 2026-11-11.
+
 ### Debug Log References
 
 - Shared creation/ruling history: `20-1-registry-client-install-verb-vetter-and-yank-evidence/creation/`. Its a4c00897 citations/prices are historical, not current pins.
@@ -940,6 +942,82 @@ assertions. The inherited admission hunk remains a re-review focus. Final owned
 paths/hashes and consolidated evidence are in `source-inventory.json` and
 `final-report.md` under this correction directory. No commit/push/status flip.
 
+### Landing 2 — final kernel landing (row R = KQ1 + P) and the AC8 quarantine effect — 2026-11-11
+
+**Authority and base.** Model `anthropic/claude-sonnet-5-5` (Dev201bK), base `c2beedb4` (= origin/main), uncommitted.
+Grant: [`20-1b-flag-winston-decision.md`](20-1b-flag-winston-decision.md) (ruled 2026-11-01/02 `rows201`; Main 2026-11-06:
+the AC8 effect joins row R, no KQ0 substitute). Evidence: `20-1b-vetting-yank-policy-and-quarantine-evidence/landing-2/`
+(`README.md` index, `commands.md`). Creation prototypes were never compiled and were re-cut, not applied blindly: the
+creation scheduler hunk no longer applied after 20-11 and the one-line `unload` clear was re-placed.
+
+**T0 (priced before editing the repo).** On a `git archive HEAD` copy, formatted, prebuilt gates from the copy root:
+kernel **26889 / 21073 -> 26967 / 21141 = +78 physical / +68 tokei, identical to the grant** (creation +78/+68; forecast
+at the old base 26919/21110). Live x2 ceilings: 26889 + 156 = **27045** physical, 21073 + 136 = **21209** tokei; shared
+STOP 21250 not approached. The surface gate flagged exactly one symbol, `CapabilityRegistryAdapter` (named by D-20-1-02 A):
+one ADR-066 hash refresh `bb8e817f... -> 6e32a642...`; nothing outside the grant, so no STOP.
+
+**Implemented.**
+
+- *KQ1* (`capability/mod.rs`, `revocation/applier.rs`, `scheduler/scheduler_loop.rs`): private `quarantined` pid set,
+  `set_quarantined`/`is_quarantined`; `is_paused` honours it at every fence site; the CRL `Quarantine` arm fences, journals
+  `spirit.quarantined`, spawns no drain/terminate; `unload` clears it; a director `resume` cannot.
+- *P* (`revocation/poller.rs`): first failure prints once with the repeat note; repeats counted; recovery prints the count.
+- *AC8 effect* (`maos-bin/src/yank_policy.rs`, `main.rs`): `YankRuntime::new` takes the `CapabilityRegistryAdapter`;
+  the `quarantine` policy fences each signed-yank-matched Running Spirit (`policy_request` carries the pid) and journals the
+  same `spirit.quarantined` receipt; replays are deduplicated by the existing `observed` map. The L1 signed-yank authority
+  checks gate the request. The stale "requested only (not claimed in L1)" daemon line and `MAOS_YANK_POLICY` text are
+  updated; no new verb, env var or CLI surface.
+- *FR4 classifier* (`maos-audit/src/fr4_classifier.rs`, +11 tokei): the one-time workspace run caught the new tokenless
+  kind-7 writer site (`yank_policy.rs, policy_request, 0`) and the renamed kernel marker as unclassified (`fr4_classifier_16_2`
+  red, `landing-2/final/workspace-nextest.log`); both are now `WRITER_SHAPES` entries with the same payload shape
+  (`spirit_id`, `spirit_pid`, `quarantined`) and a measured fixture each.
+- Docs: coverage-matrix FR13/FR37/FR59 notes, `4-kernel-design.md` §RevocationApplier, ADR-056, `MAOS_YANK_POLICY` purpose.
+  `docs/invariants/*.md` untouched (ADR-037) -- the I5 FR13 flip is a held row.
+
+**AC witness table.** Red-run line numbers are from the pre-`cargo fmt` test files; names are stable.
+
+| AC | Witness (final name:line) | Red at HEAD (log under `landing-2/red-head/`) | Plant (restored by copy-back + cmp + touch; `landing-2/plants/`) | Final |
+|---|---|---|---|---|
+| AC11.2 receipt + no halt | `quarantine_fr13_20_1.rs:337 crl_quarantine_journals_one_typed_receipt_and_no_termination` | `red-head-kernel.log`: HEAD journals `spirit.quarantine_requested` (left 0 / right 1) | `ac11-drain-in-arm` (Quarantine falls into drain-then-terminate), rc 101, 4.2 s | green |
+| AC11.2 mediated actions | `:380 crl_quarantine_refuses_every_mediated_action_and_reaches_no_effect` (mint MCP/inference/memory, verify held tokens, real MCP + inference adapters with counting stubs, bystander unaffected) | HEAD mints after the CRL (`Ok(token)` vs `Err(Revoked)`) | same plant, red | green |
+| AC11.2 loaded past deadline | `:456 crl_quarantine_keeps_the_spirit_loaded_and_running_past_the_drain_deadline` | HEAD unloads at the old 10 s deadline | same plant, red | green |
+| AC11.2 resume/unload | `:492 crl_quarantine_survives_director_resume_and_ends_only_at_unload` | HEAD has no fence to survive the resume | `ac11-unload-keeps-fence` (drop the unload clear), rc 101, 4.1 s | green |
+| AC11 existing action test | `on_revocation_three_actions.rs:157 applier_executes_terminate_drain_and_quarantine_actions` (updated: quarantine stays loaded, `spirit.quarantined`, no receipts) | red at HEAD (marker count 0/1) | covered by the AC11 plant | green |
+| AC12 | `one_daemon_one_door_16_1.rs:698 ac12_20_1b_a_failing_revocation_poll_is_printed_once` (real `maos run`, fresh home, `MAOS_REVOCATION_FAST`, ~1 s) | `red-head-poller.log`: **12** `poll_once failed` lines at HEAD | `ac12-print-every-failure`, rc 101, 11.4 s | exactly 1 line |
+| AC8 effect | `yank_policy_20_1b.rs:213` (policy matrix: only quarantine fences) | `red-head-bin-policy-ac8-warn-quarantine-crl.log` (`false` vs `true`) | `ac8-effect-ignored`, rc 101, 12.3 s | green |
+| AC8 + hostile registry | `yank_policy_20_1b.rs:339 quarantine_policy_fences_only_the_signed_yank_target_and_stays_sticky_ac8` (forged, wrong-publisher, uninstalled-name, wrong-registry rows refused; wrong-version verified/not actionable; authentic row fences only the target, one receipt, replay deduplicated, resume cannot lift, unload clears) | `red-head-bin-policy.log` (`the yanked Spirit is quarantined`) | `ac8-unrelated-spirit-matched` (6.1 s) and `ac8-hostile-row-accepted` (9.6 s), both rc 101 | green |
+
+`red-head-bin-policy.log` also contains four `PoisonError` cascade failures from the shared `ENV` mutex after the first
+red; they are not witnesses (the policy-matrix red is the separate log). The first kernel red run (single combined test)
+was split into the four vectors above before the retained run.
+
+**Exact pins.** `kernel-core-baseline.toml` 26889 -> **26967**, set hash `1eb6670a...` -> `06386b44...5e5f`, four file
+digests; `kloc.toml` kernel 21073 -> **21141**, bin 38362 -> **38392** (+30, inside the 20-1b bin ceiling 35671:
+35586 + 85 room, 55 left), audit 8286 -> **8297** (+11: one FR4 `WRITER_SHAPES` entry for the new bin receipt writer plus the renamed kernel marker intent/key; inside the 20-11 ceiling 8313 and the 20-1b audit correction ceiling 8204 = 8179 + 25), `_aggregate_hardfail` 202506 -> **202615** (clean aggregate 202614 on a `git archive HEAD` copy
+overlaid with the landing; the local tree's untracked operator files inflate the in-tree figure and are excluded);
+`kernel_pin_content_hash_16_0.rs` 26889 -> 26967 (x4); `recovery_lane_ceiling_rule.rs` 21_073 -> 21_141;
+`kernel-surface-v0.1-beta.json` one `CapabilityRegistryAdapter` hash. `kernel-api-classes.toml` unchanged.
+
+**Observed verification** (exact commands, exits and seconds: `landing-2/commands.md`). Kernel `--lib` 253/253; the four
+new kernel vectors + the updated action test, bin policy 11/11, poller 1/1, FR4 classifier 22/22 (after the two
+`WRITER_SHAPES` entries the first workspace run exposed), no-default verb table 7/7; gates (record completeness,
+epic-close coherence, exit commands, decision register, env contract, dev-model tier, kernel baseline 26967,
+service boundary, pub-field constructors, dependency closure, `invariant-lock`, `check-fkcs` own cell) all exit 0;
+`kloc-check` on the clean `git archive HEAD` overlay exits 0 (aggregate 202614, `over_budget []`); clippy exits 0 with the
+ratchet unchanged at 1328 occurrences / 868 source-distinct and no new diagnostic on a line added here; the AC13 negative
+control reds (39 stale-owner violations). Workspace nextest: run 1 had six `fixture stale` refusals from my own `touch`
+ordering plus one real `fr4_classifier_16_2` finding (fixed); the single final-tree run is 6007 run / 6006 passed / 1 failed,
+the documented `erasure_million_20_11` AC5 1M oracle (42.6 s, owner 20-7 rows already recorded; not retried or widened).
+`check-serde-error-handling` is red on one line that exists at HEAD (`main.rs:11092`, `5ff0ead1`), not caused here
+(deferred row, owner 20-11).
+
+**Cleanup.** After a process probe (no cargo active): own `/tmp/t201b` removed (2,129,133,568 allocated bytes) and 185 stale incremental sessions pruned (3,887,570,944 allocated bytes; newest session per crate and anything touched within 2 h kept) — `landing-2/cleanup.json`.
+
+**Not claimed / still open.** AC11.5 hosted T3 leg; AC15 hosted TLS/dev/macOS legs; hosted run, prepush and the
+independent review; restart persistence of quarantine (the fence is an in-memory pid set: a reload after a restart is
+unfenced, see the deferred row and the decision record); KQ2 egress fence not selected; the ADR-037 I5 flip. AC13's
+deferred-row closure is staged as locally witnessed with the `CLOSED @commit` stamp Main-owned. Status is not flipped.
+
 ### File List
 
 Historical original-L1 inventories: initial42 paths in `landing-tracked-file-list.stdout`; final43 in `landing-tracked-file-list-final.stdout`. These are not the correction-pass inventory. Original grouped implementation inventory:
@@ -971,6 +1049,8 @@ exact paths/hashes in `landing-1/ac15/review-corrections/source-inventory.json`)
 - Actual discipline workflow, old20-1a branch recipe and current20-1b branch recipe; TypeScript example README.
 - Coupled KLOC rows; story, tracker, deferred ledger and epic20 preflight rulings.
 
+Landing 2 (final kernel landing; uncommitted) owned paths: kernel `crates/maos-kernel-core/src/{capability/mod.rs,revocation/applier.rs,revocation/poller.rs,scheduler/scheduler_loop.rs}`; kernel tests `tests/quarantine_fr13_20_1.rs` (new), `tests/on_revocation_three_actions.rs`; audit `src/fr4_classifier.rs`, `tests/fr4_classifier_16_2.rs`; bin `src/{yank_policy.rs,main.rs,env_contract.rs}`, `tests/{yank_policy_20_1b.rs,one_daemon_one_door_16_1.rs}`; registry doc comment `crates/maos-registry/src/yank.rs`; pins `xtask/{kernel-core-baseline.toml,kloc.toml}`, `xtask/tests/{kernel_pin_content_hash_16_0.rs,recovery_lane_ceiling_rule.rs}`, `docs/ci-baselines/kernel-surface-v0.1-beta.json`; records `20-1b-flag-winston-decision.md`, this story, `deferred-work.md`, `sprint-status.yaml`, epic-20 + preflight mirrors, coverage matrix, ADR-056, `4-kernel-design.md`; evidence `20-1b-vetting-yank-policy-and-quarantine-evidence/landing-2/`.
+
 ### Change Log
 
 - At the original L1 handoff, operator `f1b` scope and Main's kernel-last AC8 split were recorded while F5 choices remained priced PROPOSED D-rows; superseded by the dated `f5rows` entry below.
@@ -982,4 +1062,5 @@ exact paths/hashes in `landing-1/ac15/review-corrections/source-inventory.json`)
   landing-1 review/corrections and explicit `CARGO HANDOFF AC15`; no cargo run.
 - 2026-11-07 (Main L1 correction handoff at62faff63): implemented P1-P18/security F1-F5 and ruled D1-D5, including durable/releasable pins, immutable publication, safe evidence renewal, explicit vetted-door package/deployed-byte checks, production principal identity/erasure, authenticated scoped withdrawals/cursors and prompt no-source boot/network cancellation. Recorded real before/plants and applicability limits; AC15 and final KQ1 remain unimplemented here.
 - 2026-11-08 (Dev201b, openai-codex/gpt-6.1-sol; Main AC15 handoff atc656a6e7): implemented ruled A/A/A URI-bound root/rustls/explicit dev mode and authenticated complete response heads; fixed hosted42418118608 cohort audit-owner regression with real no-T3 before/plant and AST/declared-capability controls. Exact aggregate196964/hardfail196965, kernel unchanged. One standalone workspace100 and one prepush1 are honestly recorded, not retried; independent/hosted review remains Main-owned. Cleanup and full acceptance/source/command evidence are under `landing-1/ac15/`.
+- 2026-11-11 (Dev201bK, anthropic/claude-sonnet-5-5; base c2beedb4): landing 2 = final kernel row R (KQ1 sticky quarantine fence + P poller edge-trigger, kernel 26967/21141, +78/+68 = grant, one `CapabilityRegistryAdapter` surface-hash refresh) and the AC8 quarantine effect (bin +30, audit +11); failing-before + six plants; pins re-set together; records, deferred rows and mirrors updated. Uncommitted; status not flipped (hosted T3/TLS legs, hosted run, prepush/review, quarantine restart persistence, I5 flip open).
 - 2026-11-08 (Dev201b; independent AC15 review baseline9e8c7737): implemented P1–P12 and scoped security corrections/D1–D5, recorded W dispositions and correction witnesses, forfeited legacy CLI reserve, and re-pinned registry6151/bin35586/domain10144/aggregate197451 (hardfail197452). Exact kernel hash unchanged; no KQ1 effect claimed. Current detailed verification/limitations are in the correction Dev Agent Record and review-corrections evidence; no status flip or commit.

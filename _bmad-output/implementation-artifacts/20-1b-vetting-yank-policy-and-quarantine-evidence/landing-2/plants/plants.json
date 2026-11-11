@@ -1,0 +1,38 @@
+[
+ {
+  "name": "ac11-drain-in-arm",
+  "rc": 101,
+  "elapsed": 4.2,
+  "restored_cmp": true
+ },
+ {
+  "name": "ac11-unload-keeps-fence",
+  "rc": 101,
+  "elapsed": 4.1,
+  "restored_cmp": true
+ },
+ {
+  "name": "ac8-effect-ignored",
+  "rc": 101,
+  "elapsed": 12.3,
+  "restored_cmp": true
+ },
+ {
+  "name": "ac8-unrelated-spirit-matched",
+  "rc": 101,
+  "elapsed": 6.1,
+  "restored_cmp": true
+ },
+ {
+  "name": "ac12-print-every-failure",
+  "rc": 101,
+  "elapsed": 11.4,
+  "restored_cmp": true
+ },
+ {
+  "name": "ac8-hostile-row-accepted",
+  "rc": 101,
+  "elapsed": 9.6,
+  "restored_cmp": true
+ }
+]
