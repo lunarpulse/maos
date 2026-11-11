@@ -1,0 +1,3 @@
+build exit=0
+fixtures exit=0
+nextest exit=100

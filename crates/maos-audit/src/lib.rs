@@ -1782,6 +1782,89 @@ pub fn resolve_spirit_name_optional(
     Ok(resolved)
 }
 
+/// Rows of one read-only Transparency Log query; absence of the log is no rows.
+fn tl_query<T>(
+    db_path: &Path,
+    sql: &str,
+    params: impl rusqlite::Params,
+    map: impl FnMut(&rusqlite::Row<'_>) -> rusqlite::Result<T>,
+) -> Result<Vec<T>, String> {
+    if !db_path.exists() {
+        return Ok(Vec::new());
+    }
+    let conn = open_transparency_log_readonly(db_path)?;
+    let mut statement = conn
+        .prepare(sql)
+        .map_err(|e| format!("halt query failed: {e}"))?;
+    let rows = statement
+        .query_map(params, map)
+        .map_err(|e| format!("halt query failed: {e}"))?;
+    let rows = rows.collect::<Result<Vec<_>, _>>();
+    rows.map_err(|e| format!("halt row failed: {e}"))
+}
+
+/// Story 20-11 AC3 — halts `spirit` raised that no terminal receipt and no
+/// `halt.resolve` decision ever closed: what a dead root left pending. The
+/// owner is the admission identity at the invocation's row, never a recycled
+/// pid; receipts carry `terminal_state`, invocation payloads do not.
+pub fn orphaned_halts(
+    db_path: &Path,
+    spirit: &str,
+) -> Result<Vec<(u64, u32, maos_domain::frame::EpistemicHaltPayload)>, String> {
+    tl_query(
+        db_path,
+        "WITH j AS (SELECT rowid r, boot_nonce b, spirit_pid p, kind k, intent i, capability_token c, \
+                CAST(payload_redacted AS TEXT) t FROM transparency_log WHERE kind IN (3, 7, 19)), \
+         h AS (SELECT r, b, p, t, json_extract(t, '$.halt_id') id, json_type(t, '$.terminal_state') s FROM j \
+               WHERE k = 3 AND CASE WHEN json_valid(t) THEN json_type(t, '$.halt_id') END = 'text') \
+         SELECT b, p, t FROM h WHERE s IS NULL \
+         AND (SELECT CASE WHEN json_valid(a.t) AND json_type(a.t, '$.spirit_id') = 'text' \
+                     THEN json_extract(a.t, '$.spirit_id') ELSE a.i END FROM j a \
+              WHERE a.b = h.b AND a.p = h.p AND a.r <= h.r \
+              AND (a.k = 19 OR (a.k = 7 AND a.i = 'lifecycle.load' AND a.c IS NULL)) \
+              ORDER BY a.r DESC LIMIT 1) = ?1 \
+         AND id NOT IN (SELECT id FROM h WHERE s IS NOT NULL) \
+         AND NOT EXISTS (SELECT 1 FROM approval_decision_log d WHERE d.capability = 'halt.resolve' \
+              AND d.target = ?1 AND instr(d.reasoning, 'halt=' || h.id || ':') = 1) ORDER BY r",
+        [spirit],
+        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?, row.get::<_, String>(2)?)),
+    )?
+    .into_iter()
+    .map(|(boot, pid, payload)| {
+        let halt = serde_json::from_str(&payload)
+            .map_err(|e| format!("orphaned halt payload undecodable: {e}"))?;
+        Ok((boot as u64, pid as u32, halt))
+    })
+    .collect()
+}
+
+/// Story 20-11 AC3 — the `(halt_id, receipt frame)` pairs one unload of
+/// `(boot, pid)` wrote: every non-marker `planned_unload` receipt after the
+/// pid's last `lifecycle.unload` frame.
+pub fn planned_unload_receipts(
+    db_path: &Path,
+    boot: u64,
+    pid: u32,
+) -> Result<Vec<(String, [u8; 16])>, String> {
+    tl_query(
+        db_path,
+        "SELECT payload_redacted FROM transparency_log WHERE kind = 3 AND boot_nonce = ?1 AND spirit_pid = ?2 \
+         AND intent = 'planned_unload' AND length(payload_redacted) > 0 AND rowid > COALESCE((SELECT MAX(rowid) \
+         FROM transparency_log WHERE boot_nonce = ?1 AND spirit_pid = ?2 AND intent = 'lifecycle.unload'), 0) \
+         AND CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) THEN \
+             substr(json_extract(CAST(payload_redacted AS TEXT), '$.halt_id'), 1, 5) END IS NOT 'term-' ORDER BY rowid",
+        [boot as i64, i64::from(pid)],
+        |row| row.get::<_, Vec<u8>>(0),
+    )?
+    .iter()
+    .map(|bytes| {
+        let receipt: maos_domain::halt::HaltReceipt = serde_json::from_slice(bytes)
+            .map_err(|e| format!("planned unload receipt undecodable: {e}"))?;
+        Ok((receipt.halt_id.as_str().to_owned(), receipt.frame_id))
+    })
+    .collect()
+}
+
 /// Boot-local identity events ordered by journal timestamp and frame id.
 pub type SpiritNames = std::collections::BTreeMap<(u64, u32), Vec<(u64, String)>>;
 

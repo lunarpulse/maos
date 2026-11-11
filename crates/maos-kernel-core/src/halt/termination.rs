@@ -36,6 +36,13 @@ pub fn terminate_spirit(
         .unwrap_or_default()
         .as_nanos() as u64;
 
+    // Story 20-11 (D-20-11-11) — close the pid, after any invocation already
+    // committing, before the drain: no halt can land after it.
+    registry
+        .closed
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .insert(spirit_pid);
     let pending = registry.drain_for_spirit(spirit_pid);
     let kind_str = kind.as_str();
 

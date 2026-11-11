@@ -101,7 +101,7 @@ numerical facts keep structured redaction.
 The unreleased proof format is `maos.erasure-proof.v2`, with a mandatory,
 exact sixteen-category inventory. Every observation gets a distinct
 `principal.uninstall.category` TL row and post-tree inclusion. `Removed{count:n}`
-must sum to exactly `n` matching typed evidence: unique frame/package/schedule
+must sum to exactly `n` matching typed evidence: unique frame/package/schedule/halt
 identities, or the real memory/index ForgetReceipt and capability-revocation
 batch counts. Missing, duplicate, wrong-kind or mismatched evidence is rejected
 by both verifiers. Schema types, unknown/duplicate JSON fields, UTF-8 canonical
@@ -138,11 +138,23 @@ authenticate both. If final publication fails, the earlier gap receipt remains
 the honest available artifact; no provisional receipt certifies completion.
 
 
-L1 remains kernel-free: pending halts explicitly name AC3's final KS + O4 landing,
-and the live schedule category names the observed ids plus retained watchdog
-buckets/stamps until root exit. No empty fresh registry is evidence of halt
-erasure. Offline package removal removes its schedule admission source; a
-compiled-in Spirit may be admitted again by the binary.
+Final kernel landing (20-11 L2: KS + O4): `pending_halts` is queried, never read
+from a fresh registry. Through the door the count is the unload's own
+`planned_unload` receipts, read back from the log after the unload frame and
+cross-checked against the pre-unload registry read and the post-unload registry;
+a pending halt without a receipt, or one still in the registry, is a named gap.
+Halts a dead root left open (an invocation frame owned by the admission identity
+at its row, in any boot, with no terminal receipt and no `halt.resolve`
+decision) get one `unplanned_crash` receipt each from the single receipt writer
+on a transient registry; each receipt is typed `halt` evidence naming the halt id
+and its receipt frame, which both verifiers require in the post-tree. O4 closes
+the pid inside that writer before its drain, so no halt can land after the
+drain: a later invocation is refused with `SpiritUnloading(pid)` and writes
+nothing. The door's schedule category is `Removed{n}` only after the watchdog
+dropped that Spirit's rate buckets and last-fire stamps (`forget_spirit`) and no
+stamp survives; otherwise the surviving ids are named. Offline package removal
+removes its schedule admission source; a compiled-in Spirit may be admitted
+again by the binary. The private/index hold lease stays a named gap.
 
 The serving admission paths currently default the SCB's schedule section, even
 when the input manifest declares schedules. AC6.3 therefore uses a live

@@ -181,6 +181,19 @@ fn exercise(worker: bool) {
         .expect("canonical live digest")
         .digest_frame_id;
     drop(stores);
+    // The schedule is firing (AC4.1) before the Spirit is uninstalled.
+    let firing = Instant::now() + Duration::from_secs(60);
+    while !h::rows(home)
+        .iter()
+        .any(|r| r.1 == pid && r.2 == "schedule.fire:daily")
+    {
+        assert!(
+            Instant::now() < firing,
+            "the schedule never fired: {}",
+            diagnostics(&live)
+        );
+        std::thread::sleep(Duration::from_millis(40));
+    }
     let output = h::ctl(&ctl, home, &["uninstall", &id]);
     assert!(
         output.status.success(),
@@ -194,12 +207,33 @@ fn exercise(worker: bool) {
     )
     .unwrap_or_else(|e| panic!("bundle {e}"));
     assert!(proof.categories.iter().any(|c|c.name=="intent_lineage" && matches!(c.status,maos_audit::erasure::proof::CategoryStatus::Removed{count} if count>=1)));
-    for (name, limitation) in [
-        ("pending_halts", "final kernel"),
-        ("scheduled_invocations", "pending KS"),
-    ] {
-        assert!(proof.categories.iter().any(|c|c.name==name && matches!(&c.status,maos_audit::erasure::proof::CategoryStatus::CoverageGap{reason} if reason.contains(limitation))));
-    }
+    let status = |name: &str| {
+        proof
+            .categories
+            .iter()
+            .find(|c| c.name == name)
+            .map(|c| c.status.clone())
+            .unwrap_or_else(|| panic!("missing {name}"))
+    };
+    // AC3: the halts come from the log, so a live Spirit with none is a
+    // queried VerifiedEmpty, never a gap.
+    assert!(
+        matches!(
+            status("pending_halts"),
+            maos_audit::erasure::proof::CategoryStatus::VerifiedEmpty
+        ),
+        "{:?}",
+        status("pending_halts")
+    );
+    // AC4: the firing schedule's SCB, buckets and stamp are gone.
+    assert!(
+        matches!(
+            status("scheduled_invocations"),
+            maos_audit::erasure::proof::CategoryStatus::Removed { count: 1 }
+        ),
+        "{:?}",
+        status("scheduled_invocations")
+    );
     assert!(proof
         .erased_frame_proofs
         .iter()

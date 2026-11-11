@@ -1,0 +1,597 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: `maos-iac` (lib) generated 3 warnings (run `cargo fix --lib -p maos-iac` to apply 3 suggestions)
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1434:21
+     |
+1434 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+warning: unused import: `DecisionId`
+  --> crates/maos-acp/src/server.rs:13:45
+   |
+13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+   |                                             ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `other`
+   --> crates/maos-acp/src/server.rs:223:25
+    |
+223 |                         other => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+warning: unused variable: `halt_id`
+  --> crates/maos-director-surface/src/halt_ui.rs:59:9
+   |
+59 |         halt_id: HaltId,
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+warning: unused variable: `file_name`
+   --> crates/maos-eval/src/distillate_corpus.rs:106:17
+    |
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+   |
+13 | use maos_domain::frame::EpistemicHaltPayload;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `test-introspection`
+   --> crates/maos-kernel-core/src/capability/mod.rs:487:21
+    |
+487 |     #[cfg(any(test, feature = "test-introspection"))]
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `HaltJournal`
+  --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+   |
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+   |                                  ^^^^^^^^^^^
+
+warning: private item shadows public glob re-export
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+  --> crates/maos-kernel-core/src/iac.rs:13:9
+   |
+13 | pub use maos_iac::*;
+   |         ^^^^^^^^^^^
+note: but the private item here shadows it
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `crate::capability::WorkingMemoryStore`
+  --> crates/maos-kernel-core/src/inference/mod.rs:23:5
+   |
+23 | use crate::capability::WorkingMemoryStore;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+   |
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i1::TokenId`
+  --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+   |
+60 | use maos_domain::invariants::i1::TokenId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LifecycleEntry`
+  --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+   |
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+   |                                                                 ^^^^^^^^^^^^^^
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+   |
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+   |                                                           ^^^^^^^
+
+warning: unused import: `McpRequest`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+   |
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+   |                                                                         ^^^^^^^^^^
+
+warning: unused import: `Path`
+  --> crates/maos-kernel-core/src/memory/private.rs:13:17
+   |
+13 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `AtomicU64`
+ --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                         ^^^^^^^^^
+
+warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+   |
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `DispositionOutcome`
+  --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+   |
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+   |                 ^^^^^^^^^^^^^^^^^^
+
+warning: unreachable pattern
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+    |                     ----------------------------- matches some of the same values
+330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+    |                     --------------- matches some of the same values
+331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+    |                     ----------- matches some of the same values
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_providers::Provider`
+  --> crates/maos-kernel-core/src/inference/mod.rs:29:5
+   |
+29 | use maos_providers::Provider;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `event`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+   |
+66 |         let event = self
+   |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spirit_id`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+   |
+69 |     spirit_id: &str,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+
+warning: unused variable: `spirit_pid`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+   |
+70 |     spirit_pid: u32,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+
+warning: variable does not need to be mutable
+   --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:622:9
+    |
+622 |     let mut child = spawn_child(&mut spec, &argv)?;
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `e`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+    |
+161 |                         Err(e) => {
+    |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `ctx`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+    |
+132 |             let ctx = GatewayCtx {
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+
+warning: unused variable: `now_ns`
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:196:13
+    |
+196 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+
+warning: value assigned to `owned_guard` is never read
+   --> crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:401:27
+    |
+401 |     let mut owned_guard = None;
+    |                           ^^^^ this value is reassigned later and never used
+...
+455 |     owned_guard = Some(SandboxedContainerChild::own(
+    |     ----------- `owned_guard` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `total`
+  --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+   |
+22 |     let total = drained_tasks.len();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+warning: field `boot_nonce` is never read
+   --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+    |
+ 95 | pub struct KernelHaltResolver {
+    |            ------------------ field in this struct
+...
+101 |     boot_nonce: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `next_frame_counter` is never read
+  --> crates/maos-kernel-core/src/memory/mod.rs:82:5
+   |
+77 | pub struct MemoryManagerAdapter {
+   |            -------------------- field in this struct
+...
+82 |     next_frame_counter: AtomicU64,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: method `mint_frame_id` is never used
+   --> crates/maos-kernel-core/src/memory/mod.rs:665:8
+    |
+115 | impl MemoryManagerAdapter {
+    | ------------------------- method in this implementation
+...
+665 |     fn mint_frame_id(&self) -> [u8; 16] {
+    |        ^^^^^^^^^^^^^
+
+warning: field `kind` is never read
+  --> crates/maos-kernel-core/src/memory/private.rs:46:5
+   |
+44 | struct DiskCandidate {
+   |        ------------- field in this struct
+45 |     name: String,
+46 |     kind: ValueKind,
+   |     ^^^^
+
+warning: field `iac_rt_metrics` is never read
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+   |
+32 | pub struct SelfTelemetryAggregator {
+   |            ----------------------- field in this struct
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+   |     ^^^^^^^^^^^^^^
+
+warning: associated function `resolution_label` is never used
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+   |
+38 | impl SelfTelemetryAggregator {
+   | ---------------------------- associated function in this implementation
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: associated function `kind_to_str` is never used
+  --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+   |
+38 | impl SharedMemoryStore {
+   | ---------------------- associated function in this implementation
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+   |        ^^^^^^^^^^^
+
+warning: method `build_kernel_ctx` is never used
+   --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:141:8
+    |
+ 70 | impl HookDispatcher {
+    | ------------------- method in this implementation
+...
+141 |     fn build_kernel_ctx<'a>(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `attestation` is never read
+  --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+   |
+34 | pub struct VerifiedImageAttestation {
+   |            ------------------------ field in this struct
+35 |     attestation: T3ImageAttestation,
+   |     ^^^^^^^^^^^
+   |
+   = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+   |
+23 | pub struct ProgressWatchdog {
+   |            ---------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+   |
+23 | pub struct SilentFailureDetector {
+   |            --------------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-kernel-core` (lib) generated 37 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 21 suggestions)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:198:27
+    |
+198 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: methods `accept_consent` and `outbound_consent_context` are never used
+   --> crates/maos-cohort/src/state.rs:388:19
+    |
+206 | impl CohortManifestState {
+    | ------------------------ methods in this implementation
+...
+388 |     pub(crate) fn accept_consent(
+    |                   ^^^^^^^^^^^^^^
+...
+408 |     pub(crate) fn outbound_consent_context(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-registry` (lib) generated 4 warnings (run `cargo fix --lib -p maos-registry` to apply 4 suggestions)
+warning: `maos-cohort` (lib) generated 1 warning
+warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+  --> crates/maos-spirit-cli/src/signing.rs:27:7
+   |
+27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-spirit-cli` (lib) generated 1 warning
+warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+  --> crates/maos-control/src/lib.rs:17:11
+   |
+17 | use ring::constant_time;
+   |           ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+    --> crates/maos-control/src/lib.rs:1064:28
+     |
+1064 |             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
+     |                            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-control` (lib) generated 2 warnings
+warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+    --> crates/maos-bin/src/cross_team_crossing.rs:1014:5
+     |
+1014 | use maos_kernel_core::memory::MemoryManagerAdapter;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `AtomicUsize`
+   --> crates/maos-bin/src/supervision.rs:249:63
+    |
+249 |     use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+    |                                                               ^^^^^^^^^^^
+
+warning: `maos-bin` (lib) generated 2 warnings (run `cargo fix --lib -p maos-bin` to apply 2 suggestions)
+   Compiling maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+warning: unused import: `maos_mcp::McpClient`
+    --> crates/maos-bin/src/main.rs:1381:9
+     |
+1381 |     use maos_mcp::McpClient as _;
+     |         ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `purpose` and `stability` are never read
+ --> crates/maos-bin/src/env_contract.rs:3:9
+  |
+1 | pub struct EnvVar {
+  |            ------ fields in this struct
+2 |     pub name: &'static str,
+3 |     pub purpose: &'static str,
+  |         ^^^^^^^
+4 |     pub stability: EnvStability,
+  |         ^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-bin` (bin "maos" test) generated 2 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.70s
+     Running unittests src/main.rs (/mnt/build/cargo-maos/debug/deps/maos-eda3f53ffeeec3ae)
+
+running 7 tests
+test uninstall_review_20_11::review_p9_ambiguous_malformed_retained_and_owned_erasure_uncertified ... FAILED
+test uninstall_review_20_11::ac3_ac4_door_counts_unload_receipts_and_removed_watchdog_state ... FAILED
+test uninstall_review_20_11::review_p9_late_only_held_lineage_retains_package_and_signed_gap ... ok
+test uninstall_review_20_11::ac3_door_empty_registry_is_not_a_removed_claim_and_a_missing_receipt_is_a_gap ... ok
+test uninstall_review_20_11::review_p9_own_hold_after_first_forget_retains_package_and_names_hold ... ok
+test uninstall_review_20_11::ac4_door_surviving_watchdog_stamp_is_named_not_removed ... ok
+test uninstall_review_20_11::review_p9_owned_malformed_late_lineage_is_erased_and_proved ... FAILED
+
+failures:
+
+---- uninstall_review_20_11::review_p9_ambiguous_malformed_retained_and_owned_erasure_uncertified stdout ----
+
+thread 'uninstall_review_20_11::review_p9_ambiguous_malformed_retained_and_owned_erasure_uncertified' (1438431) panicked at crates/maos-bin/src/../tests/support/uninstall_review_20_11.rs:322:9:
+late incomplete erasure deleted the package
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- uninstall_review_20_11::ac3_ac4_door_counts_unload_receipts_and_removed_watchdog_state stdout ----
+maos-registry: explicit uninstall recovery required: io error: No such file or directory (os error 2) at path "/tmp/.tmpQ5hH2P/.local/share/maos/registry/installed/.tmpe7kA1p"
+
+thread 'uninstall_review_20_11::ac3_ac4_door_counts_unload_receipts_and_removed_watchdog_state' (1438428) panicked at crates/maos-bin/src/../tests/support/uninstall_review_20_11.rs:645:5:
+assertion `left == right` failed: {"schema_version":"maos.erasure-proof.v2","spirit_id":"hello-spirit","spirit_pid":1,"uninstalled_at_ns":1794394238772838830,"pre_root":[237,110,163,45,42,26,15,98,102,30,93,94,106,239,62,218,170,225,252,209,121,247,126,183,145,216,219,184,234,195,156,51],"post_root":[172,71,88,237,5,192,57,235,200,20,198,216,125,25,128,255,128,125,221,244,181,137,24,40,160,167,62,195,67,236,7,16],"pre_leaves":["01a1:ca3b:2c03:ed62:32cd:5614:9490:0bae","01a1:ca3b:2c11:6714:01a0:3983:c1ca:3630","01a1:ca3b:2c16:9553:9c49:902f:03e1:b1b9","01a1:ca3b:2c20:a89e:2b9d:e067:3d17:cec8","01a1:ca3b:2c29:876d:d399:2bc5:1fa6:ef5b","01a1:ca3b:2c33:159a:5137:e82a:8e05:a834","01a1:ca3b:2c3d:2741:d7a5:160f:ad7a:284e"],"post_leaves":["01a1:ca3b:2c03:ed62:32cd:5614:9490:0bae","01a1:ca3b:2c11:6714:01a0:3983:c1ca:3630","01a1:ca3b:2c16:9553:9c49:902f:03e1:b1b9","01a1:ca3b:2c20:a89e:2b9d:e067:3d17:cec8","01a1:ca3b:2c29:876d:d399:2bc5:1fa6:ef5b","01a1:ca3b:2c33:159a:5137:e82a:8e05:a834","01a1:ca3b:2c3d:2741:d7a5:160f:ad7a:284e","01a1:ca3b:2c48:1ae8:deb9:2b37:7063:248e","01a1:ca3b:2c51:db10:5c06:78ba:7a5c:0799","01a1:ca3b:2c5a:18dd:6e86:61bc:f00f:e8c1","01a1:ca3b:2c64:ca03:0e53:9270:7efc:ad55","01a1:ca3b:2c6d:1d2c:7bec:a3a2:4533:0be0","01a1:ca3b:2c77:aa31:19bb:fb36:64d5:a6e9","01a1:ca3b:2c81:ef29:05d7:d536:6f10:a910","01a1:ca3b:2c8a:f856:ad20:8199:aec4:9f7e","01a1:ca3b:2c94:79b8:c35e:28cf:994b:286e","01a1:ca3b:2c9e:0156:43c0:2f08:481a:f859","01a1:ca3b:2ca8:a66a:822e:5feb:0028:85b2","01a1:ca3b:2cb2:df0b:5a86:1313:8edb:006a","01a1:ca3b:2cbb:4354:d78f:22b8:148d:a855","01a1:ca3b:2cc5:2627:eb8d:e8af:9290:7365","01a1:ca3b:2cce:6dea:2169:637d:78c4:d25c","01a1:ca3b:2cd8:8af4:8e16:c280:36f3:69e4","01a1:ca3b:2e26:9fd3:f792:80c8:a4d5:3271","01a1:ca3b:2e2d:314b:c656:a336:134a:a556","01a1:ca3b:2e37:b1cb:2bac:a83a:09a1:005b","01a1:ca3b:2e43:a9f1:2b55:d85b:6d50:abe9","01a1:ca3b:2e4f:0677:910d:b100:f239:895a","01a1:ca3b:2e5a:11de:5f20:18a5:e544:943d","01a1:ca3b:2e66:d5d9:e983:4f34:f336:17aa","01a1:ca3b:2e71:9710:9b02:7ca2:a183:3f9b","01a1:ca3b:2e7b:a051:deed:12c6:7241:433a","01a1:ca3b:2e85:ffc3:3796:8c52:0dfa:7898","01a1:ca3b:2e90:c7c1:9212:37c4:7de7:a430","01a1:ca3b:2e99:af22:ff07:8e54:1dd9:5443","01a1:ca3b:2ea5:bb15:e20c:27f4:04eb:0d9c","01a1:ca3b:2eb1:389f:f95f:1d13:2418:11f8","01a1:ca3b:2ebc:e278:1804:efa0:c93e:4115","01a1:ca3b:2ec8:3c0a:b6e2:d038:5147:9c06","01a1:ca3b:2ed4:5227:c0c5:fa98:3b0c:637d","01a1:ca3b:2ee0:dc1f:5714:b129:95e4:6f25","01a1:ca3b:2eeb:2c5c:9197:ad20:4f1a:5ca1"],"erased_frame_proofs":[],"redacted_principal_frame_proofs":[],"subject_exclusion_proofs":[],"subject_count":0,"subject_commitment_scheme":"hkdf-sha256-signer-keyed-v1","completion_boundary":"durable_transactional_marker","frame_sweep_completion":{"frame_id":"01a1:ca3b:2e37:b1cb:2bac:a83a:09a1:005b","through_rowid":25,"post_inclusion":{"leaf":[30,252,236,156,99,181,96,6,115,13,60,28,196,104,80,49,120,113,148,72,182,154,197,233,56,125,184,73,243,141,134,59],"adjacent_leaf":null,"leaf_index":4,"siblings":[[31,126,125,11,63,79,7,6,98,15,222,233,165,181,195,192,199,24,233,17,249,173,53,96,226,67,84,55,115,98,87,166],[148,204,224,252,254,188,93,185,239,139,209,252,199,6,12,136,42,192,188,150,124,192,186,132,97,96,81,205,124,39,171,22],[114,175,219,211,249,166,15,184,22,12,3,74,11,168,56,91,242,20,107,107,19,21,61,128,125,184,155,29,54,230,105,179],[62,120,215,101,69,30,85,61,11,66,121,57,118,224,41,26,206,105,115,111,9,178,231,28,163,18,92,86,39,244,24,253],[219,34,72,203,196,21,174,220,185,214,75,141,172,7,61,28,196,169,117,188,41,76,86,70,49,254,35,63,96,149,42,108],[37,254,137,13,181,227,186,221,174,29,129,142,34,66,114,227,91,135,113,185,43,66,119,61,134,237,138,169,204,143,92,230]],"directions":[false,false,true,false,false,false]}},"categories":[{"name":"memory_namespace","status":{"status":"VerifiedEmpty"}},{"name":"principal_index","status":{"status":"VerifiedEmpty"}},{"name":"capability_tokens","status":{"status":"VerifiedEmpty"}},{"name":"shared","status":{"status":"VerifiedEmpty"}},{"name":"private","status":{"status":"CoverageGap","reason":"kernel_private_index_hold_lease pending final kernel landing; private_before=1; 0 private principal value(s) remain; no private principal values observed; no cross-store lease claim"}},{"name":"principal_frames","status":{"status":"VerifiedEmpty"}},{"name":"intent_lineage","status":{"status":"VerifiedEmpty"}},{"name":"pending_halts","status":{"status":"Removed","count":1}},{"name":"scheduled_invocations","status":{"status":"Removed","count":1}},{"name":"manifest_archive","status":{"status":"VerifiedEmpty"}},{"name":"skill_queue","status":{"status":"VerifiedEmpty"}},{"name":"lifecycle_journal","status":{"status":"VerifiedEmpty"}},{"name":"worker_workspaces","status":{"status":"VerifiedEmpty"}},{"name":"installed_package","status":{"status":"CoverageGap","reason":"installed generation retained/recovery required after failure: package final delete failed: io error: delete failed: No such file or directory (os error 2); recovery failed: io error: No such file or directory (os error 2) at path \"/tmp/.tmpQ5hH2P/.local/share/maos/registry/installed/.tmpn4Hcj0\"; package/index recovery failed: io error: No such file or directory (os error 2) at path \"/tmp/.tmpQ5hH2P/.local/share/maos/registry/installed/.tmpqPRnlS\""}},{"name":"legal_hold","status":{"status":"VerifiedEmpty"}},{"name":"region_signing_key","status":{"status":"VerifiedEmpty"}}],"category_evidence":[{"spirit_id":"hello-spirit","name":"memory_namespace","frame_id":"01a1:ca3b:2e43:a9f1:2b55:d85b:6d50:abe9","post_inclusion":{"leaf":[0,39,221,64,219,121,34,131,151,81,74,220,41,194,186,65,105,152,185,51,123,109,215,0,194,114,210,130,135,197,214,32],"adjacent_leaf":null,"leaf_index":0,"siblings":[[0,100,4,16,121,153,21,180,210,9,23,87,68,136,107,41,48,16,239,43,201,72,106,26,31,65,78,216,198,133,14,53],[248,197,130,91,77,228,161,213,9,35,137,163,196,231,120,246,227,106,55,238,136,31,61,204,88,12,211,13,145,77,52,175],[249,158,134,128,65,147,28,28,168,68,233,191,212,99,151,56,251,99,139,111,21,179,165,143,58,32,129,246,243,173,82,186],[62,120,215,101,69,30,85,61,11,66,121,57,118,224,41,26,206,105,115,111,9,178,231,28,163,18,92,86,39,244,24,253],[219,34,72,203,196,21,174,220,185,214,75,141,172,7,61,28,196,169,117,188,41,76,86,70,49,254,35,63,96,149,42,108],[37,254,137,13,181,227,186,221,174,29,129,142,34,66,114,227,91,135,113,185,43,66,119,61,134,237,138,169,204,143,92,230]],"directions":[false,false,false,false,false,false]},"removals":[]},{"spirit_id":"hello-spirit","name":"principal_index","frame_id":"01a1:ca3b:2e4f:0677:910d:b100:f239:895a","post_inclusion":{"leaf":[91,176,209,91,212,197,37,181,84,133,107,15,150,25,176,41,146,2,55,143,140,39,209,187,159,28,236,237,119,177,224,108],"adjacent_leaf":null,"leaf_index":17,"siblings":[[88,233,119,39,222,128,225,26,130,109,226,4,97,75,25,28,191,188,54,208,119,74,203,129,69,40,171,12,239,10,244,40],[213,49,154,48,239,72,240,127,50,199,98,101,37,52,71,218,31,150,2,245,160,65,246,125,122,231,13,52,168,89,229,47],[224,241,61,181,123,92,232,142,222,219,52,211,169,227,113,225,61,161,1,229,213,121,2,75,9,200,74,112,131,135,34,61],[130,184,135,105,200,76,254,248,50,101,187,161,67,157,113,136,228,47,221,52,91,183,106,141,97,214,192,19,43,212,211,64],[102,38,33,240,131,151,197,163,188,254,46,143,65,248,192,253,74,62,235,12,151,88,50,120,162,182,39,110,135,206,58,127],[37,254,137,13,181,227,186,221,174,29,129,142,34,66,114,227,91,135,113,185,43,66,119,61,134,237,138,169,204,143,92,230]],"directions":[true,false,false,false,true,false]},"removals":[]},{"spirit_id":"hello-spirit","name":"capability_tokens","frame_id":"01a1:ca3b:2e5a:11de:5f20:18a5:e544:943d","post_inclusion":{"leaf":[173,216,110,107,171,140,50,194,12,158,155,27,13,157,181,38,236,165,241,237,92,29,246,255,159,227,26,80,215,141,197,217],"adjacent_leaf":null,"leaf_index":31,"siblings":[[160,47,221,91,236,72,155,26,82,25,215,225,91,217,101,131,3,98,96,223,181,110,24,135,208,193,117,145,48,120,227,109],[48,93,105,64,77,137,150,103,136,204,33,212,7,55,232,47,109,244,144,56,108,164,113,252,173,36,116,117,54,91,194,24],[14,85,169,132,109,99,62,169,3,114,52,43,122,124,211,166,28,238,41,179,255,96,36,173,96,237,192,138,197,244,247,161],[63,27,11,164,127,187,179,185,84,240,17,42,91,60,52,51,18,83,176,52,106,22,237,199,109,115,72,106,154,190,137,129],[102,38,33,240,131,151,197,163,188,254,46,143,65,248,192,253,74,62,235,12,151,88,50,120,162,182,39,110,135,206,58,127],[37,254,137,13,181,227,186,221,174,29,129,142,34,66,114,227,91,135,113,185,43,66,119,61,134,237,138,169,204,143,92,230]],"directions":[true,true,true,true,true,false]},"removals":[]},{"spirit_id":"hello-spirit","name":"shared","frame_id":"01a1:ca3b:2e66:d5d9:e983:4f34:f336:17aa","post_inclusion":{"leaf":[160,47,221,91,236,72,155,26,82,25,215,225,91,217,101,131,3,98,96,223,181,110,24,135,208,193,117,145,48,120,227,109],"adjacent_leaf":null,"leaf_index":30,"siblings":[[173,216,110,107,171,140,50,194,12,158,155,27,13,157,181,38,236,165,241,237,92,29,246,255,159,227,26,80,215,141,197,217],[48,93,105,64,77,137,150,103,136,204,33,212,7,55,232,47,109,244,144,56,108,164,113,252,173,36,116,117,54,91,194,24],[14,85,169,132,109,99,62,169,3,114,52,43,122,124,211,166,28,238,41,179,255,96,36,173,96,237,192,138,197,244,247,161],[63,27,11,164,127,187,179,185,84,240,17,42,91,60,52,51,18,83,176,52,106,22,237,199,109,115,72,106,154,190,137,129],[102,38,33,240,131,151,197,163,188,254,46,143,65,248,192,253,74,62,235,12,151,88,50,120,162,182,39,110,135,206,58,127],[37,254,137,13,181,227,186,221,174,29,129,142,34,66,114,227,91,135,113,185,43,66,119,61,134,237,138,169,204,143,92,230]],"directions":[false,true,true,true,true,false]},"removals":[]},{"spirit_id":"hello-spirit","name":"private","frame_id":"01a1:ca3b:2e71:9710:9b02:7ca2:a183:3f9b","post_inclusion":{"leaf":[147,59,151,247,204,247,139,107,199,201,240,190,75,70,221,122,226,154,247,10,22,180,211,144,237,138,68,72,74,210,242,141],"adjacent_leaf":null,"leaf_index":27,"siblings":[[144,81,97,224,114,112,71,85,74,76,235,5,40,124,233,241,36,89,215,97,98,197,90,55,195,205,227,86,64,169,186,133],[97,29,75,111,120,161,196,31,159,130,29,94,165,6,144,225,18,174,8,31,92,212,253,155,20,159,153,159,248,219,127,25],[182,52,192,199,55,251,196,62,195,249,12,129,135,68,244,75,223,96,78,149,50,176,200,119,20,180,130,99,168,74,2,13],[63,27,11,164,127,187,179,185,84,240,17,42,91,60,52,51,18,83,176,52,106,22,237,199,109,115,72,106,154,190,137,129],[102,38,33,240,131,151,197,163,188,254,46,143,65,248,192,253,74,62,235,12,151,88,50,120,162,182,39,110,135,206,58,127],[37,254,137,13,181,227,186,221,174,29,129,142,34,66,114,227,91,135,113,185,43,66,119,61,134,237,138,169,204,143,92,230]],"directions":[true,true,false,true,true,false]},"removals":[]},{"spirit_id":"hello-spirit","name":"principal_frames","frame_id":"01a1:ca3b:2e7b:a051:deed:12c6:7241:433a","post_inclusion":{"leaf":[181,195,217,172,95,29,120,235,31,229,78,8,39,238,162,30,10,122,247,98,121,113,16,67,68,100,88,8,131,171,92,165],"adjacent_leaf":null,"leaf_index":32,"siblings":[[184,209,32,19,33,50,74,241,214,134,210,238,25,15,106,139,34,39,248,40,227,41,220,199,0,46,88,124,205,229,36,121],[154,141,229,42,13,66,185,179,220,251,44,98,77,60,85,204,103,235,59,252,195,137,153,98,167,96,55,65,131,7,158,154],[100,30,147,83,186,59,129,144,169,113,58,148,199,108,26,6,142,134,99,26,62,77,100,136,88,156,207,124,58,219,113,102],[242,170,61,46,213,77,128,232,11,85,223,18,248,73,192,147,135,50,83,226,204,45,151,86,113,221,165,211,20,111,144,57],[58,133,127,239,113,37,117,225,194,92,243,113,158,178,110,197,55,56,24,230,150,26,144,232,178,138,224,126,65,97,165,170],[80,216,188,240,109,209,238,78,12,122,181,247,59,111,5,66,177,205,23,82,11,108,145,46,22,140,215,172,105,38,61,26]],"directions":[false,false,false,false,false,true]},"removals":[]},{"spirit_id":"hello-spirit","name":"intent_lineage","frame_id":"01a1:ca3b:2e85:ffc3:3796:8c52:0dfa:7898","post_inclusion":{"leaf":[193,197,36,4,83,88,132,94,179,4,241,178,18,202,182,203,239,173,192,17,137,35,152,237,182,71,22,139,253,114,211,16],"adjacent_leaf":null,"leaf_index":35,"siblings":[[192,30,166,2,19,147,189,206,112,215,36,126,28,148,148,200,131,87,173,67,188,59,12,235,17,14,109,48,187,154,77,59],[214,222,229,157,97,130,207,193,19,217,131,136,173,191,162,98,224,100,87,14,72,168,16,151,205,126,88,223,154,122,112,1],[100,30,147,83,186,59,129,144,169,113,58,148,199,108,26,6,142,134,99,26,62,77,100,136,88,156,207,124,58,219,113,102],[242,170,61,46,213,77,128,232,11,85,223,18,248,73,192,147,135,50,83,226,204,45,151,86,113,221,165,211,20,111,144,57],[58,133,127,239,113,37,117,225,194,92,243,113,158,178,110,197,55,56,24,230,150,26,144,232,178,138,224,126,65,97,165,170],[80,216,188,240,109,209,238,78,12,122,181,247,59,111,5,66,177,205,23,82,11,108,145,46,22,140,215,172,105,38,61,26]],"directions":[true,true,false,false,false,true]},"removals":[]},{"spirit_id":"hello-spirit","name":"pending_halts","frame_id":"01a1:ca3b:2e90:c7c1:9212:37c4:7de7:a430","post_inclusion":{"leaf":[202,164,124,25,31,204,108,159,146,39,44,3,65,39,215,175,192,25,10,237,79,120,209,51,85,190,91,236,24,118,235,7],"adjacent_leaf":null,"leaf_index":37,"siblings":[[199,21,7,10,157,194,129,71,186,105,87,40,135,60,221,184,26,116,247,233,48,213,206,55,63,67,103,195,154,177,211,102],[43,34,195,89,157,106,114,114,148,31,5,4,152,52,250,149,24,136,226,30,192,216,192,89,81,234,40,185,100,33,114,6],[245,33,190,43,139,80,86,222,228,34,17,132,235,47,17,22,222,170,130,88,126,26,144,205,69,120,11,254,79,122,101,83],[242,170,61,46,213,77,128,232,11,85,223,18,248,73,192,147,135,50,83,226,204,45,151,86,113,221,165,211,20,111,144,57],[58,133,127,239,113,37,117,225,194,92,243,113,158,178,110,197,55,56,24,230,150,26,144,232,178,138,224,126,65,97,165,170],[80,216,188,240,109,209,238,78,12,122,181,247,59,111,5,66,177,205,23,82,11,108,145,46,22,140,215,172,105,38,61,26]],"directions":[true,false,true,false,false,true]},"removals":[{"kind":"halt","halt_id":"door-halt-20-11","receipt_frame_id":"01a1ca3b2c29876dd3992bc51fa6ef5b"}]},{"spirit_id":"hello-spirit","name":"scheduled_invocations","frame_id":"01a1:ca3b:2e99:af22:ff07:8e54:1dd9:5443","post_inclusion":{"leaf":[137,176,102,107,143,148,170,54,215,249,98,73,87,72,207,152,71,111,196,134,104,26,100,145,39,101,149,26,153,100,152,14],"adjacent_leaf":null,"leaf_index":22,"siblings":[[138,40,121,167,58,249,159,232,92,46,177,97,192,24,38,167,215,120,32,60,228,246,43,190,133,82,140,129,147,82,120,68],[4,182,185,250,9,8,240,134,19,236,135,102,41,37,233,96,38,169,13,170,114,208,136,29,30,34,170,211,160,124,92,186],[6,6,246,162,110,81,227,45,223,86,224,6,105,200,27,230,203,230,45,86,184,63,177,16,116,155,219,35,245,22,150,94],[130,184,135,105,200,76,254,248,50,101,187,161,67,157,113,136,228,47,221,52,91,183,106,141,97,214,192,19,43,212,211,64],[102,38,33,240,131,151,197,163,188,254,46,143,65,248,192,253,74,62,235,12,151,88,50,120,162,182,39,110,135,206,58,127],[37,254,137,13,181,227,186,221,174,29,129,142,34,66,114,227,91,135,113,185,43,66,119,61,134,237,138,169,204,143,92,230]],"directions":[false,true,true,false,true,false]},"removals":[{"kind":"schedule","schedule_id":"daily"}]},{"spirit_id":"hello-spirit","name":"manifest_archive","frame_id":"01a1:ca3b:2ea5:bb15:e20c:27f4:04eb:0d9c","post_inclusion":{"leaf":[75,84,96,42,145,69,184,97,192,58,67,4,185,151,53,143,250,11,149,211,99,208,171,156,18,122,119,184,22,57,45,75],"adjacent_leaf":null,"leaf_index":13,"siblings":[[67,10,246,41,26,237,98,161,28,58,59,118,144,34,159,204,46,217,114,94,94,14,216,209,23,12,199,188,222,162,80,75],[90,34,129,85,78,2,194,58,211,238,39,219,207,191,114,241,231,102,134,106,39,152,221,21,163,7,4,29,212,66,45,40],[2,59,137,187,232,5,228,24,60,64,76,63,66,51,76,239,155,19,179,71,201,193,32,202,9,41,48,54,114,33,84,201],[157,53,97,192,227,173,100,19,128,121,234,146,62,217,23,95,20,239,146,222,16,245,78,230,104,203,186,208,64,86,34,201],[219,34,72,203,196,21,174,220,185,214,75,141,172,7,61,28,196,169,117,188,41,76,86,70,49,254,35,63,96,149,42,108],[37,254,137,13,181,227,186,221,174,29,129,142,34,66,114,227,91,135,113,185,43,66,119,61,134,237,138,169,204,143,92,230]],"directions":[true,false,true,true,false,false]},"removals":[]},{"spirit_id":"hello-spirit","name":"skill_queue","frame_id":"01a1:ca3b:2eb1:389f:f95f:1d13:2418:11f8","post_inclusion":{"leaf":[204,35,83,15,219,98,46,211,10,108,87,72,182,186,189,185,52,28,87,167,154,228,198,113,140,161,152,165,160,62,112,122],"adjacent_leaf":null,"leaf_index":38,"siblings":[[207,91,114,14,235,22,79,235,3,11,197,138,250,159,24,20,153,195,238,23,152,200,29,82,114,51,24,121,225,76,38,61],[90,182,208,112,179,187,38,157,46,164,124,47,167,184,21,254,221,203,112,247,135,83,93,159,53,126,121,0,203,208,18,176],[245,33,190,43,139,80,86,222,228,34,17,132,235,47,17,22,222,170,130,88,126,26,144,205,69,120,11,254,79,122,101,83],[242,170,61,46,213,77,128,232,11,85,223,18,248,73,192,147,135,50,83,226,204,45,151,86,113,221,165,211,20,111,144,57],[58,133,127,239,113,37,117,225,194,92,243,113,158,178,110,197,55,56,24,230,150,26,144,232,178,138,224,126,65,97,165,170],[80,216,188,240,109,209,238,78,12,122,181,247,59,111,5,66,177,205,23,82,11,108,145,46,22,140,215,172,105,38,61,26]],"directions":[false,true,true,false,false,true]},"removals":[]},{"spirit_id":"hello-spirit","name":"lifecycle_journal","frame_id":"01a1:ca3b:2ebc:e278:1804:efa0:c93e:4115","post_inclusion":{"leaf":[141,159,99,108,91,38,109,222,206,185,133,210,103,190,47,28,58,188,229,203,169,206,7,184,253,52,139,115,177,31,5,60],"adjacent_leaf":null,"leaf_index":25,"siblings":[[138,215,46,16,251,39,217,121,11,39,110,134,95,252,45,244,136,127,134,211,177,108,120,147,233,248,85,174,230,246,179,55],[180,111,1,78,140,144,69,93,15,98,59,18,159,164,230,42,0,198,238,174,135,132,122,151,151,250,155,229,115,249,5,49],[182,52,192,199,55,251,196,62,195,249,12,129,135,68,244,75,223,96,78,149,50,176,200,119,20,180,130,99,168,74,2,13],[63,27,11,164,127,187,179,185,84,240,17,42,91,60,52,51,18,83,176,52,106,22,237,199,109,115,72,106,154,190,137,129],[102,38,33,240,131,151,197,163,188,254,46,143,65,248,192,253,74,62,235,12,151,88,50,120,162,182,39,110,135,206,58,127],[37,254,137,13,181,227,186,221,174,29,129,142,34,66,114,227,91,135,113,185,43,66,119,61,134,237,138,169,204,143,92,230]],"directions":[true,false,false,true,true,false]},"removals":[]},{"spirit_id":"hello-spirit","name":"worker_workspaces","frame_id":"01a1:ca3b:2ec8:3c0a:b6e2:d038:5147:9c06","post_inclusion":{"leaf":[149,77,109,115,90,207,254,86,73,161,221,109,209,43,23,31,158,84,46,5,91,138,53,18,26,171,193,146,153,128,165,114],"adjacent_leaf":null,"leaf_index":29,"siblings":[[147,223,67,190,224,33,115,245,33,161,210,11,136,220,205,238,185,92,138,253,84,21,196,85,47,106,31,204,147,238,70,194],[175,159,173,253,222,207,165,202,184,228,27,185,238,133,180,178,218,255,182,24,150,172,254,232,106,120,30,146,118,115,24,170],[14,85,169,132,109,99,62,169,3,114,52,43,122,124,211,166,28,238,41,179,255,96,36,173,96,237,192,138,197,244,247,161],[63,27,11,164,127,187,179,185,84,240,17,42,91,60,52,51,18,83,176,52,106,22,237,199,109,115,72,106,154,190,137,129],[102,38,33,240,131,151,197,163,188,254,46,143,65,248,192,253,74,62,235,12,151,88,50,120,162,182,39,110,135,206,58,127],[37,254,137,13,181,227,186,221,174,29,129,142,34,66,114,227,91,135,113,185,43,66,119,61,134,237,138,169,204,143,92,230]],"directions":[true,false,true,true,true,false]},"removals":[]},{"spirit_id":"hello-spirit","name":"installed_package","frame_id":"01a1:ca3b:2ed4:5227:c0c5:fa98:3b0c:637d","post_inclusion":{"leaf":[207,91,114,14,235,22,79,235,3,11,197,138,250,159,24,20,153,195,238,23,152,200,29,82,114,51,24,121,225,76,38,61],"adjacent_leaf":null,"leaf_index":39,"siblings":[[204,35,83,15,219,98,46,211,10,108,87,72,182,186,189,185,52,28,87,167,154,228,198,113,140,161,152,165,160,62,112,122],[90,182,208,112,179,187,38,157,46,164,124,47,167,184,21,254,221,203,112,247,135,83,93,159,53,126,121,0,203,208,18,176],[245,33,190,43,139,80,86,222,228,34,17,132,235,47,17,22,222,170,130,88,126,26,144,205,69,120,11,254,79,122,101,83],[242,170,61,46,213,77,128,232,11,85,223,18,248,73,192,147,135,50,83,226,204,45,151,86,113,221,165,211,20,111,144,57],[58,133,127,239,113,37,117,225,194,92,243,113,158,178,110,197,55,56,24,230,150,26,144,232,178,138,224,126,65,97,165,170],[80,216,188,240,109,209,238,78,12,122,181,247,59,111,5,66,177,205,23,82,11,108,145,46,22,140,215,172,105,38,61,26]],"directions":[true,true,true,false,false,true]},"removals":[]},{"spirit_id":"hello-spirit","name":"legal_hold","frame_id":"01a1:ca3b:2ee0:dc1f:5714:b129:95e4:6f25","post_inclusion":{"leaf":[50,246,70,34,45,166,168,168,109,224,94,233,22,100,196,109,137,25,85,4,85,82,54,235,164,133,163,68,221,1,65,141],"adjacent_leaf":null,"leaf_index":7,"siblings":[[37,41,78,51,129,169,173,206,241,14,238,236,41,186,46,245,81,117,193,250,165,104,169,224,143,6,114,56,40,128,189,219],[0,240,71,145,136,68,150,171,195,80,111,184,22,7,215,1,71,13,135,156,161,69,182,162,1,183,181,218,0,133,217,181],[114,175,219,211,249,166,15,184,22,12,3,74,11,168,56,91,242,20,107,107,19,21,61,128,125,184,155,29,54,230,105,179],[62,120,215,101,69,30,85,61,11,66,121,57,118,224,41,26,206,105,115,111,9,178,231,28,163,18,92,86,39,244,24,253],[219,34,72,203,196,21,174,220,185,214,75,141,172,7,61,28,196,169,117,188,41,76,86,70,49,254,35,63,96,149,42,108],[37,254,137,13,181,227,186,221,174,29,129,142,34,66,114,227,91,135,113,185,43,66,119,61,134,237,138,169,204,143,92,230]],"directions":[true,true,true,false,false,false]},"removals":[]},{"spirit_id":"hello-spirit","name":"region_signing_key","frame_id":"01a1:ca3b:2eeb:2c5c:9197:ad20:4f1a:5ca1","post_inclusion":{"leaf":[67,10,246,41,26,237,98,161,28,58,59,118,144,34,159,204,46,217,114,94,94,14,216,209,23,12,199,188,222,162,80,75],"adjacent_leaf":null,"leaf_index":12,"siblings":[[75,84,96,42,145,69,184,97,192,58,67,4,185,151,53,143,250,11,149,211,99,208,171,156,18,122,119,184,22,57,45,75],[90,34,129,85,78,2,194,58,211,238,39,219,207,191,114,241,231,102,134,106,39,152,221,21,163,7,4,29,212,66,45,40],[2,59,137,187,232,5,228,24,60,64,76,63,66,51,76,239,155,19,179,71,201,193,32,202,9,41,48,54,114,33,84,201],[157,53,97,192,227,173,100,19,128,121,234,146,62,217,23,95,20,239,146,222,16,245,78,230,104,203,186,208,64,86,34,201],[219,34,72,203,196,21,174,220,185,214,75,141,172,7,61,28,196,169,117,188,41,76,86,70,49,254,35,63,96,149,42,108],[37,254,137,13,181,227,186,221,174,29,129,142,34,66,114,227,91,135,113,185,43,66,119,61,134,237,138,169,204,143,92,230]],"directions":[false,false,true,true,false,false]},"removals":[]}],"signature_block":{"algorithm":"Ed25519","attester_pubkey":"af06a3e3291714e4f356c19c9b15cd1951ec6e6662aa77be07547f289383341d","signature":"0d347b82647230003e37d86a7fb8d04e103e7aa1b62e898a26df00124b54ab7af0d73a81a81d0a4f3f1a37a27549340cd0c372426201757bda7a298132ec9a04"},"terminal":{"outcome":"failed","spirit_id":"hello-spirit","error":"package final delete failed: io error: delete failed: No such file or directory (os error 2); recovery failed: io error: No such file or directory (os error 2) at path \"/tmp/.tmpQ5hH2P/.local/share/maos/registry/installed/.tmpn4Hcj0\"; package/index recovery failed: io error: No such file or directory (os error 2) at path \"/tmp/.tmpQ5hH2P/.local/share/maos/registry/installed/.tmpqPRnlS\"","proof_path":"/tmp/.tmpMgmw2M/data/maos/erasure-proofs/hello-spirit-1794394238772838830-ac4758ed05c039eb.bundle"}}
+  left: String("failed")
+ right: "erased"
+
+---- uninstall_review_20_11::review_p9_owned_malformed_late_lineage_is_erased_and_proved stdout ----
+
+thread 'uninstall_review_20_11::review_p9_owned_malformed_late_lineage_is_erased_and_proved' (1438434) panicked at crates/maos-bin/src/../tests/support/uninstall_review_20_11.rs:283:10:
+injected after initial receipt
+
+
+failures:
+    uninstall_review_20_11::ac3_ac4_door_counts_unload_receipts_and_removed_watchdog_state
+    uninstall_review_20_11::review_p9_ambiguous_malformed_retained_and_owned_erasure_uncertified
+    uninstall_review_20_11::review_p9_owned_malformed_late_lineage_is_erased_and_proved
+
+test result: FAILED. 4 passed; 3 failed; 0 ignored; 0 measured; 25 filtered out; finished in 3.21s
+
+error: test failed, to rerun pass `-p maos-bin --bin maos`

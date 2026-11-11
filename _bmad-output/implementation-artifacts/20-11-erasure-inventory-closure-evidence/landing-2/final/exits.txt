@@ -1,0 +1,9 @@
+w1-kernel-o4-ks exit=0
+w2-kernel-lib exit=0
+w3-audit-erasure-review exit=0
+w4-bin-erasure-inventory exit=0
+w5-bin-door-shell-host exit=0
+w6-bin-unit-composition exit=0
+build exit=0
+w7-bin-live exit=0
+w8-xtask-pins exit=0

@@ -67,6 +67,10 @@ pub enum RemovalEvidence {
     Schedule {
         schedule_id: String,
     },
+    Halt {
+        halt_id: String,
+        receipt_frame_id: String,
+    },
     MemoryNamespaceBatch {
         receipt_frame_id: String,
         deleted_entries: u64,
@@ -464,8 +468,7 @@ fn validate_frame_proofs(
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum RemovalIdentity<'a> {
     Frame([u8; 16]),
-    Package(&'a str),
-    Schedule(&'a str),
+    Name(&'a str),
     Batch([u8; 16]),
     Capability(u64, u32),
 }
@@ -478,6 +481,13 @@ fn removal_count(
 ) -> Result<u64, ErasureProofError> {
     let mut seen = BTreeSet::new();
     let mut total = 0_u64;
+    let receipt = |id: &str, absent: &str| -> Result<[u8; 16], ErasureProofError> {
+        let frame = parse_frame_id_hex(id)?;
+        post.leaves
+            .binary_search(&hash_leaf(&frame))
+            .map_err(|_| invalid(absent))?;
+        Ok(frame)
+    };
     for item in &evidence.removals {
         let (identity, count) = match (evidence.name.as_str(), item) {
             ("principal_frames" | "intent_lineage", RemovalEvidence::Frame { frame_id }) => {
@@ -494,12 +504,22 @@ fn removal_count(
                     generation,
                 },
             ) if spirit_id == spirit && !generation.is_empty() => {
-                (RemovalIdentity::Package(generation), 1)
+                (RemovalIdentity::Name(generation), 1)
             }
             ("scheduled_invocations", RemovalEvidence::Schedule { schedule_id })
                 if !schedule_id.is_empty() =>
             {
-                (RemovalIdentity::Schedule(schedule_id), 1)
+                (RemovalIdentity::Name(schedule_id), 1)
+            }
+            (
+                "pending_halts",
+                RemovalEvidence::Halt {
+                    halt_id,
+                    receipt_frame_id,
+                },
+            ) if !halt_id.is_empty() => {
+                receipt(receipt_frame_id, "halt receipt absent from post-tree")?;
+                (RemovalIdentity::Name(halt_id), 1)
             }
             (
                 "memory_namespace",
@@ -508,10 +528,7 @@ fn removal_count(
                     deleted_entries,
                 },
             ) => {
-                let frame = parse_frame_id_hex(receipt_frame_id)?;
-                if post.leaves.binary_search(&hash_leaf(&frame)).is_err() {
-                    return Err(invalid("memory receipt absent from post-tree"));
-                }
+                let frame = receipt(receipt_frame_id, "memory receipt absent from post-tree")?;
                 (RemovalIdentity::Batch(frame), *deleted_entries)
             }
             (
@@ -521,10 +538,7 @@ fn removal_count(
                     deleted_index_rows,
                 },
             ) => {
-                let frame = parse_frame_id_hex(receipt_frame_id)?;
-                if post.leaves.binary_search(&hash_leaf(&frame)).is_err() {
-                    return Err(invalid("index receipt absent from post-tree"));
-                }
+                let frame = receipt(receipt_frame_id, "index receipt absent from post-tree")?;
                 (RemovalIdentity::Batch(frame), *deleted_index_rows)
             }
             (

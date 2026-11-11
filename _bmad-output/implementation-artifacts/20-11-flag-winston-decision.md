@@ -124,3 +124,46 @@ HEAD at `:187`.
 - O4 allowance **+32 / +24** kernel and domain **+8** (measured +4) is granted, binding after re-base at landing.
 - Ask `halt_landing` settles the dependency: AC3 and KS + O4 land together in the final kernel landing;
   L1 is kernel-free AC1, AC2, AC4–AC7. No cargo, tests or gates ran for this ruling-record update.
+
+## Landing 2 — final kernel landing, measured vs granted (Dev2011k, 2026-11-11, base `345ae30f`)
+
+**Authority:** the grant above (asks `s2011`, `halt_grant`, `halt_landing`) binds at this landing after re-base. KH/KF were not
+requested and are not landed. T0 evidence: `20-11-erasure-inventory-closure-evidence/landing-2/t0-measurement.md` + raw JSON.
+
+| | Base (HEAD) | Prototype (T0, reverted `git archive HEAD` copy) | Landed (in tree, formatted) | Grant / ceiling |
+|---|---:|---:|---:|---|
+| Kernel physical | 26,854 | 26,880 (+26) | **26,880** | measured +26; ×2 ceiling 26,893 |
+| Kernel tokei | 21,051 | 21,069 (+18) | **21,069** | measured +18; ×2 ceiling 21,078; shared STOP 21,250; ADR-069 alarm 22,000 |
+| maos-domain | 10,211 | 10,215 (+4) | **10,215** | measured +4; ×2 allowance +8 |
+| Kernel file set | 95 files, `2c223219…` | `affee8b0…` | **`affee8b007d65000b63a3776cf59bd5d3fafb874cc818bc68133bbf3ef41a883`** | none added/removed |
+
+The measurement equals the grant exactly (KS +10/+6 and O4 +16/+12 became +26/+18 together); nothing exceeded a ceiling, so no STOP
+was needed for the kernel rows. Changed kernel files and new per-file hashes: `halt/mod.rs` `b77703f8…`, `halt/termination.rs`
+`043a2a54…`, `scheduler/schedule_watchdog.rs` `3b9d8431…`, `scheduler/scheduler_loop.rs` `95bd5a33…`.
+
+**Single public-surface change (explicit note, ADR-066 hand-edit convention).** `docs/ci-baselines/kernel-surface-v0.1-beta.json:618`
+`maos_kernel_core::halt::HaltRegistry` `b6d6524333a6327adc96c8a3ef78e2a10134ea7e2a9c534d930d6a248eda4af8` →
+`a917eddcb762e31e151adbbb2dad84de0ce445df29bfd8abbddd9a4d3b19f910`. Cause: the private `closed` field (`check-service-boundary`
+hashes structs in full). It is the ONLY surface edit; no new symbol, no `kernel-api-classes.toml` row, `invoke_halt`/`terminate_spirit`
+signature hashes unchanged, `ScheduleWatchdog::forget_spirit` does not move the struct-only hash. `check-service-boundary` passes.
+
+**Shape landed (O4 as ruled, no deviation).** `terminate_spirit` closes the pid in `HaltRegistry.closed` before its drain; `invoke_halt`
+holds that lock across TL row → Journal → registry insert and returns `InvokeHaltError::SpiritUnloading(pid)` (new `maos-domain`
+variant) for a closed pid, writing nothing; the silent drain at `scheduler_loop.rs:573-574` is deleted. A halt in flight when the close
+runs is committed first and receipted by the drain; a later one is refused. Crash and revocation drain through the same writer, so they
+are fenced too. Hot swap (K1p carry-not-drain) never calls the writer and is unchanged. No kernel panic/unwrap added; I2 fail-stop untouched.
+
+**Non-kernel overdrafts (orchestrator-adjudicated, disclosed to the operator, D02 A, 2026-11-11).**
+- **maos-audit:** 20-11's absolute ceiling **8,261 → 8,313**; pin **8,227 → 8,313** (+86 measured: `orphaned_halts`,
+  `planned_unload_receipts` — the two read-only TL queries — and the typed `halt` removal evidence in `proof.rs`; genuine production code,
+  relocation to maos-bin would only move the overdraft). Knock-on: 20-1b's "remaining 82" is moot; later stories re-base on 8,313.
+- **maos-bin:** pin **38,061 → 38,202** (+141). The story's bin ceilings (34,698 creation / 35,704 L1) are stale-absolute against
+  38,061 (other stories' grants); the live bin ceiling is the measured pin plus this story's own remaining allowance (35,704 − 35,102 = 602;
+  this landing uses 141).
+- Aggregate hardfail **202,122 → 202,371** (clean aggregate 202,370 on a `git archive HEAD` copy overlaid with the landing).
+
+**Witnesses and plants** (details: story Dev Agent Record and `landing-2/plants.md`): the T0 oracle is re-stated (typed refusal, no
+durable row, no journal entry, empty registry, only the unload's `term-…` receipt); S2 (in-flight halt receipted, the next refused); S4
+(crash path fenced). Plant (a) (no close in `terminate_spirit`) reds all three; plant (b) (release before the TL write) reds S2. Plant
+(c) "close in `unload` only" is an O1 shape that needs a `pub(crate)` close method this repair deliberately does not have; no realistic
+variant exists in the landed design, and plant (a) already reds the crash witness S4.

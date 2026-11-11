@@ -337,6 +337,8 @@ pub enum InvokeHaltError {
     JournalWriteFailed(String),
     #[error("registry insert failed: {0}")]
     RegistryInsertFailed(String),
+    #[error("spirit pid {0} is being unloaded; halt refused")]
+    SpiritUnloading(u32),
 }
 
 /// I14 — Hot-swap halt-continuity typed error per ADR-019.
@@ -684,6 +686,8 @@ mod tests {
         assert!(e.to_string().contains("jw"));
         let e = InvokeHaltError::RegistryInsertFailed("ri".into());
         assert!(e.to_string().contains("ri"));
+        let e = InvokeHaltError::SpiritUnloading(7);
+        assert!(e.to_string().contains("pid 7"));
     }
 
     #[test]

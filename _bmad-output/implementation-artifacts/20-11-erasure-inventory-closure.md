@@ -12,6 +12,7 @@ kernel_grant: >-
   Grant binds only at the final kernel landing after re-measurement/re-base; KS + O4 and AC3 land last.
   Shared cumulative measured STOP 21250 for the whole ledger at each landing (ask halt_grant);
   expected cumulative 21203 + 12 = 21215; ADR-069 alarm 22000 / envelope 23000 unchanged.
+  Landing 2 (2026-11-11): re-based onto 26854/21051; measured KS + O4 = +26/+18 = grant (26880/21069), cumulative 21069 <= STOP 21250.
 kloc_grant: >-
   RULED asks s2011 and halt_grant; D02 A ×2 measured / ×3 unmeasured.
   L1 review re-based 2026-11-05 onto 93d39cc7: kernel pins 26841/21042 unchanged; maos-iac 8551,
@@ -30,12 +31,15 @@ kloc_grant: >-
   Counterfactual aggregate195438 exceeds195404 by34; actual counted194934 remains within
   the unchanged aggregate ceiling. No further source-to-tests accounting transfer or ceiling grant is introduced.
   L1 consumes only these non-kernel allowances; no kernel grant is consumed.
+  Landing 2 (2026-11-11, orchestrator-adjudicated overdraft, disclosed to the operator, D02 A): audit ceiling 8261 -> 8313
+  (pin 8227 -> 8313, +86 measured); bin pin 38061 -> 38202 (+141; story bin ceilings are stale-absolute, live ceiling = measured pin
+  plus own remaining allowance); aggregate hardfail 202122 -> 202371; kernel 26880/21069 and domain 10215 inside the grant.
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:57-71`): an attesting control (a signed proof-of-erasure, rule 11), cross-Spirit isolation (pid reuse across boots, legal holds), concurrency (EC-13 lock windows, forget/hold serialization) and, if ruled, a kernel FLAG-Winston row. Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC2.4, AC3, AC5.3 and the proof format (D-20-11-09), Test Infrastructure on glm-5.3 (standing policy; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
 
 # Story 20.11: Erasure inventory closure — per-Spirit proof of erasure
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Created 2026-11-02 at a8af3215 (main; origin 47631284) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30). D-20-11-01…10 are PROPOSED, not ruled — the operator rules; a different ruling rewrites only the clauses marked with that row. No cargo ran: cites re-read at HEAD (`creation/cites-a8af3215.md`); kernel and kloc by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`); prototypes saved as diffs, never applied. Stale epic cites are corrected here and owed to the epic (`creation/records-owed.md` §A). -->
 
@@ -340,12 +344,12 @@ L1 must not claim that kernel-dependent proof or borrow a hosted run from an anc
 - [x] **T1 — Proof format (AC1, D-09).** Evidence frames, per-category verification in `proof.rs` and `verify.py`,
   `NotFound` rule; failing-before + plant.
 - [x] **T2 — Intent lineage (AC2).** Admission-qualified stable-identity inventory, transactional scrub/marker and all-boot isolation; witnesses + plant.
-- [ ] **T3 — Pending halts (AC3, final kernel landing only).** Door count + post-verify, offline orphan query and
-  receipts, O4 late-invocation refusal / in-flight / crash witnesses and plants; no AC3 implementation in L1.
-- [ ] **T4 — Schedules and package (AC4).** L1 SCB/manifest snapshot enumeration, retained-watchdog reason,
+- [x] **T3 — Pending halts (AC3, final kernel landing only).** Door count + post-verify, offline orphan query and
+  receipts, O4 late-invocation refusal / in-flight / crash witnesses and plants (landing 2).
+- [x] **T4 — Schedules and package (AC4).** L1 SCB/manifest snapshot enumeration, retained-watchdog reason,
   `uninstall_package`, CLI doc and snapshot plant; `forget_spirit` and its plant at the final KS landing.
   - [x] L1 snapshot/package implementation and restored pre-unload plant.
-  - [ ] Final KS watchdog cleanup and its plant (explicitly outside this assignment).
+  - [x] Final KS watchdog cleanup and its plant (landing 2: `forget_spirit`, live-door and kernel plants).
 - [ ] **T5 — EC-13 (AC5), REOPENED by review ruling 2026-11-05.** Hosted run `42533166219` passes the 100k writer and 1M completion/repeat vectors; full AC5/EC-13 remains open for final landing review of all clauses and controls. The shared-host timing/I/O half remains dispositioned under 20-7; earlier failures are retained. [Hosted evidence](20-11-erasure-inventory-closure-evidence/landing-1/hosted-evidence.md).
 - [x] **T6 — Inventory (AC7).** Typed store list, named categories, vector + plant.
 - [ ] **T7 — T3 leg (AC6).** Hosted branch run under `provision-t3-test-substrate`; run id.
@@ -354,9 +358,9 @@ L1 must not claim that kernel-dependent proof or borrow a hosted run from an anc
   one hosted discipline run on the final tree. No commit or push without the operator.
   - [x] Local source/focused/structural gates, exact pins, final clippy delta, one standalone workspace execution and once-only final prepush recorded.
   - [ ] Hosted discipline run `42533166219` failed on the 20-7 snapshot-owner timing family; signed-T3 Worker execution cannot be distinguished from the witness's successful early return using the log alone. Final landing review remains owed.
-- [ ] **T9 — Final kernel landing (L2).** Granted KS + O4 last, together with AC3 halt counts/receipt category;
-  re-base onto then-current pins, obey shared measured STOP 21250; FLAG-Winston record, exact pins/content hashes,
-  single HaltRegistry surface-hash refresh under ADR-066, O4 domain variant and AC8. KH/KF are not granted.
+- [x] **T9 — Final kernel landing (L2).** Granted KS + O4 last, together with AC3 halt counts/receipt category;
+  re-based onto 26854/21051, measured +26/+18, FLAG-Winston record, exact pins/content hashes, single HaltRegistry
+  surface-hash refresh under ADR-066, O4 domain variant and AC8 landed 2026-11-11 (uncommitted); KH/KF not granted.
 
 ## Dev Notes
 
@@ -1041,7 +1045,7 @@ openai-codex/gpt-6.1-sol (landing-1 T0 STOP investigation and Dev2011b L1 contin
 - Once-only prescribed prepush completes within its3000s cell: exit1 in2943.623s,84 pass/1 red/1 advisory/6 skips. The sole red is workspace-nextest; same-run JUnit5707/5708, sole1M first-completion observation failure50.162s after pending10.000723955s (seed allocated1487568896 bytes). Seven unchanged-budget advisories have same-line20-7 rows; the new heavy binary61.897s is below its approved78s. Earlier standalone occurrences are retained, not retired by these later positives; no second prepush or retry-to-green.
 - Prepush's six skips are five local CI-marker cardinalities plus cargo-deny because Cargo.lock/deny.toml did not change. The promoted existing dependency edge is nevertheless explicitly checked: cargo deny check exits0 in1.351s. AC6 prints its real named skip: signed T3 substrate not provisioned, provision_t3_tests.py/t3.env required. Hosted native instructions, Apple compilation/runtime and fullAC5/T3 evidence remain unverified. The generated intent-lineage report is restored exactly from its saved preimage with copy-back+cmp+touch0.
 
-- Closing exit-command, decision-register, Dev Agent Record and epic-coherence checks each exit0 after the final prepush/deferred records. Final guarded cleanup exits0: /proc has no cargo/rustc/clippy/rustdoc/nextest process, own scratch removed and544 stale incremental sessions pruned while retaining newest/recent2h sessions. Logical8111838200 bytes / last-link file allocation6504443904 bytes unlinked; observed Cargo-filesystem free-space gain5914886144 bytes. Earlier aborted-fixture cleanup is separate (1396526824 logical/1396523008 allocated bytes). All completed raw evidence is archived; no deps/build/fingerprint, other-worktree, .devcontainer or parked-archive deletion. No checks after final cleanup.
+- Closing exit-command, decision-register, Dev Agent Record and epic-coherence checks each exit0 after the final prepush/deferred records. Final guarded cleanup exits0: /proc has no cargo/rustc/clippy/rustdoc/nextest process, own scratch removed and544 stale incremental sessions pruned while retaining newest/recent2h sessions. Logical8111838202 bytes / last-link file allocation6504443904 bytes unlinked; observed Cargo-filesystem free-space gain5914886144 bytes. Earlier aborted-fixture cleanup is separate (1396526824 logical/1396523008 allocated bytes). All completed raw evidence is archived; no deps/build/fingerprint, other-worktree, .devcontainer or parked-archive deletion. No checks after final cleanup.
 
 ### Hosted discipline observation — 2026-11-08
 
@@ -1049,6 +1053,24 @@ Main run [`42533166219`](https://github.com/lunarpulse/maos/actions/runs/4253316
 
 The run's epic-17-exit matrix, check-test-budget, check-perf-counts and macos-check jobs succeeded. IAC routing measured 960868.4 instructions against 997449.662 baseline; the hosted JUnit sum was 1133.876 s against 1440 s. Apple ARM all-target compilation passes, not FIFO runtime. Signed T3 substrate was provisioned and the AC6 test is reported PASS, but its skip guard makes live-Worker execution unverified from the log alone. AC3/KS/O4 and private/index hold lease remain final-kernel work. Exact job citations and AC5 clause boundaries: [hosted evidence](20-11-erasure-inventory-closure-evidence/landing-1/hosted-evidence.md). Status remains `ready-for-dev`.
 
+
+### Landing 2 — final kernel landing (Dev2011k, 2026-11-11, base `345ae30f`)
+
+**Scope:** KS `ScheduleWatchdog::forget_spirit`; O4 (closed-pid fence in the single receipt writer, typed `SpiritUnloading(pid)`, silent unload drain deleted); AC3 pending halts (door count from `planned_unload` receipts read back after the unload frame, pre/post registry checks; offline orphan closure through `terminate_spirit` on a transient registry; typed `halt` removal evidence in both verifiers; `NotFound` now also requires no orphans/pre-unload halts); AC4 door schedules `Removed{n}` only after `forget_spirit` and a stamp-residue check; one `ScheduleWatchdog` built (`new_schedule_watchdog`) only by its consumer — a door root builds it before its door and parks a `Weak` in a root-scope slot; the serving tail and `LifecycleCallers::start` upgrade it (or build their own). KH/KF not landed.
+
+**T0 (measured before editing):** `landing-2/t0-measurement.md`. Prototype = creation KS diff + landing-1 O4 diff, rustfmt'd, prebuilt gate binary: kernel +26 physical/+18 tokei, domain +4 — exactly the grant; ceilings 26,893/21,078, STOP 21,250 not approached. Landed formatted code has the identical set hash `affee8b0…`.
+
+**Exact pins:** kernel `src_lines` 26,880, set hash `affee8b007d65000b63a3776cf59bd5d3fafb874cc818bc68133bbf3ef41a883`, per-file `halt/mod.rs` `b77703f8…`, `halt/termination.rs` `043a2a54…`, `scheduler/schedule_watchdog.rs` `3b9d8431…`, `scheduler/scheduler_loop.rs` `95bd5a33…`; kloc kernel 21,069, domain 10,215, bin 38,202, audit 8,313, `_aggregate_hardfail` 202,371 (clean aggregate 202,370); xtask pin tests re-pinned (26,880 / 21,069). Surface: single `HaltRegistry` hash refresh (`kernel-surface-v0.1-beta.json:618`, ADR-066 hand-edit), no class row.
+
+**Overdraft ruling (orchestrator, D02 A, disclosed to the operator):** audit ceiling 8,261 → 8,313 (+86 = `orphaned_halts`, `planned_unload_receipts`, typed `halt` evidence; relocating to maos-bin would only move the overdraft); bin's stale-absolute story ceilings are not enforceable against 38,061 — the live bin ceiling is the measured pin plus this story's own remaining allowance (602 at the L1 pin; 141 used). Knock-on: 20-1b's "audit remaining 82" is moot; later stories re-base on 8,313.
+
+**Witnesses / plants:** `landing-2/plants.md` (witness name:line, failing-before log, plant log, final log). Final-tree green: kernel O4+KS 4/4, kernel `--lib` 253/253, audit `erasure_review_20_11` 11/11, bin `erasure_inventory_20_11` 20/20, door `shell_host_16_2 ac3_/ac4_` 2/2, composition `main.rs ac3_/ac4_/review_p9` 7/7, live `erasure_live_20_11` 2/2 (Worker leg skips without T3), xtask pin tests 9+25+12.
+
+**Review-relevant facts:** (1) a halt in flight when the pid is closed is committed first and receipted by the drain; a later halt is refused and writes nothing (no TL row, no Journal entry). (2) `terminate_spirit` callers (unload, crash, revocation) all fence. (3) Hot swap (K1p) never calls the writer: unchanged. (4) The offline closure writes receipts stamped with the offline process's boot nonce at the old pid; the receipt payload carries the incarnation's `boot_nonce`/`pid`, and orphan detection keys on the payload's `halt_id` (ULID), not the row boot. (5) A `halt.resolve` approval row (target = Spirit, reasoning prefix `halt=<id>:`) counts as a resolution. (6) Plant (c) of the pricing (close in unload only) has no realistic variant in this design; plant (a) reds the crash witness.
+
+**Defect found and fixed by the workspace nextest (observed):** the first full run (5987 cases) failed 20, 19 of them `audit writer drain timed out after 5s` (one-shot, journey, uninstall, butler, door-disabled `run`): my first cut built the shared `ScheduleWatchdog` unconditionally in `main`, and an unspawned instance holds the capability registry's audit sender, so the drain never closed. Repaired by building it only in a door root and parking a `Weak` (a strong slot in main scope still stalled door-disabled `run` roots: observed on re-test). The 20th failure was the known local `erasure_million_20_11` AC5 1M oracle (not retried or widened). The nine affected bin binaries and the two journey binaries then passed (log `final/retest2-bin.log`, `final/retest3-journey.log`); the final one-workspace nextest is in `final/workspace-nextest-final.log`.
+
+**Unverified / open:** AC5/EC-13 (hosted serial 1M pass, `erasure_million_20_11` local oracle ~21 s vs 20 s allowance, root-caused, not widened), AC6 live T3 leg (hosted-only), private/index hold lease (`kernel_private_index_hold_lease` gap, separate grant required), hosted discipline run on the final tree.
 
 ### Completion Notes List
 
@@ -1088,6 +1110,9 @@ The run's epic-17-exit matrix, check-test-budget, check-perf-counts and macos-ch
 - Hosted-follow-up tests: `crates/maos-iac/tests/support/erasure_races_20_11.rs`, `crates/maos-bin/tests/erasure_inventory_20_11.rs`, `crates/maos-bin/tests/shell_host_16_2.rs`, new `crates/maos-bin/tests/erasure_million_20_11.rs` and `crates/maos-bin/tests/support/shell_world_16_2.rs` — real regression controls, portable FIFO and unchanged heavy vectors/helper transfer.
 - Hosted-follow-up records/configuration: `.config/nextest.toml`, `xtask/test-budgets.toml`, `xtask/kloc.toml`, this story, `deferred-work.md`, ADR-044, EN/KO operator docs, coverage matrix and `20-11-erasure-inventory-closure-evidence/landing-1/hosted-followup-42224167600/`; existing T0 and prior failed evidence retained.
 - Hosted evidence record: `20-11-erasure-inventory-closure-evidence/landing-1/hosted-evidence.md`.
+- Landing 2 kernel: `crates/maos-kernel-core/src/{halt/mod.rs,halt/termination.rs,scheduler/schedule_watchdog.rs,scheduler/scheduler_loop.rs}`, `crates/maos-domain/src/halt.rs`, `docs/ci-baselines/kernel-surface-v0.1-beta.json` (single HaltRegistry hash), `xtask/kernel-core-baseline.toml`, `xtask/kloc.toml`, `xtask/tests/{kernel_pin_content_hash_16_0,recovery_lane_ceiling_rule}.rs`; new `crates/maos-kernel-core/tests/{halt_unload_fence_20_11,schedule_forget_spirit_20_11}.rs`.
+- Landing 2 production: `crates/maos-audit/src/{lib.rs,erasure/proof.rs}`, `tools/verify-erasure/verify.py`, `crates/maos-bin/src/{main,operator_door,spawned_lifecycle}.rs`.
+- Landing 2 tests/records: `crates/maos-audit/tests/erasure_review_20_11.rs`, `crates/maos-bin/tests/{erasure_inventory_20_11,erasure_live_20_11,shell_host_16_2}.rs`, `crates/maos-bin/tests/support/{shell_world_16_2,uninstall_review_20_11,worker_revoke_root}.rs`, `20-11-flag-winston-decision.md`, `deferred-work.md`, ADR-044, `tests/coverage-matrix.yaml`, `sprint-status.yaml`, epic-20/preflight mirrors, `20-11-erasure-inventory-closure-evidence/landing-2/`.
 
 ## Change Log
 
@@ -1111,6 +1136,7 @@ The run's epic-17-exit matrix, check-test-budget, check-perf-counts and macos-ch
 - 2026-11-05: Final record gates0; cleanup0 with no active cargo/rustc/nextest. Removed own scratch and486 stale incremental sessions, keeping newest/recent; logical6064487193 bytes and last-link allocation5121658880 bytes unlinked, observed Cargo free-space gain3897225216 bytes. No checks after cleanup, no deps/build/fingerprint, other-worktree or parked-archive deletion.
 - 2026-11-06: Hosted42224167600 follow-up from cleanfd4f60f1 implements cached indexed INSERT plus allocation-neutral inline delivery storage, safe POSIX FIFO creation, durable marker-scoped replay with generation/hold/tail controls and preserved transport deadline, and unchanged physical100k/1M vectors in the explicitly approved78s serial binary. Genuine before/plant failures and restored positives are preserved; no perf/latency/deadline/oracle widening, new crate version, kernel change or tracker flip. Exact aggregate194934/hardfail194935; AC5/full hosted proof remains open.
 - 2026-11-06: Final follow-up source/record/fmt/docs bundle20/20 and explicit cargo-deny0; actual default-concurrency standalone5702/5708 with six retained timing/I/O observations, once-only prepush5707/5708 with sole1M completion observation and seven unchanged-budget advisories. Prepush2943.623s stays within3000s; no retry, baseline/deadline widening, kernel edit or tracker flip. Exact pins194934/hardfail194935; source/name/control records and resource cleanup are retained. AC5/full hosted proof stays open.
-- 2026-11-06: Closing four record gates0; guarded owned-scratch/incremental cleanup0 removes544 stale sessions,8111838200 logical bytes /6504443904 last-link allocated-file bytes, with5914886144 observed Cargo free-space gain. Earlier positively identified aborted1M fixture cleanup is separately recorded; no source/pin/status change or checks after cleanup.
+- 2026-11-06: Closing four record gates0; guarded owned-scratch/incremental cleanup0 removes544 stale sessions,8111838202 logical bytes /6504443904 last-link allocated-file bytes, with5914886144 observed Cargo free-space gain. Earlier positively identified aborted1M fixture cleanup is separately recorded; no source/pin/status change or checks after cleanup.
 - 2026-11-08: Recorded hosted run `42533166219` @ `a13140b8`: 100k/1M vectors pass; workspace fails only the known 20-7 snapshot-owner timing family. AC5/EC-13 stays open for final review, AC6 live Worker remains unverified from the log, final-kernel work remains owed, and status is unchanged.
 - 2026-11-11: **Loom whole-package leg skips the 1M vector** (Dev20Hosted; operator ruling 2026-11-11, ask `m1`, option 3 only): `check-multi-tenant-loom`'s `maos-bin-whole-package-parallel-isolation` leg now runs `cargo test -p maos-bin -- --skip ac5_million_row_pending_forget_finishes_and_repeats_without_corruption` (default parallelism and the three required `cross_team_consent_13_3` tests unchanged; test `whole_package_leg_skips_only_the_million_row_test`, red at `459a606a`). The heavy vector keeps its hosted serial-group coverage in the workspace nextest run (`.config/nextest.toml`); the loom leg is the `MAOS_HOME` race witness, not a 1M witness. No 20-11 oracle, deadline or budget changed. **AC5/EC-13 stays OPEN** until a hosted serial pass of that vector is cited at the final 20-11 landing; this skip is not that evidence.
+- 2026-11-11: **Landing 2 (final kernel landing: KS + O4 + AC3), Dev2011k, base `345ae30f`** (uncommitted, awaiting orchestrator commit/review). T0 on a reverted `git archive HEAD` prototype: kernel 26854/21051 → 26880/21069 (**+26/+18 = grant**), domain 10211 → 10215 (+4); one HaltRegistry surface-hash refresh `b6d65243…` → `a917eddc…`. Every witness green in the final tree with red-before and plants (`landing-2/plants.md`). **Orchestrator-adjudicated overdraft, disclosed to the operator (D02 A):** maos-audit 20-11 ceiling 8,261 → 8,313 (pin 8,227 → 8,313, +86); maos-bin pin 38,061 → 38,202 (+141); aggregate hardfail 202,122 → 202,371. **Status stays in-progress:** AC5/EC-13 (hosted serial 1M pass), AC6 live T3 leg (hosted-only) and the private/index hold lease (named gap, separate grant) remain open.

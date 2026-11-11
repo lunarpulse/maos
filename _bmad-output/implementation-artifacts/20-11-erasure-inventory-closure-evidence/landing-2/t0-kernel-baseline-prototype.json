@@ -1,0 +1,17 @@
+{
+  "passed": false,
+  "actual-lines": 26880,
+  "pinned-lines": 26854,
+  "baseline-file": "/tmp/t0_2011k/proto/xtask/kernel-core-baseline.toml",
+  "file-set-entries": 95,
+  "set-hash": "affee8b007d65000b63a3776cf59bd5d3fafb874cc818bc68133bbf3ef41a883",
+  "pinned-set-hash": "2c22321948fb89df25f58b4abcb54e3ff81bd2c5ffa0c8f8429d27562164375b",
+  "changed": [
+    "halt/mod.rs",
+    "halt/termination.rs",
+    "scheduler/schedule_watchdog.rs",
+    "scheduler/scheduler_loop.rs"
+  ],
+  "added": [],
+  "removed": []
+}

@@ -3447,6 +3447,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         audit_rx,
         Arc::clone(&transparency_log),
     );
+    // Story 6.4 / FR26 / ADR-025 + Story 20-11 KS — a door root builds the ONE ScheduleWatchdog before
+    // its door so an uninstall can drop its per-Spirit buckets and stamps (`forget_spirit`); the
+    // serving tail or the `run` lifecycle callers take and spawn that same handle.
+    let mut schedule_state: Option<std::sync::Weak<maos_kernel_core::scheduler::ScheduleWatchdog>> =
+        None;
     // ─────────────────────────────────────────────────────────────
     // Story 16-1 (D-16-1-B) — THE OPERATOR DOOR: bind relocated and
     // ROOT-GATED. Exactly three roots bind — `maos run`, `maos shell`
@@ -3565,6 +3570,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // resolves through it in-process (one mechanism, two surfaces) and
         // must work with no `maos init` (FR58 zero-config). Only the HTTP
         // BIND below stays gated on the env pair / `control.json`.
+        let schedule_watchdog = new_schedule_watchdog(&scheduler, &transparency_log, &capability);
+        schedule_state = Some(Arc::downgrade(&schedule_watchdog));
         let private_ops = Arc::new(BinPrivateOpsImpl {
             provider_catalog: Arc::clone(&provider_catalog),
             memory: Arc::clone(&memory),
@@ -3600,6 +3607,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             butler_principal: Arc::clone(&butler_principal),
             #[cfg(feature = "wasm-host")]
             swap_slot: swap_slot.clone(),
+            schedule_watchdog,
         });
         let door = Arc::new(maos_bin::operator_door::OperatorDoor::new(
             Arc::clone(&scheduler),
@@ -6883,8 +6891,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut spawned_callers = spawned_core.is_some().then(|| {
                 maos_bin::spawned_lifecycle::LifecycleCallers::start(
                     &scheduler,
-                    &transparency_log,
-                    &capability,
+                    schedule_state
+                        .take()
+                        .and_then(|weak| weak.upgrade())
+                        .unwrap_or_else(|| {
+                            new_schedule_watchdog(&scheduler, &transparency_log, &capability)
+                        }),
                     &hook_pump,
                 )
             });
@@ -7528,7 +7540,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &memory_db_path,
                 UninstallContext {
                     pump: None,
-                    door_schedules: None,
+                    door: None,
                 },
             )
             .await;
@@ -9828,15 +9840,11 @@ description = "smoke test spirit successor"
 
     // Story 6.4 / FR26 / ADR-025 — ScheduleWatchdog spawned alongside the
     // IdleWatchdog; wires the cadence loop for manifest `[[schedule]]` entries.
-    let schedule_watchdog = Arc::new(
-        maos_kernel_core::scheduler::ScheduleWatchdog::new(
-            scheduler.scbs(),
-            scheduler.dispatcher_arc(),
-            Arc::clone(&transparency_log),
-        )
-        .with_capability(Arc::clone(&capability)),
-    )
-    .spawn(cancel.child_token());
+    let schedule_watchdog = schedule_state
+        .take()
+        .and_then(|weak| weak.upgrade())
+        .unwrap_or_else(|| new_schedule_watchdog(&scheduler, &transparency_log, &capability))
+        .spawn(cancel.child_token());
     eprintln!("maos: ScheduleWatchdog spawned (Story 6.4)");
 
     // Story 5.3 — ProgressWatchdog + SilentFailureDetector spawned.
@@ -10139,6 +10147,24 @@ impl UninstallCascadeTerminal {
 /// A refused cold swap restores this incarnation, never a mutable pathname.
 type AdmittedManifests = Arc<std::sync::RwLock<std::collections::BTreeMap<String, Arc<String>>>>;
 
+/// Story 6.4 / FR26 + Story 20-11 KS — the root's ScheduleWatchdog, built only by the consumer that
+/// needs it (the door roots, the `run` lifecycle callers, the serving tail): an unspawned instance
+/// would hold the capability registry's audit sender and stall a one-shot root's audit drain.
+fn new_schedule_watchdog(
+    scheduler: &maos_kernel_core::scheduler::SpiritSchedulerAdapter,
+    transparency_log: &Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+    capability: &Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+) -> Arc<maos_kernel_core::scheduler::ScheduleWatchdog> {
+    Arc::new(
+        maos_kernel_core::scheduler::ScheduleWatchdog::new(
+            scheduler.scbs(),
+            scheduler.dispatcher_arc(),
+            Arc::clone(transparency_log),
+        )
+        .with_capability(Arc::clone(capability)),
+    )
+}
+
 fn record_admitted_manifest(map: &AdmittedManifests, spirit_id: &str, text: &str) {
     map.write()
         .unwrap_or_else(|error| error.into_inner())
@@ -10183,6 +10209,8 @@ struct BinPrivateOpsImpl {
     /// Story 20-9 — the root's spawned-form handles, filled once its supervision is armed.
     #[cfg(feature = "wasm-host")]
     swap_slot: maos_bin::spawned_lifecycle::SwapSlot,
+    /// Story 20-11 KS — the watchdog whose buckets and stamps an uninstall drops.
+    schedule_watchdog: Arc<maos_kernel_core::scheduler::ScheduleWatchdog>,
 }
 
 #[cfg(feature = "network")]
@@ -10219,8 +10247,18 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
     async fn run_uninstall_cascade(
         &self,
         spirit_id: &str,
-        schedule_ids: Vec<String>,
+        mut door: maos_bin::operator_door::DoorUninstall,
     ) -> maos_bin::operator_door::UninstallOutcome {
+        // The SCB is unloaded and its Worker stopped: nothing fires for this
+        // pid again. Drop the watchdog's per-process buckets and stamps, then
+        // name any schedule whose stamp survived instead of claiming removal.
+        self.schedule_watchdog.forget_spirit(spirit_id, door.pid);
+        door.watchdog_residue = door
+            .schedule_ids
+            .iter()
+            .filter(|id| self.schedule_watchdog.last_fire_ns(door.pid, id) != 0)
+            .cloned()
+            .collect();
         let (terminal, redistillation) = run_uninstall_cascade(
             spirit_id,
             self.memory.as_ref(),
@@ -10230,7 +10268,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
             &self.memory_db_path,
             UninstallContext {
                 pump: Some(&self.hooks),
-                door_schedules: Some(&schedule_ids),
+                door: Some(&door),
             },
         )
         .await;
@@ -10812,7 +10850,7 @@ impl RetainedUninstallStore {
 #[cfg(feature = "network")]
 struct UninstallContext<'a> {
     pump: Option<&'a maos_bin::hook_pump::HookPump>,
-    door_schedules: Option<&'a [String]>,
+    door: Option<&'a maos_bin::operator_door::DoorUninstall>,
 }
 
 #[cfg(feature = "network")]
@@ -10989,6 +11027,99 @@ impl UninstallProofInventory<'_> {
     }
 }
 
+/// Story 20-11 AC3 — close every halt the Spirit left pending and return one
+/// typed evidence row per terminal receipt, plus every reason that claim is
+/// not complete. Door: the unload's own `planned_unload` receipts, read back
+/// from the log after its unload frame and checked against the pre-unload
+/// registry read and the post-unload registry. Both paths: halts a dead root
+/// left open (any boot, owner by admission identity) get one `unplanned_crash`
+/// receipt each from the single receipt writer on a transient registry; the
+/// category never reads this process's own registry for the offline count.
+#[cfg(feature = "network")]
+fn close_pending_halts(
+    spirit_id: &str,
+    transparency_log: &maos_kernel_core::iac::TransparencyLogAdapter,
+    audit_db_path: &std::path::Path,
+    door: Option<&maos_bin::operator_door::DoorUninstall>,
+    orphans: Vec<(u64, u32, maos_domain::frame::EpistemicHaltPayload)>,
+) -> Result<
+    (
+        Vec<maos_audit::erasure::proof::RemovalEvidence>,
+        Vec<String>,
+    ),
+    Box<dyn std::error::Error>,
+> {
+    let mut receipts = Vec::new();
+    let mut gaps = Vec::new();
+    if let Some(door) = door {
+        receipts = maos_audit::planned_unload_receipts(
+            audit_db_path,
+            transparency_log.boot_nonce(),
+            door.pid,
+        )?;
+        gaps.extend(
+            door.halts_before
+                .iter()
+                .filter(|id| receipts.iter().all(|(receipt, _)| receipt != *id))
+                .map(|id| format!("halt {id} has no planned_unload receipt")),
+        );
+        if !door.halts_after.is_empty() {
+            gaps.push(format!(
+                "the halt registry still holds {}",
+                door.halts_after.join(", ")
+            ));
+        }
+    }
+    let mut open = std::collections::BTreeMap::<
+        (u64, u32),
+        Vec<maos_domain::frame::EpistemicHaltPayload>,
+    >::new();
+    for (boot, pid, payload) in orphans {
+        open.entry((boot, pid)).or_default().push(payload);
+    }
+    for ((boot, pid), halts) in open {
+        let registry = maos_kernel_core::halt::HaltRegistry::new();
+        for payload in halts {
+            registry.insert_pending_with_metadata(
+                maos_domain::halt::HaltId::new(payload.halt_id.clone())?,
+                maos_domain::halt::HaltState::PendingResolution,
+                maos_kernel_core::halt::PendingHaltMetadata {
+                    spirit_pid: pid,
+                    spirit_id: spirit_id.into(),
+                    payload,
+                    fired_ns: 0,
+                },
+            )?;
+        }
+        let closed = maos_kernel_core::halt::terminate_spirit(
+            transparency_log,
+            &registry,
+            pid,
+            spirit_id,
+            maos_domain::halt::TerminationKind::UnplannedCrash,
+            boot,
+        );
+        receipts.extend(
+            closed
+                .into_iter()
+                .map(|receipt| (receipt.halt_id.as_str().to_owned(), receipt.frame_id)),
+        );
+    }
+    if !maos_audit::orphaned_halts(audit_db_path, spirit_id)?.is_empty() {
+        gaps.push("orphaned halts remain after closure".into());
+    }
+    let evidence = receipts
+        .into_iter()
+        .map(
+            |(halt_id, frame)| maos_audit::erasure::proof::RemovalEvidence::Halt {
+                halt_id,
+                receipt_frame_id: hex::encode(frame),
+            },
+        )
+        .collect();
+    Ok((evidence, gaps))
+}
+
 #[cfg(feature = "network")]
 async fn run_uninstall_cascade_inner(
     spirit_id: &str,
@@ -11014,10 +11145,7 @@ async fn run_uninstall_cascade_inner(
             Status::Removed { count }
         }
     };
-    let UninstallContext {
-        pump,
-        door_schedules,
-    } = context;
+    let UninstallContext { pump, door } = context;
     let installed = maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()?
         .into_iter()
         .find(|(name, _)| name == spirit_id);
@@ -11073,8 +11201,8 @@ async fn run_uninstall_cascade_inner(
         .into_iter()
         .map(|store| store.observe(spirit_id, &all_incarnations))
         .collect::<Result<Vec<_>, _>>()?;
-    let schedule_ids = match door_schedules {
-        Some(ids) => ids.to_vec(),
+    let schedule_ids = match door {
+        Some(door) => door.schedule_ids.clone(),
         None => match &installed {
             Some((_, path)) => {
                 let document: toml::Value = toml::from_str(&std::fs::read_to_string(path)?)?;
@@ -11091,6 +11219,9 @@ async fn run_uninstall_cascade_inner(
             None => Vec::new(),
         },
     };
+    // Halts a dead root left pending (invocation, no terminal receipt, no
+    // resolution): enumerated from the log, never from this process's registry.
+    let orphans = maos_audit::orphaned_halts(audit_db_path, spirit_id)?;
     if subjects.is_empty()
         && shared == 0
         && private_before == 0
@@ -11099,6 +11230,8 @@ async fn run_uninstall_cascade_inner(
         && legacy.is_empty()
         && installed.is_none()
         && schedule_ids.is_empty()
+        && orphans.is_empty()
+        && door.is_none_or(|door| door.halts_before.is_empty())
         && retained
             .iter()
             .all(|category| matches!(category.status, Status::VerifiedEmpty))
@@ -11194,6 +11327,7 @@ async fn run_uninstall_cascade_inner(
     let work=async {
     transparency_log.insert_kernel_event_returning_id(0,maos_iac::adapter::transparency_log::FrameKind::Decision,None,
         "principal.uninstall.scope",&serde_json::to_vec(&serde_json::json!({"spirit_id":spirit_id,"principal_ids":subjects}))?);
+    let (halt_evidence,halt_gaps)=close_pending_halts(spirit_id,transparency_log,audit_db_path,door,orphans)?;
     for subject in &subjects {
         match memory.forget_with_reason(subject,None) {
             Ok(outcome @ ForgetOutcome::Erased {..})=>{
@@ -11318,8 +11452,15 @@ async fn run_uninstall_cascade_inner(
         inventory.removals.insert(name.into(),ids.iter().map(|id|Evidence::Frame {frame_id:hex::encode(id)}).collect());
     }
     inventory.status("legal_hold",if held_principals.is_empty() && held_frames.is_empty() {Status::VerifiedEmpty} else {gap(format!("durable holds retained: principals={held_principals:?}; frames={held_frames:?}"))});
-    inventory.status("pending_halts",gap("AC3/KS/O4 pending final kernel landing; no halt-count claim; IAC-frame intent_lineage audit arrays retained (NFR-Aud-14)".into()));
-    inventory.status("scheduled_invocations",gap(format!("{} schedule(s): {}; {}; watchdog buckets/stamps pending KS; IAC-frame intent_lineage audit arrays retained",schedule_ids.len(),schedule_ids.join(", "),if door_schedules.is_some() {"SCB unloaded; firing stopped"} else {"installed manifest queried; compiled-in Spirit may be re-admitted at next boot"})));
+    inventory.status("pending_halts",if halt_gaps.is_empty() {removed(halt_evidence.len() as u64)} else {gap(format!("pending halts not fully closed: {}; {} receipt(s) written; IAC-frame intent_lineage audit arrays retained (NFR-Aud-14)",halt_gaps.join("; "),halt_evidence.len()))});
+    if halt_gaps.is_empty() && !halt_evidence.is_empty() {inventory.removals.insert("pending_halts".into(),halt_evidence);}
+    match door {
+        Some(door) => {
+            inventory.status("scheduled_invocations",if door.watchdog_residue.is_empty() {removed(schedule_ids.len() as u64)} else {gap(format!("SCB unloaded; watchdog state retained for {}",door.watchdog_residue.join(", ")))});
+            if door.watchdog_residue.is_empty() && !schedule_ids.is_empty() {inventory.removals.insert("scheduled_invocations".into(),schedule_ids.iter().cloned().map(|schedule_id|Evidence::Schedule {schedule_id}).collect());}
+        }
+        None => inventory.status("scheduled_invocations",gap(format!("{} schedule(s): {}; installed manifest queried; compiled-in Spirit may be re-admitted at next boot; IAC-frame intent_lineage audit arrays retained",schedule_ids.len(),schedule_ids.join(", ")))),
+    }
     inventory.status("region_signing_key",if regional {gap(REGION_KEY_GAP.into())} else {Status::VerifiedEmpty});
     for category in retained {inventory.status(&category.name,category.status);}
     if !held_principals.is_empty() {failures.push(Failure::Hold("principal erasure suspended by durable legal hold".into()));}
@@ -11361,7 +11502,7 @@ async fn run_uninstall_cascade_inner(
                 }],
             );
         }
-        if door_schedules.is_none() {
+        if door.is_none() {
             inventory.status("scheduled_invocations", removed(schedule_ids.len() as u64));
             if !schedule_ids.is_empty() {
                 inventory.removals.insert(
@@ -11431,7 +11572,7 @@ async fn run_uninstall_cascade_inner(
                 Status::VerifiedEmpty
             },
         );
-        if door_schedules.is_none() && installed.is_some() {
+        if door.is_none() && installed.is_some() {
             inventory.removals.remove("scheduled_invocations");
             inventory.status(
                 "scheduled_invocations",

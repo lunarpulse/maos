@@ -925,3 +925,132 @@ fn registry_bound_principal_is_counted_and_erased_on_uninstall_p3() {
     );
     verify(&proof);
 }
+
+fn raise_halt(f: &Fixture, boot: u64, pid: u32, spirit: &str, halt: &str) {
+    let tl = TransparencyLogAdapter::open_with_global_legal_holds(&f.db, &f.db, boot).expect("TL");
+    let journal =
+        maos_kernel_core::journal::JournalAdapter::open(&f.dir.path().join("halt-journal.ndjson"))
+            .expect("journal");
+    maos_kernel_core::halt::invoke_halt(
+        &tl,
+        &journal,
+        &maos_kernel_core::halt::HaltRegistry::new(),
+        maos_domain::frame::EpistemicHaltPayload::new(
+            halt.into(),
+            "ambiguity".into(),
+            1.0,
+            None,
+            "policy".into(),
+            "derived".into(),
+        )
+        .expect("payload"),
+        pid,
+        spirit,
+        boot,
+    )
+    .expect("a halt raised by a root that never closed it");
+}
+/// `resolution_kind` of every terminal receipt row naming `halt`.
+fn receipts_of(f: &Fixture, halt: &str) -> Vec<String> {
+    let db = rusqlite::Connection::open(&f.db).expect("db");
+    let mut statement = db
+        .prepare(
+            "SELECT json_extract(CAST(payload_redacted AS TEXT),'$.resolution_kind') FROM transparency_log \
+             WHERE kind=3 AND CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) THEN \
+             json_extract(CAST(payload_redacted AS TEXT),'$.halt_id') END = ?1 AND \
+             CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) THEN \
+             json_type(CAST(payload_redacted AS TEXT),'$.terminal_state') END IS NOT NULL",
+        )
+        .expect("receipt query");
+    statement
+        .query_map([halt], |row| row.get(0))
+        .expect("receipts")
+        .collect::<Result<_, _>>()
+        .expect("receipt rows")
+}
+fn python_accepts(f: &Fixture, proof: &serde_json::Value) -> bool {
+    let path = f.dir.path().join("python-bundle.json");
+    std::fs::write(&path, serde_json::to_vec(proof).expect("encode")).expect("bundle");
+    Command::new("python3")
+        .arg(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tools/verify-erasure/verify.py"))
+        .arg(&path)
+        .arg(hex::encode(maos_audit::sealed_export::derive_pubkey(
+            &[0x61; 32],
+        )))
+        .status()
+        .expect("python verifier")
+        .success()
+}
+#[test]
+fn ac3_offline_orphaned_halt_gets_one_terminal_receipt_and_isolation_holds() {
+    let f = Fixture::new();
+    f.seed(1, "hello-spirit", 7, false);
+    f.seed(2, "other-spirit", 7, false);
+    raise_halt(&f, 1, 7, "hello-spirit", "orphan-a-20-11");
+    raise_halt(&f, 1, 7, "hello-spirit", "resolved-b-20-11");
+    raise_halt(&f, 2, 7, "other-spirit", "other-c-20-11");
+    let tl = TransparencyLogAdapter::open_with_global_legal_holds(&f.db, &f.db, 1).expect("TL");
+    maos_kernel_core::halt::journal_halt_resolution(
+        &tl,
+        "director",
+        "hello-spirit",
+        &maos_domain::halt::HaltId::new("resolved-b-20-11").expect("id"),
+        &maos_domain::halt::Resolution::AcceptedHalt,
+    )
+    .expect("a real resolution row");
+    drop(tl);
+    let out = f.run();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let proof = f.proof(&out);
+    assert_eq!(
+        category(&proof, "pending_halts")["status"]["status"],
+        "Removed"
+    );
+    assert_eq!(category(&proof, "pending_halts")["status"]["count"], 1);
+    assert_eq!(receipts_of(&f, "orphan-a-20-11"), ["unplanned_crash"]);
+    assert!(
+        receipts_of(&f, "resolved-b-20-11").is_empty(),
+        "a resolved halt"
+    );
+    assert!(
+        receipts_of(&f, "other-c-20-11").is_empty(),
+        "another Spirit's halt"
+    );
+    verify(&proof);
+    assert!(python_accepts(&f, &proof));
+}
+#[test]
+fn ac3_spirit_with_only_an_orphaned_halt_is_not_not_found() {
+    let f = Fixture::new();
+    f.seed(1, "hello-spirit", 7, false);
+    raise_halt(&f, 1, 7, "hello-spirit", "orphan-only-20-11");
+    let out = f.run();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let proof = f.proof(&out);
+    assert_eq!(category(&proof, "pending_halts")["status"]["count"], 1);
+    assert_eq!(receipts_of(&f, "orphan-only-20-11"), ["unplanned_crash"]);
+    verify(&proof);
+}
+#[test]
+fn ac3_no_halts_is_verified_empty_from_the_query() {
+    let f = Fixture::new();
+    f.seed(1, "hello-spirit", 7, true);
+    let out = f.run();
+    let proof = f.proof(&out);
+    assert_eq!(
+        category(&proof, "pending_halts")["status"]["status"],
+        "VerifiedEmpty"
+    );
+    verify(&proof);
+    assert!(python_accepts(&f, &proof));
+}

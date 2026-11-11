@@ -1193,7 +1193,7 @@ fn ac4_door_snapshots_real_scb_schedules_before_unload() {
         .enable_all()
         .build()
         .expect("runtime");
-    let capture = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let capture = Arc::new(std::sync::Mutex::new(None));
     let ops = Arc::new(UnwiredBinOps {
         schedule_capture: Some(Arc::clone(&capture)),
     });
@@ -1211,9 +1211,93 @@ fn ac4_door_snapshots_real_scb_schedules_before_unload() {
         ),
         "{result:?}"
     );
-    assert_eq!(*capture.lock().expect("snapshot"), ["daily"]);
+    assert_eq!(
+        capture
+            .lock()
+            .expect("snapshot")
+            .take()
+            .expect("cascade ran")
+            .schedule_ids,
+        ["daily"]
+    );
     assert!(
         !scheduler.scbs().read().expect("SCBs").contains_key(&pid),
         "unloaded SCB remains"
+    );
+}
+
+/// AC3 (door): a live pending halt is read before the unload, the unload ends
+/// it in a `planned_unload` receipt that the log read-back names, and the
+/// registry holds nothing for the pid afterwards.
+#[test]
+fn ac3_door_snapshots_pending_halts_around_the_unload() {
+    let world = kernel_world(2011);
+    let scheduler = scheduler_with_hello(&world, 2011);
+    let pid = scheduler.resolve_pid("hello-spirit").expect("real SCB");
+    maos_kernel_core::halt::invoke_halt(
+        &world.transparency_log,
+        &world.journal,
+        &world.halt_registry,
+        maos_domain::frame::EpistemicHaltPayload::new(
+            "door-halt-20-11".into(),
+            "ambiguity".into(),
+            1.0,
+            None,
+            "policy".into(),
+            "derived".into(),
+        )
+        .expect("payload"),
+        pid,
+        "hello-spirit",
+        2011,
+    )
+    .expect("a live pending halt");
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .expect("runtime");
+    let capture = Arc::new(std::sync::Mutex::new(None));
+    let ops = Arc::new(UnwiredBinOps {
+        schedule_capture: Some(Arc::clone(&capture)),
+    });
+    let door = regression_door_with_ops(&world, &scheduler, &rt, 2011, ops);
+    let result = submit_and_wait(
+        door.as_ref(),
+        OperatorCommand::Uninstall {
+            spirit_id: "hello-spirit".into(),
+        },
+    );
+    assert!(
+        matches!(
+            result,
+            SubmitOutcome::Completed(OperatorOutcome::Completed(_))
+        ),
+        "{result:?}"
+    );
+    let snapshot = capture
+        .lock()
+        .expect("snapshot")
+        .take()
+        .expect("cascade ran");
+    assert_eq!(snapshot.pid, pid);
+    assert_eq!(snapshot.halts_before, ["door-halt-20-11"]);
+    assert!(
+        snapshot.halts_after.is_empty(),
+        "{:?}",
+        snapshot.halts_after
+    );
+    let receipts = maos_audit::planned_unload_receipts(
+        &world.dir.path().join("transparency.sqlite"),
+        2011,
+        pid,
+    )
+    .expect("receipt read-back");
+    assert_eq!(
+        receipts
+            .iter()
+            .map(|(id, _)| id.as_str())
+            .collect::<Vec<_>>(),
+        ["door-halt-20-11"]
     );
 }

@@ -120,8 +120,10 @@ impl maos_iac::adapter::redaction::RedactionPolicy for AtFirstReceipt {
     }
 }
 
+/// Both fixtures rewrite process-wide environment variables: one lock.
+static ENV: Mutex<()> = Mutex::new(());
+
 fn exercise(mode: LateObservation) {
-    static ENV: Mutex<()> = Mutex::new(());
     let _serialized = ENV.lock().unwrap_or_else(|error| error.into_inner());
     let directory = tempfile::tempdir().expect("uninstall root");
     let home = directory.path();
@@ -270,7 +272,7 @@ fn exercise(mode: LateObservation) {
             &path,
             UninstallContext {
                 pump: Some(&pump),
-                door_schedules: Some(&[]),
+                door: Some(&maos_bin::operator_door::DoorUninstall::default()),
             },
         )
         .await;
@@ -444,4 +446,241 @@ fn review_p9_own_hold_after_first_forget_retains_package_and_names_hold() {
 #[test]
 fn review_p9_ambiguous_malformed_retained_and_owned_erasure_uncertified() {
     exercise(LateObservation::MixedMalformed);
+}
+
+/// One real door-shaped uninstall: a live pending halt, the real unload, then
+/// the real cascade fed the snapshot the door takes around the unload.
+fn door_uninstall(
+    schedule_ids: &[&str],
+    watchdog_residue: &[&str],
+    ghost_before: bool,
+) -> serde_json::Value {
+    let _serialized = ENV.lock().unwrap_or_else(|error| error.into_inner());
+    let directory = tempfile::tempdir().expect("uninstall root");
+    let home = directory.path();
+    let _env = Env([
+        "HOME",
+        "XDG_DATA_HOME",
+        "MAOS_HOME",
+        "MAOS_MEMORY_ROOT",
+        "MAOS_ARCHIVE_DIR",
+        "MAOS_AUDIT_KEY",
+        "MAOS_REGION_HOME",
+        "MAOS_ERASURE_PROOFS_DIR",
+    ]
+    .into_iter()
+    .map(|name| (name, std::env::var_os(name)))
+    .collect());
+    for (name, path) in [
+        ("HOME", home.to_owned()),
+        ("XDG_DATA_HOME", home.join("data")),
+        ("MAOS_HOME", home.join("home")),
+        ("MAOS_MEMORY_ROOT", home.join("memory")),
+        ("MAOS_ARCHIVE_DIR", home.join("archive")),
+        ("MAOS_AUDIT_KEY", home.join("audit.key")),
+    ] {
+        std::env::set_var(name, path);
+    }
+    std::env::remove_var("MAOS_REGION_HOME");
+    std::env::remove_var("MAOS_ERASURE_PROOFS_DIR");
+    std::fs::write(home.join("audit.key"), hex::encode([0x61; 32])).expect("signing key");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(
+            home.join("audit.key"),
+            std::fs::Permissions::from_mode(0o600),
+        )
+        .expect("key mode");
+    }
+    let path = home.join("home/audit/transparency.sqlite");
+    std::fs::create_dir_all(path.parent().expect("audit parent")).expect("audit directory");
+    let log = Arc::new(
+        TransparencyLogAdapter::open_with_global_legal_holds(&path, &path, 2011).expect("log"),
+    );
+    let memory = Arc::new(MemoryManagerAdapter::new(
+        Arc::new(PrivateMemoryStore::new(home.join("memory"), 4096)),
+        Arc::new(SharedMemoryStore::open(&path).expect("shared")),
+        Arc::new(PrincipalNamespaceIndex::open(&path).expect("principal index")),
+        Arc::clone(&log),
+    ));
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let telemetry = Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default());
+    let (sender, receiver) = maos_kernel_core::capability::cap_audit::channel();
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .expect("runtime");
+    let _entered = runtime.enter();
+    maos_kernel_core::capability::cap_audit::CapAuditWriter::spawn(receiver, Arc::clone(&log));
+    let capability = Arc::new(CapabilityRegistryAdapter::new(
+        Arc::new(maos_kernel_core::security::crypto::RingCryptoProvider),
+        Ed25519SigningKey::new([0x16; 32]),
+        2011,
+        Arc::new(PolicyTable::new()),
+        sender,
+        CapQuotaTracker::new(),
+        Arc::new(WorkingMemoryStore::new()),
+        Arc::clone(&telemetry),
+    ));
+    let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
+    let registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
+    let scheduler = maos_kernel_core::scheduler::SpiritSchedulerAdapter::new(
+        Arc::clone(&log),
+        Arc::clone(&capability),
+        Arc::clone(&memory),
+        Arc::new(maos_iac::adapter::IacBusAdapter::new(
+            Arc::new(maos_iac::adapter::Mailbox::new(Arc::clone(&metrics))),
+            Arc::clone(&log),
+        )),
+        Arc::clone(&registry),
+        metrics,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    );
+    let journal = Arc::new(
+        maos_kernel_core::journal::JournalAdapter::open(&home.join("halt-journal.ndjson"))
+            .expect("journal"),
+    );
+    let (terminal, _) = runtime.block_on(async {
+        let pid = scheduler
+            .load(
+                "hello-spirit",
+                Default::default(),
+                maos_spirit_hello::HelloSpirit,
+                2011,
+            )
+            .await
+            .expect("load");
+        maos_kernel_core::halt::invoke_halt(
+            &log,
+            &journal,
+            &registry,
+            maos_domain::frame::EpistemicHaltPayload::new(
+                "door-halt-20-11".into(),
+                "ambiguity".into(),
+                1.0,
+                None,
+                "policy".into(),
+                "derived".into(),
+            )
+            .expect("payload"),
+            pid,
+            "hello-spirit",
+            2011,
+        )
+        .expect("a live pending halt");
+        let mut halts_before: Vec<String> = registry
+            .drain_for_spirit_dry_run(pid)
+            .into_iter()
+            .map(|(id, _)| id.as_str().to_owned())
+            .collect();
+        if ghost_before {
+            halts_before.push("ghost-halt-20-11".into());
+        }
+        scheduler.unload(pid).await.expect("unload");
+        let door = maos_bin::operator_door::DoorUninstall {
+            pid,
+            schedule_ids: schedule_ids.iter().map(|id| (*id).to_owned()).collect(),
+            halts_before,
+            halts_after: registry
+                .halt_metadata_for_spirit(pid, 0)
+                .into_iter()
+                .map(|(id, _)| id.as_str().to_owned())
+                .collect(),
+            watchdog_residue: watchdog_residue.iter().map(|id| (*id).to_owned()).collect(),
+        };
+        let pump =
+            maos_bin::hook_pump::HookPump::new(&scheduler, telemetry.as_ref(), Arc::clone(&log));
+        let result = run_uninstall_cascade(
+            "hello-spirit",
+            memory.as_ref(),
+            capability.as_ref(),
+            log.as_ref(),
+            &path,
+            &path,
+            UninstallContext {
+                pump: Some(&pump),
+                door: Some(&door),
+            },
+        )
+        .await;
+        pump.shutdown().await;
+        result
+    });
+    let terminal =
+        serde_json::to_value(terminal).unwrap_or_else(|error| panic!("terminal: {error}"));
+    let proof_path = terminal["proof_path"]
+        .as_str()
+        .unwrap_or_else(|| panic!("signed proof: {terminal}"));
+    let proof: maos_audit::erasure::proof::ErasureProof =
+        serde_json::from_slice(&std::fs::read(proof_path).expect("bundle"))
+            .unwrap_or_else(|error| panic!("typed proof: {error}"));
+    maos_audit::erasure::proof::verify_erasure_proof(
+        &proof,
+        &maos_audit::sealed_export::derive_pubkey(&[0x61; 32]),
+    )
+    .expect("the signed door inventory verifies");
+    let mut report = serde_json::to_value(&proof).expect("proof value");
+    report["terminal"] = terminal;
+    report
+}
+
+fn status<'a>(report: &'a serde_json::Value, name: &str) -> &'a serde_json::Value {
+    &report["categories"]
+        .as_array()
+        .expect("categories")
+        .iter()
+        .find(|category| category["name"] == name)
+        .unwrap_or_else(|| panic!("missing {name}"))["status"]
+}
+
+#[test]
+fn ac3_ac4_door_counts_unload_receipts_and_removed_watchdog_state() {
+    let report = door_uninstall(&["daily"], &[], false);
+    assert_eq!(report["terminal"]["outcome"], "erased", "{report}");
+    assert_eq!(status(&report, "pending_halts")["status"], "Removed");
+    assert_eq!(status(&report, "pending_halts")["count"], 1);
+    assert_eq!(
+        status(&report, "scheduled_invocations")["status"],
+        "Removed"
+    );
+    assert_eq!(status(&report, "scheduled_invocations")["count"], 1);
+    let evidence = report["category_evidence"]
+        .as_array()
+        .expect("evidence")
+        .iter()
+        .find(|item| item["name"] == "pending_halts")
+        .expect("halt evidence");
+    assert_eq!(evidence["removals"][0]["kind"], "halt");
+    assert_eq!(evidence["removals"][0]["halt_id"], "door-halt-20-11");
+}
+
+#[test]
+fn ac3_door_empty_registry_is_not_a_removed_claim_and_a_missing_receipt_is_a_gap() {
+    let report = door_uninstall(&[], &[], true);
+    let halts = status(&report, "pending_halts");
+    assert_eq!(halts["status"], "CoverageGap", "{report}");
+    assert!(halts["reason"]
+        .as_str()
+        .is_some_and(|reason| reason.contains("ghost-halt-20-11")));
+    assert_eq!(
+        status(&report, "scheduled_invocations")["status"],
+        "VerifiedEmpty"
+    );
+}
+
+#[test]
+fn ac4_door_surviving_watchdog_stamp_is_named_not_removed() {
+    let report = door_uninstall(&["daily"], &["daily"], false);
+    let schedules = status(&report, "scheduled_invocations");
+    assert_eq!(schedules["status"], "CoverageGap", "{report}");
+    assert!(schedules["reason"].as_str().is_some_and(|reason| reason
+        .contains("watchdog state retained")
+        && reason.contains("daily")));
 }

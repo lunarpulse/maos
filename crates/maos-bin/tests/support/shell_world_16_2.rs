@@ -188,7 +188,8 @@ pub(super) fn scheduler_with_bundle(
 /// unreachable by construction of that vector.
 #[derive(Default)]
 pub(super) struct UnwiredBinOps {
-    pub(super) schedule_capture: Option<Arc<std::sync::Mutex<Vec<String>>>>,
+    pub(super) schedule_capture:
+        Option<Arc<std::sync::Mutex<Option<maos_bin::operator_door::DoorUninstall>>>>,
 }
 
 #[async_trait]
@@ -211,13 +212,13 @@ impl BinPrivateOps for UnwiredBinOps {
     async fn run_uninstall_cascade(
         &self,
         _spirit_id: &str,
-        schedule_ids: Vec<String>,
+        door: maos_bin::operator_door::DoorUninstall,
     ) -> maos_bin::operator_door::UninstallOutcome {
         let capture = self
             .schedule_capture
             .as_ref()
             .expect("only the snapshot oracle reaches this fixture spy");
-        *capture.lock().expect("snapshot") = schedule_ids;
+        *capture.lock().expect("snapshot") = Some(door);
         maos_bin::operator_door::UninstallOutcome {
             body: serde_json::json!({"fixture_snapshot_only":true}),
             terminal_code: 0,

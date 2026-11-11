@@ -1010,6 +1010,15 @@ coverage:
       legacy-numeric fail-closed vectors, real partial-delete/index-recovery
       and late-journal failures with retained signed partial proofs, and
       pending-repeat recovery from durable uninstall subject scope.
+      Story 20-11 landing 2 (final kernel, KS + O4): erasure_inventory_20_11
+      ac3_* witness the offline orphaned-halt closure (one unplanned_crash
+      receipt, resolved and other-Spirit halts untouched), halt-only Spirits no
+      longer not_found, and the queried VerifiedEmpty; shell_host_16_2
+      ac3_door_snapshots_pending_halts_around_the_unload and the main.rs
+      ac3_/ac4_ composition witnesses cover the door count, receipt read-back
+      and named gaps; erasure_live_20_11 observes Removed schedules after
+      forget_spirit. Kernel halt_unload_fence_20_11 and
+      schedule_forget_spirit_20_11 witness O4 and KS. Hosted T3 leg unverified.
       shell_host_16_2::ac4_door_snapshots_real_scb_schedules_before_unload
       drives the real SCB/door snapshot boundary; erasure_live_20_11 drives
       the real live cascade. AC6's T3 Worker leg is hosted-only and uses the
@@ -1106,8 +1115,9 @@ coverage:
       check; new matching bodies or a changed reason cause fresh erasure.
       The returned report retains the original operation id and marker, while
       a fresh transport completion links the replay instead of certifying it again.
-      Pending halt receipts and watchdog cleanup remain final-kernel
-      dependencies; hosted proof is owed.
+      Pending halt receipts (typed halt evidence, both verifiers) and watchdog
+      cleanup landed with the final kernel landing (20-11 L2); the private/index
+      hold lease remains a named gap; hosted AC5/EC-13 and T3 proof are owed.
       erasure_review_20_11 tests the complete typed sixteen-category evidence
       language in both verifiers. IAC erasure_races_20_11 covers final-partial
       appends, reverse-import closure/order, sustained writers, cross-process

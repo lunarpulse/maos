@@ -162,7 +162,7 @@ def _removals(values, category, spirit, post_ids, erased, principal_frames):
     allowed = {
         "memory_namespace": "memory_namespace_batch", "principal_index": "principal_index_batch",
         "capability_tokens": "capability_batch", "principal_frames": "frame", "intent_lineage": "frame",
-        "installed_package": "package", "scheduled_invocations": "schedule",
+        "installed_package": "package", "scheduled_invocations": "schedule", "pending_halts": "halt",
     }.get(category)
     for item in _array(values, "removal evidence"):
         if type(item) is not dict or item.get("kind") != allowed or allowed is None:
@@ -184,6 +184,12 @@ def _removals(values, category, spirit, post_ids, erased, principal_frames):
             identity = _text(item["schedule_id"], "schedule id")
             if not identity:
                 raise ValueError("empty schedule id")
+            count = 1
+        elif allowed == "halt":
+            _object(item, {"kind", "halt_id", "receipt_frame_id"}, "halt removal")
+            identity = _text(item["halt_id"], "halt id")
+            if not identity or _frame_id(item["receipt_frame_id"]) not in post_ids:
+                raise ValueError("empty halt id or receipt absent from post-tree")
             count = 1
         elif allowed == "capability_batch":
             _object(item, {"kind", "boot_nonce", "spirit_pid", "revoked_tokens"}, "capability batch")

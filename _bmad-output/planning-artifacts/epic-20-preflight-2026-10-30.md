@@ -13,6 +13,13 @@ not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21
 (physical **27032 + 16 = 27048**). ADR-069 alarm **22000** and envelope **23000** are unchanged.
 Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
 
+**20-11 landing 2 (final kernel landing) — 2026-11-11 (Dev2011k, uncommitted, awaiting review).** KS + O4 + AC3 landed: measured
+**+26 physical / +18 tokei** (kernel 26854/21051 → **26880/21069**, set hash `affee8b0…`) and maos-domain +4 (10211 → 10215) = the grant;
+cumulative measured kernel tokei is now **21069** (shared STOP 21250, ADR-069 alarm 22000). One public-surface change:
+`HaltRegistry` struct hash `b6d65243…` → `a917eddc…` (ADR-066 hand-edit). Orchestrator-adjudicated overdraft, disclosed to the operator
+(D02 A): maos-audit 20-11 ceiling 8261 → 8313 (pin 8227 → 8313); bin pin 38061 → 38202; later stories re-base on these pins.
+20-11 stays in-progress: AC5/EC-13 hosted serial pass, AC6 live T3 leg and the private/index hold lease remain open.
+
 
 | Record | Value / authority |
 |---|---|

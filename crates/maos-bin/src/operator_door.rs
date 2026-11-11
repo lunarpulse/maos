@@ -51,6 +51,19 @@ pub struct UpgradeVetting<'a> {
     pub vetter_keyring: Option<&'a str>,
 }
 
+/// What the door observed around the unload it ran before the cascade
+/// (story 20-11 AC3/AC4): the SCB's `[[schedule]]` ids and the pending halts
+/// of the pid before the unload and still in the registry after it.
+#[derive(Clone, Debug, Default)]
+pub struct DoorUninstall {
+    pub pid: u32,
+    pub schedule_ids: Vec<String>,
+    pub halts_before: Vec<String>,
+    pub halts_after: Vec<String>,
+    /// Schedules whose watchdog stamp survived `forget_spirit` (set by the private ops).
+    pub watchdog_residue: Vec<String>,
+}
+
 /// Bin-private composition-root operations the LIB-side port cannot reach.
 ///
 /// D-16-1-N: `run_uninstall_cascade`, `append_lifecycle_journal`,
@@ -74,11 +87,8 @@ pub trait BinPrivateOps: Send + Sync + 'static {
     /// The real erasure cascade (proof bundle, principal teardown, token
     /// revocation), after the door already unloaded the SCB. The terminal
     /// carries the preserved one-shot exit contract: 0/3/4/5.
-    async fn run_uninstall_cascade(
-        &self,
-        spirit_id: &str,
-        schedule_ids: Vec<String>,
-    ) -> UninstallOutcome;
+    async fn run_uninstall_cascade(&self, spirit_id: &str, door: DoorUninstall)
+        -> UninstallOutcome;
 
     /// Vetted-target upgrade precondition. `attestation`/`vetter_keyring` are
     /// PARAMETERS (D-16-1-W(4)) — never re-read from the daemon's
@@ -1786,6 +1796,13 @@ impl DoorInner {
                     .collect()
             })
             .unwrap_or_default();
+        let halts_before = self
+            .halt_registry
+            .drain_for_spirit_dry_run(pid)
+            .into_iter()
+            .filter(|(_, state)| matches!(state, maos_domain::halt::HaltState::PendingResolution))
+            .map(|(id, _)| id.as_str().to_owned())
+            .collect();
         let transitioned = self.scheduler.unload(pid).await;
         self.stop_worker_after_unload(pid).await;
         if let Err(error) = transitioned {
@@ -1795,9 +1812,24 @@ impl DoorInner {
             };
         }
         self.private_ops.forget_promotion_set(spirit_id);
+        let halts_after = self
+            .halt_registry
+            .halt_metadata_for_spirit(pid, 0)
+            .into_iter()
+            .map(|(id, _)| id.as_str().to_owned())
+            .collect();
         let outcome = self
             .private_ops
-            .run_uninstall_cascade(spirit_id, schedule_ids)
+            .run_uninstall_cascade(
+                spirit_id,
+                DoorUninstall {
+                    pid,
+                    schedule_ids,
+                    halts_before,
+                    halts_after,
+                    ..Default::default()
+                },
+            )
             .await;
         OperatorOutcome::Completed(outcome.body)
     }

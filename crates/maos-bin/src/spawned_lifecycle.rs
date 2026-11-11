@@ -879,22 +879,17 @@ pub struct LifecycleCallers {
 impl LifecycleCallers {
     pub fn start(
         scheduler: &maos_kernel_core::scheduler::SpiritSchedulerAdapter,
-        tl: &Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
-        capability: &Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+        schedule: Arc<maos_kernel_core::scheduler::ScheduleWatchdog>,
         hooks: &crate::hook_pump::HookPump,
     ) -> Self {
-        use maos_kernel_core::scheduler::{IdleWatchdog, ScheduleWatchdog};
+        use maos_kernel_core::scheduler::IdleWatchdog;
         let cancel = tokio_util::sync::CancellationToken::new();
         let idle = Arc::new(IdleWatchdog::new(
             scheduler.scbs(),
             scheduler.dispatcher_arc(),
         ))
         .spawn(cancel.child_token());
-        let schedule = Arc::new(
-            ScheduleWatchdog::new(scheduler.scbs(), scheduler.dispatcher_arc(), Arc::clone(tl))
-                .with_capability(Arc::clone(capability)),
-        )
-        .spawn(cancel.child_token());
+        let schedule = schedule.spawn(cancel.child_token());
         Self {
             cancel,
             watchdogs: vec![("IdleWatchdog", idle), ("ScheduleWatchdog", schedule)],

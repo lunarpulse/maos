@@ -130,6 +130,16 @@ impl ScheduleWatchdog {
             .unwrap_or(0)
     }
 
+    /// Story 20-11 — drop an uninstalled Spirit's per-process firing state:
+    /// its rate-limit buckets (keyed by Spirit id) and last-fire stamps
+    /// (keyed by pid). Returns the number of entries removed.
+    pub fn forget_spirit(&self, spirit_id: &str, spirit_pid: u32) -> usize {
+        let before = self.rate_limits.len() + self.last_fire_ns.len();
+        self.rate_limits.retain(|(id, _), _| id != spirit_id);
+        self.last_fire_ns.retain(|(pid, _), _| *pid != spirit_pid);
+        before.saturating_sub(self.rate_limits.len() + self.last_fire_ns.len())
+    }
+
     /// Spawn the watchdog background task.
     ///
     /// Polls the SCB map every `poll_interval_ms` (default 1000ms; with

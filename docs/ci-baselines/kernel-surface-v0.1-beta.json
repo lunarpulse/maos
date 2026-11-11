@@ -615,7 +615,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::halt::HaltRegistry",
-      "signature_hash": "b6d6524333a6327adc96c8a3ef78e2a10134ea7e2a9c534d930d6a248eda4af8"
+      "signature_hash": "a917eddcb762e31e151adbbb2dad84de0ce445df29bfd8abbddd9a4d3b19f910"
     },
     {
       "kind": "struct",

@@ -1,0 +1,10 @@
+f1-kernel-o4-ks exit=0
+f2-kernel-lib exit=0
+f3-audit-erasure-review exit=0
+f4-bin-erasure-inventory exit=0
+f5-bin-door exit=0
+f6-bin-unit exit=0
+f7-bin-live exit=0
+f8-xtask-pins exit=0
+f9-verb-no-default exit=0
+fkcs exit=0

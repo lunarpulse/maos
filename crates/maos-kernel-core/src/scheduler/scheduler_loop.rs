@@ -570,8 +570,6 @@ impl SpiritSchedulerAdapter {
         self.capability.revoke_all_for_pid(spirit_pid);
         self.capability.context_budget().remove(spirit_pid);
         self.capability.set_paused(spirit_pid, false);
-        // Story 5.3 — per-PID drain (closes Story 4.1 deferred §1)
-        let _ = self._halt_registry.drain_for_spirit(spirit_pid);
         {
             let mut spirits = self.spirits.write().unwrap();
             spirits.remove(&spirit_pid);

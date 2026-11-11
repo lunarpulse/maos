@@ -102,6 +102,9 @@ pub struct HaltRegistry {
     pending: RwLock<HashMap<HaltId, HaltState>>,
     /// Story 4.3 — per-halt metadata for resolution-side lookups.
     metadata: RwLock<HashMap<HaltId, PendingHaltMetadata>>,
+    /// Story 20-11 (D-20-11-11) — pids `terminate_spirit` closed (never reused,
+    /// `allocate_pid`); `invoke_halt` holds this lock across its writes.
+    closed: std::sync::Mutex<std::collections::HashSet<u32>>,
     /// Story 4.5 — AC5 isolation hook for corpus runner observation.
     #[cfg(feature = "spirit_test")]
     isolation_hook: Option<
@@ -533,6 +536,14 @@ pub fn invoke_halt(
 
     let halt_id = maos_domain::halt::HaltId::new(payload.halt_id.clone())
         .map_err(|_| InvokeHaltError::RegistryInsertFailed("invalid halt_id".into()))?;
+    // Story 20-11 (D-20-11-11) — held across the three writes below.
+    let closed = registry
+        .closed
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if closed.contains(&spirit_pid) {
+        return Err(InvokeHaltError::SpiritUnloading(spirit_pid));
+    }
 
     let timestamp_ns = SystemTime::now()
         .duration_since(UNIX_EPOCH)
