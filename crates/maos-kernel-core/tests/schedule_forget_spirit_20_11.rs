@@ -244,11 +244,12 @@ async fn a_candidate_captured_before_the_uninstall_never_fires_after_it() {
     );
 }
 
-/// P1, second half: a firing already admitted (its hook running) finishes
-/// before `forget_spirit` clears anything or reports, so the report is never
-/// signed while a stamp can still be written.
+/// Round 3 (N1): the fence covers admission and the stamp, never the hook. A
+/// Spirit whose `on_schedule` has not returned must not stall the erasure path:
+/// `forget_spirit` of another Spirit completes promptly, and a Spirit retired
+/// while its own hook runs gets no stamp when the hook finally returns.
 #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
-async fn forget_spirit_waits_for_an_admitted_firing() {
+async fn a_hanging_hook_never_stalls_forget_spirit_nor_stamps_a_retired_spirit() {
     maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     std::env::set_var("MAOS_SCHEDULE_FAST", "1");
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0x2011));
@@ -268,31 +269,30 @@ async fn forget_spirit_waits_for_an_admitted_firing() {
     );
     let scbs = Arc::new(RwLock::new(BTreeMap::new()));
     scbs.write().expect("scbs").insert(1, Arc::clone(&a));
+    scbs.write().expect("scbs").insert(2, scb(2, "b"));
     let watchdog = Arc::new(ScheduleWatchdog::new(Arc::clone(&scbs), dispatcher, tl));
     let cancel = tokio_util::sync::CancellationToken::new();
     let handle = Arc::clone(&watchdog).spawn(cancel.child_token());
     entered_rx
         .recv_timeout(std::time::Duration::from_secs(10))
-        .expect("A's firing is admitted and inside its hook");
+        .expect("A's hook is running and has not returned");
+    let bound = std::time::Duration::from_secs(2);
+    tokio::time::timeout(bound, watchdog.forget_spirit("b", 2))
+        .await
+        .expect("forget_spirit(B) queued behind A's hanging hook");
     a.state
         .store(ScbLifecycleState::Unloaded as u8, Ordering::Release);
-    let mut forgetting = {
-        let watchdog = Arc::clone(&watchdog);
-        tokio::spawn(async move { watchdog.forget_spirit("a", 1).await })
-    };
-    assert!(
-        tokio::time::timeout(std::time::Duration::from_millis(300), &mut forgetting)
-            .await
-            .is_err(),
-        "forget_spirit reported while an admitted firing was still running"
-    );
-    release_tx.send(()).expect("release A");
-    forgetting.await.expect("forget task");
+    tokio::time::timeout(bound, watchdog.forget_spirit("a", 1))
+        .await
+        .expect("forget_spirit(A) queued behind A's own hanging hook");
+    release_tx.send(()).expect("release A's hook");
+    // The poll that was inside A's hook ends; let it run to completion.
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     cancel.cancel();
     handle.await.expect("watchdog shuts down cleanly");
     assert_eq!(
         watchdog.last_fire_ns(1, "daily"),
         0,
-        "the firing's stamp survived"
+        "a retired Spirit was stamped"
     );
 }

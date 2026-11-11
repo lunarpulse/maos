@@ -164,7 +164,10 @@ gap beyond), duplicate invocation rows of one `(boot, pid, halt_id)` are one hal
 and a malformed id is a named gap, not a failed uninstall. Both verifiers also
 require decoded halt receipt-frame ids to be unique, so one receipt cannot back two
 halts. A receipt always cites its own frame (returning-id inserts), and an uninstall
-waits for an in-flight schedule firing before the watchdog state is cleared.
+waits only for the short admission and stamp sections of a schedule firing (never for the
+hook), and a retired Spirit gets no stamp. Halt provenance is not size-capped: a halt is never
+dropped for the size of its `derived_from`. The orphan scan streams resolution history once,
+bounded, and closes nothing it cannot prove unresolved.
 
 The serving admission paths currently default the SCB's schedule section, even
 when the input manifest declares schedules. AC6.3 therefore uses a live

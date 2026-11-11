@@ -460,3 +460,37 @@ async fn receipts_cite_their_own_frame_under_a_concurrent_writer() {
         &misbound[..misbound.len().min(5)]
     );
 }
+
+/// Round 3: a halt whose provenance is large (a cold Butler assessment's
+/// `derived_from` exceeds 4096 bytes) is still invoked, journaled, registered
+/// and receipted; no size policy may turn a halt into "no halt".
+#[tokio::test]
+async fn an_oversized_provenance_halt_is_still_invoked_and_receipted() {
+    let (world, _reached, _resume) = world("no-pause-20-11").await;
+    let payload = EpistemicHaltPayload::new(
+        "halt-big-20-11".into(),
+        "ambiguity".into(),
+        0.99,
+        Some(0.7),
+        "policy-20-11".into(),
+        "e".repeat(100_000),
+    )
+    .expect("a large provenance never refuses the halt");
+    let receipt = invoke_halt(
+        &world.tl,
+        &world.journal,
+        &world.registry,
+        payload,
+        world.pid,
+        "race-20-11",
+        BOOT,
+    )
+    .expect("the halt is invoked");
+    assert_eq!(receipt.halt_id.as_str(), "halt-big-20-11");
+    assert!(world
+        .registry
+        .lookup_pending_metadata(&HaltId::new("halt-big-20-11").expect("id"))
+        .is_some());
+    assert_eq!(journal_halts(&world), 1);
+    assert_eq!(invocation_rows(&world), 1);
+}

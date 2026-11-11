@@ -1,0 +1,6 @@
+g-kernel exit=101
+g-domain exit=0
+g-audit-i2 exit=0
+g-bin-unit exit=0
+g-bin-inventory exit=0
+g-kernel(rerun) exit=0

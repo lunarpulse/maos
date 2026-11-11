@@ -18,6 +18,12 @@ use maos_domain::halt::{HaltId, HaltReceipt, HaltState, TerminationKind};
 use maos_domain::invariants::i3::FrameOrigin;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// The empty marker row of one termination; its id is minted under the log's
+/// own lock, so a receipt can never cite a concurrent writer's frame.
+fn marker(tl: &TransparencyLogAdapter, spirit_pid: u32, kind_str: &str) -> [u8; 16] {
+    tl.insert_kernel_event_returning_id(spirit_pid, FrameKind::EpistemicHalt, None, kind_str, &[])
+}
+
 /// Drain all pending halts for a Spirit, produce HaltReceipts, and
 /// write them to the Transparency Log. For Spirits with zero pending
 /// halts, writes ONE "term-{spirit_pid}-{boot_nonce}" receipt.
@@ -59,13 +65,7 @@ pub fn terminate_spirit(
             }
         };
 
-        let frame_id = tl.insert_kernel_event_returning_id(
-            spirit_pid,
-            FrameKind::EpistemicHalt,
-            None,
-            kind_str,
-            &[],
-        );
+        let frame_id = marker(tl, spirit_pid, kind_str);
 
         let receipt = HaltReceipt::new(hid.clone(), timestamp_ns, spirit_pid, boot_nonce, frame_id)
             .with_resolution(HaltState::Terminated, kind_str, timestamp_ns);
@@ -88,13 +88,7 @@ pub fn terminate_spirit(
     } else {
         let mut receipts = Vec::with_capacity(pending.len());
         for (halt_id, _state) in pending {
-            let frame_id = tl.insert_kernel_event_returning_id(
-                spirit_pid,
-                FrameKind::EpistemicHalt,
-                None,
-                kind_str,
-                &[],
-            );
+            let frame_id = marker(tl, spirit_pid, kind_str);
 
             let receipt = HaltReceipt::new(
                 halt_id.clone(),

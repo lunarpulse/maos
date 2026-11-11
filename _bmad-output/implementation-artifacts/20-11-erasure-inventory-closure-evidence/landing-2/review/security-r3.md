@@ -1,0 +1,54 @@
+# Security review — 20-11 L2 corrections commit (`5ff0ead`, parent `c402c29`)
+
+Reviewed read-only via the working tree at HEAD plus the commit's manifest (`landing-2/review-corrections/final/gates/changed-files.txt`); no git mutation, no builds, no writes (no write tool available — full report here). Scope: closure of prior F1–F6 (dispositions cross-checked against `review-corrections/plants.md`) and the six assigned new-defect areas.
+
+## Closure of F1–F6
+
+| Prior | Verdict | Evidence |
+|---|---|---|
+| F1 forged halt rows | **Closed** | `frame_bridge.rs:612-617` rejects `FrameKind::EpistemicHalt` at lift; `:406-408` rejects the payload regardless of carrier kind; the `bridge!` macro (`:641-642`) shares this body with the **legacy** bridge. Second gate at `spirit_session.rs:1101-1107` (kind/payload consistency + "kernel-reserved" Protocol error) and `:1271-1277` overwrites `frame.from` with the session's real id. `KernelCtx` (`kernel_ctx.rs`) exposes no guest send API. Production kind-3 writers are only `halt/mod.rs` and `halt/termination.rs`. |
+| F2 empty halt_id bricks uninstall | **Closed** | `main.rs:11125-11135` counts malformed/empty ids into a named gap; `close_pending_halts` `main.rs:11203-11210` converts `HaltId::new`/registry errors into "left unclosed" gaps; re-scan `main.rs:11239-11242` keeps "orphans remain" as a gap. No `?`-fail path to `Failed` remains. |
+| F3 frame-id misbinding | **Closed** | `insert_kernel_event_returning_id` mints + inserts under one lock (`transparency_log.rs:2543-2581`); `invoke_halt` pre-mints via `mint_frame_id()` and inserts with the id (`halt/mod.rs:558-570`; counter-under-lock `transparency_log.rs:743-746, 1033-1036`). No `last_frame_id()` readback anywhere. |
+| F4 unbounded scan | **Closed** | `main.rs:11078-11090`: per-pid `kind IN (3,7,19) ORDER BY rowid LIMIT 50001`, kernel-writer predicate (`capability_token IS NULL AND from_spirit_id='' AND to_spirit_id=''`), `HALT_SCAN_ROWS = 50_000` (`main.rs:11034`); over-ceiling → named gap. |
+| F5 pid wrap | **Open — deferred** | `scheduler_loop.rs:29-33` still `fetch_add`; explicitly dispositioned to a rule-10 deferred row (`plants.md` F5 row → `deferred-work.md`). Not silently dropped; remains Low/defense-in-depth. |
+| F6 payload caps / lock hold | **Closed with a new defect (N2 below)** | Cap added (`frame.rs:274-276`), bounding the `closed`-mutex hold and TL bloat — but the cap itself opens a fail-open path (N2). |
+
+## New findings
+
+**N1 — Medium — Watchdog retirement fence is held across untrusted hook execution: a hanging `on_schedule` hook stalls every uninstall/erasure (`forget_spirit`) and all scheduled firings process-wide for up to the Spirit-declared `time_cap_seconds` (≤ 24 h).**
+- `crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs:213` (fence acquired per candidate), `:280-282` (`fire_on_schedule` awaited inside the `_fence` guard), `:287-288` (stamp still inside), `:143-144` (`forget_spirit` awaits the same fence); `crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:571-580` (the only bound is `timeout(cap_seconds, …)` on a non-cancellable `spawn_blocking`), `:357-364` (`effective_cap_seconds` = manifest `[budget].time_cap_seconds`, no kernel clamp), `crates/maos-manifest/src/manifest.rs:1184-1189` (manifest validator allows up to 86 400 s); `crates/maos-bin/src/main.rs:10255-10257` (door `run_uninstall_cascade` awaits `forget_spirit` with no timeout — the Art. 17 erasure entry point).
+- Exploit/impact: an admitted Spirit (compiled-in guest code is untrusted per the F1 threat model) declares `on_schedule` enabled, `time_cap_seconds = 86400`, and a hook that blocks forever. One cadence firing is admitted; the fence is then held ≤ 24 h. The fence is **per-watchdog, not per-Spirit**, so during the hold: (a) `forget_spirit` — and therefore the uninstall/erasure cascade — blocks for **any** Spirit being erased, not just the attacker; (b) the whole `check_and_fire` loop is parked, so every other Spirit's FR26 scheduled compliance firings starve. Renewable each cadence while the attacker runs.
+- Fix sketch: narrow the fence to admission→TL-row (release before the hook dispatch; re-acquire briefly for the `last_fire_ns` stamp with a `Running` re-check), or bound the fence-acquire in `forget_spirit` (timeout → report residue as a `CoverageGap`) so the erasure path can never queue behind guest code.
+
+**N2 — Medium — The new 4096-byte halt-payload cap fail-opens the epistemic-halt enforcement: Spirit-controlled `derived_from` > ~4 KB makes a firing policy rule abort before any halt is invoked, journaled, or receipted — while the violating scalar stays persisted.**
+- `crates/maos-domain/src/frame.rs:274-276` (`halt_id+tag+policy_id+derived_from > 4096` → `Err(FieldTooLong)`); `crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:134-141` (`?` propagates the cap error); `crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:68-80` (Step 1 `set_scalar` **persists** the slot, Step 2 `?` aborts — partial mutation, no halt, no TL row, no journal, no `CoverageGap` anywhere); no upstream length cap exists (`crates/maos-capability/src/working_memory/store.rs:52-77`, `mod.rs:38-64` reject only empty/NaN/inf); surfaced to the Spirit merely as a failed write (`crates/maos-bin/src/main.rs:566-574` maps to `ScalarPortError::Backend`).
+- Exploit/impact: the Orchestrator class's `dispatch_ambiguity` halt is a **mandatory** safety control (`main.rs:579-583` refuses a manifest without the policy). A Spirit that would trip the rule writes the offending scalar with a 5 KB `derived_from`: the rule fires, payload construction fails, the write errors back (the attacker doesn't care), the slot persists, and the halt never lands — deterministically evading the epistemic-halt control and leaving zero durable trace. Introduced by this commit's F6 fix.
+- Fix sketch: fail-closed sizing — cap/truncate `derived_from` at ingress (`set_scalar`/`write_scalar`, e.g. 2048 bytes with a truncation marker) so a firing rule's payload can never exceed the 4096 budget; or on `FieldTooLong`, truncate and still fire the halt (a halt must not be droppable by guest-controlled input length).
+
+## Assigned areas — verified sound
+
+- **Kernel-writer filter vs empty from/to forgery:** `insert_routed_frame` does write guest-supplied `from`/`to` verbatim (`transparency_log.rs:1293-1326`) and `SpiritId("")` is constructible (`maos-spirit-abi/src/identity.rs:149-177`) — but every guest ingress sanitizes `from` (`spirit_session.rs:1271-1277`) or rejects kind 3 (bridge + session); `KernelCtx` has no send API; CLI/door/delegation/kernel writers are trusted with non-empty froms. Ownership rows are unforgeable via the bus because `deliver_typed` derives intent only from the typed `IntentClass` (`adapter.rs:606-610` → "high"/"standard"/"readonly"), never the kernel-only strings `lifecycle.load`/kind 19.
+- **Halts silently lost at ingress:** no guest-legitimate halt emission exists (halt_ids are kernel-minted ULIDs, `policy_runtime.rs:127`); bridge/session rejections are loud (`BridgeError`, `SessionError::Protocol` — visible turn failure). Residual loss paths are the intended `SpiritUnloading` fence (test-pinned) and deferred F5. The real silent-loss path is N2 (upstream of ingress).
+- **Ceiling semantics:** LIMIT 50001 read; `rows.len() > 50 000` always emits a named gap, including cross-boot pid-reuse truncation, so over-ceiling can only produce over-closing/gaps — never false completeness; the door path independently cross-checks `halts_before`/`halts_after` (`main.rs:11184-11199`). A Spirit flooding *kernel-writer* kind-3 rows now needs ~50 k genuine `invoke_halt` cycles (each a real policy violation) — cheap frame spam is gone.
+- **Receipt uniqueness, both verifiers:** Rust — shared receipt frame rejected (`proof.rs:521-524`), duplicate halt-id via `seen.insert(identity)` (`:565-567`), empty `halt_id` falls to the catch-all reject (`:564`); Python — `("receipt", frame)` and identity dedup with explicit messages (`verify.py:188-209`). Symmetric, closed.
+- **Atomic frame-id inserts:** `insert_kernel_event_returning_id` single-lock mint+insert; `invoke_halt` pre-mint + `insert_frame_event_with_id`; `terminate_spirit` marker ids atomic; receipt payload cites the marker id that provably exists.
+- **unwrap/expect after serde:** none in changed production code — `from_str(...).unwrap_or_default` (`main.rs:11095`), `from_slice` mapped (`lib.rs:1832-1839`), `to_vec` matched (`termination.rs:75-79, 105-110`); the only `expect` is on a hardcoded literal (`termination.rs:57`) and a non-serde `RwLock` read (`schedule_watchdog.rs:180`).
+
+## Rejected candidates (9)
+
+1. Guest kernel-shape kind-3 forgery via `from=""`/`to=[]` on the bus — all guest ingresses sanitize or reject (above).
+2. Ownership-row poisoning (kind 19 / kind-7 `lifecycle.load` with foreign `spirit_id`) — intent string is kernel-derived from `IntentClass`; kind 19 is not a guest-constructible domain kind.
+3. Ceiling → false completeness — gap always accompanies truncation; door cross-checks back the registry path.
+4. Marker-vs-receipt frame-id collision in `terminate_spirit` — receipt cites the atomically minted marker id; verifier only requires post-tree presence.
+5. Legitimate guest halt silently refused at ingress — halts are kernel-reserved; rejections are loud; no legitimate guest path exists.
+6. Verifier divergence on shared receipts/duplicate ids — symmetric rejection in Rust and Python (above).
+7. `unwrap`/`expect` after serde in changed production files — none found (sweep above).
+8. `planned_unload_receipts` NULL/`json_valid` skip hiding receipts — skipped rows surface as "no planned_unload receipt" gaps via the `halts_before` cross-check (`main.rs:11187-11192`); bound parameters throughout.
+9. `resolved`-set poisoning via `approval_decision_log` — kernel/operator-written table; parsing fails closed (`strip_prefix`/`split_once` → excluded).
+
+## Counts
+
+- New findings: **2** (N1, N2 — both Medium). 0 High/Critical.
+- Prior findings: 4 closed (F1–F4), 1 closed-with-new-defect (F6 → N2), 1 open-deferred (F5, Low, documented grant row).
+- Rejected candidates: **9**.
+- Production files reviewed this round (21): `schedule_watchdog.rs`, `hook_dispatch.rs`, `kernel_ctx.rs`, `halt/termination.rs`, `halt/mod.rs`, `scheduler_loop.rs`, `policy_runtime.rs`, `working_memory/orchestrator.rs`, `maos-capability/working_memory/{mod,store}.rs`, `maos-manifest/manifest.rs` (budget validation), `maos-iac/adapter.rs`, `maos-iac/adapter/transparency_log.rs`, `frame_bridge.rs`, `spirit_session.rs`, `maos-bin/main.rs` (orphan scan, close_pending_halts, door cascade, scalar port), `maos-audit/lib.rs`, `erasure/proof.rs`, `tools/verify-erasure/verify.py`, `maos-spirit-abi/{ctx,identity}.rs`, plus disposition docs (`plants.md`, `commands.md`).

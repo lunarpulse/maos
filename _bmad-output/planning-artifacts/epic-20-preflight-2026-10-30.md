@@ -20,6 +20,7 @@ cumulative measured kernel tokei is now **21069** (shared STOP 21250, ADR-069 al
 (D02 A): maos-audit 20-11 ceiling 8261 → 8313 (pin 8227 → 8313); bin pin 38061 → 38202; later stories re-base on these pins.
 20-11 stays in-progress: AC5/EC-13 hosted serial pass, AC6 live T3 leg and the private/index hold lease remain open.
 **20-11 L2 review corrections — 2026-11-11 (operator ask `s2` = allow).** Kernel P1 (watchdog retirement fence) + F3 (atomic receipt frame ids) landed at +6 tokei: kernel **26891 / 21075**, inside the granted x2 ceiling 26893 / 21078; second `ScheduleWatchdog` surface-hash hand-refresh (ADR-066, noted); cumulative measured kernel tokei **21075** (shared STOP 21250, alarm 22000). Audit 8286, bin 38335, domain 10220.
+**20-11 L2 correction round 3 — 2026-11-11.** Halt payload cap reversed (a halt is never dropped), I2 assert on a duplicate minted id, watchdog fence off the hook: kernel **26889 / 21073** (inside 26893 / 21078, no new surface hash edit), domain 10215, bin 38362; cumulative measured kernel tokei **21073** (shared STOP 21250, alarm 22000).
 
 
 | Record | Value / authority |

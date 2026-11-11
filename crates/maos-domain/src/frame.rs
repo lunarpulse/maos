@@ -271,9 +271,6 @@ impl EpistemicHaltPayload {
         if halt_id.is_empty() {
             return Err(HaltPayloadError::EmptyHaltId);
         }
-        if halt_id.len() + tag.len() + policy_id.len() + derived_from.len() > 4096 {
-            return Err(HaltPayloadError::FieldTooLong);
-        }
         if value.is_nan() {
             return Err(HaltPayloadError::NanValue);
         }
@@ -301,8 +298,6 @@ pub enum HaltPayloadError {
     NanThreshold,
     #[error("halt_id must be non-empty")]
     EmptyHaltId,
-    #[error("a halt payload's strings exceed 4096 bytes in total")]
-    FieldTooLong,
 }
 
 /// TODO(NFR-Obs-3 v0.3): shape pinned by NFR-Obs-3.

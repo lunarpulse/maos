@@ -1,0 +1,12 @@
+# 20-11 L2 correction round 3 — witnesses, failing-before, plants (Dev2011k, 2026-11-11, base `5ff0ead1`)
+Reviews verbatim: `landing-2/review/gpt-review-r3.md`, `security-r3.md`. Raw logs `logs-r3/` (red at HEAD, plants, first greens) and `final-r3/`.
+
+| Finding | Witness | Failing-before (HEAD) | Plant -> red | Final |
+|---|---|---|---|---|
+| GPT r3 P1 / GLM N2 (halt never lost) | `maos-domain/tests/halt_provenance_size_20_11`; `halt_unload_fence_20_11::an_oversized_provenance_halt_is_still_invoked_and_receipted` | `logs-r3/red-r3-domain-oversized.log`, `red-r3-kernel-oversized.log` (`FieldTooLong`) | (the cap is deleted; reinstating it reds both) | `final-r3/f1-kernel.log`, `f3-domain.log` |
+| GPT r3 P2 (I2 fail-stop on a duplicate minted id) | `maos-audit/tests/halt_i2_fail_stop_20_11` (syn source scan: write result bound, `assert*` requires `FrameRowWrite::Written`) | `logs-r3/red-r3-i2-source-scan.log` | assert removed: `logs-r3/plant-r3-i2-assert-removed.log` | `final-r3/f4-audit.log` |
+| GPT r3 P3 (resolution history) | `main.rs` unit `review_r3_large_approval_history_is_bounded_and_exhaustion_is_a_gap`, `review_r3_a_resolution_inside_the_ceiling_still_suppresses_its_orphan` | `logs-r3/red-r3-approval-history.log` (all 60,000 rows read, orphan closed) | exhaustion keeps orphans: `logs-r3/plant-r3-approval-exhaustion-keeps-orphans.log` | `final-r3/f8-bin-unit.log` |
+| GLM N1 (fence across the hook) | `schedule_forget_spirit_20_11::a_hanging_hook_never_stalls_forget_spirit_nor_stamps_a_retired_spirit`; the P1 stale-candidate test unchanged | `logs-r3/red-n1-hook-fence-head.log` (`forget_spirit(B)` queued behind A's hook) | fence held across hook: `logs-r3/plant-r3-n1-fence-held-across-hook.log`; stamp without `Running` re-check: `logs-r3/plant-r3-n1-stamp-without-running-check.log` | `final-r3/f1-kernel.log` |
+| F3 (marker helper) | `receipts_cite_their_own_frame_under_a_concurrent_writer` (unchanged) | — | readback restored: `logs-r3/plant-r3-f3-marker-readback.log` | `final-r3/f1-kernel.log` |
+
+Honest limits: a minted-id collision cannot be planted deterministically (random ULID, nothing exposes it before the insert; no kernel seam in the line budget), so the P2 witness is a source scan plus its plant, not a runtime collision. The door's 5 s `forget_spirit` bound has no witness (the fence is held only briefly now). Concurrent firing is not changed (deferred row).

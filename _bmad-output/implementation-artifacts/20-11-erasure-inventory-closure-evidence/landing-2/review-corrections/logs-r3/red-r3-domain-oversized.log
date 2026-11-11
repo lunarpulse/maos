@@ -1,0 +1,53 @@
+   Compiling maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain)
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.34s
+     Running tests/halt_provenance_size_20_11.rs (/mnt/build/cargo-maos/debug/deps/halt_provenance_size_20_11-b05a54986a37bdc8)
+
+running 1 test
+test an_oversized_derived_from_still_builds_a_halt ... FAILED
+
+failures:
+
+---- an_oversized_derived_from_still_builds_a_halt stdout ----
+
+thread 'an_oversized_derived_from_still_builds_a_halt' (2151996) panicked at crates/maos-domain/tests/halt_provenance_size_20_11.rs:17:6:
+a large provenance never refuses the halt: FieldTooLong
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    an_oversized_derived_from_still_builds_a_halt
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p maos-domain --test halt_provenance_size_20_11`

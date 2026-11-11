@@ -136,10 +136,7 @@ impl ScheduleWatchdog {
     /// Story 20-11 — drop an uninstalled Spirit's per-process firing state:
     /// its rate-limit buckets (keyed by Spirit id) and last-fire stamps
     /// (keyed by pid). Returns the number of entries removed.
-    ///
-    /// Takes the same fence every queued candidate holds from admission to its
-    /// stamp: an admitted firing finishes first, and a candidate captured
-    /// before the uninstall finds its SCB no longer `Running` and is skipped.
+    /// Waits on the candidate fence, so an admitted firing finishes first.
     pub async fn forget_spirit(&self, spirit_id: &str, spirit_pid: u32) -> usize {
         let _fence = self.fence.lock().await;
         let before = self.rate_limits.len() + self.last_fire_ns.len();
@@ -210,7 +207,7 @@ impl ScheduleWatchdog {
         };
 
         for (scb, entry) in candidates {
-            let _fence = self.fence.lock().await;
+            let fence = self.fence.lock().await;
             if scb.current_state() != ScbLifecycleState::Running {
                 continue;
             }
@@ -275,6 +272,8 @@ impl ScheduleWatchdog {
                 FrameOrigin::Kernel,
             );
 
+            // The fence never spans the (untrusted, up to `time_cap_seconds`) hook.
+            drop(fence);
             // Fire the hook with the manifest's payload_bytes.
             let _outcome = self
                 .dispatcher
@@ -284,8 +283,11 @@ impl ScheduleWatchdog {
             // Update last-fire timestamp regardless of hook outcome — the
             // dispatch decision (gate passes, rate-limit consumed) is the
             // firing event for cadence purposes.
-            self.last_fire_ns
-                .insert((scb.pid, entry.id.clone()), fired_at_ns);
+            let _fence = self.fence.lock().await;
+            if scb.current_state() == ScbLifecycleState::Running {
+                self.last_fire_ns
+                    .insert((scb.pid, entry.id.clone()), fired_at_ns);
+            }
         }
     }
 

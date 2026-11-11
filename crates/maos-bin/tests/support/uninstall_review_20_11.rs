@@ -734,3 +734,98 @@ fn review_f4_own_flood_past_the_row_ceiling_is_a_named_gap() {
         started.elapsed()
     );
 }
+
+/// One TL with Spirit `hello-spirit` at pid 7, one kernel-written orphan halt
+/// `orphan-r3`, and `approvals` unrelated `halt.resolve` decisions about the
+/// Spirit (the last one optionally resolving the orphan).
+fn orphan_with_history(
+    directory: &std::path::Path,
+    approvals: u32,
+    resolve_orphan: bool,
+) -> std::path::PathBuf {
+    let path = directory.join("transparency.sqlite");
+    let log = TransparencyLogAdapter::open_with_global_legal_holds(&path, &path, 1).expect("log");
+    log.insert_frame_event(
+        FrameKind::SpiritAdmitted,
+        7,
+        None,
+        "hello-spirit",
+        br#"{"spirit_id":"hello-spirit"}"#,
+        FrameOrigin::Kernel,
+    );
+    log.insert_frame_event(
+        FrameKind::EpistemicHalt,
+        7,
+        None,
+        "ambiguity",
+        br#"{"halt_id":"orphan-r3","tag":"ambiguity","value":1.0,"threshold":null,"policy_id":"p","derived_from":"d"}"#,
+        FrameOrigin::SpiritAuto,
+    );
+    drop(log);
+    let mut db = rusqlite::Connection::open(&path).expect("db");
+    let tx = db.transaction().expect("tx");
+    {
+        let mut insert = tx
+            .prepare(
+                "INSERT INTO approval_decision_log(timestamp_ns,actor,target,capability,intent,decision,reasoning) \
+                 VALUES(?1,'director','hello-spirit','halt.resolve','accepted_halt',1,?2)",
+            )
+            .expect("insert");
+        for n in 0..approvals {
+            let id = if resolve_orphan && n == approvals - 1 {
+                "orphan-r3".to_owned()
+            } else {
+                format!("other-{n}")
+            };
+            insert
+                .execute(rusqlite::params![
+                    i64::from(n),
+                    format!("halt={id}: accepted_halt")
+                ])
+                .expect("decision row");
+        }
+    }
+    tx.commit().expect("commit");
+    path
+}
+
+/// GPT r3 P2: resolution history is streamed once, bounded, retaining only ids
+/// that are still orphan candidates; past the ceiling the scan says so and
+/// closes nothing it cannot prove unresolved.
+#[test]
+fn review_r3_large_approval_history_is_bounded_and_exhaustion_is_a_gap() {
+    let directory = tempfile::tempdir().expect("scan root");
+    let path = orphan_with_history(directory.path(), 60_000, false);
+    let started = std::time::Instant::now();
+    let (orphans, gaps) = super::orphaned_halts(&path, "hello-spirit").expect("bounded scan");
+    assert!(
+        orphans.is_empty(),
+        "closed a halt whose resolution it could not rule out"
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.contains("bounded") && gap.contains("approval")),
+        "{gaps:?}"
+    );
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(10),
+        "{:?}",
+        started.elapsed()
+    );
+}
+
+#[test]
+fn review_r3_a_resolution_inside_the_ceiling_still_suppresses_its_orphan() {
+    let directory = tempfile::tempdir().expect("scan root");
+    let resolved = orphan_with_history(directory.path(), 5_000, true);
+    let (orphans, gaps) = super::orphaned_halts(&resolved, "hello-spirit").expect("scan");
+    assert!(
+        orphans.is_empty() && gaps.is_empty(),
+        "{orphans:?} {gaps:?}"
+    );
+    let other = tempfile::tempdir().expect("scan root");
+    let open = orphan_with_history(other.path(), 5_000, false);
+    let (orphans, gaps) = super::orphaned_halts(&open, "hello-spirit").expect("scan");
+    assert_eq!(orphans.len(), 1, "{gaps:?}");
+    assert!(gaps.is_empty(), "{gaps:?}");
+}

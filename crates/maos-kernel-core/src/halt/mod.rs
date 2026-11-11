@@ -22,7 +22,7 @@ pub use output_markers::OutputMarkerRegistry;
 pub use resolver::{FailingHaltResolver, KernelHaltResolver, MockHaltResolver};
 pub use termination::terminate_spirit;
 
-use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
+use crate::iac::transparency_log::{FrameKind, FrameRowWrite, TransparencyLogAdapter};
 use crate::journal::JournalAdapter;
 use maos_domain::frame::EpistemicHaltPayload;
 use maos_domain::halt::{
@@ -551,22 +551,24 @@ pub fn invoke_halt(
         .as_nanos() as u64;
 
     // Step 1: Write Transparency Log row (FrameKind::EpistemicHalt = 3).
-    // I2 guarantees: insert_frame_event panics on write failure, so the
-    // audit chain is never incomplete at this point.
+    // I2: a minted-id collision (`Duplicate`) fails stop, like the old insert.
     let payload_bytes = serde_json::to_vec(&payload)
         .map_err(|e| InvokeHaltError::TransparencyLogWriteFailed(e.to_string()))?;
     let frame_id = tl.mint_frame_id();
-    tl.insert_frame_event_with_id(
-        Some(frame_id),
-        FrameKind::EpistemicHalt,
-        spirit_pid,
-        "",
-        "",
-        None,
-        payload.tag.as_str(),
-        &payload_bytes,
-        FrameOrigin::SpiritAuto,
-    );
+    let row = tl
+        .insert_frame_event_with_id(
+            Some(frame_id),
+            FrameKind::EpistemicHalt,
+            spirit_pid,
+            "",
+            "",
+            None,
+            payload.tag.as_str(),
+            &payload_bytes,
+            FrameOrigin::SpiritAuto,
+        )
+        .into_inner();
+    assert_eq!(row, FrameRowWrite::Written, "MAOS I2: halt id collision");
 
     // Step 2: Write Lifecycle Journal entry (LifecycleEvent::Halt = 6)
     journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {

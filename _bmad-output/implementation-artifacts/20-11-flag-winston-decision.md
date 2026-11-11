@@ -198,3 +198,17 @@ version deleted); maos-bin 38,202 -> **38,335** (+133, inside the story's own bi
 the story's remaining +4: disclosed); maos-wasm-host 3,143 -> 3,141; aggregate hardfail 202,371 -> **202,486** (clean aggregate 202,485).
 
 **Witnesses and plants:** `landing-2/review-corrections/plants.md`.
+
+## Landing 2 correction round 3 — kernel (Dev2011k, 2026-11-11, base `5ff0ead1`)
+
+**Authority:** Main-ruled items inside the already-granted KS + O4 binding D02 A x2 ceiling **26,893 / 21,078** (operator ask `s2` = allow covered P1 + F3; round 3 adds the GPT P2 I2 assert and the GLM N1 fence narrowing, ordered by Main, with "STOP if it would exceed").
+
+| | Round 2 | Round 3 (formatted) | Ceiling |
+|---|---:|---:|---|
+| Kernel physical | 26,891 | **26,889 (-2)** | 26,893 |
+| Kernel tokei | 21,075 | **21,073 (-2)** | 21,078; shared STOP 21,250; alarm 22,000 |
+
+Components (tokei): `invoke_halt` I2 assert on `FrameRowWrite::Written` +3; watchdog fence released before the hook and re-acquired for the stamp with a `Running` re-check +4; `terminate_spirit` marker rows through one `marker` helper -9 (the two identical returning-id inserts). Set hash `1eb6670a1998fd349802f6042abf2a356ae6b4fa1a0bc94937527bed469400bd`.
+**No surface change:** no struct field was added (the existing `fence` is reused), so the `ScheduleWatchdog` hash `5e58c7d5…` is unchanged and the gate passes; the total stays two surface hash edits for 20-11.
+**Non-kernel:** maos-domain 10,220 -> **10,215** (cap removed); maos-bin 38,335 -> **38,362**; aggregate hardfail **202,506** (clean 202,505).
+**Honest limit:** a minted-id collision cannot be planted deterministically; the I2 witness is a source scan with a plant. Evidence: `landing-2/review-corrections/plants-r3.md`.

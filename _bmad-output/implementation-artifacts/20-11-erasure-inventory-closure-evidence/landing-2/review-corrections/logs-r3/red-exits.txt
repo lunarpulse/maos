@@ -1,0 +1,5 @@
+red-r3-domain-oversized exit=101
+red-r3-kernel-oversized exit=101
+red-r3-i2-source-scan exit=101
+red-r3-approval-history exit=101
+exit=101

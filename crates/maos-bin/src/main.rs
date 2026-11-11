@@ -10252,13 +10252,19 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         // The SCB is unloaded and its Worker stopped: nothing fires for this
         // pid again. Drop the watchdog's per-process buckets and stamps, then
         // name any schedule whose stamp survived instead of claiming removal.
-        self.schedule_watchdog
-            .forget_spirit(spirit_id, door.pid)
-            .await;
+        // The wait is bounded: if the watchdog's fence cannot be taken in time the
+        // state is unforgotten and every schedule is named as retained residue.
+        let forgotten = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            self.schedule_watchdog.forget_spirit(spirit_id, door.pid),
+        )
+        .await;
         door.watchdog_residue = door
             .schedule_ids
             .iter()
-            .filter(|id| self.schedule_watchdog.last_fire_ns(door.pid, id) != 0)
+            .filter(|id| {
+                forgotten.is_err() || self.schedule_watchdog.last_fire_ns(door.pid, id) != 0
+            })
             .cloned()
             .collect();
         let (terminal, redistillation) = run_uninstall_cascade(
@@ -11062,15 +11068,6 @@ fn orphaned_halts(
     let Some(conn) = maos_audit::open_tenant_artifact_readonly(audit_db_path)? else {
         return Ok((Vec::new(), Vec::new()));
     };
-    let resolved: HashSet<String> = conn
-        .prepare("SELECT reasoning FROM approval_decision_log WHERE capability = 'halt.resolve' AND target = ?1")?
-        .query_map([spirit], |row| row.get::<_, Option<String>>(0))?
-        .filter_map(|text| {
-            let text = text.ok()??;
-            let (id, _) = text.strip_prefix("halt=")?.split_once(':')?;
-            Some(id.to_owned())
-        })
-        .collect();
     let (mut orphans, mut gaps) = (BTreeMap::new(), Vec::new());
     for pid in pids {
         let rows = conn
@@ -11119,7 +11116,7 @@ fn orphaned_halts(
         let mut malformed = 0_u64;
         for (boot, value) in open {
             let id = value["halt_id"].as_str().unwrap_or_default().to_owned();
-            if closed.contains(&id) || resolved.contains(&id) {
+            if closed.contains(&id) {
                 continue;
             }
             match serde_json::from_value::<maos_domain::frame::EpistemicHaltPayload>(value) {
@@ -11134,6 +11131,41 @@ fn orphaned_halts(
                 "{malformed} malformed orphaned halt row(s) at pid {pid} left unclosed"
             ));
         }
+    }
+    // Resolution history is streamed once, newest first and bounded, retaining
+    // only ids that are still orphan candidates. If it is not fully read, no
+    // candidate can be proved unresolved: close none and say so.
+    let wanted: HashSet<String> = orphans.keys().map(|(_, _, id)| id.clone()).collect();
+    if !wanted.is_empty() {
+        let mut statement = conn.prepare(
+            "SELECT reasoning FROM approval_decision_log WHERE capability = 'halt.resolve' \
+             AND target = ?1 ORDER BY decision_id DESC LIMIT ?2",
+        )?;
+        let history = statement.query_map(
+            rusqlite::params![spirit, HALT_SCAN_ROWS as i64 + 1],
+            |row| row.get::<_, Option<String>>(0),
+        )?;
+        let (mut resolved, mut read) = (HashSet::new(), 0_usize);
+        for text in history {
+            read += 1;
+            if read > HALT_SCAN_ROWS {
+                gaps.push(format!(
+                    "approval history bounded at {HALT_SCAN_ROWS} rows; orphaned halts not closed"
+                ));
+                orphans.clear();
+                break;
+            }
+            let text = text?.unwrap_or_default();
+            if let Some((id, _)) = text
+                .strip_prefix("halt=")
+                .and_then(|rest| rest.split_once(':'))
+            {
+                if wanted.contains(id) {
+                    resolved.insert(id.to_owned());
+                }
+            }
+        }
+        orphans.retain(|(_, _, id), _| !resolved.contains(id));
     }
     Ok((
         orphans

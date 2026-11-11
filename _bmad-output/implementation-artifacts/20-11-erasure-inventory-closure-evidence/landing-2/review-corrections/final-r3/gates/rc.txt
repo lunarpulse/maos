@@ -1,0 +1,10 @@
+kloc clean rc=0
+check-dev-record-completeness rc=0
+check-epic-close-coherence rc=0
+check-exit-commands rc=0
+check-decision-register rc=0
+check-env-contract rc=0
+check-dev-model-tier rc=0
+check-kernel-baseline rc=0
+check-service-boundary rc=0
+invariant-lock rc=0
