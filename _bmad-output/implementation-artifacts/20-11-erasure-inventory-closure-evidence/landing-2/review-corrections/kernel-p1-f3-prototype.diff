@@ -1,0 +1,104 @@
+diff -r base/crates/maos-kernel-core/src/halt/mod.rs proto/crates/maos-kernel-core/src/halt/mod.rs
+--- base/crates/maos-kernel-core/src/halt/mod.rs	2026-11-11 11:27:07.000000000 +0000
++++ proto/crates/maos-kernel-core/src/halt/mod.rs	2026-11-11 11:44:30.161011915 +0000
+@@ -555,15 +555,18 @@
+     // audit chain is never incomplete at this point.
+     let payload_bytes = serde_json::to_vec(&payload)
+         .map_err(|e| InvokeHaltError::TransparencyLogWriteFailed(e.to_string()))?;
+-    tl.insert_frame_event(
++    let frame_id = tl.mint_frame_id();
++    tl.insert_frame_event_with_id(
++        Some(frame_id),
+         FrameKind::EpistemicHalt,
+         spirit_pid,
++        "",
++        "",
+         None,
+         payload.tag.as_str(),
+         &payload_bytes,
+         FrameOrigin::SpiritAuto,
+     );
+-    let frame_id = tl.last_frame_id();
+ 
+     // Step 2: Write Lifecycle Journal entry (LifecycleEvent::Halt = 6)
+     journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
+diff -r base/crates/maos-kernel-core/src/halt/termination.rs proto/crates/maos-kernel-core/src/halt/termination.rs
+--- base/crates/maos-kernel-core/src/halt/termination.rs	2026-11-11 11:27:07.000000000 +0000
++++ proto/crates/maos-kernel-core/src/halt/termination.rs	2026-11-11 11:44:30.201221514 +0000
+@@ -59,15 +59,13 @@
+             }
+         };
+ 
+-        tl.insert_frame_event(
+-            FrameKind::EpistemicHalt,
++        let frame_id = tl.insert_kernel_event_returning_id(
+             spirit_pid,
++            FrameKind::EpistemicHalt,
+             None,
+             kind_str,
+             &[],
+-            FrameOrigin::Kernel,
+         );
+-        let frame_id = tl.last_frame_id();
+ 
+         let receipt = HaltReceipt::new(hid.clone(), timestamp_ns, spirit_pid, boot_nonce, frame_id)
+             .with_resolution(HaltState::Terminated, kind_str, timestamp_ns);
+@@ -90,15 +88,13 @@
+     } else {
+         let mut receipts = Vec::with_capacity(pending.len());
+         for (halt_id, _state) in pending {
+-            tl.insert_frame_event(
+-                FrameKind::EpistemicHalt,
++            let frame_id = tl.insert_kernel_event_returning_id(
+                 spirit_pid,
++                FrameKind::EpistemicHalt,
+                 None,
+                 kind_str,
+                 &[],
+-                FrameOrigin::Kernel,
+             );
+-            let frame_id = tl.last_frame_id();
+ 
+             let receipt = HaltReceipt::new(
+                 halt_id.clone(),
+diff -r base/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs proto/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs
+--- base/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs	2026-11-11 11:27:07.000000000 +0000
++++ proto/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs	2026-11-11 11:44:30.161211999 +0000
+@@ -97,6 +97,8 @@
+     rate_limits: DashMap<(String, String), Arc<ScheduleBucket>>,
+     /// Per-(spirit_pid, schedule_id) last-fire timestamp (ns).
+     last_fire_ns: DashMap<(u32, String), u64>,
++    /// Story 20-11 — one candidate admission-to-stamp at a time; `forget_spirit` waits on it.
++    fence: tokio::sync::Mutex<()>,
+ }
+ 
+ impl ScheduleWatchdog {
+@@ -112,6 +114,7 @@
+             transparency_log,
+             rate_limits: DashMap::new(),
+             last_fire_ns: DashMap::new(),
++            fence: tokio::sync::Mutex::new(()),
+         }
+     }
+ 
+@@ -133,7 +136,8 @@
+     /// Story 20-11 — drop an uninstalled Spirit's per-process firing state:
+     /// its rate-limit buckets (keyed by Spirit id) and last-fire stamps
+     /// (keyed by pid). Returns the number of entries removed.
+-    pub fn forget_spirit(&self, spirit_id: &str, spirit_pid: u32) -> usize {
++    pub async fn forget_spirit(&self, spirit_id: &str, spirit_pid: u32) -> usize {
++        let _fence = self.fence.lock().await;
+         let before = self.rate_limits.len() + self.last_fire_ns.len();
+         self.rate_limits.retain(|(id, _), _| id != spirit_id);
+         self.last_fire_ns.retain(|(pid, _), _| *pid != spirit_pid);
+@@ -202,6 +206,10 @@
+         };
+ 
+         for (scb, entry) in candidates {
++            let _fence = self.fence.lock().await;
++            if scb.current_state() != ScbLifecycleState::Running {
++                continue;
++            }
+             // Step 2 — principal-revocability proxy: at v0.5 the per-Spirit
+             // revocation status is the proxy for principal revocation
+             // (Story 9.2 wires the cascade). If the Spirit's tokens are

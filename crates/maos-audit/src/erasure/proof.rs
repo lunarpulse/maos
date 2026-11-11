@@ -518,7 +518,10 @@ fn removal_count(
                     receipt_frame_id,
                 },
             ) if !halt_id.is_empty() => {
-                receipt(receipt_frame_id, "halt receipt absent from post-tree")?;
+                let frame = receipt(receipt_frame_id, "halt receipt absent from post-tree")?;
+                if !seen.insert(RemovalIdentity::Batch(frame)) {
+                    return Err(invalid("one receipt frame cannot close two halts"));
+                }
                 (RemovalIdentity::Name(halt_id), 1)
             }
             (

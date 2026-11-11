@@ -19,6 +19,7 @@ cumulative measured kernel tokei is now **21069** (shared STOP 21250, ADR-069 al
 `HaltRegistry` struct hash `b6d65243…` → `a917eddc…` (ADR-066 hand-edit). Orchestrator-adjudicated overdraft, disclosed to the operator
 (D02 A): maos-audit 20-11 ceiling 8261 → 8313 (pin 8227 → 8313); bin pin 38061 → 38202; later stories re-base on these pins.
 20-11 stays in-progress: AC5/EC-13 hosted serial pass, AC6 live T3 leg and the private/index hold lease remain open.
+**20-11 L2 review corrections — 2026-11-11 (operator ask `s2` = allow).** Kernel P1 (watchdog retirement fence) + F3 (atomic receipt frame ids) landed at +6 tokei: kernel **26891 / 21075**, inside the granted x2 ceiling 26893 / 21078; second `ScheduleWatchdog` surface-hash hand-refresh (ADR-066, noted); cumulative measured kernel tokei **21075** (shared STOP 21250, alarm 22000). Audit 8286, bin 38335, domain 10220.
 
 
 **Status:** `in-progress` — opened 2026-10-06 by `20-6-macos-compile-guard` (the first story created in this epic; created ahead of `20-1`…`20-5` by operator decision, the epic's own order unchanged). Round 2 correct-course 2026-09-04 (`sprint-change-proposal-2026-09-04-round2.md`, Lunarpulse-ratified; Fork C). Replaces the morning's Epic 20 file. `sprint-status.yaml` is authoritative for status.

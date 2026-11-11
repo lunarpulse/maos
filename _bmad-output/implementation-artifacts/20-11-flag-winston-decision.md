@@ -167,3 +167,34 @@ durable row, no journal entry, empty registry, only the unload's `term-…` rece
 (crash path fenced). Plant (a) (no close in `terminate_spirit`) reds all three; plant (b) (release before the TL write) reds S2. Plant
 (c) "close in `unload` only" is an O1 shape that needs a `pub(crate)` close method this repair deliberately does not have; no realistic
 variant exists in the landed design, and plant (a) already reds the crash witness S4.
+
+## Landing 2 review corrections — kernel P1 + F3 (Dev2011k, 2026-11-11, base `c402c29b`)
+
+**Authority:** operator ask `s2` = allow (relayed by Main, 2026-11-11): P1 + F3 at the priced +7/+6, kernel 26,887/21,075, inside the already-granted
+KS + O4 binding D02 A x2 ceiling **26,893 / 21,078**; one second `ScheduleWatchdog` surface-hash hand-refresh (ADR-066) allowed with an explicit note.
+
+| | Landed L2 | T0 prototype (reverted `git archive HEAD` copy, `kernel-p1-f3-prototype.diff`) | Landed corrections (formatted) | Ceiling |
+|---|---:|---:|---:|---|
+| Kernel physical | 26,880 | 26,887 (+7) | **26,891 (+11)** | 26,893 |
+| Kernel tokei | 21,069 | 21,075 (+6) | **21,075 (+6)** | 21,078; shared STOP 21,250; ADR-069 alarm 22,000 |
+
+The tokei equals the priced figure (P1 +7, F3 -1). Physical is +4 over the prototype only because the landed `forget_spirit` carries four doc-comment
+lines; still 2 under the physical ceiling. Set hash `f76a9937799ec53e59491efe427eddfa20932262d83ea3897431a25c72a6d8ba`; changed per-file hashes
+`halt/mod.rs` `9f981811…`, `halt/termination.rs` `3364cd49…`, `scheduler/schedule_watchdog.rs` `e16a890a…`; `scheduler_loop.rs` unchanged.
+
+**Shape.** P1: `ScheduleWatchdog.fence` (`tokio::sync::Mutex<()>`) is held by every queued candidate from admission to its stamp, with a `Running`
+re-check under it (an unloaded Spirit's stale candidate is skipped before any bucket, fire row, stamp or dispatch); `forget_spirit` is `async` and
+takes the same fence (an admitted firing finishes before anything is cleared or reported). F3: `terminate_spirit` marker rows use
+`insert_kernel_event_returning_id` (same Kernel origin); `invoke_halt` uses `mint_frame_id()` + `insert_frame_event_with_id(Some(id), …, SpiritAuto)`
+(origin unchanged), so a receipt always cites its own frame.
+
+**Second and last surface edit (explicit note, ADR-066 hand-edit).** `docs/ci-baselines/kernel-surface-v0.1-beta.json` `ScheduleWatchdog` struct
+`2feabbd714c29206b1fafe72b4611a98a8a02a001ec0be1f74a04c5c55430f02` -> `5e58c7d5ef9f066eb5976dacbad215e221d80aa88a29f1d0f0448d36ee35c55d`
+(private `fence` field). `check-service-boundary` flagged only that symbol; with the edit it passes. Together with the L2 `HaltRegistry` refresh
+that is two surface hash edits in total for 20-11; no new symbol, no class row.
+
+**Non-kernel (all inside the story's envelope except as noted).** maos-audit 8,313 -> **8,286** (the bounded orphan scan moved to maos-bin; old SQL
+version deleted); maos-bin 38,202 -> **38,335** (+133, inside the story's own bin allowance); maos-domain 10,215 -> **10,220** (+5, F6 cap, one over
+the story's remaining +4: disclosed); maos-wasm-host 3,143 -> 3,141; aggregate hardfail 202,371 -> **202,486** (clean aggregate 202,485).
+
+**Witnesses and plants:** `landing-2/review-corrections/plants.md`.

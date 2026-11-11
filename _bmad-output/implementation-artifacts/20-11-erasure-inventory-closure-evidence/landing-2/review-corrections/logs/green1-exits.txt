@@ -1,0 +1,6 @@
+g1-kernel-watchdog-f3-o4 exit=0
+g1-domain exit=0
+g1-audit-verifier exit=0
+g1-wasm exit=0
+g2-bin-inventory exit=0
+g2-bin-unit exit=0

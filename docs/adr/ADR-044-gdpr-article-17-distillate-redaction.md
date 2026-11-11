@@ -156,6 +156,16 @@ stamp survives; otherwise the surviving ids are named. Offline package removal
 removes its schedule admission source; a compiled-in Spirit may be admitted
 again by the binary. The private/index hold lease stays a named gap.
 
+Review corrections (20-11 L2): only kernel-written halt rows count as invocations
+(no sender, no addressee), so a frame a Spirit routed through the bus cannot mint
+receipts; `EpistemicHalt` is refused at the guest lift and by the Spirit session.
+The orphan scan is one bounded pass per incarnation pid (50,000 rows, an explicit
+gap beyond), duplicate invocation rows of one `(boot, pid, halt_id)` are one halt,
+and a malformed id is a named gap, not a failed uninstall. Both verifiers also
+require decoded halt receipt-frame ids to be unique, so one receipt cannot back two
+halts. A receipt always cites its own frame (returning-id inserts), and an uninstall
+waits for an in-flight schedule firing before the watchdog state is cleared.
+
 The serving admission paths currently default the SCB's schedule section, even
 when the input manifest declares schedules. AC6.3 therefore uses a live
 principal-free lineage witness for the hosted Worker, not an invented firing

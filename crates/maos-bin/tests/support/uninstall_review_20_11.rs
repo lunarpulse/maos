@@ -684,3 +684,53 @@ fn ac4_door_surviving_watchdog_stamp_is_named_not_removed() {
         .contains("watchdog state retained")
         && reason.contains("daily")));
 }
+
+/// Security review F4: one incarnation pid's scan examines a bounded number of
+/// rows and says so; it never walks an unbounded flood.
+#[test]
+fn review_f4_own_flood_past_the_row_ceiling_is_a_named_gap() {
+    let directory = tempfile::tempdir().expect("scan root");
+    let path = directory.path().join("transparency.sqlite");
+    let log = TransparencyLogAdapter::open_with_global_legal_holds(&path, &path, 1).expect("log");
+    log.insert_frame_event(
+        FrameKind::SpiritAdmitted,
+        7,
+        None,
+        "hello-spirit",
+        br#"{"spirit_id":"hello-spirit"}"#,
+        FrameOrigin::Kernel,
+    );
+    drop(log);
+    let mut db = rusqlite::Connection::open(&path).expect("db");
+    let tx = db.transaction().expect("tx");
+    {
+        let mut insert = tx
+            .prepare(
+                "INSERT INTO transparency_log(frame_id,timestamp_ns,spirit_pid,boot_nonce,kind,intent,payload_redacted,origin) \
+                 VALUES(?1,?2,7,1,3,'planned_unload',?3,0)",
+            )
+            .expect("insert");
+        for n in 0..60_000_u32 {
+            let mut id = [0xf2_u8; 16];
+            id[..4].copy_from_slice(&n.to_be_bytes());
+            let body = format!(r#"{{"halt_id":"closed-{n}","terminal_state":"Terminated"}}"#);
+            insert
+                .execute(rusqlite::params![
+                    id.as_slice(),
+                    1_000_000 + i64::from(n),
+                    body.as_bytes()
+                ])
+                .expect("flood row");
+        }
+    }
+    tx.commit().expect("commit");
+    let started = std::time::Instant::now();
+    let (orphans, gaps) = super::orphaned_halts(&path, "hello-spirit").expect("bounded scan");
+    assert!(orphans.is_empty());
+    assert!(gaps.iter().any(|gap| gap.contains("bounded")), "{gaps:?}");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(10),
+        "{:?}",
+        started.elapsed()
+    );
+}

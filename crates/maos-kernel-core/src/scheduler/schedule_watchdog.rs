@@ -97,6 +97,8 @@ pub struct ScheduleWatchdog {
     rate_limits: DashMap<(String, String), Arc<ScheduleBucket>>,
     /// Per-(spirit_pid, schedule_id) last-fire timestamp (ns).
     last_fire_ns: DashMap<(u32, String), u64>,
+    /// Story 20-11 — one candidate admission-to-stamp at a time; `forget_spirit` waits on it.
+    fence: tokio::sync::Mutex<()>,
 }
 
 impl ScheduleWatchdog {
@@ -112,6 +114,7 @@ impl ScheduleWatchdog {
             transparency_log,
             rate_limits: DashMap::new(),
             last_fire_ns: DashMap::new(),
+            fence: tokio::sync::Mutex::new(()),
         }
     }
 
@@ -133,7 +136,12 @@ impl ScheduleWatchdog {
     /// Story 20-11 — drop an uninstalled Spirit's per-process firing state:
     /// its rate-limit buckets (keyed by Spirit id) and last-fire stamps
     /// (keyed by pid). Returns the number of entries removed.
-    pub fn forget_spirit(&self, spirit_id: &str, spirit_pid: u32) -> usize {
+    ///
+    /// Takes the same fence every queued candidate holds from admission to its
+    /// stamp: an admitted firing finishes first, and a candidate captured
+    /// before the uninstall finds its SCB no longer `Running` and is skipped.
+    pub async fn forget_spirit(&self, spirit_id: &str, spirit_pid: u32) -> usize {
+        let _fence = self.fence.lock().await;
         let before = self.rate_limits.len() + self.last_fire_ns.len();
         self.rate_limits.retain(|(id, _), _| id != spirit_id);
         self.last_fire_ns.retain(|(pid, _), _| *pid != spirit_pid);
@@ -202,6 +210,10 @@ impl ScheduleWatchdog {
         };
 
         for (scb, entry) in candidates {
+            let _fence = self.fence.lock().await;
+            if scb.current_state() != ScbLifecycleState::Running {
+                continue;
+            }
             // Step 2 — principal-revocability proxy: at v0.5 the per-Spirit
             // revocation status is the proxy for principal revocation
             // (Story 9.2 wires the cascade). If the Spirit's tokens are

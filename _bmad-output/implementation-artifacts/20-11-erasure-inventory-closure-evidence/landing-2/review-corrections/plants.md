@@ -1,0 +1,15 @@
+# 20-11 L2 review corrections — witnesses, failing-before, plants (Dev2011k, 2026-11-11)
+Raw logs in `logs/` (red at HEAD `c402c29b`, plants, first greens) and `final/` (final tree). Plants run once, restored byte-for-byte (`cmp` rc 0 + `touch`).
+
+| Finding | Witness | Failing-before (HEAD) | Plant -> red | Final |
+|---|---|---|---|---|
+| GPT P1 stale candidate after uninstall | `schedule_forget_spirit_20_11::a_candidate_captured_before_the_uninstall_never_fires_after_it` | `logs/red-p1-watchdog-head.log` (fire row written for the retired Spirit) | skip the `Running` re-check: `logs/plant-p1-skip-running-check.log` | `final/f1-kernel.log` |
+| GPT P1 admitted firing finishes first | `…::forget_spirit_waits_for_an_admitted_firing` | (new API shape; compile-red at HEAD) | forget without the fence: `logs/plant-p1-forget-without-fence.log` | same |
+| GPT P2 duplicate invocation rows | `erasure_inventory_20_11::review_p2_duplicate_invocation_rows_close_once` | `logs/red-bin-review-p2-f2-f1-head.log` (uninstall fails on the duplicate) | no dedup: `logs/plant-p2-no-dedup.log` | `final/f6-bin-inventory.log` |
+| GPT P2 receipt frame shared by two halts | `erasure_review_20_11` vectors `halt_shared_receipt` (reject), `halt_distinct_receipts` (accept) | `logs/red-audit-verifier-head.log` (both verifiers accepted `Removed{2}` on one receipt) | Rust check removed: `logs/plant-verifier-rust-shared-receipt.log`; Python check removed: `logs/plant-verifier-python-shared-receipt.log` | `final/f4-audit.log` |
+| GLM F1 forged halt frames | `frame_bridge_roundtrip::a_guest_cannot_emit_an_epistemic_halt_frame`; `erasure_inventory_20_11::review_f1_spirit_submitted_halt_frames_are_not_invocations` | `logs/red-wasm-lift-head.log`; `logs/red-bin-review-p2-f2-f1-head.log` | lift kind check removed: `logs/plant-f1-lift-kind-check.log`; any row counts: `logs/plant-f1-any-row-counts.log` | `final/f5-wasm.log`, `final/f6-…` |
+| GLM F2 empty/malformed id | `…::review_f2_malformed_orphan_id_is_a_named_gap_not_a_failed_uninstall` | same red log (uninstall `Failed`) | empty id accepted: `logs/plant-f2-empty-id-accepted.log` | `final/f6-…` |
+| GLM F3 receipt frame id race | `halt_unload_fence_20_11::receipts_cite_their_own_frame_under_a_concurrent_writer` | `logs/red-f3-receipt-frame-head.log` (800 of 800 receipts cited a foreign frame) | `last_frame_id()` readback restored: `logs/plant-f3-last-frame-readback.log` | `final/f1-kernel.log` |
+| GLM F4 unbounded scan | `erasure_inventory_20_11::review_f4_another_spirits_flood_does_not_slow_the_orphan_scan` (100k other-Spirit halt rows, uninstall < 20 s); `main.rs` unit `review_f4_own_flood_past_the_row_ceiling_is_a_named_gap` | `logs/red-bin-review-head-partial.log` (both F4 tests still running after 60 s at HEAD, killed) | (bounded by construction; ceiling const) | `final/f6-…`, `final/f8-bin-unit.log` |
+| GLM F6 field caps | `maos-domain/tests/halt_payload_caps_20_11` | `logs/red-domain-caps-head.log` (compile-red) | cap disabled: `logs/plant-f6-no-cap.log` | `final/f3-domain.log` |
+| GLM F5 | rule-10 deferred row (needs a grant) | — | — | `deferred-work.md` |

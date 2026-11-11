@@ -1,0 +1,17 @@
+build-bin-cli exit=0
+fixtures exit=0
+f1-kernel exit=0
+f2-kernel-lib exit=0
+f3-domain exit=0
+f4-audit exit=0
+f5-wasm exit=0
+f6-bin-inventory exit=0
+f7-door exit=0
+f8-bin-unit exit=0
+f9-live exit=0
+f10-xtask-pins exit=0
+f11-verb-no-default exit=0
+clippy exit=0
+ratchet exit=0
+fkcs exit=0
+nextest exit=100

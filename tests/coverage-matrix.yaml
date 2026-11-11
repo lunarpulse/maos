@@ -1019,6 +1019,10 @@ coverage:
       and named gaps; erasure_live_20_11 observes Removed schedules after
       forget_spirit. Kernel halt_unload_fence_20_11 and
       schedule_forget_spirit_20_11 witness O4 and KS. Hosted T3 leg unverified.
+      Review corrections: halt_unload_fence_20_11::receipts_cite_their_own_frame_*,
+      schedule_forget_spirit_20_11 (retired candidate, admitted firing),
+      erasure_inventory_20_11 review_p2/f1/f2/f4, erasure_review_20_11 shared-receipt
+      vectors, frame_bridge_roundtrip guest halt refusal, halt_payload_caps_20_11.
       shell_host_16_2::ac4_door_snapshots_real_scb_schedules_before_unload
       drives the real SCB/door snapshot boundary; erasure_live_20_11 drives
       the real live cascade. AC6's T3 Worker leg is hosted-only and uses the

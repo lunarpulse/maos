@@ -890,7 +890,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::scheduler::schedule_watchdog::ScheduleWatchdog",
-      "signature_hash": "2feabbd714c29206b1fafe72b4611a98a8a02a001ec0be1f74a04c5c55430f02"
+      "signature_hash": "5e58c7d5ef9f066eb5976dacbad215e221d80aa88a29f1d0f0448d36ee35c55d"
     },
     {
       "kind": "struct",

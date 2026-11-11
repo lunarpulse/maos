@@ -188,8 +188,10 @@ def _removals(values, category, spirit, post_ids, erased, principal_frames):
         elif allowed == "halt":
             _object(item, {"kind", "halt_id", "receipt_frame_id"}, "halt removal")
             identity = _text(item["halt_id"], "halt id")
-            if not identity or _frame_id(item["receipt_frame_id"]) not in post_ids:
-                raise ValueError("empty halt id or receipt absent from post-tree")
+            frame = _frame_id(item["receipt_frame_id"])
+            if not identity or frame not in post_ids or ("receipt", frame) in seen:
+                raise ValueError("empty halt id, receipt absent from post-tree, or receipt shared by two halts")
+            seen.add(("receipt", frame))
             count = 1
         elif allowed == "capability_batch":
             _object(item, {"kind", "boot_nonce", "spirit_pid", "revoked_tokens"}, "capability batch")

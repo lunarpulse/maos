@@ -1117,6 +1117,11 @@ fn authorize_and_deliver(
             "frame kind does not match its payload",
         ));
     }
+    if expected_kind == FrameKind::EpistemicHalt {
+        return Err(SessionError::Protocol(
+            "epistemic halt frames are kernel-reserved",
+        ));
+    }
     let policy = deps.security.policy().inner().load_full();
     let posture_hash = policy
         .spirit_postures

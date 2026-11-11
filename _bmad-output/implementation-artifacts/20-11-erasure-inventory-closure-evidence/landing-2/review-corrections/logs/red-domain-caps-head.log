@@ -1,0 +1,41 @@
+   Compiling tempfile v3.27.0
+   Compiling maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain)
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+error[E0599]: no variant, associated function, or constant named `FieldTooLong` found for enum `HaltPayloadError` in the current scope
+  --> crates/maos-domain/tests/halt_payload_caps_20_11.rs:20:75
+   |
+20 |         assert_eq!(build(id, tag, policy, derived), Err(HaltPayloadError::FieldTooLong));
+   |                                                                           ^^^^^^^^^^^^ variant, associated function, or constant not found in `HaltPayloadError`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `maos-domain` (test "halt_payload_caps_20_11") due to 1 previous error

@@ -34,6 +34,8 @@ kloc_grant: >-
   Landing 2 (2026-11-11, orchestrator-adjudicated overdraft, disclosed to the operator, D02 A): audit ceiling 8261 -> 8313
   (pin 8227 -> 8313, +86 measured); bin pin 38061 -> 38202 (+141; story bin ceilings are stale-absolute, live ceiling = measured pin
   plus own remaining allowance); aggregate hardfail 202122 -> 202371; kernel 26880/21069 and domain 10215 inside the grant.
+  Review corrections (2026-11-11, operator ask s2 = allow for kernel P1 + F3): kernel 26891/21075 inside the x2 ceiling 26893/21078; audit 8313 -> 8286 (scan moved to bin); bin 38202 -> 38335;
+  domain 10215 -> 10220 (one over the story's remaining +4, disclosed); wasm-host 3143 -> 3141; aggregate hardfail 202371 -> 202486.
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:57-71`): an attesting control (a signed proof-of-erasure, rule 11), cross-Spirit isolation (pid reuse across boots, legal holds), concurrency (EC-13 lock windows, forget/hold serialization) and, if ruled, a kernel FLAG-Winston row. Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC2.4, AC3, AC5.3 and the proof format (D-20-11-09), Test Infrastructure on glm-5.3 (standing policy; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
 
@@ -1072,6 +1074,24 @@ The run's epic-17-exit matrix, check-test-budget, check-perf-counts and macos-ch
 
 **Unverified / open:** AC5/EC-13 (hosted serial 1M pass, `erasure_million_20_11` local oracle ~21 s vs 20 s allowance, root-caused, not widened), AC6 live T3 leg (hosted-only), private/index hold lease (`kernel_private_index_hold_lease` gap, separate grant required), hosted discipline run on the final tree.
 
+### Landing 2 review corrections (Dev2011k, 2026-11-11, base `c402c29b`)
+
+**Reviews (verbatim):** `20-11-erasure-inventory-closure-evidence/landing-2/review/gpt-review.md` (P1 + 2 P2) and `security.md` (F1-F6). Ruled by Main/operator: kernel P1 + F3 authorized (+7/+6 priced on a reverted prototype; ask `s2` = allow, second `ScheduleWatchdog` surface-hash refresh once, noted); F1 rejected at ingress in the kernel-free layer and by an orphan kernel-writer filter; F4 without a new index; F5 a deferred row; F6 caps in maos-domain.
+
+| Finding | Correction | Witness |
+|---|---|---|
+| GPT P1 (kernel) | `ScheduleWatchdog.fence`: candidate admission-to-stamp and `forget_spirit` (now `async`) share it; `Running` re-check under it | `schedule_forget_spirit_20_11` (2 new tests) |
+| GPT P2 duplicates | `orphaned_halts` collapses by `(boot, pid, halt_id)` | `review_p2_duplicate_invocation_rows_close_once` |
+| GPT P2 shared receipt | both verifiers reject two halts sharing one receipt frame | `erasure_review_20_11` vectors |
+| GLM F1 | wasm `lift` refuses `EpistemicHalt` (kind and payload); the Spirit session refuses it; the orphan scan counts only kernel-writer rows (no sender/addressee) | `a_guest_cannot_emit_an_epistemic_halt_frame`, `review_f1_*` |
+| GLM F2 | malformed/empty orphan ids are a named `CoverageGap`, valid halts still close | `review_f2_*` |
+| GLM F3 (kernel) | returning-id inserts (`insert_kernel_event_returning_id`; `mint_frame_id` + `insert_frame_event_with_id`) | `receipts_cite_their_own_frame_under_a_concurrent_writer` |
+| GLM F4 | one bounded pass per incarnation pid (50,000-row ceiling, explicit gap), no new index; the scan moved into maos-bin beside its only consumer | `review_f4_*` |
+| GLM F5 | deferred row (needs a grant) | — |
+| GLM F6 | 4096-byte total cap on the Spirit-supplied halt strings in `EpistemicHaltPayload::new` | `halt_payload_caps_20_11` |
+
+**Measured:** kernel 26,880/21,069 -> **26,891/21,075** (tokei +6 = priced; physical +4 over the prototype from doc comments; inside the 26,893/21,078 x2 ceiling), set hash `f76a9937…`; audit 8,313 -> **8,286**; domain 10,215 -> **10,220** (one over the story's remaining +4, disclosed); bin 38,202 -> **38,335**; wasm-host 3,143 -> 3,141; aggregate hardfail **202,486**. Second `ScheduleWatchdog` surface hash `2feabbd7…` -> `5e58c7d5…` (flagged symbol was the only one). Evidence: `landing-2/review-corrections/` (`plants.md`, `logs/`, `final/`). Honest limits: the Spirit-session refusal has no direct witness (deferred row); the failing-before for P1's second test and F6 is compile-red (new API); F4's HEAD red is two tests still running after 60 s, killed.
+
 ### Completion Notes List
 
 - The historical `cbed4dad` local landing claims above are superseded by the review-correction Dev Agent Record and evidence. The correction remains kernel-free; AC5/EC-13 is explicitly OPEN pending hosted <25% wall and 1M completion, and AC6's T3 substrate is unverified locally. AC3/KS/O4 and the private-tier/index hold lease remain final-kernel work, not implemented here. Original T0 evidence, failures and rulings are preserved; no tracker flip.
@@ -1139,4 +1159,5 @@ The run's epic-17-exit matrix, check-test-budget, check-perf-counts and macos-ch
 - 2026-11-06: Closing four record gates0; guarded owned-scratch/incremental cleanup0 removes544 stale sessions,8111838202 logical bytes /6504443904 last-link allocated-file bytes, with5914886144 observed Cargo free-space gain. Earlier positively identified aborted1M fixture cleanup is separately recorded; no source/pin/status change or checks after cleanup.
 - 2026-11-08: Recorded hosted run `42533166219` @ `a13140b8`: 100k/1M vectors pass; workspace fails only the known 20-7 snapshot-owner timing family. AC5/EC-13 stays open for final review, AC6 live Worker remains unverified from the log, final-kernel work remains owed, and status is unchanged.
 - 2026-11-11: **Loom whole-package leg skips the 1M vector** (Dev20Hosted; operator ruling 2026-11-11, ask `m1`, option 3 only): `check-multi-tenant-loom`'s `maos-bin-whole-package-parallel-isolation` leg now runs `cargo test -p maos-bin -- --skip ac5_million_row_pending_forget_finishes_and_repeats_without_corruption` (default parallelism and the three required `cross_team_consent_13_3` tests unchanged; test `whole_package_leg_skips_only_the_million_row_test`, red at `459a606a`). The heavy vector keeps its hosted serial-group coverage in the workspace nextest run (`.config/nextest.toml`); the loom leg is the `MAOS_HOME` race witness, not a 1M witness. No 20-11 oracle, deadline or budget changed. **AC5/EC-13 stays OPEN** until a hosted serial pass of that vector is cited at the final 20-11 landing; this skip is not that evidence.
+- 2026-11-11: **Landing 2 review corrections** (Dev2011k, base `c402c29b`, uncommitted): GPT P1 + 2 P2 and GLM F1-F4/F6 corrected, F5 deferred; kernel P1 + F3 +6 tokei (26,891/21,075, inside the x2 ceiling), second `ScheduleWatchdog` surface-hash refresh, bin 38,335, audit 8,286, domain 10,220, aggregate hardfail 202,486; every correction red-before with plants; `landing-2/review-corrections/`. Status stays in-progress.
 - 2026-11-11: **Landing 2 (final kernel landing: KS + O4 + AC3), Dev2011k, base `345ae30f`** (uncommitted, awaiting orchestrator commit/review). T0 on a reverted `git archive HEAD` prototype: kernel 26854/21051 → 26880/21069 (**+26/+18 = grant**), domain 10211 → 10215 (+4); one HaltRegistry surface-hash refresh `b6d65243…` → `a917eddc…`. Every witness green in the final tree with red-before and plants (`landing-2/plants.md`). **Orchestrator-adjudicated overdraft, disclosed to the operator (D02 A):** maos-audit 20-11 ceiling 8,261 → 8,313 (pin 8,227 → 8,313, +86); maos-bin pin 38,061 → 38,202 (+141); aggregate hardfail 202,122 → 202,371. **Status stays in-progress:** AC5/EC-13 (hosted serial 1M pass), AC6 live T3 leg (hosted-only) and the private/index hold lease (named gap, separate grant) remain open.

@@ -260,12 +260,15 @@ elif case in ("weighted_capability_valid", "duplicate_batch", "batch_overflow"):
         bundle["category_evidence"][capability]["removals"].append(copy.deepcopy(batch))
     elif case == "batch_overflow":
         bundle["category_evidence"][capability]["removals"].append({"kind":"capability_batch","boot_nonce":2011,"spirit_pid":8,"revoked_tokens":1})
-elif case in ("halt_valid", "halt_missing_receipt", "halt_duplicate", "halt_wrong_kind"):
+elif case in ("halt_valid", "halt_missing_receipt", "halt_duplicate", "halt_wrong_kind", "halt_shared_receipt", "halt_distinct_receipts"):
     halts = next(i for i,c in enumerate(bundle["categories"]) if c["name"] == "pending_halts")
     item = {"kind":"halt","halt_id":"halt-20-11","receipt_frame_id":("ee" if case == "halt_missing_receipt" else "2a")*16}
-    count = 2 if case == "halt_duplicate" else 1
+    count = 2 if case in ("halt_duplicate", "halt_shared_receipt", "halt_distinct_receipts") else 1
     bundle["categories"][halts]["status"] = {"status":"Removed","count":count}
     bundle["category_evidence"][halts]["removals"] = [{"kind":"schedule","schedule_id":"daily"}] if case == "halt_wrong_kind" else [copy.deepcopy(item) for _ in range(count)]
+    if case in ("halt_shared_receipt", "halt_distinct_receipts"):
+        # Two DIFFERENT halts; sharing one receipt frame must not count twice.
+        bundle["category_evidence"][halts]["removals"] = [dict(item, halt_id="halt-a"), dict(item, halt_id="halt-b", receipt_frame_id=("2a" if case == "halt_shared_receipt" else "64")*16)]
 elif case == "missing_removal":
     bundle["category_evidence"][index]["removals"] = []
 elif case == "duplicate_removal":
@@ -370,6 +373,8 @@ sys.stdout.buffer.write(encoded.encode("utf-8"))
         ("halt_missing_receipt", false),
         ("halt_duplicate", false),
         ("halt_wrong_kind", false),
+        ("halt_shared_receipt", false),
+        ("halt_distinct_receipts", true),
         ("batch_overflow", false),
         ("missing_removal", false),
         ("duplicate_removal", false),

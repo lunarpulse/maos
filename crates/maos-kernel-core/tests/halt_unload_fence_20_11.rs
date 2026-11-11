@@ -373,3 +373,90 @@ async fn o4_crash_path_refuses_a_late_halt() {
         .halt_metadata_for_spirit(world.pid, 0)
         .is_empty());
 }
+
+/// F3 (security review): a receipt must cite ITS OWN frame. The row id was
+/// read back with `last_frame_id()`, which any concurrent writer may overwrite
+/// between the insert and the read. A tight foreign writer runs while many
+/// invocations and terminations are issued; every returned frame id must name
+/// the row that was written for it.
+#[tokio::test]
+async fn receipts_cite_their_own_frame_under_a_concurrent_writer() {
+    use maos_domain::halt::{HaltId, HaltState, TerminationKind};
+    use maos_kernel_core::halt::{terminate_spirit, PendingHaltMetadata};
+
+    let (world, _reached, _resume) = world("no-pause-20-11").await;
+    let world = Arc::new(world);
+    let stop = Arc::new(AtomicBool::new(false));
+    let writer = {
+        let (tl, stop) = (Arc::clone(&world.tl), Arc::clone(&stop));
+        std::thread::spawn(move || {
+            while !stop.load(Ordering::Relaxed) {
+                tl.insert_frame_event(
+                    FrameKind::TelemetryEvent,
+                    0,
+                    None,
+                    "foreign.writer",
+                    b"{}",
+                    maos_domain::invariants::i3::FrameOrigin::Kernel,
+                );
+            }
+        })
+    };
+    let owner = |frame_id: [u8; 16]| {
+        world
+            .tl
+            .query_frames(FrameFilter {
+                spirit_pid: Some(world.pid),
+                kind: Some(FrameKind::EpistemicHalt),
+                ..Default::default()
+            })
+            .expect("halt rows")
+            .into_iter()
+            .find(|row| row.frame_id == frame_id)
+    };
+    let mut misbound = Vec::new();
+    for round in 0..400 {
+        let receipt = raise(&world, &format!("own-{round}")).expect("an open pid accepts a halt");
+        if !owner(receipt.frame_id).is_some_and(|row| row.intent == "ambiguity") {
+            misbound.push(format!("invoke own-{round}"));
+        }
+    }
+    let registry = HaltRegistry::new();
+    for round in 0..400 {
+        let id = format!("term-{round}");
+        registry
+            .insert_pending_with_metadata(
+                HaltId::new(id.clone()).expect("id"),
+                HaltState::PendingResolution,
+                PendingHaltMetadata {
+                    spirit_pid: world.pid,
+                    spirit_id: "race-20-11".into(),
+                    payload: halt(&id),
+                    fired_ns: 0,
+                },
+            )
+            .expect("pending");
+        for receipt in terminate_spirit(
+            &world.tl,
+            &registry,
+            world.pid,
+            "race-20-11",
+            TerminationKind::PlannedUnload,
+            BOOT,
+        ) {
+            if !owner(receipt.frame_id).is_some_and(|row| {
+                row.intent == "planned_unload" && row.payload_redacted.is_empty()
+            }) {
+                misbound.push(format!("terminate {id}"));
+            }
+        }
+    }
+    stop.store(true, Ordering::Relaxed);
+    writer.join().expect("writer");
+    assert!(
+        misbound.is_empty(),
+        "{} receipts cite a foreign frame: {:?}",
+        misbound.len(),
+        &misbound[..misbound.len().min(5)]
+    );
+}

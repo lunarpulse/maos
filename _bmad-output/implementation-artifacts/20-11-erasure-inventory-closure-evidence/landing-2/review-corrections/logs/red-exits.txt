@@ -1,0 +1,7 @@
+red-p1-watchdog-head exit=101
+red-f3-receipt-frame-head exit=101
+red-bin-review-head: KILLED after F4 tests ran >60s each at HEAD (O(n*m) scan); p2/f2/f1 results in the -partial log
+red-bin-review-p2-f2-f1-head exit=101
+red-audit-verifier-head exit=101
+red-wasm-lift-head exit=101
+red-domain-caps-head exit=101

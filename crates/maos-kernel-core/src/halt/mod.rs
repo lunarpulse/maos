@@ -555,15 +555,18 @@ pub fn invoke_halt(
     // audit chain is never incomplete at this point.
     let payload_bytes = serde_json::to_vec(&payload)
         .map_err(|e| InvokeHaltError::TransparencyLogWriteFailed(e.to_string()))?;
-    tl.insert_frame_event(
+    let frame_id = tl.mint_frame_id();
+    tl.insert_frame_event_with_id(
+        Some(frame_id),
         FrameKind::EpistemicHalt,
         spirit_pid,
+        "",
+        "",
         None,
         payload.tag.as_str(),
         &payload_bytes,
         FrameOrigin::SpiritAuto,
     );
-    let frame_id = tl.last_frame_id();
 
     // Step 2: Write Lifecycle Journal entry (LifecycleEvent::Halt = 6)
     journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {

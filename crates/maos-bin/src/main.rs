@@ -10252,7 +10252,9 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         // The SCB is unloaded and its Worker stopped: nothing fires for this
         // pid again. Drop the watchdog's per-process buckets and stamps, then
         // name any schedule whose stamp survived instead of claiming removal.
-        self.schedule_watchdog.forget_spirit(spirit_id, door.pid);
+        self.schedule_watchdog
+            .forget_spirit(spirit_id, door.pid)
+            .await;
         door.watchdog_residue = door
             .schedule_ids
             .iter()
@@ -11027,6 +11029,121 @@ impl UninstallProofInventory<'_> {
     }
 }
 
+/// Rows examined per incarnation pid before the halt scan stops and says so.
+#[cfg(feature = "network")]
+const HALT_SCAN_ROWS: usize = 50_000;
+
+/// Halts `spirit` raised that no terminal receipt and no `halt.resolve`
+/// decision ever closed (what a dead root left pending), plus every reason
+/// that list is incomplete. One bounded pass per incarnation pid. The owner is
+/// the admission identity at the invocation's row, never a recycled pid. Only
+/// kernel-writer rows count (no sender, no addressee): a frame a Spirit routed
+/// through the bus is not an invocation. Receipts carry `terminal_state`,
+/// invocation payloads do not; duplicate invocation rows of one
+/// `(boot, pid, halt_id)` are one halt.
+#[cfg(feature = "network")]
+#[allow(clippy::type_complexity)]
+fn orphaned_halts(
+    audit_db_path: &std::path::Path,
+    spirit: &str,
+) -> Result<
+    (
+        Vec<(u64, u32, maos_domain::frame::EpistemicHaltPayload)>,
+        Vec<String>,
+    ),
+    Box<dyn std::error::Error>,
+> {
+    use std::collections::{BTreeMap, HashMap, HashSet};
+    let pids: std::collections::BTreeSet<u32> =
+        maos_audit::resolve_spirit_name_optional(audit_db_path, spirit, true)?
+            .into_iter()
+            .map(|(_, pid)| pid)
+            .collect();
+    let Some(conn) = maos_audit::open_tenant_artifact_readonly(audit_db_path)? else {
+        return Ok((Vec::new(), Vec::new()));
+    };
+    let resolved: HashSet<String> = conn
+        .prepare("SELECT reasoning FROM approval_decision_log WHERE capability = 'halt.resolve' AND target = ?1")?
+        .query_map([spirit], |row| row.get::<_, Option<String>>(0))?
+        .filter_map(|text| {
+            let text = text.ok()??;
+            let (id, _) = text.strip_prefix("halt=")?.split_once(':')?;
+            Some(id.to_owned())
+        })
+        .collect();
+    let (mut orphans, mut gaps) = (BTreeMap::new(), Vec::new());
+    for pid in pids {
+        let rows = conn
+            .prepare(
+                "SELECT boot_nonce, kind, intent, capability_token IS NULL, from_spirit_id = '' AND to_spirit_id = '', \
+                 CAST(payload_redacted AS TEXT) FROM transparency_log WHERE spirit_pid = ?1 AND kind IN (3, 7, 19) \
+                 ORDER BY rowid LIMIT ?2",
+            )?
+            .query_map(rusqlite::params![pid, HALT_SCAN_ROWS as i64 + 1], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?, row.get::<_, String>(2)?, row.get::<_, bool>(3)?, row.get::<_, bool>(4)?, row.get::<_, String>(5)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        if rows.len() > HALT_SCAN_ROWS {
+            gaps.push(format!(
+                "halt scan of pid {pid} bounded at {HALT_SCAN_ROWS} rows; later rows not examined"
+            ));
+        }
+        let (mut owner, mut closed, mut open) = (HashMap::new(), HashSet::new(), Vec::new());
+        for (boot, kind, intent, untokened, kernel_row, text) in
+            rows.into_iter().take(HALT_SCAN_ROWS)
+        {
+            let value: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
+            if kind == 3 {
+                match (
+                    kernel_row,
+                    value["halt_id"].as_str(),
+                    value.get("terminal_state"),
+                ) {
+                    (true, Some(id), Some(_)) => {
+                        closed.insert(id.to_owned());
+                    }
+                    (true, Some(_), None)
+                        if owner.get(&boot).is_some_and(|name: &String| name == spirit) =>
+                    {
+                        open.push((boot, value))
+                    }
+                    _ => {}
+                }
+            } else if kind == 19 || (intent == "lifecycle.load" && untokened) {
+                owner.insert(
+                    boot,
+                    value["spirit_id"].as_str().map_or(intent, str::to_owned),
+                );
+            }
+        }
+        let mut malformed = 0_u64;
+        for (boot, value) in open {
+            let id = value["halt_id"].as_str().unwrap_or_default().to_owned();
+            if closed.contains(&id) || resolved.contains(&id) {
+                continue;
+            }
+            match serde_json::from_value::<maos_domain::frame::EpistemicHaltPayload>(value) {
+                Ok(halt) if !id.is_empty() => {
+                    orphans.entry((boot as u64, pid, id)).or_insert(halt);
+                }
+                _ => malformed += 1,
+            }
+        }
+        if malformed > 0 {
+            gaps.push(format!(
+                "{malformed} malformed orphaned halt row(s) at pid {pid} left unclosed"
+            ));
+        }
+    }
+    Ok((
+        orphans
+            .into_iter()
+            .map(|((boot, pid, _), halt)| (boot, pid, halt))
+            .collect(),
+        gaps,
+    ))
+}
+
 /// Story 20-11 AC3 — close every halt the Spirit left pending and return one
 /// typed evidence row per terminal receipt, plus every reason that claim is
 /// not complete. Door: the unload's own `planned_unload` receipts, read back
@@ -11041,7 +11158,10 @@ fn close_pending_halts(
     transparency_log: &maos_kernel_core::iac::TransparencyLogAdapter,
     audit_db_path: &std::path::Path,
     door: Option<&maos_bin::operator_door::DoorUninstall>,
-    orphans: Vec<(u64, u32, maos_domain::frame::EpistemicHaltPayload)>,
+    (orphans, orphan_gaps): (
+        Vec<(u64, u32, maos_domain::frame::EpistemicHaltPayload)>,
+        Vec<String>,
+    ),
 ) -> Result<
     (
         Vec<maos_audit::erasure::proof::RemovalEvidence>,
@@ -11050,7 +11170,7 @@ fn close_pending_halts(
     Box<dyn std::error::Error>,
 > {
     let mut receipts = Vec::new();
-    let mut gaps = Vec::new();
+    let mut gaps = orphan_gaps;
     if let Some(door) = door {
         receipts = maos_audit::planned_unload_receipts(
             audit_db_path,
@@ -11080,16 +11200,27 @@ fn close_pending_halts(
     for ((boot, pid), halts) in open {
         let registry = maos_kernel_core::halt::HaltRegistry::new();
         for payload in halts {
-            registry.insert_pending_with_metadata(
-                maos_domain::halt::HaltId::new(payload.halt_id.clone())?,
-                maos_domain::halt::HaltState::PendingResolution,
-                maos_kernel_core::halt::PendingHaltMetadata {
-                    spirit_pid: pid,
-                    spirit_id: spirit_id.into(),
-                    payload,
-                    fired_ns: 0,
-                },
-            )?;
+            let queued = maos_domain::halt::HaltId::new(payload.halt_id.clone())
+                .map_err(|error| error.to_string())
+                .and_then(|id| {
+                    registry
+                        .insert_pending_with_metadata(
+                            id,
+                            maos_domain::halt::HaltState::PendingResolution,
+                            maos_kernel_core::halt::PendingHaltMetadata {
+                                spirit_pid: pid,
+                                spirit_id: spirit_id.into(),
+                                payload,
+                                fired_ns: 0,
+                            },
+                        )
+                        .map_err(|error| error.to_string())
+                });
+            if let Err(reason) = queued {
+                gaps.push(format!(
+                    "orphaned halt at boot {boot} pid {pid} left unclosed: {reason}"
+                ));
+            }
         }
         let closed = maos_kernel_core::halt::terminate_spirit(
             transparency_log,
@@ -11105,9 +11236,16 @@ fn close_pending_halts(
                 .map(|receipt| (receipt.halt_id.as_str().to_owned(), receipt.frame_id)),
         );
     }
-    if !maos_audit::orphaned_halts(audit_db_path, spirit_id)?.is_empty() {
+    let (left, scan_gaps) = orphaned_halts(audit_db_path, spirit_id)?;
+    if !left.is_empty() {
         gaps.push("orphaned halts remain after closure".into());
     }
+    gaps.extend(
+        scan_gaps
+            .into_iter()
+            .filter(|gap| !gaps.contains(gap))
+            .collect::<Vec<_>>(),
+    );
     let evidence = receipts
         .into_iter()
         .map(
@@ -11221,7 +11359,7 @@ async fn run_uninstall_cascade_inner(
     };
     // Halts a dead root left pending (invocation, no terminal receipt, no
     // resolution): enumerated from the log, never from this process's registry.
-    let orphans = maos_audit::orphaned_halts(audit_db_path, spirit_id)?;
+    let orphans = orphaned_halts(audit_db_path, spirit_id)?;
     if subjects.is_empty()
         && shared == 0
         && private_before == 0
@@ -11230,7 +11368,8 @@ async fn run_uninstall_cascade_inner(
         && legacy.is_empty()
         && installed.is_none()
         && schedule_ids.is_empty()
-        && orphans.is_empty()
+        && orphans.0.is_empty()
+        && orphans.1.is_empty()
         && door.is_none_or(|door| door.halts_before.is_empty())
         && retained
             .iter()

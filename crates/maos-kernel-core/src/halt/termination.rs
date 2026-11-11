@@ -59,15 +59,13 @@ pub fn terminate_spirit(
             }
         };
 
-        tl.insert_frame_event(
-            FrameKind::EpistemicHalt,
+        let frame_id = tl.insert_kernel_event_returning_id(
             spirit_pid,
+            FrameKind::EpistemicHalt,
             None,
             kind_str,
             &[],
-            FrameOrigin::Kernel,
         );
-        let frame_id = tl.last_frame_id();
 
         let receipt = HaltReceipt::new(hid.clone(), timestamp_ns, spirit_pid, boot_nonce, frame_id)
             .with_resolution(HaltState::Terminated, kind_str, timestamp_ns);
@@ -90,15 +88,13 @@ pub fn terminate_spirit(
     } else {
         let mut receipts = Vec::with_capacity(pending.len());
         for (halt_id, _state) in pending {
-            tl.insert_frame_event(
-                FrameKind::EpistemicHalt,
+            let frame_id = tl.insert_kernel_event_returning_id(
                 spirit_pid,
+                FrameKind::EpistemicHalt,
                 None,
                 kind_str,
                 &[],
-                FrameOrigin::Kernel,
             );
-            let frame_id = tl.last_frame_id();
 
             let receipt = HaltReceipt::new(
                 halt_id.clone(),

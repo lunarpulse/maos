@@ -1,0 +1,1 @@
+{"own_tmp_removed":"/tmp/dev2011k2","own_tmp_bytes_logical":3305692271,"incremental_prune":{"policy":"per crate dir keep newest session and any session younger than 2 h; flock probe","removed_sessions":1486,"skipped_locked":0,"freed_allocated_bytes":12854349824},"cargo_running_at_cleanup":false}

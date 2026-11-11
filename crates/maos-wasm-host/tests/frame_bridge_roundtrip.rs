@@ -137,6 +137,9 @@ fn all_19_frame_kinds_round_trip_through_lower_lift() {
     assert_eq!(all.len(), 19, "sanity: the frame set has 19 kinds");
 
     for kind in all {
+        if kind == FrameKind::EpistemicHalt {
+            continue; // kernel-reserved: lowered to a guest, never lifted from one
+        }
         let frame = envelope(kind, dummy.clone());
         let round = round_trip(&frame);
         assert_eq!(
@@ -201,7 +204,7 @@ fn decision_dispatch_payload_round_trips() {
 }
 
 #[test]
-fn epistemic_halt_payload_round_trips() {
+fn epistemic_halt_payload_lowers_to_the_guest_without_loss() {
     let payload = EpistemicHaltPayload {
         halt_id: "halt-1".into(),
         tag: "confidence".into(),
@@ -214,22 +217,17 @@ fn epistemic_halt_payload_round_trips() {
         FrameKind::EpistemicHalt,
         FramePayload::EpistemicHalt(payload),
     );
-    let round = round_trip(&frame);
-    assert_envelope_round_trips(&frame, &round);
-    let FramePayload::EpistemicHalt(got) = &round.payload else {
+    let lowered = lower(&frame).expect("a halt is lowered to the guest");
+    let wit::FramePayload::EpistemicHalt(got) = lowered.payload else {
         panic!("expected EpistemicHalt");
     };
     assert_eq!(got.halt_id, "halt-1");
     assert_eq!(got.tag, "confidence");
     assert!(
         (got.value - 0.42_f32).abs() < 1e-6,
-        "f32 value must round-trip"
+        "f32 value must lower exactly"
     );
-    assert_eq!(
-        got.threshold,
-        Some(0.9_f32),
-        "Option<f32> threshold must round-trip"
-    );
+    assert_eq!(got.threshold, Some(0.9_f32));
     assert_eq!(got.policy_id, "policy-7");
     assert_eq!(got.derived_from, "frame-9");
 }
@@ -719,6 +717,43 @@ fn fetched_origin_case_names_match_the_wit_contract() {
         assert_eq!(
             maos_wasm_host::frame_bridge::origin_case_name(origin),
             expected
+        );
+    }
+}
+
+/// Security review F1: `EpistemicHalt` is a kernel-reserved kind. The kernel
+/// writes halt rows (`invoke_halt`); a guest that emits one — with a payload
+/// of its own or under the kind with another payload — is refused at `lift`,
+/// so it never reaches the Transparency Log as an invocation.
+#[test]
+fn a_guest_cannot_emit_an_epistemic_halt_frame() {
+    let halt = envelope(
+        FrameKind::EpistemicHalt,
+        FramePayload::EpistemicHalt(EpistemicHaltPayload {
+            halt_id: "forged-1".into(),
+            tag: "confidence".into(),
+            value: 0.1,
+            threshold: None,
+            policy_id: String::new(),
+            derived_from: String::new(),
+        }),
+    );
+    let carrier = envelope(
+        FrameKind::EpistemicHalt,
+        FramePayload::TaskComplete(TaskCompletePayload {
+            result: "carrier".into(),
+        }),
+    );
+    for frame in [halt, carrier] {
+        let wit_frame = lower(&frame).expect("the host may still lower a halt to a guest");
+        assert!(
+            matches!(
+                lift(wit_frame),
+                Err(BridgeError::Unrepresentable {
+                    ty: "EpistemicHalt"
+                })
+            ),
+            "a guest-emitted halt frame was lifted"
         );
     }
 }

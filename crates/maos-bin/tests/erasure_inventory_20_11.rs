@@ -1054,3 +1054,185 @@ fn ac3_no_halts_is_verified_empty_from_the_query() {
     verify(&proof);
     assert!(python_accepts(&f, &proof));
 }
+
+fn halt_payload(halt: &str) -> maos_domain::frame::EpistemicHaltPayload {
+    maos_domain::frame::EpistemicHaltPayload::new(
+        halt.into(),
+        "ambiguity".into(),
+        1.0,
+        None,
+        "policy".into(),
+        "derived".into(),
+    )
+    .expect("payload")
+}
+/// One kernel-shaped invocation row (no sender, no addressee), raw bytes.
+fn forge_kernel_shaped(f: &Fixture, boot: u64, pid: u32, payload: &[u8]) {
+    let tl = TransparencyLogAdapter::open_with_global_legal_holds(&f.db, &f.db, boot).expect("TL");
+    tl.insert_frame_event(
+        FrameKind::EpistemicHalt,
+        pid,
+        None,
+        "ambiguity",
+        payload,
+        FrameOrigin::SpiritAuto,
+    );
+}
+#[test]
+fn review_p2_duplicate_invocation_rows_close_once() {
+    let f = Fixture::new();
+    f.seed(1, "hello-spirit", 7, false);
+    let tl = TransparencyLogAdapter::open_with_global_legal_holds(&f.db, &f.db, 1).expect("TL");
+    let journal =
+        maos_kernel_core::journal::JournalAdapter::open(&f.dir.path().join("halt-journal.ndjson"))
+            .expect("journal");
+    let registry = maos_kernel_core::halt::HaltRegistry::new();
+    let raise = || {
+        maos_kernel_core::halt::invoke_halt(
+            &tl,
+            &journal,
+            &registry,
+            halt_payload("twice-20-11"),
+            7,
+            "hello-spirit",
+            1,
+        )
+    };
+    raise().expect("first invocation");
+    assert!(
+        matches!(
+            raise(),
+            Err(maos_domain::halt::InvokeHaltError::DuplicateHaltId(_))
+        ),
+        "the second invocation is the typed duplicate, after its durable row"
+    );
+    drop(tl);
+    let out = f.run();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let proof = f.proof(&out);
+    assert_eq!(category(&proof, "pending_halts")["status"]["count"], 1);
+    assert_eq!(receipts_of(&f, "twice-20-11"), ["unplanned_crash"]);
+    verify(&proof);
+}
+#[test]
+fn review_f2_malformed_orphan_id_is_a_named_gap_not_a_failed_uninstall() {
+    let f = Fixture::new();
+    f.seed(1, "hello-spirit", 7, true);
+    raise_halt(&f, 1, 7, "hello-spirit", "real-20-11");
+    forge_kernel_shaped(&f, 1, 7, br#"{"halt_id":"","tag":"x"}"#);
+    let out = f.run();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let proof = f.proof(&out);
+    let halts = category(&proof, "pending_halts");
+    assert_eq!(halts["status"]["status"], "CoverageGap", "{halts}");
+    assert!(halts["status"]["reason"]
+        .as_str()
+        .is_some_and(|r| r.contains("malformed")));
+    assert_eq!(
+        receipts_of(&f, "real-20-11"),
+        ["unplanned_crash"],
+        "valid halts still close"
+    );
+    verify(&proof);
+}
+#[test]
+fn review_f1_spirit_submitted_halt_frames_are_not_invocations() {
+    let f = Fixture::new();
+    f.seed(1, "hello-spirit", 7, true);
+    // A routed Spirit frame names a sender; a kernel invocation row does not.
+    let tl = TransparencyLogAdapter::open_with_global_legal_holds(&f.db, &f.db, 1).expect("TL");
+    for round in 0..50 {
+        tl.insert_frame_event_with_sender(
+            FrameKind::EpistemicHalt,
+            7,
+            "hello-spirit",
+            "director",
+            None,
+            "standard",
+            serde_json::to_vec(&halt_payload(&format!("forged-{round}")))
+                .expect("payload")
+                .as_slice(),
+            FrameOrigin::SpiritAuto,
+        );
+    }
+    drop(tl);
+    let out = f.run();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let proof = f.proof(&out);
+    assert_eq!(
+        category(&proof, "pending_halts")["status"]["status"],
+        "VerifiedEmpty"
+    );
+    assert!(
+        receipts_of(&f, "forged-0").is_empty(),
+        "a forged frame earned a receipt"
+    );
+    verify(&proof);
+}
+/// Bulk kernel-shaped invocation rows (distinct ids) straight into the log.
+fn flood(f: &Fixture, boot: u64, pid: u32, rows: u32) {
+    let mut db = rusqlite::Connection::open(&f.db).expect("db");
+    let tx = db.transaction().expect("tx");
+    {
+        let mut insert = tx
+            .prepare(
+                "INSERT INTO transparency_log(frame_id,timestamp_ns,spirit_pid,boot_nonce,kind,intent,payload_redacted,origin) \
+                 VALUES(?1,?2,?3,?4,3,'ambiguity',?5,0)",
+            )
+            .expect("insert");
+        for n in 0..rows {
+            let mut id = [0xf1_u8; 16];
+            id[..4].copy_from_slice(&n.to_be_bytes());
+            id[4..8].copy_from_slice(&pid.to_be_bytes());
+            let body =
+                serde_json::to_vec(&halt_payload(&format!("flood-{pid}-{n}"))).expect("body");
+            insert
+                .execute(rusqlite::params![
+                    id.as_slice(),
+                    1_000_000 + i64::from(n),
+                    pid,
+                    boot as i64,
+                    body
+                ])
+                .expect("flood row");
+        }
+    }
+    tx.commit().expect("commit");
+}
+#[test]
+fn review_f4_another_spirits_flood_does_not_slow_the_orphan_scan() {
+    let f = Fixture::new();
+    f.seed(1, "hello-spirit", 7, false);
+    f.seed(1, "noisy-spirit", 9, false);
+    raise_halt(&f, 1, 7, "hello-spirit", "mine-20-11");
+    flood(&f, 1, 9, 100_000);
+    let started = std::time::Instant::now();
+    let out = f.run();
+    let took = started.elapsed();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    assert!(
+        took < std::time::Duration::from_secs(20),
+        "uninstall took {took:?} beside another Spirit's 100k halt rows"
+    );
+    assert_eq!(receipts_of(&f, "mine-20-11"), ["unplanned_crash"]);
+}

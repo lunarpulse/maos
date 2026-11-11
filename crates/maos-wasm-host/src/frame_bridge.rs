@@ -403,14 +403,9 @@ fn payload_from_wit(p: wit::FramePayload) -> Result<domain::FramePayload, Bridge
                     ),
             })
         }
-        wit::FramePayload::EpistemicHalt(b) => D::EpistemicHalt(domain::EpistemicHaltPayload {
-            halt_id: b.halt_id,
-            tag: b.tag,
-            value: b.value,
-            threshold: b.threshold,
-            policy_id: b.policy_id,
-            derived_from: b.derived_from,
-        }),
+        wit::FramePayload::EpistemicHalt(_) => {
+            return Err(BridgeError::Unrepresentable { ty: "EpistemicHalt" })
+        }
         wit::FramePayload::TelemetryEvent(b) => D::TelemetryEvent(domain::TelemetryEventPayload {
             event_type: b.event_type,
             data: b.data,
@@ -615,6 +610,11 @@ pub fn lower(frame: &domain::IacFrame) -> Result<wit::IacFrame, BridgeError> {
 
 /// Lift a WIT `IacFrame` emitted by the guest back into its domain shape.
 pub fn lift(frame: wit::IacFrame) -> Result<domain::IacFrame, BridgeError> {
+    // `EpistemicHalt` is kernel-reserved: halt rows are written by `invoke_halt`,
+    // never lifted from a guest (a forged one would read as a pending halt).
+    if matches!(frame.kind, wit::FrameKind::EpistemicHalt) {
+        return Err(BridgeError::Unrepresentable { ty: "EpistemicHalt" });
+    }
     Ok(domain::IacFrame {
         frame_id: frame_id_from_vec(frame.frame_id)?,
         timestamp_ns: frame.timestamp_ns,

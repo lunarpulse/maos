@@ -27,6 +27,14 @@ impl maos_spirit_abi::lifecycle::Spirit for Quiet {}
 
 /// A running Spirit whose one schedule may fire once per hour.
 fn scb(pid: u32, spirit_id: &str) -> Arc<SpiritControlBlock> {
+    scb_of(pid, spirit_id, Quiet)
+}
+
+fn scb_of(
+    pid: u32,
+    spirit_id: &str,
+    spirit: impl maos_spirit_abi::lifecycle::Spirit + Send + Sync + 'static,
+) -> Arc<SpiritControlBlock> {
     let manifest = SpiritManifestBundle {
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["on_schedule".into()],
@@ -44,7 +52,7 @@ fn scb(pid: u32, spirit_id: &str) -> Arc<SpiritControlBlock> {
         },
         ..Default::default()
     };
-    let scb = SpiritControlBlock::new(pid, spirit_id.into(), manifest, make_spirit_obj(Quiet), 0);
+    let scb = SpiritControlBlock::new(pid, spirit_id.into(), manifest, make_spirit_obj(spirit), 0);
     scb.state
         .store(ScbLifecycleState::Running as u8, Ordering::Release);
     Arc::new(scb)
@@ -100,14 +108,14 @@ async fn forget_spirit_drops_only_that_spirits_buckets_and_stamps() {
     assert_ne!(watchdog.last_fire_ns(2, "daily"), 0);
 
     // One bucket (by Spirit id) plus one stamp (by pid) belong to `gone`.
-    assert_eq!(watchdog.forget_spirit("gone", 1), 2);
+    assert_eq!(watchdog.forget_spirit("gone", 1).await, 2);
     assert_eq!(watchdog.last_fire_ns(1, "daily"), 0, "stamp dropped");
     assert_ne!(
         watchdog.last_fire_ns(2, "daily"),
         0,
         "another Spirit's stamp"
     );
-    assert_eq!(watchdog.forget_spirit("gone", 1), 0, "idempotent");
+    assert_eq!(watchdog.forget_spirit("gone", 1).await, 0, "idempotent");
 
     // The uninstalled Spirit is gone from the SCB map; a same-id reinstall
     // (pid 3) gets a fresh bucket and fires, while a re-admitted `kept`
@@ -123,4 +131,168 @@ async fn forget_spirit_drops_only_that_spirits_buckets_and_stamps() {
     run_until(&watchdog, &tl, &[3, 5]).await;
     assert_eq!(fires(&tl, 3), 1, "a reinstall must not inherit the bucket");
     assert_eq!(fires(&tl, 4), 0, "an untouched bucket stays exhausted");
+}
+
+/// Holds the watchdog inside Spirit A's schedule hook until released.
+struct Blocking {
+    entered: std::sync::Mutex<Option<std::sync::mpsc::SyncSender<()>>>,
+    release: std::sync::Mutex<std::sync::mpsc::Receiver<()>>,
+}
+impl maos_spirit_abi::lifecycle::Spirit for Blocking {
+    fn on_schedule(
+        &self,
+        _ctx: &mut maos_spirit_abi::ctx::Ctx,
+        _payload: &maos_spirit_abi::lifecycle::SchedulePayload<'_>,
+    ) {
+        if let Some(entered) = self.entered.lock().expect("entered").take() {
+            entered.send(()).expect("test observes the hook");
+        }
+        self.release
+            .lock()
+            .expect("release")
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("test releases the hook");
+    }
+}
+
+/// Counts `on_schedule` calls.
+struct Counting(Arc<std::sync::atomic::AtomicU32>);
+impl maos_spirit_abi::lifecycle::Spirit for Counting {
+    fn on_schedule(
+        &self,
+        _ctx: &mut maos_spirit_abi::ctx::Ctx,
+        _payload: &maos_spirit_abi::lifecycle::SchedulePayload<'_>,
+    ) {
+        self.0.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+/// P1 (review): a poll captures Spirits A, B and C, then waits inside A's
+/// hook. B is unloaded and forgotten meanwhile. When A resumes the stale B
+/// candidate must not recreate B's bucket or stamp, write a `schedule.fire`
+/// row, or dispatch B's hook; C (captured after B) still fires.
+#[tokio::test(flavor = "multi_thread", worker_threads = 3)]
+async fn a_candidate_captured_before_the_uninstall_never_fires_after_it() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    std::env::set_var("MAOS_SCHEDULE_FAST", "1");
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0x2011));
+    let dispatcher = Arc::new(HookDispatcher::new(
+        Arc::clone(&tl),
+        Arc::new(IacRtMetrics::new()),
+    ));
+    let (entered_tx, entered_rx) = std::sync::mpsc::sync_channel(1);
+    let (release_tx, release_rx) = std::sync::mpsc::sync_channel(1);
+    let b_calls = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let b = scb_of(2, "b", Counting(Arc::clone(&b_calls)));
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    {
+        let mut map = scbs.write().expect("scbs");
+        map.insert(
+            1,
+            scb_of(
+                1,
+                "a",
+                Blocking {
+                    entered: std::sync::Mutex::new(Some(entered_tx)),
+                    release: std::sync::Mutex::new(release_rx),
+                },
+            ),
+        );
+        map.insert(2, Arc::clone(&b));
+        map.insert(3, scb(3, "c"));
+    }
+    let watchdog = Arc::new(ScheduleWatchdog::new(
+        Arc::clone(&scbs),
+        dispatcher,
+        Arc::clone(&tl),
+    ));
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let handle = Arc::clone(&watchdog).spawn(cancel.child_token());
+    entered_rx
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .expect("the poll is inside A's hook, so B and C are already captured");
+    // The door's order: unload (SCB leaves Running), then forget.
+    b.state
+        .store(ScbLifecycleState::Unloaded as u8, Ordering::Release);
+    scbs.write().expect("scbs").remove(&2);
+    let forgetting = {
+        let watchdog = Arc::clone(&watchdog);
+        tokio::spawn(async move { watchdog.forget_spirit("b", 2).await })
+    };
+    release_tx.send(()).expect("release A");
+    forgetting.await.expect("forget task");
+    let observed = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        while fires(&tl, 3) == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await;
+    cancel.cancel();
+    handle.await.expect("watchdog shuts down cleanly");
+    observed.expect("C, captured after B in the same poll, fires");
+    assert_eq!(fires(&tl, 2), 0, "a retired Spirit wrote a fire row");
+    assert_eq!(
+        b_calls.load(Ordering::SeqCst),
+        0,
+        "a retired Spirit's hook ran"
+    );
+    assert_eq!(watchdog.last_fire_ns(2, "daily"), 0, "a retired stamp");
+    assert_eq!(
+        watchdog.forget_spirit("b", 2).await,
+        0,
+        "a retired Spirit's bucket was recreated"
+    );
+}
+
+/// P1, second half: a firing already admitted (its hook running) finishes
+/// before `forget_spirit` clears anything or reports, so the report is never
+/// signed while a stamp can still be written.
+#[tokio::test(flavor = "multi_thread", worker_threads = 3)]
+async fn forget_spirit_waits_for_an_admitted_firing() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    std::env::set_var("MAOS_SCHEDULE_FAST", "1");
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0x2011));
+    let dispatcher = Arc::new(HookDispatcher::new(
+        Arc::clone(&tl),
+        Arc::new(IacRtMetrics::new()),
+    ));
+    let (entered_tx, entered_rx) = std::sync::mpsc::sync_channel(1);
+    let (release_tx, release_rx) = std::sync::mpsc::sync_channel(1);
+    let a = scb_of(
+        1,
+        "a",
+        Blocking {
+            entered: std::sync::Mutex::new(Some(entered_tx)),
+            release: std::sync::Mutex::new(release_rx),
+        },
+    );
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().expect("scbs").insert(1, Arc::clone(&a));
+    let watchdog = Arc::new(ScheduleWatchdog::new(Arc::clone(&scbs), dispatcher, tl));
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let handle = Arc::clone(&watchdog).spawn(cancel.child_token());
+    entered_rx
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .expect("A's firing is admitted and inside its hook");
+    a.state
+        .store(ScbLifecycleState::Unloaded as u8, Ordering::Release);
+    let mut forgetting = {
+        let watchdog = Arc::clone(&watchdog);
+        tokio::spawn(async move { watchdog.forget_spirit("a", 1).await })
+    };
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(300), &mut forgetting)
+            .await
+            .is_err(),
+        "forget_spirit reported while an admitted firing was still running"
+    );
+    release_tx.send(()).expect("release A");
+    forgetting.await.expect("forget task");
+    cancel.cancel();
+    handle.await.expect("watchdog shuts down cleanly");
+    assert_eq!(
+        watchdog.last_fire_ns(1, "daily"),
+        0,
+        "the firing's stamp survived"
+    );
 }
