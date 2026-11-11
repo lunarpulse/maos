@@ -1,0 +1,11 @@
+--- crates/maos-bin/src/operator_door.rs (orig)
++++ crates/maos-bin/src/operator_door.rs (plant)
+@@ -1554,7 +1554,7 @@
+         // Story 20-8 (AC8): the coordinator's swap-invariant rule holds for a cold swap
+         // too, refused before the unload so a successor cannot sever the chain.
+         if let Some(invariant) =
+-            crate::admission::dropped_swap_invariant(&predecessor_manifest, &target_text)
++            crate::admission::dropped_swap_invariant(&predecessor_manifest, &target_text).filter(|_| false)
+         {
+             return OperatorOutcome::Conflict {
+                 code: "swap_invariant_dropped".into(),

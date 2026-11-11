@@ -502,7 +502,22 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 27009
+src_lines = 27014
+# HISTORY: 20-8-manifest-contract-completion landing 2 review corrections
+# (GPT P2 x2, same FLAG-Winston KS row; Main approved the /tmp-priced prototype),
+# exact formatted 27009 -> 27014 (+5 physical), tokei 21178 -> 21181 (+3), 95
+# files, no new surface hash (the gate flags nothing; no new field or symbol),
+# inside the x2 ceiling 27043 / 21207 and the shared STOP 21250. (1) the
+# successor parser's `[swap_invariants]` extraction reuses the `extract` closure
+# so a serialization failure (a scalar `swap_invariants = false`) is a
+# ManifestParse, never "no declaration" (upgrade.rs, net 0 lines). (2) the
+# coordinator carries the dropped name in the saga reason as labelled,
+# reversible colon-separated hex of its UTF-8 bytes, because the transparency
+# log's credential redactor would irreversibly erase a valid secret-shaped name
+# (coordinator.rs +5; the typed error keeps the raw name; the redactor is
+# untouched). Changed files: hot_swap/coordinator.rs, lifecycle/upgrade.rs;
+# digests and set_hash adopted from `--emit-pin`. Cumulative measured tokei
+# 21181 (shared STOP 21250).
 # HISTORY: 20-8-manifest-contract-completion landing 2 (20-8 L2, final kernel
 # landing), FLAG-Winston KS (D-20-8-07 A, ruled 2026-11-03 ask d_batch4; grant
 # +38 physical / +33 tokei priced at 8c809f9c from 26841 / 21042 with x2
@@ -1036,7 +1051,7 @@ src_lines = 27009
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "aca977c8123a25e345df6fd22bf3cd13d9b6e3ad32f1e578fd3a322f3fd1806d"
+set_hash = "c6136060dcadd9c181e5c35b2c612f05be459d53d2a2bc9aa067bdc8b2afe8a9"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -1055,7 +1070,7 @@ set_hash = "aca977c8123a25e345df6fd22bf3cd13d9b6e3ad32f1e578fd3a322f3fd1806d"
 "halt/resolver.rs" = "3756181d4a06e121fdd3b63818b45d20205e6acb9b43cc18fb5ad82c93ac6b1f"
 "halt/termination.rs" = "ad56de586651f8f69a9c860374a0a0c0b7242501a25792a54423cfb9ec278097"
 "hot_swap/archive.rs" = "a6e4ea60193e182b2dad8edeb793d3de366ef95b0be30e8c85756af78aeb7ddb"
-"hot_swap/coordinator.rs" = "9e8b70c8c877d2d499c2544f11fc2e28e1a2c193cfcab336a9f4c9d8d43e5e7d"
+"hot_swap/coordinator.rs" = "cbf8da129371ed9dc34d8d08c2947d2f2076a28d0d04ea3c296988f0543104c4"
 "hot_swap/migrator.rs" = "1c72d4b472310fcc36f80521d25ab3da72691fc99b79c1b258bdd75ab5a53b88"
 "hot_swap/mod.rs" = "d378c979b9338914bdb50d507ddc7826c0f5852a4364e4736fde3a7d9e35e5a6"
 "hot_swap/post_swap_monitor.rs" = "5f1ef159078b114c29e220651a7b37fcf266921bdbead7f358d2b9dec67b3ac0"
@@ -1075,7 +1090,7 @@ set_hash = "aca977c8123a25e345df6fd22bf3cd13d9b6e3ad32f1e578fd3a322f3fd1806d"
 "lifecycle/cli_wrapper/mod.rs" = "048746e1d08c93a64aba4745a532883a96899526bf825ff7f67eb3d2ee2270d5"
 "lifecycle/cli_wrapper/runtime.rs" = "3a7c5986c4b7578b7d600be694eb097bc6eebafc479704e4ca690b4c44b5c59c"
 "lifecycle/mod.rs" = "b4d995c3b6887d905790611f4145f1ea8eb349e0dc73a923d13e56abcd09d335"
-"lifecycle/upgrade.rs" = "b737cc53a76d3b4c9cc78c770fe9cf434f077e1374ca563d18c872bd30a8c9a9"
+"lifecycle/upgrade.rs" = "7edee0b9070cd163e858155add6570d3c0c2844c4435eab15195c19904ee7982"
 "mcp/mod.rs" = "12604548a8daa78a2786b820733f4639f06759f893856745027c8083c8a42bfd"
 "memory/for_spirit.rs" = "6d58364f78f6026a8fe203f161964eb724bd2fa82f43146c3c3d8b605e1ce95a"
 "memory/mod.rs" = "779cf99f4fcc57c1243d33375508a92285a8e2533965701f58df3c8639226d4c"

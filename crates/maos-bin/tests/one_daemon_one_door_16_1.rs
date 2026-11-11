@@ -2497,6 +2497,53 @@ fn ac8_20_8_a_dropped_swap_invariant_is_a_typed_409_and_the_predecessor_keeps_se
     assert_eq!(root.lifecycle_state("butler").as_deref(), Some("Running"));
 }
 
+/// Story 20-8 review correction (GLM F-1) — `--policy cold-swap` honours the
+/// same swap-invariant rule as the coordinator: a successor that drops a
+/// predecessor-declared invariant is `409 swap_invariant_dropped` BEFORE the
+/// unload (the predecessor keeps its pid and keeps serving); a superset swaps
+/// at a new pid.
+///
+/// Proven red (`landing-2/review-corrections`): without the door check the
+/// cold swap of the dropping successor completes (exit 0).
+#[test]
+fn ac8_20_8_a_cold_swap_that_drops_a_swap_invariant_is_a_typed_409_before_unload() {
+    let fixtures = tempfile::TempDir::new().expect("fixture dir");
+    let predecessor = write_fixture(
+        fixtures.path(),
+        "butler-0.3.0.toml",
+        &butler_preserving("0.3.0", &["open_pr_state", "review_queue"]),
+    );
+    let root = Root::spawn("cold-swap-invariants", utf8(&predecessor), &[], None);
+    let pid = pid_of(&root, "butler");
+
+    let dropping = write_fixture(
+        fixtures.path(),
+        "butler-0.3.1-drops.toml",
+        &butler_preserving("0.3.1", &["open_pr_state"]),
+    );
+    let out = upgrade(&root, &dropping, Some("cold-swap"));
+    let err = stderr(&out);
+    assert_eq!(code(&out), 1, "a typed door refusal: {err}");
+    assert!(
+        err.contains("swap_invariant_dropped")
+            && err.contains("HTTP 409")
+            && err.contains("review_queue"),
+        "the refusal must be typed and name the invariant: {err}"
+    );
+    assert_eq!(pid_of(&root, "butler"), pid, "refused before the unload");
+    assert_eq!(root.lifecycle_state("butler").as_deref(), Some("Running"));
+
+    let superset = write_fixture(
+        fixtures.path(),
+        "butler-0.3.1.toml",
+        &butler_preserving("0.3.1", &["review_queue", "open_pr_state", "triage_cursor"]),
+    );
+    let out = upgrade(&root, &superset, Some("cold-swap"));
+    assert_eq!(code(&out), 0, "a superset cold-swaps: {}", stderr(&out));
+    assert_ne!(pid_of(&root, "butler"), pid, "re-init: a new pid");
+    assert_eq!(root.lifecycle_state("butler").as_deref(), Some("Running"));
+}
+
 /// AC6.1 (D-19-5-10 C) — a `[cli_wrapper]` Worker is not a Spirit form
 /// (ADR-060): an upgrade naming one is refused with its own typed code,
 /// not the `target_manifest_unparseable` it fell into for lack of `[class]`.

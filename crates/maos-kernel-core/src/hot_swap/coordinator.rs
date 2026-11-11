@@ -201,9 +201,15 @@ impl HotSwapCoordinator {
                     .any(|section| section.preserve.contains(name))
             });
         if let Some(invariant) = dropped {
+            // The receipt passes the credential redactor, which would erase a
+            // valid name shaped like a secret: carry it as reversible hex.
+            let hex = (invariant.as_bytes().chunks(2))
+                .map(hex::encode)
+                .collect::<Vec<_>>()
+                .join(":");
             saga.compensate(
                 SagaCompensation::RestorePredecessor {
-                    reason: format!("swap invariant dropped: {invariant}"),
+                    reason: format!("swap invariant dropped (utf-8 hex, colon-separated): {hex}"),
                 },
                 &self.tl,
                 &self.journal,

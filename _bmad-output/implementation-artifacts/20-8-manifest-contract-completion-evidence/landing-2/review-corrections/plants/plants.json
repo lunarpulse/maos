@@ -1,0 +1,30 @@
+[
+ {
+  "name": "scalar-error-swallowed",
+  "file": "crates/maos-kernel-core/src/lifecycle/upgrade.rs",
+  "exit": 101,
+  "seconds": 4.4,
+  "restore_cmp_rc": 0
+ },
+ {
+  "name": "raw-name-in-receipt",
+  "file": "crates/maos-kernel-core/src/hot_swap/coordinator.rs",
+  "exit": 101,
+  "seconds": 4.4,
+  "restore_cmp_rc": 0
+ },
+ {
+  "name": "cold-swap-check-dropped",
+  "file": "crates/maos-bin/src/operator_door.rs",
+  "exit": 101,
+  "seconds": 21.1,
+  "restore_cmp_rc": 0
+ },
+ {
+  "name": "raw-name-under-hex-label",
+  "file": "crates/maos-kernel-core/src/hot_swap/coordinator.rs",
+  "exit": 101,
+  "seconds": 4.1,
+  "restore_cmp_rc": 0
+ }
+]

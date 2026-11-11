@@ -73,10 +73,11 @@ Declare `[capabilities.required.iac]` for bus emission: the kernel mediates each
 
 Schema 7 adds the [FR8 declarations](/manifest/v7). `explanation_shape` is
 declared and journaled, **not enforced** because no decision frame has an
-explanation body. `swap_invariants` is enforced at hot swap: a successor that
-does not declare every invariant its predecessor declared is refused before
-any hook fires, and the predecessor keeps serving. The check is structural and
-does not prove that state survived.
+explanation body. `swap_invariants` is enforced at hot swap, migrator and cold
+swap: a successor that does not declare every invariant its predecessor
+declared is refused (`409 swap_invariant_dropped`) before the swap or unload,
+and the predecessor keeps serving. The check is structural and does not prove
+that state survived.
 
 The additive `maos:spirit/skills@2.4.0` import offers `author(document)` and
 `propose(target-id, target-version, diff)` only inside `handle-frame`.

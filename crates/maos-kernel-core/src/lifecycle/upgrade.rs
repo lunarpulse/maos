@@ -392,8 +392,7 @@ pub(crate) fn load_bundle_from_file(
                 .as_ref()
                 .is_some_and(|c| c.manifest_schema_version >= FR8_DECLARATIONS_SINCE_SCHEMA)
         })
-        .and_then(|v| toml::to_string(v).ok())
-        .map(|s| SwapInvariantsSection::from_toml_str(&s))
+        .map(|_| extract("swap_invariants").and_then(|s| SwapInvariantsSection::from_toml_str(&s)))
         .transpose()?;
 
     // Story 6.4 — `[[schedule]]` array-of-tables. The raw section parser

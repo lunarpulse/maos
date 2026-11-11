@@ -679,6 +679,29 @@ pub fn is_spawned_form(text: &str) -> bool {
     manifest_identity(text).is_ok_and(|class| class.forms == ["wasm-component"])
 }
 
+/// Story 20-8 (AC8) — the first `[swap_invariants].preserve` entry of `predecessor`
+/// that `successor` does not declare. Each side is read at schema >= 7, as
+/// admission and the kernel's successor parser do; a section that cannot be read
+/// declares nothing (a malformed successor is refused by its own admission).
+pub fn dropped_swap_invariant(predecessor: &str, successor: &str) -> Option<String> {
+    let declared = |text: &str| -> Option<Vec<String>> {
+        let root: toml::Value = toml::from_str(text).ok()?;
+        let fr8 = class_identity(&root).is_ok_and(|c| {
+            c.manifest_schema_version >= maos_manifest::FR8_DECLARATIONS_SINCE_SCHEMA
+        });
+        let section = optional_section(
+            &root,
+            "swap_invariants",
+            maos_manifest::SwapInvariantsSection::from_toml_str,
+        );
+        section.ok().flatten().filter(|_| fr8).map(|s| s.preserve)
+    };
+    let kept = declared(successor).unwrap_or_default();
+    declared(predecessor)?
+        .into_iter()
+        .find(|name| !kept.contains(name))
+}
+
 /// Extract the validated class identity without imposing admission-only
 /// mediation gates on an already accepted upgrade.
 pub fn manifest_identity(text: &str) -> Result<ClassSection, AdmissionRefusal> {

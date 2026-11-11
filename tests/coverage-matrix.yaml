@@ -1058,9 +1058,12 @@ coverage:
       A declaration is not proof of admission. Hosted T2 proof remains unverified.
       Story 20-8 L2 (AC8): `swap_invariants_20_8` (maos-kernel-core; a hot swap
       refuses a successor that drops a predecessor-declared swap invariant before
-      any hook fires) and `one_daemon_one_door_16_1::ac8_20_8_a_dropped_swap_invariant_is_a_typed_409_and_the_predecessor_keeps_serving`
-      (door `409 swap_invariant_dropped`). The check is structural, not a proof that
-      state survived; `HotSwapCoordinator::precheck` does not report it.
+      any hook fires; a malformed section is a parse refusal; the receipt carries
+      the dropped name as reversible hex) and `one_daemon_one_door_16_1::ac8_20_8_a_dropped_swap_invariant_is_a_typed_409_and_the_predecessor_keeps_serving`
+      / `ac8_20_8_a_cold_swap_that_drops_a_swap_invariant_is_a_typed_409_before_unload`
+      (door `409 swap_invariant_dropped`, hot swap and cold swap). The check is
+      structural, not a proof that state survived; `HotSwapCoordinator::precheck`
+      does not report it.
   FR9:
     gates:
       - journal_survives_cold_restart

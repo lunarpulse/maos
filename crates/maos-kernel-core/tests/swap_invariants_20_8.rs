@@ -191,11 +191,78 @@ async fn a_successor_that_drops_a_declared_invariant_is_refused_before_any_hook(
         "one hot_swap.aborted receipt: {receipts:?}"
     );
     assert!(
-        receipts[0].contains("swap invariant dropped: review_queue")
-            && receipts[0].contains("RestorePredecessor"),
+        receipts[0].contains("RestorePredecessor"),
         "{}",
         receipts[0]
     );
+    assert_eq!(recovered_invariant(&receipts[0]), "review_queue");
+}
+
+/// The receipt carries the dropped name as labelled, reversible colon-separated
+/// hex of its UTF-8 bytes: the transparency log's credential redactor would
+/// irreversibly erase a valid name shaped like a secret.
+fn recovered_invariant(receipt: &str) -> String {
+    let payload: serde_json::Value = serde_json::from_str(receipt).expect("receipt is JSON");
+    let reason = payload["reason"].as_str().expect("receipt reason");
+    let (label, encoded) = reason.rsplit_once(": ").expect("labelled reason");
+    assert_eq!(label, "swap invariant dropped (utf-8 hex, colon-separated)");
+    let bytes: Vec<u8> = encoded
+        .split(':')
+        .flat_map(|group| hex::decode(group).expect("hex group"))
+        .collect();
+    String::from_utf8(bytes).expect("utf-8 name")
+}
+
+/// A valid 32-hex name and a valid `sk-…` name are both redactor-shaped: the
+/// typed error keeps the raw name, the persisted receipt yields the exact
+/// identifier, the predecessor is unchanged and no hook fired.
+/// Plant: interpolate the raw name into the saga reason ⇒ the receipt is
+/// redacted and the recovery fails.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_redactor_shaped_dropped_name_is_recoverable_from_the_receipt() {
+    for name in ["0123456789abcdef0123456789abcdef", "sk-queue"] {
+        let rig = boot(Some(&[name])).await;
+        let error = refused(&rig, &manifest("0.2.0", 7, &preserve(&["other_state"]))).await;
+        assert_eq!(
+            error,
+            HotSwapError::SwapInvariantDropped {
+                invariant: name.into()
+            }
+        );
+        let receipts = aborted_rows(&rig);
+        assert_eq!(receipts.len(), 1, "{receipts:?}");
+        assert_eq!(recovered_invariant(&receipts[0]), name, "{}", receipts[0]);
+        assert_eq!(live_version_and_declaration(&rig).0, "0.1.0");
+        assert_eq!(rig.counts.swap_out.load(Ordering::SeqCst), 0);
+        assert_eq!(rig.counts.snapshot.load(Ordering::SeqCst), 0);
+    }
+}
+
+/// A schema-7 successor whose `swap_invariants` is not a table is a manifest
+/// parse refusal, never "no declaration": an undeclared predecessor must not
+/// swap to it. Zero hooks, runtime unchanged. Plant: swallow the serialization
+/// error (`.ok()`) ⇒ the swap completes.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_scalar_swap_invariants_declaration_is_a_parse_refusal_not_absence() {
+    let rig = boot(None).await;
+    let text = format!("swap_invariants = false\n{}", manifest("0.2.0", 7, ""));
+    let path = rig.harness.write_manifest("scalar.toml", &text);
+    let outcome = rig
+        .harness
+        .orchestrator
+        .upgrade("keeper", &path, UpgradePolicy::HotSwap)
+        .await;
+    assert!(
+        matches!(outcome, Err(UpgradeError::ManifestParse { .. })),
+        "{outcome:?}"
+    );
+    assert_eq!(
+        live_version_and_declaration(&rig),
+        ("0.1.0".to_owned(), None)
+    );
+    assert_eq!(rig.counts.swap_out.load(Ordering::SeqCst), 0);
+    assert_eq!(rig.counts.snapshot.load(Ordering::SeqCst), 0);
+    assert_eq!(scb(&rig).current_state(), ScbLifecycleState::Running);
 }
 
 /// A successor that declares nothing drops everything the predecessor declared;

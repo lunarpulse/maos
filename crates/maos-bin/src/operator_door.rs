@@ -1532,8 +1532,8 @@ impl DoorInner {
         let spawned = crate::admission::is_spawned_form(&predecessor_manifest);
         // A cold swap keeps the form (the successor of a component is a component): the
         // restore must go back through the path the predecessor came in by.
-        let target_spawned = std::fs::read_to_string(target)
-            .is_ok_and(|text| crate::admission::is_spawned_form(&text));
+        let target_text = std::fs::read_to_string(target).unwrap_or_default();
+        let target_spawned = crate::admission::is_spawned_form(&target_text);
         if target_spawned != spawned {
             let form = |spawned: bool| {
                 if spawned {
@@ -1548,6 +1548,19 @@ impl DoorInner {
                     "'{spirit_id}' is {} and the target is {}; refused before unload",
                     form(spawned),
                     form(target_spawned)
+                ),
+            };
+        }
+        // Story 20-8 (AC8): the coordinator's swap-invariant rule holds for a cold swap
+        // too, refused before the unload so a successor cannot sever the chain.
+        if let Some(invariant) =
+            crate::admission::dropped_swap_invariant(&predecessor_manifest, &target_text)
+        {
+            return OperatorOutcome::Conflict {
+                code: "swap_invariant_dropped".into(),
+                detail: format!(
+                    "the successor does not declare swap invariant {invariant}, which '{spirit_id}' \
+                     declared; refused before unload"
                 ),
             };
         }

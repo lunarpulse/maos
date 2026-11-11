@@ -63,6 +63,27 @@ rows — the `expect("successor SCB just inserted")` window after the SCB swap (
 **Not delivered:** `HotSwapCoordinator::precheck` does not report a dropped invariant (it needs a new `PrecheckOutcome` variant and `precheck.rs`, outside this grant: deferred row, owner 20-8,
 operator-ruled priced row needed). Evidence: `20-8-manifest-contract-completion-evidence/landing-2/`.
 
+**L2 review corrections — 2026-11-11 (Dev208K; GPT P2 ×2 and GLM F-1; Main approved the /tmp-priced prototype, base `a2bbd687`).**
+
+| | Physical | Tokei |
+|---|---:|---:|
+| Landed KS | 27009 | 21178 |
+| **T0 prototype of items (1)+(2) on a `git archive HEAD` copy** | +5 → 27014 | +3 → 21181 |
+| **Corrected, exact formatted** | **27014** (+5) | **21181** (+3) |
+| x2 ceiling re-based / shared STOP / alarm | 27043 | 21207 / 21250 / 22000 |
+
+Inside every kernel ceiling (STOP 21250: 69 left). No new struct field or public symbol: `check-service-boundary` flags nothing (the one `SpiritManifestBundle`
+refresh of the landing stands). Pins: `src_lines` 27014; set hash `c6136060…`; digests `hot_swap/coordinator.rs` `cbf8da12…`, `lifecycle/upgrade.rs` `7edee0b9…`;
+`kernel_pin_content_hash_16_0.rs` 27014; `recovery_lane_ceiling_rule.rs` 21_181; `xtask/kloc.toml` kernel 21181. Changes: (1) the successor parser's
+`[swap_invariants]` extraction reuses the `extract` closure, so a serialization failure (a scalar `swap_invariants = false`) is `UpgradeError::ManifestParse`, never
+"no declaration" (net 0 lines); (2) the coordinator carries the dropped name in the saga reason as labelled, reversible colon-separated hex of its UTF-8 bytes
+(coordinator +5) because the transparency log's credential redactor (token-shaped ≥32 hex chars, `sk-` prefixes) irreversibly erases a valid secret-shaped name;
+`HotSwapError` keeps the raw name and the redactor is untouched. Outside the kernel (GLM F-1, kernel-free): `cold_swap` refuses `409 swap_invariant_dropped` before the unload
+(`admission::dropped_swap_invariant`, `operator_door.rs`): bin **38446 → 38475 (+29)**, aggregate hardfail 202719 → 202751 (clean aggregate 202750). The 20-8 L1 bin ceiling
+36160 is stale-absolute against the live pin; the honest figure is the cumulative 20-8 draw on the live pins: +23 at the landing and +29 here = **+52**, live bin pin now 38475.
+Not changed by design: F-2 precheck (needs a `PrecheckOutcome` variant in maos-domain and `precheck.rs`, kernel/public, stays the 20-8-owned row, GLM detail added), F-3 (below-schema-7
+fail-open) and N-1 (coordinator not self-serializing) are rule-10 deferred rows with dispositions. Evidence: `20-8-manifest-contract-completion-evidence/landing-2/review-corrections/` and `landing-2/review/{gpt-review,security}.md` (verbatim).
+
 ## Why the kernel is touched at all
 
 A hot swap parses its successor in the kernel (`load_bundle_from_file`, `crates/maos-kernel-core/src/lifecycle/upgrade.rs:307-429`, caller
