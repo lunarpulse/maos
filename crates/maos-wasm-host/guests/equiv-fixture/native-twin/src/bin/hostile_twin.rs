@@ -49,6 +49,15 @@ fn main() -> ExitCode {
         // Never `Ready`: a runner that only writes diagnostics, for as long as anyone reads.
         return flood();
     }
+    if mode == "slow-ready" {
+        // `Ready` only after 50 s, then silence: two stages that each fit a 90 s attempt and
+        // together do not. Parked on a futex: a plain `thread::sleep` here got the child closed
+        // at once under the sandbox (`child_closed`).
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(50);
+        while std::time::Instant::now() < until {
+            std::thread::park_timeout(until.saturating_duration_since(std::time::Instant::now()));
+        }
+    }
     let stdout = io::stdout();
     let mut writer = BufWriter::new(stdout.lock());
     if write_frame(&mut writer, &[]).is_err() {
@@ -57,7 +66,7 @@ fn main() -> ExitCode {
     if mode == "ready-then-exit" {
         return ExitCode::SUCCESS;
     }
-    if mode == "probe-flood" {
+    if mode == "probe-flood" || mode == "slow-ready" {
         // `Ready`, then no reply to the first request: only diagnostics, forever.
         let _ = writer.flush();
         return flood();

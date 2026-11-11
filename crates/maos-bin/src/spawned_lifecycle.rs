@@ -25,11 +25,11 @@ pub const DEADLINE: &str = "deadline";
 /// A trigger that found its session busy for half its budget: dropped, never a strike.
 pub const BUSY: &str = "busy";
 
-/// The longest a swap stage waits on a successor that has not yet been adopted: its pre-warm
-/// (`Ready`, the probe) and every exchange of its swap (`migrate`, `swap-in`), whatever budget
-/// its manifest declares, which may be a day. A stage the successor stays silent in fences the
-/// predecessor and holds the door's upgrade lock for this long, not for its manifest's budget.
-pub const PREWARM_WALL: Duration = Duration::from_secs(60);
+/// The longest one swap attempt may spend before its successor is adopted: launch, `Ready`, the
+/// probe and every exchange of the swap (`migrate`, `swap-in`) share it, whatever budgets the
+/// successor's manifest declares (up to a day). A successor that stays silent fences the
+/// predecessor and holds the door's upgrade lock for this long per attempt, not per stage.
+pub const ATTEMPT_WALL: Duration = Duration::from_secs(90);
 
 /// Slack a pump trigger's link deadline leaves past the pump's wall, so the pump accounts an
 /// overrun as the overrun it is before the link gives up on the export.
@@ -133,6 +133,9 @@ pub struct Prewarm {
     pub turn_budget: Duration,
     pub context_window: maos_kernel_core::capability::context_budget::ContextWindow,
     pub scopes: Vec<Scope>,
+    /// Where this swap attempt must be over, however long its stages' budgets: set when the
+    /// attempt began, shared by the pre-warm and every exchange of the swap.
+    pub deadline: Instant,
 }
 
 /// A committed successor: the predecessor's session adopts it.
@@ -169,13 +172,18 @@ impl Prewarm {
         }
     }
 
+    /// When a stage allowed `cap` must end: no later than this attempt's one deadline.
+    fn until(&self, cap: Duration) -> Instant {
+        (Instant::now() + cap).min(self.deadline)
+    }
+
     /// One request/reply on a child nobody else is serving.
     pub fn exchange(
         &mut self,
         request: &LifecycleRequest,
         cap: Duration,
     ) -> Result<LifecycleReply, String> {
-        let deadline = Instant::now() + cap.min(PREWARM_WALL);
+        let deadline = self.until(cap);
         let body = wire::encode_request(request).map_err(|error| format!("encode: {error}"))?;
         self.writer
             .write_frame(&body)
@@ -189,7 +197,7 @@ impl Prewarm {
 
     /// Wait for the runner's empty `Ready` control frame.
     pub fn await_ready(&mut self, cap: Duration) -> Result<(), String> {
-        let bytes = self.next_stdout(Instant::now() + cap.min(PREWARM_WALL))?;
+        let bytes = self.next_stdout(self.until(cap))?;
         if bytes.is_empty() {
             Ok(())
         } else {
@@ -217,6 +225,8 @@ pub struct LifecycleLink {
     /// and unfences under this same lock, so a reply that arrives after a refused swap fences
     /// nothing.
     attempt: Mutex<Option<Arc<AtomicBool>>>,
+    /// On a successor's link: the attempt it began on its predecessor, which only it releases.
+    own: Mutex<Option<Arc<AtomicBool>>>,
     swap: Mutex<Option<SwapContext>>,
     prewarm: Mutex<Option<Prewarm>>,
     predecessor: Mutex<Option<Arc<LifecycleLink>>>,
@@ -242,6 +252,7 @@ impl LifecycleLink {
             awaiting: AtomicBool::new(false),
             fenced: AtomicBool::new(false),
             attempt: Mutex::new(None),
+            own: Mutex::new(None),
             swap: Mutex::new(None),
             prewarm: Mutex::new(None),
             predecessor: Mutex::new(None),
@@ -284,10 +295,13 @@ impl LifecycleLink {
                 .map(|prewarm| prewarm.exchange(&request, cap))
         };
         if let Some(reply) = inline {
-            if reply.is_err() {
-                // A successor that failed an exchange is not served again: its child dies and
-                // the predecessor is released now, not when the coordinator's compensation
-                // finally drops this link.
+            if matches!(
+                reply,
+                Err(_) | Ok(LifecycleReply::Declined(_) | LifecycleReply::Failed(_))
+            ) {
+                // A successor that failed or refused an exchange is not served again: its child
+                // dies and its attempt ends now, not when the coordinator's compensation (or a
+                // pin on the object) finally drops this link.
                 drop(locked(&self.prewarm).take());
                 self.release_predecessor();
             }
@@ -357,7 +371,10 @@ impl LifecycleLink {
                     call = back;
                     std::thread::sleep(Duration::from_millis(5));
                 }
-                Err(TrySendError::Full(_)) => return Err(BUSY.into()),
+                Err(TrySendError::Full(_)) => {
+                    state.cancel_queued();
+                    return Err(BUSY.into());
+                }
                 Err(TrySendError::Disconnected(_)) => return Err(SESSION_ENDED.into()),
             }
         }
@@ -482,22 +499,44 @@ impl LifecycleLink {
     ) {
         self.set_cap(prewarm.turn_budget);
         *locked(&self.prewarm) = Some(prewarm);
-        *locked(&predecessor.attempt) = Some(Arc::new(AtomicBool::new(true)));
+        *locked(&self.own) = Some(predecessor.begin_attempt());
         *locked(&self.predecessor) = Some(Arc::clone(predecessor));
         *locked(&self.outcome) = Some(Box::new(outcome));
     }
 }
 
 impl LifecycleLink {
-    /// End the swap attempt this (successor) link was installed for and release its
-    /// predecessor's fence, once: the first of a failed exchange and the link's drop does it.
+    /// A new swap attempt on this (predecessor) link. It ends whichever attempt it replaces,
+    /// fence included, and the token it returns is the only one that may later release it.
+    pub fn begin_attempt(&self) -> Arc<AtomicBool> {
+        let token = Arc::new(AtomicBool::new(true));
+        if let Some(old) = locked(&self.attempt).replace(Arc::clone(&token)) {
+            old.store(false, Ordering::Release);
+            self.set_fenced(false);
+        }
+        token
+    }
+
+    /// End `attempt`, and release the fence only if it is still the installed one: a late end
+    /// of an older attempt must not unfence a predecessor a newer attempt froze.
+    pub fn end_attempt(&self, attempt: &Arc<AtomicBool>) {
+        attempt.store(false, Ordering::Release);
+        let mut installed = locked(&self.attempt);
+        if installed
+            .as_ref()
+            .is_some_and(|live| Arc::ptr_eq(live, attempt))
+        {
+            installed.take();
+            self.set_fenced(false);
+        }
+    }
+
+    /// End the swap attempt this (successor) link was installed for, once: the first of a
+    /// failed or refused exchange and the link's drop does it.
     fn release_predecessor(&self) {
-        if let Some(predecessor) = locked(&self.predecessor).take() {
-            let mut attempt = locked(&predecessor.attempt);
-            if let Some(live) = attempt.take() {
-                live.store(false, Ordering::Release);
-            }
-            predecessor.set_fenced(false);
+        let own = locked(&self.own).take();
+        if let (Some(predecessor), Some(own)) = (locked(&self.predecessor).take(), own) {
+            predecessor.end_attempt(&own);
         }
     }
 }
@@ -651,7 +690,7 @@ impl SwapHandles {
             }
             result.map(|_| ())
         }));
-        let until = Instant::now() + budget.min(PREWARM_WALL) + READY_GRACE;
+        let until = Instant::now() + budget.min(ATTEMPT_WALL) + READY_GRACE;
         let failure = loop {
             if link.wait_supported(Duration::ZERO).is_some() {
                 // Only a component that started is the version the FR11 archive names.
@@ -704,6 +743,7 @@ pub fn spawned_successor(
         emit_manifest_declaration_event, emit_manifest_declaration_outcome, gate_manifest,
         read_manifest,
     };
+    let began = Instant::now();
     let refused = |error: crate::admission::AdmissionRefusal| format!("{}: {error}", error.code());
     let supervisor = handles
         .supervisor
@@ -800,6 +840,7 @@ pub fn spawned_successor(
         turn_budget: launch.turn_budget,
         context_window: launch.context_window,
         scopes: launch.scopes,
+        deadline: began + ATTEMPT_WALL,
     };
     let launch_failed = |error: String| format!("spawned_swap_launch_failed: {error}");
     prewarm

@@ -1279,6 +1279,43 @@ async fn a_consolidation_past_its_wall_is_still_joined_before_shutdown_returns()
     );
 }
 
+/// Outlasts its 2 s budget (and the pump's 1.9 s wall) in every `on_consolidate`.
+struct OverrunsEveryNotice;
+
+impl Spirit for OverrunsEveryNotice {
+    fn on_consolidate(&self, _ctx: &mut Ctx, _payload: &ConsolidatePayload<'_>) {
+        std::thread::sleep(Duration::from_secs(3));
+    }
+}
+
+// GPT r4 #3 — what the pump keeps of wall overruns is what still runs, not a count of every
+// overrun so far: privacy notices bypass quarantine, so one subscriber can overrun on each.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn finished_wall_overruns_are_not_kept_for_the_life_of_the_pump() {
+    let world = World::new();
+    world
+        .admit(
+            &OBSERVER_MANIFEST.replace("time_cap_seconds = 10", "time_cap_seconds = 2"),
+            make_spirit_obj(OverrunsEveryNotice),
+            StartPolicy::StartNow,
+        )
+        .await
+        .unwrap();
+    let forgotten = world
+        .memory
+        .forget_with_reason("parked-overruns-209", None)
+        .unwrap();
+    for _ in 0..4 {
+        HookPump::finish_forget(&world.tl, &forgotten, Some(&world.pump)).await;
+    }
+    assert!(
+        world.pump.parked() <= 1,
+        "{} overruns are still held after four finished notices",
+        world.pump.parked()
+    );
+    world.pump.shutdown().await;
+}
+
 /// Keep both standard pipes saturated throughout emission AND writer shutdown.
 /// A subprocess isolates descriptor flags and prevents the test harness itself
 /// from consuming the bytes whose backpressure is the regression trigger.

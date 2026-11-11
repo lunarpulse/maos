@@ -861,8 +861,8 @@ async fn a_slow_snapshot_of_a_refused_swap_does_not_fence_the_retry() {
 }
 
 /// A successor whose manifest declares a ten-minute budget and whose guest misbehaves in `mode`
-/// is refused at the pre-warm wall (60 s), its child is gone, and the predecessor serves.
-async fn refused_at_the_prewarm_wall(mode: &str) {
+/// is refused at the attempt wall (90 s), its child is gone, and the predecessor serves.
+async fn refused_at_the_attempt_wall(mode: &str) {
     let mut world = World::bare().await;
     let running = world
         .start(&capped(&world, "1.0.0", "lifecycle_probe.wasm", 2))
@@ -888,9 +888,11 @@ async fn refused_at_the_prewarm_wall(mode: &str) {
         });
         let _ = tx.send(result);
     });
-    let result = tokio::time::timeout(Duration::from_secs(80), rx)
+    let result = tokio::time::timeout(Duration::from_secs(100), rx)
         .await
-        .unwrap_or_else(|_| panic!("`{mode}`: a silent successor held the swap past its 60 s wall"))
+        .unwrap_or_else(|_| {
+            panic!("`{mode}`: a silent successor held the swap past its 90 s attempt wall")
+        })
         .expect("the swap thread");
     let error = result.expect_err(mode);
     assert!(
@@ -898,7 +900,7 @@ async fn refused_at_the_prewarm_wall(mode: &str) {
         "{mode}: {error}"
     );
     assert!(
-        started.elapsed() >= Duration::from_secs(55),
+        started.elapsed() >= Duration::from_secs(85),
         "{mode}: refused after {:?}, before the wall",
         started.elapsed()
     );
@@ -918,12 +920,54 @@ async fn refused_at_the_prewarm_wall(mode: &str) {
 // GLM r3 F1 — pre-warm readiness: a successor that never becomes `Ready` is cut off at the wall,
 // not at its manifest's budget (which may be a day), while it holds the door's upgrade lock.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn a_successor_that_never_becomes_ready_is_refused_at_the_prewarm_wall() {
-    refused_at_the_prewarm_wall("stderr-flood").await;
+async fn a_successor_that_never_becomes_ready_is_refused_at_the_attempt_wall() {
+    refused_at_the_attempt_wall("stderr-flood").await;
 }
 
 // GLM r3 F1 — the pre-warm probe and every inline swap-stage exchange share the same wall.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn a_successor_that_never_answers_its_probe_is_refused_at_the_prewarm_wall() {
-    refused_at_the_prewarm_wall("probe-flood").await;
+async fn a_successor_that_never_answers_its_probe_is_refused_at_the_attempt_wall() {
+    refused_at_the_attempt_wall("probe-flood").await;
+}
+
+// GLM r4 F2 — the wall is one per attempt: a successor that is `Ready` after 50 s and then
+// silent spends 40 s of the same 90 s on its probe, not a fresh 90 s (140 s in all).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_successor_slow_in_each_stage_is_refused_at_one_attempt_wall_not_one_per_stage() {
+    refused_at_the_attempt_wall("slow-ready").await;
+}
+
+// GLM r4 F1 — a successor object kept alive past its failed attempt (a pump dispatch, an in-flight
+// hook) drops after the retry began: its late end must not take the retry's token or unfence the
+// predecessor the retry's snapshot froze.
+#[test]
+fn a_late_end_of_an_older_attempt_never_unfences_a_newer_one() {
+    use std::sync::atomic::Ordering;
+    let predecessor = maos_bin::spawned_lifecycle::LifecycleLink::new();
+    let first = predecessor.begin_attempt();
+    predecessor.fence_for_snapshot(Some(&first));
+    assert!(
+        predecessor.fenced(),
+        "the first attempt froze the predecessor"
+    );
+    // The first attempt was refused but its successor is still pinned; the operator retries.
+    let second = predecessor.begin_attempt();
+    assert!(
+        !first.load(Ordering::SeqCst),
+        "the retry ends the attempt it replaces"
+    );
+    assert!(
+        !predecessor.fenced(),
+        "and releases the fence that attempt took"
+    );
+    predecessor.fence_for_snapshot(Some(&second));
+    assert!(predecessor.fenced(), "the retry's snapshot froze it again");
+    // The first attempt's pin finally drops.
+    predecessor.end_attempt(&first);
+    assert!(
+        predecessor.fenced() && second.load(Ordering::SeqCst),
+        "a stale end unfenced the predecessor mid-swap or killed the retry's token"
+    );
+    predecessor.end_attempt(&second);
+    assert!(!predecessor.fenced(), "the retry's own end releases it");
 }

@@ -164,9 +164,6 @@ struct Subscriber {
     /// The runtime object the strikes and quarantine refer to. `Weak` keeps
     /// the allocation's address unique without keeping the Spirit alive.
     object: Option<Weak<dyn AnySpiritObj>>,
-    /// Dispatch-only SCB, never installed in the scheduler. Its object cannot
-    /// change under a queued blocking hook. Rebuilt only at runtime cutover.
-    target: Option<Arc<SpiritControlBlock>>,
     strikes: u32,
     /// The last five telemetry deliveries, newest in bit 0: 1 = over 80% of the budget.
     slow_history: u8,
@@ -181,24 +178,25 @@ struct Subscriber {
 }
 
 impl Subscriber {
+    /// A dispatch-only SCB over exactly the runtime snapshot the dispatch was checked against,
+    /// never installed in the scheduler. It is built per dispatch and kept by nothing but the
+    /// dispatch, so a runtime object a swap installed and then undid is not kept alive (and its
+    /// session link not held) by a cache.
     fn dispatch_target(
-        &mut self,
+        &self,
         scb: &SpiritControlBlock,
         snapshot: ScbRuntimeSnapshot,
     ) -> Arc<SpiritControlBlock> {
-        let target = self.target.get_or_insert_with(|| {
-            Arc::new(SpiritControlBlock::new(
-                scb.pid,
-                scb.spirit_id.clone(),
-                Default::default(),
-                Arc::clone(&snapshot.spirit_obj),
-                scb.boot_nonce,
-            ))
-        });
-        // Move the already-read manifest into the view; no per-event SCB
-        // allocation or second manifest copy. Eligibility uses the real SCB.
+        let target = SpiritControlBlock::new(
+            scb.pid,
+            scb.spirit_id.clone(),
+            Default::default(),
+            Arc::clone(&snapshot.spirit_obj),
+            scb.boot_nonce,
+        );
+        // Move the already-read manifest into the view. Eligibility uses the real SCB.
         target.replace_runtime(snapshot);
-        Arc::clone(target)
+        Arc::new(target)
     }
 }
 
@@ -273,13 +271,17 @@ fn receives_telemetry(snapshot: &ScbRuntimeSnapshot) -> bool {
 }
 
 impl Shared {
+    /// Keep an overrun's execution until it ends. Finished ones are reaped on every parking,
+    /// so what is held is what still runs, never the count of overruns so far.
     fn park(&self, run: JoinHandle<HookOutcome>) {
-        self.parked
+        let mut parked = self
+            .parked
             .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .spawn(async move {
-                let _ = run.await;
-            });
+            .unwrap_or_else(|error| error.into_inner());
+        while parked.try_join_next().is_some() {}
+        parked.spawn(async move {
+            let _ = run.await;
+        });
     }
 
     /// Join every parked hook, including any parked while joining.
@@ -364,7 +366,6 @@ impl Shared {
             .is_some_and(|weak| same_object(weak, &snapshot.spirit_obj))
         {
             entry.object = Some(Arc::downgrade(&snapshot.spirit_obj));
-            entry.target = None;
             entry.strikes = 0;
             entry.slow_history = 0;
             entry.quarantined = false;
@@ -1109,7 +1110,6 @@ impl HookPump {
         let mut entry = Subscriber {
             spirit_id: spirit_id.to_owned(),
             object: None,
-            target: None,
             strikes: 0,
             slow_history: 0,
             quarantined: false,
@@ -1134,6 +1134,15 @@ impl HookPump {
     /// outstanding grant is revoked with `reason`.
     pub fn unregister(&self, pid: u32, reason: &str) {
         self.shared.unregister(pid, reason);
+    }
+
+    /// Overrun hooks the pump still holds: running ones, and finished ones not yet reaped.
+    pub fn parked(&self) -> usize {
+        self.shared
+            .parked
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .len()
     }
 
     /// The counters, with `in_flight` read now.
@@ -1462,7 +1471,7 @@ async fn fire_walled(
         Hook::Telemetry => (invocation::TELEMETRY, seq),
         Hook::Consolidate => (invocation::CONSOLIDATE, invocation::digest(&payload)),
     };
-    let record = invocation::Registered::open(pid, kind, tag);
+    let record = invocation::Registered::open(pid, kind, tag).await;
     let began = Instant::now();
     let mut run = tokio::spawn(async move {
         match hook {

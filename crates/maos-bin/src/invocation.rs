@@ -72,13 +72,25 @@ pub struct Registered {
 }
 
 impl Registered {
-    pub fn open(pid: u32, kind: u8, tag: u64) -> Self {
+    /// Register a dispatch. Two live dispatches never share a key: content cannot tell the
+    /// calls of identical batches apart, so a dispatch that finds its key in use (a forget's
+    /// notice byte for byte the same as one still running) waits for that one to end, which
+    /// its wall bounds, and runs after it.
+    pub async fn open(pid: u32, kind: u8, tag: u64) -> Self {
         let record = Arc::new(Invocation {
             phase: AtomicU8::new(UNSEEN),
             started: OnceLock::new(),
         });
-        live().push(((pid, kind, tag), Arc::clone(&record)));
-        Self { record }
+        loop {
+            {
+                let mut live = live();
+                if !live.iter().any(|(key, _)| *key == (pid, kind, tag)) {
+                    live.push(((pid, kind, tag), Arc::clone(&record)));
+                    return Self { record };
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
     }
 
     pub fn invocation(&self) -> &Invocation {

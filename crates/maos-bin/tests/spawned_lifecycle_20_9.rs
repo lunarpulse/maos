@@ -604,3 +604,97 @@ async fn a_telemetry_export_that_queued_behind_a_turn_is_held_to_its_wall_from_i
     assert_eq!(world.pump.stats().delivered, 1, "the event ran to its end");
     stop(world, running).await;
 }
+
+// GPT r4 #1, GLM r4 F3 — two forgets whose notices are byte for byte the same reach one
+// subscriber together: content cannot tell them apart, so they take turns, and each report
+// matches what actually ran (a queue drop of the second must not mark the first undelivered).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn two_identical_forget_batches_are_each_reported_as_they_actually_ran() {
+    let mut world = World::bare().await;
+    let path = world.write(
+        "twin-forget.toml",
+        &manifest_capped(
+            ID,
+            "1.0.0",
+            "lifecycle_probe.wasm",
+            &["on_consolidate"],
+            "",
+            6,
+        ),
+    );
+    let running = world.start(&path).await;
+    // The first notice holds the session for 4 s of its 6 s budget; a second one queued behind it
+    // would give up after 3 s.
+    world.turn(ID, "sleep-in consolidate 4").await;
+    let forgotten = erased_forget(&world);
+    let forget = |world: &World| {
+        let (tl, pump, forgotten) = (
+            std::sync::Arc::clone(&world.tl),
+            std::sync::Arc::clone(&world.pump),
+            forgotten.clone(),
+        );
+        tokio::spawn(async move {
+            maos_bin::hook_pump::HookPump::finish_forget(&tl, &forgotten, Some(&pump)).await
+        })
+    };
+    let (first, second) = (forget(&world), forget(&world));
+    for report in [first.await.unwrap(), second.await.unwrap()] {
+        assert_eq!(
+            report["purge_undelivered"],
+            serde_json::json!([]),
+            "a notice that ran was reported undelivered, or one that never ran delivered:\n{report}"
+        );
+    }
+    assert_eq!(
+        World::count(&world.turn(ID, "").await, "consolidate"),
+        2,
+        "both notices reached the guest"
+    );
+    stop(world, running).await;
+}
+
+// GPT r4 #2 — a telemetry event that cannot even enter the session's one queue slot (a frame turn
+// holds the session, a consolidation holds the slot) is dropped for contention: neither run nor
+// delivered.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_telemetry_event_that_finds_the_queue_slot_taken_is_dropped_not_delivered() {
+    let mut world = World::bare().await;
+    let path = world.write(
+        "full-slot.toml",
+        &manifest(
+            ID,
+            "1.0.0",
+            "lifecycle_probe.wasm",
+            &["on_consolidate", "on_telemetry_event"],
+            "",
+        ),
+    );
+    let running = world.start(&path).await;
+    world.send(ID, "sleep 6").await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    let (scb, dispatcher) = (world.scb(ID), world.scheduler.dispatcher_arc());
+    let held = tokio::spawn(async move { dispatcher.fire_on_consolidate(&scb, &[]).await });
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    world
+        .capability
+        .set_scalar(903, "emitter", "queue.depth", 0.5, "test")
+        .unwrap();
+    world.pump.flush().await.unwrap();
+    held.await.unwrap();
+    world
+        .report(Duration::from_secs(15))
+        .await
+        .expect("the long turn reports");
+    let after = world.turn(ID, "").await;
+    assert_eq!(
+        World::count(&after, "telemetry"),
+        0,
+        "the dropped event must not run:\n{after}"
+    );
+    assert_eq!(
+        world.pump.stats().delivered,
+        0,
+        "an event that never entered the queue is not a delivery"
+    );
+    stop(world, running).await;
+}
