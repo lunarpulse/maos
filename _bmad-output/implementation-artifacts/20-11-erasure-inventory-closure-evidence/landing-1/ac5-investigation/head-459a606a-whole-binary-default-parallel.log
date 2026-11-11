@@ -1,0 +1,21 @@
+1794388058.198315627
+
+running 6 tests
+test ac5_replay_rechecks_the_current_global_hold ... ok
+test ac5_completed_forget_is_durable_marker_scoped_replay ... ok
+test ac5_replay_tail_cap_starts_fresh_forget_instead_of_trusting_an_unchecked_tail ... ok
+test ac5_replay_invalidates_for_new_matching_frames_and_changed_reason ... ok
+EC-13 fixture rows=100000 seed_peak_apparent_bytes=151809600 seed_peak_allocated_bytes=151810048
+EC-13 route rows=100000 wall=2.626137801s response=Completed(Completed(Object {"redistill_outcomes": Array [], "redistilled_count": Number(0), "pending_count": Number(0), "purge_undelivered": Array [], "late_redacted_distillate_frame_ids": Array [], "late_redacted_principal_frame_ids": Array [], "held_frame_ids": Array [], "malformed_frame_ids": Array [], "held_principal_ids": Array [], "frame_sweep_status": String("complete"), "completion_boundary": String("durable_transactional_marker"), "frame_sweep_completion": Object {"frame_id": String("01a1c9dcf2d6ebd1973841efe6761689"), "through_rowid": Number(100234)}, "frame_sweep_pending": Null, "principal_id": String("scan-target@example.org"), "outcome": String("erased"), "forget": Object {"outcome": String("Erased"), "receipt": Object {"principal_id": String("scan-target@example.org"), "deleted_entries": Number(0), "deleted_index_rows": Number(0), "timestamp_ns": Number(1794388061569702214), "frame_id": Array [Number(1), Number(161), Number(201), Number(220), Number(237), Number(117), Number(98), Number(8), Number(30), Number(115), Number(161), Number(189), Number(82), Number(130), Number(144), Number(149)]}, "redacted_distillate_frame_ids": Array [], "redacted_principal_frame_ids": Array [String("00000000000000000000000000000000")], "redistill": Array []}, "terminal_code": Number(0), "operation_id": String("op-c9f21921aeda56fe59f44aa0"), "replayed": Bool(false)}))
+EC-13 door rows=100000 wall=2.627266351s max_insert=23.779469ms writes=230 wall_ratio=0.00905103092838264 response=Completed(Completed(Object {"redistill_outcomes": Array [], "redistilled_count": Number(0), "pending_count": Number(0), "purge_undelivered": Array [], "late_redacted_distillate_frame_ids": Array [], "late_redacted_principal_frame_ids": Array [], "held_frame_ids": Array [], "malformed_frame_ids": Array [], "held_principal_ids": Array [], "frame_sweep_status": String("complete"), "completion_boundary": String("durable_transactional_marker"), "frame_sweep_completion": Object {"frame_id": String("01a1c9dcf2d6ebd1973841efe6761689"), "through_rowid": Number(100234)}, "frame_sweep_pending": Null, "principal_id": String("scan-target@example.org"), "outcome": String("erased"), "forget": Object {"outcome": String("Erased"), "receipt": Object {"principal_id": String("scan-target@example.org"), "deleted_entries": Number(0), "deleted_index_rows": Number(0), "timestamp_ns": Number(1794388061569702214), "frame_id": Array [Number(1), Number(161), Number(201), Number(220), Number(237), Number(117), Number(98), Number(8), Number(30), Number(115), Number(161), Number(189), Number(82), Number(130), Number(144), Number(149)]}, "redacted_distillate_frame_ids": Array [], "redacted_principal_frame_ids": Array [String("00000000000000000000000000000000")], "redistill": Array []}, "terminal_code": Number(0), "operation_id": String("op-c9f21921aeda56fe59f44aa0"), "replayed": Bool(false)}))
+EC-13 fixture rows=100000 peak_apparent_bytes=152235512 peak_allocated_bytes=152236032
+test ac5_door_bounded_scan_admits_continuous_writer ... ok
+EC-13 fixture rows=1000000 seed_peak_apparent_bytes=1487572544 seed_peak_allocated_bytes=1487568896
+EC-13 route rows=1000000 wall=10.000116722s response=HandlerStillRunning { operation_id: "op-1b1c20d26f94e9e62f061f73" }
+EC-13 pending rows=1000000 operation_id=op-1b1c20d26f94e9e62f061f73
+EC-13 door rows=1000000 wall=19.885661221s max_insert=27.630969ms writes=2206 wall_ratio=0.0013894920914583754 response=HandlerStillRunning { operation_id: "op-1b1c20d26f94e9e62f061f73" }
+EC-13 fixture rows=1000000 peak_apparent_bytes=1487572544 peak_allocated_bytes=1487568896
+test ac5_million_row_pending_forget_finishes_and_repeats_without_corruption ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 36.21s
+

@@ -1,0 +1,9 @@
+.github/workflows/discipline.yml
+_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure.md
+_bmad-output/implementation-artifacts/20-9-spawned-form-lifecycle-hooks.md
+_bmad-output/implementation-artifacts/deferred-work.md
+xtask/kloc.toml
+xtask/src/check_dev_model_tier.rs
+xtask/src/check_multi_tenant_loom.rs
+xtask/test-budgets.toml
+xtask/tests/ci_shape_18_0.rs

@@ -1,0 +1,37 @@
+
+running 1 test
+test ac5_million_row_pending_forget_finishes_and_repeats_without_corruption ... EC-13 fixture rows=1000000 seed_peak_apparent_bytes=1487572544 seed_peak_allocated_bytes=1487568896
+EC-13 route rows=1000000 wall=10.000111421s response=HandlerStillRunning { operation_id: "op-6c2e69d57670574dfca2901e" }
+EC-13 pending rows=1000000 operation_id=op-6c2e69d57670574dfca2901e
+
+thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (853612) panicked at crates/maos-bin/tests/erasure_million_20_11.rs:186:17:
+pending operation did not finish: op-6c2e69d57670574dfca2901e
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: door_scan_with_continuous_writer
+             at ./crates/maos-bin/tests/erasure_million_20_11.rs:186:17
+   3: erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption
+             at ./crates/maos-bin/tests/erasure_million_20_11.rs:20:5
+   4: erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption::{closure#0}
+             at ./crates/maos-bin/tests/erasure_million_20_11.rs:19:76
+   5: <erasure_million_20_11::ac5_million_row_pending_forget_finishes_and_repeats_without_corruption::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    ac5_million_row_pending_forget_finishes_and_repeats_without_corruption
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 36.39s
+
+
+real	0m36.401s
+user	0m14.302s
+sys	0m7.825s

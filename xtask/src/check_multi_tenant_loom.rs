@@ -1852,14 +1852,25 @@ const SPECS: &[TestLeg] = &[
         //   with it                 — 20 PASS / 0 FAIL of 20
         // and whole-package: 38 binaries, 259 tests, 0 failures.
         //
-        // NO `--exact`, NO test-name filter, NO `--test-threads=1`. Default
-        // parallel flags are the whole point: the defect only exists when two
-        // tests share one process. Ship the lock without this leg and CI stays
-        // exactly as green as it was while broken.
+        // NO `--exact`, NO `--test-threads=1`, and the only test-name filter is a
+        // `--skip` of the one heavy 1M-row vector (operator ruling 2026-11-11,
+        // ask `m1`, option 3): that test is a tens-of-seconds disk/WAL vector,
+        // not a `MAOS_HOME` race witness, and it keeps its hosted serial-group
+        // coverage in the workspace nextest run. Default parallel flags are the
+        // whole point: the defect only exists when two tests share one process.
+        // Ship the lock without this leg and CI stays exactly as green as it was
+        // while broken.
         TestLeg {
             name: "maos-bin-whole-package-parallel-isolation",
             class: BindingClass::Blocking,
-            args: &["test", "-p", "maos-bin"],
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--",
+                "--skip",
+                "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption",
+            ],
         },
     ];
 
@@ -1953,6 +1964,30 @@ mod tests {
             },
             None,
         )
+    }
+
+    /// Operator ruling 2026-11-11 (ask `m1`, option 3): the whole-package leg
+    /// skips the one heavy 1M-row test and nothing else. Default parallelism
+    /// stays (the `set_var` race only exists with two tests in one process) and
+    /// the skipped name must still exist, so a rename cannot silently un-skip it.
+    #[test]
+    fn whole_package_leg_skips_only_the_million_row_test() {
+        const HEAVY: &str =
+            "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption";
+        let leg = SPECS
+            .iter()
+            .find(|leg| leg.name == "maos-bin-whole-package-parallel-isolation")
+            .expect("whole-package leg");
+        assert_eq!(leg.args, ["test", "-p", "maos-bin", "--", "--skip", HEAVY]);
+        let source = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../crates/maos-bin/tests/erasure_million_20_11.rs"),
+        )
+        .expect("read the 1M test source");
+        assert!(
+            source.contains(&format!("fn {HEAVY}(")),
+            "{HEAVY} must exist"
+        );
     }
 
     #[test]

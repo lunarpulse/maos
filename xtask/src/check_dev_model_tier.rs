@@ -52,6 +52,12 @@ const ENFORCE_FROM_EPIC: u32 = 12;
 /// operator rules `openai-codex/gpt-6-astra` frontier-class (the 17-2 record
 /// names it). Same documented A1 maintenance, not a waiver; the §A6 net stays
 /// mandatory.
+///
+/// `sonnet-5-5` added 2026-11-11 (hosted run 42987393747 @ `459a606a`, operator
+/// ruling, ask `tier` = allow): the operator rules `anthropic/claude-sonnet-5-5`
+/// frontier-class for the `20-5` and `20-9` dev records. The same documented A1
+/// maintenance, not a waiver; the §A6 net stays mandatory, and `sonnet-4-5` and
+/// the haiku tier stay outside the list.
 const FRONTIER_FAMILIES: &[&str] = &[
     "opus-4-6",
     "opus-4-7",
@@ -64,6 +70,7 @@ const FRONTIER_FAMILIES: &[&str] = &[
     "glm-5.1",
     "glm-5.2",
     "glm-5.3",
+    "sonnet-5-5",
 ];
 /// §A6 review-net markers — a story that ran the multi-layer adversarial review
 /// names at least one of these somewhere in its record.
@@ -248,6 +255,29 @@ mod tests {
         let d = TempDir::new().unwrap();
         story(&d, "12-9-good.md", FRONTIER_OK);
         assert!(run_with_dir(false, d.path().to_str().unwrap()).is_ok());
+    }
+
+    /// Operator ruling 2026-11-11 (ask `tier`): `anthropic/claude-sonnet-5-5` is
+    /// frontier-class for this gate; the older and smaller Anthropic tiers are
+    /// not, so the token admits exactly the ruled model.
+    #[test]
+    fn sonnet_5_5_is_allowlisted_and_neighbouring_models_are_not() {
+        let ruled = "---\nepic: 20\n---\n### Agent Model Used\n\nModel: anthropic/claude-sonnet-5-5\n\n§A6 net.\n";
+        let d = TempDir::new().unwrap();
+        story(&d, "20-9-ruled.md", ruled);
+        assert!(run_with_dir(false, d.path().to_str().unwrap()).is_ok());
+        for model in ["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-4-5"] {
+            let d = TempDir::new().unwrap();
+            story(
+                &d,
+                "20-9-other.md",
+                &ruled.replace("anthropic/claude-sonnet-5-5", model),
+            );
+            assert!(
+                run_with_dir(false, d.path().to_str().unwrap()).is_err(),
+                "{model} must stay outside the allowlist"
+            );
+        }
     }
 
     #[test]

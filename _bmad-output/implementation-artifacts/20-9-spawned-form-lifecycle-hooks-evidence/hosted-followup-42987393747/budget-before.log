@@ -1,0 +1,8 @@
+{"gate":"check-test-budget","passed":false,"junit":"/tmp/dev20hosted/junit/workspace-test-suite-junit/junit.xml","binaries":641,"total_span_seconds":674.8010063171387,"total_sum_seconds":1078.2399999999989,"findings":["maos-bin::hook_pump_17_4 took 44.520 s (Σ per-test time) over 33 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml"]}
+::error::check-test-budget: FAIL — 1 finding(s):
+- maos-bin::hook_pump_17_4 took 44.520 s (Σ per-test time) over 33 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+
+check-test-budget: FAIL — 1 finding(s):
+- maos-bin::hook_pump_17_4 took 44.520 s (Σ per-test time) over 33 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+
+rc=1

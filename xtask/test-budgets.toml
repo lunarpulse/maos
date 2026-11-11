@@ -128,6 +128,12 @@ seconds = 75
 reason = "20-13 real cohort mTLS boot, live CRL and governed token/seal witness; serialized, with bounded 45+10+10 second waits. Pending hosted timing."
 owner = "20-13-pluggable-crypto-provider-selection"
 
+[[exception]]
+binary = "maos-bin::hook_pump_17_4"
+seconds = 56
+reason = "17-4 hook pump + 20-9 L1 round 3-5 wall-overrun vectors (33 tests; real thread::sleep past the consolidation wall of 9.75 s and 3 s, joined-at-shutdown, finished-overrun eviction, 5 s slow-telemetry window; the pump's walls are real-time fractions of the manifest's whole-second time_cap_seconds, so no sleep can be shortened without weakening the witness): hosted run 42987393747 @ 459a606a measured Σ 44.520 s (was 15.515 s over 29 tests on 42955256177); R3 observed Σ x1.25 = 55.65 rounds up to 56 s"
+owner = "20-9-spawned-form-lifecycle-hooks"
+
 # --- Expensive tests (ignored in the default run) ---------------------------
 
 [[expensive]]

@@ -1,0 +1,28 @@
+--- /home/lunarpulse/dev_ws/crates/maos-iac/src/adapter/transparency_log.rs	2026-11-11 00:38:30.126134701 +0000
++++ /tmp/ac5-inv/head/crates/maos-iac/src/adapter/transparency_log.rs	2026-11-11 09:08:36.750114168 +0000
+@@ -1907,10 +1907,16 @@
+         range: (i64, i64),
+         mut each: impl FnMut(&rusqlite::Row<'_>) -> Result<(), AuditError>,
+     ) -> Result<(), AuditError> {
+-        const FORGET_SCAN_PAGE: i64 = 4096;
++        const FORGET_SCAN_PAGE: i64 = 16384;
++        struct Rep { t0: std::time::Instant, wait: std::time::Duration, hold: std::time::Duration, maxwait: std::time::Duration, n: u32, label: String }
++        impl Drop for Rep { fn drop(&mut self) { if self.n > 0 { eprintln!("SCAN label={} windows={} total={:?} lock_wait={:?} max_wait={:?} lock_hold={:?}", self.label, self.n, self.t0.elapsed(), self.wait, self.maxwait, self.hold); } } }
++        let mut rep = Rep { t0: std::time::Instant::now(), wait: Default::default(), hold: Default::default(), maxwait: Default::default(), n: 0, label: sql.chars().take(60).collect() };
+         let mut after = range.0;
+         while after < range.1 {
++            let t_req = std::time::Instant::now();
+             let inner = self.inner.lock();
++            let t_got = std::time::Instant::now();
++            rep.wait += t_got - t_req; rep.maxwait = rep.maxwait.max(t_got - t_req); rep.n += 1;
+             // Count actual rows, not rowid distance: sparse legacy rowids must
+             // not create billions of empty windows or enlarge a lock window.
+             let mut boundary = inner.conn.prepare_cached(
+@@ -1944,6 +1950,7 @@
+             erasure_scan_work::record(&stmt, sql, boundary_steps);
+             drop(stmt);
+             drop(inner);
++            rep.hold += t_got.elapsed();
+             #[cfg(test)]
+             erasure_races_20_11::after_window(self, sql, principal);
+             // FairMutex hands the next lock turn to an already-queued writer.

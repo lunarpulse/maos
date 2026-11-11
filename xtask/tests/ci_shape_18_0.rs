@@ -170,6 +170,48 @@ fn recall_gate_enrolls_all_source_vectors_and_pins_source_count() {
     }
 }
 
+/// Hosted run 42987393747: `maos-wasm-host`'s `lifecycle_runner_20_9` asked the
+/// manifest for `lifecycle_probe.wasm`, which the producer's `--only` list did
+/// not build. Every fixture a wasm-host test requests through the manifest must
+/// be on that list.
+#[test]
+fn producer_builds_every_fixture_the_wasm_host_tests_request() {
+    let workflow = workflow();
+    let producer = key(key(&workflow, "jobs"), "ci-test-producer");
+    let build = str_of(
+        &steps(producer)[step_index(producer, "Build the fixtures and debug exit binaries")],
+        "run",
+    )
+    .expect("fixture build commands");
+    let only = build
+        .split_once("build-test-fixtures --only ")
+        .and_then(|(_, tail)| tail.split_whitespace().next())
+        .expect("producer --only list");
+    let listed: Vec<&str> = only.split(',').collect();
+    let tests = root().join("crates/maos-wasm-host/tests");
+    let mut requested = Vec::new();
+    for entry in fs::read_dir(&tests).expect("wasm-host tests dir") {
+        let path = entry.expect("dir entry").path();
+        if path.extension().is_some_and(|ext| ext == "rs") {
+            let source = fs::read_to_string(&path).expect("read wasm-host test");
+            for tail in source.split("fixtures::fixture(\"").skip(1) {
+                let name = tail.split('"').next().expect("fixture name");
+                requested.push(name.to_string());
+            }
+        }
+    }
+    assert!(
+        requested.iter().any(|name| name == "lifecycle_probe.wasm"),
+        "the scan must see the 20-9 test: {requested:?}"
+    );
+    for name in &requested {
+        assert!(
+            listed.contains(&name.as_str()),
+            "producer `--only` list {listed:?} lacks `{name}`"
+        );
+    }
+}
+
 #[test]
 fn platform_recall_wire_gates_pin_every_source_test() {
     let names = source_test_names(

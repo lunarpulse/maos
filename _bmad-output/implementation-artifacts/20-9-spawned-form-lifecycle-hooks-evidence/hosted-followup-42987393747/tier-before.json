@@ -1,0 +1,2 @@
+{"gate":"check-dev-model-tier","passed":false,"oracle_green":false,"binding":"Blocking","enforce_from_epic":12,"stories_checked":97,"stories_skipped_pre_dev":6,"violations":[{"file":"20-9-spawned-form-lifecycle-hooks.md","reason":"dev model `anthropic/claude-sonnet-5-5` is not in the frontier allowlist [\"opus-4-6\", \"opus-4-7\", \"opus-4-8\", \"opus-5\", \"gpt-5.5\", \"gpt-5.6\", \"gpt-6.1\", \"gpt-6-astra\", \"glm-5.1\", \"glm-5.2\", \"glm-5.3\"]"}]}
+check-dev-model-tier: 1 frontier-era stories violate the dev-model-tier gate

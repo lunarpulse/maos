@@ -2171,7 +2171,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo build --locked -p maos-bin --bin maos
-          cargo run --locked -p xtask -- build-test-fixtures --only forbidden-syscall-probe,escape-forbidden-syscall-probe,maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,recall_probe.wasm,compat_echo_2_0.wasm,equiv-native-twin,maosctl,worker-cli-fixture
+          cargo run --locked -p xtask -- build-test-fixtures --only forbidden-syscall-probe,escape-forbidden-syscall-probe,maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,recall_probe.wasm,lifecycle_probe.wasm,compat_echo_2_0.wasm,equiv-native-twin,maosctl,worker-cli-fixture
           mkdir -p target/tmp
           rustc --edition=2021 -C opt-level=1 --crate-name cgroup_ceiling_fixture \
             crates/maos-kernel-core/tests/fixtures/native/cgroup_ceiling.rs \
