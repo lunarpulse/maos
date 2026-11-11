@@ -250,7 +250,7 @@ fn archive_cgroup_jobs_keep_real_delegation_counts_and_rootless_canary() {
             assert!(run.contains("required_tests+=(--required-test \"$test_name\")"));
             assert!(run.contains("done <<< \"${EPIC17_SPAWNED_REQUIRED_TESTS}\""));
             assert!(run.contains(
-                "check-log --exit-code 0 --expected-count 23 \"${required_tests[@]}\""
+                "check-log --exit-code 0 --expected-count 24 \"${required_tests[@]}\""
             ));
         }
     }
