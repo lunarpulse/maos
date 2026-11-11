@@ -5,6 +5,8 @@
 # (`ECliWrapperRequiresT3`). NO `[class]` section.
 
 [cli_wrapper]
+# Story 20-5 — the Worker manifest schema version (absent means 1; window 1..=1).
+manifest_schema_version = 1
 command = "worker-cli-fixture"
 argv_prefix = ["--maos-worker"]
 output_shape_version = "1.0.0"

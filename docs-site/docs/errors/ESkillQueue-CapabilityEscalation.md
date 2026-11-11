@@ -2,7 +2,7 @@
 title: "ESkillQueue::CapabilityEscalation"
 sidebar_position: 0
 description: "Skill capability subset requirement"
-slug: "/errors/ESkillQueue::CapabilityEscalation"
+slug: "/errors/ESkillQueue--CapabilityEscalation"
 ---
 
 # ESkillQueue::CapabilityEscalation

@@ -1,0 +1,21 @@
+# AC5.3 measured on the real tree (2026-11-11), no --tag, --json, then --tag v1.0.0-rc.1 (the operator's form)
+stability-matrix: PASS — STABILITY.md in sync with workspace state; 0 undocumented deprecations; §Export present (non-stub)
+check-rc-readiness: FAIL version — workspace version 0.1.0-alpha.1, tag -
+check-rc-readiness: PASS stability-matrix — in sync
+check-rc-readiness: FAIL epic-20-stories — not done: {"20-11-erasure-inventory-closure=ready-for-dev", "20-13-pluggable-crypto-provider-selection=ready-for-dev", "20-14-complete-cost-attribution=in-progress", "20-1b-vetting-yank-policy-and-quarantine=backlog", "20-2-deb-airgap-docker-and-formula-corrections=ready-for-dev", "20-4-gemini-driver-and-endpoint-pin=ready-for-dev", "20-7-stable-runner-perf-gates=in-progress", "20-8-manifest-contract-completion=ready-for-dev", "20-9-spawned-form-lifecycle-hooks=in-progress"}
+check-rc-readiness: PASS provisioning — not present: []
+check-rc-readiness: PASS deny-ignores — ignored without a deferred-work row: []
+check-rc-readiness: the tree is not rc-ready
+rc=1
+stability-matrix: PASS — STABILITY.md in sync with workspace state; 0 undocumented deprecations; §Export present (non-stub)
+{"gate":"check-rc-readiness","passed":false,"legs":[{"leg":"version","passed":false,"detail":"workspace version 0.1.0-alpha.1, tag -"},{"leg":"stability-matrix","passed":true,"detail":"in sync"},{"leg":"epic-20-stories","passed":false,"detail":"not done: {\"20-11-erasure-inventory-closure=ready-for-dev\", \"20-13-pluggable-crypto-provider-selection=ready-for-dev\", \"20-14-complete-cost-attribution=in-progress\", \"20-1b-vetting-yank-policy-and-quarantine=backlog\", \"20-2-deb-airgap-docker-and-formula-corrections=ready-for-dev\", \"20-4-gemini-driver-and-endpoint-pin=ready-for-dev\", \"20-7-stable-runner-perf-gates=in-progress\", \"20-8-manifest-contract-completion=ready-for-dev\", \"20-9-spawned-form-lifecycle-hooks=in-progress\"}"},{"leg":"provisioning","passed":true,"detail":"not present: []"},{"leg":"deny-ignores","passed":true,"detail":"ignored without a deferred-work row: []"}]}
+check-rc-readiness: the tree is not rc-ready
+rc=1
+stability-matrix: PASS — STABILITY.md in sync with workspace state; 0 undocumented deprecations; §Export present (non-stub)
+check-rc-readiness: FAIL version — workspace version 0.1.0-alpha.1, tag v1.0.0-rc.1
+check-rc-readiness: PASS stability-matrix — in sync
+check-rc-readiness: FAIL epic-20-stories — not done: {"20-11-erasure-inventory-closure=ready-for-dev", "20-13-pluggable-crypto-provider-selection=ready-for-dev", "20-14-complete-cost-attribution=in-progress", "20-1b-vetting-yank-policy-and-quarantine=backlog", "20-2-deb-airgap-docker-and-formula-corrections=ready-for-dev", "20-4-gemini-driver-and-endpoint-pin=ready-for-dev", "20-5-v1-0-rc-tag-and-lts-rule=in-progress", "20-7-stable-runner-perf-gates=in-progress", "20-8-manifest-contract-completion=ready-for-dev", "20-9-spawned-form-lifecycle-hooks=in-progress"}
+check-rc-readiness: PASS provisioning — not present: []
+check-rc-readiness: PASS deny-ignores — ignored without a deferred-work row: []
+check-rc-readiness: the tree is not rc-ready
+rc(tag)=1

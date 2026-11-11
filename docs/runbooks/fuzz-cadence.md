@@ -40,7 +40,7 @@ the separate workflow does not replace the per-commit compile gate.
 
 | Field | Value |
 |-------|-------|
-| Trigger | `fuzz-prerelease.yml`: `workflow_dispatch` or a `v*-rc*` tag |
+| Trigger | `fuzz-prerelease.yml`: `workflow_dispatch` only, run by the operator at the candidate SHA BEFORE tagging (Story 20-5: a `v*-rc*` push trigger would start a duplicate chain after the tag); `check-release-precondition --fuzz-ledger` reads the result |
 | Duration | Five sequential 5h links per target; final assertion requires ≥86,400 measured libFuzzer seconds per target |
 | Workers | Runner cores; independent worker counters, zero crashes |
 | Resume | Each link downloads the previous link's target-specific corpus artifact |

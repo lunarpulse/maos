@@ -1,0 +1,8 @@
+# AC7 / AC5.3(e) failing-before: the NEW check-rc-readiness binary (rebuilt after the plants were restored) run on a git-archive of HEAD f56959c2 (deny.toml and deferred-work.md without the two rows)
+check-rc-readiness: FAIL version — workspace version 0.1.0-alpha.1, tag -
+check-rc-readiness: FAIL stability-matrix — CLI_WRAPPER_SCHEMA_VERSION not found
+check-rc-readiness: FAIL epic-20-stories — not done: {"20-11-erasure-inventory-closure=ready-for-dev", "20-13-pluggable-crypto-provider-selection=ready-for-dev", "20-14-complete-cost-attribution=in-progress", "20-1b-vetting-yank-policy-and-quarantine=backlog", "20-2-deb-airgap-docker-and-formula-corrections=ready-for-dev", "20-4-gemini-driver-and-endpoint-pin=ready-for-dev", "20-5-v1-0-rc-tag-and-lts-rule=ready-for-dev", "20-7-stable-runner-perf-gates=in-progress", "20-8-manifest-contract-completion=ready-for-dev", "20-9-spawned-form-lifecycle-hooks=in-progress"}
+check-rc-readiness: PASS provisioning — not present: []
+check-rc-readiness: FAIL deny-ignores — ignored without a deferred-work row: ["RUSTSEC-2021-0127", "RUSTSEC-2025-0134"]
+check-rc-readiness: the tree is not rc-ready
+rc=1

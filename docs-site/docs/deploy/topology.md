@@ -35,7 +35,7 @@ cargo build -p maos-bin --release
 
 # Initialize and run
 ./target/release/maos init
-./target/release/maos run
+./target/release/maos run spirits/hello-spirit/manifest.toml
 ```
 
 All Spirits communicate via in-process channels. The Transparency Log is a local SQLite database at `$MAOS_HOME/audit/transparency.sqlite`.
@@ -72,7 +72,7 @@ export MAOS_A2A_CERT="/etc/maos/tls/host.crt"
 export MAOS_A2A_KEY="/etc/maos/tls/host.key"
 export MAOS_A2A_CA="/etc/maos/tls/ca.crt"
 
-./target/release/maos run
+./target/release/maos run spirits/hello-spirit/manifest.toml
 ```
 
 ## Air-gapped

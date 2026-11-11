@@ -2,7 +2,7 @@
 title: "EPinMismatch::FingerprintCollision"
 sidebar_position: 0
 description: "Error reference for EPinMismatch::FingerprintCollision"
-slug: "/errors/EPinMismatch::FingerprintCollision"
+slug: "/errors/EPinMismatch--FingerprintCollision"
 ---
 
 # EPinMismatch::FingerprintCollision

@@ -218,7 +218,7 @@ since_version = "0.5.0"
 [[error]]
 code = "ECliWrapperTierNotGranted"
 cause = "The spirit manifest requests a sandbox tier (e.g. t3) that the host-side grant allowlist does not include. The kernel enforces fail-closed behavior — it will not silently downgrade to a lower tier."
-remediation = "Add the requested sandbox tier to the host's grant allowlist configuration. Locate the grant allowlist (typically in the MAOS host config or deployment policy) and add the spirit's identity or class to the t3 grant list. Re-deploy after updating the allowlist."
+remediation = "Add a `[[grant]]` entry for the manifest's `command` (`attested_image`) and `[author]` `name` (`signing_key_id`) with `permitted_tier = \"T3\"` to the operator-owned grant file that the `MAOS_HOST_GRANTS` environment variable names, then re-run `maos run`. The manifest cannot grant itself a tier; only the host-managed allowlist (the built-in hermetic fixture grants plus that file) can."
 rust_path = "CliWrapperAdmissionError::ECliWrapperTierNotGranted"
 source_file = "crates/maos-domain/src/cli_wrapper.rs"
 description = "Manifest requested sandbox tier not granted by host-side grant allowlist — fail-closed, no silent downgrade"
@@ -227,6 +227,19 @@ recovery_class = "reject"
 owner = "maos-domain"
 kernel_or_spirit = "kernel"
 since_version = "0.9.0"
+
+[[error]]
+code = "ECliWrapperSchemaUnsupported"
+cause = "The Worker manifest's `[cli_wrapper]` table declares `manifest_schema_version` with a value outside the window this kernel accepts (`1..=1`), or with a value that is not an integer (a string, a float, a boolean, an array, zero or a negative number). The check runs before the strict parse of the table, so a manifest written for a newer schema is refused as too new rather than as an unknown key. An absent key means `1`; the check runs before any probe, process or token exists."
+remediation = "Set `manifest_schema_version` in `[cli_wrapper]` to an integer inside the window the error message names (`1` today), or remove the key (absent means `1`). A manifest written for a newer schema needs a newer MAOS kernel: upgrade the kernel, do not edit the manifest down."
+rust_path = "CliWrapperAdmissionError::ECliWrapperSchemaUnsupported"
+source_file = "crates/maos-domain/src/cli_wrapper.rs"
+description = "Worker manifest [cli_wrapper] manifest_schema_version is outside the supported window or not an integer — refused before the strict parse"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "1.0.0"
 
 [[error]]
 code = "ERespawnWithContextUnsupported"

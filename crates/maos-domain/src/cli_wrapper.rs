@@ -76,6 +76,19 @@ pub enum CliWrapperAdmissionError {
     )]
     ERespawnWithContextUnsupported,
 
+    /// Story 20-5 — the Worker manifest's `[cli_wrapper] manifest_schema_version` is
+    /// outside this kernel's window (absent means 1) or is not an integer. Checked
+    /// before the strict parse, so a newer manifest is refused as too new, never as
+    /// an unknown key. `declared` is the value as written (a TOML literal).
+    #[error(
+        "cli_wrapper manifest_schema_version {declared} unsupported: this kernel accepts {min_supported}..={max_supported}"
+    )]
+    ECliWrapperSchemaUnsupported {
+        declared: String,
+        min_supported: u32,
+        max_supported: u32,
+    },
+
     /// Egress requests require a configured daemon proxy and host permission.
     #[error("CliWrapperSpirit egress proxy unavailable")]
     EEgressProxyUnavailable,

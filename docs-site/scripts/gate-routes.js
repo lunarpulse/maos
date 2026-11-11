@@ -85,17 +85,15 @@ function main() {
 
   // Check error routes (also enforce content floor — error pages must not be stubs)
   for (const code of errorCodes) {
-    const route = `/errors/${code}`;
-    let resolved = resolveRoute(route);
+    // A `Family::Variant` code is served at `/errors/Family--Variant` (Story 20-5): a `:`
+    // in a Docusaurus slug is a route parameter that collapses every variant of a family
+    // onto one page, so no fallback to another spelling is allowed to mask a regression.
+    const route = `/errors/${code.replace(/::/g, "--")}`;
+    const resolved = resolveRoute(route);
     if (!resolved) {
-      // Error routes with :: get URL-encoded; check filesystem
-      const altCode = code.replace(/::/g, "-");
-      resolved = resolveRoute(`/errors/${altCode}`);
-      if (!resolved) {
-        failures.push(`MISSING: ${route}`);
-        failed++;
-        continue;
-      }
+      failures.push(`MISSING: ${route}`);
+      failed++;
+      continue;
     }
     if (!hasContentFloor(resolved, "error table")) {
       failures.push(`THIN: ${route} — expected error table`);

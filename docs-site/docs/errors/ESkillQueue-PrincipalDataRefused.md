@@ -2,7 +2,7 @@
 title: "ESkillQueue::PrincipalDataRefused"
 sidebar_position: 0
 description: "Indexed principal payload refusal"
-slug: "/errors/ESkillQueue::PrincipalDataRefused"
+slug: "/errors/ESkillQueue--PrincipalDataRefused"
 ---
 
 # ESkillQueue::PrincipalDataRefused

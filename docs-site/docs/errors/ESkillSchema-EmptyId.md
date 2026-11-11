@@ -2,7 +2,7 @@
 title: "ESkillSchema::EmptyId"
 sidebar_position: 0
 description: "Error reference for ESkillSchema::EmptyId"
-slug: "/errors/ESkillSchema::EmptyId"
+slug: "/errors/ESkillSchema--EmptyId"
 ---
 
 # ESkillSchema::EmptyId

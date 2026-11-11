@@ -64,10 +64,13 @@ fn shipped_worker_manifests() -> Vec<(std::path::PathBuf, toml::Value, CliWrappe
             let Some(section) = root.get("cli_wrapper") else {
                 continue;
             };
-            // The composition root feeds `from_toml_str` the re-serialized
-            // `[cli_wrapper]` section, so drive it the same way rather than a
-            // shape the production path never sees.
-            let section_toml = toml::to_string(section)
+            // The composition root peels the schema version, then feeds `from_toml_str`
+            // the re-serialized `[cli_wrapper]` section, so drive it the same way rather
+            // than a shape the production path never sees.
+            let mut section = section.clone();
+            CliWrapperConfig::take_schema_version(&mut section)
+                .unwrap_or_else(|e| panic!("{} schema version: {e}", path.display()));
+            let section_toml = toml::to_string(&section)
                 .unwrap_or_else(|e| panic!("{} [cli_wrapper] re-serialize: {e}", path.display()));
             let cfg = CliWrapperConfig::from_toml_str(&section_toml)
                 .unwrap_or_else(|e| panic!("{} fails [cli_wrapper] parsing: {e}", path.display()));
@@ -150,10 +153,9 @@ fn builtin_probe_authority_cannot_admit_the_operator_echo_destination() {
         "../../../spirits/worker/manifest-probe-echo.toml"
     ))
     .unwrap();
-    let config = CliWrapperConfig::from_toml_str(
-        &toml::to_string(root.get("cli_wrapper").unwrap()).unwrap(),
-    )
-    .unwrap();
+    let mut section = root.get("cli_wrapper").unwrap().clone();
+    CliWrapperConfig::take_schema_version(&mut section).unwrap();
+    let config = CliWrapperConfig::from_toml_str(&toml::to_string(&section).unwrap()).unwrap();
     let grant = maos_bin::worker_spawn::builtin_probe_grant();
     assert!(matches!(
         maos_kernel_core::lifecycle::cli_wrapper::admission::check_egress(

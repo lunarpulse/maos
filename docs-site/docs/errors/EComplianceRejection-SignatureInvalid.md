@@ -2,7 +2,7 @@
 title: "EComplianceRejection::SignatureInvalid"
 sidebar_position: 0
 description: "Error reference for EComplianceRejection::SignatureInvalid"
-slug: "/errors/EComplianceRejection::SignatureInvalid"
+slug: "/errors/EComplianceRejection--SignatureInvalid"
 ---
 
 # EComplianceRejection::SignatureInvalid

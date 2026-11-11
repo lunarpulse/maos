@@ -2,7 +2,7 @@
 title: "ESkillQueue::EntryNotFound"
 sidebar_position: 0
 description: "Unknown queue selector"
-slug: "/errors/ESkillQueue::EntryNotFound"
+slug: "/errors/ESkillQueue--EntryNotFound"
 ---
 
 # ESkillQueue::EntryNotFound

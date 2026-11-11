@@ -2,7 +2,7 @@
 title: "ESkillStore::Json"
 sidebar_position: 0
 description: "Error reference for ESkillStore::Json"
-slug: "/errors/ESkillStore::Json"
+slug: "/errors/ESkillStore--Json"
 ---
 
 # ESkillStore::Json

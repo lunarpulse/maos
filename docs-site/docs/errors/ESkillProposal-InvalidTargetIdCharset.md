@@ -2,7 +2,7 @@
 title: "ESkillProposal::InvalidTargetIdCharset"
 sidebar_position: 0
 description: "Error reference for ESkillProposal::InvalidTargetIdCharset"
-slug: "/errors/ESkillProposal::InvalidTargetIdCharset"
+slug: "/errors/ESkillProposal--InvalidTargetIdCharset"
 ---
 
 # ESkillProposal::InvalidTargetIdCharset

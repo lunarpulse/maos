@@ -2,7 +2,7 @@
 title: "ESkillSchema::TomlParse"
 sidebar_position: 0
 description: "Error reference for ESkillSchema::TomlParse"
-slug: "/errors/ESkillSchema::TomlParse"
+slug: "/errors/ESkillSchema--TomlParse"
 ---
 
 # ESkillSchema::TomlParse

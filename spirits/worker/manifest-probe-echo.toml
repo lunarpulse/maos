@@ -1,6 +1,8 @@
 # Hermetic T3 positive control. No built-in grant: the operator must grant this
 # exact author/image/destination. The test runner owns the loopback echo service.
 [cli_wrapper]
+# Story 20-5 — the Worker manifest schema version (absent means 1; window 1..=1).
+manifest_schema_version = 1
 command = "worker-probe-fixture"
 argv_prefix = ["--maos-worker", "--maos-probe-positive-control"]
 output_shape_version = "1.0.0"

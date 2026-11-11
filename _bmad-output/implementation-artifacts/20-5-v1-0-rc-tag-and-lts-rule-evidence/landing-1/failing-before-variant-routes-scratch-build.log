@@ -1,0 +1,1283 @@
+
+> maos-docs-site@0.0.0 build
+> docusaurus build
+
+[INFO] Website will be built for all these locales: 
+- en
+- ko
+[INFO] [en] Creating an optimized production build...
+[info] [webpackbar] Compiling Client
+[info] [webpackbar] Compiling Server
+[success] [webpackbar] Server: Compiled successfully in 3.80s
+[success] [webpackbar] Client: Compiled successfully in 6.57s
+[SUCCESS] Generated static files in "build".
+[INFO] [ko] Creating an optimized production build...
+[info] [webpackbar] Compiling Client
+[info] [webpackbar] Compiling Server
+[success] [webpackbar] Server: Compiled successfully in 2.74s
+[success] [webpackbar] Client: Compiled successfully in 5.15s
+
+[ERROR] Error: Unable to build website for locale ko.
+    at tryToBuildLocale (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/commands/build/build.js:76:15)
+    at async /home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/commands/build/build.js:34:9
+    ... 4 lines matching cause stack trace ...
+    at async file:///home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/bin/docusaurus.mjs:44:3 {
+  [cause]: Error: Docusaurus static site generation failed for 77 paths:
+  - "/ko/markdown-page"
+  - "/ko/abi/v1/"
+  - "/ko/abi/v1/cancellation"
+  - "/ko/abi/v1/compliance"
+  - "/ko/abi/v1/ctx"
+  - "/ko/abi/v1/deprecation"
+  - "/ko/abi/v1/gateway"
+  - "/ko/abi/v1/identity"
+  - "/ko/abi/v1/lifecycle"
+  - "/ko/community/breaking-changes"
+  - "/ko/community/code-of-conduct"
+  - "/ko/community/governance"
+  - "/ko/community/locales"
+  - "/ko/community/rfc-template"
+  - "/ko/community/trademark"
+  - "/ko/cookbook/"
+  - "/ko/cookbook/cancellation-handling"
+  - "/ko/cookbook/capability-scoping"
+  - "/ko/cookbook/cli-wrapper-spirit"
+  - "/ko/cookbook/compliance-claim"
+  - "/ko/cookbook/error-handling"
+  - "/ko/cookbook/gateway-integration"
+  - "/ko/cookbook/hello-world-spirit"
+  - "/ko/cookbook/hot-swap-migration"
+  - "/ko/cookbook/manifest-fields"
+  - "/ko/cookbook/scheduled-invocations"
+  - "/ko/cookbook/testing-with-spirit-sdk"
+  - "/ko/cookbook/wasm-component-spirit"
+  - "/ko/deploy/"
+  - "/ko/deploy/air-gap-deployment"
+  - "/ko/deploy/release-signing"
+  - "/ko/deploy/restore-drill"
+  - "/ko/deploy/topology"
+  - "/ko/errors/EAbiTooNew"
+  - "/ko/errors/EAbiTooOld"
+  - "/ko/errors/EClassRequired"
+  - "/ko/errors/ECliBinaryNotFound"
+  - "/ko/errors/ECliProbeFailed"
+  - "/ko/errors/ECliWrapperRequiresT3"
+  - "/ko/errors/ECliWrapperTierNotGranted"
+  - "/ko/errors/ECrossWallRecallDenied"
+  - "/ko/errors/EEgressNotGranted"
+  - "/ko/errors/EEgressProxyUnavailable"
+  - "/ko/errors/EHaltContinuityViolation"
+  - "/ko/errors/EIntentLineageBroken"
+  - "/ko/errors/EManifestSchemaConflict"
+  - "/ko/errors/EMigratorMissing"
+  - "/ko/errors/EMigratorMissing_PrecheckOutcome"
+  - "/ko/errors/EModelProvenanceMissing"
+  - "/ko/errors/EModelProvenanceStale"
+  - "/ko/errors/EOrchestratorDispatchRawOutput"
+  - "/ko/errors/EOutputShapeAdapterMismatch"
+  - "/ko/errors/EOutputShapeAdapterNotRegistered"
+  - "/ko/errors/ERegionTagInvalid"
+  - "/ko/errors/ERegionViolation"
+  - "/ko/errors/ERespawnWithContextUnsupported"
+  - "/ko/errors/ESubstrateTooOld"
+  - "/ko/errors/ETeamIdInvalid"
+  - "/ko/manifest/"
+  - "/ko/manifest/v1"
+  - "/ko/manifest/v2"
+  - "/ko/manifest/v3"
+  - "/ko/manifest/v4"
+  - "/ko/manifest/v5"
+  - "/ko/manifest/v6"
+  - "/ko/manifest/v7"
+  - "/ko/migrate/"
+  - "/ko/migrate/abi-stability"
+  - "/ko/migrate/v1-to-v2"
+  - "/ko/migrate/v2-to-v3"
+  - "/ko/migrate/v3-to-v4"
+  - "/ko/migrate/v4-to-v5"
+  - "/ko/run-maos"
+  - "/ko/troubleshoot/"
+  - "/ko/understand-maos"
+  - "/ko/write-a-spirit"
+  - "/ko/"
+      at throwSSGError (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgGlobalResult.js:56:11)
+      at createGlobalSSGResult (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgGlobalResult.js:66:9)
+      ... 11 lines matching cause stack trace ...
+      at async file:///home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/bin/docusaurus.mjs:44:3 {
+    [cause]: AggregateError
+        at throwSSGError (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgGlobalResult.js:57:16)
+        at createGlobalSSGResult (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgGlobalResult.js:66:9)
+        at /home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgExecutor.js:30:68
+        at async executeSSG (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgExecutor.js:143:20)
+        at async buildLocale (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/commands/build/buildLocale.js:88:31)
+        at async runBuildLocaleTask (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/commands/build/build.js:91:5)
+        at async /home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/commands/build/build.js:72:13
+        at async tryToBuildLocale (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/commands/build/build.js:68:9)
+        at async /home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/commands/build/build.js:34:9
+        at async mapAsyncSequential (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/utils/lib/jsUtils.js:21:24)
+        at async Command.build (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/commands/build/build.js:33:5)
+        at async Promise.all (index 0)
+        at async runCLI (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/commands/cli.js:56:5)
+        at async file:///home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/bin/docusaurus.mjs:44:3 {
+      [errors]: [
+        Error: Can't render static file for pathname "/ko/markdown-page"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot destructure property 'title' of 'metadata' as it is undefined.
+              at MDXPage (server.bundle.js:33657:108)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/abi/v1/"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/abi/v1/cancellation"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/abi/v1/compliance"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/abi/v1/ctx"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/abi/v1/deprecation"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/abi/v1/gateway"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/abi/v1/identity"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/abi/v1/lifecycle"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/community/breaking-changes"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/community/code-of-conduct"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/community/governance"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/community/locales"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/community/rfc-template"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/community/trademark"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/cookbook/"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/cookbook/cancellation-handling"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/cookbook/capability-scoping"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/cookbook/cli-wrapper-spirit"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/cookbook/compliance-claim"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/cookbook/error-handling"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/cookbook/gateway-integration"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/cookbook/hello-world-spirit"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/cookbook/hot-swap-migration"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/cookbook/manifest-fields"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/cookbook/scheduled-invocations"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/cookbook/testing-with-spirit-sdk"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/cookbook/wasm-component-spirit"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/deploy/"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/deploy/air-gap-deployment"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/deploy/release-signing"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/deploy/restore-drill"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/deploy/topology"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EAbiTooNew"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EAbiTooOld"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EClassRequired"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/ECliBinaryNotFound"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/ECliProbeFailed"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/ECliWrapperRequiresT3"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/ECliWrapperTierNotGranted"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/ECrossWallRecallDenied"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EEgressNotGranted"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EEgressProxyUnavailable"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EHaltContinuityViolation"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EIntentLineageBroken"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EManifestSchemaConflict"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EMigratorMissing"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EMigratorMissing_PrecheckOutcome"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EModelProvenanceMissing"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EModelProvenanceStale"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EOrchestratorDispatchRawOutput"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EOutputShapeAdapterMismatch"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/EOutputShapeAdapterNotRegistered"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/ERegionTagInvalid"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/ERegionViolation"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/ERespawnWithContextUnsupported"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/ESubstrateTooOld"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/errors/ETeamIdInvalid"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/manifest/"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/manifest/v1"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/manifest/v2"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/manifest/v3"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/manifest/v4"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/manifest/v5"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/manifest/v6"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/manifest/v7"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/migrate/"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/migrate/abi-stability"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/migrate/v1-to-v2"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/migrate/v2-to-v3"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/migrate/v3-to-v4"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/migrate/v4-to-v5"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/run-maos"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/troubleshoot/"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/understand-maos"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/write-a-spirit"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        },
+        Error: Can't render static file for pathname "/ko/"
+            at generateStaticFile (/home/lunarpulse/dev_ws/docs-site/node_modules/@docusaurus/core/lib/ssg/ssgRenderer.js:131:20)
+            at async /home/lunarpulse/dev_ws/docs-site/node_modules/p-map/index.js:57:22 {
+          [cause]: TypeError: Cannot read properties of undefined (reading 'id')
+              at DocItem (server.bundle.js:32271:89)
+              at renderWithHooks (server.bundle.js:51148:18)
+              at renderElement (server.bundle.js:51286:14)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at renderElement (server.bundle.js:51731:11)
+              at retryNode (server.bundle.js:52004:16)
+              at renderNodeDestructive (server.bundle.js:51798:7)
+              at finishFunctionComponent (server.bundle.js:51189:9)
+              at renderElement (server.bundle.js:51288:7)
+        }
+      ]
+    }
+  }
+}
+[INFO] Docusaurus version: 3.10.1
+Node version: v20.19.2

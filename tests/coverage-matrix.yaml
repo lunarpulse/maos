@@ -1323,7 +1323,13 @@ coverage:
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
-    notes: 1-year LTS at v1.0; 2-year LTS at v1.5
+    notes: >-
+      1-year LTS at v1.0 with security-only patches after year 1; 2-year LTS at
+      v1.5 is a v1.5 decision. Story 20-5 witnesses only the PUBLISHED RULE - the
+      generated LTS Policy section of STABILITY.md, byte-checked by
+      `stability-matrix --check` - and claims no gate for the commitment itself
+      (rule 11). The clock starts at the v1.0.0 tag, never at a release candidate
+      (docs/release/lts-policy.md; ops-ga-tag-after-holds).
   NFR-Maint-7:
     gates: []
     enforcement: advisory-until-engagement

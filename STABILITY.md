@@ -21,9 +21,12 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 | Leg | Live value |
 |---|---|
 | `kernel_version` | `0.1.0-alpha.1` |
+| release channel | development pre-release — no LTS commitment |
 | `abi_version` | `1` |
 | `manifest_schema_version` (current) | `7` |
 | supported schema window | `1..=7` |
+| `[cli_wrapper]` `manifest_schema_version` (current; absent means 1) | `1` |
+| supported `[cli_wrapper]` window | `1..=1` |
 | workspace crates | `58` |
 
 | Manifest schema | Kernel behavior |
@@ -33,6 +36,7 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 | `manifest_schema_version < 1` (N-2) | ⛔ hard refusal — typed `SecurityError::EAbiTooOld` at admit |
 | `manifest_schema_version > 7` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
 | `min_substrate_version` > running `kernel_version` | ⛔ hard refusal — typed `SecurityError::ESubstrateTooOld` (FR8) |
+| `[cli_wrapper]` `manifest_schema_version` outside `1..=1` | ⛔ hard refusal before the strict parse — typed `CliWrapperAdmissionError::ECliWrapperSchemaUnsupported` |
 
 The version gate is **fail-closed in both directions**: an out-of-window
 manifest is refused with an actionable typed error, never silently
@@ -52,12 +56,14 @@ surface MUST appear as a row below AND carry a dated entry in `BREAKING.md`; CI
 
 ## LTS Policy
 
-MAOS v1.5 carries a **2-year LTS commitment** (NFR-Maint-6): the v1.0 line
-receives **security-only patches for 2 years** from the LTS clock-start below.
-The 2-year term takes effect at v1.5, extending the original v1.0 1-year window.
+MAOS v1.0 carries a **1-year LTS commitment** (NFR-Maint-6) from the LTS
+clock-start below; **security-only patches after year 1**. A 2-year commitment
+is a v1.5 decision, taken once support load is known. A release candidate
+(`-rc.N`) carries no LTS commitment and never starts the clock; `v1.0.0` does
+([`docs/release/lts-policy.md`](docs/release/lts-policy.md)).
 
-<!-- lts-clock-start: filled by `stability-matrix` IFF a `1.0.0`/`v1.0.0` git tag exists (Epic 10 cuts the tag); placeholder until then — do NOT fabricate a SHA/tag. -->
-- **LTS clock-start:** pending — the `1.0.0` tag is cut in Epic 10 (`epic-10-v10-ship-gate`); this fills automatically when the tag exists.
+<!-- lts-clock-start: read from the committed `xtask/release-channel.toml`, which `ops-ga-tag-after-holds` writes when it cuts `v1.0.0`; placeholder until then — do NOT fabricate a SHA/tag. -->
+- **LTS clock-start:** pending — `v1.0.0` is cut by `ops-ga-tag-after-holds` after RELEASE-HOLDS Holds 1–2 clear, which writes `xtask/release-channel.toml`; no clock runs before then.
 
 ## Substrate-Self Compliance Scope
 

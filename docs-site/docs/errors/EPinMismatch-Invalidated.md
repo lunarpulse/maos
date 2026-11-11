@@ -2,7 +2,7 @@
 title: "EPinMismatch::Invalidated"
 sidebar_position: 0
 description: "Error reference for EPinMismatch::Invalidated"
-slug: "/errors/EPinMismatch::Invalidated"
+slug: "/errors/EPinMismatch--Invalidated"
 ---
 
 # EPinMismatch::Invalidated

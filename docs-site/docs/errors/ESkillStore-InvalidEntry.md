@@ -2,7 +2,7 @@
 title: "ESkillStore::InvalidEntry"
 sidebar_position: 0
 description: "Stored or submitted entry validation refusal"
-slug: "/errors/ESkillStore::InvalidEntry"
+slug: "/errors/ESkillStore--InvalidEntry"
 ---
 
 # ESkillStore::InvalidEntry

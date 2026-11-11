@@ -155,3 +155,35 @@ assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
 ```rust
 pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 7u32;
 ```
+
+### `CLI_WRAPPER_SCHEMA_VERSION` {#maos-spirit-abi-cli-wrapper-schema-version}
+
+Story 20-5 — schema version of a Worker manifest's `[cli_wrapper]` table.
+
+A counter separate from [`MANIFEST_SCHEMA_VERSION`]: a Worker manifest has no
+`[class]`, so it carries no ABI triple. An absent
+`[cli_wrapper] manifest_schema_version` means `1` for the whole v1.x line.
+
+
+```rust
+pub const CLI_WRAPPER_SCHEMA_VERSION: u32 = 1u32;
+```
+
+### `MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION` {#maos-spirit-abi-min-supported-cli-wrapper-schema-version}
+
+Oldest `[cli_wrapper]` schema version this kernel accepts.
+
+
+```rust
+pub const MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION: u32 = 1u32;
+```
+
+### `MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION` {#maos-spirit-abi-max-supported-cli-wrapper-schema-version}
+
+Newest `[cli_wrapper]` schema version this kernel accepts; a higher one is refused
+with `CliWrapperAdmissionError::ECliWrapperSchemaUnsupported`.
+
+
+```rust
+pub const MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION: u32 = 1u32;
+```

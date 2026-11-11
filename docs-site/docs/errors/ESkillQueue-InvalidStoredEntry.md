@@ -2,7 +2,7 @@
 title: "ESkillQueue::InvalidStoredEntry"
 sidebar_position: 0
 description: "Corrupt persisted skill identity or payload"
-slug: "/errors/ESkillQueue::InvalidStoredEntry"
+slug: "/errors/ESkillQueue--InvalidStoredEntry"
 ---
 
 # ESkillQueue::InvalidStoredEntry

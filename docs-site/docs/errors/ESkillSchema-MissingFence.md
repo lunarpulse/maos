@@ -2,7 +2,7 @@
 title: "ESkillSchema::MissingFence"
 sidebar_position: 0
 description: "Error reference for ESkillSchema::MissingFence"
-slug: "/errors/ESkillSchema::MissingFence"
+slug: "/errors/ESkillSchema--MissingFence"
 ---
 
 # ESkillSchema::MissingFence

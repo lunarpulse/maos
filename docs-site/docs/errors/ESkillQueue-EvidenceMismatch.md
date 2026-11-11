@@ -2,7 +2,7 @@
 title: "ESkillQueue::EvidenceMismatch"
 sidebar_position: 0
 description: "Root-fixed telemetry pid requirement"
-slug: "/errors/ESkillQueue::EvidenceMismatch"
+slug: "/errors/ESkillQueue--EvidenceMismatch"
 ---
 
 # ESkillQueue::EvidenceMismatch

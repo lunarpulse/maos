@@ -2,7 +2,7 @@
 title: "ESkillQueue::DuplicateSkillId"
 sidebar_position: 0
 description: "Error reference for ESkillQueue::DuplicateSkillId"
-slug: "/errors/ESkillQueue::DuplicateSkillId"
+slug: "/errors/ESkillQueue--DuplicateSkillId"
 ---
 
 # ESkillQueue::DuplicateSkillId

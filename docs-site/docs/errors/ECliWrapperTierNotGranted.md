@@ -31,7 +31,7 @@ The spirit manifest requests a sandbox tier (e.g. t3) that the host-side grant a
 
 ## Resolution
 
-Add the requested sandbox tier to the host's grant allowlist configuration. Locate the grant allowlist (typically in the MAOS host config or deployment policy) and add the spirit's identity or class to the t3 grant list. Re-deploy after updating the allowlist.
+Add a `[[grant]]` entry for the manifest's `command` (`attested_image`) and `[author]` `name` (`signing_key_id`) with `permitted_tier = "T3"` to the operator-owned grant file that the `MAOS_HOST_GRANTS` environment variable names, then re-run `maos run`. The manifest cannot grant itself a tier; only the host-managed allowlist (the built-in hermetic fixture grants plus that file) can.
 
 ## Source Location
 

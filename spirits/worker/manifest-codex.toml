@@ -55,6 +55,8 @@
 # └────────────────────────────────────────────────────────────────────────────┘
 
 [cli_wrapper]
+# Story 20-5 — the Worker manifest schema version (absent means 1; window 1..=1).
+manifest_schema_version = 1
 command = "codex"
 # → codex exec --sandbox workspace-write --json "<frame-borne task>"
 argv_prefix = ["exec", "--sandbox", "workspace-write", "--json"]

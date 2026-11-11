@@ -36,7 +36,7 @@ cargo build -p maos-bin --release
 
 # Initialize and run
 ./target/release/maos init
-./target/release/maos run
+./target/release/maos run spirits/hello-spirit/manifest.toml
 ```
 
 모든 Spirit은 인프로세스 채널로 통신합니다. Transparency Log는 `$MAOS_HOME/audit/transparency.sqlite`의 로컬 SQLite 데이터베이스입니다.
@@ -73,7 +73,7 @@ export MAOS_A2A_CERT="/etc/maos/tls/host.crt"
 export MAOS_A2A_KEY="/etc/maos/tls/host.key"
 export MAOS_A2A_CA="/etc/maos/tls/ca.crt"
 
-./target/release/maos run
+./target/release/maos run spirits/hello-spirit/manifest.toml
 ```
 
 ## 에어갭 (Air-gapped)

@@ -316,3 +316,13 @@ adr_ref = "ADR-031,ADR-045,ADR-060"
 status = "ratified"
 covered_changes = ["maos:spirit@2.4.0", "lifecycle", "lifecycle-error", "telemetry-event", "spirit-lifecycle"]
 ratified_at = "2026-11-10"
+
+# Story 20-5 AC3 — PROPOSED (never self-ratified): the operator ratifies (D-20-5-04 A).
+# The `[cli_wrapper]` schema version is a counter separate from the Spirit manifest's;
+# absent means 1 for the whole v1.x line, so no manifest written before it changes meaning.
+[[ratification]]
+proposal_id = "20-5-cli-wrapper-schema-version"
+summary = "maos-spirit-abi CLI_WRAPPER_SCHEMA_VERSION = 1 with MIN/MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION; Worker manifests may declare [cli_wrapper] manifest_schema_version; a value outside 1..=1 is refused before the strict parse; absent means 1"
+adr_ref = "ADR-045,ADR-069"
+status = "proposed"
+covered_changes = ["CLI_WRAPPER_SCHEMA_VERSION", "MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION", "MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION", "CliWrapperConfig::take_schema_version", "CliWrapperAdmissionError::ECliWrapperSchemaUnsupported"]

@@ -23,12 +23,15 @@ ignore = [
     # the CCAC N=600 ship-gate corpus, whose hashes are pinned. Migrating to the
     # author-recommended `ciborium` (already in-tree) changes canonical byte
     # ordering → re-pins every ComplianceClaim hash + NFR-Aud-9 corpus. That is a
-    # dedicated story, not a CI-green patch. Tracked as deferred work.
+    # dedicated story, not a CI-green patch. Tracked as deferred work: the
+    # `serde_cbor 0.11.2` row in deferred-work.md (Ownerless and open; 20-5 L1).
     "RUSTSEC-2021-0127",
     # rustls-pemfile 2.2.0 — archived Aug 2025; pulled transitively by the rustls
     # TLS stack under maos-a2a-tcp. "No safe upgrade is available" (latest is a
     # thin wrapper over rustls-pki-types' PemObject). Migration = swap to
     # rustls-pki-types' PemObject API; deferred to an A2A-TLS hardening follow-up.
+    # Tracked as deferred work: the `rustls-pemfile 2.2.0` row in deferred-work.md
+    # (Ownerless and open; 20-5 L1).
     "RUSTSEC-2025-0134",
     # unsafe-libyaml 0.2.11 — unmaintained (RUSTSEC-2024-0449, archived
     # 2024-03-25; first failed this repo's `cargo deny check` in run 38807569588

@@ -2,7 +2,7 @@
 title: "ESkillQueue::NonFiniteEvidence"
 sidebar_position: 0
 description: "Finite durable revision evidence"
-slug: "/errors/ESkillQueue::NonFiniteEvidence"
+slug: "/errors/ESkillQueue--NonFiniteEvidence"
 ---
 
 # ESkillQueue::NonFiniteEvidence

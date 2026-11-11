@@ -2,7 +2,7 @@
 title: "EPinMismatch::NotPinned"
 sidebar_position: 0
 description: "Error reference for EPinMismatch::NotPinned"
-slug: "/errors/EPinMismatch::NotPinned"
+slug: "/errors/EPinMismatch--NotPinned"
 ---
 
 # EPinMismatch::NotPinned

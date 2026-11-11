@@ -84,6 +84,7 @@ mod build_test_fixtures;
 mod check_multi_provider_drift;
 mod check_pentest_gate;
 mod check_pub_field_constructors;
+mod check_rc_readiness;
 mod check_red_team_gate;
 mod check_release_precondition;
 mod check_review_findings_resolved;
@@ -802,12 +803,27 @@ enum Commands {
         #[arg(long)]
         base_url: Option<String>,
     },
+    /// Story 20-5 — tree-state readiness of a `vX.Y.Z-rc.N` candidate (version,
+    /// STABILITY.md, Epic 20 closure, provisioning, deny ignores); never tags.
+    #[command(name = "check-rc-readiness")]
+    CheckRcReadiness {
+        /// The tag the operator will cut; must equal `v` + the workspace version, and
+        /// requires every `20-*` story (this story's own included) to be `done`.
+        #[arg(long)]
+        tag: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 15-4 AC3 — require a successful discipline aggregate before publication.
     #[command(name = "check-release-precondition")]
     CheckReleasePrecondition {
         /// GitHub check-runs API response; reads stdin when omitted.
         #[arg(long)]
         check_runs: Option<String>,
+        /// Story 20-5 AC4 — `fuzz-ledger.json`: also require a complete T3 fuzz chain
+        /// for the released SHA.
+        #[arg(long)]
+        fuzz_ledger: Option<String>,
         #[arg(long)]
         json: bool,
     },
@@ -1478,9 +1494,15 @@ fn main() {
             maosctl,
             base_url,
         } => render_packages::run(&dist_dir, &output, &maosctl, base_url.as_deref()),
-        Commands::CheckReleasePrecondition { check_runs, json } => {
-            check_release_precondition::run(check_runs.as_deref(), json)
+        Commands::CheckRcReadiness { tag, json } => {
+            let workspace_root = std::env::current_dir().expect("failed to get current dir");
+            check_rc_readiness::run(&workspace_root, tag.as_deref(), json)
         }
+        Commands::CheckReleasePrecondition {
+            check_runs,
+            fuzz_ledger,
+            json,
+        } => check_release_precondition::run(check_runs.as_deref(), fuzz_ledger.as_deref(), json),
         Commands::CheckPerfVerdict {
             sha,
             ledger,

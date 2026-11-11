@@ -2,7 +2,7 @@
 title: "EComplianceRejection::MalformedClaim"
 sidebar_position: 0
 description: "Error reference for EComplianceRejection::MalformedClaim"
-slug: "/errors/EComplianceRejection::MalformedClaim"
+slug: "/errors/EComplianceRejection--MalformedClaim"
 ---
 
 # EComplianceRejection::MalformedClaim

@@ -39,6 +39,7 @@ const SPIRIT_ABI_LIB: &str = "crates/maos-spirit-abi/src/lib.rs";
 const CARGO_TOML: &str = "Cargo.toml";
 const STABILITY_MD: &str = "STABILITY.md";
 const BREAKING_MD: &str = "BREAKING.md";
+const RELEASE_CHANNEL_RECORD: &str = "xtask/release-channel.toml";
 
 pub fn run(workspace_root: &Path, check: bool, json: bool) -> Result<(), String> {
     let rendered = render(workspace_root)?;
@@ -136,7 +137,14 @@ fn render(workspace_root: &Path) -> Result<String, String> {
     let cargo_path = workspace_root.join(CARGO_TOML);
     let kernel_version = parse_workspace_version(&cargo_path)?;
     let member_count = count_cargo_toml_members(&cargo_path)?;
-    let lts_clock = lts_clock_start(workspace_root);
+    let lts_clock = lts_clock_start(workspace_root)?;
+    let channel = release_channel(&kernel_version);
+    let cw_current = parse_const(&abi_src, "CLI_WRAPPER_SCHEMA_VERSION")
+        .ok_or_else(|| "CLI_WRAPPER_SCHEMA_VERSION not found".to_string())?;
+    let cw_min = parse_const(&abi_src, "MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION")
+        .ok_or_else(|| "MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION not found".to_string())?;
+    let cw_max = parse_const(&abi_src, "MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION")
+        .ok_or_else(|| "MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION not found".to_string())?;
 
     // N-1 / N-2 rows derived from the live window. N-1 exists only when the
     // current schema is at least 2 (CURRENT-1 ≥ MIN); below that it is N/A.
@@ -183,9 +191,12 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 | Leg | Live value |
 |---|---|
 | `kernel_version` | `{kernel_version}` |
+| release channel | {channel} |
 | `abi_version` | `{abi_version}` |
 | `manifest_schema_version` (current) | `{current_schema}` |
 | supported schema window | `{min_schema}..={max_schema}` |
+| `[cli_wrapper]` `manifest_schema_version` (current; absent means 1) | `{cw_current}` |
+| supported `[cli_wrapper]` window | `{cw_min}..={cw_max}` |
 | workspace crates | `{member_count}` |
 
 | Manifest schema | Kernel behavior |
@@ -195,6 +206,7 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 {n_minus_2}
 | `manifest_schema_version > {max_schema}` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
 | `min_substrate_version` > running `kernel_version` | ⛔ hard refusal — typed `SecurityError::ESubstrateTooOld` (FR8) |
+| `[cli_wrapper]` `manifest_schema_version` outside `{cw_min}..={cw_max}` | ⛔ hard refusal before the strict parse — typed `CliWrapperAdmissionError::ECliWrapperSchemaUnsupported` |
 
 The version gate is **fail-closed in both directions**: an out-of-window
 manifest is refused with an actionable typed error, never silently
@@ -214,11 +226,13 @@ surface MUST appear as a row below AND carry a dated entry in `BREAKING.md`; CI
 
 ## LTS Policy
 
-MAOS v1.5 carries a **2-year LTS commitment** (NFR-Maint-6): the v1.0 line
-receives **security-only patches for 2 years** from the LTS clock-start below.
-The 2-year term takes effect at v1.5, extending the original v1.0 1-year window.
+MAOS v1.0 carries a **1-year LTS commitment** (NFR-Maint-6) from the LTS
+clock-start below; **security-only patches after year 1**. A 2-year commitment
+is a v1.5 decision, taken once support load is known. A release candidate
+(`-rc.N`) carries no LTS commitment and never starts the clock; `v1.0.0` does
+([`docs/release/lts-policy.md`](docs/release/lts-policy.md)).
 
-<!-- lts-clock-start: filled by `stability-matrix` IFF a `1.0.0`/`v1.0.0` git tag exists (Epic 10 cuts the tag); placeholder until then — do NOT fabricate a SHA/tag. -->
+<!-- lts-clock-start: read from the committed `xtask/release-channel.toml`, which `ops-ga-tag-after-holds` writes when it cuts `v1.0.0`; placeholder until then — do NOT fabricate a SHA/tag. -->
 - **LTS clock-start:** {lts_clock}
 
 ## Substrate-Self Compliance Scope
@@ -332,7 +346,7 @@ fn export_non_stub_issue(stability_md: &str) -> Option<String> {
     None
 }
 /// Parse `[workspace.package].version` from `Cargo.toml`.
-fn parse_workspace_version(cargo_path: &Path) -> Result<String, String> {
+pub(crate) fn parse_workspace_version(cargo_path: &Path) -> Result<String, String> {
     let src = std::fs::read_to_string(cargo_path)
         .map_err(|e| format!("cannot read {}: {e}", cargo_path.display()))?;
     let root: toml::Value =
@@ -345,26 +359,59 @@ fn parse_workspace_version(cargo_path: &Path) -> Result<String, String> {
         .ok_or_else(|| "[workspace.package].version not found in Cargo.toml".to_string())
 }
 
-/// Resolve the LTS clock-start field. Fills `<sha> (tag <tag>)` IFF a
-/// `1.0.0`/`v1.0.0` git tag exists; otherwise emits the deterministic
-/// placeholder (the `1.0.0` tag is cut in Epic 10 — Conflict #4; do NOT
-/// fabricate). Best-effort: any git failure → placeholder.
-fn lts_clock_start(workspace_root: &Path) -> String {
-    for tag in ["1.0.0", "v1.0.0"] {
-        if let Ok(out) = std::process::Command::new("git")
-            .args(["rev-list", "-n", "1", tag])
-            .current_dir(workspace_root)
-            .output()
-        {
-            if out.status.success() {
-                let sha = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                if !sha.is_empty() {
-                    return format!("`{sha}` (tag `{tag}`)");
-                }
-            }
-        }
+/// Resolve the LTS clock-start field from the committed record
+/// `xtask/release-channel.toml` (`[lts] clock_start_tag` / `clock_start_sha`), which
+/// `ops-ga-tag-after-holds` writes when it cuts `v1.0.0`. Render never shells out to
+/// git, so a clone and a `git archive` copy produce the same bytes (D-20-5-06 B).
+/// An absent record is the deterministic placeholder; a present but malformed record
+/// is an error, never the placeholder.
+fn lts_clock_start(workspace_root: &Path) -> Result<String, String> {
+    const PLACEHOLDER: &str = "pending — `v1.0.0` is cut by `ops-ga-tag-after-holds` after RELEASE-HOLDS Holds 1–2 clear, which writes `xtask/release-channel.toml`; no clock runs before then.";
+    let path = workspace_root.join(RELEASE_CHANNEL_RECORD);
+    let src = match std::fs::read_to_string(&path) {
+        Ok(src) => src,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(PLACEHOLDER.to_string()),
+        Err(e) => return Err(format!("cannot read {RELEASE_CHANNEL_RECORD}: {e}")),
+    };
+    let record: toml::Value =
+        toml::from_str(&src).map_err(|e| format!("{RELEASE_CHANNEL_RECORD}: {e}"))?;
+    let field = |key: &str| {
+        record
+            .get("lts")
+            .and_then(|lts| lts.get(key))
+            .and_then(toml::Value::as_str)
+            .ok_or_else(|| format!("{RELEASE_CHANNEL_RECORD}: [lts] {key} is missing"))
+    };
+    let (tag, sha) = (field("clock_start_tag")?, field("clock_start_sha")?);
+    let sha_ok =
+        matches!(sha.len(), 40 | 64) && sha.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'));
+    let tag_ok = !tag.is_empty()
+        && tag
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b".-_".contains(&b));
+    if !(sha_ok && tag_ok) {
+        return Err(format!(
+            "{RELEASE_CHANNEL_RECORD}: clock_start_sha must be a lowercase hex commit id and clock_start_tag a plain tag name"
+        ));
     }
-    "pending — the `1.0.0` tag is cut in Epic 10 (`epic-10-v10-ship-gate`); this fills automatically when the tag exists.".to_string()
+    Ok(format!("`{sha}` (tag `{tag}`)"))
+}
+
+/// Story 20-5 — the release channel, from the SemVer pre-release suffix of
+/// `[workspace.package].version`: `-rc.N` is a release candidate (no LTS clock), no
+/// suffix is GA, any other suffix is a development pre-release.
+fn release_channel(kernel_version: &str) -> &'static str {
+    match kernel_version.split_once('-').map(|(_, pre)| pre) {
+        None => "GA",
+        Some(pre)
+            if pre
+                .strip_prefix("rc.")
+                .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())) =>
+        {
+            "release candidate — pre-release; LTS clock not started"
+        }
+        Some(_) => "development pre-release — no LTS commitment",
+    }
 }
 
 /// NFR-Maint-3 cross-check: each `#[maos_attrs::deprecated_since(...)]`
@@ -471,7 +518,18 @@ mod tests {
         assert_eq!(a, b, "render must be byte-deterministic for --check");
         assert!(a.contains("## Compatibility Matrix"));
         assert!(a.contains("## LTS Policy"));
-        assert!(a.contains("2-year LTS"));
+        assert!(
+            a.contains("1-year LTS"),
+            "NFR-Maint-6: v1.0 carries a 1-year LTS"
+        );
+        assert!(
+            !a.contains("2-year LTS"),
+            "the 2-year term is a v1.5 decision"
+        );
+        assert!(
+            !a.contains("Epic 10"),
+            "the clock placeholder names its real owner"
+        );
         assert!(a.contains("## Substrate-Self Compliance Scope"));
         assert!(a.contains("SOC 2") && a.contains("ISO 27001") && a.contains("FedRAMP"));
         assert!(a.contains("## Export"));
@@ -487,9 +545,74 @@ mod tests {
             .parent()
             .unwrap()
             .to_path_buf();
-        // No 1.0.0 tag exists pre-Epic-10 → deterministic placeholder.
-        let clock = lts_clock_start(&root);
-        assert!(clock.contains("Epic 10") || clock.contains("tag `"));
+        // No 1.0.0 tag exists before `ops-ga-tag-after-holds` → deterministic placeholder.
+        let clock = lts_clock_start(&root).expect("no record, or a well-formed one");
+        assert!(clock.contains("ops-ga-tag-after-holds") || clock.contains("tag `"));
+    }
+
+    /// Story 20-5 (D-20-5-06 B) — the clock reads a committed record, never `git`: a
+    /// `git archive` copy and a clone render the same bytes.
+    #[test]
+    fn lts_clock_reads_the_committed_record_and_never_git() {
+        let (_guard, tmp) = isolated_workspace();
+        let placeholder = render(&tmp).expect("render");
+        assert!(
+            placeholder.contains("ops-ga-tag-after-holds"),
+            "no record → placeholder"
+        );
+        let sha = "0123456789abcdef0123456789abcdef01234567";
+        std::fs::create_dir_all(tmp.join("xtask")).unwrap();
+        std::fs::write(
+            tmp.join("xtask/release-channel.toml"),
+            format!("[lts]\nclock_start_tag = \"v1.0.0\"\nclock_start_sha = \"{sha}\"\n"),
+        )
+        .unwrap();
+        let rendered = render(&tmp).expect("render");
+        assert!(
+            rendered.contains(&format!("`{sha}` (tag `v1.0.0`)")),
+            "the record's sha and tag are rendered"
+        );
+        for malformed in [
+            "[lts]\nclock_start_tag = \"v1.0.0\"\nclock_start_sha = \"not-a-sha\"\n",
+            "[lts]\nclock_start_tag = \"v1.0.0\"\n",
+            "not toml = = =",
+        ] {
+            std::fs::write(tmp.join("xtask/release-channel.toml"), malformed).unwrap();
+            assert!(
+                render(&tmp).is_err(),
+                "a malformed record is a loud error, never the placeholder: {malformed}"
+            );
+        }
+    }
+
+    /// Story 20-5 AC2 — a `release channel` row derives from the pre-release suffix.
+    #[test]
+    fn render_names_the_release_channel_from_the_version_suffix() {
+        for (version, expected) in [
+            ("1.0.0-rc.1", "| release channel | release candidate"),
+            ("1.0.0", "| release channel | GA |"),
+            (
+                "0.1.0-alpha.1",
+                "| release channel | development pre-release",
+            ),
+            ("1.0.0-rcx", "| release channel | development pre-release"),
+        ] {
+            let (_guard, tmp) = isolated_workspace();
+            let cargo =
+                format!("[workspace]\nmembers = [\"xtask\"]\n[workspace.package]\nversion = \"{version}\"\n");
+            std::fs::write(tmp.join(CARGO_TOML), cargo).unwrap();
+            let rendered = render(&tmp).expect("render");
+            assert!(rendered.contains(expected), "{version}: {expected}");
+        }
+    }
+
+    /// Story 20-5 AC3.5 — the `[cli_wrapper]` window is published beside the Spirit window.
+    #[test]
+    fn render_publishes_the_cli_wrapper_schema_window() {
+        let (_guard, tmp) = isolated_workspace();
+        let rendered = render(&tmp).expect("render");
+        assert!(rendered.contains("supported `[cli_wrapper]` window | `1..=1` |"));
+        assert!(rendered.contains("ECliWrapperSchemaUnsupported"));
     }
 
     /// Proven-red negative test for `--check` (Story 9.5a, AC-2, D8/Epic-8

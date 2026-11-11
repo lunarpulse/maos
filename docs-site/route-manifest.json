@@ -264,7 +264,7 @@
     }
   ],
   "error_routes_pattern": "/errors/{ERR_NAME}",
-  "expected_distinct_pages": 137,
+  "expected_distinct_pages": 176,
   "error_codes": [
     "EAbiTooNew",
     "EAbiTooOld",
@@ -272,6 +272,7 @@
     "ECliBinaryNotFound",
     "ECliProbeFailed",
     "ECliWrapperRequiresT3",
+    "ECliWrapperSchemaUnsupported",
     "ECliWrapperTierNotGranted",
     "EComplianceRejection::ContextDrift",
     "EComplianceRejection::ExpiredClaim",

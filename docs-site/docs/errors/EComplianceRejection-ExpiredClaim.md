@@ -2,7 +2,7 @@
 title: "EComplianceRejection::ExpiredClaim"
 sidebar_position: 0
 description: "Error reference for EComplianceRejection::ExpiredClaim"
-slug: "/errors/EComplianceRejection::ExpiredClaim"
+slug: "/errors/EComplianceRejection--ExpiredClaim"
 ---
 
 # EComplianceRejection::ExpiredClaim

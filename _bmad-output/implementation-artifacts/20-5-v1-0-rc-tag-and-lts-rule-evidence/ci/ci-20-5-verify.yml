@@ -1,0 +1,58 @@
+# Branch-only recipe. Copy to .github/workflows on ci/20-5-verify; not installed on main.
+# UNVERIFIED: no hosted run exists. It proves, on a hosted runner and with the default token only
+# (read-only, no secret, no tag, no dispatch, no ledger write):
+#   1. the exact `gh api` fetch release.yml uses for fuzz-ledger.json works against the live
+#      `fuzz-ledger` branch, and `check-release-precondition --fuzz-ledger` REFUSES while the branch
+#      holds no complete T3 chain for the SHA (0 T3 records when measured 2026-11-04/11-11);
+#   2. `check-rc-readiness` runs hosted and reports its five legs (it exits non-zero until L2;
+#      the step asserts the non-zero exit and prints the legs, it never turns red legs green).
+# The operator-lane chain itself (dispatch of fuzz-prerelease at the candidate SHA) is NOT simulated.
+name: 20-5 L1 hosted proof
+on:
+  push:
+    branches: ['ci/20-5-verify']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  precondition-refuses-without-a-t3-chain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Fetch the live ledger exactly as release.yml does
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api -H "Accept: application/vnd.github.raw+json" \
+            "repos/${{ github.repository }}/contents/fuzz-ledger.json?ref=fuzz-ledger" > "$RUNNER_TEMP/fuzz-ledger.json"
+          python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print('schema', d['schema_version'], 'records', len(d['records']), 'T3', sum(r['tier']=='T3' for r in d['records']))" "$RUNNER_TEMP/fuzz-ledger.json"
+      - name: The leg refuses (a refusal is the PASS of this step)
+        run: |
+          set -uo pipefail
+          printf '{"check_runs":[{"name":"aggregate","status":"completed","conclusion":"success","head_sha":"%s"}]}' "$GITHUB_SHA" > "$RUNNER_TEMP/check-runs.json"
+          if cargo run --locked -p xtask -- check-release-precondition --check-runs "$RUNNER_TEMP/check-runs.json" --fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json"; then
+            echo "UNEXPECTED: the precondition passed without a complete T3 chain for $GITHUB_SHA"; exit 1
+          fi
+          echo "refused as required"
+  rc-readiness-reports-its-legs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Report the five legs (non-zero until the L2 landing is a fact)
+        run: |
+          set -uo pipefail
+          cargo run --locked -p xtask -- check-rc-readiness --json | tee "$RUNNER_TEMP/readiness.json"
+          status=${PIPESTATUS[0]}
+          python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print({l['leg']: l['passed'] for l in d['legs']})" "$RUNNER_TEMP/readiness.json"
+          echo "check-rc-readiness exit=$status (red legs are reported, never waived)"

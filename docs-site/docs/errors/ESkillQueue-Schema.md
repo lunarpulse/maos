@@ -2,7 +2,7 @@
 title: "ESkillQueue::Schema"
 sidebar_position: 0
 description: "Typed skill document validation failure"
-slug: "/errors/ESkillQueue::Schema"
+slug: "/errors/ESkillQueue--Schema"
 ---
 
 # ESkillQueue::Schema

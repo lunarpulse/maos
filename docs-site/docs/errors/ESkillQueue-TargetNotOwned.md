@@ -2,7 +2,7 @@
 title: "ESkillQueue::TargetNotOwned"
 sidebar_position: 0
 description: "Revision ownership refusal"
-slug: "/errors/ESkillQueue::TargetNotOwned"
+slug: "/errors/ESkillQueue--TargetNotOwned"
 ---
 
 # ESkillQueue::TargetNotOwned

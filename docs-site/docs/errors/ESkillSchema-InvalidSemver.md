@@ -2,7 +2,7 @@
 title: "ESkillSchema::InvalidSemver"
 sidebar_position: 0
 description: "Error reference for ESkillSchema::InvalidSemver"
-slug: "/errors/ESkillSchema::InvalidSemver"
+slug: "/errors/ESkillSchema--InvalidSemver"
 ---
 
 # ESkillSchema::InvalidSemver

@@ -1,0 +1,38 @@
+
+> maos-docs-site@0.0.0 gate:static
+> npm run gate:routes && npm run gate:troubleshoot && npm run gate:glossary-lock && npm run gate:anchor-ids
+
+
+> maos-docs-site@0.0.0 gate:routes
+> node scripts/gate-routes.js
+
+gate:routes — 123 passed, 0 failed
+PASS: gate:routes
+gate:cookbook-count — 13 structural patterns (verified in build)
+PASS: gate:cookbook-count
+
+> maos-docs-site@0.0.0 gate:troubleshoot
+> node scripts/gate-troubleshoot-bidi.js
+
+Catalog codes: 70
+Troubleshoot pages: 70
+PASS: gate:troubleshoot-bidi — symmetric difference is empty
+PASS: route-manifest error_codes == error-catalog keys
+PASS: gate:troubleshoot-teach — code + cause + resolution distinct from summary
+PASS: catalog cause/remediation fields complete + distinct
+
+> maos-docs-site@0.0.0 gate:glossary-lock
+> LOCALE=ko node scripts/gate-glossary-lock.js
+
+Loaded 42 locked terms, 3 denylist entries from DENYLIST
+[docs] scanned 114 en files; checked 38 ko counterparts
+[abi] scanned 18 en files; checked 9 ko counterparts
+Checked 47 ko translation files total
+
+PASS: ko glossary-lock gate — all locked terms present, no denylist violations
+
+> maos-docs-site@0.0.0 gate:anchor-ids
+> node scripts/gate-anchor-ids.js
+
+PASS: gate:anchor-ids — 18 ABI markdown page(s) have explicit heading IDs
+exit=0

@@ -2,7 +2,7 @@
 title: "ESkillSchema::EmptyName"
 sidebar_position: 0
 description: "Error reference for ESkillSchema::EmptyName"
-slug: "/errors/ESkillSchema::EmptyName"
+slug: "/errors/ESkillSchema--EmptyName"
 ---
 
 # ESkillSchema::EmptyName

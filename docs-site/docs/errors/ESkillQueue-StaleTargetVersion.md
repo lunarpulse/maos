@@ -2,7 +2,7 @@
 title: "ESkillQueue::StaleTargetVersion"
 sidebar_position: 0
 description: "Current owned version requirement"
-slug: "/errors/ESkillQueue::StaleTargetVersion"
+slug: "/errors/ESkillQueue--StaleTargetVersion"
 ---
 
 # ESkillQueue::StaleTargetVersion

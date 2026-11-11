@@ -16,9 +16,11 @@
   All PRD journeys served.
 - **GA tag:** ⏳ **Held.** Blocked only by the two external items below. Neither
   blocks further development, branch merges, or internal milestones.
-- **Signed pre-release:** `v0.1.0-alpha.1` is not a GA tag and is unaffected
-  by Holds 1–2 under this ledger's development/GA scope above. Cut it only by
-  following `docs/release/tag-procedure.md`.
+- **Signed pre-release:** `v0.1.0-alpha.1` and the `v1.0.0-rc.N` release candidates
+  are not GA tags and are unaffected by Holds 1–2 under this ledger's
+  development/GA scope above. Cut them only by following
+  `docs/release/tag-procedure.md`. A release candidate carries no LTS commitment and
+  starts no LTS clock; `v1.0.0` does (`docs/release/lts-policy.md`).
 
 ## Holds
 
@@ -70,9 +72,9 @@
 | 20 | **Worker workspaces are not size-capped (Story 19-3; operator rulings `r19_3_disk` and `r19_3_hold_kind`, 2026-10-28).** Since 19-3 every T3 Worker run writes to a host-backed workspace (`--volume=<dir>:/workspace:rw,U`) that is kept after the Worker exits and has no size quota. Before 19-3 everything a Worker could write was tmpfs counted against its memory limit; now a runaway or prompt-injected Worker can write until the filesystem holding the workspaces root is full. By default that root is `<MAOS_HOME>/workspaces`, on the same filesystem as the MAOS home's audit store (the Transparency Log), so audit writes can fail with it; retained workspaces also accumulate across runs. **Mitigations in force (they do not cap anything):** `MAOS_WORKER_WORKSPACES_ROOT` (an absolute path) moves the workspaces root to a separate filesystem, off the audit store; after each Worker run `maos run` checks free space on the workspace's filesystem and, below 1 GiB, warns on stderr (`maos run: WARNING: Worker workspaces filesystem at <workspace> has <n> bytes free (below 1073741824); …`) — a warning, never a refusal, and not journaled; `maos purge` enumerates both `<MAOS_HOME>/workspaces` and a configured `MAOS_WORKER_WORKSPACES_ROOT`, and removes Worker-owned files with `podman unshare rm -rf --one-file-system` or reports them as residue. | That a Worker's disk use is bounded, that a Worker cannot exhaust the filesystem holding its workspaces root, or that the audit store is protected from a runaway Worker when the workspaces root is left at its default. The low-space warning is an operator signal, not a control. | A per-workspace size cap (filesystem project quota, or a size-capped mount with copy-out) enforced at the T3 Worker spawn, with a committed proven-red vector showing a Worker that writes past the cap cannot exhaust the host filesystem. Owner unscheduled. |
 
 ## GA-tag procedure (do not tag until both clear)
-This section governs GA tags only. The signed `v0.1.0-alpha.1` pre-release
-follows `docs/release/tag-procedure.md` and may be cut while Holds 1–2 remain
-open, consistent with this ledger's Scope.
+This section governs GA tags only. The signed `v0.1.0-alpha.1` pre-release and the
+`v1.0.0-rc.N` release candidates follow `docs/release/tag-procedure.md` and may be
+cut while Holds 1–2 remain open, consistent with this ledger's Scope.
 
 
 1. Hold 1: pen-test report received, joint-panel triage records **zero P0/P1

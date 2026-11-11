@@ -2,7 +2,7 @@
 title: "ESkillStore::NoDataHome"
 sidebar_position: 0
 description: "Private skill data home unavailable"
-slug: "/errors/ESkillStore::NoDataHome"
+slug: "/errors/ESkillStore--NoDataHome"
 ---
 
 # ESkillStore::NoDataHome

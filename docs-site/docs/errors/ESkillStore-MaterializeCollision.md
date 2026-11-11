@@ -2,7 +2,7 @@
 title: "ESkillStore::MaterializeCollision"
 sidebar_position: 0
 description: "Foreign skill file collision"
-slug: "/errors/ESkillStore::MaterializeCollision"
+slug: "/errors/ESkillStore--MaterializeCollision"
 ---
 
 # ESkillStore::MaterializeCollision

@@ -506,7 +506,10 @@ fn generate_catalog_artifact(catalog: &Catalog) -> String {
                 "description": entry.description,
                 "cause": entry.cause,
                 "remediation": entry.remediation,
-                "docs_url": format!("https://docs.maos.dev/errors/{}", entry.code),
+                // A `Family::Variant` code is served at `/errors/Family--Variant`: a `:` in
+                // a Docusaurus slug is a route parameter and collapses every variant of
+                // a family onto one page (Story 20-5, AC6).
+                "docs_url": format!("https://docs.maos.dev/errors/{}", entry.code.replace("::", "--")),
             }),
         );
     }
@@ -1071,7 +1074,7 @@ mod tests {
             let url = entry["docs_url"].as_str().unwrap();
             assert_eq!(
                 url,
-                &format!("https://docs.maos.dev/errors/{}", code),
+                &format!("https://docs.maos.dev/errors/{}", code.replace("::", "--")),
                 "each error must map to docs.maos.dev/errors/<ERR_NAME>"
             );
         }
@@ -1160,9 +1163,13 @@ mod tests {
                 .expect("docs_url must be a string");
             assert_eq!(
                 url,
-                &format!("https://docs.maos.dev/errors/{}", code),
+                &format!("https://docs.maos.dev/errors/{}", code.replace("::", "--")),
                 "link-shape: {} must map to docs.maos.dev/errors/<ERR_NAME>",
                 code
+            );
+            assert!(
+                !url["https://".len()..].contains(':'),
+                "{code}: a `:` in a route is a Docusaurus parameter; variants use `--`"
             );
         }
     }

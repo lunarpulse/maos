@@ -605,16 +605,20 @@ pub fn run_cli_wrapper_manifest(
         resolve_cli_wrapper_tier, spawn_and_bridge, Backpressure, BridgeSpawnSpec,
     };
     use maos_kernel_core::security::manifest::CliWrapperConfig;
+    // Story 20-5 — a Worker manifest's schema version is read and checked FIRST, before
+    // any other parse, so a manifest from a newer schema is refused as too new rather
+    // than as an unknown key in whichever section it extended.
+    let mut cw_section = manifest_root
+        .get("cli_wrapper")
+        .ok_or("maos run: missing [cli_wrapper] section")?
+        .clone();
+    CliWrapperConfig::take_schema_version(&mut cw_section).map_err(|e| format!("maos run: {e}"))?;
     // Parse and resolve resources before probes, host binding, or token minting.
     let resolved_caps = resolve_worker_caps(manifest_root, policy.as_ref())?;
 
     // 1. Parse [cli_wrapper].
-    let cw_toml = toml::to_string(
-        manifest_root
-            .get("cli_wrapper")
-            .ok_or("maos run: missing [cli_wrapper] section")?,
-    )
-    .map_err(|e| format!("maos run: serialize [cli_wrapper]: {e}"))?;
+    let cw_toml = toml::to_string(&cw_section)
+        .map_err(|e| format!("maos run: serialize [cli_wrapper]: {e}"))?;
     let mut config = CliWrapperConfig::from_toml_str(&cw_toml)
         .map_err(|e| format!("maos run: [cli_wrapper] parse: {e}"))?;
 

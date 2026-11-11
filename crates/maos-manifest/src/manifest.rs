@@ -4646,6 +4646,39 @@ pub enum CliWrapperControlChannel {
 }
 
 impl CliWrapperConfig {
+    /// Story 20-5 — remove `manifest_schema_version` from a `[cli_wrapper]` table and
+    /// check it against the supported window BEFORE the strict parse: the struct is
+    /// `deny_unknown_fields`, so a newer manifest that adds keys must be refused as too
+    /// new, not as an unknown field. Absent means `1` (every manifest written before the
+    /// key existed). Anything but an integer inside the window is refused, typed.
+    pub fn take_schema_version(
+        section: &mut toml::Value,
+    ) -> Result<u32, maos_domain::cli_wrapper::CliWrapperAdmissionError> {
+        use maos_spirit_abi::{
+            MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION as MAX,
+            MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION as MIN,
+        };
+        let Some(declared) = section
+            .as_table_mut()
+            .and_then(|table| table.remove("manifest_schema_version"))
+        else {
+            return Ok(1);
+        };
+        let in_window = match &declared {
+            toml::Value::Integer(value) => u32::try_from(*value)
+                .ok()
+                .filter(|value| (MIN..=MAX).contains(value)),
+            _ => None,
+        };
+        in_window.ok_or_else(|| {
+            maos_domain::cli_wrapper::CliWrapperAdmissionError::ECliWrapperSchemaUnsupported {
+                declared: declared.to_string().chars().take(64).collect(),
+                min_supported: MIN,
+                max_supported: MAX,
+            }
+        })
+    }
+
     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
         let cfg: Self = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
         cfg.validate()?;

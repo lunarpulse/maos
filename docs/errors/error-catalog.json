@@ -95,6 +95,22 @@
     "remediation": "Set `tier = \"T3\"` in the manifest's `[sandbox]` table, or omit `[sandbox]` (a Worker requests `T3` by default). The operator must also grant `T3` for the manifest's `command` and `[author]` `name` in the `MAOS_HOST_GRANTS` file; otherwise admission fails with `ECliWrapperTierNotGranted`.",
     "docs_url": "https://docs.maos.dev/errors/ECliWrapperRequiresT3"
   },
+  "ECliWrapperSchemaUnsupported": {
+    "code": "ECliWrapperSchemaUnsupported",
+    "rust_path": "CliWrapperAdmissionError::ECliWrapperSchemaUnsupported",
+    "severity": "policy",
+    "recovery_class": "reject",
+    "retryable": false,
+    "cause_chain_semantics": "admission or runtime policy",
+    "owner": "maos-domain",
+    "kernel_or_spirit": "kernel",
+    "since_version": "1.0.0",
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "description": "Worker manifest [cli_wrapper] manifest_schema_version is outside the supported window or not an integer — refused before the strict parse",
+    "cause": "The Worker manifest's `[cli_wrapper]` table declares `manifest_schema_version` with a value outside the window this kernel accepts (`1..=1`), or with a value that is not an integer (a string, a float, a boolean, an array, zero or a negative number). The check runs before the strict parse of the table, so a manifest written for a newer schema is refused as too new rather than as an unknown key. An absent key means `1`; the check runs before any probe, process or token exists.",
+    "remediation": "Set `manifest_schema_version` in `[cli_wrapper]` to an integer inside the window the error message names (`1` today), or remove the key (absent means `1`). A manifest written for a newer schema needs a newer MAOS kernel: upgrade the kernel, do not edit the manifest down.",
+    "docs_url": "https://docs.maos.dev/errors/ECliWrapperSchemaUnsupported"
+  },
   "ECliWrapperTierNotGranted": {
     "code": "ECliWrapperTierNotGranted",
     "rust_path": "CliWrapperAdmissionError::ECliWrapperTierNotGranted",
@@ -108,7 +124,7 @@
     "version_stability": "stable within LTS cycle — no breaking error-code changes",
     "description": "Manifest requested sandbox tier not granted by host-side grant allowlist — fail-closed, no silent downgrade",
     "cause": "The spirit manifest requests a sandbox tier (e.g. t3) that the host-side grant allowlist does not include. The kernel enforces fail-closed behavior — it will not silently downgrade to a lower tier.",
-    "remediation": "Add the requested sandbox tier to the host's grant allowlist configuration. Locate the grant allowlist (typically in the MAOS host config or deployment policy) and add the spirit's identity or class to the t3 grant list. Re-deploy after updating the allowlist.",
+    "remediation": "Add a `[[grant]]` entry for the manifest's `command` (`attested_image`) and `[author]` `name` (`signing_key_id`) with `permitted_tier = \"T3\"` to the operator-owned grant file that the `MAOS_HOST_GRANTS` environment variable names, then re-run `maos run`. The manifest cannot grant itself a tier; only the host-managed allowlist (the built-in hermetic fixture grants plus that file) can.",
     "docs_url": "https://docs.maos.dev/errors/ECliWrapperTierNotGranted"
   },
   "EComplianceRejection::ContextDrift": {
@@ -125,7 +141,7 @@
     "description": "Runtime execution-context drifted from the attested ComplianceClaim fingerprint",
     "cause": "During runtime, the execution context (environment fingerprint, resource bindings, or host state) changed in a way that no longer matches the fingerprint attested in the ComplianceClaim. This indicates the compliance invariant was violated after initial admission.",
     "remediation": "Investigate what changed in the execution environment since the ComplianceClaim was issued. Common triggers include host reconfiguration, resource re-binding, or container migration. Re-attest the ComplianceClaim against the current context fingerprint and re-submit the spirit.",
-    "docs_url": "https://docs.maos.dev/errors/EComplianceRejection::ContextDrift"
+    "docs_url": "https://docs.maos.dev/errors/EComplianceRejection--ContextDrift"
   },
   "EComplianceRejection::ExpiredClaim": {
     "code": "EComplianceRejection::ExpiredClaim",
@@ -141,7 +157,7 @@
     "description": "ComplianceClaim carried an expires_at_unix_ms in the past",
     "cause": "The ComplianceClaim's `expires_at_unix_ms` timestamp is in the past relative to the kernel's clock. Claims are time-bounded to prevent stale attestations from being replayed.",
     "remediation": "Re-issue the ComplianceClaim with a fresh `expires_at_unix_ms` value. Ensure the claim-issuing service and the MAOS kernel have synchronized clocks (NTP). If clock skew is suspected, check `timedatectl` or equivalent on both the issuer and the kernel host.",
-    "docs_url": "https://docs.maos.dev/errors/EComplianceRejection::ExpiredClaim"
+    "docs_url": "https://docs.maos.dev/errors/EComplianceRejection--ExpiredClaim"
   },
   "EComplianceRejection::MalformedClaim": {
     "code": "EComplianceRejection::MalformedClaim",
@@ -157,7 +173,7 @@
     "description": "ComplianceClaim could not be decoded, was missing a required field, or carried an unknown enum value",
     "cause": "The ComplianceClaim payload could not be decoded (invalid encoding), was missing a required field (e.g. `issuer`, `subject`, `expires_at_unix_ms`), or contained an unrecognized enum variant that the kernel cannot interpret.",
     "remediation": "Validate the ComplianceClaim against the expected schema before submission. Ensure all required fields are present and that enum values match the kernel's known set. Use a JSON/CBOR validator to check encoding integrity.",
-    "docs_url": "https://docs.maos.dev/errors/EComplianceRejection::MalformedClaim"
+    "docs_url": "https://docs.maos.dev/errors/EComplianceRejection--MalformedClaim"
   },
   "EComplianceRejection::SignatureInvalid": {
     "code": "EComplianceRejection::SignatureInvalid",
@@ -173,7 +189,7 @@
     "description": "ComplianceClaim Ed25519 signature verification failed (or signing_alg unsupported)",
     "cause": "The Ed25519 signature on the ComplianceClaim failed cryptographic verification. This can occur if the claim was tampered with in transit, signed with a wrong or rotated key, or uses an unsupported signing algorithm.",
     "remediation": "Verify that the signing key used to produce the ComplianceClaim matches the public key the kernel trusts. Check the key fingerprint with the compliance authority. If keys were rotated, update the kernel's trusted-key store and re-sign the claim.",
-    "docs_url": "https://docs.maos.dev/errors/EComplianceRejection::SignatureInvalid"
+    "docs_url": "https://docs.maos.dev/errors/EComplianceRejection--SignatureInvalid"
   },
   "ECrossWallRecallDenied": {
     "code": "ECrossWallRecallDenied",
@@ -397,7 +413,7 @@
     "description": "Fingerprint insertion refused — another peer already holds the fingerprint as a current pin or open rotation generation",
     "cause": "A proposed first-contact pin, operator-approved re-pin, or next rotation fingerprint is already held by another peer as a current pin or open rotation generation. Opening a rotation window with the peer's own current fingerprint is also refused.",
     "remediation": "Compare the reported peer, colliding_peer, and fingerprint against the trusted peer configuration. Give each peer a distinct verified identity; for rotation, use a new fingerprint different from the current pin. Investigate unexpected key reuse before retrying the trust or rotation operation.",
-    "docs_url": "https://docs.maos.dev/errors/EPinMismatch::FingerprintCollision"
+    "docs_url": "https://docs.maos.dev/errors/EPinMismatch--FingerprintCollision"
   },
   "EPinMismatch::Invalidated": {
     "code": "EPinMismatch::Invalidated",
@@ -413,7 +429,7 @@
     "description": "TOFU pin invalidated for peer (Spirit restart, manual invalidation)",
     "cause": "The TOFU (Trust On First Use) pin for a peer is invalidated. Usually the peer Spirit restarted: its frame carried a boot nonce different from the pinned one (NFR-Rel-6 restart detection), the certificate identity is unchanged, and re-pin consent is required. The pin can also be manually invalidated, or a rotation-window or first-contact operation can be refused against an existing or invalidated pin.",
     "remediation": "After a peer restart, confirm the restart with the peer's operator and obtain its new boot nonce (decimal) out of band. On the receiving host's `cohort-a2a-daemon` door run `maosctl a2a repin list`, then `maosctl a2a repin approve <peer> --boot-nonce <N>` within 300 s of the detection: it re-pins the SAME pinned fingerprint with nonce N and writes an Approval Decision Log row first. The re-pin is held in memory only; a restart of the receiving daemon rebuilds pins from `[[tcp.peer_pins]]`. The alternative recovery is to correct that row's `boot_nonce` and restart the receiving host. If the restart was unexpected, investigate a possible compromise before approving; refuse with `maosctl a2a repin reject <peer> --boot-nonce <N>`.",
-    "docs_url": "https://docs.maos.dev/errors/EPinMismatch::Invalidated"
+    "docs_url": "https://docs.maos.dev/errors/EPinMismatch--Invalidated"
   },
   "EPinMismatch::Mismatch": {
     "code": "EPinMismatch::Mismatch",
@@ -429,7 +445,7 @@
     "description": "TOFU pin mismatch for peer — pinned fingerprint does not match observed",
     "cause": "The observed cryptographic fingerprint of a peer spirit does not match the previously pinned fingerprint (TOFU). This is a potential man-in-the-middle indicator — something is presenting a different identity than what was trusted on first contact.",
     "remediation": "Do NOT blindly accept the new fingerprint. Investigate why the peer's fingerprint changed. If the peer was legitimately re-keyed, verify through an out-of-band channel and update the pin. If the change is unexplained, treat it as a potential security incident and escalate to the security team.",
-    "docs_url": "https://docs.maos.dev/errors/EPinMismatch::Mismatch"
+    "docs_url": "https://docs.maos.dev/errors/EPinMismatch--Mismatch"
   },
   "EPinMismatch::NotPinned": {
     "code": "EPinMismatch::NotPinned",
@@ -445,7 +461,7 @@
     "description": "No TOFU pin recorded for peer — first-contact not yet attempted",
     "cause": "No TOFU pin exists for the target peer. Pins are configured, not learned: each one is loaded at transport bind from a `[[tcp.peer_pins]]` row in this host's configuration, and an unpinned peer is refused rather than trusted on first contact.",
     "remediation": "Verify the peer's leaf-certificate SHA-256 fingerprint and current boot nonce out of band, add a `[[tcp.peer_pins]]` row for it (`peer_id`, `fingerprint`, decimal `boot_nonce`) to this host's configuration, and restart this process so the pin store is rebuilt from config. No runtime command creates a first pin; `maosctl a2a repin` only re-arms an existing pin.",
-    "docs_url": "https://docs.maos.dev/errors/EPinMismatch::NotPinned"
+    "docs_url": "https://docs.maos.dev/errors/EPinMismatch--NotPinned"
   },
   "ERegionTagInvalid": {
     "code": "ERegionTagInvalid",
@@ -509,7 +525,7 @@
     "description": "Revision proposal proposed_diff must be non-empty (FR57)",
     "cause": "A skill revision proposal was submitted with an empty `proposed_diff` field. Per FR57, every revision proposal must contain a non-empty diff describing what changed.",
     "remediation": "Populate the `proposed_diff` field with the actual changes before submitting the revision proposal. The diff should describe the content modifications between the current skill version and the proposed revision.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillProposal::EmptyDiff"
+    "docs_url": "https://docs.maos.dev/errors/ESkillProposal--EmptyDiff"
   },
   "ESkillProposal::EmptyTargetId": {
     "code": "ESkillProposal::EmptyTargetId",
@@ -525,7 +541,7 @@
     "description": "Revision proposal target_skill_id must be non-empty",
     "cause": "A skill revision proposal was submitted with an empty `target_skill_id` field. The proposal must identify which skill it targets.",
     "remediation": "Set the `target_skill_id` field to the non-empty identifier of the skill being revised. Use `maos skill list` to find valid skill IDs in the registry.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillProposal::EmptyTargetId"
+    "docs_url": "https://docs.maos.dev/errors/ESkillProposal--EmptyTargetId"
   },
   "ESkillProposal::InvalidTargetIdCharset": {
     "code": "ESkillProposal::InvalidTargetIdCharset",
@@ -541,7 +557,7 @@
     "description": "Revision proposal target_skill_id contains invalid characters",
     "cause": "The `target_skill_id` in the revision proposal contains characters outside the allowed set. Skill IDs must conform to the charset rules (typically lowercase alphanumeric, hyphens, and dots).",
     "remediation": "Correct the `target_skill_id` to use only allowed characters: lowercase letters (a-z), digits (0-9), hyphens (-), and dots (.). Remove or replace any uppercase letters, spaces, underscores, or special characters.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillProposal::InvalidTargetIdCharset"
+    "docs_url": "https://docs.maos.dev/errors/ESkillProposal--InvalidTargetIdCharset"
   },
   "ESkillProposal::InvalidTargetVersion": {
     "code": "ESkillProposal::InvalidTargetVersion",
@@ -557,7 +573,7 @@
     "description": "Revision proposal target_version is not valid semver",
     "cause": "The `target_version` field in the revision proposal is not a valid semver string (e.g. `1.2.3`). The kernel requires strict semver for all version references.",
     "remediation": "Fix the `target_version` to be a valid semver string (MAJOR.MINOR.PATCH, e.g. `1.0.0`). Pre-release and build metadata are allowed per semver spec (e.g. `1.0.0-beta.1`). Do not use partial versions like `1.0` or non-numeric segments.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillProposal::InvalidTargetVersion"
+    "docs_url": "https://docs.maos.dev/errors/ESkillProposal--InvalidTargetVersion"
   },
   "ESkillQueue::AlreadyDecided": {
     "code": "ESkillQueue::AlreadyDecided",
@@ -573,7 +589,7 @@
     "description": "Terminal skill admission decision",
     "cause": "The selected queue entry is already Admitted or Rejected rather than Pending.",
     "remediation": "Show the entry and reconcile approval rows before preparing a decision. Submit a new version or revision instead of rewriting a terminal decision.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::AlreadyDecided"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--AlreadyDecided"
   },
   "ESkillQueue::AmbiguousEntry": {
     "code": "ESkillQueue::AmbiguousEntry",
@@ -589,7 +605,7 @@
     "description": "Entry id required for a shared skill id",
     "cause": "Multiple queued versions or proposals share the selected skill id; first-match selection could decide the wrong payload.",
     "remediation": "Select an exact entry id from the queue list. Revision approval targets end in #entry_id and never share the base skill's decision target.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::AmbiguousEntry"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--AmbiguousEntry"
   },
   "ESkillQueue::AuthoredIdTooLong": {
     "code": "ESkillQueue::AuthoredIdTooLong",
@@ -605,7 +621,7 @@
     "description": "Authored skill identifier exceeds the shared length limit",
     "cause": "An authored skill id exceeds the operator door's 128-byte identifier boundary.",
     "remediation": "Choose a lowercase namespaced id of at most 128 ASCII bytes before submitting; do not truncate an existing identity.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::AuthoredIdTooLong"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--AuthoredIdTooLong"
   },
   "ESkillQueue::CapabilityEscalation": {
     "code": "ESkillQueue::CapabilityEscalation",
@@ -621,7 +637,7 @@
     "description": "Skill requirements exceed the author's declared actions",
     "cause": "At least one required_capabilities entry is not an exact member of the root-supplied declared scope action keys.",
     "remediation": "Remove undeclared requirements or change and re-admit the Spirit manifest through normal operator admission. Skill documents never grant authority.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::CapabilityEscalation"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--CapabilityEscalation"
   },
   "ESkillQueue::DuplicateSkillId": {
     "code": "ESkillQueue::DuplicateSkillId",
@@ -637,7 +653,7 @@
     "description": "A conflicting pending submission or already-recorded canonical entry identity exists",
     "cause": "New documents are bounded to one Pending entry per skill id. Revisions are bounded to one Pending entry per target and full author provenance (class, pid, boot nonce). Exact canonical entry identities cannot be replayed, including after a terminal decision.",
     "remediation": "Wait for the pending entry's operator decision before submitting a distinct payload. Use an advancing document version or a new revision payload rather than replaying an entry; select exact entry ids for coexisting revisions.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::DuplicateSkillId"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--DuplicateSkillId"
   },
   "ESkillQueue::EntryNotFound": {
     "code": "ESkillQueue::EntryNotFound",
@@ -653,7 +669,7 @@
     "description": "Unknown queue selector",
     "cause": "No queued entry matches the requested entry id or skill id.",
     "remediation": "List the queue in the intended data home and use a returned exact entry id. No decision or payload mutation occurred.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::EntryNotFound"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--EntryNotFound"
   },
   "ESkillQueue::EvidenceMismatch": {
     "code": "ESkillQueue::EvidenceMismatch",
@@ -669,7 +685,7 @@
     "description": "Telemetry evidence pid differs from author provenance",
     "cause": "The root-assembled telemetry report pid differs from the fixed author pid.",
     "remediation": "Obtain evidence from the root aggregator for the bound pid since its bind instant. Do not coerce the pid or accept Spirit-supplied evidence.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::EvidenceMismatch"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--EvidenceMismatch"
   },
   "ESkillQueue::ForeignNamespace": {
     "code": "ESkillQueue::ForeignNamespace",
@@ -685,7 +701,7 @@
     "description": "Authored skill id is outside the author's namespace",
     "cause": "An authored id does not begin with the root-resolved author class followed by a dot.",
     "remediation": "Use an id in the author's own class namespace; do not alter provenance or bypass the root-bound port. Nothing is enqueued.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::ForeignNamespace"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--ForeignNamespace"
   },
   "ESkillQueue::InvalidStoredEntry": {
     "code": "ESkillQueue::InvalidStoredEntry",
@@ -701,7 +717,7 @@
     "description": "Corrupt persisted skill identity or payload",
     "cause": "Stored identity, payload or provenance violates queue invariants, including SHA mismatch, duplicate live entry id, missing author payload or mismatched document id/version.",
     "remediation": "Preserve the original file and restore validated data. Do not recompute hashes to legitimize altered content. V1 label-only entries remain explicitly legacy.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::InvalidStoredEntry"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--InvalidStoredEntry"
   },
   "ESkillQueue::NonFiniteEvidence": {
     "code": "ESkillQueue::NonFiniteEvidence",
@@ -717,7 +733,7 @@
     "description": "Revision evidence cannot be durably represented",
     "cause": "Revision telemetry contains a non-finite f32 halt value or threshold that cannot round-trip through durable JSON.",
     "remediation": "Correct the telemetry producer and submit only finite evidence; preserve the existing queue and never replace non-finite measurements with fabricated values.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::NonFiniteEvidence"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--NonFiniteEvidence"
   },
   "ESkillQueue::PayloadTooLarge": {
     "code": "ESkillQueue::PayloadTooLarge",
@@ -733,7 +749,7 @@
     "description": "Skill submission exceeds the payload byte limit",
     "cause": "A Spirit-authored document or revision diff exceeds 256 KiB.",
     "remediation": "Reduce the document or diff to at most 256 KiB before submitting it.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::PayloadTooLarge"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--PayloadTooLarge"
   },
   "ESkillQueue::PendingLimit": {
     "code": "ESkillQueue::PendingLimit",
@@ -749,7 +765,7 @@
     "description": "Author class has reached the pending submission limit",
     "cause": "The author class already has 64 pending skill submissions.",
     "remediation": "Have an operator decide pending submissions before submitting another.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::PendingLimit"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--PendingLimit"
   },
   "ESkillQueue::PrincipalDataRefused": {
     "code": "ESkillQueue::PrincipalDataRefused",
@@ -765,7 +781,7 @@
     "description": "Payload contains an indexed principal id",
     "cause": "The document or diff contains a token-bounded principal id indexed to the root-fixed author pid; the queue is outside forget's erasure reach.",
     "remediation": "Remove personal identifiers before resubmission. Do not echo the matched principal in a refusal receipt. Unindexed personal data remains a stated limit of this check.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::PrincipalDataRefused"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--PrincipalDataRefused"
   },
   "ESkillQueue::Proposal": {
     "code": "ESkillQueue::Proposal",
@@ -781,7 +797,7 @@
     "description": "Typed revision proposal validation failure",
     "cause": "A live or stored revision has an invalid target id/version or an empty diff; the wrapped ESkillProposal preserves the precise cause.",
     "remediation": "Correct the proposal before resubmitting. Keep root-attached evidence and opaque diff semantics; approval does not apply the diff.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::Proposal"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--Proposal"
   },
   "ESkillQueue::Schema": {
     "code": "ESkillQueue::Schema",
@@ -797,7 +813,7 @@
     "description": "Typed skill document validation failure",
     "cause": "A live or stored authored document failed strict maos.skill.v1 validation; the wrapped ESkillSchema identifies the precise failure.",
     "remediation": "Correct the document according to the schema cause before resubmitting. Restore persisted invalid content from validated data rather than silently discarding it.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::Schema"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--Schema"
   },
   "ESkillQueue::StaleTargetVersion": {
     "code": "ESkillQueue::StaleTargetVersion",
@@ -813,7 +829,7 @@
     "description": "Target version is stale or authored version does not advance",
     "cause": "A proposal names a version other than the highest admitted owned semver, or a new authored document does not strictly exceed every same-id non-revision queue entry in any state and every discovered package version.",
     "remediation": "Read current owned entries before proposing. Submit authored documents above all previous non-revision and discovered versions, including rejected drafts; approval of an opaque revision alone does not apply a diff.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::StaleTargetVersion"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--StaleTargetVersion"
   },
   "ESkillQueue::TargetNotOwned": {
     "code": "ESkillQueue::TargetNotOwned",
@@ -829,7 +845,7 @@
     "description": "Revision target is not an admitted skill authored by this class",
     "cause": "The target has no admitted AuthorSelf document whose provenance class matches the root-resolved author class; package and legacy entries do not establish ownership.",
     "remediation": "Select an admitted owned skill from own_entries. Have the operator admit the original authored document first; nothing is enqueued on refusal.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::TargetNotOwned"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--TargetNotOwned"
   },
   "ESkillQueue::UnknownEntryPath": {
     "code": "ESkillQueue::UnknownEntryPath",
@@ -845,7 +861,7 @@
     "description": "Unknown persisted admission entry label",
     "cause": "A stored entry label is not package_shipped, author_self or revision_proposal. Unknown v1 labels also refuse migration.",
     "remediation": "Preserve the queue and restore validated provenance. Never substitute PackageShipped or proceed with an invented empty queue after load failure.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::UnknownEntryPath"
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue--UnknownEntryPath"
   },
   "ESkillSchema::EmptyBody": {
     "code": "ESkillSchema::EmptyBody",
@@ -861,7 +877,7 @@
     "description": "Skill body must be present (non-empty markdown after frontmatter fence)",
     "cause": "The skill document has no content after the TOML frontmatter fence. A skill must contain non-empty markdown body text that describes its behavior.",
     "remediation": "Add markdown content after the closing `---` fence of the TOML frontmatter. The body should describe the skill's purpose, triggers, and behavior. Even a minimal description is required.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillSchema::EmptyBody"
+    "docs_url": "https://docs.maos.dev/errors/ESkillSchema--EmptyBody"
   },
   "ESkillSchema::EmptyId": {
     "code": "ESkillSchema::EmptyId",
@@ -877,7 +893,7 @@
     "description": "Skill id must be non-empty",
     "cause": "The skill's TOML frontmatter has an `id` field that is empty or contains only whitespace. Every skill must have a non-empty identifier.",
     "remediation": "Set the `id` field in the TOML frontmatter to a non-empty value. Example: `id = \"my-skill-name\"`. The ID must also conform to charset rules (lowercase alphanumeric, hyphens, dots).",
-    "docs_url": "https://docs.maos.dev/errors/ESkillSchema::EmptyId"
+    "docs_url": "https://docs.maos.dev/errors/ESkillSchema--EmptyId"
   },
   "ESkillSchema::EmptyName": {
     "code": "ESkillSchema::EmptyName",
@@ -893,7 +909,7 @@
     "description": "Skill name must be non-empty",
     "cause": "The skill's TOML frontmatter has a `name` field that is empty or contains only whitespace. Every skill must have a human-readable display name.",
     "remediation": "Set the `name` field in the TOML frontmatter to a non-empty human-readable string. Example: `name = \"My Skill Name\"`. The name is used for display purposes in the skill registry.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillSchema::EmptyName"
+    "docs_url": "https://docs.maos.dev/errors/ESkillSchema--EmptyName"
   },
   "ESkillSchema::InvalidIdCharset": {
     "code": "ESkillSchema::InvalidIdCharset",
@@ -909,7 +925,7 @@
     "description": "Skill id contains invalid characters (allowed: a-z, 0-9, '-', '.')",
     "cause": "The skill's `id` field contains characters outside the allowed set. Only lowercase letters (a-z), digits (0-9), hyphens (-), and dots (.) are permitted.",
     "remediation": "Rename the skill ID to use only allowed characters. Replace uppercase letters with lowercase, spaces/underscores with hyphens. Example: `My_Skill` → `my-skill`.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillSchema::InvalidIdCharset"
+    "docs_url": "https://docs.maos.dev/errors/ESkillSchema--InvalidIdCharset"
   },
   "ESkillSchema::InvalidSemver": {
     "code": "ESkillSchema::InvalidSemver",
@@ -925,7 +941,7 @@
     "description": "Skill version is not a valid semver string",
     "cause": "The skill's `version` field in the TOML frontmatter is not a valid semver string. The kernel strictly validates version strings at parse time.",
     "remediation": "Set the `version` field to a valid semver string: `MAJOR.MINOR.PATCH` (e.g. `version = \"1.0.0\"`). Partial versions like `1.0` or non-numeric versions like `v1` are not accepted.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillSchema::InvalidSemver"
+    "docs_url": "https://docs.maos.dev/errors/ESkillSchema--InvalidSemver"
   },
   "ESkillSchema::MissingFence": {
     "code": "ESkillSchema::MissingFence",
@@ -941,7 +957,7 @@
     "description": "maos.skill.v1 document missing the --- TOML frontmatter fence",
     "cause": "The skill document is missing the `---` TOML frontmatter fence. The `maos.skill.v1` format requires a fenced TOML block at the top of the document.",
     "remediation": "Add the TOML frontmatter fence at the top of the skill document. The document must start with `---` followed by TOML key-value pairs and end with `---` before the markdown body. Example:\n```\n---\nid = \"my-skill\"\nname = \"My Skill\"\nversion = \"1.0.0\"\n---\nSkill body here.\n```",
-    "docs_url": "https://docs.maos.dev/errors/ESkillSchema::MissingFence"
+    "docs_url": "https://docs.maos.dev/errors/ESkillSchema--MissingFence"
   },
   "ESkillSchema::TomlParse": {
     "code": "ESkillSchema::TomlParse",
@@ -957,7 +973,7 @@
     "description": "TOML frontmatter failed to parse (malformed syntax, missing required field, wrong value type)",
     "cause": "The TOML content within the frontmatter fences failed to parse. This is caused by malformed TOML syntax (unclosed quotes, invalid escapes), a missing required field, or a field with the wrong value type (e.g. string where integer expected).",
     "remediation": "Validate the TOML frontmatter with a TOML linter (e.g. `taplo check`). Fix any syntax errors, add missing required fields, and ensure value types match the schema. Common issues: unquoted strings, missing commas in arrays, bare keys with special characters.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillSchema::TomlParse"
+    "docs_url": "https://docs.maos.dev/errors/ESkillSchema--TomlParse"
   },
   "ESkillSchema::UnknownField": {
     "code": "ESkillSchema::UnknownField",
@@ -973,7 +989,7 @@
     "description": "Unknown field in TOML frontmatter — deny_unknown_fields rejects it",
     "cause": "The TOML frontmatter contains a field name that is not recognized by the skill schema. The schema uses `deny_unknown_fields` to reject any extraneous keys, preventing silent misconfiguration.",
     "remediation": "Remove the unrecognized field from the TOML frontmatter. Check the skill schema documentation for the list of valid fields. Common mistakes: typos in field names (e.g. `verson` instead of `version`), or fields from a newer schema version not yet supported.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillSchema::UnknownField"
+    "docs_url": "https://docs.maos.dev/errors/ESkillSchema--UnknownField"
   },
   "ESkillStore::InvalidEntry": {
     "code": "ESkillStore::InvalidEntry",
@@ -989,7 +1005,7 @@
     "description": "Typed stored or submitted entry validation refusal",
     "cause": "The durable API rejected a submitted or stored entry with a typed ESkillQueue cause such as failed namespace/ownership, principal data, escalation or corrupt payload.",
     "remediation": "Handle the wrapped queue variant without string fallback. Preserve unreadable queues and journal non-personal live refusal receipts at the root-fixed author pid.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillStore::InvalidEntry"
+    "docs_url": "https://docs.maos.dev/errors/ESkillStore--InvalidEntry"
   },
   "ESkillStore::Io": {
     "code": "ESkillStore::Io",
@@ -1005,7 +1021,7 @@
     "description": "Filesystem I/O failure reading or writing the durable skill-queue cache (queue.json)",
     "cause": "The skill-queue store encountered a filesystem error reading queue.json or creating, writing, syncing, or renaming its atomic replacement. A nonexistent queue file alone is treated as an empty queue, not this error.",
     "remediation": "Inspect the underlying I/O error and <maos_home>/skills/queue.json (MAOS_HOME, otherwise HOME/.maos). Restore directory access, writable storage, and available space as appropriate; preserve existing queues and journal the one-time validated migration from the former data-home path.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillStore::Io"
+    "docs_url": "https://docs.maos.dev/errors/ESkillStore--Io"
   },
   "ESkillStore::Json": {
     "code": "ESkillStore::Json",
@@ -1021,7 +1037,7 @@
     "description": "The durable payload queue could not be strictly serialized or deserialized",
     "cause": "Invalid JSON, missing required v2 identity/provenance/payload fields, unknown fields or incompatible types prevent strict serialization/deserialization. V1 label-only entries require the explicit versioned migration.",
     "remediation": "Preserve queue.json and inspect the underlying JSON error. Restore validated payload data or repair it deliberately before submitting or deciding. Discovery and the transparency log cannot reconstruct documents, diffs or telemetry evidence: never rebuild an empty queue over a corrupt payload store.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillStore::Json"
+    "docs_url": "https://docs.maos.dev/errors/ESkillStore--Json"
   },
   "ESkillStore::MaterializeCollision": {
     "code": "ESkillStore::MaterializeCollision",
@@ -1037,7 +1053,7 @@
     "description": "Foreign skill file materialization collision",
     "cause": "The destination skill file is not recognized as admitted document bytes owned by the same author class; byte equality to an unadmitted draft alone does not establish ownership.",
     "remediation": "Preserve and inspect the existing file, then resolve the collision explicitly before reconciliation. Do not overwrite foreign content merely because a queue decision committed. Revision decisions never materialize.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillStore::MaterializeCollision"
+    "docs_url": "https://docs.maos.dev/errors/ESkillStore--MaterializeCollision"
   },
   "ESkillStore::NoDataHome": {
     "code": "ESkillStore::NoDataHome",
@@ -1053,7 +1069,7 @@
     "description": "Private skill data home unavailable",
     "cause": "Neither MAOS_HOME nor HOME identifies a private home, or authored admission was called without an explicit materialization directory. Persisted payloads have no tmp fallback.",
     "remediation": "Configure an absolute MAOS_HOME or the intended user's HOME. The queue uses <maos_home>/skills/queue.json; admitted documents use HOME/.maos/skills. Daemon boot warns and leaves authoring unavailable rather than blocking unrelated modes; explicit test paths remain supported.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillStore::NoDataHome"
+    "docs_url": "https://docs.maos.dev/errors/ESkillStore--NoDataHome"
   },
   "ESkillStore::UnknownSchemaVersion": {
     "code": "ESkillStore::UnknownSchemaVersion",
@@ -1069,7 +1085,7 @@
     "description": "queue.json carries an unknown/absent schema_version (hard error — no best-effort parse; the version stamp is a tripwire)",
     "cause": "The queue declares neither maos.skill-queue.v2 nor the supported v1 migration format, or omits schema_version. Unknown versions are never interpreted as the current schema.",
     "remediation": "Use compatible software and preserve the original payload file. Restore a valid backup if necessary; do not relabel an unknown schema, discard payloads or rebuild an empty queue over unreadable data. V1 files migrate explicitly and save as v2.",
-    "docs_url": "https://docs.maos.dev/errors/ESkillStore::UnknownSchemaVersion"
+    "docs_url": "https://docs.maos.dev/errors/ESkillStore--UnknownSchemaVersion"
   },
   "ESubstrateTooOld": {
     "code": "ESubstrateTooOld",

@@ -11,7 +11,13 @@ const MANIFEST: &str = include_str!("../manifest.toml");
 
 #[test]
 fn cli_wrapper_section_parses_with_authoritative_validator() {
-    let cfg = CliWrapperConfig::from_toml_str(&section(MANIFEST, "cli_wrapper"))
+    let mut section = value(MANIFEST)["cli_wrapper"].clone();
+    assert_eq!(
+        CliWrapperConfig::take_schema_version(&mut section).expect("schema version in window"),
+        1,
+        "the shipped Worker manifest declares manifest_schema_version = 1"
+    );
+    let cfg = CliWrapperConfig::from_toml_str(&toml::to_string(&section).unwrap())
         .expect("[cli_wrapper] valid");
     assert_eq!(cfg.command, "worker-cli-fixture");
     assert_eq!(cfg.argv_prefix, vec!["--maos-worker".to_string()]);

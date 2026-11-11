@@ -1,0 +1,50 @@
+# failing-before AC6.2: docs-site built from the HEAD f56959c2 docs (git-archive scratch copy /tmp/d205/head/docs-site), 2026-11-11
+# note: the scratch build exited 1 on the ko locale (symlinked node_modules in the scratch copy; raw: /tmp/d205/head-docs-build.log); the en locale site, which holds /errors/*, was written and is what is read here
+build/errors/EComplianceRejection::ContextDrift -> <title data-rh="true">EComplianceRejection::ContextDrift | MAOS
+build/errors/EComplianceRejection::ExpiredClaim -> <title data-rh="true">EComplianceRejection::ContextDrift | MAOS
+build/errors/EComplianceRejection::MalformedClaim -> <title data-rh="true">EComplianceRejection::ContextDrift | MAOS
+build/errors/EComplianceRejection::SignatureInvalid -> <title data-rh="true">EComplianceRejection::ContextDrift | MAOS
+build/errors/EPinMismatch::FingerprintCollision -> <title data-rh="true">EPinMismatch::FingerprintCollision | MAOS
+build/errors/EPinMismatch::Invalidated -> <title data-rh="true">EPinMismatch::FingerprintCollision | MAOS
+build/errors/EPinMismatch::Mismatch -> <title data-rh="true">EPinMismatch::FingerprintCollision | MAOS
+build/errors/EPinMismatch::NotPinned -> <title data-rh="true">EPinMismatch::FingerprintCollision | MAOS
+build/errors/ESkillProposal::EmptyDiff -> <title data-rh="true">ESkillProposal::EmptyDiff | MAOS
+build/errors/ESkillProposal::EmptyTargetId -> <title data-rh="true">ESkillProposal::EmptyDiff | MAOS
+build/errors/ESkillProposal::InvalidTargetIdCharset -> <title data-rh="true">ESkillProposal::EmptyDiff | MAOS
+build/errors/ESkillProposal::InvalidTargetVersion -> <title data-rh="true">ESkillProposal::EmptyDiff | MAOS
+build/errors/ESkillQueue::AlreadyDecided -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::AmbiguousEntry -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::AuthoredIdTooLong -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::CapabilityEscalation -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::DuplicateSkillId -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::EntryNotFound -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::EvidenceMismatch -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::ForeignNamespace -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::InvalidStoredEntry -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::NonFiniteEvidence -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::PayloadTooLarge -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::PendingLimit -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::PrincipalDataRefused -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::Proposal -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::Schema -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::StaleTargetVersion -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::TargetNotOwned -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillQueue::UnknownEntryPath -> <title data-rh="true">ESkillQueue::AlreadyDecided | MAOS
+build/errors/ESkillSchema::EmptyBody -> <title data-rh="true">ESkillSchema::EmptyBody | MAOS
+build/errors/ESkillSchema::EmptyId -> <title data-rh="true">ESkillSchema::EmptyBody | MAOS
+build/errors/ESkillSchema::EmptyName -> <title data-rh="true">ESkillSchema::EmptyBody | MAOS
+build/errors/ESkillSchema::InvalidIdCharset -> <title data-rh="true">ESkillSchema::EmptyBody | MAOS
+build/errors/ESkillSchema::InvalidSemver -> <title data-rh="true">ESkillSchema::EmptyBody | MAOS
+build/errors/ESkillSchema::MissingFence -> <title data-rh="true">ESkillSchema::EmptyBody | MAOS
+build/errors/ESkillSchema::TomlParse -> <title data-rh="true">ESkillSchema::EmptyBody | MAOS
+build/errors/ESkillSchema::UnknownField -> <title data-rh="true">ESkillSchema::EmptyBody | MAOS
+build/errors/ESkillStore::InvalidEntry -> <title data-rh="true">ESkillStore::InvalidEntry | MAOS
+build/errors/ESkillStore::Io -> <title data-rh="true">ESkillStore::InvalidEntry | MAOS
+build/errors/ESkillStore::Json -> <title data-rh="true">ESkillStore::InvalidEntry | MAOS
+build/errors/ESkillStore::MaterializeCollision -> <title data-rh="true">ESkillStore::InvalidEntry | MAOS
+build/errors/ESkillStore::NoDataHome -> <title data-rh="true">ESkillStore::InvalidEntry | MAOS
+build/errors/ESkillStore::UnknownSchemaVersion -> <title data-rh="true">ESkillStore::InvalidEntry | MAOS
+
+variant routes: 44
+distinct <title> values across the variant routes:
+6

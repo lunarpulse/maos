@@ -18,8 +18,9 @@ MAOS가 호스트 네트워크나 홈 디렉터리에 접근하지 않고 지원
 ```toml
 # A Worker manifest: [cli_wrapper] replaces [class]; never declare both.
 [cli_wrapper]
+manifest_schema_version = 1
 command = "codex"
-argv_prefix = ["exec", "--json", "--sandbox", "workspace-write"]
+argv_prefix = ["exec", "--sandbox", "workspace-write", "--json"]
 output_shape_version = "1.0.0"
 recovery_policy = "escalate"
 egress = ["api.openai.com:443"]

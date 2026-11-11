@@ -2,7 +2,7 @@
 title: "ESkillQueue::Proposal"
 sidebar_position: 0
 description: "Typed revision proposal validation failure"
-slug: "/errors/ESkillQueue::Proposal"
+slug: "/errors/ESkillQueue--Proposal"
 ---
 
 # ESkillQueue::Proposal

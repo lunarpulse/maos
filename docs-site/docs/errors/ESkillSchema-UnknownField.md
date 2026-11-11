@@ -2,7 +2,7 @@
 title: "ESkillSchema::UnknownField"
 sidebar_position: 0
 description: "Error reference for ESkillSchema::UnknownField"
-slug: "/errors/ESkillSchema::UnknownField"
+slug: "/errors/ESkillSchema--UnknownField"
 ---
 
 # ESkillSchema::UnknownField

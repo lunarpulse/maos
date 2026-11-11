@@ -2,7 +2,7 @@
 title: "ESkillQueue::AmbiguousEntry"
 sidebar_position: 0
 description: "Entry id required for shared skill id"
-slug: "/errors/ESkillQueue::AmbiguousEntry"
+slug: "/errors/ESkillQueue--AmbiguousEntry"
 ---
 
 # ESkillQueue::AmbiguousEntry

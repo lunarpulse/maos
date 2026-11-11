@@ -2,7 +2,7 @@
 title: "ESkillQueue::AlreadyDecided"
 sidebar_position: 0
 description: "Terminal skill admission decision"
-slug: "/errors/ESkillQueue::AlreadyDecided"
+slug: "/errors/ESkillQueue--AlreadyDecided"
 ---
 
 # ESkillQueue::AlreadyDecided

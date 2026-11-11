@@ -2,7 +2,7 @@
 title: "ESkillProposal::InvalidTargetVersion"
 sidebar_position: 0
 description: "Error reference for ESkillProposal::InvalidTargetVersion"
-slug: "/errors/ESkillProposal::InvalidTargetVersion"
+slug: "/errors/ESkillProposal--InvalidTargetVersion"
 ---
 
 # ESkillProposal::InvalidTargetVersion

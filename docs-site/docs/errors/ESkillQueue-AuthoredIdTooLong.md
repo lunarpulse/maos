@@ -2,7 +2,7 @@
 title: "ESkillQueue::AuthoredIdTooLong"
 sidebar_position: 0
 description: "Authored identifier length limit"
-slug: "/errors/ESkillQueue::AuthoredIdTooLong"
+slug: "/errors/ESkillQueue--AuthoredIdTooLong"
 ---
 
 # ESkillQueue::AuthoredIdTooLong

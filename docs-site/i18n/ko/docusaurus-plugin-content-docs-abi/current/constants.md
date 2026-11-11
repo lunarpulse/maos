@@ -139,3 +139,32 @@ assert!(!is_version_supported(6)); // Above ceiling — EAbiTooNew
 ```rust
 pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 6u32;
 ```
+
+### `CLI_WRAPPER_SCHEMA_VERSION` {#maos-spirit-abi-cli-wrapper-schema-version}
+
+Story 20-5 — Worker manifest의 `[cli_wrapper]` table 스키마 버전입니다.
+
+[`MANIFEST_SCHEMA_VERSION`]과 별개의 카운터입니다. Worker manifest에는 `[class]`가 없으므로 ABI 트리플을 갖지 않습니다. `[cli_wrapper] manifest_schema_version`이 없으면 v1.x 전체에서 `1`을 뜻합니다.
+
+
+```rust
+pub const CLI_WRAPPER_SCHEMA_VERSION: u32 = 1u32;
+```
+
+### `MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION` {#maos-spirit-abi-min-supported-cli-wrapper-schema-version}
+
+이 kernel이 허용하는 가장 오래된 `[cli_wrapper]` 스키마 버전입니다.
+
+
+```rust
+pub const MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION: u32 = 1u32;
+```
+
+### `MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION` {#maos-spirit-abi-max-supported-cli-wrapper-schema-version}
+
+이 kernel이 허용하는 가장 새로운 `[cli_wrapper]` 스키마 버전입니다. 더 높은 값은 `CliWrapperAdmissionError::ECliWrapperSchemaUnsupported`로 거부됩니다. Worker manifest가 이 범위를 벗어나면 엄격한 파싱 전에 거부됩니다.
+
+
+```rust
+pub const MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION: u32 = 1u32;
+```

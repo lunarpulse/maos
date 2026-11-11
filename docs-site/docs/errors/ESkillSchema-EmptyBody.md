@@ -2,7 +2,7 @@
 title: "ESkillSchema::EmptyBody"
 sidebar_position: 0
 description: "Error reference for ESkillSchema::EmptyBody"
-slug: "/errors/ESkillSchema::EmptyBody"
+slug: "/errors/ESkillSchema--EmptyBody"
 ---
 
 # ESkillSchema::EmptyBody

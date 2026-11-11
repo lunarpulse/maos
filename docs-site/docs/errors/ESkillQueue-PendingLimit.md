@@ -2,7 +2,7 @@
 title: "ESkillQueue::PendingLimit"
 sidebar_position: 0
 description: "Skill author pending submission limit"
-slug: "/errors/ESkillQueue::PendingLimit"
+slug: "/errors/ESkillQueue--PendingLimit"
 ---
 
 # ESkillQueue::PendingLimit

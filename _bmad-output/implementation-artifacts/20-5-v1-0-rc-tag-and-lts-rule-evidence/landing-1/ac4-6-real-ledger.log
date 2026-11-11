@@ -1,0 +1,9 @@
+# AC4.6 measured 2026-11-11: HEAD sha f56959c25d6e49640ad37107dce008033adef587 vs the LIVE fuzz-ledger branch (GET contents API, read-only) and the stale local remote-tracking ref
+real-ledger-gh.json schema 1 records 42 {'T2': 42}
+real-ledger-local-ref.json schema 1 records 9 {'T2': 9}
+## real-ledger-gh.json
+release precondition failed: no complete T3 fuzz chain for manifest_parser at f56959c25d6e49640ad37107dce008033adef587 (5 links of one run, >= 86400 measured libFuzzer seconds); the operator dispatches fuzz-prerelease at this SHA before tagging
+rc=1
+## real-ledger-local-ref.json
+release precondition failed: no complete T3 fuzz chain for manifest_parser at f56959c25d6e49640ad37107dce008033adef587 (5 links of one run, >= 86400 measured libFuzzer seconds); the operator dispatches fuzz-prerelease at this SHA before tagging
+rc=1

@@ -2,7 +2,7 @@
 title: "ESkillStore::UnknownSchemaVersion"
 sidebar_position: 0
 description: "Error reference for ESkillStore::UnknownSchemaVersion"
-slug: "/errors/ESkillStore::UnknownSchemaVersion"
+slug: "/errors/ESkillStore--UnknownSchemaVersion"
 ---
 
 # ESkillStore::UnknownSchemaVersion

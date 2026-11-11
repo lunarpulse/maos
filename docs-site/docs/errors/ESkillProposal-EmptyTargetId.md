@@ -2,7 +2,7 @@
 title: "ESkillProposal::EmptyTargetId"
 sidebar_position: 0
 description: "Error reference for ESkillProposal::EmptyTargetId"
-slug: "/errors/ESkillProposal::EmptyTargetId"
+slug: "/errors/ESkillProposal--EmptyTargetId"
 ---
 
 # ESkillProposal::EmptyTargetId

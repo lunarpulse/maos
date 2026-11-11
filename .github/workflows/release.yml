@@ -115,12 +115,32 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
+      - name: Require rc tree readiness (rc tags only)
+        if: contains(github.ref_name, '-rc.')
+        env:
+          TAG: ${{ github.ref_name }}
+        run: cargo run --locked -p xtask -- check-rc-readiness --tag "$TAG"
       - name: Require successful main discipline aggregate
         env:
           GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
+          set -euo pipefail
+          # Story 20-5 AC4: a release candidate or GA tag also needs a complete T3 fuzz
+          # chain (3 targets x 5 links x >= 24 h measured) for this exact SHA in the
+          # `fuzz-ledger` branch; the operator dispatches `fuzz-prerelease` before
+          # tagging. Other pre-releases (the alpha line) keep the aggregate-only rule.
+          fuzz_args=()
+          case "$REF_NAME" in
+            *-rc.*) fuzz_args=(--fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json") ;;
+            *-*) ;;
+            *) fuzz_args=(--fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json") ;;
+          esac
+          if [ "${#fuzz_args[@]}" -gt 0 ]; then
+            gh api -H "Accept: application/vnd.github.raw+json" "repos/${{ github.repository }}/contents/fuzz-ledger.json?ref=fuzz-ledger" > "$RUNNER_TEMP/fuzz-ledger.json"
+          fi
           gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=aggregate&status=completed&filter=latest" |
-            cargo run --locked -p xtask -- check-release-precondition
+            cargo run --locked -p xtask -- check-release-precondition "${fuzz_args[@]}"
       - uses: actions/download-artifact@v4
         with:
           path: dist

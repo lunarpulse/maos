@@ -2,7 +2,7 @@
 title: "EPinMismatch::Mismatch"
 sidebar_position: 0
 description: "Error reference for EPinMismatch::Mismatch"
-slug: "/errors/EPinMismatch::Mismatch"
+slug: "/errors/EPinMismatch--Mismatch"
 ---
 
 # EPinMismatch::Mismatch

@@ -2,7 +2,7 @@
 title: "ESkillQueue::UnknownEntryPath"
 sidebar_position: 0
 description: "Unknown persisted entry label refusal"
-slug: "/errors/ESkillQueue::UnknownEntryPath"
+slug: "/errors/ESkillQueue--UnknownEntryPath"
 ---
 
 # ESkillQueue::UnknownEntryPath

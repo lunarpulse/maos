@@ -2,7 +2,7 @@
 title: "EComplianceRejection::ContextDrift"
 sidebar_position: 0
 description: "Error reference for EComplianceRejection::ContextDrift"
-slug: "/errors/EComplianceRejection::ContextDrift"
+slug: "/errors/EComplianceRejection--ContextDrift"
 ---
 
 # EComplianceRejection::ContextDrift

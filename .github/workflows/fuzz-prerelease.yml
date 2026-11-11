@@ -2,12 +2,14 @@
 # Four <=6h links cannot hold 24h plus setup under the hosted 6h job cap.
 # Operator ruling: link COUNT yields to 24h; five 5h soaks leave setup headroom.
 # The final assertion checks libFuzzer-measured seconds, never configured time.
-# The rc release precondition is owned by 20-5, not implemented here.
+# The rc release precondition (`check-release-precondition --fuzz-ledger`, 20-5) reads
+# this chain from the `fuzz-ledger` branch; it never starts it. The operator dispatches
+# this workflow at the candidate SHA (`gh workflow run fuzz-prerelease.yml --ref main`)
+# and waits for `t3-ledger-collect` BEFORE tagging: a tag push trigger would start a
+# second ~26 h chain after the tag it was meant to precede.
 name: fuzz-prerelease
 on:
   workflow_dispatch:
-  push:
-    tags: ['v*-rc*']
 permissions:
   contents: write
   actions: read

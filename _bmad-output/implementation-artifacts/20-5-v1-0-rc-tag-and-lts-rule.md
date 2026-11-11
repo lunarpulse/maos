@@ -24,7 +24,7 @@ Thus C is below shared STOP 21250; the frontmatter/Kernel table/cumulative parag
 no alternative is newly granted by the STOP change.
 
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Created 2026-11-04 at 73e7afbc (main; `git log -1 -- crates xtask` = 73e7afbc) by bmad-create-story under the lighter measured creation contract (`Create205`). Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30); 20-3a Q3 (2026-10-15: the rc-tag T3 precondition is routed here); 17-1 Q8 (2026-10-07: the `[cli_wrapper]` schema version is owned here); D-18-0-03 (2026-10-24: the deny ignore re-check is owned here). D-20-5-01…16 were ruled as recommended by the operator on 2026-11-04 (ask d205); grants bind at dev start and re-base onto the then-landed exact pins. No cargo ran: cites re-read at HEAD (`creation/cites-73e7afbc.md`); kernel and kloc by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`); ledger, tag, secret and run facts read-only (`creation/cites-73e7afbc.md` §O). Stale E20 §20-5 cites corrected in place (`creation/records-owed.md` §A). -->
 
@@ -163,6 +163,8 @@ B 21205, C 21219 (STOP). Not compiled ([INFERENCE]; measurement 1).
 | maos-spirit-abi | 1042 | +3 | **1048** | yes |
 | maos-bin | 34504 | +2 meas, 0…+20 | **34568** (+4 + 60) | yes |
 | aggregate | 193140 | +272…+327 | **193869** (+729); hardfail = measured + 1 | yes |
+
+**L1 re-base at dev start — 2026-11-11 (D02 A; base `f56959c2`, exact pins read from `xtask/kloc.toml` (c8e5d035 reproduced earlier by `kloc-check --json` on a `git archive` copy): bin 37832, wasm-host 3137, xtask 44936, maos-manifest 4738, maos-domain 10203, maos-spirit-abi 1042 (pin ceiling 3000 retained), aggregate 201396, `_aggregate_hardfail` 201397, kernel 26841 / 21042).** Ceiling = base + the allowance column above: **xtask ≤ 45527** (+591), **maos-manifest ≤ 4790** (+52), **maos-domain ≤ 10219** (+16), **maos-spirit-abi ≤ 1048** (+6), **maos-bin ≤ 37896** (+64), **aggregate ≤ 202125** (+729), **kernel 0**. Landed L1 (exact formatted): xtask 45315 (+379), maos-manifest 4765 (+27), maos-domain 10211 (+8), maos-spirit-abi 1045 (+3), maos-bin 37833 (+1), aggregate 201814 (+418; `_aggregate_hardfail` 201815), kernel unchanged — every figure inside its ceiling; the xtask figure is above the creation forecast (+213 measured / +268 with the inferred bands) because the readiness gate, the clock-record reader and the T3 leg were written with their error paths (`creation/measurements.md` priced prototypes that were never compiled).
 
 Interaction: every unlanded Epic 20 story claims room in these crates (`creation/measurements.md` "Cumulative claims":
 xtask ≈ +864 in deltas plus 20-7/20-1a's 45830; aggregate ≈ +10.0k plus residues). 20-5 lands last, so each ceiling
@@ -341,14 +343,14 @@ run. No AC needs a secret, a tag or a dispatch.)*
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight.** Operator rulings on D-20-5-01…16 and the ABI row recorded; tracker → `in-progress`. Run
+- [x] **T0 — Preflight.** Operator rulings on D-20-5-01…16 and the ABI row recorded; tracker → `in-progress`. Run *(L1, 2026-11-11: rulings read; ceilings re-based above; measurements 1, 2, 3, 6, 7 done (landing-1/evidence.md); 4 (public-api) by `check-abi-ratification` only; tracker → `in-progress`.)*
   `creation/measurements.md` "Not measured here" 1–8 (L1 needs 1–4, 6, 7). Re-measure every cite this story touches
   (rule 9). A figure above the ruled envelope, a kernel line, or a T0 result contradicting a ruled option is STOP + D-row.
-- [ ] **T1 — LTS rule (AC2).** `stability_matrix.rs`, STABILITY.md, `lts-policy.md`, RELEASE-HOLDS, coverage matrix.
-- [ ] **T2 — `[cli_wrapper]` schema (AC3).** Consts, peel, variant, readers, catalog + page, manifests, ABI proposal.
-- [ ] **T3 — T3 precondition (AC4).** Leg, `release.yml`, `fuzz-prerelease.yml` trigger, procedure, vectors, plant.
-- [ ] **T4 — Readiness (AC5).** Command, release wiring, fixtures, plant.
-- [ ] **T5 — Docs truth + deny record (AC6, AC7).**
+- [x] **T1 — LTS rule (AC2).** `stability_matrix.rs`, STABILITY.md, `lts-policy.md`, RELEASE-HOLDS, coverage matrix. *(L1 done.)*
+- [x] **T2 — `[cli_wrapper]` schema (AC3).** Consts, peel, variant, readers, catalog + page, manifests, ABI proposal. *(L1 done; ABI row PROPOSED, never self-ratified.)*
+- [x] **T3 — T3 precondition (AC4).** Leg, `release.yml`, `fuzz-prerelease.yml` trigger, procedure, vectors, plant. *(L1 done; hosted run and the operator's chain unverified.)*
+- [x] **T4 — Readiness (AC5).** Command, release wiring, fixtures, plant. *(L1 done.)*
+- [x] **T5 — Docs truth + deny record (AC6, AC7).** *(L1 done.)*
 - [ ] **T6 — L1 landing.** Exact pins inside the ruled envelope; `check-kernel-baseline` unchanged; `kloc-check`,
   `check-abi-ratification`, `check-dev-record-completeness`, `check-epic-close-coherence`, `check-exit-commands`,
   `check-decision-register`, `prepush`; one hosted discipline run on the final tree + plants. No commit or push without
@@ -507,7 +509,25 @@ tree (in sync). `kloc-check` / `check-kernel-baseline` ran on archive copies onl
 
 ### Agent Model Used
 
-anthropic/claude-opus-5-5 (creation).
+anthropic/claude-opus-5-5 (creation); anthropic/claude-sonnet-5-5 (`Dev205L1`, landing 1).
+
+### Landing 1 (kernel-free: AC2–AC7), 2026-11-11, base `f56959c2`, uncommitted
+
+Evidence: `20-5-v1-0-rc-tag-and-lts-rule-evidence/landing-1/evidence.md` (witness table, red/plant logs, kloc, gates, what was NOT run). Operator-lane steps (T3 dispatch, tag, signing, protected `release` environment, ledger access, ABI ratification) are operator-owned and unverified. L2 (AC1, AC8, AC9) is not started.
+
+**What landed.** AC2: `stability_matrix.rs` renders a release-channel row (`-rc.N` / GA / development), the 1-year LTS text per NFR-Maint-6, the placeholder re-pointed to `ops-ga-tag-after-holds`, and reads the LTS clock from the committed `xtask/release-channel.toml` (absent until GA; malformed = error; no `git`); `docs/release/lts-policy.md`, RELEASE-HOLDS, coverage-matrix note, `tag-procedure.md` generalized to `vX.Y.Z-rc.N`. AC3: `CLI_WRAPPER_SCHEMA_VERSION` + window consts, `CliWrapperConfig::take_schema_version` (struct untouched; peel before ANY other Worker parse in `run_cli_wrapper_manifest`, the only production strict parse), `ECliWrapperSchemaUnsupported` (`declared` is the TOML literal as a bounded `String`, a deviation from the prototype's `u32` so `"x"`/`-1` are not shown as `0`), catalog entry + page, five Worker manifests and the docs examples stamped `manifest_schema_version = 1`, shipped-manifest readers in tests peel first, ABI row `20-5-cli-wrapper-schema-version` PROPOSED. AC4: `check-release-precondition --fuzz-ledger` (per run: five distinct links 1..=5 at the exact commit, `tier T3`, max-per-link, Σ ≥ 86 400; schema/malformed/missing/empty-SHA are loud errors), `release.yml` fetches the ledger and requires the chain for rc and GA tags (other pre-releases unchanged), the `v*-rc*` push trigger of `fuzz-prerelease.yml` removed. AC5: `check-rc-readiness [--tag] [--json]`, five legs, wired into `release.yml` for rc tags. AC6: topology (en + ko), v3 `argv_prefix`, TierNotGranted remediation (catalog + page), 44 variant pages served at `/errors/<Family>--<Variant>` (slugs, `docs_url`, generated catalog, troubleshoot links, `gate-routes.js`, Playwright `manifest.ts`), `expected_distinct_pages` 137 → 176 (confirmed by the local Playwright a11y run). AC7: dated re-check and rows for RUSTSEC-2021-0127 / -2025-0134, `deny.toml` comments.
+
+**Corrections / observations.** The prototype diffs were re-cut against the current tree (manifest.rs, worker_spawn.rs and main.rs had moved; `main()` returns `()`, so no `?`). More readers than the story listed strict-parse shipped manifests (`worker_manifests_2a.rs` ×2, `cookbook_manifests_17_3b.rs`, `spirits/worker/tests/spirit_smoke.rs`): they now peel first. `maos run` prints errors through `{:?}`, so a string `declared` appears escaped (the door vector unescapes). A stale ko ABI constants page needed the new sections for the glossary-lock gate. The first AC3 plant attempt did not apply (post-`cargo fmt` text) and ran green; it was discarded and redone. After the plants the xtask binary must be rebuilt before reading evidence from it (an evidence read from a planted binary was caught and redone).
+
+**kloc (exact).** xtask 44936 → 45315 (+379; ceiling 45527), maos-manifest 4738 → 4765 (4790), maos-domain 10203 → 10211 (10219), maos-spirit-abi 1042 → 1045 (1048; pin ceiling 3000), maos-bin 37832 → 37833 (37896), aggregate 201396 → 201814 (202125; hardfail 201815). Kernel 26841 / 21042 unchanged.
+
+**Verification.** After a recovery (the untracked files were rebuilt from this transcript, the logs regenerated) the one workspace nextest ran: 5957 run, 5955 passed, 2 failed, both unrelated (`kloc_check_runs_on_workspace`: the operator's untracked `spikes/gpui-operator-shell`; `erasure_million_20_11` 1M-row timing, already a deferred row owned by 20-7); `verb_table_15_3` no-default 7/7; all gates, clippy and the ratchet green (evidence.md). `prepush` skipped (wraps the same run).
+
+**Not done.** Hosted legs and every operator-lane step (unverified); L2 (AC1, AC8, AC9).
+
+### File List (landing 1)
+
+xtask: `src/{check_rc_readiness (new),check_release_precondition,stability_matrix,check_error_catalog,main}.rs`, `error-catalog.toml`, `abi-ratifications.toml`, `kloc.toml`, tests `release_precondition_t3_20_5.rs`, `rc_readiness_20_5.rs` (new). Crates: `maos-spirit-abi/src/lib.rs`, `maos-domain/src/cli_wrapper.rs`, `maos-manifest/src/manifest.rs` + `tests/cli_wrapper_schema_20_5.rs`, `maos-bin/src/worker_spawn.rs` + `tests/{cli_wrapper_schema_20_5 (new),worker_manifests_2a,cookbook_manifests_17_3b}.rs`, `spirits/worker/{manifest*.toml,tests/spirit_smoke.rs}`. Workflows: `release.yml`, `fuzz-prerelease.yml`. Docs: `STABILITY.md`, `docs/release/{lts-policy (new),tag-procedure}.md`, `RELEASE-HOLDS.md`, `docs/runbooks/{fuzz-cadence,provisioning-checklist}.md`, `docs/errors/error-catalog.json`, `tests/coverage-matrix.yaml`, `deny.toml`, `deferred-work.md`, `sprint-status.yaml`, docs-site (topology, manifest v3/v5, cookbook, 44 error pages + new page + TierNotGranted, troubleshoot, ko twins, `abi/v1/constants.md` + ko, `route-manifest.json`, `scripts/gate-routes.js`, `tests/playwright/manifest.ts`). Evidence: `landing-1/`, `ci/ci-20-5-verify.yml` (unverified recipe).
 
 ### Debug Log References
 
@@ -516,6 +536,8 @@ anthropic/claude-opus-5-5 (creation).
 ### File List
 
 ## Change Log
+
+- 2026-11-11: **L1 (kernel-free AC2–AC7) implemented at `f56959c2`, uncommitted** (Dev205L1): ceilings re-based onto the exact pins (xtask 45527 / aggregate 202125 …); landed xtask 45315, aggregate 201814; red/plant logs under `landing-1/`; workspace nextest run (2 unrelated failures), prepush skipped; hosted and operator-lane steps unverified; tracker → `in-progress`.
 
 - 2026-11-04: Operator ruled D-20-5-01…16 as recommended (ask d205): D-01 B, D-06 B, all other rows A. Grants bind at dev start with exact-pin re-basing; kernel-Δ 0. Updated ruling records and confirmed 20-7 operator prerequisites O1–O7 from its §O record.
 

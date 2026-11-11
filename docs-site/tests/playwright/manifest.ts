@@ -26,7 +26,8 @@ export function loadManifest(): RouteManifest {
 export function manifestRoutePaths(manifest = loadManifest()): string[] {
   const paths = manifest.routes.map((route) => route.path);
   for (const code of manifest.error_codes ?? []) {
-    paths.push(`/errors/${code}`);
+    // `Family::Variant` codes are served at `/errors/Family--Variant` (Story 20-5).
+    paths.push(`/errors/${code.replace(/::/g, "--")}`);
   }
   return paths;
 }

@@ -1,5 +1,7 @@
 # Hermetic T3 negative control: the built-in MAOS Project grant has no egress.
 [cli_wrapper]
+# Story 20-5 — the Worker manifest schema version (absent means 1; window 1..=1).
+manifest_schema_version = 1
 command = "worker-probe-fixture"
 argv_prefix = ["--maos-worker"]
 output_shape_version = "1.0.0"

@@ -1,0 +1,26 @@
+
+> maos-docs-site@0.0.0 build
+> docusaurus build
+
+[INFO] Website will be built for all these locales: 
+- en
+- ko
+[INFO] [en] Creating an optimized production build...
+[info] [webpackbar] Compiling Client
+[info] [webpackbar] Compiling Server
+[success] [webpackbar] Server: Compiled successfully in 634.07ms
+[success] [webpackbar] Client: Compiled successfully in 826.92ms
+[SUCCESS] Generated static files in "build".
+[INFO] [ko] Creating an optimized production build...
+[info] [webpackbar] Compiling Client
+[info] [webpackbar] Compiling Server
+[success] [webpackbar] Server: Compiled successfully in 656.75ms
+[success] [webpackbar] Client: Compiled successfully in 664.13ms
+[SUCCESS] Generated static files in "build/ko".
+[INFO] Use `npm run serve` command to test your build locally.
+
+> maos-docs-site@0.0.0 postbuild
+> node scripts/postbuild-fallback-lang.js
+
+postbuild:fallback-lang — patched 32 ko fallback page(s)
+exit=0

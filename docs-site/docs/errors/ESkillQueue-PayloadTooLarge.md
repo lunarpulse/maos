@@ -2,7 +2,7 @@
 title: "ESkillQueue::PayloadTooLarge"
 sidebar_position: 0
 description: "Skill submission payload limit"
-slug: "/errors/ESkillQueue::PayloadTooLarge"
+slug: "/errors/ESkillQueue--PayloadTooLarge"
 ---
 
 # ESkillQueue::PayloadTooLarge

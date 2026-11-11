@@ -2,7 +2,7 @@
 title: "ESkillQueue::ForeignNamespace"
 sidebar_position: 0
 description: "Author namespace refusal"
-slug: "/errors/ESkillQueue::ForeignNamespace"
+slug: "/errors/ESkillQueue--ForeignNamespace"
 ---
 
 # ESkillQueue::ForeignNamespace

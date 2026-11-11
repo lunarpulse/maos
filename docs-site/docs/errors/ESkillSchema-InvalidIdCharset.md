@@ -2,7 +2,7 @@
 title: "ESkillSchema::InvalidIdCharset"
 sidebar_position: 0
 description: "Error reference for ESkillSchema::InvalidIdCharset"
-slug: "/errors/ESkillSchema::InvalidIdCharset"
+slug: "/errors/ESkillSchema--InvalidIdCharset"
 ---
 
 # ESkillSchema::InvalidIdCharset

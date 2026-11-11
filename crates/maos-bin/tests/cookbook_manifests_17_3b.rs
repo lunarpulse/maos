@@ -150,10 +150,13 @@ fn cli_wrapper_manifest_passes_worker_load_gates() {
 
     let document = toml::from_str::<toml::Value>(&manifest)
         .unwrap_or_else(|error| panic!("{page}: whole manifest parses: {error}"));
-    let cli_wrapper = document
+    let mut cli_wrapper = document
         .get("cli_wrapper")
-        .unwrap_or_else(|| panic!("{page}: [cli_wrapper] table exists"));
-    let cli_wrapper_toml = toml::to_string(cli_wrapper)
+        .unwrap_or_else(|| panic!("{page}: [cli_wrapper] table exists"))
+        .clone();
+    CliWrapperConfig::take_schema_version(&mut cli_wrapper)
+        .unwrap_or_else(|error| panic!("{page}: [cli_wrapper] schema version: {error}"));
+    let cli_wrapper_toml = toml::to_string(&cli_wrapper)
         .unwrap_or_else(|error| panic!("{page}: serialize [cli_wrapper]: {error}"));
     let config = CliWrapperConfig::from_toml_str(&cli_wrapper_toml)
         .unwrap_or_else(|error| panic!("{page}: [cli_wrapper] parses and validates: {error}"));

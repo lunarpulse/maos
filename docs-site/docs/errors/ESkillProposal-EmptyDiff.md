@@ -2,7 +2,7 @@
 title: "ESkillProposal::EmptyDiff"
 sidebar_position: 0
 description: "Error reference for ESkillProposal::EmptyDiff"
-slug: "/errors/ESkillProposal::EmptyDiff"
+slug: "/errors/ESkillProposal--EmptyDiff"
 ---
 
 # ESkillProposal::EmptyDiff

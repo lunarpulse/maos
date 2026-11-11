@@ -2,7 +2,7 @@
 title: "ESkillStore::Io"
 sidebar_position: 0
 description: "Error reference for ESkillStore::Io"
-slug: "/errors/ESkillStore::Io"
+slug: "/errors/ESkillStore--Io"
 ---
 
 # ESkillStore::Io
