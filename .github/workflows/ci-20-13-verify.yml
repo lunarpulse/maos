@@ -23,9 +23,8 @@ jobs:
           tool: cargo-nextest@0.9.149
       - name: Planted kernel arm must turn the bin witness red
         run: |
-          set -uo pipefail
-          grep -c "RingCryptoProvider" crates/maos-kernel-core/src/security/mod.rs
-          git diff HEAD~1 --stat -- crates/maos-kernel-core/src/security/mod.rs
+          set +e -uo pipefail
+          grep -n "RingCryptoProvider" crates/maos-kernel-core/src/security/mod.rs
           cargo nextest run --locked -p maos-bin --features crypto-recording --profile ci --test crypto_t3_admission_20_13 2>&1 | tee plant.log
           if [ "${PIPESTATUS[0]}" -eq 0 ]; then echo "PLANT NOT DETECTED" >&2; exit 1; fi
           grep -F "kernel T3 admission must verify exactly once" plant.log
