@@ -61,6 +61,8 @@ const FORBIDDEN_CRATES: &[&str] = &[
     "cedar-policy-formatter",
     // Daemon-owned credential/proxy transport never enters the frozen closure.
     "maos-egress",
+    // 21-5: the FR20 buffer crate is composed at the root; the kernel reaches it only through the domain port.
+    "maos-orchestrator-buffer",
 ];
 
 /// Trees whose transitive closure must exclude every FORBIDDEN_CRATES entry.

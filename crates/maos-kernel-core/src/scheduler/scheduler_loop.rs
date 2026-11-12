@@ -86,7 +86,7 @@ pub struct SpiritSchedulerAdapter {
     _iac: Arc<crate::iac::IacBusAdapter>,
     _halt_registry: Arc<crate::halt::HaltRegistry>,
     security_manager: Option<Arc<crate::security::SecurityManagerAdapter>>,
-    orchestrator_registry: Option<Arc<crate::orchestrator::OrchestratorBufferRegistry>>,
+    orchestrator_registry: Option<Arc<dyn maos_domain::orchestrator::OrchestratorResumePort>>,
     crash_detector: Option<Arc<crate::supervision::CrashDetector>>,
     /// Resolver used to route FR50 disposition after an unload-hook failure;
     /// late-bound at the composition root with CrashDetector.
@@ -110,7 +110,7 @@ impl SpiritSchedulerAdapter {
         distillate_writer: Option<Arc<crate::iac::distillate::DistillateWriter>>,
         self_telemetry: Option<Arc<crate::memory::self_telemetry::SelfTelemetryAggregator>>,
         security_manager: Option<Arc<crate::security::SecurityManagerAdapter>>,
-        orchestrator_registry: Option<Arc<crate::orchestrator::OrchestratorBufferRegistry>>,
+        orchestrator_registry: Option<Arc<dyn maos_domain::orchestrator::OrchestratorResumePort>>,
         crash_detector: Option<Arc<crate::supervision::CrashDetector>>,
     ) -> Self {
         let spirits = Arc::new(RwLock::new(BTreeMap::new()));
@@ -487,21 +487,9 @@ impl SpiritSchedulerAdapter {
         // Story 19-2 (FR51 a) — lift the pause fence once Running again.
         self.capability.set_paused(spirit_pid, false);
 
-        // Story 3.4 — replay buffered Orchestrator instructions.
-        if let Some(ref registry) = self.orchestrator_registry {
-            use maos_spirit_abi::identity::SpiritId;
-            let sid = SpiritId::from(scb.spirit_id.as_str());
-            if let Some(buffer) = registry.get(&sid) {
-                let pending = buffer.recall_all_pending();
-                // v0.3-β: re-enqueue so the Orchestrator spirit can dequeue
-                // them at a safe point. Frame-level delivery deferred to
-                // Story 5.4 when the orchestrator wire protocol stabilizes.
-                for instr in pending {
-                    if let Err(e) = buffer.enqueue(instr) {
-                        eprintln!("maos: resume re-enqueue failed: {e}");
-                    }
-                }
-            }
+        // Story 3.4 — replay buffered Orchestrator instructions (FR20 port).
+        if let Some(ref port) = self.orchestrator_registry {
+            port.replay_pending(&scb.spirit_id);
         }
 
         let outcome = self.dispatcher.fire_on_resume(&scb).await;

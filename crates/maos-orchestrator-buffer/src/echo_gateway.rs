@@ -80,7 +80,7 @@ impl GatewaySubmodule for EchoGatewaySubmodule {
 /// Factory for creating EchoGatewaySubmodule instances.
 pub struct EchoGatewayFactory;
 
-impl crate::orchestrator::gateway_dispatcher::GatewaySubmoduleFactory for EchoGatewayFactory {
+impl crate::gateway_dispatcher::GatewaySubmoduleFactory for EchoGatewayFactory {
     fn create(
         &self,
         _entry: &maos_manifest::GatewayEntry,

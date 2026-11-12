@@ -1,10 +1,10 @@
 #![forbid(unsafe_code)]
 
-//! Story 21-5 L1 (AC5, D-21-5-06 B, D-21-5-07 B) — the FR20 Orchestrator
-//! buffer's observable behaviour, recorded against the UNMOVED
-//! `maos_kernel_core::orchestrator` so L2 can prove the move preserves it:
-//! L2 changes only the `use` lines of this file (and removes the one
-//! `#[ignore]` below).
+//! Story 21-5 (AC5, D-21-5-06 B, D-21-5-07 B) — the FR20 Orchestrator
+//! buffer's observable behaviour, recorded at L1 against the module while it
+//! was still inside the kernel so L2 could prove the move preserves it: L2
+//! changed only the `use` lines of this file (now `maos_orchestrator_buffer`),
+//! this paragraph, and removed the one `#[ignore]` the race witness carried.
 //!
 //! * (a) the three journal functions write the audit rows the fixture holds
 //!   (`actor, target, capability, intent, decision, reasoning`);
@@ -29,13 +29,13 @@ use std::sync::{Arc, Once};
 
 use maos_domain::orchestrator::{OrchestratorInstruction, OrchestratorInstructionId};
 use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
-use maos_kernel_core::orchestrator::{
-    journal_director_lifecycle_action, journal_orchestrator_queue, journal_token_revocation,
-    OrchestratorBuffer, OrchestratorBufferError, OrchestratorBufferRegistry,
-};
 use maos_kernel_core::scheduler::control_block::SpiritManifestBundle;
 use maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter;
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
+use maos_orchestrator_buffer::{
+    journal_director_lifecycle_action, journal_orchestrator_queue, journal_token_revocation,
+    OrchestratorBuffer, OrchestratorBufferError, OrchestratorBufferRegistry,
+};
 use maos_spirit_abi::identity::SpiritId;
 use serde_json::Value;
 
@@ -320,9 +320,8 @@ async fn c_resume_of_a_spirit_never_queued_to_creates_no_buffer() -> TestResult 
 /// nothing to enqueue; any accepted enqueue or any change to the final queue
 /// is the race.
 ///
-/// Red against the unmoved replay (`scheduler_loop.rs:490-505`); L2 moves the
-/// replay into one lock scope (D-21-5-07 B) and removes the `#[ignore]`.
-#[ignore = "21-5 L1: red against the unmoved two-lock replay; L2 (D-21-5-07 B) removes this attribute"]
+/// Red against the pre-move replay (the kernel's `scheduler_loop.rs:490-505`,
+/// recorded at L1); L2 moved the replay into one lock scope (D-21-5-07 B).
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_producer_racing_resume_neither_overtakes_nor_displaces_the_queue() -> TestResult {
     const CYCLES: usize = 200;

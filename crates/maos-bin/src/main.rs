@@ -2356,7 +2356,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Story 3.4 — Orchestrator buffer registry (shared Arc for one-shot arms).
     let orchestrator_registry =
-        Arc::new(maos_kernel_core::orchestrator::OrchestratorBufferRegistry::new());
+        Arc::new(maos_orchestrator_buffer::OrchestratorBufferRegistry::new());
     eprintln!("maos: orchestrator buffer registry initialized (Story 3.4)");
 
     // Transparency Log — shared across services within this one-team process.
@@ -3037,7 +3037,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Arc::clone(&distillate_writer)),
         Some(Arc::clone(&self_telemetry)),
         None, // security_manager — constructed per-one-shot arm at v0.3-β
-        Some(Arc::clone(&orchestrator_registry)),
+        Some(orchestrator_registry.clone()),
         None, // crash_detector — wired below at Story 5.3 Task 14
     ));
     eprintln!("maos: Spirit Scheduler wired (Story 5.1)");

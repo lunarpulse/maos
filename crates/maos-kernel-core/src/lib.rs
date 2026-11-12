@@ -34,7 +34,6 @@ pub mod journal; // supervised internal — Lifecycle Journal per I10 / §4.1 (S
 pub mod lifecycle; // Story 5.4 — upgrade orchestrator (hot-swap, cold-swap, migrator)
 pub mod mcp; // Story 5.5c — MCP client kernel-side adapter
 pub mod memory; // supervised service — Memory Manager (§4.2)
-pub mod orchestrator; // Story 3.4 — Orchestrator instruction buffer + journal helpers
 pub mod revocation; // Story 5.4 — CRL poller, parser, applier, propagation pipeline
 pub mod scheduler; // supervisor — Spirit Scheduler (architecture §4.1)
 pub mod security; // supervised service — Security Manager (§4.3)

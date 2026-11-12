@@ -19,6 +19,7 @@ smallvec = "1"
 [dev-dependencies]
 maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner", "mock", "spirit_test"] }
 maos-kernel-core = { path = "../../crates/maos-kernel-core" }
+maos-orchestrator-buffer = { path = "../../crates/maos-orchestrator-buffer" }
 maos-manifest = { path = "../../crates/maos-manifest" }
 tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time", "sync"] }
 sha2 = "0.10"

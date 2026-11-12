@@ -7,8 +7,8 @@
 //! Story 4.3 MemoryManagerAdapter isolation wiring + Story 4.4
 //! LogRecallAdapter isolation wiring.
 //!
-//! The `isolation/` directory is parallel-shaped to `halt/` and
-//! `orchestrator/`, reflecting the architectural fact that cross-Spirit
+//! The `isolation/` directory is parallel-shaped to `halt/`, reflecting
+//! the architectural fact that cross-Spirit
 //! isolation enforcement is a cross-cutting kernel surface.
 
 pub mod runner;

@@ -291,7 +291,7 @@ impl GatewayDispatcher {
         use maos_domain::frame::{
             DisconnectOutcome, GatewayUninstallEntry, GatewayUninstallRecord,
         };
-        let uninstalled_at_ns = crate::capability::cap_tokens::monotonic_now_ns();
+        let uninstalled_at_ns = maos_capability::cap_tokens::monotonic_now_ns();
         let keys_to_remove: Vec<(u32, String)> = self
             .gateways
             .iter()

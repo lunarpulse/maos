@@ -267,7 +267,7 @@ impl RevokeRoot {
             Arc::clone(&policy),
             Arc::clone(&halt),
             Arc::new(maos_kernel_core::halt::OutputMarkerRegistry::new()),
-            Arc::new(maos_kernel_core::orchestrator::OrchestratorBufferRegistry::new()),
+            Arc::new(maos_orchestrator_buffer::OrchestratorBufferRegistry::new()),
             Arc::new(maos_kernel_core::revocation::RevocationApplier::new(
                 scheduler.scbs(),
                 Arc::clone(&capability),

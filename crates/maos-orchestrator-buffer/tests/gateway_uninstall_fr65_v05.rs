@@ -2,15 +2,15 @@
 
 //! Gateway uninstall integration tests — Story 6.5 / FR65 v0.5.
 
-use maos_kernel_core::orchestrator::{
+use maos_manifest::{GatewayEntry, GatewayType, GatewaysSection};
+use maos_orchestrator_buffer::{
     echo_gateway::EchoGatewayFactory,
     gateway_dispatcher::{GatewayDispatcher, GatewaySubmoduleRegistry},
 };
-use maos_manifest::{GatewayEntry, GatewayType, GatewaysSection};
 use std::sync::Arc;
 
 fn init_clock() {
-    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    maos_capability::cap_tokens::init_monotonic_base();
 }
 
 fn make_entry(id: &str) -> GatewayEntry {

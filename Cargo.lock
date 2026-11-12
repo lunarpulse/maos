@@ -2684,6 +2684,7 @@ dependencies = [
  "maos-manifest",
  "maos-mcp",
  "maos-notify-push",
+ "maos-orchestrator-buffer",
  "maos-pdp",
  "maos-providers",
  "maos-registry",
@@ -3118,6 +3119,22 @@ dependencies = [
  "mira",
  "serde_json",
  "ureq",
+]
+
+[[package]]
+name = "maos-orchestrator-buffer"
+version = "0.1.0-alpha.1"
+dependencies = [
+ "dashmap",
+ "maos-attrs",
+ "maos-capability",
+ "maos-domain",
+ "maos-iac",
+ "maos-manifest",
+ "maos-spirit-abi",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]
@@ -3788,6 +3805,7 @@ dependencies = [
  "maos-domain",
  "maos-kernel-core",
  "maos-manifest",
+ "maos-orchestrator-buffer",
  "maos-spirit-abi",
  "maos-spirit-sdk",
  "serde",

@@ -15,6 +15,7 @@ members = [
     "crates/maos-director-surface",
     "crates/maos-domain",
     "crates/maos-egress",
+    "crates/maos-orchestrator-buffer",
     "crates/maos-capability",
     "crates/maos-iac",
     "crates/maos-journey-test",

@@ -271,10 +271,10 @@ Every AC names a failing-before witness or an equivalence golden, and a plant. *
 - [x] **T2 — Goldens (AC5)** against `maos_kernel_core::orchestrator`, plants. (L1: `crates/maos-bin/tests/orchestrator_equivalence_21_5.rs` + fixture; plants `landing-1/plants.md`; plus the D-21-5-07 replay-race witness, red on the unmoved kernel.)
 - [ ] **T3 — L1 landing (D-05 A).** Exact domain pin; `check-kernel-baseline` unchanged; `kloc-check`,
   `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; hosted run on the final tree + plants.
-- [ ] **T4 — Kernel-free red witnesses first (AC2.4 leaf vector, AC3.2)**, then the move (AC2.1–2.3), the control
-  (AC3.1), the kernel vector (AC2.4), plants (AC2.5, AC3.4, AC1.4).
+- [x] **T4 — Kernel-free red witnesses first (AC2.4 leaf vector, AC3.2)**, then the move (AC2.1–2.3), the control
+  (AC3.1), the kernel vector (AC2.4), plants (AC2.5, AC3.4, AC1.4). (L2, 2026-11-12, Dev215L2; `landing-2/evidence.md`.)
 - [ ] **T5 — Records and L2 landing (AC1, AC7).** Pins, constants, surface, classes, ADR-070, STABILITY, workspace
-  count; `cargo test -p maos-kernel-core --lib`; focused suites; hosted run; FLAG-Winston landing record.
+  count; `cargo test -p maos-kernel-core --lib`; focused suites; hosted run; FLAG-Winston landing record. (Local legs done 2026-11-12, Dev215L2; the hosted run and the review are open.)
 
 ## Dev Notes
 
@@ -398,7 +398,7 @@ ADR-066, ADR-069; 19-6 `r19_6_d04` (`19-6-…md:181`); `epic-15-foundations-w0.m
 
 ### Agent Model Used
 
-anthropic/claude-opus-5-5 (creation); anthropic/claude-sonnet-5-5 (L1 implementation, Dev215L1, 2026-11-12).
+anthropic/claude-opus-5-5 (creation); anthropic/claude-sonnet-5-5 (L1 implementation, Dev215L1; L2 implementation, Dev215L2, 2026-11-12).
 
 ### Story context creation
 
@@ -427,12 +427,13 @@ in-flight pin 27043); `check-decision-register` rc 0 (23 rows, 6 open); `check-e
 
 ### Debug Log References
 
-`21-5-orchestrator-port-and-move-evidence/landing-1/` (`evidence.md`, `plants.md`, `red/`, `plants/`, `gates/`).
+`21-5-orchestrator-port-and-move-evidence/landing-1/` (`evidence.md`, `plants.md`, `red/`, `plants/`, `gates/`); `…/landing-2/` (`evidence.md`, `plants/`, `green/`, `gates/`).
 
 ### Completion Notes List
 
 - **2026-11-12 — L1 landed UNCOMMITTED until Main commits (Dev215L1, kernel-free, base `d00802aa`).** Contents: `OrchestratorResumePort` in `maos-domain` (+3 tokei, no dependency added); the AC5 equivalence goldens recorded against the unmoved `maos_kernel_core::orchestrator` (5 green) with a fixture; the D-21-5-07 replay-race witness, **RED on the unmoved replay in 10 of 10 runs (and the first), committed `#[ignore]`d** so hosted CI stays green, L2 removes the attribute when the one-lock replay lands; dated FR20 / FR54 / §4.0.7 notes (no FR text deleted). No kernel source line changed (kernel 27103 / 21256 / 95 files unchanged, `repin.py --check` in sync). Pins: `maos-domain` 10274 → 10277 (+3, inside the D-21-5-12 A ceiling of +6; the script's overdraft flag was adjudicated against that ruling), aggregate hardfail 203241 → 203244. Evidence: `landing-1/evidence.md`.
 - **What L1 taught L2:** see `landing-1/evidence.md` §L2 plan (the lost-instruction race is real; the one-lock replay degenerates to an identity; the `Some(registry)` coercion keeps every `new` call site).
+- **2026-11-12 — L2 landed UNCOMMITTED until Main commits (Dev215L2, base `257a0fd7`).** What moved: the whole `orchestrator` module (buffer, registry, three journal fns, FR54 gateway host; 5 files) → NEW leaf `maos-orchestrator-buffer` (deps `maos-domain, maos-iac, maos-spirit-abi, maos-manifest, maos-attrs, maos-capability, dashmap, thiserror, tokio`; the prototype's closure omitted `maos-capability` and `tokio`, never compiled), three kernel tests moved with it, the kernel keeps one `OrchestratorResumePort` call. Measured: kernel **26062 physical / 20429 tokei / 90 files** (−1041 / −827, exactly the KP price; STOP −1028/−817 not crossed), leaf **833** (priced 829, +4 = the one-lock replay method), xtask **45462** (+1, priced), domain 10277 and bin 38602 unchanged, aggregate **203250**, hardfail 203251. Surface: 401 → 380 baseline items (21 deleted, `SpiritSchedulerAdapter` `2daf34b2…` → `d2170d38…`), `check-service-boundary` rc 0; ADR-070 written. Witnesses: the race witness un-ignored, RED 11/11 on the unmoved replay (L1) → GREEN 10/10 on the one-lock replay; kernel recording-port vector and leaf vector green; plants P1 (delete the port call), P2a/P2b (replay drops items / off by one), P6 (two-lock replay), P3 (kernel depends on the leaf), P4/P4b (module restored / old path named), P5 (registry left in the kernel) all red and restored. Gates observed rc 0: `check-kernel-baseline`, `check-cohort-mesh` (39 legs), `kloc-check`, `check-service-boundary`, `check-dependency-closure`, `check-workspace-count` (59), `stability-matrix --check`, `gen-abi-docs --check`, `check-loom`, `check-empty-kernel`, `check-serde-error-handling`, `check-dev-record-completeness`, `check-epic-close-coherence`. `abi-diff` not run (dirty tree; spirit-abi untouched). Not done: the hosted run and the review (Status stays `in-progress`). Evidence: `landing-2/evidence.md`.
 
 ### File List
 
@@ -441,9 +442,13 @@ in-flight pin 27043); `check-decision-register` rc 0 (23 rows, 6 open); `check-e
 - `xtask/kloc.toml` (domain row, aggregate hardfail; `repin.py`)
 - `_bmad-output/planning-artifacts/prd/functional-requirements.md` (`:54`, `:68`), `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md` (`:186`)
 - NEW `_bmad-output/implementation-artifacts/21-5-orchestrator-port-and-move-evidence/landing-1/`
+- L2 (Dev215L2): NEW `crates/maos-orchestrator-buffer/` (`Cargo.toml`, `src/{lib,buffer,registry,gateway_dispatcher,echo_gateway}.rs`, `tests/{gateway_dispatcher_fr54,gateway_uninstall_fr65_v05,lifecycle_journal_write_latency,resume_replay_21_5}.rs`); DELETED `crates/maos-kernel-core/src/orchestrator/*` (5) and `crates/maos-kernel-core/tests/{gateway_dispatcher_fr54,gateway_uninstall_fr65_v05,lifecycle_journal_write_latency}.rs`; `crates/maos-kernel-core/src/{lib.rs,isolation/mod.rs,scheduler/scheduler_loop.rs}`; NEW `crates/maos-kernel-core/tests/orchestrator_resume_port_21_5.rs`
+- L2: `crates/maos-bin/{Cargo.toml,src/{main,operator_door,orchestrator_root}.rs,tests/support/{shell_world_16_2,worker_revoke_root}.rs,tests/orchestrator_equivalence_21_5.rs}` (imports; the one `#[ignore]` removed); `spirits/orchestrator/{Cargo.toml,src/lib.rs,tests/{fixtures_pin,orchestrator_buffer}.rs}`
+- L2: `Cargo.toml`, `Cargo.lock`, `STABILITY.md`; `xtask/src/check_dependency_closure.rs`, NEW `xtask/tests/orchestrator_out_of_kernel_21_5.rs`, `xtask/tests/{kernel_pin_content_hash_16_0,recovery_lane_ceiling_rule}.rs`, `xtask/{kernel-core-baseline,kloc,kernel-api-classes}.toml`, `xtask/serde-error-allowlist.toml`; `docs/ci-baselines/kernel-surface-v0.1-beta.json` (surgical), NEW `docs/adr/ADR-070-…md`, `docs/adr/index.md`, `docs/adr/ADR-069-…md` (relief note); `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md` (`:117` workspace-count sentence); `21-5-flag-winston-decision.md` (L2 landing record); NEW `…-evidence/landing-2/`
 
 ## Change Log
 
 - 2026-11-12: Created (`ready-for-dev`, D-21-5-01…14 PROPOSED) at `0baa76fb`; pulled forward by ruling `s21`.
 - 2026-11-12: all fourteen D-rows RULED (ask `d21`, 2026-11-12, accepted as recommended: D01 A, D02 A, D03 A crate `maos-orchestrator-buffer`, D04 A, D05 A, D06 B, D07 B, D08 A ADR-070, D09 A, D10 A, D11 A, D12 A, D13 A key kept in Epic 21 after 20-9, D14 B). Story Status stays `ready-for-dev`. D13 A: `s21` waives the epic-20-retrospective precondition for this key only; `epic-21` → `in-progress`. D14 B: AC6 void; the maos-iac FR21 exemption row re-pointed to ownerless-and-open (operator named no key). Records applied: epic-21 corrections A1–A6, tracker B1–B3, acceleration note C1, deferred-work C2.
 - 2026-11-12: L1 (kernel-free) landed uncommitted (Dev215L1): port, goldens, replay-race witness (red, `#[ignore]`d until L2), PRD/architecture notes; Status `ready-for-dev` → `in-progress`; domain +3 (10277), aggregate hardfail 203244, kernel pins unchanged.
+- 2026-11-12: L2 (kernel move) landed uncommitted (Dev215L2): `maos-orchestrator-buffer` leaf crate (new workspace member, 59), the module out of the kernel (KP; kernel 27103/21256/95 → 26062/20429/90), `SpiritSchedulerAdapter` holds `Option<Arc<dyn OrchestratorResumePort>>` (the one surface refresh `2daf34b2…` → `d2170d38…`), 21 baseline triples removed under ADR-070 (401 → 380), one-lock replay (D-21-5-07 B; the race witness un-ignored, green), `maos-orchestrator-buffer` in `FORBIDDEN_CRATES` (xtask +1), ADR-069 relief note; pins exact (leaf 833, xtask 45462, aggregate 203250/hardfail 203251). Status stays `in-progress` until the hosted run and review.

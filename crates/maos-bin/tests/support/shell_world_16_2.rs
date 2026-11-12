@@ -20,12 +20,12 @@ use maos_kernel_core::journal::JournalAdapter;
 use maos_kernel_core::memory::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
 };
-use maos_kernel_core::orchestrator::OrchestratorBufferRegistry;
 use maos_kernel_core::revocation::RevocationApplier;
 use maos_kernel_core::scheduler::{HookDispatcher, SpiritSchedulerAdapter};
 use maos_kernel_core::security::crypto::RingCryptoProvider;
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 use maos_kernel_core::telemetry::TelemetryStreamAdapter;
+use maos_orchestrator_buffer::OrchestratorBufferRegistry;
 pub(super) struct KernelWorld {
     pub(super) dir: tempfile::TempDir,
     pub(super) transparency_log: Arc<TransparencyLogAdapter>,

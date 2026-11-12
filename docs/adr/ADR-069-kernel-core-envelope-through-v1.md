@@ -60,3 +60,13 @@ Median ◆ grant ≈ +80, mean ≈ +273. Forecast for the remaining lane: 7 × 2
 `xtask/tests/recovery_lane_ceiling_rule.rs` asserts against the tree that the `maos-kernel-core` row is
 ≤ 23,000, and that a row above 22,000 carries `ENVELOPE ALARM` in its comment. Both are kloc-free and run
 in the existing xtask suite.
+
+## Relief valve exercised — 2026-11-12 (Story 21-5 L2, ADR-070)
+
+Operator ruling `s21` scheduled `21-5-orchestrator-port-and-move` ahead of the alarm (it did not fire: the row stood at
+21,256, 744 below 22,000). L2 moved the FR20 buffer, its journal helpers and the parked FR54 gateway host out of
+`maos-kernel-core` into `maos-orchestrator-buffer`: the `maos-kernel-core` row is **21,256 → 20,429 (−827 tokei)**,
+raw `src/` lines 27,103 → 26,062 (−1,041), 95 → 90 files; **1,571 below the 22,000 alarm and 2,571 below the
+23,000 envelope**. The freed lines are not growth capacity: the row was LOWERED to the measured figure
+(`RATIFIED_AT_EASING` follows it) and keeps zero headroom; every later kernel line still needs its own grant
+(Decision 2). The row's HISTORY says `ADR-069 RELIEF VALVE (21-5, ruling s21)`.

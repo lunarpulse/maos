@@ -515,7 +515,7 @@ struct DoorInner {
     scheduler: Arc<maos_kernel_core::scheduler::SpiritSchedulerAdapter>,
     policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
     halt_registry: Arc<maos_kernel_core::halt::HaltRegistry>,
-    orchestrator_registry: Arc<maos_kernel_core::orchestrator::OrchestratorBufferRegistry>,
+    orchestrator_registry: Arc<maos_orchestrator_buffer::OrchestratorBufferRegistry>,
     output_markers: Arc<maos_kernel_core::halt::OutputMarkerRegistry>,
     revocation_applier: Arc<maos_kernel_core::revocation::RevocationApplier>,
     hot_swap_coordinator: Arc<maos_kernel_core::hot_swap::HotSwapCoordinator>,
@@ -570,7 +570,7 @@ impl OperatorDoor {
         policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
         halt_registry: Arc<maos_kernel_core::halt::HaltRegistry>,
         output_markers: Arc<maos_kernel_core::halt::OutputMarkerRegistry>,
-        orchestrator_registry: Arc<maos_kernel_core::orchestrator::OrchestratorBufferRegistry>,
+        orchestrator_registry: Arc<maos_orchestrator_buffer::OrchestratorBufferRegistry>,
         revocation_applier: Arc<maos_kernel_core::revocation::RevocationApplier>,
         hot_swap_coordinator: Arc<maos_kernel_core::hot_swap::HotSwapCoordinator>,
         capability: Arc<maos_kernel_core::api::CapabilityRegistryAdapter>,
@@ -1028,7 +1028,7 @@ impl DoorInner {
                 detail: error,
             };
         }
-        if let Err(error) = maos_kernel_core::orchestrator::journal_director_lifecycle_action(
+        if let Err(error) = maos_orchestrator_buffer::journal_director_lifecycle_action(
             &self.transparency_log,
             DIRECTOR,
             spirit_id,
@@ -1139,7 +1139,7 @@ impl DoorInner {
             );
             payload["journal_error"] = serde_json::Value::String(error);
         }
-        if let Err(error) = maos_kernel_core::orchestrator::journal_director_lifecycle_action(
+        if let Err(error) = maos_orchestrator_buffer::journal_director_lifecycle_action(
             &self.transparency_log,
             DIRECTOR,
             &admitted.spirit_id,
@@ -2025,7 +2025,7 @@ impl DoorInner {
                 }
             }
         };
-        if let Err(error) = maos_kernel_core::orchestrator::journal_orchestrator_queue(
+        if let Err(error) = maos_orchestrator_buffer::journal_orchestrator_queue(
             &self.transparency_log,
             DIRECTOR,
             spirit_id,
@@ -2175,7 +2175,7 @@ impl DoorInner {
                 detail: error.to_string(),
             },
             Ok(()) => {
-                let journaled = maos_kernel_core::orchestrator::journal_token_revocation(
+                let journaled = maos_orchestrator_buffer::journal_token_revocation(
                     &self.transparency_log,
                     DIRECTOR,
                     token_id,

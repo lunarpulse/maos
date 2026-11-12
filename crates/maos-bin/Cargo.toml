@@ -53,6 +53,7 @@ maos-domain = { path = "../maos-domain" }
 maos-frame-codec = { path = "../maos-frame-codec" }
 maos-manifest = { path = "../maos-manifest" }
 maos-kernel-core = { path = "../maos-kernel-core" }
+maos-orchestrator-buffer = { path = "../maos-orchestrator-buffer" }
 maos-control = { path = "../maos-control" }
 maos-loom-lite = { path = "../maos-loom-lite" }
 maos-pdp = { path = "../maos-pdp" }   # Story 11.4a — enterprise PDP (Cedar) adapter; composed at the root, optional via MAOS_PDP_POLICY

@@ -44,6 +44,18 @@ impl OrchestratorBufferRegistry {
     }
 }
 
+/// FR20 resume replay (Story 3.4), called by the kernel scheduler through
+/// `maos_domain::orchestrator::OrchestratorResumePort` on `resume`. The
+/// replay holds the buffer's single guard (D-21-5-07 B); see
+/// `OrchestratorBuffer::replay_pending`.
+impl maos_domain::orchestrator::OrchestratorResumePort for OrchestratorBufferRegistry {
+    fn replay_pending(&self, spirit_id: &str) {
+        if let Some(buffer) = self.get(&SpiritId::from(spirit_id)) {
+            buffer.replay_pending();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

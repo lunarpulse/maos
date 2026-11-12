@@ -40,10 +40,11 @@
 //! This crate depends only on the Spirit SDK/ABI and the PURE `maos-domain`
 //! types (the FR20 `OrchestratorInstruction`, the FR21 `TaskAssignPayload` /
 //! `PriorDistillateRef`, the `IacFrame` dispatch shape). It NEVER reaches into
-//! `maos-kernel-core`. The real `OrchestratorBuffer`, the real FR21 IacBus gate,
+//! `maos-kernel-core`. The real `OrchestratorBuffer` (leaf crate
+//! `maos-orchestrator-buffer` since Story 21-5), the real FR21 IacBus gate,
 //! and the real `DistillateWriter` are exercised in `tests/`, which carry those
 //! crates as dev-dependencies only. The dispatch *decision* (order, target role,
-//! distillate attachment) lives entirely here; the kernel buffer/gate are
+//! distillate attachment) lives entirely here; the buffer/gate are
 //! consumed, not modified (§4.0.7).
 
 use std::sync::{Arc, Mutex};

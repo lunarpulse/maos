@@ -1,0 +1,27 @@
+# P4: lib.rs + "pub mod orchestrator;" and stub crates/maos-kernel-core/src/orchestrator/mod.rs
+    failures:
+        the_kernel_has_no_orchestrator_module
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.01s
+  stderr ───
+    thread 'the_kernel_has_no_orchestrator_module' (526907) panicked at xtask/tests/orchestrator_out_of_kernel_21_5.rs:36:5:
+    /home/lunarpulse/dev_ws/crates/maos-kernel-core/src/orchestrator must not exist: the buffer lives in maos-orchestrator-buffer
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: orchestrator_out_of_kernel_21_5::the_kernel_has_no_orchestrator_module
+                 at ./tests/orchestrator_out_of_kernel_21_5.rs:36:5
+       3: orchestrator_out_of_kernel_21_5::the_kernel_has_no_orchestrator_module::{closure#0}
+                 at ./tests/orchestrator_out_of_kernel_21_5.rs:33:47
+       4: <orchestrator_out_of_kernel_21_5::the_kernel_has_no_orchestrator_module::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+        PASS [   0.121s] (2/2) xtask::orchestrator_out_of_kernel_21_5 no_rust_file_names_the_retired_kernel_path
+────────────
+     Summary [   0.122s] 2 tests run: 1 passed, 1 failed, 0 skipped
+        FAIL [   0.009s] (1/2) xtask::orchestrator_out_of_kernel_21_5 the_kernel_has_no_orchestrator_module
+error: test run failed
+restored

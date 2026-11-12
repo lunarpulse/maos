@@ -132,3 +132,29 @@ first segment cites this key with `->` (D11 A). The xtask test constants move wi
 ## L1 note — 2026-11-12 (Dev215L1; kernel-free; no grant is used or changed)
 
 L1 (D-21-5-05 A) landed uncommitted until Main commits: `maos_domain::orchestrator::OrchestratorResumePort` (+3 tokei; `maos-domain` 10274 → 10277, aggregate hardfail 203241 → 203244), the equivalence goldens recorded against the unmoved `maos_kernel_core::orchestrator`, and the D-21-5-07 replay-race witness (red on the unmoved code, `#[ignore]`d until L2). **No kernel source line changed**: kernel 27103 physical / 21256 tokei / 95 files, as on the L1 base `d00802aa`. The KP prototype diff still applies to the live tree with only its (now landed) domain hunk excluded (`git apply --check` rc 0); the kernel row figures above are unchanged and still owed at L2 (re-measure at T0). Evidence: `21-5-orchestrator-port-and-move-evidence/landing-1/evidence.md`.
+
+## L2 landing record — 2026-11-12 (Dev215L2; kernel move; landed UNCOMMITTED until Main commits)
+
+**Grant used as ruled (KP, D-21-5-01 A / -02 A / -08 A / -11 A / -12 A); nothing above the grant.** Re-based onto the then-landed pins (base `257a0fd7`, kernel 27103 physical / 21256 tokei / 95 files). The KP prototype diff applied to the live tree with `git apply -p1 --exclude='crates/maos-domain/*'` (rc 0; the domain hunk had landed at L1); the prototype had never compiled and needed three corrections (below).
+
+| Figure | Before | After | Priced |
+|---|---:|---:|---|
+| `maos-kernel-core` physical (`check-kernel-baseline`) | 27103 | **26062** (−1041) | −1041 (KP) |
+| `maos-kernel-core` tokei (`kloc.toml:264`, lowered) | 21256 | **20429** (−827) | −827 (KP); STOP was Δ above −817 / −1028: not crossed |
+| kernel files | 95 | **90** | 95 → 90 |
+| to the ADR-069 alarm 22000 / envelope 23000 | 744 / 1744 | **1571 / 2571** | no `ENVELOPE ALARM` owed |
+| `maos-orchestrator-buffer` (new row, exact; was the 917 forward-declared row) | 0 | **833** | 829 (+4: the one-lock replay method, D-21-5-07 B, ±5 forecast); ceiling ≤ 835 not crossed |
+| `maos-domain` | 10277 | 10277 | ≤ 10283 (L1 landed the +3) |
+| `maos-bin` | 38602 | 38602 | 0 |
+| `xtask` | 45461 | **45462** (+1) | +1 `FORBIDDEN_CRATES` (D-21-5-09 A); the re-pin script reported it as an OVERDRAFT and it was adjudicated as the priced +1 |
+| aggregate / hardfail | 203243 / 203244 | **203250 / 203251** | +7 (−827 + 833 + 1) |
+
+Kernel source files changed: exactly `lib.rs` (−1), `scheduler/scheduler_loop.rs` (field/param type, replay → one port call), `isolation/mod.rs` (doc), and the five deleted `orchestrator/` files. No other kernel line.
+
+**Surface (executed):** `docs/ci-baselines/kernel-surface-v0.1-beta.json` hand-edited, 401 → **380** items (21 triples deleted, 1 hash refreshed; `git diff --stat`: 1 insertion, 106 deletions), never re-emitted. The one refresh — `maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter` `2daf34b24f2563ac0d1861c9736e1d4f7a7231e7d616e18cc8df6b3dd4b0e40c` → `d2170d389c72d69275cbad202942db89f6d5295bb63104fee3f86c30d7896bf1` — pre-approved by the standing rule (named in this measured grant) and recorded here; the measured hash equals the creation-priced hash. The 21 removals are sanctioned by **ADR-070** (+ `docs/adr/index.md` row). `check-service-boundary` rc 0, 0 violations. `kernel-api-classes.toml`: the nine `orchestrator` rows and their banner deleted. `abi-diff` is not run (it reads `maos-spirit-abi` only, untouched; it cannot run on a dirty tree).
+
+**Where the prototype was wrong (never compiled):** the leaf needs `maos-capability` and `tokio` as normal dependencies (the gateway host uses `tokio::spawn`/`time` and `monotonic_now_ns`), and `serde_json` as a dev-dependency (the moved FR65 test); the `Cargo.lock` entry is therefore larger than the creation evidence said. None of these enters the kernel closure (`check-dependency-closure` rc 0; the kernel does not depend on the leaf). Also: `SpiritSchedulerAdapter::new`'s `Some(Arc<Registry>)` argument coerces to `Option<Arc<dyn OrchestratorResumePort>>`, so the 37 `None` callers and the L1 goldens need no edit.
+
+**Replay (D-21-5-07 B):** the leaf's `OrchestratorBuffer::replay_pending` rotates the queue under one guard (each `push_back` follows a `pop_front` in the same guard; capacity cannot be exceeded; there is no refusal path and the `eprintln!` is gone). In sequential use it is an identity on the queue by design (frame-level delivery stays deferred to Story 5.4); the work it does is the guarded re-queue, which the plants below mutate. The L1 race witness is un-ignored and green.
+
+Evidence: `21-5-orchestrator-port-and-move-evidence/landing-2/evidence.md`.

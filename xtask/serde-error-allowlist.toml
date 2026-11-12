@@ -730,12 +730,6 @@ location = "crates/maos-kernel-core/tests/distillation_i11_audit_chain.rs:251"
 location = "crates/maos-kernel-core/tests/drr_scheduler.rs:110"
 
 [[allow]]
-location = "crates/maos-kernel-core/tests/gateway_uninstall_fr65_v05.rs:147"
-
-[[allow]]
-location = "crates/maos-kernel-core/tests/gateway_uninstall_fr65_v05.rs:148"
-
-[[allow]]
 location = "crates/maos-kernel-core/tests/memory_md_opaque_write.rs:71"
 
 [[allow]]

@@ -5,7 +5,7 @@
 //! the Spirit owns the safe-point gate, the kernel owns the FIFO.
 
 use maos_domain::orchestrator::{OrchestratorInstruction, OrchestratorInstructionId};
-use maos_kernel_core::orchestrator::{OrchestratorBuffer, OrchestratorBufferError};
+use maos_orchestrator_buffer::{OrchestratorBuffer, OrchestratorBufferError};
 use orchestrator::Orchestrator;
 
 fn instr(id: u64, goal: &str) -> OrchestratorInstruction {

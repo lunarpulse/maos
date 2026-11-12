@@ -1,0 +1,7 @@
+# P4b: a .rs file naming the retired path (spirits/orchestrator/tests/zz_p4b_plant.rs)
+627:        FAIL [   0.035s] (2/2) xtask::orchestrator_out_of_kernel_21_5 no_rust_file_names_the_retired_kernel_path
+631:    test no_rust_file_names_the_retired_kernel_path ... FAILED
+638:    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.03s
+643:    `maos_kernel_core::orchestrator` is named by: ["/home/lunarpulse/dev_ws/spirits/orchestrator/tests/zz_p4b_plant.rs"]
+660:     Summary [   0.036s] 2 tests run: 1 passed, 1 failed, 0 skipped
+661:        FAIL [   0.035s] (2/2) xtask::orchestrator_out_of_kernel_21_5 no_rust_file_names_the_retired_kernel_path

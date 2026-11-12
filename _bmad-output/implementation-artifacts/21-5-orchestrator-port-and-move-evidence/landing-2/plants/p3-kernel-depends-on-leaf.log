@@ -1,0 +1,27 @@
+# plant p3-kernel-depends-on-leaf: crates/maos-kernel-core/Cargo.toml : 18a maos-orchestrator-buffer = { path = "../maos-orchestrator-buffer" }
+18a19
+> maos-orchestrator-buffer = { path = "../maos-orchestrator-buffer" }
+# command: env CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask check-dependency-closure --json
+{
+  "passed": false,
+  "violations": [
+    "maos-orchestrator-buffer"
+  ],
+  "trees": [
+    {
+      "crate_name": "maos-kernel-core",
+      "passed": false,
+      "violations": [
+        "maos-orchestrator-buffer"
+      ]
+    },
+    {
+      "crate_name": "maos-domain",
+      "passed": true,
+      "violations": []
+    }
+  ]
+}
+check-dependency-closure failed: 1 forbidden crate(s) across [maos-kernel-core]
+# rc=1
+# restored: cmp equal, touched

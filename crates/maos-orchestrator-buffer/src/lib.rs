@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! Orchestrator instruction buffer — kernel checkpoint/resume primitive
+//! Orchestrator instruction buffer — FR20 checkpoint/resume primitive (moved out of maos-kernel-core by 21-5)
 //! per FR20 + epic-3 Story 3.4 AC.
 //!
 //! Story 3.4 LANDS: the per-Spirit `OrchestratorBuffer` + `OrchestratorBufferRegistry`,
@@ -28,9 +28,9 @@ pub use gateway_dispatcher::{
 };
 pub use registry::OrchestratorBufferRegistry;
 
-use crate::iac::transparency_log::TransparencyLogAdapter;
 use maos_domain::halt::HaltJournalError;
 use maos_domain::invariants::i4::ApprovalDecision;
+use maos_iac::transparency_log::TransparencyLogAdapter;
 
 /// Journal an orchestrator enqueue to the Approval Decision Log (Story 3.4 AC2).
 /// Mirrors `crate::halt::journal_halt_resolution` (Story 3.3 AC4) — one canonical

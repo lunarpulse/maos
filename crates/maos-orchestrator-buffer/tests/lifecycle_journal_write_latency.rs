@@ -15,8 +15,8 @@
 use std::time::Instant;
 
 use maos_domain::invariants::i4::ApprovalDecision;
-use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
-use maos_kernel_core::orchestrator::OrchestratorBufferRegistry;
+use maos_iac::transparency_log::TransparencyLogAdapter;
+use maos_orchestrator_buffer::OrchestratorBufferRegistry;
 use maos_spirit_abi::identity::SpiritId;
 
 /// P99 ceiling of one lifecycle journal write, in microseconds (2 s).

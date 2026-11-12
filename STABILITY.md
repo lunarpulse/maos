@@ -27,7 +27,7 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 | supported schema window | `1..=7` |
 | `[cli_wrapper]` `manifest_schema_version` (current; absent means 1) | `1` |
 | supported `[cli_wrapper]` window | `1..=1` |
-| workspace crates | `58` |
+| workspace crates | `59` |
 
 | Manifest schema | Kernel behavior |
 |---|---|

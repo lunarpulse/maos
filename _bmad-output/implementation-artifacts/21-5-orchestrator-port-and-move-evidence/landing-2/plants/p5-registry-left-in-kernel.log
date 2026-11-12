@@ -1,0 +1,17 @@
+# P5: stub crates/maos-kernel-core/src/orchestrator/registry.rs left in the kernel
+{
+  "passed": false,
+  "actual-lines": 26063,
+  "pinned-lines": 26062,
+  "baseline-file": "/home/lunarpulse/dev_ws/xtask/kernel-core-baseline.toml",
+  "file-set-entries": 91,
+  "set-hash": "e40618325dbd1fda132373b30c6590b7aad8c69a55ba7e39778964be8a66a61d",
+  "pinned-set-hash": "6eaa5c6ab6e8e49505d16615ad5c20c58d1988fe8713e26be23ef6892dbc50fc",
+  "changed": [],
+  "added": [
+    "orchestrator/registry.rs"
+  ],
+  "removed": []
+}
+kernel-core drifted from the pinned baseline
+# rc=1

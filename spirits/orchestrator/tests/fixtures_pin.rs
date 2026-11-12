@@ -3,7 +3,7 @@
 //! Mirrors `spirits/observer`'s fixtures_pin.
 
 use maos_domain::orchestrator::{OrchestratorInstruction, OrchestratorInstructionId};
-use maos_kernel_core::orchestrator::OrchestratorBuffer;
+use maos_orchestrator_buffer::OrchestratorBuffer;
 use orchestrator::Orchestrator;
 use sha2::{Digest, Sha256};
 

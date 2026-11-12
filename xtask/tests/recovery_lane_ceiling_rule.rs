@@ -276,7 +276,19 @@ fn kernel_core_ceiling_has_not_moved_under_the_easing() {
     // verification and wire use; inference/mod.rs spawns RateLimited delivery
     // instead of dropping its unpolled future. The +23 allowance is not headroom:
     // the ceiling is the measured +22.
-    const RATIFIED_AT_EASING: i64 = 21_256;
+    const RATIFIED_AT_EASING: i64 = 20_429;
+    // 21-5-orchestrator-port-and-move: exact formatted 21256 -> 20429 (-827), physical
+    // 27103 -> 26062 (-1041); ADR-069 RELIEF VALVE (21-5, ruling s21): L2 landing, the
+    // FR20 buffer + journal helpers + parked FR54 gateway host (5 files) leave
+    // maos-kernel-core for the new leaf maos-orchestrator-buffer behind
+    // maos_domain::orchestrator::OrchestratorResumePort (KP, FLAG-Winston GRANTED ask
+    // d21, D-21-5-01 A/-02 A/-11 A/-12 A); kernel tokei 21256 -> 20429 (-827), physical
+    // 27103 -> 26062 (-1041), 95 -> 90 files, 1571 to the 22000 alarm (was 744), 2571
+    // to the 23000 envelope; the freed lines are not growth capacity (15.5 Decision
+    // 2a); one SpiritSchedulerAdapter surface refresh (2daf34b2 -> d2170d38) + 21
+    // triples removed under ADR-070; leaf row 917 -> 833 exact measured (D-21-5-10 A,
+    // priced 829, one-lock replay +4); xtask +1 FORBIDDEN_CRATES entry (D-21-5-09 A,
+    // priced +1, adjudicated); aggregate +7 (203243 -> 203250)
     // 20-9 landing 2 (20-9 L2, AC7/AC8), FLAG-Winston row R (D-20-9-13 A + D-20-9-14 A, ruled
     // 2026-11-03 ask d_batch4) plus the operator-granted options (a1) typed NotLoaded refusal, (b)
     // atomic archive record, (c) idle-watchdog parallel fire (asks of 2026-11-12): exact formatted

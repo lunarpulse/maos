@@ -28,9 +28,9 @@ use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind};
 use maos_kernel_core::iac::TransparencyLogAdapter;
 use maos_kernel_core::journal::JournalAdapter;
 use maos_kernel_core::memory::MemoryManagerAdapter;
-use maos_kernel_core::orchestrator::OrchestratorBufferRegistry;
 use maos_kernel_core::scheduler::control_block::ScbLifecycleState;
 use maos_kernel_core::scheduler::SpiritSchedulerAdapter;
+use maos_orchestrator_buffer::OrchestratorBufferRegistry;
 use orchestrator::{
     fold_instruction, split_epic, EpicSection, Orchestrator, OrchestratorInferenceBinding,
     PidSource, SCALAR_TAG_DISPATCH_AMBIGUITY,

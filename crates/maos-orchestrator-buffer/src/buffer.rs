@@ -79,6 +79,24 @@ impl OrchestratorBuffer {
         }
     }
 
+    /// FR20 resume replay (Story 3.4; D-21-5-07 B): re-queue every pending
+    /// instruction in FIFO order under ONE guard. The previous replay drained
+    /// and re-enqueued in two lock scopes, so a producer racing a resume could
+    /// fill the queue between them and the replayed tail was refused (a lost
+    /// instruction). Each `push_back` follows a `pop_front` under the same
+    /// guard, so capacity cannot be exceeded and no refusal path exists. In
+    /// sequential use the queue is unchanged; frame-level delivery stays
+    /// deferred to Story 5.4. A poisoned mutex is left alone, as `recall_all_pending` does.
+    pub fn replay_pending(&self) {
+        if let Ok(mut q) = self.queue.lock() {
+            for _ in 0..q.len() {
+                if let Some(instruction) = q.pop_front() {
+                    q.push_back(instruction);
+                }
+            }
+        }
+    }
+
     /// Current pending count — surfaced by `maosctl orchestrator status`
     /// (read-only inspection; not normative for the queue's correctness).
     pub fn pending_count(&self) -> usize {
