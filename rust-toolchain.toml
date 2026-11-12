@@ -1,4 +1,28 @@
+# Pinned 2026-11-12 for the v1.0.0-rc.1 candidate (was `channel = "stable"`).
+#
+# rustc/cargo 1.100.0 (stable since 2026-11-09) changed cargo's test-executable
+# layout: test binaries now live under `target/<profile>/build/<pkg>/<hash>/out/`
+# instead of `target/<profile>/deps/`. `tests/harness/fixtures.rs`
+# (`profile_dir()`/`target_root()`) and ~60 test files that locate fixtures or
+# sibling binaries through `std::env::current_exe()` assume
+# `<target>/<profile>/deps/<test>-<hash>`, so on 1.100.0 they resolve the wrong
+# directory and ~20 CI jobs fail.
+#
+# Unpin (back to "stable") only after the post-tag layout-agnostic harness fix
+# lands. The `dtolnay/rust-toolchain` workflow steps still install `stable`; this
+# file overrides it for every `cargo`/`rustc` run inside the repo (rustup >= 1.28.1
+# auto-installs the channel, components and targets named here on first use).
+# `targets` covers every non-nightly cross target a job compiles for: wasm32-wasip2
+# (WASM guest fixtures), aarch64-apple-darwin (macos-check, release macOS),
+# aarch64-unknown-linux-gnu (release/release-dry-run arm64), x86_64-unknown-linux-gnu
+# (static T3 probe / worker-probe-fixture).
 [toolchain]
-channel = "stable"
+channel = "1.99.1"
 components = ["rustfmt", "clippy"]
 profile = "minimal"
+targets = [
+    "wasm32-wasip2",
+    "aarch64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-unknown-linux-gnu",
+]
