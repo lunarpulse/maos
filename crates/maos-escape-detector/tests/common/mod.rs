@@ -37,9 +37,10 @@ use maos_kernel_core::security::SecurityManagerAdapter;
 /// `try_send`s it); the policy table is unused on this path.
 pub fn emit_only_security() -> SecurityManagerAdapter {
     use std::sync::Arc;
-    SecurityManagerAdapter::new(Arc::new(
-        maos_kernel_core::capability::cap_policy::PolicyTable::new(),
-    ))
+    SecurityManagerAdapter::new(
+        Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+        Arc::new(maos_kernel_core::security::RingCryptoProvider),
+    )
 }
 
 /// The edge-wired producer seam (Task 1 / AC3). Spawn a real sandboxed child,

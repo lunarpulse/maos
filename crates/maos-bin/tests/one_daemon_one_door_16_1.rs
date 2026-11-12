@@ -2248,7 +2248,10 @@ async fn admitted_class_bundle(
         .expect("transparency log"),
     );
     let policy = Arc::new(PolicyTable::new());
-    let security = Arc::new(SecurityManagerAdapter::new(Arc::clone(&policy)));
+    let security = Arc::new(SecurityManagerAdapter::new(
+        Arc::clone(&policy),
+        Arc::new(maos_kernel_core::api::RingCryptoProvider),
+    ));
     let telemetry = Arc::new(TelemetryStreamAdapter::default());
     let (audit_tx, _audit_rx) = cap_audit::channel();
     let capability = Arc::new(CapabilityRegistryAdapter::new(

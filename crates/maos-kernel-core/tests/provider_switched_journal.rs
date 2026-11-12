@@ -7,6 +7,13 @@ use maos_kernel_core::security::manifest::{
 };
 use maos_kernel_core::security::SecurityManagerAdapter;
 
+fn security_adapter() -> SecurityManagerAdapter {
+    SecurityManagerAdapter::new(
+        std::sync::Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+        std::sync::Arc::new(maos_kernel_core::security::RingCryptoProvider),
+    )
+}
+
 mod common;
 
 struct MockJournal {
@@ -103,7 +110,7 @@ fn admit_with_provider(
 
 #[test]
 fn first_admit_emits_no_switch_event() {
-    let security = SecurityManagerAdapter::default();
+    let security = security_adapter();
     let journal = MockJournal::new();
 
     let providers = ProvidersSection::from_toml_str(
@@ -131,7 +138,7 @@ id = "anthropic"
 
 #[test]
 fn second_admit_same_provider_emits_no_switch_event() {
-    let security = SecurityManagerAdapter::default();
+    let security = security_adapter();
     let journal = MockJournal::new();
 
     let providers = ProvidersSection::from_toml_str(
@@ -160,7 +167,7 @@ id = "anthropic"
 
 #[test]
 fn admit_with_changed_provider_emits_switch_event() {
-    let security = SecurityManagerAdapter::default();
+    let security = security_adapter();
     let journal = MockJournal::new();
 
     let anthropic = ProvidersSection::from_toml_str(
@@ -207,7 +214,7 @@ id = "openai"
 
 #[test]
 fn multiple_switches_each_emit_event() {
-    let security = SecurityManagerAdapter::default();
+    let security = security_adapter();
     let journal = MockJournal::new();
 
     let anthropic = ProvidersSection::from_toml_str(

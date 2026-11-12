@@ -1,0 +1,1 @@
+{"passed":false,"violation_count":1,"violations":["error: maos-kernel-core/src/security/mod.rs:363 names RingCryptoProvider outside the selection root"],"adapters_found":11,"constructions_found":20}

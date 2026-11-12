@@ -220,7 +220,10 @@ impl World {
             .unwrap();
         let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
         let policy = Arc::new(PolicyTable::new());
-        let security = Arc::new(SecurityManagerAdapter::new(Arc::clone(&policy)));
+        let security = Arc::new(SecurityManagerAdapter::new(
+            Arc::clone(&policy),
+            Arc::new(maos_kernel_core::api::RingCryptoProvider),
+        ));
         let (audit_tx, audit_rx) = cap_audit::channel();
         let telemetry = Arc::new(TelemetryStreamAdapter::default());
         let capability = Arc::new(CapabilityRegistryAdapter::new(

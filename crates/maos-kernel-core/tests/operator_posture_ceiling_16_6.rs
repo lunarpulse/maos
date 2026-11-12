@@ -50,7 +50,10 @@ fn harness(ceiling: Option<Posture>) -> Harness {
     let journal =
         JournalAdapter::open(&scratch.path().join("journal.ndjson")).expect("journal opens");
     Harness {
-        security: SecurityManagerAdapter::new(Arc::clone(&policy)),
+        security: SecurityManagerAdapter::new(
+            Arc::clone(&policy),
+            Arc::new(maos_kernel_core::security::RingCryptoProvider),
+        ),
         policy,
         journal,
         _scratch: scratch,

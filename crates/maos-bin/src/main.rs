@@ -2255,8 +2255,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (security_drift_tx, security_drift_rx) = maos_kernel_core::security::make_drift_channel();
     let _security_drift_rx = security_drift_rx; // hold receiver for adapter lifetime
     let security = Arc::new(
-        maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
-            .with_drift_sender(security_drift_tx),
+        maos_kernel_core::security::SecurityManagerAdapter::new(
+            Arc::clone(&policy),
+            Arc::clone(&crypto),
+        )
+        .with_drift_sender(security_drift_tx),
     );
 
     // Story 11.4a — enterprise Policy Decision Point (Cedar, out-of-kernel per
@@ -9639,7 +9642,7 @@ description = "smoke test spirit successor"
 
         // Story 7.5a AC6 — smoke-abi-7-5a: ABI Stability Triple observability demo.
         if mode == "smoke-abi-7-5a" {
-            return smoke_abi_7_5a().await;
+            return smoke_abi_7_5a(Arc::clone(&crypto)).await;
         }
 
         if mode != "hello-spirit" {
@@ -15666,7 +15669,9 @@ async fn smoke_skill_7_4() -> Result<(), Box<dyn std::error::Error>> {
 ///      with typed `EAbiTooOld`;
 ///   4. assert the committed STABILITY.md carries the LIVE triple (in_sync);
 ///   5. assert the BREAKING.md dated-entry gate passes.
-async fn smoke_abi_7_5a() -> Result<(), Box<dyn std::error::Error>> {
+async fn smoke_abi_7_5a(
+    crypto: Arc<dyn maos_domain::ports::CryptoProvider>,
+) -> Result<(), Box<dyn std::error::Error>> {
     use maos_domain::invariants::i9::SandboxTier;
     use maos_kernel_core::capability::cap_policy::{
         decision::TrustTier, PolicyTable, PolicyTableInner,
@@ -15691,7 +15696,7 @@ async fn smoke_abi_7_5a() -> Result<(), Box<dyn std::error::Error>> {
         .insert(TrustTier::Verified, SandboxTier::T0);
     policy.update(inner);
     // p1-allow: smoke-arm demo — isolated root, not the supervised owner
-    let adapter = SecurityManagerAdapter::new(policy);
+    let adapter = SecurityManagerAdapter::new(policy, crypto);
 
     let journal_path =
         std::env::temp_dir().join(format!("maos-smoke-abi-7-5a-{}.ndjson", std::process::id()));
@@ -16199,31 +16204,32 @@ mod tests {
         ))
         .unwrap();
         // p1-allow: unit-test mock root — isolated from the supervised composition owner
-        maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
-            .admit_spirit(
-                179,
-                "trusted-live-spirit",
-                &SandboxConfig {
-                    tier: maos_domain::invariants::i9::SandboxTier::T0,
-                    image_pin: None,
-                },
-                &ResourceCaps::default(),
-                &CapabilitiesRequired::from_toml_str(&declared).unwrap(),
-                None,
-                &journal,
-                &PostureSection::from_toml_str(
-                    "default = \"assistive\"\nallowed_max = \"assistive\"",
-                )
+        maos_kernel_core::security::SecurityManagerAdapter::new(
+            Arc::clone(&policy),
+            Arc::new(maos_kernel_core::api::RingCryptoProvider),
+        )
+        .admit_spirit(
+            179,
+            "trusted-live-spirit",
+            &SandboxConfig {
+                tier: maos_domain::invariants::i9::SandboxTier::T0,
+                image_pin: None,
+            },
+            &ResourceCaps::default(),
+            &CapabilitiesRequired::from_toml_str(&declared).unwrap(),
+            None,
+            &journal,
+            &PostureSection::from_toml_str("default = \"assistive\"\nallowed_max = \"assistive\"")
                 .unwrap(),
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                Some(&class),
-            )
-            .unwrap();
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(&class),
+        )
+        .unwrap();
         // A 60 s window from construction: every refusal below is a spent budget.
         let quota = CapQuotaTracker::with_quota(IssuanceQuota {
             budget_per_window: budget,
@@ -16990,6 +16996,7 @@ mod story_13_5a_enterprise_daemon_seam {
         // p1-allow: kernel-stack test proves direct production adapters are used in the kernel stack
         let security = Arc::new(maos_kernel_core::security::SecurityManagerAdapter::new(
             Arc::clone(&policy),
+            Arc::clone(&crypto),
         ));
         (capability, security, audit_rx)
     }

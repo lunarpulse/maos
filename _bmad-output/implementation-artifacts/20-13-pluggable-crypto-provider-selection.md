@@ -588,6 +588,53 @@ compliance 2,107 (unchanged), registry 6,194 (unchanged), domain 10,198
 aggregate 198,914 (+79; ceiling 199,280). The exact pins and aggregate
 hardfail 198,915 are re-pinned together; `tests/` witness bodies are excluded.
 
+### L2 candidate — kernel T3 admission (AC7), 2026-11-12 — uncommitted; story stays in-progress
+
+**Ruling (operator, 2026-11-12, ask `kt3`):** the LITERAL KT3 shape. `SecurityManagerAdapter` carries the selected
+provider as a field of the public struct (`new(policy, crypto)`, `impl Default` removed, manual `Debug`), and
+**exactly one** kernel surface hash is refreshed: `maos_kernel_core::security::SecurityManagerAdapter`
+(`76:bb:bb:10:3f:98:d9:4e:…` -> `60:35:04:56:09:f4:28:36:…`, full values in `landing-2/evidence.md`). `check-service-boundary`
+was run before the refresh and flagged that one symbol and nothing else. The refresh is also pre-approved by the
+2026-11-12 standing rule `prepaid` (a) (a symbol named in this measured FLAG-Winston grant); both are recorded in
+`20-13-flag-winston-decision.md` §L2 and the tracker comment.
+
+**Change.** `security/mod.rs`: the field, `new(policy, crypto)`, manual `Debug`, the T3 arm verifies through
+`self.crypto` on both the explicit-lock and the environment branch, `Default` removed; `security/crypto.rs`: module
+doc rewritten line-neutral. Callers migrated: `maos-bin/src/main.rs` (the supervised root passes `Arc::clone(&crypto)`,
+the same instance the capability registry receives; the 7.5a smoke arm takes the root's provider as a parameter; two
+test-module roots), 14 `maos-bin` integration/support files (shared selected provider in
+`support/crypto_integrated_20_13.rs`, test-local ring elsewhere), `maos-escape-detector/tests/common/mod.rs`, four
+kernel integration files and `xtask/tests/story_10_4a_ac1_proven_red.rs`. The xtask structural check drops the
+pending-T3 exception and its visitor state (`pending_t3`, `security_impl`, `visit_item_impl`), keeping the
+`cfg(test)` skip and negative controls; direct ring construction in the T3 arm is now rejected.
+
+**Witnesses** (`crates/maos-kernel-core/tests/t3_admission_crypto_20_13.rs`; full logs under `landing-2/`):
+
+| Vector | Red before (HEAD, pre-KT3 helper) | Plant (inline ring restored) | Final |
+|---|---|---|---|
+| explicit lock, selected provider rejects every signature -> `T3AdmissionFailed`, no `Load` journaled | RED: admitted | RED | green |
+| explicit lock, recording provider sees exactly one `verify_signature` on the selected instance | RED: 0 calls | RED | green |
+| environment lock (`MAOS_T3_IMAGE_LOCK_PATH` + trust anchor hex): ring admits; rejecting refuses; recording counts 1 | RED | RED | green |
+| controls: valid lock + ring admits; tampered signature and wrong trust anchor refuse | green | green | green |
+| gate unit: kernel `admit_spirit` ring construction is a violation (2 of 2, no exemption) | RED (left 1, right 2) | — | green |
+| `check-composition-root-completeness` on the restored inline line | — | RED (`security/mod.rs:363`) | green |
+
+The red-before form differs from the final file in one helper line (`adapter_with`: HEAD ignores the provider and
+builds `SecurityManagerAdapter::new(policy)`), recorded as the transitional pre-routing state.
+
+**Measured (after `cargo fmt --all`, live base `456793ca`):** kernel **27044 physical / 21202 tokei** (+1 / −1: the
+priced KT3 figure, under the shared STOP 22000), maos-capability 1454, maos-domain 10274, maos-iac 8771, maos-cli
+6612 (all unchanged), **maos-bin 38563 (+7 over the live pin 38556**: four call sites; overdraft for Main
+adjudication; the L1 ceilings in the frontmatter are stale absolutes, the cumulative L2 draw is +7), xtask 45355
+(−24), aggregate 202917, hardfail 202918. Pins are re-fixed in `kernel-core-baseline.toml` (src_lines 27044, two file
+digests, set hash), `kloc.toml` (kernel, bin, xtask, aggregate; the xtask row's first HISTORY segment cites this live
+key with `->`) and the two pin-constant tests.
+
+**Not claimed.** No Worker T3 container run, no hosted run, no `abi-diff` (it refuses a dirty tree). The bin-side
+recording leg of AC7.2 (a daemon T3 admission recorded as a kernel `verify_signature`) needs the hosted T3 substrate;
+the same-instance property is covered locally by the counting provider on the adapter and, in the root, by the
+compiler-required argument at `main.rs` (`Arc::clone(&crypto)`, the registry receives the same clone).
+
 
 ### Story context creation
 

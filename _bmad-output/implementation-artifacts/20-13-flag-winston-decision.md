@@ -9,8 +9,8 @@ Older arithmetic/rulings below remain historical; later kernel landers must re-m
 
 
 **Date:** 2026-11-03  
-**Status:** `RULING RECORDED` 2026-11-03 (ask `d_batch4`): D-20-13-04 A and D-20-13-13 A as recommended. KT3 remains a measured request, binding at dev start; no implementation or landing claimed.  
-**Scope:** kernel row **KT3** for `20-13-pluggable-crypto-provider-selection` (AC7, L2 kernel last); no implementation or landing claimed.  
+**Status:** `RULING RECORDED` 2026-11-03 (ask `d_batch4`): D-20-13-04 A and D-20-13-13 A as recommended. KT3 remains a measured request, binding at dev start. **2026-11-12 (ask `kt3`): the literal shape ruled and the L2 candidate measured (+1 / −1), see §L2 ruling below; landing is claimed only after the hosted run and review.**  
+**Scope:** kernel row **KT3** for `20-13-pluggable-crypto-provider-selection` (AC7, L2 kernel last).  
 **Story:** `_bmad-output/implementation-artifacts/20-13-pluggable-crypto-provider-selection.md`, frontmatter, §Decisions, §Kernel and kloc pricing.  
 **Evidence:** `20-13-pluggable-crypto-provider-selection-evidence/creation/measurements.md`, `kloc-kernel-8c809f9c-and-prototypes.json`, `kt3-required-ctor-param.diff`, `kt1-builder-ring-default.diff`, `ktd-builder-debug-supertrait.diff`, `ki-trait-identity.diff`, `ko-trait-open-sealed.diff`, `gate-sim-base.txt`.  
 **Precedent:** `20-4-flag-winston-decision.md`, `20-7-flag-winston-decision.md`.
@@ -48,3 +48,27 @@ implements AC7 under the ruled row last, re-bases on whichever of 20-1b / 20-4 /
 code and pins `xtask/kernel-core-baseline.toml:505` (+ content hash, EOF HISTORY) and `xtask/kloc.toml:264` exactly, with a
 HISTORY first segment citing this key with `->`. The kernel-surface baseline (`docs/ci-baselines/kernel-surface-v0.1-beta.json:912`)
 is re-checked after the private field and the removed `Default`. Unused room is not reserved.
+
+## L2 ruling and measured landing — 2026-11-12 (ask `kt3`)
+
+**Operator ruling (2026-11-12, ask `kt3`): the LITERAL KT3 shape.** `SecurityManagerAdapter` gains the
+`crypto: Arc<dyn CryptoProvider>` field on the public struct (`new(policy, crypto)` required, `impl Default`
+removed, manual `Debug`), and exactly ONE surface-hash refresh is granted: `maos_kernel_core::security::SecurityManagerAdapter`
+(struct hash `76:bb:bb:10:…:c4:96:7e` -> `60:35:04:56:…:50:73:a3:79`; the full hashes are in `landing-2/evidence.md`). The earlier
+"private `T3ImageVerificationConfig`" alternative priced by the pre-landing pricing is NOT adopted. The gate was
+required to flag nothing else, and did not (`check-service-boundary` before the refresh: one violation, the named
+symbol; no other symbol changed or was added). Per the 2026-11-12 standing pre-approval (`prepaid` (a)) the
+refresh also names a symbol in this measured grant; both authorisations are recorded.
+
+**Measured L2 grant (live base `456793ca`, after `cargo fmt --all`):** kernel **27043 -> 27044 physical (+1),
+21203 -> 21202 tokei (-1)**, 95 files, none added or removed — the creation-priced KT3 figure (+1 / -1) exactly.
+Cumulative measured tokei **21202**, under the shared STOP **22000** set by the 2026-11-12 operator ruling
+(`decisions-2026-11-12-acceleration.md`); ADR-069 alarm 22000 / envelope 23000 untouched. Zero headroom; unused room
+is not reserved. Other crates against their live pins: maos-capability 1454, maos-domain 10274, maos-iac 8771,
+maos-cli 6612 unchanged; **maos-bin 38556 -> 38563 (+7)**, an overdraft over the live pin from migrating the four
+`main.rs` call sites (disclosed for Main adjudication; the ceilings in the story are stale absolutes), xtask
+45379 -> 45355 (-24, the pending kernel T3 gate exception removed); aggregate measured 202917, hardfail 202918.
+
+**Landing:** the L1 pending gate entry (`pending_t3` / `security_impl` visitor state) is removed; the structural
+check now refuses every production `RingCryptoProvider` naming outside its allowlist, `security/mod.rs`
+included. Evidence, witnesses and plants: `20-13-pluggable-crypto-provider-selection-evidence/landing-2/evidence.md`.

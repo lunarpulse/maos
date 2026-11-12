@@ -73,7 +73,10 @@ impl World {
         );
         let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
         let policy = Arc::new(PolicyTable::new());
-        let security = Arc::new(SecurityManagerAdapter::new(Arc::clone(&policy)));
+        let security = Arc::new(SecurityManagerAdapter::new(
+            Arc::clone(&policy),
+            Arc::new(maos_kernel_core::api::RingCryptoProvider),
+        ));
         let (audit_tx, mut audit_rx) = cap_audit::channel();
         std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
         let telemetry = Arc::new(TelemetryStreamAdapter::default());

@@ -46,7 +46,7 @@ ComplianceClaim을 선택된 공급자로 다시 검증합니다. `maosctl spiri
 ComplianceClaim을 평가하지 않으므로 daemon 부팅 재검증 보장에 포함되지
 않습니다. vetting, yank, registry publish 검사도 ring을 직접 사용합니다.
 감사 산출물 서명, 게시자 도구, rustls TLS는 이 공급자 범위 밖입니다.
-20-13 L2 전에는 kernel 내부 T3 입장 검증이 여전히 `ring`을 사용합니다.
+kernel 내부 T3 입장 검증도 선택된 공급자 인스턴스로 이미지 잠금을 검증합니다(20-13 L2). kernel은 자체 공급자를 만들지 않습니다.
 
 
 ### 평가자(evaluator) 셸

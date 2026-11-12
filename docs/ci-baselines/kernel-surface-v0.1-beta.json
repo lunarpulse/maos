@@ -910,7 +910,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::security::SecurityManagerAdapter",
-      "signature_hash": "76bbbb103f98d94ea0ff5874cc7a2ab2b0adad47baca964c498cece5a5c4967e"
+      "signature_hash": "6035045609f428362a57496b7065ba0becd03154516235d13f448ac65073a379"
     },
     {
       "kind": "struct",

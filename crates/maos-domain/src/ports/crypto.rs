@@ -4,7 +4,8 @@
 //! capability-token signing through this trait. The composition root selects
 //! one provider from the init-owned configuration and shares its instance.
 //! v1.0 ships `ring`; a FIPS-validated provider is planned for v1.5.
-//! Kernel-internal T3 admission remains on `ring` until 20-13 L2.
+//! Kernel-internal T3 admission verifies the image lock through that same
+//! instance (`SecurityManagerAdapter::new(policy, crypto)`, 20-13 L2).
 //!
 //! Hardware-backed and other providers can be substituted at the composition
 //! root without recompiling Spirit binaries.

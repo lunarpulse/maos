@@ -19,11 +19,11 @@
 //!
 //! # FR48 swap-pattern verification
 //!
-//! `maos-bin/src/main.rs` constructs `Arc::new(RingCryptoProvider)` and
-//! binds it to a local `Arc<dyn CryptoProvider>`. Swapping to a v1.0+
-//! FIPS-validated provider is one line in `main.rs`:
-//! `Arc::new(FipsCryptoProvider::from_module_id("…"))`. No Spirit
-//! binary, no `cap_tokens`-side code, no audit-spine code recompiles.
+//! `maos-bin`'s composition root builds one `Arc<dyn CryptoProvider>` from its
+//! provider table (`crypto_provider::select`) and hands clones to every
+//! kernel consumer, including `SecurityManagerAdapter::new(policy, crypto)`
+//! (T3 image-lock verification): swapping to a FIPS-validated provider is a
+//! new table row, never a Spirit, `cap_tokens` or audit-spine recompile.
 //! Verified at v0.1-α by the `swap_pattern_compiles` test below.
 
 use maos_domain::ports::crypto::{CryptoError, CryptoProvider};

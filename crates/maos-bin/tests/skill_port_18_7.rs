@@ -107,7 +107,10 @@ impl Root {
                 .insert("skill.author.self".into());
         }
         policy.update(snapshot);
-        let security = Arc::new(SecurityManagerAdapter::new(policy.clone()));
+        let security = Arc::new(SecurityManagerAdapter::new(
+            policy.clone(),
+            Arc::new(RingCryptoProvider),
+        ));
         let (tx, rx) = maos_kernel_core::capability::cap_audit::channel();
         let capability = Arc::new(CapabilityRegistryAdapter::new(
             Arc::new(RingCryptoProvider),

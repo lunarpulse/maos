@@ -37,6 +37,7 @@ async fn crypto_provider_one_boot_reaches_all_four_surfaces() {
     .unwrap();
     let security = Arc::new(maos_kernel_core::security::SecurityManagerAdapter::new(
         Arc::clone(&world.policy),
+        Arc::clone(&selected.provider),
     ));
 
     // The signed package exists before this root's installed-boot pass.

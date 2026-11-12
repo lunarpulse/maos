@@ -740,7 +740,10 @@ async fn mcp_response_only_principal_is_purged_without_cached_claim_resurrection
     );
     let metrics = Arc::new(IacRtMetrics::new());
     let policy = Arc::new(PolicyTable::new());
-    let security = Arc::new(SecurityManagerAdapter::new(Arc::clone(&policy)));
+    let security = Arc::new(SecurityManagerAdapter::new(
+        Arc::clone(&policy),
+        Arc::new(RingCryptoProvider),
+    ));
     let telemetry = Arc::new(TelemetryStreamAdapter::default());
     let (audit_tx, _audit_rx) = maos_kernel_core::capability::cap_audit::channel();
     let capability = Arc::new(CapabilityRegistryAdapter::new(

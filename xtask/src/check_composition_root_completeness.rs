@@ -132,7 +132,8 @@ pub fn run(api_rs: &str, main_rs: &str, whitelist_path: &str, json: bool) -> Res
     }
 }
 
-// L1's kernel T3 construction is the sole pending 20-13 L2 exception.
+// Every production `RingCryptoProvider` naming outside these files is refused;
+// kernel T3 admission verifies through the injected provider (20-13 L2).
 const CRYPTO_ALLOWED_FILES: &[(&str, &str)] = &[
     ("maos-bin/src/crypto_provider.rs", "provider selection root"),
     (
@@ -164,8 +165,6 @@ fn crypto_provider_violations(crates: &std::path::Path) -> Result<Vec<String>, S
         let ast = syn::parse_file(&text).map_err(|e| format!("{path}: {e}"))?;
         let mut visitor = CryptoConstructionVisitor {
             path: rel,
-            pending_t3: false,
-            security_impl: false,
             violations: &mut violations,
         };
         visitor.visit_file(&ast);
@@ -175,8 +174,6 @@ fn crypto_provider_violations(crates: &std::path::Path) -> Result<Vec<String>, S
 
 struct CryptoConstructionVisitor<'a> {
     path: &'a str,
-    pending_t3: bool,
-    security_impl: bool,
     violations: &'a mut Vec<String>,
 }
 impl CryptoConstructionVisitor<'_> {
@@ -211,16 +208,6 @@ impl<'ast> syn::visit::Visit<'ast> for CryptoConstructionVisitor<'_> {
         syn::visit::visit_item_mod(self, item);
     }
 
-    fn visit_item_impl(&mut self, item: &'ast syn::ItemImpl) {
-        let previous = self.security_impl;
-        let self_ty = &item.self_ty;
-        self.security_impl = self.path == "maos-kernel-core/src/security/mod.rs"
-            && item.trait_.is_none()
-            && quote::quote!(#self_ty).to_string().replace(' ', "") == "SecurityManagerAdapter";
-        syn::visit::visit_item_impl(self, item);
-        self.security_impl = previous;
-    }
-
     fn visit_item_fn(&mut self, item: &'ast syn::ItemFn) {
         if !cfg_test(&item.attrs) {
             syn::visit::visit_item_fn(self, item);
@@ -228,13 +215,9 @@ impl<'ast> syn::visit::Visit<'ast> for CryptoConstructionVisitor<'_> {
     }
 
     fn visit_impl_item_fn(&mut self, item: &'ast syn::ImplItemFn) {
-        if cfg_test(&item.attrs) {
-            return;
+        if !cfg_test(&item.attrs) {
+            syn::visit::visit_impl_item_fn(self, item);
         }
-        let previous = self.pending_t3;
-        self.pending_t3 = self.security_impl && item.sig.ident == "admit_spirit";
-        syn::visit::visit_impl_item_fn(self, item);
-        self.pending_t3 = previous;
     }
 
     fn visit_use_rename(&mut self, item: &'ast syn::UseRename) {
@@ -247,12 +230,7 @@ impl<'ast> syn::visit::Visit<'ast> for CryptoConstructionVisitor<'_> {
 
     fn visit_expr_path(&mut self, expr: &'ast syn::ExprPath) {
         use syn::spanned::Spanned;
-        if names_ring(&expr.path)
-            && !(self.pending_t3
-                && quote::quote!(#expr).to_string().replace(' ', "")
-                    == "crate::security::crypto::RingCryptoProvider"
-                && std::mem::take(&mut self.pending_t3))
-        {
+        if names_ring(&expr.path) {
             self.reject(expr.span());
         }
         syn::visit::visit_expr_path(self, expr);
@@ -302,17 +280,19 @@ mod crypto_tests {
     use super::*;
     use syn::visit::Visit;
 
-    fn violations(source: &str) -> usize {
+    fn violations_at(path: &str, source: &str) -> usize {
         let parsed = syn::parse_file(source).unwrap();
         let mut found = Vec::new();
         CryptoConstructionVisitor {
-            path: "maos-bin/src/main.rs",
-            pending_t3: false,
-            security_impl: false,
+            path,
             violations: &mut found,
         }
         .visit_file(&parsed);
         found.len()
+    }
+
+    fn violations(source: &str) -> usize {
+        violations_at("maos-bin/src/main.rs", source)
     }
 
     #[test]
@@ -340,19 +320,19 @@ mod crypto_tests {
         ] {
             assert!(violations(source) > 0, "missed {source}");
         }
-        let mut found = Vec::new();
-        let syntax = syn::parse_file("\n\nimpl SecurityManagerAdapter { fn admit_spirit() { let _ = crate::security::crypto::RingCryptoProvider; let _ = crate::security::crypto::RingCryptoProvider; } fn other() { let _ = crate::security::crypto::RingCryptoProvider; } }").unwrap();
-        CryptoConstructionVisitor {
-            path: "maos-kernel-core/src/security/mod.rs",
-            pending_t3: false,
-            security_impl: false,
-            violations: &mut found,
-        }
-        .visit_file(&syntax);
+        // The kernel's former T3 admission line is no longer exempt: every
+        // construction in `security/mod.rs` is refused, `admit_spirit` included.
         assert_eq!(
-            found.len(),
-            2,
-            "only one named T3 construction may be exempt: {found:?}"
+            violations_at(
+                "maos-kernel-core/src/security/mod.rs",
+                "impl SecurityManagerAdapter { fn admit_spirit() { let _ = crate::security::crypto::RingCryptoProvider; } fn other() { let _ = crate::security::crypto::RingCryptoProvider; } }"
+            ),
+            2
+        );
+        // Test-only code stays outside the scan.
+        assert_eq!(
+            violations("impl Root { #[cfg(test)] fn t() { let _ = RingCryptoProvider; } }"),
+            0
         );
     }
 }

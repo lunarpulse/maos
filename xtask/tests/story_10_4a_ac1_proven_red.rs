@@ -993,7 +993,8 @@ loom.write = true
 loom.scan = true"#,
     )
     .expect("v4 Loom capability declaration parses");
-    let security = SecurityManagerAdapter::default();
+    let security =
+        SecurityManagerAdapter::new(Arc::new(PolicyTable::new()), Arc::new(RingCryptoProvider));
     let posture = PostureSection::from_toml_str(
         r#"default = "cautious"
 allowed_max = "cautious""#,

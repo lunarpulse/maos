@@ -814,7 +814,11 @@ coverage:
       all four: cohort mode skips the installed inventory. The blocking
       composition-root discipline job runs these recording-provider witnesses.
       check-composition-root-completeness refuses bypass construction (AC3).
-      Kernel T3 admission remains on ring pending 20-13 L2. Ring is not a
+      Story 20-13 L2: kernel T3 admission verifies the image lock through the
+      provider the root selected (SecurityManagerAdapter::new(policy, crypto);
+      t3_admission_crypto_20_13 witnesses the explicit-lock and environment
+      branches with a rejecting and a recording provider); the structural
+      check no longer carries a kernel exception. Ring is not a
       FIPS-validated module.
   FR49:
     gates: []
@@ -1925,7 +1929,8 @@ coverage:
     valid_until: '2027-05-12'
     notes: |
       Story 20-13 L1 witnesses provider selection and routing; the validated
-      FIPS 140-3 provider remains planned for v1.5, and kernel T3 routing awaits L2.
+      FIPS 140-3 provider remains planned for v1.5; kernel T3 routing landed in
+      Story 20-13 L2.
   NFR-Sec-16:
     gates: []
     corpora: []

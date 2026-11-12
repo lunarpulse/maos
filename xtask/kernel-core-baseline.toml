@@ -502,7 +502,20 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 27043
+src_lines = 27044
+# HISTORY: 20-13-pluggable-crypto-provider-selection landing 2 (20-13 L2, AC7) -> FLAG-Winston KT3
+# (D-20-13-04 A, ruled 2026-11-03 ask d_batch4; the literal public-field shape ruled by the
+# operator 2026-11-12 ask `kt3`), exact formatted 27043 -> 27044 (+1 physical), tokei 21203 -> 21202
+# (-1), 95 files, none added or removed, the priced KT3 figure (+1 / -1). `SecurityManagerAdapter`
+# gains the `crypto: Arc<dyn CryptoProvider>` field and `new(policy, crypto)`; T3 image-lock
+# admission verifies through `self.crypto` on both the explicit-lock and the environment branch,
+# the inline `RingCryptoProvider` and `impl Default` are removed, and `Debug` is manual. EXACTLY
+# ONE surface-hash refresh, `maos_kernel_core::security::SecurityManagerAdapter` (struct hash
+# 76:bb:bb:10:…:c4:96:7e -> 60:35:04:56:…:50:73:a3:79; operator-granted, ask `kt3`, 2026-11-12); the gate flags
+# nothing else. Cumulative measured tokei 21202 (shared STOP 22000, 2026-11-12 operator ruling;
+# ADR-069 alarm 22000 / envelope 23000 untouched). Changed files: security/mod.rs (code) and
+# security/crypto.rs (module doc only, line-neutral); digests and set_hash adopted from
+# `--emit-pin`.
 # HISTORY: 20-14-complete-cost-attribution landing 2 review round 1 (GPT P2 x3, GLM S1-S3) ->
 # FLAG-Winston KT redesign, exact formatted 27040 -> 27043 (+3 physical), tokei 21201 -> 21203 (+2),
 # 95 files, none added or removed, inside the x2 ceiling 21221 (+20 over the landing's own 21181
@@ -1073,7 +1086,7 @@ src_lines = 27043
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "7077b5b76321a9144a5b83803a4f320df8be46eb15e1bec28158de990dda9b20"
+set_hash = "d7d3df117a2792302041d66a08bc0c248dd28ce627445afac3e6da12970a1843"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -1143,10 +1156,10 @@ set_hash = "7077b5b76321a9144a5b83803a4f320df8be46eb15e1bec28158de990dda9b20"
 "scheduler/scheduler_loop.rs" = "987f537ee6464a1832229c265bd058a75f1dc8bceee1d3cb03a87058e38b099c"
 "scheduler/verb_resolver.rs" = "114fe959e9f7b4126464b63ad51f57a374646c95dbb72c0f3d8c19dbc363ab16"
 "security/approval.rs" = "d9847e9ffbd4ef4b5f21410a7a1c24e0dbb3f57bb98eeee20ae6b2f27e670ea3"
-"security/crypto.rs" = "201a1034b043a8001ecac32c424645d2db2a58cd0bfbba5a5a1092d960397a4e"
+"security/crypto.rs" = "0301d5d0b574791bd314cdef5c9ec9c80adec58248e49dc6731e9abc5b4e38c8"
 "security/drift.rs" = "875b2c652bc10ca1aa2f4dc1f4b6bd410e5c91ef37750b98fceb6058fb926328"
 "security/manifest.rs" = "d2e02fe45059446d55437e9d9e03893c96945741ec7d9ca4b13882d2bc5a4e85"
-"security/mod.rs" = "8143ffb5d1ed5366fdaa545ee201cc6be5fdf1e3fde3cee4ffc64003d7720eed"
+"security/mod.rs" = "56bf678eb903318ecb5fae169ae52c2e6408f2570f733bdaafb634e5c920df43"
 "security/operator_config.rs" = "513a8bb167fa2180893ac27877dc95e858ac2d8dadc5b7e88c5039ab68ca5fff"
 "security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
 "security/sandbox/linux.rs" = "54d0125650e886fe6dc3aee42cbc8575c8c9ab36d5f8604ed486438e01ce1096"

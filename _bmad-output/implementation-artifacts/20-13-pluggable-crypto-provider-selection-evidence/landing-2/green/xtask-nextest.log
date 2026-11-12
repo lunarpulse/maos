@@ -1,0 +1,2095 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1434:21
+     |
+1434 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: `maos-iac` (lib) generated 3 warnings (run `cargo fix --lib -p maos-iac` to apply 3 suggestions)
+warning: unused import: `DecisionId`
+  --> crates/maos-acp/src/server.rs:13:45
+   |
+13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+   |                                             ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `other`
+   --> crates/maos-acp/src/server.rs:223:25
+    |
+223 |                         other => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+warning: unused variable: `halt_id`
+  --> crates/maos-director-surface/src/halt_ui.rs:59:9
+   |
+59 |         halt_id: HaltId,
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+warning: unused variable: `file_name`
+   --> crates/maos-eval/src/distillate_corpus.rs:106:17
+    |
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:198:27
+    |
+198 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-registry` (lib) generated 4 warnings (run `cargo fix --lib -p maos-registry` to apply 4 suggestions)
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+   |
+13 | use maos_domain::frame::EpistemicHaltPayload;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `test-introspection`
+   --> crates/maos-kernel-core/src/capability/mod.rs:521:21
+    |
+521 |     #[cfg(any(test, feature = "test-introspection"))]
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `HaltJournal`
+  --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+   |
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+   |                                  ^^^^^^^^^^^
+
+warning: private item shadows public glob re-export
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+  --> crates/maos-kernel-core/src/iac.rs:13:9
+   |
+13 | pub use maos_iac::*;
+   |         ^^^^^^^^^^^
+note: but the private item here shadows it
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `crate::capability::WorkingMemoryStore`
+  --> crates/maos-kernel-core/src/inference/mod.rs:23:5
+   |
+23 | use crate::capability::WorkingMemoryStore;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+   |
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i1::TokenId`
+  --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+   |
+60 | use maos_domain::invariants::i1::TokenId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LifecycleEntry`
+  --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+   |
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+   |                                                                 ^^^^^^^^^^^^^^
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+   |
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+   |                                                           ^^^^^^^
+
+warning: unused import: `McpRequest`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+   |
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+   |                                                                         ^^^^^^^^^^
+
+warning: unused import: `Path`
+  --> crates/maos-kernel-core/src/memory/private.rs:13:17
+   |
+13 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `AtomicU64`
+ --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                         ^^^^^^^^^
+
+warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+   |
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `DispositionOutcome`
+  --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+   |
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+   |                 ^^^^^^^^^^^^^^^^^^
+
+warning: unreachable pattern
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+    |                     ----------------------------- matches some of the same values
+330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+    |                     --------------- matches some of the same values
+331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+    |                     ----------- matches some of the same values
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_providers::Provider`
+  --> crates/maos-kernel-core/src/inference/mod.rs:29:5
+   |
+29 | use maos_providers::Provider;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `event`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+   |
+66 |         let event = self
+   |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spirit_id`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+   |
+69 |     spirit_id: &str,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+
+warning: unused variable: `spirit_pid`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+   |
+70 |     spirit_pid: u32,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+
+warning: variable does not need to be mutable
+   --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:622:9
+    |
+622 |     let mut child = spawn_child(&mut spec, &argv)?;
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `e`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+    |
+161 |                         Err(e) => {
+    |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `ctx`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+    |
+132 |             let ctx = GatewayCtx {
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+
+warning: unused variable: `now_ns`
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:196:13
+    |
+196 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+
+warning: value assigned to `owned_guard` is never read
+   --> crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:401:27
+    |
+401 |     let mut owned_guard = None;
+    |                           ^^^^ this value is reassigned later and never used
+...
+455 |     owned_guard = Some(SandboxedContainerChild::own(
+    |     ----------- `owned_guard` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `total`
+  --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+   |
+22 |     let total = drained_tasks.len();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+warning: field `boot_nonce` is never read
+   --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+    |
+ 95 | pub struct KernelHaltResolver {
+    |            ------------------ field in this struct
+...
+101 |     boot_nonce: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `next_frame_counter` is never read
+  --> crates/maos-kernel-core/src/memory/mod.rs:82:5
+   |
+77 | pub struct MemoryManagerAdapter {
+   |            -------------------- field in this struct
+...
+82 |     next_frame_counter: AtomicU64,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: method `mint_frame_id` is never used
+   --> crates/maos-kernel-core/src/memory/mod.rs:665:8
+    |
+115 | impl MemoryManagerAdapter {
+    | ------------------------- method in this implementation
+...
+665 |     fn mint_frame_id(&self) -> [u8; 16] {
+    |        ^^^^^^^^^^^^^
+
+warning: field `kind` is never read
+  --> crates/maos-kernel-core/src/memory/private.rs:46:5
+   |
+44 | struct DiskCandidate {
+   |        ------------- field in this struct
+45 |     name: String,
+46 |     kind: ValueKind,
+   |     ^^^^
+
+warning: field `iac_rt_metrics` is never read
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+   |
+32 | pub struct SelfTelemetryAggregator {
+   |            ----------------------- field in this struct
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+   |     ^^^^^^^^^^^^^^
+
+warning: associated function `resolution_label` is never used
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+   |
+38 | impl SelfTelemetryAggregator {
+   | ---------------------------- associated function in this implementation
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: associated function `kind_to_str` is never used
+  --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+   |
+38 | impl SharedMemoryStore {
+   | ---------------------- associated function in this implementation
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+   |        ^^^^^^^^^^^
+
+warning: method `build_kernel_ctx` is never used
+   --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:141:8
+    |
+ 70 | impl HookDispatcher {
+    | ------------------- method in this implementation
+...
+141 |     fn build_kernel_ctx<'a>(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `attestation` is never read
+  --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+   |
+34 | pub struct VerifiedImageAttestation {
+   |            ------------------------ field in this struct
+35 |     attestation: T3ImageAttestation,
+   |     ^^^^^^^^^^^
+   |
+   = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+   |
+23 | pub struct ProgressWatchdog {
+   |            ---------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+   |
+23 | pub struct SilentFailureDetector {
+   |            --------------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-kernel-core` (lib) generated 37 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 21 suggestions)
+warning: methods `accept_consent` and `outbound_consent_context` are never used
+   --> crates/maos-cohort/src/state.rs:388:19
+    |
+206 | impl CohortManifestState {
+    | ------------------------ methods in this implementation
+...
+388 |     pub(crate) fn accept_consent(
+    |                   ^^^^^^^^^^^^^^
+...
+408 |     pub(crate) fn outbound_consent_context(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-cohort` (lib) generated 1 warning
+warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+  --> crates/maos-spirit-cli/src/signing.rs:27:7
+   |
+27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-spirit-cli` (lib) generated 1 warning
+warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+  --> crates/maos-control/src/lib.rs:17:11
+   |
+17 | use ring::constant_time;
+   |           ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+    --> crates/maos-control/src/lib.rs:1064:28
+     |
+1064 |             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
+     |                            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-control` (lib) generated 2 warnings
+warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+    --> crates/maos-bin/src/cross_team_crossing.rs:1014:5
+     |
+1014 | use maos_kernel_core::memory::MemoryManagerAdapter;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `AtomicUsize`
+   --> crates/maos-bin/src/supervision.rs:249:63
+    |
+249 |     use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+    |                                                               ^^^^^^^^^^^
+
+warning: `maos-bin` (lib) generated 2 warnings (run `cargo fix --lib -p maos-bin` to apply 2 suggestions)
+warning: function `register_fixture_story` is never used
+   --> xtask/src/gate_common.rs:119:15
+    |
+119 | pub(crate) fn register_fixture_story(dir: &Path, file_name: &str) {
+    |               ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `xtask` (lib test) generated 1 warning
+   Compiling xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+warning: unnecessary parentheses around function argument
+   --> xtask/src/check_migration_merkle.rs:325:41
+    |
+325 |             let payload: Vec<u8> = vec![(0x11u8 + i as u8); 64];
+    |                                         ^                ^
+    |
+    = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+    |
+325 -             let payload: Vec<u8> = vec![(0x11u8 + i as u8); 64];
+325 +             let payload: Vec<u8> = vec![0x11u8 + i as u8; 64];
+    |
+
+warning: unused import: `std::path::Path`
+   --> xtask/src/gen_termination_corpus.rs:210:9
+    |
+210 |     use std::path::Path;
+    |         ^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::io::Write`
+   --> xtask/src/templates_regen.rs:261:9
+    |
+261 |     use std::io::Write;
+    |         ^^^^^^^^^^^^^^
+
+warning: fields `summary` and `adr_ref` are never read
+  --> xtask/src/check_abi_ratification.rs:22:9
+   |
+20 | pub struct RatificationEntry {
+   |            ----------------- fields in this struct
+21 |     pub proposal_id: String,
+22 |     pub summary: String,
+   |         ^^^^^^^
+23 |     pub adr_ref: String,
+   |         ^^^^^^^
+   |
+   = note: `RatificationEntry` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `substrate_present` is never read
+    --> xtask/src/evidence_ledger.rs:1259:9
+     |
+1254 | pub struct PublishedLeg {
+     |            ------------ field in this struct
+...
+1259 |     pub substrate_present: bool,
+     |         ^^^^^^^^^^^^^^^^^
+     |
+     = note: `PublishedLeg` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: associated function `synthetic` is never used
+   --> xtask/src/check_fkcs.rs:117:12
+    |
+116 | impl FkcsSurfaceSnapshot {
+    | ------------------------ associated function in this implementation
+117 |     pub fn synthetic<A, H, AS, HS>(src_lines: usize, abi_items: A, host_items: H) -> Self
+    |            ^^^^^^^^^
+
+warning: function `read_nonempty_lines` is never used
+   --> xtask/src/check_fkcs.rs:744:8
+    |
+744 | pub fn read_nonempty_lines(path: &str) -> Result<BTreeSet<String>, String> {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: field `owasp_methodology_commit` is never read
+  --> xtask/src/check_pentest_gate.rs:24:9
+   |
+19 | pub struct GateSection {
+   |            ----------- field in this struct
+...
+24 |     pub owasp_methodology_commit: String,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `GateSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `fixture_path` is never read
+  --> xtask/src/check_skill_conformance.rs:33:9
+   |
+27 | pub struct ConformanceSection {
+   |            ------------------ field in this struct
+...
+33 |     pub fixture_path: String,
+   |         ^^^^^^^^^^^^
+   |
+   = note: `ConformanceSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: struct `AlwaysDisagree` is never constructed
+  --> xtask/src/tests/rebaseline_check_tests.rs:55:12
+   |
+55 |     struct AlwaysDisagree;
+   |            ^^^^^^^^^^^^^^
+
+warning: `xtask` (bin "xtask" test) generated 10 warnings (run `cargo fix --bin "xtask" -p xtask --tests` to apply 3 suggestions)
+warning: method `blocks` is never used
+   --> xtask/src/gate_common.rs:649:12
+    |
+577 | impl OutOfLedgerVerdict {
+    | ----------------------- method in this implementation
+...
+649 |     pub fn blocks(&self) -> bool {
+    |            ^^^^^^
+
+warning: method `detail` is never used
+   --> xtask/src/evidence_ledger.rs:536:12
+    |
+494 | impl SignatureCheck {
+    | ------------------- method in this implementation
+...
+536 |     pub fn detail(&self) -> &str {
+    |            ^^^^^^
+
+warning: `xtask` (bin "xtask") generated 8 warnings (6 duplicates)
+warning: function `workspace_path` is never used
+ --> xtask/tests/coverage_matrix_completeness_tests.rs:6:4
+  |
+6 | fn workspace_path(rel: &str) -> std::path::PathBuf {
+  |    ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `xtask` (test "coverage_matrix_completeness_tests") generated 1 warning
+warning: fields `reference_spirits`, `reproducibility`, and `methodology` are never read
+  --> xtask/tests/pentest_gate_tests.rs:15:5
+   |
+13 | struct EngagementManifest {
+   |        ------------------ fields in this struct
+14 |     environment: EngagementEnvironment,
+15 |     reference_spirits: ReferenceSpirits,
+   |     ^^^^^^^^^^^^^^^^^
+16 |     reproducibility: Reproducibility,
+   |     ^^^^^^^^^^^^^^^
+17 |     methodology: Methodology,
+   |     ^^^^^^^^^^^
+   |
+   = note: `EngagementManifest` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `build_command`, `binary_path`, `maosctl_path`, and `maosctl_verify` are never read
+  --> xtask/tests/pentest_gate_tests.rs:23:5
+   |
+21 | struct EngagementEnvironment {
+   |        --------------------- fields in this struct
+22 |     pinned_commit_sha: String,
+23 |     build_command: String,
+   |     ^^^^^^^^^^^^^
+24 |     binary_path: String,
+   |     ^^^^^^^^^^^
+25 |     maosctl_path: String,
+   |     ^^^^^^^^^^^^
+26 |     maosctl_verify: String,
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `EngagementEnvironment` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `hello_spirit`, `butler`, `worker`, `mira`, and `nash` are never read
+  --> xtask/tests/pentest_gate_tests.rs:31:5
+   |
+30 | struct ReferenceSpirits {
+   |        ---------------- fields in this struct
+31 |     hello_spirit: String,
+   |     ^^^^^^^^^^^^
+32 |     butler: String,
+   |     ^^^^^^
+33 |     worker: String,
+   |     ^^^^^^
+34 |     mira: String,
+   |     ^^^^
+35 |     nash: String,
+   |     ^^^^
+   |
+   = note: `ReferenceSpirits` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `rust_toolchain`, `cargo_lock`, `os`, and `instructions` are never read
+  --> xtask/tests/pentest_gate_tests.rs:40:5
+   |
+39 | struct Reproducibility {
+   |        --------------- fields in this struct
+40 |     rust_toolchain: String,
+   |     ^^^^^^^^^^^^^^
+41 |     cargo_lock: String,
+   |     ^^^^^^^^^^
+42 |     os: String,
+   |     ^^
+43 |     instructions: String,
+   |     ^^^^^^^^^^^^
+   |
+   = note: `Reproducibility` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `owasp_frozen_doc`, `scope_doc`, `triage_protocol`, and `findings_schema` are never read
+  --> xtask/tests/pentest_gate_tests.rs:48:5
+   |
+47 | struct Methodology {
+   |        ----------- fields in this struct
+48 |     owasp_frozen_doc: String,
+   |     ^^^^^^^^^^^^^^^^
+49 |     scope_doc: String,
+   |     ^^^^^^^^^
+50 |     triage_protocol: String,
+   |     ^^^^^^^^^^^^^^^
+51 |     findings_schema: String,
+   |     ^^^^^^^^^^^^^^^
+   |
+   = note: `Methodology` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: struct `PenTestSummary` is never constructed
+   --> xtask/tests/pentest_gate_tests.rs:102:8
+    |
+102 | struct PenTestSummary {
+    |        ^^^^^^^^^^^^^^
+
+warning: struct `GateSection` is never constructed
+   --> xtask/tests/pentest_gate_tests.rs:107:8
+    |
+107 | struct GateSection {
+    |        ^^^^^^^^^^^
+
+warning: `xtask` (test "pentest_gate_tests") generated 7 warnings
+warning: function `fixture` is never used
+ --> xtask/tests/check_corpus_integration.rs:3:4
+  |
+3 | fn fixture(path: &str) -> String {
+  |    ^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `xtask` (test "check_corpus_integration") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 56.51s
+────────────
+ Nextest run ID f5795cd4-7232-4b57-8874-255215e4e3eb with nextest profile: default
+    Starting 1315 tests across 76 binaries (12 tests skipped)
+        PASS [   0.006s] (   1/1315) xtask check_host_surface::tests::addition_is_red
+        PASS [   0.006s] (   2/1315) xtask check_empty_kernel::tests::whitelist_hit_skips_struct
+        PASS [   0.006s] (   3/1315) xtask check_empty_kernel::tests::recognizes_i9_exempt
+        PASS [   0.006s] (   4/1315) xtask check_error_catalog::tests::is_e_prefixed_positive
+        PASS [   0.006s] (   5/1315) xtask check_error_catalog::tests::is_e_prefixed_negative
+        PASS [   0.006s] (   6/1315) xtask check_host_surface::tests::empty_baseline_is_red
+        PASS [   0.006s] (   7/1315) xtask abi_diff::tests::line_diff_add_remove
+        PASS [   0.006s] (   8/1315) xtask check_error_catalog::tests::scan_finds_e_prefixed_error_enum_variants
+        PASS [   0.006s] (   9/1315) xtask check_host_surface::tests::addition_and_removal_reds_on_addition_only
+        PASS [   0.006s] (  10/1315) xtask check_error_catalog::tests::scan_finds_e_prefixed_variant
+        PASS [   0.006s] (  11/1315) xtask abi_diff::tests::line_diff_identical
+        PASS [   0.006s] (  12/1315) xtask check_empty_kernel::tests::ignores_vec_of_primitive
+        PASS [   0.006s] (  13/1315) xtask check_error_catalog::tests::scan_excludes_cfg_test
+        PASS [   0.006s] (  14/1315) xtask check_empty_kernel::tests::ignores_vec_of_u8
+        PASS [   0.007s] (  15/1315) xtask abi_diff::tests::resolve_fallback
+        PASS [   0.006s] (  16/1315) xtask check_error_catalog::tests::scan_excludes_non_error_e_enum
+        PASS [   0.007s] (  17/1315) xtask check_empty_kernel::tests::detects_hashmap_field
+        PASS [   0.007s] (  18/1315) xtask check_empty_kernel::tests::detects_mutex_field
+        PASS [   0.007s] (  19/1315) xtask check_error_catalog::tests::negative_meta_test_missing_field_detected
+        PASS [   0.007s] (  20/1315) xtask check_empty_kernel::tests::json_round_trip
+        PASS [   0.007s] (  21/1315) xtask check_empty_kernel::tests::detects_vec_of_struct
+        PASS [   0.007s] (  22/1315) xtask check_empty_kernel::tests::whitelist_has_exactly_three_paths
+        PASS [   0.007s] (  23/1315) xtask check_error_catalog::tests::negative_meta_test_uncatalogued_detected
+        PASS [   0.007s] (  24/1315) xtask check_error_catalog::tests::generator_is_deterministic
+        PASS [   0.007s] (  25/1315) xtask check_error_catalog::tests::negative_meta_test_stale_detected
+        PASS [   0.008s] (  26/1315) xtask check_error_catalog::tests::validate_passes_on_perfect_bijection
+        PASS [   0.008s] (  27/1315) xtask check_error_catalog::tests::link_shape_test
+        PASS [   0.009s] (  28/1315) xtask check_error_catalog::tests::invalid_severity_detected
+        PASS [   0.008s] (  29/1315) xtask check_empty_kernel::tests::missing_exemption_doc_fires
+        PASS [   0.005s] (  30/1315) xtask check_host_surface::tests::empty_current_is_green_everything_removed
+        PASS [   0.005s] (  31/1315) xtask check_service_boundary::tests::check_p4_flags_bare_exit
+        PASS [   0.005s] (  32/1315) xtask check_service_boundary::tests::p3_reports_supervisor_exception_and_enforced_when_no_kernel
+        PASS [   0.005s] (  33/1315) xtask check_host_surface::tests::whitespace_only_lines_ignored
+        PASS [   0.005s] (  34/1315) xtask check_host_surface::tests::mutation_proven_red
+        PASS [   0.005s] (  35/1315) xtask check_service_boundary::tests::doc_comment_change_is_not_a_surface_change
+        PASS [   0.004s] (  36/1315) xtask gate_common::evidence_projection_tests::projection_truth_table_is_exhaustive
+        PASS [   0.005s] (  37/1315) xtask gate_common::evidence_projection_tests::wire_spellings_match_the_epic_vocabulary
+        PASS [   0.005s] (  38/1315) xtask check_service_boundary::tests::fn_signature_change_is_a_surface_change
+        PASS [   0.006s] (  39/1315) xtask check_service_boundary::tests::fn_body_change_is_not_a_surface_change
+        PASS [   0.006s] (  40/1315) xtask check_service_boundary::tests::doc_attr_stripper_handles_escapes_and_brackets
+        PASS [   0.005s] (  41/1315) xtask gate_common::option_c_tests::blocking_class_hard_fails_a_red_oracle_regardless_of_substrate
+        PASS [   0.006s] (  42/1315) xtask check_host_surface::tests::identical_is_green
+        PASS [   0.006s] (  43/1315) xtask check_service_boundary::tests::signature_hash_changes_on_return_type
+        PASS [   0.005s] (  44/1315) xtask check_service_boundary::tests::snapshot_empty_crate_stable
+        PASS [   0.005s] (  45/1315) xtask check_service_boundary::tests::p2_reports_enforced_when_no_api_rs
+        PASS [   0.006s] (  46/1315) xtask check_service_boundary::tests::struct_field_change_is_still_a_surface_change
+        PASS [   0.005s] (  47/1315) xtask gate_common::out_of_ledger_tests::absent_evidence_follows_the_disposition_at_the_requested_phase
+        PASS [   0.006s] (  48/1315) xtask check_service_boundary::tests::json_round_trip
+        PASS [   0.007s] (  49/1315) xtask check_service_boundary::tests::check_p4_allows_shutdown_exit_code
+        PASS [   0.008s] (  50/1315) xtask gate_common::option_c_tests::phase_disposition_inherits_the_nearest_earlier_phase
+        PASS [   0.008s] (  51/1315) xtask check_service_boundary::tests::p1_reports_enforced_when_no_main_rs
+        PASS [   0.005s] (  52/1315) xtask invariant_lock::tests::detect_revert_matches_reverts_pr_idiom
+        PASS [   0.006s] (  53/1315) xtask invariant_lock::tests::detect_revert_captures_both_idioms_when_present
+        PASS [   0.007s] (  54/1315) xtask gate_common::out_of_ledger_tests::registry_rows_without_a_known_binding_are_refused
+        PASS [   0.009s] (  55/1315) xtask gate_common::evidence_projection_tests::only_the_two_proven_states_carry_evidence
+        PASS [   0.010s] (  56/1315) xtask gate_common::out_of_ledger_tests::out_of_ledger_truth_table_is_exhaustive
+        PASS [   0.010s] (  57/1315) xtask gate_common::option_c_tests::advisory_substrate_blocks_only_when_the_substrate_is_present
+        PASS [   0.009s] (  58/1315) xtask gate_common::out_of_ledger_tests::worst_state_names_the_gate
+        PASS [   0.006s] (  59/1315) xtask invariant_lock::tests::detect_revert_returns_none_on_non_revert_body
+        PASS [   0.006s] (  60/1315) xtask invariant_lock::tests::parse_cadence_handles_tabs
+        PASS [   0.007s] (  61/1315) xtask invariant_lock::tests::detect_revert_rejects_non_numeric_pr_ref
+        PASS [   0.007s] (  62/1315) xtask invariant_lock::tests::json_output_round_trip
+        PASS [   0.008s] (  63/1315) xtask invariant_lock::tests::detect_revert_returns_none_on_unreadable_body_path
+        PASS [   0.020s] (  64/1315) xtask check_error_catalog::tests::live_catalog_link_shape
+        PASS [   0.010s] (  65/1315) xtask::binary_size_limit_pin_20_1b the_size_limit_is_34_mib_in_both_enforcers
+        PASS [   0.023s] (  66/1315) xtask check_error_catalog::tests::live_catalog_matches_committed_artifact
+        PASS [   0.014s] (  67/1315) xtask invariant_lock::tests::detect_regression_runtime_to_ci
+        PASS [   0.011s] (  68/1315) xtask invariant_lock::tests::parse_cadence_works
+        PASS [   0.012s] (  69/1315) xtask invariant_lock::tests::no_invariant_touch_passes
+        PASS [   0.012s] (  70/1315) xtask invariant_lock::tests::detect_revert_matches_this_reverts_commit_idiom
+        PASS [   0.007s] (  71/1315) xtask::check_exit_commands_gate a_glued_subshell_paren_does_not_become_the_head
+        PASS [   0.005s] (  72/1315) xtask::check_exit_commands_gate bogus_one_shot_mode_reds_even_though_bare_maos_is_legal
+        PASS [   0.012s] (  73/1315) xtask invariant_lock::tests::parse_cadence_handles_14_distinct_files
+        PASS [   0.005s] (  74/1315) xtask::check_exit_commands_gate command_substitution_is_matched_before_separator_splitting
+        PASS [   0.014s] (  75/1315) xtask invariant_lock::tests::detect_revert_rejects_too_short_sha
+        PASS [   0.006s] (  76/1315) xtask::check_exit_commands_gate cargo_run_p_xtask_resolves_the_verb_after_the_double_dash
+        PASS [   0.008s] (  77/1315) xtask::check_exit_commands_gate a_plain_cargo_invocation_is_declared_not_resolved
+        PASS [   0.014s] (  78/1315) xtask invariant_lock::tests::regression_detection_in_14_invariant_batch
+        PASS [   0.012s] (  79/1315) xtask::check_corpus_integration clean_calibration_corpus_smoke
+        PASS [   0.010s] (  80/1315) xtask::check_exit_commands_gate a_hash_inside_quotes_is_not_a_comment
+        PASS [   0.015s] (  81/1315) xtask::calibrate_integration calibrate_surfaces_malformed_items
+        PASS [   0.006s] (  82/1315) xtask::check_exit_commands_gate env_wrapper_does_not_hide_its_child_command
+        PASS [   0.005s] (  83/1315) xtask::check_exit_commands_gate extra_files_without_a_block_are_not_a_finding
+        PASS [   0.005s] (  84/1315) xtask::check_exit_commands_gate exit_block_without_a_closing_fence_reds
+        PASS [   0.005s] (  85/1315) xtask::check_exit_commands_gate green_control_block_passes_and_is_not_vacuous
+        PASS [   0.006s] (  86/1315) xtask::check_exit_commands_gate done_epics_are_out_of_the_roster
+        PASS [   0.017s] (  87/1315) xtask::calibrate_integration calibrate_passes_on_clean_corpus
+        PASS [   0.006s] (  88/1315) xtask::check_exit_commands_gate malformed_shell_boundaries_red_instead_of_resolving
+        PASS [   0.005s] (  89/1315) xtask::check_exit_commands_gate quoted_placeholder_is_green
+        PASS [   0.013s] (  90/1315) xtask::check_exit_commands_gate a_non_done_epic_with_no_exit_block_reds
+        PASS [   0.007s] (  91/1315) xtask::check_exit_commands_gate owed_token_binds_to_the_exact_exit_line_and_full_command_path
+        PASS [   0.006s] (  92/1315) xtask::check_exit_commands_gate quoted_placeholder_still_requires_a_declaration
+        PASS [   0.008s] (  93/1315) xtask::check_exit_commands_gate nested_and_secondary_cli_commands_are_resolved_at_every_level
+        PASS [   0.016s] (  94/1315) xtask::check_corpus_integration clean_corpus_passes
+        PASS [   0.007s] (  95/1315) xtask::check_exit_commands_gate planted_absent_verb_reds
+        PASS [   0.014s] (  96/1315) xtask::check_exit_commands_gate bare_maos_with_a_declared_mode_is_green
+        PASS [   0.016s] (  97/1315) xtask::check_corpus_integration violation_corpus_fails
+        PASS [   0.021s] (  98/1315) xtask::calibrate_integration calibrate_fails_on_mismatch_at_p_0_99
+        PASS [   0.005s] (  99/1315) xtask::check_exit_commands_gate two_exit_block_files_for_one_epic_reds
+        PASS [   0.005s] ( 100/1315) xtask::check_exit_commands_gate whole_line_comments_carry_no_tokens
+        PASS [   0.008s] ( 101/1315) xtask::check_exit_commands_gate resolve_or_be_named_accepts_a_token_owed_by_an_open_story
+        PASS [   0.016s] ( 102/1315) xtask::check_exit_commands_gate an_empty_corpus_reds_rather_than_passing_vacuously
+        PASS [   0.006s] ( 103/1315) xtask::check_exit_commands_gate unquoted_placeholder_reds_as_a_redirection_hazard
+        PASS [   0.010s] ( 104/1315) xtask::check_exit_commands_gate owner_claim_requires_token_boundaries
+        PASS [   0.007s] ( 105/1315) xtask::check_exit_commands_gate sprint_status_epic_without_any_candidate_file_reds
+        PASS [   0.007s] ( 106/1315) xtask::check_exit_commands_gate resolve_or_be_named_reds_when_the_owning_story_is_done
+        PASS [   0.006s] ( 107/1315) xtask::check_exit_commands_gate unrecognised_token_reds_instead_of_being_skipped
+        PASS [   0.022s] ( 108/1315) xtask::calibrate_integration calibrate_passes_on_mismatch_but_within_ci
+        PASS [   0.007s] ( 109/1315) xtask::check_exit_commands_gate unreadable_planned_binary_is_owed_by_its_exact_exit_line
+        PASS [   0.006s] ( 110/1315) xtask::check_exit_commands_gate unreadable_unowned_binary_is_a_surface_finding
+        PASS [   0.008s] ( 111/1315) xtask::check_exit_commands_gate unreadable_required_help_surface_is_a_finding
+        PASS [   0.010s] ( 112/1315) xtask::check_exit_commands_gate resolve_or_be_named_reds_when_the_owner_never_claims_the_token
+        PASS [   0.005s] ( 113/1315) xtask::check_test_budget_proven_red a_planted_31_second_test_in_an_unbudgeted_binary_reds
+        PASS [   0.006s] ( 114/1315) xtask::check_test_budget_proven_red a_binary_under_its_budget_is_green
+        PASS [   0.006s] ( 115/1315) xtask::check_test_budget_proven_red an_empty_report_cannot_pass
+        PASS [   0.008s] ( 116/1315) xtask::check_test_budget_proven_red a_non_finite_or_negative_junit_time_is_refused
+        PASS [   0.007s] ( 117/1315) xtask::check_test_budget_proven_red a_stale_exception_reds
+        PASS [   0.013s] ( 118/1315) xtask::check_multi_provider_drift_integration with_outlier_report_returns_zero_exit_annotation_mode
+        PASS [   0.011s] ( 119/1315) xtask::check_test_budget_proven_red a_binary_listed_twice_is_refused
+        PASS [   0.013s] ( 120/1315) xtask::check_release_precondition_gate completed_failure_refuses
+        PASS [   0.011s] ( 121/1315) xtask::check_test_budget_proven_red a_non_finite_or_non_positive_budget_is_refused
+        PASS [   0.013s] ( 122/1315) xtask::check_release_precondition_gate empty_check_run_set_refuses_and_names_the_main_branch_cause
+        PASS [   0.007s] ( 123/1315) xtask::check_test_budget_proven_red an_exception_without_owner_or_not_above_default_is_refused
+        PASS [   0.007s] ( 124/1315) xtask::check_test_budget_proven_red an_exception_with_reason_and_owner_raises_only_its_binary
+        PASS [   0.013s] ( 125/1315) xtask::check_release_precondition_gate success_allows_over_the_stdin_transport_the_workflow_uses
+        PASS [   0.016s] ( 126/1315) xtask::check_multi_provider_drift_integration clean_report_returns_zero_exit
+        PASS [   0.015s] ( 127/1315) xtask::check_release_precondition_gate a_trailing_success_cannot_mask_the_latest_failure
+        PASS [   0.016s] ( 128/1315) xtask::check_multi_provider_drift_integration with_outlier_strict_mode_returns_nonzero_exit
+        PASS [   0.013s] ( 129/1315) xtask::check_release_precondition_gate empty_check_run_set_refuses_over_the_stdin_transport
+        PASS [   0.005s] ( 130/1315) xtask::check_test_budget_proven_red the_budget_is_the_sum_of_test_times_not_the_span
+        PASS [   0.019s] ( 131/1315) xtask::check_judge_config_integration clean_judge_direct_call_passes
+        PASS [   0.018s] ( 132/1315) xtask::check_judge_config_integration violation_judge_direct_call_fails
+        PASS [   0.018s] ( 133/1315) xtask::check_mock_not_in_release_smoke gate_passes_on_clean_binary
+        PASS [   0.019s] ( 134/1315) xtask::check_mock_not_in_release_smoke gate_json_output_serializes
+        PASS [   0.017s] ( 135/1315) xtask::check_release_precondition_gate completed_success_allows
+        PASS [   0.008s] ( 136/1315) xtask::check_test_budget_proven_red hosted_1_model_currency_calibration_changes_only_its_binary_budget
+        PASS [   0.018s] ( 137/1315) xtask::check_release_precondition_gate a_similarly_named_check_run_is_not_the_aggregate
+        PASS [   0.007s] ( 138/1315) xtask::check_test_budget_proven_red the_suite_total_is_budgeted
+        PASS [   0.018s] ( 139/1315) xtask::check_release_precondition_gate in_progress_refuses
+        PASS [   0.008s] ( 140/1315) xtask::check_test_budget_proven_red the_committed_register_parses
+        PASS [   0.021s] ( 141/1315) xtask::check_release_precondition_gate completed_skipped_refuses
+        PASS [   0.014s] ( 142/1315) xtask::check_test_budget_proven_red an_expensive_row_with_an_empty_job_reason_or_owner_is_refused
+        PASS [   0.011s] ( 143/1315) xtask::check_test_cost_proven_red an_empty_ignore_reason_reds
+        PASS [   0.012s] ( 144/1315) xtask::check_test_cost_proven_red a_marked_call_reached_by_a_non_ignored_test_reds_at_that_test
+        PASS [   0.012s] ( 145/1315) xtask::check_test_cost_proven_red a_stale_register_row_reds
+        PASS [   0.014s] ( 146/1315) xtask::check_test_cost_proven_red a_marked_call_directly_inside_a_non_ignored_test_reds
+        PASS [   0.014s] ( 147/1315) xtask::check_test_cost_proven_red a_comment_that_mentions_cargo_is_not_a_call
+        PASS [   0.013s] ( 148/1315) xtask::check_test_cost_proven_red a_symlink_loop_is_skipped
+        PASS [   0.011s] ( 149/1315) xtask::check_test_cost_proven_red an_unregistered_expensive_binary_reds
+        PASS [   0.013s] ( 150/1315) xtask::check_test_cost_proven_red a_use_of_trybuild_is_not_a_spawn
+        PASS [   0.010s] ( 151/1315) xtask::check_test_cost_proven_red marked_ignored_and_registered_is_green_and_feeds_the_ci_filter
+        PASS [   0.012s] ( 152/1315) xtask::check_test_cost_proven_red an_ordinary_test_reaching_a_single_line_static_reds_at_that_test
+        PASS [   0.014s] ( 153/1315) xtask::check_test_cost_proven_red an_empty_marker_reason_reds
+        PASS [   0.016s] ( 154/1315) xtask::check_test_cost_proven_red a_cargo_query_that_compiles_reds
+        PASS [   0.013s] ( 155/1315) xtask::check_test_cost_proven_red control_without_cargo_is_green
+        PASS [   0.050s] ( 156/1315) xtask::cgroup_ceiling_workflow_17_2 archive_cgroup_jobs_keep_real_delegation_counts_and_rootless_canary
+        PASS [   0.012s] ( 157/1315) xtask::check_test_cost_proven_red planting_an_unmarked_cargo_call_reds_naming_its_line
+        PASS [   0.010s] ( 158/1315) xtask::check_unsafe_integration with_unsafe_fails
+        PASS [   0.009s] ( 159/1315) xtask::check_unsafe_integration without_unsafe_passes
+        PASS [   0.019s] ( 160/1315) xtask::check_test_cost_proven_red a_cargo_query_on_a_compiler_or_without_reason_reds
+        PASS [   0.020s] ( 161/1315) xtask::check_test_cost_proven_red a_cargo_query_for_tree_stays_in_the_default_run
+        PASS [   0.019s] ( 162/1315) xtask::check_test_cost_proven_red a_single_line_static_connects_its_helper_to_an_ignored_test
+        PASS [   0.015s] ( 163/1315) xtask::check_test_cost_proven_red every_workspace_member_tests_dir_is_scanned
+        PASS [   0.017s] ( 164/1315) xtask::check_test_cost_proven_red every_compiler_spawn_trigger_reds_unmarked
+        PASS [   0.018s] ( 165/1315) xtask::check_test_cost_proven_red an_expensive_job_must_run_ignored_tests
+        PASS [   0.053s] ( 166/1315) xtask::cgroup_ceiling_workflow_17_2 observer_artifact_stages_fixed_cargo_scratch_beside_the_log
+        PASS [   0.005s] ( 167/1315) xtask::clippy_ratchet_20_3b every_t0_identity_component_affects_source_distinct
+        PASS [   0.008s] ( 168/1315) xtask::clippy_ratchet_20_3b fixture_baseline_ratchets_down_without_pinning_live_debt
+        PASS [   0.004s] ( 169/1315) xtask::clippy_ratchet_20_3b malformed_truncated_or_failed_clippy_stream_is_not_zero_debt
+        PASS [   0.004s] ( 170/1315) xtask::clippy_ratchet_20_3b repeated_targets_count_as_occurrences_not_source_distinct
+        PASS [   0.007s] ( 171/1315) xtask::clippy_ratchet_20_3b ratchet_fails_if_either_count_grows_and_accepts_equal_or_lower
+        PASS [   0.011s] ( 172/1315) xtask::corpus_staleness_integration clean_staleness_passes
+        PASS [   0.010s] ( 173/1315) xtask::corpus_staleness_integration violation_staleness_fails
+        PASS [   0.006s] ( 174/1315) xtask::coverage_matrix_20_3b no_go_keeps_the_live_completeness_control_and_documents_why
+        PASS [   0.098s] ( 175/1315) xtask gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field
+        PASS [   0.011s] ( 176/1315) xtask::coverage_matrix_20_3b spike_source_plus_per_gate_covers_is_byte_identical_before_changes
+        PASS [   0.051s] ( 177/1315) xtask::ci_shape_18_0 archive_transport_is_same_run_same_arch_and_restores_absolute_paths
+        PASS [   0.049s] ( 178/1315) xtask::ci_shape_18_0 epic_18_exit_runs_line_3_verbatim_and_its_empty_cassette_twin
+        PASS [   0.049s] ( 179/1315) xtask::ci_shape_18_0 nfr_aud_7_runs_maos_eval_distill_for_the_researcher
+        PASS [   0.052s] ( 180/1315) xtask::ci_shape_18_0 epic_18_exit_runs_line_1_verbatim_and_its_proven_red_twin
+        PASS [   0.052s] ( 181/1315) xtask::ci_shape_18_0 cargo_deny_is_its_own_blocking_job_in_aggregate
+        PASS [   0.010s] ( 182/1315) xtask::coverage_matrix_completeness_tests advisory_until_engagement_counts_as_non_empty
+        PASS [   0.050s] ( 183/1315) xtask::ci_shape_18_0 producer_keeps_package_feature_families_and_nextest_version
+        PASS [   0.053s] ( 184/1315) xtask::ci_shape_18_0 epic_18_exit_runs_line_4_verbatim_and_its_steady_twin
+        PASS [   0.053s] ( 185/1315) xtask::ci_shape_18_0 parsed_workflow_output_is_colorless_without_step_overrides
+        PASS [   0.056s] ( 186/1315) xtask::ci_shape_18_0 consumer_archive_files_are_the_families_that_hold_their_suites
+        PASS [   0.051s] ( 187/1315) xtask::ci_shape_18_0 unregistered_jobs_are_enrolled_in_aggregate_only
+        PASS [   0.058s] ( 188/1315) xtask::ci_shape_18_0 archive_consumers_run_every_test_without_a_per_test_kill
+        PASS [   0.052s] ( 189/1315) xtask::ci_shape_18_0 proven_red_steps_run_after_a_red_gate_step
+        PASS [   0.055s] ( 190/1315) xtask::ci_shape_18_0 expensive_tests_uploads_its_junit_and_builds_no_fixtures
+        PASS [   0.057s] ( 191/1315) xtask::ci_shape_18_0 epic_18_exit_runs_line_2_verbatim_and_its_drift_blind_twin
+        PASS [   0.006s] ( 192/1315) xtask::d11_xtask_ceiling_ratchet ceiling_raise_after_every_numbered_epic_is_done_reds
+        PASS [   0.005s] ( 193/1315) xtask::d11_xtask_ceiling_ratchet ceiling_raise_citing_an_open_story_passes
+        PASS [   0.006s] ( 194/1315) xtask::d11_xtask_ceiling_ratchet ceiling_raise_citing_a_done_story_reds
+        PASS [   0.005s] ( 195/1315) xtask::d11_xtask_ceiling_ratchet ceiling_raise_without_a_story_citation_reds
+        PASS [   0.056s] ( 196/1315) xtask::clippy_ratchet_20_3b advisory_lane_is_enrolled_but_not_in_blocking_fanin
+        PASS [   0.005s] ( 197/1315) xtask::d11_xtask_ceiling_ratchet the_tree_bound_inputs_exist
+        PASS [   0.060s] ( 198/1315) xtask::ci_shape_18_0 platform_recall_wire_gates_pin_every_source_test
+        PASS [   0.011s] ( 199/1315) xtask::coverage_matrix_integration violation_coverage_matrix_warning_passes
+        PASS [   0.013s] ( 200/1315) xtask::coverage_matrix_completeness_tests passes_on_populated_v1_0_gates
+        PASS [   0.014s] ( 201/1315) xtask::coverage_matrix_completeness_tests fails_on_empty_v1_0_gates
+        PASS [   0.014s] ( 202/1315) xtask::coverage_matrix_integration coverage_matrix_lint_fails_on_missing_fr
+        PASS [   0.012s] ( 203/1315) xtask::coverage_matrix_integration violation_coverage_matrix_hard_fails
+        PASS [   0.014s] ( 204/1315) xtask::coverage_matrix_integration clean_coverage_matrix_passes
+        PASS [   0.009s] ( 205/1315) xtask::d11_xtask_ceiling_ratchet the_ceiling_is_not_frozen_while_a_numbered_epic_is_open
+        PASS [   0.060s] ( 206/1315) xtask::ci_shape_18_0 producer_builds_every_fixture_the_wasm_host_tests_request
+        PASS [   0.011s] ( 207/1315) xtask::d19_story_file_governance an_empty_development_status_block_reds_too
+        PASS [   0.015s] ( 208/1315) xtask::d19_story_file_governance a_j1_story_with_a_bare_review_findings_placeholder_reds
+        PASS [   0.014s] ( 209/1315) xtask::d19_story_file_governance a_j1_story_with_no_recorded_model_reds
+        PASS [   0.046s] ( 210/1315) xtask::coverage_matrix_20_3b committed_hand_kept_matrix_is_hard_and_all_references_resolve
+        PASS [   0.016s] ( 211/1315) xtask::d19_story_file_governance a_j1_story_with_a_missing_dev_record_reds_the_blocking_gate
+        PASS [   0.013s] ( 212/1315) xtask::d19_story_file_governance epic_rollups_and_retrospectives_are_not_governed
+        PASS [   0.015s] ( 213/1315) xtask::d19_story_file_governance a_missing_sprint_status_reds_rather_than_governing_nothing
+        PASS [   0.013s] ( 214/1315) xtask::d19_story_file_governance the_same_defect_reds_under_a_numeric_key_too
+        PASS [   0.016s] ( 215/1315) xtask::d19_story_file_governance a_nested_review_heading_does_not_hide_a_bare_placeholder
+        PASS [   0.021s] ( 216/1315) xtask::d19_story_file_governance a_complete_fixture_is_green_on_every_converted_gate
+        PASS [   0.018s] ( 217/1315) xtask::d19_story_file_governance a_j1_story_with_an_open_finding_while_done_reds
+        PASS [   0.004s] ( 218/1315) xtask::decision_register_gate a_complete_current_register_is_green
+        PASS [   0.004s] ( 219/1315) xtask::decision_register_gate a_declared_unqueryable_deadline_is_reported_but_never_counted_green
+        PASS [   0.004s] ( 220/1315) xtask::decision_register_gate a_deadline_cannot_bind_to_an_incidental_story_token
+        PASS [   0.004s] ( 221/1315) xtask::decision_register_gate a_re_anchored_unqueryable_row_still_has_its_expiry_evaluated
+        PASS [   0.004s] ( 222/1315) xtask::decision_register_gate a_missing_opening_pipe_cannot_hide_following_rows
+        PASS [   0.004s] ( 223/1315) xtask::decision_register_gate a_register_with_no_findable_table_is_an_error_not_a_pass
+        PASS [   0.004s] ( 224/1315) xtask::decision_register_gate a_reaches_done_anchor_that_is_merely_in_progress_has_not_passed
+        PASS [   0.004s] ( 225/1315) xtask::decision_register_gate a_phrase_that_defers_naming_a_vehicle_reds
+        PASS [   0.018s] ( 226/1315) xtask::d19_story_file_governance an_active_story_requires_a_concrete_model
+        PASS [   0.004s] ( 227/1315) xtask::decision_register_gate a_retrospective_action_target_reds
+        PASS [   0.019s] ( 228/1315) xtask::d19_story_file_governance an_ungoverned_md_file_reds_nothing
+        PASS [   0.004s] ( 229/1315) xtask::decision_register_gate a_status_outside_the_vocabulary_is_not_silently_accepted
+        PASS [   0.004s] ( 230/1315) xtask::decision_register_gate a_row_declaring_no_status_reds_and_is_treated_as_open
+        PASS [   0.004s] ( 231/1315) xtask::decision_register_gate a_table_whose_targets_all_fail_to_resolve_is_an_error_not_a_pass
+        PASS [   0.004s] ( 232/1315) xtask::decision_register_gate a_valid_target_cannot_hide_an_unresolved_nonnumeric_target
+        PASS [   0.005s] ( 233/1315) xtask::decision_register_gate a_table_row_with_an_unnamable_id_reds_instead_of_disappearing
+        PASS [   0.004s] ( 234/1315) xtask::decision_register_gate a_table_with_zero_data_rows_is_an_error_not_a_pass
+        PASS [   0.004s] ( 235/1315) xtask::decision_register_gate an_undeclared_key_target_reds
+        PASS [   0.004s] ( 236/1315) xtask::decision_register_gate an_empty_story_list_cannot_green_a_register
+        PASS [   0.004s] ( 237/1315) xtask::decision_register_gate an_ambiguous_short_form_target_reds_rather_than_resolving_by_accident
+        PASS [   0.004s] ( 238/1315) xtask::decision_register_gate an_undeclared_unqueryable_deadline_reds
+        PASS [   0.005s] ( 239/1315) xtask::decision_register_gate an_epic_key_target_reds_even_though_it_is_a_real_tracker_key
+        PASS [   0.082s] ( 240/1315) xtask::ci_shape_18_0 portable_transport_is_opted_in_only_for_the_selected_producer_and_consumers
+        PASS [   0.004s] ( 241/1315) xtask::decision_register_gate contradictory_status_declarations_red
+        PASS [   0.004s] ( 242/1315) xtask::decision_register_gate duplicate_decision_ids_red
+        PASS [   0.004s] ( 243/1315) xtask::decision_register_gate malformed_decision_ids_red_instead_of_normalizing
+        PASS [   0.004s] ( 244/1315) xtask::decision_register_gate open_row_past_a_reaches_done_anchor_reds
+        PASS [   0.004s] ( 245/1315) xtask::decision_register_gate pipes_inside_a_code_span_do_not_shift_a_rows_columns
+        PASS [   0.004s] ( 246/1315) xtask::decision_register_gate malformed_formatted_targets_red_instead_of_disappearing
+        PASS [   0.005s] ( 247/1315) xtask::decision_register_gate every_nonempty_deadline_clause_is_validated
+        PASS [   0.004s] ( 248/1315) xtask::decision_register_gate the_same_row_declared_closed_is_green
+        PASS [   0.005s] ( 249/1315) xtask::decision_register_gate open_row_past_a_leaves_backlog_anchor_reds
+        PASS [   0.136s] ( 250/1315) xtask::cgroup_ceiling_workflow_17_2 aggregate_reports_every_required_job_non_success_as_failure
+        PASS [   0.026s] ( 251/1315) xtask::d19_story_file_governance an_active_declared_story_with_no_file_reds_every_walker
+        PASS [   0.005s] ( 252/1315) xtask::decision_register_gate unqueryable_must_be_declared_on_each_nonmechanical_clause
+        PASS [   0.096s] ( 253/1315) xtask::ci_shape_18_0 archive_consumer_outputs_preserve_clean_checkout_provenance
+        PASS [   0.038s] ( 254/1315) xtask::d11_xtask_ceiling_ratchet the_live_xtask_ceiling_cites_a_real_sprint_story
+        PASS [   0.009s] ( 255/1315) xtask::empty_kernel_integration violation_i9_fails
+        PASS [   0.010s] ( 256/1315) xtask::empty_kernel_integration exempt_but_undocumented_struct_reds
+        PASS [   0.011s] ( 257/1315) xtask::empty_kernel_integration clean_i9_passes
+        PASS [   0.012s] ( 258/1315) xtask::diagnostics_20_3a abi_denied_diff_is_still_a_breaking_change
+        PASS [   0.012s] ( 259/1315) xtask::empty_kernel_integration exempt_and_documented_struct_passes
+        PASS [   0.092s] ( 260/1315) xtask::ci_shape_18_0 wasm_archive_keeps_image_matrix_suite_counts_and_all_runtime_markers
+        PASS [   0.035s] ( 261/1315) xtask::decision_adrs_and_provisioning complete_fixture_is_green_before_any_red_is_credited
+        PASS [   0.019s] ( 262/1315) xtask::diagnostics_20_3a abi_tool_failure_preserves_both_streams_and_status
+        PASS [   0.039s] ( 263/1315) xtask::erasure_verifier_runner_20_11 both_whole_package_runners_provision_the_hash_locked_verifier
+        PASS [   0.046s] ( 264/1315) xtask::epic17_exit_workflow_17_7 epic17_archive_keeps_observer_counts_oracle_and_delegated_launch
+        PASS [   0.048s] ( 265/1315) xtask::epic17_exit_workflow_17_7 epic17_archive_keeps_terminal_and_quota_proofs_on_both_t3_images
+        PASS [   0.083s] ( 266/1315) xtask::d11_xtask_ceiling_ratchet the_retirement_row_matches_its_exact_story_arrow
+        PASS [   0.097s] ( 267/1315) xtask::decision_adrs_and_provisioning real_repository_satisfies_decision_adrs_and_provisioning_contract
+        PASS [   0.090s] ( 268/1315) xtask::erasure_verifier_runner_20_11 declared_backend_path_survives_the_delegated_environment_filter
+        PASS [   0.111s] ( 269/1315) xtask::epic17_exit_workflow_17_7 purge_cut_units_pass_the_real_harness_unit_validation
+        PASS [   0.113s] ( 270/1315) xtask::fixture_provenance_20_15 absent_manifest_owned_profile_entries_fail_only_in_transport_mode
+        PASS [   0.108s] ( 271/1315) xtask::fixture_provenance_20_15 consumer_dirty_refusal_names_eight_entries_and_counts_the_rest
+        PASS [   0.114s] ( 272/1315) xtask::fixture_provenance_20_15 consumer_checks_artifact_bytes_presence_and_profile_path_identity
+        PASS [   0.003s] ( 273/1315) xtask::fixture_provenance_20_15 public_fixture_child
+        PASS [   0.125s] ( 274/1315) xtask::epic17_exit_workflow_17_7 aggregate_workflow_executes_non_success_handling_and_failure_step
+        PASS [   0.215s] ( 275/1315) xtask::ci_shape_18_0 archive_consumers_refuse_compilation_and_compile_plants
+        PASS [   0.003s] ( 276/1315) xtask::fixture_provenance_20_15 public_profile_binary_child
+        PASS [   0.117s] ( 277/1315) xtask::fixture_provenance_20_15 incomplete_or_corrupt_manifest_cannot_authorize_an_intact_entry
+        PASS [   0.104s] ( 278/1315) xtask::fixture_provenance_20_15 invalid_schema_and_partial_provenance_never_become_local_entries
+        PASS [   0.142s] ( 279/1315) xtask::fixture_provenance_20_15 consumer_rejects_stale_tree_without_mtime_fallback
+        PASS [   0.105s] ( 280/1315) xtask::fixture_provenance_20_15 missing_git_checkout_never_falls_back_to_mtime
+        PASS [   0.145s] ( 281/1315) xtask::fixture_provenance_20_15 identical_tree_on_another_commit_keeps_provenance_valid
+        PASS [   0.004s] ( 282/1315) xtask::fkcs_oracle diff_oracle_derives_kernel_unchanged_and_ignores_self_reported_flags
+        PASS [   0.003s] ( 283/1315) xtask::fkcs_oracle diff_oracle_ignores_forged_self_report_even_when_it_claims_red
+        PASS [   0.003s] ( 284/1315) xtask::fkcs_oracle diff_oracle_reports_kernel_unchanged_for_identical_surfaces
+        PASS [   0.112s] ( 285/1315) xtask::fixture_provenance_20_15 local_schema_three_without_provenance_keeps_mtime_checks
+        PASS [   0.003s] ( 286/1315) xtask::fkcs_oracle disposition_inline_parser_extracts_phase_keys_and_rejects_malformed_stanzas
+        PASS [   0.004s] ( 287/1315) xtask::fkcs_oracle frozen_baseline_files_carry_real_public_surfaces_not_synthetic_tokens
+        PASS [   0.003s] ( 288/1315) xtask::fkcs_oracle oracle_fault_injections_red_kernel_unchanged_around_a_stable_base
+        PASS [   0.003s] ( 289/1315) xtask::fkcs_oracle phase_disposition_inherits_downward_and_resolves_the_blocking_window
+        PASS [   0.013s] ( 290/1315) xtask::fkcs_oracle every_declared_admission_file_reds_a_one_byte_mutation
+        PASS [   0.004s] ( 291/1315) xtask::fkcs_oracle read_disposition_extracts_exactly_the_check_fkcs_stanza
+        PASS [   0.005s] ( 292/1315) xtask::gate_evidence_names_20_3c a_leg_name_never_claims_a_test_its_args_do_not_run
+        PASS [   0.189s] ( 293/1315) xtask::epic17_exit_workflow_17_7 purge_cut_restored_green_accepts_filtered_tests_but_requires_the_scene
+        PASS [   0.104s] ( 294/1315) xtask::fixture_provenance_20_15 producer_merge_refuses_renamed_provenance_instead_of_rewriting_it_unsealed
+        PASS [   0.143s] ( 295/1315) xtask::fixture_provenance_20_15 ordinary_ci_own_builds_use_mtimes_until_explicit_transport_is_selected
+        PASS [   0.093s] ( 296/1315) xtask::fixture_provenance_20_15 producer_refuses_missing_artifact_instead_of_recording_identity
+        PASS [   0.018s] ( 297/1315) xtask::gate_honesty_20_3a empty_fuzz_ledger_is_absent
+        PASS [   0.211s] ( 298/1315) xtask::fixture_provenance_20_15 fresh_checkout_accepts_transported_manifest_despite_newer_source_mtimes
+        PASS [   0.051s] ( 299/1315) xtask::gate_evidence_names_20_3c a_synthetic_drill_never_reports_the_operational_claim
+        PASS [   0.098s] ( 300/1315) xtask::fixture_provenance_20_15 schema_two_entries_merge_into_three_without_inventing_provenance
+        PASS [   0.032s] ( 301/1315) xtask::gate_honesty_20_3a empty_rto_ledger_is_absent_with_a_report
+        PASS [   0.221s] ( 302/1315) xtask::fixture_provenance_20_15 consumer_git_ignores_inherited_repository_locators
+        PASS [   0.102s] ( 303/1315) xtask::fixture_provenance_20_15 schema_two_local_entries_preserve_mtime_checks_in_dirty_worktrees
+        PASS [   0.025s] ( 304/1315) xtask::gate_honesty_20_3a malformed_fuzz_ledger_is_red_with_a_report
+        PASS [   0.117s] ( 305/1315) xtask::fixture_provenance_20_15 producer_seals_actual_artifact_bytes_and_absolute_paths
+        PASS [   0.091s] ( 306/1315) xtask::fixture_provenance_20_15 transport_refuses_both_identities_removed_or_renamed_even_with_old_mtimes
+        PASS [   0.116s] ( 307/1315) xtask::fixture_provenance_20_15 public_fixture_reports_listed_but_absent_artifact_as_missing
+        PASS [   0.004s] ( 308/1315) xtask::invariant_claims_20_3b asserted_claim_without_owner_is_not_an_honest_ledger_entry
+        PASS [   0.017s] ( 309/1315) xtask::gate_honesty_20_3a mature_fuzz_ledger_meeting_the_floor_passes
+        PASS [   0.006s] ( 310/1315) xtask::invariant_claims_20_3b committed_ledger_covers_all_fourteen_and_keeps_requirement_ownership
+        PASS [   0.027s] ( 311/1315) xtask::gate_honesty_20_3a malformed_pentest_toml_is_red_with_a_report
+        PASS [   0.021s] ( 312/1315) xtask::gate_honesty_20_3a young_fuzz_ledger_is_indeterminate
+        PASS [   0.022s] ( 313/1315) xtask::invariant_claims_20_3b guaranteed_accepts_asserted_dataflow_and_question_mark_tests
+        PASS [   0.010s] ( 314/1315) xtask::invariant_claims_20_3b routed_witness_binaries_and_labelled_red_owners_remain_enrolled
+        PASS [   0.027s] ( 315/1315) xtask::invariant_claims_20_3b forged_id_or_missing_register_cannot_shrink_the_ledger
+        PASS [   0.022s] ( 316/1315) xtask::invariant_claims_20_3b guaranteed_requires_property_corpus_and_ci_job_together
+        PASS [   0.095s] ( 317/1315) xtask::gate_honesty_20_3a absent_inputs_never_pass
+        PASS [   0.066s] ( 318/1315) xtask::gate_honesty_20_3a malformed_evidence_gates_emit_named_red_reports
+        PASS [   0.047s] ( 319/1315) xtask::gate_honesty_20_3a migration_manifest_and_corpus_errors_emit_named_red_reports
+        PASS [   0.307s] ( 320/1315) xtask::d11_xtask_ceiling_ratchet planted_current_row_raises_cannot_borrow_historical_or_done_grants
+        PASS [   0.046s] ( 321/1315) xtask::gate_honesty_20_3a workflow_checker_rejects_evidence_condition_plant
+        PASS [   0.060s] ( 322/1315) xtask::gate_honesty_20_3a unreadable_security_evidence_is_red_with_a_report
+        PASS [   0.067s] ( 323/1315) xtask::gate_honesty_20_3a trial_real_missing_kernel_leg_blocks
+        PASS [   0.037s] ( 324/1315) xtask::j1_crosshost_1a_proven_red delegation_becomes_decorative_when_the_env_shortcut_returns
+        PASS [   0.079s] ( 325/1315) xtask::gate_honesty_20_3a workflow_always_invokes_gates_on_absence
+        PASS [   0.152s] ( 326/1315) xtask::fkcs_oracle frozen_baseline_reconciles_live_triple_and_rejects_src_line_drift
+        PASS [   0.284s] ( 327/1315) xtask::diagnostics_20_3a composite_child_spawn_error_emits_json
+        PASS [   0.155s] ( 328/1315) xtask::fkcs_oracle frozen_snapshot_and_current_kernel_baselines_are_independently_valid
+        PASS [   0.054s] ( 329/1315) xtask::j1_crosshost_1a_proven_red baseline_fixture_tree_is_green
+        PASS [   0.053s] ( 330/1315) xtask::j1_crosshost_1a_proven_red dotted_consent_intent_is_caught_but_the_pin_test_is_not
+        PASS [   0.200s] ( 331/1315) xtask::fixture_provenance_20_15 public_profile_binary_requires_entries_for_manifest_owned_binaries_in_transport
+        PASS [   0.060s] ( 332/1315) xtask::j1_crosshost_1a_proven_red boundary_leg_reds_when_the_shared_intake_stops_self_asserting
+        PASS [   0.064s] ( 333/1315) xtask::j1_crosshost_1a_proven_red consent_intent_must_name_effect_authority_not_a_job_category
+        PASS [   0.056s] ( 334/1315) xtask::j1_crosshost_1a_proven_red route_locally_anyway_but_keep_a_matching_expression_in_a_test_module
+        PASS [   0.086s] ( 335/1315) xtask::invariant_claims_20_3b guaranteed_refuses_nonexecuting_or_unbound_witnesses
+        PASS [   0.062s] ( 336/1315) xtask::j1_crosshost_1a_proven_red delegation_breaks_when_the_pump_stops_stripping_host_id
+        PASS [   0.063s] ( 337/1315) xtask::j1_crosshost_1a_proven_red loopback_from_host_is_recorded_as_unverified_not_as_a_failure
+        PASS [   0.063s] ( 338/1315) xtask::j1_crosshost_1a_proven_red route_locally_anyway_by_dropping_the_topology_host_key
+        PASS [   0.052s] ( 339/1315) xtask::j1_crosshost_1a_proven_red route_locally_anyway_by_emitting_the_same_host_frame
+        PASS [   0.052s] ( 340/1315) xtask::j1_crosshost_1a_proven_red route_locally_anyway_by_removing_the_production_fail_closed_error
+        PASS [   0.049s] ( 341/1315) xtask::j1_crosshost_1b_proven_red a_fourth_epic_host_entry_must_red_frame_borne_route
+        PASS [   0.352s] ( 342/1315) xtask::fixture_provenance_20_15 consumer_rejects_all_dirty_states_even_with_matching_head_and_old_mtimes
+        PASS [   0.058s] ( 343/1315) xtask::j1_crosshost_1b_proven_red a_dropped_epic_host_entry_must_red_frame_borne_route
+        PASS [   0.250s] ( 344/1315) xtask::fixture_provenance_20_15 producer_refuses_sources_that_change_after_clean_capture
+        PASS [   0.049s] ( 345/1315) xtask::j1_crosshost_1b_proven_red a_missing_refusal_proof_file_is_a_finding_never_a_skip
+        PASS [   0.055s] ( 346/1315) xtask::j1_crosshost_1b_proven_red a_missing_epic_topology_must_red_frame_borne_route
+        PASS [   0.058s] ( 347/1315) xtask::j1_crosshost_1b_proven_red a_local_epic_followup_must_red_frame_borne_route
+        PASS [   0.176s] ( 348/1315) xtask::gate_honesty_20_3a escape_substrate_refusal_never_passes
+        PASS [   0.050s] ( 349/1315) xtask::j1_crosshost_1b_proven_red an_epic_host_entry_naming_another_host_must_red_frame_borne_route
+        PASS [   0.051s] ( 350/1315) xtask::j1_crosshost_1b_proven_red baseline_fixture_tree_is_green
+        PASS [   0.053s] ( 351/1315) xtask::j1_crosshost_1b_proven_red boundary_leg_reds_when_the_loopback_arm_is_removed
+        PASS [   0.307s] ( 352/1315) xtask::fixture_provenance_20_15 producer_does_not_claim_clean_provenance_for_any_dirty_state
+        PASS [   0.051s] ( 353/1315) xtask::j1_crosshost_1b_proven_red commenting_out_an_assertion_does_not_satisfy_the_leg
+        PASS [   0.053s] ( 354/1315) xtask::j1_crosshost_1b_proven_red collapsing_minus_32009_into_minus_32001_must_red
+        PASS [   0.055s] ( 355/1315) xtask::j1_crosshost_1b_proven_red collapsing_minus_32001_into_minus_32009_must_red
+        PASS [   0.057s] ( 356/1315) xtask::j1_crosshost_1b_proven_red deleting_a_test_attribute_must_red
+        PASS [   0.060s] ( 357/1315) xtask::j1_crosshost_1b_proven_red consent_enrollment_moved_to_another_job_must_red
+        PASS [   0.055s] ( 358/1315) xtask::j1_crosshost_1b_proven_red dropping_a_reachable_unclassified_reason_must_red
+        PASS [   0.057s] ( 359/1315) xtask::j1_crosshost_1b_proven_red deleting_the_consent_refusal_enrollment_line_must_red
+        PASS [   0.058s] ( 360/1315) xtask::j1_crosshost_1b_proven_red dropping_the_accept_seam_typed_binding_must_red
+        PASS [   0.051s] ( 361/1315) xtask::j1_crosshost_1b_proven_red dropping_the_expiry_code_assertion_must_red
+        PASS [   0.052s] ( 362/1315) xtask::j1_crosshost_1b_proven_red dropping_the_destination_peer_binding_must_red
+        PASS [   0.514s] ( 363/1315) xtask::check_test_cost_proven_red the_real_tree_is_green
+        PASS [   0.054s] ( 364/1315) xtask::j1_crosshost_1b_proven_red dropping_the_minus_32009_accept_seam_must_red
+        PASS [   0.060s] ( 365/1315) xtask::j1_crosshost_1b_proven_red dropping_the_minus_32009_send_seam_must_red
+        PASS [   0.052s] ( 366/1315) xtask::j1_crosshost_1b_proven_red emptying_the_derived_enrollment_set_must_red_as_VACUOUS
+        PASS [   0.059s] ( 367/1315) xtask::j1_crosshost_1b_proven_red dropping_the_positive_control_assertion_must_red
+        PASS [   0.064s] ( 368/1315) xtask::j1_crosshost_1b_proven_red dropping_the_minus_32001_deny_assertion_must_red
+        PASS [   0.043s] ( 369/1315) xtask::j1_crosshost_1b_proven_red planting_an_unenrolled_19_1_test_file_must_red
+        PASS [   0.066s] ( 370/1315) xtask::j1_crosshost_1b_proven_red dropping_the_source_host_assertion_must_red
+        PASS [   0.024s] ( 371/1315) xtask::j1_crosshost_1b_proven_red planting_an_unenrolled_j1_test_file_must_red
+        PASS [   0.064s] ( 372/1315) xtask::j1_crosshost_1b_proven_red dropping_the_typed_reason_readback_must_red
+        PASS [   0.053s] ( 373/1315) xtask::j1_crosshost_1b_proven_red ledger_leg_names_reconciles_with_the_legs_actually_invoked
+        PASS [   0.062s] ( 374/1315) xtask::j1_crosshost_1b_proven_red enrolling_an_outside_2b_file_crate_qualified_is_green
+        PASS [   0.050s] ( 375/1315) xtask::j1_crosshost_1b_proven_red planting_an_epic_numbered_foreign_lane_test_file_stays_green
+        PASS [   0.045s] ( 376/1315) xtask::j1_crosshost_1b_proven_red planting_an_unenrolled_2b_file_outside_maos_bin_must_red
+        PASS [   0.063s] ( 377/1315) xtask::j1_crosshost_1b_proven_red enrollment_in_prose_is_not_enrollment_must_red
+        PASS [   0.059s] ( 378/1315) xtask::j1_crosshost_1b_proven_red planting_a_numeric_j1_stem_must_red
+        PASS [   0.066s] ( 379/1315) xtask::j1_crosshost_1b_proven_red enrolling_an_outside_2b_file_under_the_wrong_crate_must_red
+        PASS [   0.063s] ( 380/1315) xtask::j1_crosshost_1b_proven_red every_leg_publishes_a_non_zero_check_count
+        PASS [   0.043s] ( 381/1315) xtask::j1_crosshost_1b_proven_red planting_an_unenrolled_2c_file_stays_green_here
+        PASS [   0.055s] ( 382/1315) xtask::j1_crosshost_1b_proven_red planting_an_unenrolled_19_3_test_file_must_red
+        PASS [   0.049s] ( 383/1315) xtask::j1_crosshost_1b_proven_red splitting_the_crate_and_the_target_across_two_commands_must_red
+        PASS [   0.046s] ( 384/1315) xtask::j1_crosshost_2a_proven_red a_second_test_invisible_copy_of_the_adapter_seam_must_red
+        PASS [   0.060s] ( 385/1315) xtask::j1_crosshost_1b_proven_red reformatting_the_refusal_proofs_does_not_flip_the_leg
+        PASS [   0.056s] ( 386/1315) xtask::j1_crosshost_2a_proven_red a_missing_workflow_is_a_finding_never_a_skip
+        PASS [   0.042s] ( 387/1315) xtask::j1_crosshost_2a_proven_red deleting_the_manifest_reader_enrollment_line_must_red
+        PASS [   0.058s] ( 388/1315) xtask::j1_crosshost_1b_proven_red the_unverified_boundary_is_published_and_does_not_fail_the_gate
+        PASS [   0.059s] ( 389/1315) xtask::j1_crosshost_1b_proven_red unpinning_the_source_peer_id_literal_must_red
+        PASS [   0.049s] ( 390/1315) xtask::j1_crosshost_2a_proven_red claude_may_not_go_back_to_having_no_ambient_credential_path
+        PASS [   0.076s] ( 391/1315) xtask::j1_crosshost_1b_proven_red planting_an_unenrolled_2e_file_must_red
+        PASS [   0.060s] ( 392/1315) xtask::j1_crosshost_2a_proven_red an_adapter_must_be_able_to_demand_the_flag_its_oracle_parses
+        PASS [   0.060s] ( 393/1315) xtask::j1_crosshost_2a_proven_red baseline_fixture_tree_is_green
+        PASS [   0.061s] ( 394/1315) xtask::j1_crosshost_2a_proven_red an_unwired_oracle_keeps_the_name_but_not_the_call_must_red
+        PASS [   0.062s] ( 395/1315) xtask::j1_crosshost_2a_proven_red a_test_module_mention_of_the_retired_oracle_is_not_a_regression
+        PASS [   0.053s] ( 396/1315) xtask::j1_crosshost_2a_proven_red enrollment_lines_moved_to_another_job_must_red
+        PASS [   0.053s] ( 397/1315) xtask::j1_crosshost_2a_proven_red reformatting_the_enrollment_step_does_not_flip_the_leg
+        PASS [   0.051s] ( 398/1315) xtask::j1_crosshost_2a_proven_red the_shared_final_stdout_line_oracle_may_not_come_back
+        PASS [   0.055s] ( 399/1315) xtask::j1_crosshost_2a_proven_red re_orphaning_the_adapter_seam_from_the_tests_must_red
+        PASS [   0.062s] ( 400/1315) xtask::j1_crosshost_2a_proven_red deleting_the_completion_vector_enrollment_line_must_red
+        PASS [   0.054s] ( 401/1315) xtask::j1_crosshost_2a_proven_red returning_the_tests_to_an_in_src_module_must_red
+        PASS [   0.050s] ( 402/1315) xtask::j1_crosshost_2b_proven_red baseline_fixture_tree_is_green
+        PASS [   0.213s] ( 403/1315) xtask::diagnostics_20_3a epic_status_read_error_emits_json
+        PASS [   0.044s] ( 404/1315) xtask::j1_crosshost_2b_proven_red missing_identity_proof_is_a_finding_not_a_skip
+        PASS [   0.062s] ( 405/1315) xtask::j1_crosshost_2b_proven_red deleting_any_identity_proof_needle_reds_under_its_leg
+        PASS [   0.051s] ( 406/1315) xtask::j1_crosshost_2b_proven_red inert_outcome_bindings_red_identity_proof_leg
+        PASS [   0.052s] ( 407/1315) xtask::j1_crosshost_2b_proven_red unenrolling_two_host_proof_reds_completion_vectors_leg
+        PASS [   0.065s] ( 408/1315) xtask::j1_crosshost_2b_proven_red fewer_than_three_registered_identity_tests_reds
+        PASS [   0.065s] ( 409/1315) xtask::j1_crosshost_2b_proven_red fork_shape_keeps_the_loopback_boundary_true_and_green
+        PASS [   0.693s] ( 410/1315) xtask check_error_catalog::tests::live_catalog_check_passes
+        PASS [   0.121s] ( 411/1315) xtask::j1_crosshost_2a_proven_red each_real_adapter_must_keep_its_own_structured_oracle
+        PASS [   0.650s] ( 412/1315) xtask::ci_shape_18_0 recall_gate_enrolls_all_source_vectors_and_pins_source_count
+        PASS [   0.082s] ( 413/1315) xtask::j1_crosshost_2c_proven_red a_bundle_missing_a_required_field_reds_the_schema_leg
+        PASS [   0.073s] ( 414/1315) xtask::j1_crosshost_2c_proven_red a_capture_without_both_bundle_halves_reds
+        PASS [   0.074s] ( 415/1315) xtask::j1_crosshost_2c_proven_red a_capture_with_a_rewritten_claim_scope_reds
+        PASS [   0.071s] ( 416/1315) xtask::j1_crosshost_2c_proven_red a_negation_smuggle_in_one_field_reds
+        PASS [   0.093s] ( 417/1315) xtask::j1_crosshost_2c_proven_red a_capture_disagreeing_with_its_bundle_host_reds
+        PASS [   0.077s] ( 418/1315) xtask::j1_crosshost_2c_proven_red a_services_block_on_this_job_reds
+        PASS [   0.084s] ( 419/1315) xtask::j1_crosshost_2c_proven_red a_host_field_outside_the_signature_reds
+        PASS [   0.086s] ( 420/1315) xtask::j1_crosshost_2c_proven_red a_capture_naming_one_host_twice_reds
+        PASS [   0.723s] ( 421/1315) xtask invariant_lock::tests::multi_invariant_touched_set_complete
+        PASS [   0.094s] ( 422/1315) xtask::j1_crosshost_2c_proven_red a_scan_that_rederives_the_rules_reds
+        PASS [   0.098s] ( 423/1315) xtask::j1_crosshost_2c_proven_red a_present_capture_still_claims_nothing
+        PASS [   0.074s] ( 424/1315) xtask::j1_crosshost_2c_proven_red a_surviving_unconditional_base_key_print_reds
+        PASS [   0.081s] ( 425/1315) xtask::j1_crosshost_2c_proven_red adding_kernel_core_to_a2a_tcp_production_deps_reds
+        PASS [   0.090s] ( 426/1315) xtask::j1_crosshost_2c_proven_red an_adjacent_negation_still_excuses
+        PASS [   0.098s] ( 427/1315) xtask::j1_crosshost_2c_proven_red adding_the_loom_lite_edge_to_maos_audit_reds
+        PASS [   0.067s] ( 428/1315) xtask::j1_crosshost_2c_proven_red an_overclaiming_capture_reds
+        PASS [   0.102s] ( 429/1315) xtask::j1_crosshost_2c_proven_red an_empty_stranger_verification_reds
+        PASS [   0.779s] ( 430/1315) xtask invariant_lock::tests::multi_invariant_with_corpus_delta_clears_that_leg
+        PASS [   0.106s] ( 431/1315) xtask::j1_crosshost_2c_proven_red an_extra_field_in_a_bundle_reds_the_schema_leg
+        PASS [   0.108s] ( 432/1315) xtask::j1_crosshost_2c_proven_red an_extra_entry_field_reds_the_schema_leg
+        PASS [   0.161s] ( 433/1315) xtask::j1_crosshost_2c_proven_red a_false_sworn_property_reds
+        PASS [   0.097s] ( 434/1315) xtask::j1_crosshost_2c_proven_red an_invalid_json_bundle_half_reds
+        PASS [   0.102s] ( 435/1315) xtask::j1_crosshost_2c_proven_red an_invalid_json_capture_reds
+        PASS [   0.103s] ( 436/1315) xtask::j1_crosshost_2c_proven_red an_unenrolled_story_test_target_reds
+        PASS [   0.093s] ( 437/1315) xtask::j1_crosshost_2c_proven_red dropping_the_skip_serializing_if_reds_byte_identity
+        PASS [   0.004s] ( 438/1315) xtask::kernel_pin_content_hash_16_0 a_composite_gates_json_stdout_is_machine_clean
+        PASS [   0.084s] ( 439/1315) xtask::j1_crosshost_2c_proven_red projecting_correlation_id_reds
+        PASS [   0.115s] ( 440/1315) xtask::j1_crosshost_2c_proven_red baseline_fixture_tree_is_green
+        PASS [   0.109s] ( 441/1315) xtask::j1_crosshost_2c_proven_red dropping_either_side_of_the_pin_journal_reds
+        PASS [   0.104s] ( 442/1315) xtask::j1_crosshost_2c_proven_red fixing_only_one_signing_site_reds
+        PASS [   0.034s] ( 443/1315) xtask::kernel_pin_ci_wiring_20_3a kernel_pin_ci_job_has_all_required_prerequisites
+        PASS [   0.038s] ( 444/1315) xtask::kernel_pin_ci_wiring_20_3a each_required_kernel_pin_wiring_deletion_reds
+        PASS [   0.126s] ( 445/1315) xtask::j1_crosshost_2c_proven_red an_unenrolled_t_prefixed_target_reds
+        PASS [   0.117s] ( 446/1315) xtask::j1_crosshost_2c_proven_red deleting_the_gates_job_reds
+        PASS [   0.006s] ( 447/1315) xtask::kernel_pin_content_hash_16_0 falsifier_tag_is_annotated_and_peels_to_the_pinned_commit
+        PASS [   0.124s] ( 448/1315) xtask::j1_crosshost_2c_proven_red dropping_the_partition_config_read_reds
+        PASS [   0.095s] ( 449/1315) xtask::j1_crosshost_2c_proven_red pushing_after_observing_in_the_reply_path_reds
+        PASS [   0.040s] ( 450/1315) xtask::kernel_pin_ci_wiring_20_3a kernel_pin_suite_cannot_be_impostor_skipped_or_nonblocking
+        PASS [   0.013s] ( 451/1315) xtask::kernel_pin_content_hash_16_0 emit_pin_prints_a_parseable_block_and_refuses_json
+        PASS [   0.003s] ( 452/1315) xtask::kernel_pin_content_hash_16_0 no_key_before_src_lines_begins_with_src_lines
+        PASS [   0.110s] ( 453/1315) xtask::j1_crosshost_2c_proven_red publishing_the_dedup_before_the_commit_guard_reds
+        PASS [   0.024s] ( 454/1315) xtask::kernel_pin_content_hash_16_0 a_self_inconsistent_pin_is_a_parse_error_not_a_policy_red
+        PASS [   0.116s] ( 455/1315) xtask::j1_crosshost_2c_proven_red published_capture_template_is_admissible_by_the_real_gate
+        PASS [   0.003s] ( 456/1315) xtask::kernel_pin_content_hash_16_0 the_gate_carries_no_hold_or_waiver_constant
+        PASS [   0.021s] ( 457/1315) xtask::kernel_pin_content_hash_16_0 an_empty_tree_is_a_failure_never_a_pass
+        PASS [   0.011s] ( 458/1315) xtask::kernel_pin_content_hash_16_0 live_tree_matches_the_committed_pin
+        PASS [   0.006s] ( 459/1315) xtask::kernel_pin_content_hash_16_0 the_digests_are_distinct_per_file
+        PASS [   0.015s] ( 460/1315) xtask::kernel_pin_content_hash_16_0 io_and_parse_failures_stay_err
+        PASS [   0.005s] ( 461/1315) xtask::kernel_pin_content_hash_16_0 the_non_rs_trust_anchor_is_inside_the_pinned_set
+        PASS [   0.093s] ( 462/1315) xtask::j1_crosshost_2c_proven_red reading_attester_pubkey_inside_reconciliation_reds
+        PASS [   0.005s] ( 463/1315) xtask::kernel_pin_content_hash_16_0 the_pin_block_is_emitted_byte_sorted
+        PASS [   0.006s] ( 464/1315) xtask::kernel_pin_content_hash_16_0 the_pin_is_readable_by_a_real_toml_parser
+        PASS [   0.003s] ( 465/1315) xtask::kernel_pin_content_hash_16_0 the_three_other_readers_still_resolve_the_pin
+        PASS [   0.011s] ( 466/1315) xtask::kernel_pin_content_hash_16_0 the_reflow_vector_left_the_tracked_tree_untouched
+        PASS [   0.102s] ( 467/1315) xtask::j1_crosshost_2c_proven_red removing_the_hex_run_class_reds
+        PASS [   0.100s] ( 468/1315) xtask::j1_crosshost_2c_proven_red removing_the_shared_root_refusal_reds
+        PASS [   0.093s] ( 469/1315) xtask::j1_crosshost_2c_proven_red removing_the_verify_derivation_path_reds
+        PASS [   0.006s] ( 470/1315) xtask::ledger_collectors_20_3a ledger_workflow_uploads_overwrite_artifacts_on_rerun
+        PASS [   0.098s] ( 471/1315) xtask::j1_crosshost_2c_proven_red removing_the_stdout_pubkey_line_reds
+        PASS [   0.313s] ( 472/1315) xtask::j1_crosshost_2c_proven_red a_capture_missing_a_human_step_property_reds
+        PASS [   0.063s] ( 473/1315) xtask::ledger_collectors_20_3a recorder_refuses_missing_worker_counter_and_measures_real_corpus
+        PASS [   0.313s] ( 474/1315) xtask::diagnostics_20_3a wasm_build_failure_is_not_vacuity
+        PASS [   0.196s] ( 475/1315) xtask::j1_crosshost_2c_proven_red unbounding_either_operation_reds
+        PASS [   0.202s] ( 476/1315) xtask::j1_crosshost_2c_proven_red untyping_either_nack_code_reds
+        PASS [   0.008s] ( 477/1315) xtask::loom_integration clean_loom_passes
+        PASS [   0.360s] ( 478/1315) xtask::j1_crosshost_2c_proven_red a_schema_omitting_an_emitted_field_reds
+        PASS [   0.008s] ( 479/1315) xtask::loom_integration violation_loom_fails
+        PASS [   0.213s] ( 480/1315) xtask::kernel_pin_content_hash_16_0 an_added_file_is_named_not_absorbed
+        PASS [   0.121s] ( 481/1315) xtask::ledger_collectors_20_3a t3_final_assertion_executes_measured_floor_and_link_results
+        PASS [   0.249s] ( 482/1315) xtask::kernel_pin_content_hash_16_0 a_mismatch_is_ok_passed_false_and_never_err
+        PASS [   0.037s] ( 483/1315) xtask::macos_compile_guard_20_6 a_skipped_guard_is_not_applicable_never_a_silent_pass
+        PASS [   0.272s] ( 484/1315) xtask::kernel_pin_content_hash_16_0 a_deleted_file_is_named_not_absorbed
+        PASS [   0.034s] ( 485/1315) xtask::macos_compile_guard_20_6 aggregate_depends_on_both_jobs_and_reports_not_applicable_loudly
+        PASS [   0.253s] ( 486/1315) xtask::kernel_pin_content_hash_16_0 paths_that_cannot_roundtrip_through_toml_are_refused
+        PASS [   0.048s] ( 487/1315) xtask::macos_compile_guard_20_6 an_applicable_guard_that_did_not_run_is_flagged_for_the_failing_step
+        PASS [   0.277s] ( 488/1315) xtask::kernel_pin_content_hash_16_0 non_regular_entries_are_refused_not_skipped
+        PASS [   0.274s] ( 489/1315) xtask::kernel_pin_content_hash_16_0 the_real_kernel_leg_emits_a_parseable_json_stdout
+        PASS [   1.003s] ( 490/1315) xtask::error_catalog_20_3a deleted_committed_json_key_is_red
+        PASS [   0.322s] ( 491/1315) xtask::kernel_pin_content_hash_16_0 a_reflow_moves_the_hash_and_rustfmt_restores_it
+        PASS [   0.172s] ( 492/1315) xtask::macos_compile_guard_20_6 a_guard_that_ran_is_reported_as_ran_and_a_failure_is_not_softened
+        PASS [   0.046s] ( 493/1315) xtask::macos_compile_guard_20_6 every_linux_only_dependency_is_an_os_typed_api_for_the_filter
+        PASS [   0.034s] ( 494/1315) xtask::macos_compile_guard_20_6 macos_check_is_the_only_macos_job_and_release_dry_run_remains_linux_only
+        PASS [   0.037s] ( 495/1315) xtask::macos_compile_guard_20_6 macos_check_runs_on_release_yamls_darwin_runner_and_checks_the_whole_workspace
+        PASS [   0.035s] ( 496/1315) xtask::macos_compile_guard_20_6 macos_scope_is_a_cheap_linux_job_with_full_history
+        PASS [   0.308s] ( 497/1315) xtask::macos_compile_guard_20_6 a_path_with_a_newline_cannot_forge_the_step_outputs
+        PASS [   0.331s] ( 498/1315) xtask::diagnostics_20_3a wasm_zero_tests_is_vacuous_but_missing_summary_is_not
+        PASS [   0.538s] ( 499/1315) xtask::kernel_pin_content_hash_16_0 a_line_neutral_kernel_edit_reds_the_gate_and_names_the_file
+        PASS [   0.504s] ( 500/1315) xtask::kernel_pin_content_hash_16_0 the_hash_is_independent_of_directory_creation_order
+        PASS [   0.280s] ( 501/1315) xtask::macos_compile_guard_20_6 an_unknown_diff_fails_open_and_runs_the_guard
+        PASS [   0.003s] ( 502/1315) xtask::macos_compile_guard_20_6 the_linux_only_exec_deps_crate_is_cfg_gated_in_source_not_excluded
+        PASS [   0.261s] ( 503/1315) xtask::macos_compile_guard_20_6 deleting_a_platform_file_still_counts
+        PASS [   0.035s] ( 504/1315) xtask::macos_compile_guard_20_6 the_pr_comment_script_reads_no_const_before_its_declaration
+        PASS [   0.036s] ( 505/1315) xtask::macos_compile_guard_20_6 the_pr_comment_never_calls_a_failed_filter_not_applicable
+        PASS [   0.276s] ( 506/1315) xtask::macos_compile_guard_20_6 editing_a_file_that_already_contains_a_cfg_starts_the_guard
+        PASS [   0.529s] ( 507/1315) xtask::ledger_collectors_20_3a old_array_plus_object_append_is_proven_red
+        PASS [   0.313s] ( 508/1315) xtask::macos_compile_guard_20_6 no_workspace_member_is_treated_as_outside_the_workspace
+        PASS [   0.095s] ( 509/1315) xtask::model_currency_gate a_comment_inside_a_constructor_never_stands_in_for_its_model
+        PASS [   0.307s] ( 510/1315) xtask::macos_compile_guard_20_6 removing_a_wrapped_bare_unix_cfg_starts_the_guard
+        PASS [   0.113s] ( 511/1315) xtask::model_currency_gate a_dangling_manifest_link_is_a_refusal_not_a_skip
+        PASS [   0.699s] ( 512/1315) xtask::ledger_collectors_20_3a collector_refuses_multiple_json_values_without_changing_ledger
+        PASS [   0.097s] ( 513/1315) xtask::model_currency_gate a_host_provider_constructor_that_goes_missing_reds_even_if_the_others_remain
+        PASS [   0.505s] ( 514/1315) xtask::macos_compile_guard_20_6 any_edit_to_the_macos_job_definitions_starts_the_guard_even_without_the_word_macos
+        PASS [   0.092s] ( 515/1315) xtask::model_currency_gate a_one_line_call_with_a_non_literal_model_refuses_instead_of_reading_past_it
+        PASS [   0.750s] ( 516/1315) xtask::ledger_collectors_20_3a collectors_refuse_missing_operator_branch
+        PASS [   0.313s] ( 517/1315) xtask::macos_compile_guard_20_6 removing_the_last_cfg_from_a_file_starts_the_guard
+        PASS [   0.513s] ( 518/1315) xtask::macos_compile_guard_20_6 discipline_yml_edits_start_the_guard_only_when_they_mention_macos
+        PASS [   0.720s] ( 519/1315) xtask::ledger_collectors_20_3a workflows_parse_and_gate_missing_ledger_without_skip
+        PASS [   0.353s] ( 520/1315) xtask::diagnostics_20_3a workflow_plant_reaches_the_coherence_gate_and_restores_green
+        PASS [   0.674s] ( 521/1315) xtask::macos_compile_guard_20_6 a_pull_request_is_diffed_against_its_merge_commits_first_parent_not_a_stale_base
+        PASS [   0.064s] ( 522/1315) xtask::example_spirit_regen_integration check_mode_fails_on_drift
+        PASS [   0.375s] ( 523/1315) xtask::macos_compile_guard_20_6 the_filter_reads_the_whole_pushed_range_not_the_last_commit
+        PASS [   0.008s] ( 524/1315) xtask::example_spirit_regen_integration check_mode_passes_on_committed_example
+        PASS [   0.864s] ( 525/1315) xtask::ledger_collectors_20_3a rto_collector_preserves_distinct_measurements_on_the_same_date
+        PASS [   0.136s] ( 526/1315) xtask::model_currency_gate gemini_unknown_constructor_model_is_governed_20_4
+        PASS [   1.629s] ( 527/1315) xtask::error_catalog_20_3a blank_toml_cause_is_red
+        PASS [   0.150s] ( 528/1315) xtask::model_currency_gate inactive_default_cannot_hide_an_unknown_live_model_f6
+        PASS [   0.118s] ( 529/1315) xtask::model_currency_gate kimi_k2_constructor_is_refused_as_deprecated_20_4
+        PASS [   0.005s] ( 530/1315) xtask::model_currency_gate the_data_file_is_refused_when_it_would_make_the_guidance_lie
+        PASS [   0.004s] ( 531/1315) xtask::model_currency_gate the_data_file_refuses_an_empty_provider_map_and_blank_or_repeated_retired_ids
+        PASS [   0.005s] ( 532/1315) xtask::model_currency_gate the_shipped_data_names_a_replacement_for_every_retired_id
+        PASS [   0.115s] ( 533/1315) xtask::model_currency_gate main_rs_constructors_are_read_in_every_layout_and_comments_open_no_call
+        PASS [   0.068s] ( 534/1315) xtask::model_currency_gate missing_kimi_constructor_fails_closed_20_4
+        PASS [   0.019s] ( 535/1315) xtask::owner_assertion_epic_key_rejected a_different_epic_key_owner_also_reds_so_the_rule_is_the_class
+        PASS [   0.018s] ( 536/1315) xtask::owner_assertion_epic_key_rejected a_row_owned_by_a_real_story_key_is_green
+        PASS [   0.040s] ( 537/1315) xtask::owner_assertion_epic_key_rejected a_stale_owner_still_reds
+        PASS [   0.119s] ( 538/1315) xtask::model_currency_gate shared_default_scan_skips_unrelated_item_bodies_hosted_1
+        PASS [   0.040s] ( 539/1315) xtask::owner_assertion_epic_key_rejected an_epic_key_owner_reds
+        PASS [   1.013s] ( 540/1315) xtask::ledger_collectors_20_3a collectors_refuse_malformed_record
+        PASS [   0.026s] ( 541/1315) xtask::owner_assertion_epic_key_rejected an_epic_retrospective_owner_keeps_its_existing_deferred_disposition
+        PASS [   0.018s] ( 542/1315) xtask::owner_assertion_epic_key_rejected an_ownerless_row_with_no_recorded_disposition_reds
+        PASS [   0.005s] ( 543/1315) xtask::package_recipes_20_2 ac2_committed_recipes_are_templates_not_a_development_release
+        PASS [   0.005s] ( 544/1315) xtask::package_recipes_20_2 ac2_unrendered_hash_token_is_refused
+        PASS [   0.004s] ( 545/1315) xtask::package_recipes_20_2 ac2_versions_preserve_prerelease_ordering_shape
+        PASS [   0.038s] ( 546/1315) xtask::owner_assertion_epic_key_rejected an_ownerless_row_that_cites_its_disposition_is_reported_not_blocked
+        PASS [   0.142s] ( 547/1315) xtask::model_currency_gate the_api_key_argument_is_never_judged_as_the_model
+        PASS [   0.007s] ( 548/1315) xtask::package_workflows_20_2 ac3_hosted_recipe_stays_branch_only_and_exercises_real_controls
+        PASS [   0.004s] ( 549/1315) xtask::package_workflows_20_2 ac5_login_push_and_sign_are_all_credential_gated
+        PASS [   0.003s] ( 550/1315) xtask::package_workflows_20_2 hosted_1_rpm_artifact_macro_does_not_redefine_reserved_suffix
+        PASS [   0.005s] ( 551/1315) xtask::package_workflows_20_2 review_f1_packaging_manifest_authenticates_verifier_and_recipes
+        PASS [   0.169s] ( 552/1315) xtask::model_currency_gate shared_defaults_remain_governed_at_the_declaration_f6
+        PASS [   0.006s] ( 553/1315) xtask::package_workflows_20_2 review_f3_release_signing_requires_environment_reference
+        PASS [   0.008s] ( 554/1315) xtask::package_workflows_20_2 review_f2_operator_prepare_cannot_build_tag_code_with_publish_permissions
+        PASS [   0.005s] ( 555/1315) xtask::package_workflows_20_2 review_f5_and_f10_container_bases_and_owned_state_are_explicit
+        PASS [   0.010s] ( 556/1315) xtask::package_workflows_20_2 review_f4_critical_release_actions_are_full_commit_pinned
+        PASS [   0.005s] ( 557/1315) xtask::package_workflows_20_2 review_f9_container_wait_binds_release_id_and_attempt
+        PASS [   0.064s] ( 558/1315) xtask::owner_assertion_epic_key_rejected disposition_markers_require_a_real_authority
+        PASS [   0.753s] ( 559/1315) xtask::macos_compile_guard_20_6 non_ascii_paths_are_matched_not_c_quoted_past_the_filter
+        PASS [   1.301s] ( 560/1315) xtask::j1_crosshost_2c_proven_red a_missing_governed_file_is_a_finding_not_a_skip
+        PASS [   0.006s] ( 561/1315) xtask::package_workflows_20_2 review_p1_ubuntu_rpm_has_explicit_checked_dependency_mode
+        PASS [   0.065s] ( 562/1315) xtask::owner_assertion_epic_key_rejected negated_disposition_markers_do_not_green_ownerless_rows
+        PASS [   0.049s] ( 563/1315) xtask::package_workflows_20_2 ac1_native_deb_matrix_and_all_consumers_are_required
+        PASS [   0.006s] ( 564/1315) xtask::package_workflows_20_2 review_p2_runner_owns_output_directory_before_root_containers
+        PASS [   0.004s] ( 565/1315) xtask::package_workflows_20_2 review_p5_all_recipe_routes_require_wrong_key_rejection
+        PASS [   0.003s] ( 566/1315) xtask::pentest_gate_tests manifest_fails_with_deleted_section
+        PASS [   0.005s] ( 567/1315) xtask::pentest_gate_tests manifest_deserializes_successfully
+        PASS [   0.048s] ( 568/1315) xtask::package_workflows_20_2 hosted_1_every_debian_builder_provisions_build_essential
+        PASS [   0.007s] ( 569/1315) xtask::perf_gates_20_7 a_count_over_tolerance_fails_and_a_missing_baseline_is_absent
+        PASS [   0.006s] ( 570/1315) xtask::perf_gates_20_7 a_ledger_older_than_the_stale_limit_is_red
+        PASS [   0.005s] ( 571/1315) xtask::perf_gates_20_7 a_malformed_ledger_line_is_a_loud_error_naming_the_line
+        PASS [   0.024s] ( 572/1315) xtask::pentest_gate_tests pentest_gate_passes_on_both_zero
+        PASS [   0.046s] ( 573/1315) xtask::package_workflows_20_2 review_f8_netns_artifacts_are_verified_before_execution
+        PASS [   0.007s] ( 574/1315) xtask::perf_gates_20_7 a_new_fingerprint_is_indeterminate_until_a_rebaseline_entry_exists
+        PASS [   0.034s] ( 575/1315) xtask::pentest_gate_tests pentest_gate_passes_advisory_when_absent
+        PASS [   0.034s] ( 576/1315) xtask::pentest_gate_tests pentest_gate_fails_on_p1_only
+        PASS [   0.037s] ( 577/1315) xtask::pentest_gate_tests pentest_gate_fails_on_malformed_toml
+        PASS [   0.035s] ( 578/1315) xtask::pentest_gate_tests pentest_gate_fails_on_p0_only
+        PASS [   0.008s] ( 579/1315) xtask::perf_gates_20_7 a_noisy_calibration_makes_every_verdict_indeterminate
+        PASS [   0.006s] ( 580/1315) xtask::perf_gates_20_7 a_noisy_five_run_spread_is_indeterminate_never_pass
+        PASS [   0.005s] ( 581/1315) xtask::perf_gates_20_7 callgrind_totals_come_from_the_totals_line
+        PASS [   0.007s] ( 582/1315) xtask::perf_gates_20_7 a_regression_beyond_tolerance_and_three_mads_fails
+        PASS [   0.049s] ( 583/1315) xtask::package_workflows_20_2 review_p4_python_controls_are_blocking_native_release_steps
+        PASS [   0.009s] ( 584/1315) xtask::perf_gates_20_7 a_run_inside_budget_calibration_spread_and_baseline_passes
+        PASS [   0.004s] ( 585/1315) xtask::perf_gates_20_7 issuance_instrument_uses_the_production_signing_provider
+        PASS [   0.015s] ( 586/1315) xtask::perf_gates_20_7 a_re_added_literal_reds_the_scan
+        PASS [   0.010s] ( 587/1315) xtask::perf_gates_20_7 every_nfr_perf_and_hot_path_budget_has_a_metric_with_an_existing_instrument
+        PASS [   0.005s] ( 588/1315) xtask::perf_gates_20_7 ledger_timestamps_compare_instants_not_offsets_or_truncated_hours
+        PASS [   0.011s] ( 589/1315) xtask::perf_gates_20_7 ledger_observation_identity_and_provenance_vectors
+        PASS [   0.005s] ( 590/1315) xtask::perf_gates_20_7 malformed_metric_lines_are_not_filtered
+        PASS [   0.009s] ( 591/1315) xtask::perf_gates_20_7 malformed_budget_semantics_are_refused
+        PASS [   0.008s] ( 592/1315) xtask::perf_gates_20_7 malformed_counts_never_pass
+        PASS [   0.006s] ( 593/1315) xtask::perf_gates_20_7 no_record_for_the_sha_is_absent
+        PASS [   0.015s] ( 594/1315) xtask::perf_gates_20_7 only_pass_is_green_so_a_binding_non_pass_exits_red_through_the_command
+        PASS [   0.052s] ( 595/1315) xtask::perf_gates_20_7 a_missing_ledger_is_a_loud_error_never_absent
+        PASS [   0.018s] ( 596/1315) xtask::perf_gates_20_7 refusal_1_a_second_workflow_targeting_the_perf_runner
+        PASS [   0.039s] ( 597/1315) xtask::perf_gates_20_7 escaped_host_and_matrix_expansion_cannot_bypass_admission
+        PASS [   0.005s] ( 598/1315) xtask::perf_gates_20_7 the_budget_file_is_the_only_home_of_budget_literals
+        PASS [   0.033s] ( 599/1315) xtask::perf_gates_20_7 refusal_2_perf_yml_without_its_fork_guard
+        PASS [   0.009s] ( 600/1315) xtask::perf_gates_20_7 the_budget_file_phase_is_the_gate_phase_and_every_tier_c_path_is_a_harness_path
+        PASS [   0.059s] ( 601/1315) xtask::perf_gates_20_7 deleting_the_nfr_perf_4_bench_reds_the_completeness_vector
+        PASS [   0.008s] ( 602/1315) xtask::perf_gates_20_7 the_median_decides_a_budget_breach_not_the_best_of_five
+        PASS [   0.030s] ( 603/1315) xtask::perf_gates_20_7 refusal_3_pull_request_target_added
+        PASS [   0.008s] ( 604/1315) xtask::perf_gates_20_7 workflow_trust_and_diagnostic_status_contracts
+        PASS [   0.053s] ( 605/1315) xtask::perf_gates_20_7 refusal_4_permissions_wider_than_contents_read_on_a_perf_job
+        PASS [   1.217s] ( 606/1315) xtask::ledger_collectors_20_3a collectors_refuse_rejected_push
+        PASS [   0.005s] ( 607/1315) xtask::prepush_20_16 binary_trigger_follows_transitive_local_dependencies
+        PASS [   0.089s] ( 608/1315) xtask::perf_gates_20_7 rebaseline_writer_generates_provenance_and_refuses_forged_fields
+        PASS [   0.694s] ( 609/1315) xtask::model_currency_gate a_duplicate_on_one_line_names_that_line_not_line_one
+        PASS [   0.010s] ( 610/1315) xtask::prepush_20_16 command_runner_captures_red_and_unsets_local_ci_environment
+        PASS [   0.076s] ( 611/1315) xtask::prepush_20_16 ansi_drift_and_unresolved_filters_fail_closed
+        PASS [   0.088s] ( 612/1315) xtask::perf_gates_20_7 tier_c_binds_hosted_counts_and_detects_instruction_and_allocation_regressions
+        PASS [   0.009s] ( 613/1315) xtask::prepush_20_16 dynamic_marker_skips_are_named_missing_and_static_drift_stay_red
+        PASS [   0.032s] ( 614/1315) xtask::prepush_20_16 count_pin_drift_is_red_against_listed_selection
+        PASS [   0.004s] ( 615/1315) xtask::prepush_20_16 marker_sites_ignore_comments_and_assertions_and_expose_dynamic_counts
+        PASS [   0.005s] ( 616/1315) xtask::prepush_20_16 list_counts_use_selected_cases_not_total_and_honor_ignored
+        PASS [   0.100s] ( 617/1315) xtask::perf_gates_20_7 the_policy_holds_on_a_compliant_tree_and_on_the_real_tree
+        PASS [   0.043s] ( 618/1315) xtask::prepush_20_16 count_guards_cannot_disagree_or_change_archive_binary
+        PASS [   0.008s] ( 619/1315) xtask::prepush_20_16 red_detail_keeps_output_order_and_libtest_failures
+        PASS [   0.100s] ( 620/1315) xtask::prepush_20_16 ansi_guards_are_command_scoped_and_fail_closed
+        PASS [   0.019s] ( 621/1315) xtask::prepush_20_16 red_detail_is_bounded_and_keeps_failure_lines
+        PASS [   0.010s] ( 622/1315) xtask::prepush_blocking_20_3b auxiliary_measurement_jobs_cannot_hide_an_additional_gate
+        PASS [   0.027s] ( 623/1315) xtask::prepush_20_16 red_detail_names_the_failing_test_among_captured_error_lines
+        PASS [   0.023s] ( 624/1315) xtask::prepush_blocking_20_3b assignments_env_continuations_and_multiline_xtasks_cannot_evade_pin
+        PASS [   1.299s] ( 625/1315) xtask::ledger_collectors_20_3a nightly_scan_executes_real_tree_and_rejects_planted_inline_override
+        PASS [   0.042s] ( 626/1315) xtask::prepush_20_16 only_timing_budget_findings_become_advisory_and_stale_rows_stay_red
+        PASS [   0.042s] ( 627/1315) xtask::prepush_20_16 reader_follows_env_pins_multiple_binaries_and_nextest
+        PASS [   0.015s] ( 628/1315) xtask::prepush_blocking_20_3b missing_check_flag_or_wrong_baseline_value_reds_argument_pin
+        PASS [   0.114s] ( 629/1315) xtask::prepush_20_16 archive_commands_bind_ordered_counts_and_exact_family
+        PASS [   0.058s] ( 630/1315) xtask::prepush_blocking_20_3b every_standalone_local_blocking_aggregate_gate_is_in_literal_gates
+        PASS [   0.047s] ( 631/1315) xtask::rc_readiness_20_5 a_missing_input_file_is_a_loud_error_never_a_pass
+        PASS [   0.239s] ( 632/1315) xtask::perf_gates_20_7 append_refuses_missing_duplicate_malformed_or_mismatched_observations
+        PASS [   0.051s] ( 633/1315) xtask::prepush_blocking_20_3b removing_epic_close_or_adding_a_new_blocking_local_job_reds_the_pin
+        PASS [   0.046s] ( 634/1315) xtask::rc_readiness_20_5 the_command_never_writes_into_the_tree
+        PASS [   0.004s] ( 635/1315) xtask::recovery_lane_ceiling_rule a_raise_citing_a_shipped_story_is_refused
+        PASS [   0.003s] ( 636/1315) xtask::recovery_lane_ceiling_rule a_raise_citing_an_absent_story_is_refused
+        PASS [   0.003s] ( 637/1315) xtask::recovery_lane_ceiling_rule a_raise_with_no_cited_story_is_refused
+        PASS [   0.052s] ( 638/1315) xtask::rc_readiness_20_5 an_all_green_tree_passes_with_and_without_a_tag
+        PASS [   0.004s] ( 639/1315) xtask::recovery_lane_ceiling_rule crossing_the_adr_069_alarm_is_acknowledged_in_the_row
+        PASS [   0.004s] ( 640/1315) xtask::recovery_lane_ceiling_rule kernel_core_ceiling_stays_inside_the_adr_069_envelope
+        PASS [   0.003s] ( 641/1315) xtask::recovery_lane_ceiling_rule kernel_core_is_outside_the_easing
+        PASS [   0.057s] ( 642/1315) xtask::rc_readiness_20_5 the_deny_leg_reds_on_an_ignored_advisory_without_a_deferred_row
+        PASS [   0.003s] ( 643/1315) xtask::recovery_lane_ceiling_rule the_easing_is_real_any_crate_may_raise_citing_an_open_story
+        PASS [   0.004s] ( 644/1315) xtask::recovery_lane_ceiling_rule lowering_is_always_allowed_even_for_kernel_core_and_even_when_sealed
+        PASS [   0.010s] ( 645/1315) xtask::recovery_lane_ceiling_rule kernel_core_ceiling_has_not_moved_under_the_easing
+        PASS [   0.004s] ( 646/1315) xtask::recovery_lane_ceiling_rule the_lane_seals_when_every_numbered_epic_is_done
+        PASS [   0.161s] ( 647/1315) xtask::prepush_20_16 changes_union_head_and_working_tree_and_keep_rename_endpoints
+        PASS [   0.033s] ( 648/1315) xtask::rc_readiness_20_5 the_stability_leg_reds_on_a_drifted_stability_md
+        PASS [   0.015s] ( 649/1315) xtask::recovery_lane_ceiling_rule the_lane_is_not_sealed_while_a_numbered_epic_is_open
+        PASS [   1.391s] ( 650/1315) xtask::ledger_collectors_20_3a collector_appends_exactly_one_element
+        PASS [   0.077s] ( 651/1315) xtask::rc_readiness_20_5 the_epic_20_leg_reds_on_any_story_not_done_and_ignores_provenance_comments
+        PASS [   0.026s] ( 652/1315) xtask::recovery_lane_ceiling_rule the_tree_bound_inputs_exist
+        PASS [   0.705s] ( 653/1315) xtask::model_currency_gate a_provider_table_reds_on_the_entry_line_through_comments_literals_and_duplicates
+        PASS [   0.051s] ( 654/1315) xtask::rc_readiness_20_5 this_storys_own_key_may_be_in_review_without_a_tag_but_never_with_one
+        PASS [   0.678s] ( 655/1315) xtask::model_currency_gate a_providers_section_model_id_is_a_pin
+        PASS [   0.024s] ( 656/1315) xtask::registry_socket_security_20_1b clone_failure_cannot_exit_the_registry_accept_loop_f3
+        PASS [   0.026s] ( 657/1315) xtask::registry_socket_security_20_1b accepted_registry_sockets_are_blocking_before_clone_p2
+        PASS [   0.004s] ( 658/1315) xtask::registry_workflow_security_20_1b executable_typescript_registry_example_has_both_development_optins_p1
+        PASS [   0.039s] ( 659/1315) xtask::registry_exit_20_1 installed_component_proof_uses_the_accepted_release_profile
+        PASS [   0.011s] ( 660/1315) xtask::registry_socket_security_20_1b registry_tls_features_are_explicit_not_transitive_defaults_d2
+        PASS [   0.041s] ( 661/1315) xtask::registry_exit_20_1 package_jobs_provision_registered_registry_siblings_before_tests
+        PASS [   0.023s] ( 662/1315) xtask::registry_socket_security_20_1b registry_accept_errors_have_backoff_f3
+        PASS [   0.024s] ( 663/1315) xtask::registry_socket_security_20_1b registry_bodies_do_not_preallocate_declared_lengths_f2
+        PASS [   0.049s] ( 664/1315) xtask::registry_exit_20_1 registry_release_set_and_exit_job_are_enrolled
+        PASS [   0.024s] ( 665/1315) xtask::release_dry_run_gate declared_artifact_outside_requested_targets_is_refused
+        PASS [   0.024s] ( 666/1315) xtask::release_dry_run_gate manifest_denominator_matches_declared_artifact_count_before_hash_checks
+        PASS [   0.023s] ( 667/1315) xtask::release_dry_run_gate missing_binary_target_pair_is_refused
+        PASS [   0.010s] ( 668/1315) xtask::release_dry_run_gate regular_build_cleanup_removes_stale_release_outputs_only
+        PASS [   0.026s] ( 669/1315) xtask::release_dry_run_gate packaging_file_and_symlink_do_not_expand_the_declared_denominator
+        PASS [   0.004s] ( 670/1315) xtask::release_gates_20_5r1 both_recipe_jobs_build_the_gate_in_their_own_mandatory_step
+        PASS [   0.034s] ( 671/1315) xtask::release_build_integrity_20_1a successful_command_without_an_executable_receipt_cannot_sign_stale_bytes
+        PASS [   0.004s] ( 672/1315) xtask::release_gates_20_5r1 every_later_control_reads_the_one_classification
+        PASS [   0.013s] ( 673/1315) xtask::release_dry_run_gate zero_length_declared_artifact_is_refused
+        PASS [   0.028s] ( 674/1315) xtask::release_dry_run_gate regenerating_the_manifest_drops_the_previous_signature
+        PASS [   0.005s] ( 675/1315) xtask::release_gates_20_5r1 the_aggregate_query_never_hides_a_newer_run_in_progress
+        PASS [   0.732s] ( 676/1315) xtask::model_currency_gate an_empty_entries_array_is_an_empty_price_book
+        PASS [   0.053s] ( 677/1315) xtask::release_build_integrity_20_1a configured_target_and_staging_use_the_same_built_executable
+        PASS [   0.016s] ( 678/1315) xtask::release_precondition_t3_20_5 a_bad_schema_version_is_a_loud_refusal
+        PASS [   0.726s] ( 679/1315) xtask::model_currency_gate an_unparseable_manifest_reds_instead_of_passing_unread
+        PASS [   0.017s] ( 680/1315) xtask::release_precondition_t3_20_5 a_chain_for_another_sha_is_refused
+        PASS [   0.069s] ( 681/1315) xtask::registry_workflow_security_20_1b registry_workflows_explicitly_select_server_mode_and_client_development_optin
+        PASS [   0.017s] ( 682/1315) xtask::release_precondition_t3_20_5 a_complete_chain_for_every_target_passes
+        PASS [   0.015s] ( 683/1315) xtask::release_precondition_t3_20_5 a_link_outside_one_to_five_is_not_a_link
+        PASS [   2.208s] ( 684/1315) xtask::error_catalog_20_3a generations_preserve_all_metadata_and_match_committed_bytes
+        PASS [   0.016s] ( 685/1315) xtask::release_precondition_t3_20_5 a_missing_target_is_refused
+        PASS [   0.058s] ( 686/1315) xtask::release_gates_20_5r1 an_unclassified_kind_is_refused_before_any_call
+        PASS [   0.342s] ( 687/1315) xtask::perf_gates_20_7 refusal_vectors_for_runner_policy_bypasses
+        PASS [   0.006s] ( 688/1315) xtask::release_precondition_t3_20_5 fuzz_prerelease_is_dispatched_before_the_tag_not_started_by_it
+        PASS [   0.020s] ( 689/1315) xtask::release_precondition_t3_20_5 an_empty_ledger_is_refused
+        PASS [   0.020s] ( 690/1315) xtask::release_precondition_t3_20_5 an_empty_released_sha_is_refused_not_matched_against_empty_commits
+        PASS [   0.151s] ( 691/1315) xtask::rc_readiness_20_5 the_version_leg_demands_an_rc_that_equals_the_tag
+        PASS [   0.018s] ( 692/1315) xtask::release_precondition_t3_20_5 four_links_are_refused
+        PASS [   0.182s] ( 693/1315) xtask::rc_readiness_20_5 the_provisioning_leg_needs_every_row_present
+        PASS [   0.005s] ( 694/1315) xtask::release_precondition_t3_20_5 the_release_job_passes_the_fuzz_ledger_to_the_precondition_for_rc_and_ga_tags
+        PASS [   0.005s] ( 695/1315) xtask::release_precondition_t3_20_5 the_release_job_runs_rc_readiness_before_signing_for_rc_tags_only
+        PASS [   0.003s] ( 696/1315) xtask::retro_action_items a_closed_retrospective_with_no_rows_is_refused
+        PASS [   0.004s] ( 697/1315) xtask::retro_action_items a_closed_retrospective_with_rows_is_accepted
+        PASS [   0.005s] ( 698/1315) xtask::release_workflow_15_4 release_workflow_flattens_and_publishes_the_explicit_artifact_set
+        PASS [   0.032s] ( 699/1315) xtask::release_precondition_t3_20_5 a_rerun_link_counts_once_and_cannot_stand_in_for_a_missing_link
+        PASS [   0.003s] ( 700/1315) xtask::retro_action_items an_open_retrospective_owes_nothing_yet
+        PASS [   0.004s] ( 701/1315) xtask::retro_action_items an_empty_action_is_refused
+        PASS [   0.004s] ( 702/1315) xtask::retro_action_items a_row_with_no_retrospective_document_is_refused
+        PASS [   0.004s] ( 703/1315) xtask::retro_action_items an_empty_owner_is_refused
+        PASS [   0.071s] ( 704/1315) xtask::release_gates_20_5r1 rc_and_ga_pass_the_ledger_pinned_to_its_logged_tip_and_alpha_does_not
+        PASS [   0.014s] ( 705/1315) xtask::release_precondition_t3_20_5 the_aggregate_leg_still_refuses_first
+        PASS [   0.018s] ( 706/1315) xtask::release_precondition_t3_20_5 t2_records_never_count_as_t3
+        PASS [   0.004s] ( 707/1315) xtask::retro_action_items an_unqueryable_status_is_refused
+        PASS [   0.004s] ( 708/1315) xtask::retro_action_items epics_below_the_convention_floor_are_out_of_scope
+        PASS [   0.004s] ( 709/1315) xtask::retro_action_items the_tree_bound_inputs_exist
+        PASS [   0.008s] ( 710/1315) xtask::routed_catalog_20_3b catalog_semantics_witness_refuses_missing_or_inconsistent_fields
+        PASS [   0.021s] ( 711/1315) xtask::release_precondition_t3_20_5 two_runs_each_below_24h_never_sum_across_runs
+        PASS [   0.032s] ( 712/1315) xtask::release_precondition_t3_20_5 one_second_short_of_24h_is_refused_and_exactly_24h_passes
+        PASS [   0.017s] ( 713/1315) xtask::retro_action_items every_closed_retrospective_in_this_repository_has_its_actions_in_the_tracker
+        PASS [   0.029s] ( 714/1315) xtask::service_boundary_integration clean_service_boundary_passes
+        PASS [   0.029s] ( 715/1315) xtask::service_boundary_integration p1_clean_fixture_passes
+        PASS [   0.029s] ( 716/1315) xtask::service_boundary_integration p1_violation_fixture_fails_with_message_containing_p1_violation
+        PASS [   0.042s] ( 717/1315) xtask::release_workflow_15_4 discipline_runs_both_linux_release_targets_in_the_aggregate_only
+        PASS [   0.080s] ( 718/1315) xtask::release_precondition_t3_20_5 a_malformed_or_missing_ledger_is_a_loud_refusal_never_a_pass
+        PASS [   0.032s] ( 719/1315) xtask::service_boundary_integration p2_clean_fixture_passes
+        PASS [   0.033s] ( 720/1315) xtask::service_boundary_integration p2_violation_fixture_fails_with_message_containing_p2_violation
+        PASS [   0.026s] ( 721/1315) xtask::service_boundary_integration p3_violation_fixture_fails_with_message_containing_p3_violation_and_check_empty_kernel_reference
+        PASS [   0.035s] ( 722/1315) xtask::service_boundary_integration p3_clean_fixture_passes
+        PASS [   0.034s] ( 723/1315) xtask::service_boundary_integration p4_clean_fixture_passes
+        PASS [   0.032s] ( 724/1315) xtask::service_boundary_integration p4_violation_fixture_fails_with_message_containing_p4_violation_and_denylist_pattern
+        PASS [   0.052s] ( 725/1315) xtask::service_boundary_integration violation_service_boundary_fails
+        PASS [   0.981s] ( 726/1315) xtask::model_currency_gate a_gate_that_could_scan_nothing_is_a_refusal_not_a_pass
+        PASS [   0.171s] ( 727/1315) xtask::release_gates_20_5r1 the_t3_refusal_step_passes_only_a_genuine_refusal
+        PASS [   0.062s] ( 728/1315) xtask::ship_gate_binding_20_3a registry_row_without_enrolment_reds
+        PASS [   0.076s] ( 729/1315) xtask::service_boundary_integration shipped_baseline_symbol_absent_from_surface_reds
+        PASS [   0.070s] ( 730/1315) xtask::ship_gate_binding_20_3a real_tree_has_48_bound_and_enrolled_gates
+        PASS [   2.478s] ( 731/1315) xtask::check_judge_config_integration violation_judge_config_fails
+        PASS [   0.034s] ( 732/1315) xtask::story_10_2_proven_red red_team_gate_fails_on_corpus_sha_mismatch
+        PASS [   0.041s] ( 733/1315) xtask::story_10_2_proven_red producer_emit_writes_file_the_consumer_accepts_round_trip
+        PASS [   0.035s] ( 734/1315) xtask::story_10_2_proven_red red_team_gate_fails_on_malformed_toml
+        PASS [   0.103s] ( 735/1315) xtask::ship_gate_binding_20_3a missing_binding_is_refused_by_loader
+        PASS [   0.735s] ( 736/1315) xtask::model_currency_gate two_price_rows_sharing_a_model_each_name_their_own_line
+        PASS [   0.026s] ( 737/1315) xtask::story_10_2_proven_red red_team_gate_logs_would_block_on_low_classes
+        PASS [   0.044s] ( 738/1315) xtask::story_10_2_proven_red red_team_gate_fails_on_duplicate_classes
+        PASS [   0.040s] ( 739/1315) xtask::story_10_2_proven_red red_team_gate_logs_would_block_on_low_class
+        PASS [   0.076s] ( 740/1315) xtask::ship_gate_binding_20_3a unknown_binding_is_refused_by_loader
+        PASS [   0.229s] ( 741/1315) xtask::release_gates_20_5r1 the_tag_grammar_has_one_fail_closed_decision_point
+        PASS [   0.303s] ( 742/1315) xtask::registry_socket_security_20_1b daemon_registry_policy_has_one_fail_closed_reader_d1_p10
+        PASS [   0.030s] ( 743/1315) xtask::story_10_2_proven_red ship_gate_completeness_fails_with_missing_gate
+        PASS [   0.040s] ( 744/1315) xtask::story_10_2_proven_red red_team_gate_passes_advisory_when_absent
+        PASS [   0.118s] ( 745/1315) xtask::ship_gate_binding_20_3a removing_per_commit_ship_edge_reds
+        PASS [   0.046s] ( 746/1315) xtask::story_10_2_proven_red red_team_gate_logs_would_block_on_unmitigated
+        PASS [   0.040s] ( 747/1315) xtask::story_10_2_proven_red red_team_gate_rejects_non_string_optional_notes
+        PASS [   0.040s] ( 748/1315) xtask::story_10_2_proven_red red_team_gate_passes_clean
+        PASS [   0.032s] ( 749/1315) xtask::story_10_2_proven_red trial_gate_accepts_valid_record_with_producer_signed_attestation_at_v2_0
+        PASS [   0.297s] ( 750/1315) xtask::registry_socket_security_20_1b registry_poller_starts_after_shared_installed_boot_admission_f9
+        PASS [   0.154s] ( 751/1315) xtask::ship_gate_binding_20_3a cadence_gate_cannot_also_enrol_per_commit
+        PASS [   0.030s] ( 752/1315) xtask::story_10_2_proven_red trial_gate_fails_on_empty_participants_with_fabricated_successes
+        PASS [   0.049s] ( 753/1315) xtask::story_10_2_proven_red ship_gate_completeness_passes_with_all_gates
+        PASS [   2.555s] ( 754/1315) xtask::check_judge_config_integration clean_judge_config_passes
+        PASS [   0.036s] ( 755/1315) xtask::story_10_2_proven_red trial_gate_fails_on_low_stratification
+        PASS [   0.149s] ( 756/1315) xtask::ship_gate_binding_20_3a removing_aggregate_ship_edge_reds
+        PASS [   0.024s] ( 757/1315) xtask::story_10_2_proven_red trial_gate_passes_advisory_when_absent
+        PASS [   0.018s] ( 758/1315) xtask::story_10_2_proven_red trial_gate_rejects_unknown_ship_phase
+        PASS [   0.020s] ( 759/1315) xtask::story_10_2_proven_red trial_gate_refuses_public_dev_producer_key_at_v2_0
+        PASS [   0.051s] ( 760/1315) xtask::story_10_2_proven_red trial_gate_absent_follows_ship_disposition
+        PASS [   0.027s] ( 761/1315) xtask::story_10_2_proven_red trial_gate_fails_on_malformed_toml
+        PASS [   0.028s] ( 762/1315) xtask::story_10_2_proven_red trial_gate_fails_on_low_successes
+        PASS [   0.029s] ( 763/1315) xtask::story_10_2_proven_red trial_gate_passes_on_valid_results
+        PASS [   0.029s] ( 764/1315) xtask::story_10_2_proven_red trial_gate_rejects_when_signed_sbom_false_overrides_self_reported_true_at_v2_0
+        PASS [   0.037s] ( 765/1315) xtask::story_10_2_proven_red trial_gate_rejects_tampered_producer_signature_at_v2_0
+        PASS [   0.018s] ( 766/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_dependency_closure_red
+        PASS [   0.035s] ( 767/1315) xtask::story_10_2_proven_red trial_gate_small_cohort_quality_shortfall_blocks
+        PASS [   0.025s] ( 768/1315) xtask::story_10_2_proven_red trial_gate_small_inflated_successes_is_fatal
+        PASS [   0.028s] ( 769/1315) xtask::story_10_2_proven_red trial_gate_small_duplicate_id_is_fatal
+        PASS [   0.029s] ( 770/1315) xtask::story_10_2_proven_red trial_gate_small_inconsistent_n_is_fatal
+        PASS [   0.026s] ( 771/1315) xtask::story_10_2_proven_red trial_gate_small_success_mismatch_is_fatal_with_report
+        PASS [   0.007s] ( 772/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_loom_down_typed_timeout
+        PASS [   0.027s] ( 773/1315) xtask::story_10_2_proven_red trial_gate_small_negative_frames_is_fatal_with_report
+        PASS [   0.045s] ( 774/1315) xtask::story_10_2_proven_red trial_gate_rejects_missing_producer_signed_attestation_at_v2_0
+        PASS [   0.029s] ( 775/1315) xtask::story_10_2_proven_red trial_gate_twelve_with_validated_stratum_shortfall_is_red
+        PASS [   0.004s] ( 776/1315) xtask::story_10_4a_ac1_proven_red story_13_5b_one_sided_collective_erase_is_red
+        PASS [   0.011s] ( 777/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_nfr_test_9_backing_store_red
+        PASS [   0.011s] ( 778/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_nfr_test_9_grep_red
+        PASS [   0.013s] ( 779/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_nfr_test_9_grep_green
+        PASS [   0.049s] ( 780/1315) xtask::story_10_2_proven_red trial_gate_small_consistent_cohort_is_preliminary
+        PASS [   0.005s] ( 781/1315) xtask::story_10_4a_ac1_proven_red story_13_5d_loom_scope_reaches_policy_table
+        PASS [   0.017s] ( 782/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_rto_drill_red
+        PASS [   0.314s] ( 783/1315) xtask::release_gates_20_5r1 the_tagged_commit_must_be_an_ancestor_of_origin_main
+        PASS [   0.027s] ( 784/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_rto_drill_green
+        PASS [   1.765s] ( 785/1315) xtask::ledger_collectors_20_3a concurrent_collectors_refetch_and_preserve_both_records_exactly_once
+        PASS [   0.230s] ( 786/1315) xtask::ship_gate_binding_20_3a misnamed_cadence_jobs_red
+        PASS [   0.336s] ( 787/1315) xtask::release_gates_20_5r1 the_readiness_step_passes_only_a_genuine_red_report
+        PASS [   0.003s] ( 788/1315) xtask::story_10_4a_proven_red vector_5_empty_corpus_all_zeros_green
+        PASS [   0.003s] ( 789/1315) xtask::story_10_4a_proven_red vector_5_empty_payload_oracle_is_deterministic
+        PASS [   0.016s] ( 790/1315) xtask::story_10_5_proven_red skill_conformance_blocks_when_results_absent
+        PASS [   0.015s] ( 791/1315) xtask::story_10_5_proven_red skill_conformance_fails_on_corrupt_valid_fixture
+        PASS [   2.556s] ( 792/1315) xtask::decision_adrs_and_provisioning every_clause_and_denominator_has_a_planted_red
+        PASS [   0.019s] ( 793/1315) xtask::story_10_5_proven_red skill_conformance_fails_on_false_abi_unchanged
+        PASS [   0.018s] ( 794/1315) xtask::story_10_5_proven_red skill_conformance_fails_on_false_executed_without_kernel_modification
+        PASS [   0.019s] ( 795/1315) xtask::story_10_5_proven_red skill_conformance_fails_on_malformed_toml
+        PASS [   1.297s] ( 796/1315) xtask::macos_compile_guard_20_6 wrapped_cfg_attributes_and_other_target_predicates_start_the_guard
+        PASS [   0.016s] ( 797/1315) xtask::story_10_5_proven_red skill_conformance_passes_clean_with_valid_results
+        PASS [   0.016s] ( 798/1315) xtask::story_10_5_proven_red skill_conformance_fails_when_invalid_fixture_is_accepted
+        PASS [   0.005s] ( 799/1315) xtask::trial_attestation_proven_red empty_chinese_wall_proxy_cohort_is_na_not_a_vacuous_pass
+        PASS [   0.005s] ( 800/1315) xtask::surface_and_root_20_3b root_fallback_chooses_nearest_workspace_not_any_package_manifest
+        PASS [   0.006s] ( 801/1315) xtask::surface_and_root_20_3b grouped_pub_use_adds_exactly_one_surface_change_in_both_walkers
+        PASS [   0.129s] ( 802/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_i1_valid_loomwrite_allows_green
+        PASS [   0.129s] ( 803/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_i1_unmediated_trait_path_denied_red
+        PASS [   0.120s] ( 804/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_i9_retention_detected_red
+        PASS [   0.121s] ( 805/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_i1_wrong_scope_denied_red
+        PASS [   0.005s] ( 806/1315) xtask::trial_attestation_proven_red self_report_ignored_when_real_signing_derivation_contradicts_forged_self_report
+        PASS [   0.006s] ( 807/1315) xtask::trial_attestation_proven_red valid_signature_derives_signing_chain_verified_true_at_real_ed25519_path
+        PASS [   0.006s] ( 808/1315) xtask::trial_attestation_proven_red tampered_and_wrong_key_signatures_derive_false_at_real_verify_path
+        PASS [   0.042s] ( 809/1315) xtask::surface_and_root_20_3b copied_binary_catalog_leg_works_without_runtime_manifest_environment
+        PASS [   0.129s] ( 810/1315) xtask::story_10_4a_ac1_proven_red story_13_5d_forged_pid_is_denied_before_collective_read
+        PASS [   0.121s] ( 811/1315) xtask::story_10_4a_ac1_proven_red story_13_5d_request_route_row_audit_correlation
+        PASS [   0.134s] ( 812/1315) xtask::story_10_4a_ac1_proven_red story_13_5d_forged_pid_is_denied_before_collective_scan
+        PASS [   0.132s] ( 813/1315) xtask::story_10_4a_ac1_proven_red story_13_5d_forged_pid_is_denied_before_collective_write
+        PASS [   0.136s] ( 814/1315) xtask::story_10_4a_ac1_proven_red story_13_5d_forged_token_is_verified_before_pid_mismatch
+        PASS [   0.154s] ( 815/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_i9_zero_kernel_retention
+        PASS [   0.045s] ( 816/1315) xtask::trial_attestation_proven_red ship_gate_completeness_enrolls_check_trial_attestation
+        PASS [   0.025s] ( 817/1315) xtask::workflow_honesty_20_3a every_workflow_escape_hatch_has_an_owner_or_benign_classification
+        PASS [   0.008s] ( 818/1315) xtask::bin/xtask abi_diff::tests::line_diff_identical
+        PASS [   0.012s] ( 819/1315) xtask::bin/xtask abi_diff::tests::line_diff_add_remove
+        PASS [   0.020s] ( 820/1315) xtask::workflow_honesty_20_3a journal_fetch_failure_is_fatal_and_missing_pr_is_explicitly_unverified
+        PASS [   0.007s] ( 821/1315) xtask::bin/xtask abi_diff::tests::resolve_fallback
+        PASS [   0.032s] ( 822/1315) xtask::workflow_honesty_20_3a expansion_defaults_only_job_results
+        PASS [   0.009s] ( 823/1315) xtask::bin/xtask calibrate::tests::calibrate_detects_item_mismatch
+        PASS [   0.008s] ( 824/1315) xtask::bin/xtask calibrate::tests::calibrate_reads_real_corpus_pass_rate
+        PASS [   0.009s] ( 825/1315) xtask::bin/xtask calibrate::tests::calibrate_scanner_counts_all_items
+        PASS [   0.007s] ( 826/1315) xtask::bin/xtask calibrate::tests::calibrate_surfaces_malformed_items
+        PASS [   0.006s] ( 827/1315) xtask::bin/xtask calibrate::tests::calibrate_vacuous_on_absent_corpus
+        PASS [   0.006s] ( 828/1315) xtask::bin/xtask calibrate::tests::json_round_trip
+        PASS [   0.004s] ( 829/1315) xtask::bin/xtask calibrate::tests::n500_ci_width_above_threshold_fails
+        PASS [   0.006s] ( 830/1315) xtask::bin/xtask calibrate::tests::n100_ci_width_within_threshold_passes
+        PASS [   0.006s] ( 831/1315) xtask::bin/xtask calibrate::tests::wilson_ci_successes_gt_n_is_err
+        PASS [   0.004s] ( 832/1315) xtask::bin/xtask calibrate::tests::wilson_empty_set
+        PASS [   0.004s] ( 833/1315) xtask::bin/xtask calibrate::tests::wilson_textbook_n500_p95_z1645
+        PASS [   0.005s] ( 834/1315) xtask::bin/xtask check_a2a_sender_completeness::tests::brace_in_comment_does_not_desync_body_extraction
+        PASS [   0.005s] ( 835/1315) xtask::bin/xtask calibrate::tests::wilson_textbook_n100_p50_z196
+        PASS [   0.153s] ( 836/1315) xtask::story_10_4a_proven_red vector_3_row_count_mismatch_red
+        PASS [   0.005s] ( 837/1315) xtask::bin/xtask check_a2a_sender_completeness::tests::brace_in_string_does_not_desync_body_extraction
+        PASS [   0.006s] ( 838/1315) xtask::bin/xtask check_a2a_sender_completeness::tests::exempt_marker_ignored_on_production_sender_path
+        PASS [   0.005s] ( 839/1315) xtask::bin/xtask check_a2a_sender_completeness::tests::exempt_with_justification_suppresses_in_maos_bin_only
+        PASS [   0.006s] ( 840/1315) xtask::bin/xtask check_a2a_sender_completeness::tests::exempt_without_justification_is_violation
+        PASS [   0.006s] ( 841/1315) xtask::bin/xtask check_a2a_sender_completeness::tests::extract_fn_body_isolates_the_named_fn
+        PASS [   0.005s] ( 842/1315) xtask::bin/xtask check_a2a_sender_completeness::tests::flags_unclassified_frame_literal
+        PASS [   0.005s] ( 843/1315) xtask::bin/xtask check_a2a_sender_completeness::tests::passes_classified_frame_literal
+        PASS [   0.005s] ( 844/1315) xtask::bin/xtask check_a2a_sender_completeness::tests::missing_fn_in_body_extractor_returns_none
+        PASS [   0.005s] ( 845/1315) xtask::bin/xtask check_a2a_sender_completeness::tests::preceding_line_exempt_marker_suppresses
+        PASS [   0.005s] ( 846/1315) xtask::bin/xtask check_abi_ratification::tests::base_case_no_changes_passes
+        PASS [   0.006s] ( 847/1315) xtask::bin/xtask check_a2a_sender_completeness::tests::raw_string_braces_do_not_desync
+        PASS [   0.005s] ( 848/1315) xtask::bin/xtask check_abi_ratification::tests::partial_coverage_fails
+        PASS [   0.006s] ( 849/1315) xtask::bin/xtask check_abi_ratification::tests::manifest_empty_loads
+        PASS [   0.006s] ( 850/1315) xtask::bin/xtask check_abi_ratification::tests::manifest_with_entry_loads
+        PASS [   0.004s] ( 851/1315) xtask::bin/xtask check_abi_ratification::tests::proposed_entry_does_not_cover
+        PASS [   0.004s] ( 852/1315) xtask::bin/xtask check_abi_ratification::tests::r7_a_matching_ratification_passes
+        PASS [   0.048s] ( 853/1315) xtask::workflow_honesty_20_3a journal_pr_resolution_accepts_a_missing_trailer_without_masking_git_failure
+        PASS [   0.005s] ( 854/1315) xtask::bin/xtask check_abi_ratification::tests::r7_b_withheld_ratification_fails
+        PASS [   0.006s] ( 855/1315) xtask::bin/xtask check_abi_ratification::tests::r7_c_canary_non_matching_fails
+        PASS [   0.005s] ( 856/1315) xtask::bin/xtask check_breaking_md::tests::fails_when_file_absent
+        PASS [   0.006s] ( 857/1315) xtask::bin/xtask check_breaking_md::tests::fails_when_entry_missing_migration
+        PASS [   0.006s] ( 858/1315) xtask::bin/xtask check_breaking_md::tests::fails_when_no_dated_entry
+        PASS [   0.059s] ( 859/1315) xtask::workflow_honesty_20_3a j4_budget_and_smoke_jobs_make_no_stable_runner_claim
+        PASS [   0.006s] ( 860/1315) xtask::bin/xtask check_breaking_md::tests::multiple_well_formed_entries_pass
+        PASS [   0.005s] ( 861/1315) xtask::bin/xtask check_cert_rotation_trigger::tests::a_file_that_derives_zero_tests_is_a_per_file_error
+        PASS [   0.009s] ( 862/1315) xtask::bin/xtask check_breaking_md::tests::passes_with_one_dated_entry_and_migration
+        PASS [   0.006s] ( 863/1315) xtask::bin/xtask check_cert_rotation_trigger::tests::derivation_matches_test_attributes_structurally
+        PASS [   0.005s] ( 864/1315) xtask::bin/xtask check_cert_rotation_trigger::tests::method_call_probe_is_not_satisfied_by_a_free_function_of_the_same_name
+        PASS [   0.005s] ( 865/1315) xtask::bin/xtask check_cert_rotation_trigger::tests::method_call_probe_sees_a_method_call_that_the_free_function_probe_cannot
+        PASS [   0.008s] ( 866/1315) xtask::bin/xtask check_cert_rotation_trigger::tests::every_leg_filter_names_a_test_that_exists
+        PASS [   0.005s] ( 867/1315) xtask::bin/xtask check_cert_rotation_trigger::tests::method_call_probe_skips_cfg_test_functions
+        PASS [   0.004s] ( 868/1315) xtask::bin/xtask check_cert_rotation_trigger::tests::test_summary_parser_reports_zero_when_nothing_ran
+        PASS [   0.005s] ( 869/1315) xtask::bin/xtask check_cert_rotation_trigger::tests::method_call_probe_skips_cfg_test_modules
+        PASS [   0.005s] ( 870/1315) xtask::bin/xtask check_cert_rotation_trigger::tests::test_summary_parser_folds_every_result_line
+        PASS [   0.005s] ( 871/1315) xtask::bin/xtask check_cert_rotation_trigger::tests::the_gate_has_four_non_empty_legs
+        PASS [   0.004s] ( 872/1315) xtask::bin/xtask check_cert_rotation_trigger::tests::the_runtime_control_leg_requires_a_derived_marker
+        PASS [   0.078s] ( 873/1315) xtask::workflow_honesty_20_3a grep_scans_fail_on_unreadable_input_but_not_no_match
+        PASS [   0.006s] ( 874/1315) xtask::bin/xtask check_composition_root_completeness::crypto_tests::crypto_construction_in_production_is_refused_after_test_module
+        PASS [   0.005s] ( 875/1315) xtask::bin/xtask check_corpus::tests::json_round_trip
+        PASS [   0.006s] ( 876/1315) xtask::bin/xtask check_corpus::tests::empty_manifest_passes
+        PASS [   0.005s] ( 877/1315) xtask::bin/xtask check_corpus::tests::known_hash_round_trip
+        PASS [   0.005s] ( 878/1315) xtask::bin/xtask check_corpus::tests::mismatch_detection
+        PASS [   0.005s] ( 879/1315) xtask::bin/xtask check_corpus::tests::missing_file_detection
+        PASS [   0.005s] ( 880/1315) xtask::bin/xtask check_corpus::tests::orphan_detection
+        PASS [   0.005s] ( 881/1315) xtask::bin/xtask check_corpus::tests::parse_error_detection
+        PASS [   0.004s] ( 882/1315) xtask::bin/xtask check_cross_region_consensus::tests::every_consensus_leg_runs_one_exact_trusted_test
+        PASS [   0.004s] ( 883/1315) xtask::bin/xtask check_cross_region_consensus::tests::a_red_live_leg_blocks_now_that_binding_is_leg_level
+        PASS [   0.005s] ( 884/1315) xtask::bin/xtask check_cross_region_consensus::tests::ledger_leg_names_are_derived_from_live_legs
+        PASS [   0.004s] ( 885/1315) xtask::bin/xtask check_dependency_closure::tests::both_trees_are_checked
+        PASS [   0.005s] ( 886/1315) xtask::bin/xtask check_cross_region_consensus::tests::skipped_leg_is_absent_not_green
+        PASS [   0.005s] ( 887/1315) xtask::bin/xtask check_dependency_closure::tests::clean_tree_line_not_flagged
+        PASS [   0.005s] ( 888/1315) xtask::bin/xtask check_dependency_closure::tests::forbidden_list_includes_wasm_stack
+        PASS [   0.005s] ( 889/1315) xtask::bin/xtask check_dependency_closure::tests::forbidden_list_is_nonempty
+        PASS [   0.005s] ( 890/1315) xtask::bin/xtask check_dependency_closure::tests::forbidden_line_detected
+        PASS [   0.006s] ( 891/1315) xtask::bin/xtask check_dependency_closure::tests::scan_clean_closure_green
+        PASS [   0.006s] ( 892/1315) xtask::bin/xtask check_dependency_closure::tests::scan_clean_domain_tree_green
+        PASS [   0.006s] ( 893/1315) xtask::bin/xtask check_dependency_closure::tests::scan_detects_buried_forbidden_crate_red
+        PASS [   0.006s] ( 894/1315) xtask::bin/xtask check_dependency_closure::tests::scan_domain_tree_wasm_leak_red
+        PASS [   0.005s] ( 895/1315) xtask::bin/xtask check_dependency_closure::tests::scan_kernel_tree_wasm_leak_red
+        PASS [   0.005s] ( 896/1315) xtask::bin/xtask check_dev_model_tier::tests::an_undeclared_md_file_is_not_a_story
+        PASS [   0.006s] ( 897/1315) xtask::bin/xtask check_dependency_closure::tests::wasm_forbidden_line_detected
+        PASS [   0.005s] ( 898/1315) xtask::bin/xtask check_dev_model_tier::tests::blocked_story_is_skipped_not_failed
+        PASS [   0.006s] ( 899/1315) xtask::bin/xtask check_dev_model_tier::tests::frontier_model_with_review_marker_passes
+        PASS [   0.005s] ( 900/1315) xtask::bin/xtask check_dev_model_tier::tests::missing_review_marker_reds_the_gate
+        PASS [   0.005s] ( 901/1315) xtask::bin/xtask check_dev_model_tier::tests::pre_dev_story_is_skipped_not_failed
+        PASS [   0.007s] ( 902/1315) xtask::bin/xtask check_dev_model_tier::tests::non_frontier_model_reds_the_gate
+        PASS [   0.007s] ( 903/1315) xtask::bin/xtask check_dev_model_tier::tests::pre_frontier_epic_is_out_of_scope
+        PASS [   0.006s] ( 904/1315) xtask::bin/xtask check_dev_model_tier::tests::sonnet_5_5_is_allowlisted_and_neighbouring_models_are_not
+        PASS [   0.006s] ( 905/1315) xtask::bin/xtask check_dev_model_tier::tests::same_story_marked_done_is_checked_and_reds
+        PASS [   0.005s] ( 906/1315) xtask::bin/xtask check_dev_model_tier::tests::unknown_status_is_still_checked
+        PASS [   0.127s] ( 907/1315) xtask::workflow_honesty_20_3a aggregate_skip_predicate_exempts_only_macos_and_summary_says_not_run
+        PASS [   0.007s] ( 908/1315) xtask::bin/xtask check_dev_model_tier::tests::status_parser_strips_trailing_comment
+        PASS [   0.007s] ( 909/1315) xtask::bin/xtask check_dev_model_tier::tests::unextractable_model_fails_closed
+        PASS [   0.006s] ( 910/1315) xtask::bin/xtask check_dev_record_completeness::tests::an_ownerless_row_citing_no_disposition_is_the_blocking_half
+        PASS [   0.005s] ( 911/1315) xtask::bin/xtask check_dev_record_completeness::tests::completed_retrospective_owner_becomes_stale
+        PASS [   0.006s] ( 912/1315) xtask::bin/xtask check_dev_record_completeness::tests::comment_stripped_done_story_is_checked_not_skipped
+        PASS [   0.006s] ( 913/1315) xtask::bin/xtask check_dev_record_completeness::tests::completion_notes_accepts_no_list_suffix
+        PASS [   0.005s] ( 914/1315) xtask::bin/xtask check_dev_record_completeness::tests::fails_when_dev_model_used_is_tbd
+        PASS [   0.007s] ( 915/1315) xtask::bin/xtask check_dev_record_completeness::tests::fails_when_completion_notes_empty
+        PASS [   0.005s] ( 916/1315) xtask::bin/xtask check_dev_record_completeness::tests::fails_when_file_list_empty
+        PASS [   0.005s] ( 917/1315) xtask::bin/xtask check_dev_record_completeness::tests::file_list_accepts_h2_header_and_subheadings
+        PASS [   0.006s] ( 918/1315) xtask::bin/xtask check_dev_record_completeness::tests::file_list_accepts_labeled_bullets
+        PASS [   0.006s] ( 919/1315) xtask::bin/xtask check_dev_record_completeness::tests::file_list_with_only_prose_still_fails
+        PASS [   0.007s] ( 920/1315) xtask::bin/xtask check_dev_record_completeness::tests::file_list_accepts_markdown_table_paths
+        PASS [   0.005s] ( 921/1315) xtask::bin/xtask check_dev_record_completeness::tests::model_resolved_from_agent_model_used_body
+        PASS [   0.005s] ( 922/1315) xtask::bin/xtask check_dev_record_completeness::tests::no_model_anywhere_fails
+        PASS [   0.005s] ( 923/1315) xtask::bin/xtask check_dev_record_completeness::tests::passes_when_record_is_complete
+        PASS [   0.006s] ( 924/1315) xtask::bin/xtask check_dev_record_completeness::tests::model_resolved_from_model_preamble
+        PASS [   0.005s] ( 925/1315) xtask::bin/xtask check_dev_record_completeness::tests::run_accepts_an_explicit_open_ownerless_row
+        PASS [   0.005s] ( 926/1315) xtask::bin/xtask check_dev_record_completeness::tests::run_fails_when_deferred_register_is_missing
+        PASS [   0.005s] ( 927/1315) xtask::bin/xtask check_dev_record_completeness::tests::sprint_status_loader_strips_the_provenance_comment
+        PASS [   0.005s] ( 928/1315) xtask::bin/xtask check_dev_record_completeness::tests::skips_completion_fields_for_active_stories_with_model
+        PASS [   0.057s] ( 929/1315) xtask::bin/xtask check_cert_rotation_trigger::tests::derivation_is_attribute_aware_not_prefix_based
+        PASS [   0.005s] ( 930/1315) xtask::bin/xtask check_dev_record_completeness::tests::unresolved_heading_keeps_open_ownerless_rows_visible
+        PASS [   0.006s] ( 931/1315) xtask::bin/xtask check_env_contract::tests::partial_prefix_scan_fails
+        PASS [   0.006s] ( 932/1315) xtask::bin/xtask check_env_contract::tests::non_read_literals_and_registered_prefix_scans_stay_green
+        PASS [   0.005s] ( 933/1315) xtask::bin/xtask check_env_contract::tests::registered_multiline_raw_and_parenthesized_reads_stay_green
+        PASS [   0.059s] ( 934/1315) xtask::bin/xtask check_cert_rotation_trigger::tests::every_derived_rotation_test_is_named_by_a_leg
+        PASS [   0.007s] ( 935/1315) xtask::bin/xtask check_env_contract::tests::unregistered_multiline_raw_helper_read_fails
+        PASS [   0.007s] ( 936/1315) xtask::bin/xtask check_epic_close_coherence::tests::clean_sources_pass
+        PASS [   0.004s] ( 937/1315) xtask::bin/xtask check_epic_close_coherence::tests::epic_of_story_ignores_non_numeric_heads
+        PASS [   0.005s] ( 938/1315) xtask::bin/xtask check_epic_close_coherence::tests::disabled_workflow_plant_reds_both_literal_forms_and_restores_green
+        PASS [   0.006s] ( 939/1315) xtask::bin/xtask check_epic_close_coherence::tests::draft_ready_for_preflight_agrees_with_backlog
+        PASS [   0.007s] ( 940/1315) xtask::bin/xtask check_epic_close_coherence::tests::closed_epic_keeps_its_historical_pin
+        PASS [   0.005s] ( 941/1315) xtask::bin/xtask check_epic_close_coherence::tests::index_claims_reads_count_and_status
+        PASS [   0.005s] ( 942/1315) xtask::bin/xtask check_epic_close_coherence::tests::pins_on_line_reads_both_assertion_forms
+        PASS [   0.005s] ( 943/1315) xtask::bin/xtask check_epic_close_coherence::tests::proven_red_epic_key_never_advanced
+        PASS [   0.006s] ( 944/1315) xtask::bin/xtask check_epic_close_coherence::tests::proven_red_epic_closed_over_an_open_story
+        PASS [   0.005s] ( 945/1315) xtask::bin/xtask check_equiv_fixture_provenance::tests::sha256_hex_is_lower_case
+        PASS [   0.006s] ( 946/1315) xtask::bin/xtask check_equiv_fixture_provenance::tests::missing_toolchain_is_rejected
+        PASS [   0.008s] ( 947/1315) xtask::bin/xtask check_epic_close_coherence::tests::proven_red_planning_prose_disagrees
+        PASS [   0.005s] ( 948/1315) xtask::bin/xtask check_export_control::tests::extract_fence_ignores_inline_marker_in_prose
+        PASS [   0.004s] ( 949/1315) xtask::bin/xtask check_export_control::tests::extract_fence_returns_inner_content
+        PASS [   0.008s] ( 950/1315) xtask::bin/xtask check_equiv_fixture_provenance::tests::source_hash_is_order_independent
+        PASS [   0.010s] ( 951/1315) xtask::bin/xtask check_epic_close_coherence::tests::proven_red_open_epic_cites_a_stale_pin
+        PASS [   0.009s] ( 952/1315) xtask::bin/xtask check_epic_close_coherence::tests::proven_red_story_count_disagrees
+        PASS [   1.368s] ( 953/1315) xtask::model_currency_gate a_manifest_that_hides_its_pins_from_the_scan_reds
+        PASS [   0.005s] ( 954/1315) xtask::bin/xtask check_export_control::tests::extract_fence_returns_none_without_markers
+        PASS [   0.005s] ( 955/1315) xtask::bin/xtask check_export_control::tests::fails_when_crypto_crate_missing
+        PASS [   0.025s] ( 956/1315) xtask::bin/xtask check_dev_record_completeness::tests::stale_owner_sweep_finds_every_measured_instance
+        PASS [   0.006s] ( 957/1315) xtask::bin/xtask check_export_control::tests::fails_when_crypto_primitive_missing
+        PASS [   0.005s] ( 958/1315) xtask::bin/xtask check_export_control::tests::fails_when_eccn_doc_absent
+        PASS [   0.005s] ( 959/1315) xtask::bin/xtask check_export_control::tests::fails_when_fence_is_stub
+        PASS [   0.005s] ( 960/1315) xtask::bin/xtask check_export_control::tests::fails_when_eccn_doc_empty
+        PASS [   0.027s] ( 961/1315) xtask::bin/xtask check_dev_record_completeness::tests::stale_owner_sweep_reds_on_a_planted_done_owner
+        PASS [   0.005s] ( 962/1315) xtask::bin/xtask check_export_control::tests::scan_wasm_host_leak_dedupes_repeated_wasmtime
+        PASS [   0.007s] ( 963/1315) xtask::bin/xtask check_export_control::tests::fails_when_sha256_only_as_substring
+        PASS [   0.006s] ( 964/1315) xtask::bin/xtask check_export_control::tests::passes_when_all_artifacts_present
+        PASS [   0.007s] ( 965/1315) xtask::bin/xtask check_export_control::tests::fails_when_stability_fence_missing
+        PASS [   0.006s] ( 966/1315) xtask::bin/xtask check_export_control::tests::scan_wasm_host_leak_clean_closure_green
+        PASS [   0.005s] ( 967/1315) xtask::bin/xtask check_export_control::tests::scan_wasm_host_leak_detects_wasm_host_crates_red
+        PASS [   0.006s] ( 968/1315) xtask::bin/xtask check_export_control::tests::wasm_host_leak_indicators_listed
+        PASS [   0.006s] ( 969/1315) xtask::bin/xtask check_fr47::tests::fixture_with_anthropic_dep_fails
+        PASS [   0.006s] ( 970/1315) xtask::bin/xtask check_export_control::tests::scan_wasm_host_leak_detects_wasmtime_red
+        PASS [   0.006s] ( 971/1315) xtask::bin/xtask check_fr47::tests::fixture_without_vendor_sdk_passes
+        PASS [   0.006s] ( 972/1315) xtask::bin/xtask check_fr47::tests::fixture_with_renamed_dep_fails
+        PASS [   0.006s] ( 973/1315) xtask::bin/xtask check_fuzz_floor::tests::absent_when_ledger_absent
+        PASS [   0.007s] ( 974/1315) xtask::bin/xtask check_fuzz_floor::tests::absent_when_ledger_empty
+        PASS [   0.006s] ( 975/1315) xtask::bin/xtask check_fuzz_floor::tests::hard_fails_on_string_cpu_seconds_no_advisory_coercion
+        PASS [   0.007s] ( 976/1315) xtask::bin/xtask check_fuzz_floor::tests::advisory_when_history_under_90_days_even_if_below_floor
+        PASS [   0.007s] ( 977/1315) xtask::bin/xtask check_fuzz_floor::tests::ignores_records_outside_90_day_window
+        PASS [   0.007s] ( 978/1315) xtask::bin/xtask check_fuzz_floor::tests::fails_below_floor_once_history_is_mature
+        PASS [   0.007s] ( 979/1315) xtask::bin/xtask check_fuzz_floor::tests::rejects_unknown_target
+        PASS [   0.008s] ( 980/1315) xtask::bin/xtask check_fuzz_floor::tests::passes_when_floor_met_with_mature_history
+        PASS [   0.004s] ( 981/1315) xtask::bin/xtask check_host_surface::tests::addition_is_red
+        PASS [   0.004s] ( 982/1315) xtask::bin/xtask check_host_surface::tests::addition_and_removal_reds_on_addition_only
+        PASS [   0.004s] ( 983/1315) xtask::bin/xtask check_host_surface::tests::empty_baseline_is_red
+        PASS [   0.004s] ( 984/1315) xtask::bin/xtask check_host_surface::tests::empty_current_is_green_everything_removed
+        PASS [   0.004s] ( 985/1315) xtask::bin/xtask check_host_surface::tests::mutation_proven_red
+        PASS [   0.005s] ( 986/1315) xtask::bin/xtask check_host_surface::tests::identical_is_green
+        PASS [   0.004s] ( 987/1315) xtask::bin/xtask check_host_surface::tests::whitespace_only_lines_ignored
+        PASS [   0.026s] ( 988/1315) xtask::bin/xtask check_fuzz_targets::tests::fails_when_cargo_toml_malformed
+        PASS [   0.006s] ( 989/1315) xtask::bin/xtask check_judge_config::tests::bad_prompt_hash_format_fails
+        PASS [   0.028s] ( 990/1315) xtask::bin/xtask check_fuzz_targets::tests::fails_when_corpus_empty
+        PASS [   0.026s] ( 991/1315) xtask::bin/xtask check_fuzz_targets::tests::passes_with_populated_ledger
+        PASS [   0.026s] ( 992/1315) xtask::bin/xtask check_fuzz_targets::tests::fails_when_target_source_absent
+        PASS [   0.030s] ( 993/1315) xtask::bin/xtask check_fuzz_targets::tests::fails_when_bin_target_missing
+        PASS [   0.028s] ( 994/1315) xtask::bin/xtask check_fuzz_targets::tests::fails_when_corpus_only_gitkeep
+        PASS [   0.028s] ( 995/1315) xtask::bin/xtask check_fuzz_targets::tests::fails_when_ledger_malformed
+        PASS [   0.027s] ( 996/1315) xtask::bin/xtask check_fuzz_targets::tests::fails_when_ledger_missing
+        PASS [   0.005s] ( 997/1315) xtask::bin/xtask check_judge_config::tests::json_round_trip
+        PASS [   0.008s] ( 998/1315) xtask::bin/xtask check_judge_config::tests::direct_call_identifier_in_test_code_fails
+        PASS [   0.007s] ( 999/1315) xtask::bin/xtask check_judge_config::tests::empty_judge_config_passes
+        PASS [   0.030s] (1000/1315) xtask::bin/xtask check_fuzz_targets::tests::passes_when_all_mechanics_present
+        PASS [   0.004s] (1001/1315) xtask::bin/xtask check_loom::tests::detects_planner_struct
+        PASS [   0.006s] (1002/1315) xtask::bin/xtask check_judge_config::tests::non_zero_temperature_fails
+        PASS [   0.005s] (1003/1315) xtask::bin/xtask check_loom::tests::blocklist_has_expected_entries
+        PASS [   0.005s] (1004/1315) xtask::bin/xtask check_loom::tests::allowlist_hit_skips
+        PASS [   0.006s] (1005/1315) xtask::bin/xtask check_loom::tests::detects_use_orchestrator
+        PASS [   0.005s] (1006/1315) xtask::bin/xtask check_loom::tests::ignores_planner_in_tests_mod
+        PASS [   0.005s] (1007/1315) xtask::bin/xtask check_loom::tests::ignores_planner_in_cfg_test
+        PASS [   0.005s] (1008/1315) xtask::bin/xtask check_loom::tests::ignores_comment_loom
+        PASS [   0.005s] (1009/1315) xtask::bin/xtask check_loom::tests::json_round_trip
+        PASS [   0.005s] (1010/1315) xtask::bin/xtask check_loom_substrate_drift::tests::datname_extraction_handles_both_connection_shapes
+        PASS [   0.007s] (1011/1315) xtask::bin/xtask check_loom_substrate_drift::tests::contract_table_matches_ac2
+        PASS [   0.009s] (1012/1315) xtask::bin/xtask check_loom_substrate_drift::tests::filtered_reader_scan_excludes_unreachable_tests
+        PASS [   0.317s] (1013/1315) xtask::story_10_4a_proven_red vector_1_altered_frame_id_roots_differ_red
+        PASS [   0.020s] (1014/1315) xtask::bin/xtask check_loom_substrate_drift::tests::bench_slo_reads_only_region_axis
+        PASS [   0.004s] (1015/1315) xtask::bin/xtask check_loom_substrate_drift::tests::slo_routes_cover_read_path_chokepoint
+        PASS [   0.325s] (1016/1315) xtask::story_10_4a_proven_red vector_2_payload_corruption_root_matches_but_payload_mismatch_red
+        PASS [   0.331s] (1017/1315) xtask::story_10_4a_proven_red vector_1_faithful_migration_green
+        PASS [   0.037s] (1018/1315) xtask::bin/xtask check_loom_substrate_drift::tests::reza_routes_trace_invoked_live_tests
+        PASS [   0.041s] (1019/1315) xtask::bin/xtask check_loom_substrate_drift::tests::ratified_alias_list_is_held_non_vacuous
+        PASS [   0.039s] (1020/1315) xtask::bin/xtask check_loom_substrate_drift::tests::service_block_drift_catches_divergence
+        PASS [   0.046s] (1021/1315) xtask::bin/xtask check_loom_substrate_drift::tests::real_topology_is_axis_distinct_and_its_aliases_are_ratified
+        PASS [   0.006s] (1022/1315) xtask::bin/xtask check_manifest_schema_version::tests::parse_const_finds_literal
+        PASS [   0.254s] (1023/1315) xtask::workflow_honesty_20_3a aggregate_executes_js_and_reports_advisory_failure_and_not_run
+        PASS [   0.004s] (1024/1315) xtask::bin/xtask check_manifest_schema_version::tests::parse_const_follows_alias
+        PASS [   0.052s] (1025/1315) xtask::bin/xtask check_loom_substrate_drift::tests::consensus_oracle_pg_tests_acquire_guard
+        PASS [   0.054s] (1026/1315) xtask::bin/xtask check_loom_substrate_drift::tests::cross_region_live_reads_include_all_three_axes
+        PASS [   0.006s] (1027/1315) xtask::bin/xtask check_manifest_schema_version::tests::parse_const_missing_returns_none
+        PASS [   0.005s] (1028/1315) xtask::bin/xtask check_manifest_schema_version::tests::parse_post_v1_sections_returns_empty_vec
+        PASS [   0.006s] (1029/1315) xtask::bin/xtask check_manifest_schema_version::tests::parse_post_v1_sections_extracts_entries
+        PASS [   0.005s] (1030/1315) xtask::bin/xtask check_manifest_schema_version::tests::parse_post_v1_sections_returns_none_on_missing
+        PASS [   0.006s] (1031/1315) xtask::bin/xtask check_manifest_schema_version::tests::scan_allows_lines_referencing_min_supported_constant
+        PASS [   0.005s] (1032/1315) xtask::bin/xtask check_manifest_schema_version::tests::scan_skips_test_module_and_toml_string_literals
+        PASS [   0.006s] (1033/1315) xtask::bin/xtask check_manifest_schema_version::tests::scan_flags_hardcoded_inequality_in_production
+        PASS [   0.039s] (1034/1315) xtask::bin/xtask check_loom_substrate_drift::tests::topology_value_control_catches_a_collapsed_region_axis
+        PASS [   0.052s] (1035/1315) xtask::bin/xtask check_loom_substrate_drift::tests::service_block_drift_catches_manual_unregistered_fifth_gate_job
+        PASS [   0.007s] (1036/1315) xtask::bin/xtask check_multi_provider_drift::tests::empty_report_returns_no_flags_and_zero_exit
+        PASS [   0.010s] (1037/1315) xtask::bin/xtask check_migration_merkle::tests::manifest_corpus_entry_is_present_and_pinned
+        PASS [   0.006s] (1038/1315) xtask::bin/xtask check_multi_provider_drift::tests::median_of_three_equal_flags_nothing
+        PASS [   0.006s] (1039/1315) xtask::bin/xtask check_multi_provider_drift::tests::median_of_three_with_outlier_flags_one_row
+        PASS [   0.050s] (1040/1315) xtask::bin/xtask check_loom_substrate_drift::tests::service_block_drift_catches_unregistered_fifth_job
+        PASS [   0.005s] (1041/1315) xtask::bin/xtask check_multi_provider_drift::tests::missing_provider_row_flags
+        PASS [   0.005s] (1042/1315) xtask::bin/xtask check_multi_region_slo::tests::a_red_roundtrip_slo_leg_blocks_and_is_indeterminate
+        PASS [   0.004s] (1043/1315) xtask::bin/xtask check_multi_region_slo::tests::parse_count_sums_passed_and_failed
+        PASS [   0.004s] (1044/1315) xtask::bin/xtask check_multi_region_slo::tests::ledger_leg_names_are_derived_from_raw_labels
+        PASS [   0.005s] (1045/1315) xtask::bin/xtask check_multi_region_slo::tests::halt_presence_is_hermetic_and_binds_without_substrate
+        PASS [   0.007s] (1046/1315) xtask::bin/xtask check_multi_provider_drift::tests::stop_reason_disagreement_flags
+        PASS [   0.038s] (1047/1315) xtask::bin/xtask check_loom_substrate_drift::tests::topology_value_control_catches_an_unratified_shared_standin_alias
+        PASS [   0.005s] (1048/1315) xtask::bin/xtask check_multi_region_slo::tests::skipped_live_leg_is_absent_and_unmeasured
+        PASS [   0.006s] (1049/1315) xtask::bin/xtask check_multi_region_slo::tests::structural_chokepoint_failure_blocks_without_postgres
+        PASS [   0.042s] (1050/1315) xtask::bin/xtask check_loom_substrate_drift::tests::topology_value_control_catches_a_collapsed_team_axis
+        PASS [   0.004s] (1051/1315) xtask::bin/xtask check_multi_tenant_loom::tests::nested_transport_cause_match_is_detected
+        PASS [   0.005s] (1052/1315) xtask::bin/xtask check_multi_tenant_loom::tests::kernel_source_read_error_is_blocking_not_absent
+        PASS [   0.005s] (1053/1315) xtask::bin/xtask check_multi_tenant_loom::tests::whole_package_leg_skips_only_the_million_row_test
+        PASS [   0.005s] (1054/1315) xtask::bin/xtask check_multi_tenant_loom::tests::ledger_leg_names_are_derived_from_specs
+        PASS [   0.005s] (1055/1315) xtask::bin/xtask check_review_findings_resolved::tests::bare_placeholder_still_reds_with_deferral_marker
+        PASS [   0.006s] (1056/1315) xtask::bin/xtask check_review_findings_resolved::tests::bare_placeholder_still_reds_for_bootstrap_stories
+        PASS [   0.006s] (1057/1315) xtask::bin/xtask check_review_findings_resolved::tests::fails_when_open_finding_and_status_done
+        PASS [   0.005s] (1058/1315) xtask::bin/xtask check_review_findings_resolved::tests::flags_closed_finding_without_file_reference
+        PASS [   0.005s] (1059/1315) xtask::bin/xtask check_review_findings_resolved::tests::passes_when_no_open_findings_and_status_done
+        PASS [   0.004s] (1060/1315) xtask::bin/xtask check_reza_production_path::tests::ledger_leg_names_are_derived_from_specs
+        PASS [   0.005s] (1061/1315) xtask::bin/xtask check_review_findings_resolved::tests::passes_when_open_finding_and_status_in_review
+        PASS [   0.005s] (1062/1315) xtask::bin/xtask check_reza_production_path::tests::escape_wiring_probe_requires_a_real_call_expression
+        PASS [   0.005s] (1063/1315) xtask::bin/xtask check_reza_production_path::tests::successor_ownership_is_machine_read_and_non_required
+        PASS [   0.004s] (1064/1315) xtask::bin/xtask check_rto::tests::default_thresholds_are_correct
+        PASS [   0.005s] (1065/1315) xtask::bin/xtask check_rto::tests::rpo_within_threshold_for_fresh_backup
+        PASS [   0.041s] (1066/1315) xtask::bin/xtask check_loom_substrate_drift::tests::topology_value_control_rejects_missing_and_empty_axis_values
+        PASS [   0.006s] (1067/1315) xtask::bin/xtask check_rto::tests::rpo_violation_detected
+        PASS [   0.006s] (1068/1315) xtask::bin/xtask check_rto_gate::tests::rto_drill_failure_fails
+        PASS [   0.006s] (1069/1315) xtask::bin/xtask check_rto_gate::tests::rto_future_dated_evidence_fails_recency
+        PASS [   0.005s] (1070/1315) xtask::bin/xtask check_rto_gate::tests::rto_no_evidence_is_absent_not_silent_pass
+        PASS [   0.007s] (1071/1315) xtask::bin/xtask check_rto_gate::tests::rto_exceeds_threshold_fails
+        PASS [   0.006s] (1072/1315) xtask::bin/xtask check_rto_gate::tests::rto_stale_evidence_fails_recency
+        PASS [   0.005s] (1073/1315) xtask::bin/xtask check_security_md::tests::extra_h2_sections_are_allowed
+        PASS [   0.006s] (1074/1315) xtask::bin/xtask check_rto_gate::tests::rto_within_threshold_passes
+        PASS [   0.005s] (1075/1315) xtask::bin/xtask check_security_md::tests::fails_when_file_absent
+        PASS [   0.006s] (1076/1315) xtask::bin/xtask check_security_md::tests::fails_when_any_section_missing
+        PASS [   0.005s] (1077/1315) xtask::bin/xtask check_security_md::tests::gpg_placeholder_control_fails_when_placeholder_present
+        PASS [   0.005s] (1078/1315) xtask::bin/xtask check_security_md::tests::fails_when_required_section_is_at_h1_not_h2
+        PASS [   0.005s] (1079/1315) xtask::bin/xtask check_security_md::tests::gpg_placeholder_control_passes_when_placeholder_absent
+        PASS [   0.006s] (1080/1315) xtask::bin/xtask check_security_md::tests::passes_when_all_four_h2_sections_present
+        PASS [   0.004s] (1081/1315) xtask::bin/xtask check_security_md::tests::version_row_control_fails_without_1_0_x_row
+        PASS [   0.005s] (1082/1315) xtask::bin/xtask check_security_md::tests::version_row_control_passes_with_1_0_x_row
+        PASS [   0.005s] (1083/1315) xtask::bin/xtask check_security_md::tests::version_row_control_rejects_prose_mention_outside_table_row
+        PASS [   0.005s] (1084/1315) xtask::bin/xtask check_security_md::tests::version_row_control_rejects_11_0_x_substring_row
+        PASS [   0.008s] (1085/1315) xtask::bin/xtask check_serde_error_handling::tests::detects_expect_after_serde_cbor
+        PASS [   0.008s] (1086/1315) xtask::bin/xtask check_serde_error_handling::tests::detects_ciborium_nested_module
+        PASS [   0.008s] (1087/1315) xtask::bin/xtask check_serde_error_handling::tests::detects_multiple_violations_in_one_file
+        PASS [   0.007s] (1088/1315) xtask::bin/xtask check_serde_error_handling::tests::detects_unwrap_multiline
+        PASS [   0.008s] (1089/1315) xtask::bin/xtask check_serde_error_handling::tests::detects_unwrap_or_default_inline
+        PASS [   0.007s] (1090/1315) xtask::bin/xtask check_serde_error_handling::tests::ignores_commented_code
+        PASS [   0.007s] (1091/1315) xtask::bin/xtask check_serde_error_handling::tests::ignores_explicit_allow_marker
+        PASS [   0.007s] (1092/1315) xtask::bin/xtask check_serde_error_handling::tests::ignores_map_err_chain
+        PASS [   0.005s] (1093/1315) xtask::bin/xtask check_ship_gate_completeness::tests::advisory_gate_may_report_not_proven
+        PASS [   0.005s] (1094/1315) xtask::bin/xtask check_ship_gate_completeness::tests::asserted_badge_over_not_proven_evidence_reds
+        PASS [   0.005s] (1095/1315) xtask::bin/xtask check_ship_gate_completeness::tests::advisory_gate_still_must_publish_its_ledger
+        PASS [   0.004s] (1096/1315) xtask::bin/xtask check_ship_gate_completeness::tests::asserted_badge_over_proven_evidence_passes
+        PASS [   0.004s] (1097/1315) xtask::bin/xtask check_ship_gate_completeness::tests::asserted_badge_with_no_published_ledger_reds
+        PASS [   0.008s] (1098/1315) xtask::bin/xtask check_serde_error_handling::tests::ignores_question_mark_propagation
+        PASS [   0.004s] (1099/1315) xtask::bin/xtask check_ship_gate_completeness::tests::extracts_needs_from_sample_yaml
+        PASS [   0.006s] (1100/1315) xtask::bin/xtask check_ship_gate_completeness::tests::detects_missing_gate
+        PASS [   0.004s] (1101/1315) xtask::bin/xtask check_ship_gate_completeness::tests::ledger_consumption_is_scoped_to_the_artifact_consuming_job
+        PASS [   0.004s] (1102/1315) xtask::bin/xtask check_unsafe::tests::allowed_list_is_empty
+        PASS [   0.005s] (1103/1315) xtask::bin/xtask check_unsafe::tests::clean_code_has_no_violations
+        PASS [   0.008s] (1104/1315) xtask::bin/xtask check_ship_gate_completeness::tests::expected_gates_and_registry_are_one_set_of_48
+        PASS [   1.261s] (1105/1315) xtask::model_currency_gate the_cli_subcommand_is_wired_green_at_head_and_red_on_a_plant
+        PASS [   0.005s] (1106/1315) xtask::bin/xtask check_unsafe::tests::detects_allow_unsafe_code
+        PASS [   0.005s] (1107/1315) xtask::bin/xtask check_unsafe::tests::detects_cfg_attr_allow_unsafe
+        PASS [   0.004s] (1108/1315) xtask::bin/xtask check_unsafe::tests::detects_unsafe_fn
+        PASS [   0.004s] (1109/1315) xtask::bin/xtask check_unsafe::tests::recognizes_forbid_unsafe_code
+        PASS [   0.005s] (1110/1315) xtask::bin/xtask check_unsafe::tests::detects_unsafe_block
+        PASS [   0.005s] (1111/1315) xtask::bin/xtask check_unsafe::tests::json_output_round_trip
+        PASS [   0.004s] (1112/1315) xtask::bin/xtask check_wasm_form_equiv::tests::parse_count_skips_space_before_key
+        PASS [   0.004s] (1113/1315) xtask::bin/xtask check_wasm_form_equiv::tests::parses_real_cargo_summary_line
+        PASS [   0.005s] (1114/1315) xtask::bin/xtask check_wasm_form_equiv::tests::parses_no_summary_as_zero
+        PASS [   0.005s] (1115/1315) xtask::bin/xtask check_wasm_form_equiv::tests::parses_failure_summary
+        PASS [   0.004s] (1116/1315) xtask::bin/xtask check_wasm_form_equiv::tests::phase_logic_advisory_now_blocking_at_v2_0
+        PASS [   0.007s] (1117/1315) xtask::bin/xtask check_wasm_form_equiv::tests::parses_passed_and_failed_counts
+        PASS [   0.004s] (1118/1315) xtask::bin/xtask check_workspace_count::tests::extract_declared_count_from_markdown
+        PASS [   0.004s] (1119/1315) xtask::bin/xtask check_workspace_count::tests::extract_declared_count_sentinel_alone_on_line
+        PASS [   0.005s] (1120/1315) xtask::bin/xtask check_workspace_count::tests::count_members_from_toml
+        PASS [   0.008s] (1121/1315) xtask::bin/xtask check_wasm_form_equiv::tests::registry_disposition_graduates_to_blocking_at_v2_0
+        PASS [   0.005s] (1122/1315) xtask::bin/xtask check_workspace_count::tests::multiple_sentinels_is_error
+        PASS [   0.006s] (1123/1315) xtask::bin/xtask check_workspace_count::tests::missing_members_key_is_error
+        PASS [   0.004s] (1124/1315) xtask::bin/xtask check_workspace_count::tests::sentinel_not_found_is_error
+        PASS [   0.006s] (1125/1315) xtask::bin/xtask check_workspace_count::tests::missing_workspace_section_is_error
+        PASS [   0.004s] (1126/1315) xtask::bin/xtask check_workspace_count::tests::sentinel_present_but_unparseable_count_is_error
+        PASS [   0.005s] (1127/1315) xtask::bin/xtask check_workspace_count::tests::negative_mismatch_reports_failed
+        PASS [   0.005s] (1128/1315) xtask::bin/xtask corpus_staleness::tests::expired_row_violates
+        PASS [   0.006s] (1129/1315) xtask::bin/xtask check_workspace_count::tests::non_array_members_is_error
+        PASS [   0.005s] (1130/1315) xtask::bin/xtask corpus_staleness::tests::json_round_trip
+        PASS [   0.005s] (1131/1315) xtask::bin/xtask corpus_staleness::tests::manifest_expired_violates
+        PASS [   0.005s] (1132/1315) xtask::bin/xtask corpus_staleness::tests::not_yet_due_row_passes
+        PASS [   0.005s] (1133/1315) xtask::bin/xtask corpus_staleness::tests::within_warn_window_emits_warning
+        PASS [   0.006s] (1134/1315) xtask::bin/xtask coverage_matrix::tests::dangling_corpus_ref_fails
+        PASS [   0.005s] (1135/1315) xtask::bin/xtask coverage_matrix::tests::json_round_trip
+        PASS [   0.007s] (1136/1315) xtask::bin/xtask coverage_matrix::tests::deferred_row_goes_to_out_of_scope
+        PASS [   0.008s] (1137/1315) xtask::bin/xtask coverage_matrix::tests::dangling_gate_ref_fails
+        PASS [   0.418s] (1138/1315) xtask::story_10_4a_proven_red vector_4_rollback_detects_source_drift_red
+        PASS [   0.007s] (1139/1315) xtask::bin/xtask coverage_matrix::tests::empty_coverage_passes
+        PASS [   0.006s] (1140/1315) xtask::bin/xtask coverage_matrix_nfr_test_3::tests::t5_10_soft_floor_never_fails_at_v05
+        PASS [   0.008s] (1141/1315) xtask::bin/xtask coverage_matrix::tests::mode_warning_returns_zero_with_violations
+        PASS [   0.007s] (1142/1315) xtask::bin/xtask coverage_matrix::tests::phase_config_mismatch_fails
+        PASS [   0.007s] (1143/1315) xtask::bin/xtask coverage_matrix::tests::uncovered_delivered_row_violates
+        PASS [   0.005s] (1144/1315) xtask::bin/xtask coverage_matrix_nfr_test_3::tests::t5_5_unknown_spirit_fails
+        PASS [   0.006s] (1145/1315) xtask::bin/xtask coverage_matrix_nfr_test_3::tests::t5_4_butler_not_yet_shipped
+        PASS [   0.005s] (1146/1315) xtask::bin/xtask coverage_matrix_nfr_test_3::tests::t5_6_walk_all_spirits
+        PASS [   0.008s] (1147/1315) xtask::bin/xtask coverage_matrix_nfr_test_3::tests::t5_1_hello_spirit_reports_100
+        PASS [   0.008s] (1148/1315) xtask::bin/xtask coverage_matrix_nfr_test_3::tests::t5_2_example_spirit_reports_100
+        PASS [   0.007s] (1149/1315) xtask::bin/xtask coverage_matrix_nfr_test_3::tests::t5_3_example_spirit_ts_reports_100
+        PASS [   0.005s] (1150/1315) xtask::bin/xtask coverage_matrix_nfr_test_3::tests::t5_7_dry_run_does_not_write
+        PASS [   0.006s] (1151/1315) xtask::bin/xtask coverage_matrix_nfr_test_3::tests::t5_9_zero_declared_caps_vacuous_floor_100
+        PASS [   0.006s] (1152/1315) xtask::bin/xtask demo_j1::tests::a_clear_judgement_stream_fails_the_ambiguity_halt_beat
+        PASS [   0.007s] (1153/1315) xtask::bin/xtask coverage_matrix_nfr_test_3::tests::t5_8_partial_coverage_reports_50
+        PASS [   0.005s] (1154/1315) xtask::bin/xtask demo_j1::tests::a_drain_timeout_fails_the_scene
+        PASS [   0.005s] (1155/1315) xtask::bin/xtask demo_j1::tests::a_completion_before_its_own_delegation_fails_the_order_beat
+        PASS [   0.004s] (1156/1315) xtask::bin/xtask demo_j1::tests::a_digest_citing_an_extra_completion_fails_the_digest_beat
+        PASS [   0.005s] (1157/1315) xtask::bin/xtask demo_j1::tests::a_delegation_to_the_wrong_host_fails
+        PASS [   0.005s] (1158/1315) xtask::bin/xtask demo_j1::tests::a_crashed_worker_exit_fails_the_idle_beat
+        PASS [   0.005s] (1159/1315) xtask::bin/xtask demo_j1::tests::a_fixture_take_never_claims_tier2
+        PASS [   0.005s] (1160/1315) xtask::bin/xtask demo_j1::tests::a_halt_after_three_frames_fails_the_ambiguity_halt_beat
+        PASS [   0.005s] (1161/1315) xtask::bin/xtask demo_j1::tests::a_halt_ref_naming_a_completion_row_fails_the_digest_beat
+        PASS [   0.005s] (1162/1315) xtask::bin/xtask demo_j1::tests::a_missing_delegation_event_fails_the_frame_borne_beat
+        PASS [   0.004s] (1163/1315) xtask::bin/xtask demo_j1::tests::a_missing_worker_exit_row_fails_the_idle_beat
+        PASS [   0.005s] (1164/1315) xtask::bin/xtask demo_j1::tests::a_resolved_halt_listed_open_fails_the_resume_beat
+        PASS [   0.004s] (1165/1315) xtask::bin/xtask demo_j1::tests::a_resumed_section_without_the_clarification_fails_the_resume_beat
+        PASS [   0.005s] (1166/1315) xtask::bin/xtask demo_j1::tests::a_resolved_halt_citing_another_frame_fails_the_resume_beat
+        PASS [   0.004s] (1167/1315) xtask::bin/xtask demo_j1::tests::a_spirit_that_never_idled_fails_the_idle_beat
+        PASS [   0.006s] (1168/1315) xtask::bin/xtask demo_j1::tests::a_missing_short_or_duplicated_digest_fails_the_digest_beat
+        PASS [   0.006s] (1169/1315) xtask::bin/xtask demo_j1::tests::a_repeated_lifecycle_stage_fails_the_order_beat
+        PASS [   0.004s] (1170/1315) xtask::bin/xtask demo_j1::tests::a_writer_task_failure_fails_the_drain_beat
+        PASS [   0.004s] (1171/1315) xtask::bin/xtask demo_j1::tests::absent_beats_are_visible_and_never_fail_the_scene
+        PASS [   0.006s] (1172/1315) xtask::bin/xtask demo_j1::tests::a_stream_without_judgements_fails_the_ambiguity_halt_beat
+        PASS [   0.004s] (1173/1315) xtask::bin/xtask demo_j1::tests::entry_count_reads_the_verify_line
+        PASS [   0.004s] (1174/1315) xtask::bin/xtask demo_j1::tests::only_the_tier2_and_two_host_beats_stay_unlanded
+        PASS [   0.005s] (1175/1315) xtask::bin/xtask demo_j1::tests::completion_comes_from_the_oracle_not_from_a_tl_ref
+        PASS [   0.005s] (1176/1315) xtask::bin/xtask demo_j1::tests::an_executed_beat_that_did_not_hold_fails
+        PASS [   0.006s] (1177/1315) xtask::bin/xtask demo_j1::tests::an_ambient_journal_warning_fails_the_clean_home_beat
+        PASS [   0.005s] (1178/1315) xtask::bin/xtask demo_j1::tests::resolve_topology_worker_refuses_a_topology_with_no_wrapper
+        PASS [   0.005s] (1179/1315) xtask::bin/xtask demo_j1::tests::resolve_topology_worker_refuses_an_unsupported_cli
+        PASS [   0.005s] (1180/1315) xtask::bin/xtask demo_j1::tests::resolve_topology_worker_resolves_the_single_wrapper
+        PASS [   0.006s] (1181/1315) xtask::bin/xtask demo_j1::tests::resolve_topology_worker_refuses_multiple_wrappers
+        PASS [   0.005s] (1182/1315) xtask::bin/xtask demo_j1::tests::sections_dispatched_out_of_order_fail_the_decomposition_beat
+        PASS [   0.004s] (1183/1315) xtask::bin/xtask demo_j1::tests::the_refusal_beat_is_no_longer_declared_unlanded
+        PASS [   0.005s] (1184/1315) xtask::bin/xtask demo_j1::tests::the_refusal_beat_is_emitted_by_the_gate_judging_path
+        PASS [   0.004s] (1185/1315) xtask::bin/xtask demo_j1::tests::the_sealed_export_pubkey_is_carried_into_verification
+        PASS [   0.005s] (1186/1315) xtask::bin/xtask demo_j1::tests::the_full_epic_stream_proves_every_executed_beat
+        PASS [   0.004s] (1187/1315) xtask::bin/xtask demo_j1::tests::two_host_beat_with_present_capture_renders_indeterminate_not_fail
+        PASS [   0.004s] (1188/1315) xtask::bin/xtask demo_j1::tests::the_signable_allowlist_admits_both_real_adapters_and_refuses_the_fixture
+        PASS [   0.006s] (1189/1315) xtask::bin/xtask demo_j1::tests::the_resolve_step_removed_fails_the_resume_beat
+        PASS [   0.004s] (1190/1315) xtask::bin/xtask demo_j1::tests::two_host_beat_with_refused_capture_still_renders_indeterminate_not_fail
+        PASS [   0.005s] (1191/1315) xtask::bin/xtask demo_j1::tests::two_host_beats_are_owned_by_their_crosshost_stories
+        PASS [   0.004s] (1192/1315) xtask::bin/xtask demo_reza::tests::host_args_parse_a_full_connection_string
+        PASS [   0.005s] (1193/1315) xtask::bin/xtask demo_reza::tests::host_args_default_the_port_when_absent
+        PASS [   0.004s] (1194/1315) xtask::bin/xtask demo_reza::tests::substrate_env_keeps_both_axes_pairwise_distinct
+        PASS [   0.004s] (1195/1315) xtask::bin/xtask demo_reza::tests::substrate_env_points_the_legacy_singular_at_team_b
+        PASS [   0.004s] (1196/1315) xtask::bin/xtask evidence_ledger::tests::configured_audit_key_errors_fail_loudly
+        PASS [   0.005s] (1197/1315) xtask::bin/xtask evidence_ledger::tests::absent_successors_are_derived_from_absent_legs
+        PASS [   0.005s] (1198/1315) xtask::bin/xtask evidence_ledger::tests::empty_signature_block_is_not_proven
+        PASS [   0.005s] (1199/1315) xtask::bin/xtask evidence_ledger::tests::correctly_signed_and_bound_record_is_proven_live_signed
+        PASS [   0.004s] (1200/1315) xtask::bin/xtask evidence_ledger::tests::green_but_unsigned_live_leg_refuses_the_claim_without_blocking_a_lane
+        PASS [   0.005s] (1201/1315) xtask::bin/xtask evidence_ledger::tests::green_unsigned_success_is_reported_as_advisory
+        PASS [   0.005s] (1202/1315) xtask::bin/xtask evidence_ledger::tests::ledger_set_is_derived_from_contracts
+        PASS [   0.004s] (1203/1315) xtask::bin/xtask evidence_ledger::tests::missing_journey_leg_refuses_proven_claim_before_claim_comparison
+        PASS [   0.004s] (1204/1315) xtask::bin/xtask evidence_ledger::tests::planted_absent_required_leg_blocks_on_the_enforced_lane
+        PASS [   0.005s] (1205/1315) xtask::bin/xtask evidence_ledger::tests::missing_operator_key_downgrades_with_a_written_reason
+        PASS [   0.005s] (1206/1315) xtask::bin/xtask evidence_ledger::tests::planted_red_live_leg_blocks
+        PASS [   0.005s] (1207/1315) xtask::bin/xtask evidence_ledger::tests::product_claim_is_proven_only_when_every_required_leg_is_proven
+        PASS [   0.005s] (1208/1315) xtask::bin/xtask evidence_ledger::tests::published_ledger_rejects_another_workflow_run_binding
+        PASS [   0.005s] (1209/1315) xtask::bin/xtask evidence_ledger::tests::published_ledger_rejects_missing_required_gate_owned_leg
+        PASS [   0.006s] (1210/1315) xtask::bin/xtask evidence_ledger::tests::published_claim_is_rederived_from_full_ledger
+        PASS [   0.710s] (1211/1315) xtask::routed_catalog_20_3b every_kernel_catalog_variant_has_retryability_and_cause_chain
+        PASS [   0.004s] (1212/1315) xtask::bin/xtask evidence_ledger::tests::red_live_leg_still_blocks_on_both_lanes
+        PASS [   0.004s] (1213/1315) xtask::bin/xtask evidence_ledger::tests::published_leg_cannot_reassign_a_valid_test_record
+        PASS [   0.005s] (1214/1315) xtask::bin/xtask evidence_ledger::tests::published_ledger_rejects_unknown_gate_leg
+        PASS [   0.005s] (1215/1315) xtask::bin/xtask evidence_ledger::tests::required_defaults_on_and_exempts_only_the_drift_tripwires
+        PASS [   0.005s] (1216/1315) xtask::bin/xtask evidence_ledger::tests::signature_not_bound_to_this_build_is_not_proven
+        PASS [   0.006s] (1217/1315) xtask::bin/xtask evidence_ledger::tests::serialized_empty_signature_cannot_claim_proven
+        PASS [   0.005s] (1218/1315) xtask::bin/xtask evidence_ledger::tests::signed_record_is_bound_to_expected_test_and_passed_outcome
+        PASS [   0.006s] (1219/1315) xtask::bin/xtask evidence_ledger::tests::signature_that_fails_verification_is_not_proven
+        PASS [   0.005s] (1220/1315) xtask::bin/xtask gate_common::evidence_projection_tests::only_the_two_proven_states_carry_evidence
+        PASS [   0.005s] (1221/1315) xtask::bin/xtask gate_common::evidence_projection_tests::projection_truth_table_is_exhaustive
+        PASS [   0.005s] (1222/1315) xtask::bin/xtask evidence_ledger::tests::worktree_binding_changes_with_uncommitted_content
+        PASS [   0.006s] (1223/1315) xtask::bin/xtask evidence_ledger::tests::the_declared_absent_successor_is_exempt_from_required
+        PASS [   0.005s] (1224/1315) xtask::bin/xtask gate_common::evidence_projection_tests::wire_spellings_match_the_epic_vocabulary
+        PASS [   0.005s] (1225/1315) xtask::bin/xtask gate_common::option_c_tests::advisory_substrate_blocks_only_when_the_substrate_is_present
+        PASS [   0.005s] (1226/1315) xtask::bin/xtask gate_common::option_c_tests::blocking_class_hard_fails_a_red_oracle_regardless_of_substrate
+        PASS [   0.005s] (1227/1315) xtask::bin/xtask gate_common::option_c_tests::phase_disposition_inherits_the_nearest_earlier_phase
+        PASS [   0.004s] (1228/1315) xtask::bin/xtask gate_common::out_of_ledger_tests::worst_state_names_the_gate
+        PASS [   0.005s] (1229/1315) xtask::bin/xtask gate_common::out_of_ledger_tests::absent_evidence_follows_the_disposition_at_the_requested_phase
+        PASS [   0.004s] (1230/1315) xtask::bin/xtask gen_abi_docs::tests::empty_diff_floor
+        PASS [   0.006s] (1231/1315) xtask::bin/xtask gate_common::out_of_ledger_tests::registry_rows_without_a_known_binding_are_refused
+        PASS [   0.006s] (1232/1315) xtask::bin/xtask gen_abi_docs::tests::cross_gate_contract_module_coverage
+        PASS [   0.005s] (1233/1315) xtask::bin/xtask gen_abi_docs::tests::generated_abi_pages_have_explicit_heading_ids
+        PASS [   0.008s] (1234/1315) xtask::bin/xtask gate_common::out_of_ledger_tests::out_of_ledger_truth_table_is_exhaustive
+        PASS [   0.004s] (1235/1315) xtask::bin/xtask gen_isolation_corpus::tests::each_category_floor_25_aggregate
+        PASS [   0.009s] (1236/1315) xtask::bin/xtask gen_abi_docs::tests::anti_rot_gate_catches_orphan_generated_page
+        PASS [   0.009s] (1237/1315) xtask::bin/xtask gen_abi_docs::tests::anti_rot_gate_catches_semantic_drift
+        PASS [   0.005s] (1238/1315) xtask::bin/xtask gen_isolation_corpus::tests::generator_counts_total_200
+        PASS [   0.007s] (1239/1315) xtask::bin/xtask gen_abi_docs::tests::generated_abi_pages_have_unique_heading_ids
+        PASS [   0.009s] (1240/1315) xtask::bin/xtask gen_abi_docs::tests::value_provenance_manifest_schema_version
+        PASS [   0.005s] (1241/1315) xtask::bin/xtask kloc_check::tests::alarm_fires_at_threshold
+        PASS [   0.003s] (1242/1315) xtask::bin/xtask kloc_check::tests::hardfail_at_per_crate_threshold
+        PASS [   0.004s] (1243/1315) xtask::bin/xtask kloc_check::tests::hardfail_at_aggregate_threshold
+        PASS [   0.008s] (1244/1315) xtask::bin/xtask kloc_check::tests::absent_tokei_binary_is_named_not_skipped
+        PASS [   0.005s] (1245/1315) xtask::bin/xtask kloc_check::tests::infer_crate_empty_for_target
+        PASS [   0.004s] (1246/1315) xtask::bin/xtask kloc_check::tests::infer_crate_fallback_for_unknown_path
+        PASS [   0.003s] (1247/1315) xtask::bin/xtask kloc_check::tests::infer_crate_from_xtask_path
+        PASS [   0.004s] (1248/1315) xtask::bin/xtask kloc_check::tests::infer_crate_from_crates_path
+        PASS [   0.016s] (1249/1315) xtask::bin/xtask kloc_check::tests::budget_row_nested_below_a_table_header_is_named
+        PASS [   0.007s] (1250/1315) xtask::bin/xtask kloc_check::tests::missing_or_non_integer_aggregate_threshold_is_named
+        PASS [   0.021s] (1251/1315) xtask::bin/xtask kloc_check::tests::alarm_binds_at_the_configured_threshold_and_stays_advisory
+        PASS [   0.014s] (1252/1315) xtask::bin/xtask kloc_check::tests::inverted_aggregate_thresholds_are_named
+        PASS [   0.013s] (1253/1315) xtask::bin/xtask kloc_check::tests::measured_crate_without_budget_is_named
+        PASS [   0.007s] (1254/1315) xtask::bin/xtask kloc_check::tests::missing_or_non_integer_hardfail_threshold_is_named
+        PASS [   0.005s] (1255/1315) xtask::bin/xtask kloc_check::tests::quoted_or_negative_crate_budget_is_named
+        PASS [   0.004s] (1256/1315) xtask::bin/xtask kloc_check::tests::tokei_version_parser_names_both_versions
+        PASS [   0.015s] (1257/1315) xtask::bin/xtask kloc_check::tests::operator_output_names_the_configured_thresholds
+        PASS [   0.006s] (1258/1315) xtask::bin/xtask nfr_onb_1_gate::tests::gate_passes_against_committed_artifacts
+        PASS [   0.007s] (1259/1315) xtask::bin/xtask rebaseline_check::tests::empty_manifest_vacuous_truth
+        PASS [   0.016s] (1260/1315) xtask::bin/xtask kloc_check::tests::per_crate_only_breach_does_not_claim_an_aggregate_hard_fail
+        PASS [   0.005s] (1261/1315) xtask::bin/xtask rebaseline_check::tests::json_round_trip
+        PASS [   0.014s] (1262/1315) xtask::bin/xtask kloc_check::tests::tokei_version_pin_is_enforced_at_the_call_site
+        PASS [   0.005s] (1263/1315) xtask::bin/xtask rebaseline_check::tests::offline_mode_fails_mismatched_items
+        PASS [   0.004s] (1264/1315) xtask::bin/xtask rebaseline_check::tests::offline_mode_passes_matching_items
+        PASS [   0.006s] (1265/1315) xtask::bin/xtask rebaseline_check::tests::ratio_below_threshold_violates
+        PASS [   0.004s] (1266/1315) xtask::bin/xtask stability_matrix::tests::export_non_stub_issue_flags_empty_fence
+        PASS [   0.005s] (1267/1315) xtask::bin/xtask stability_matrix::tests::export_non_stub_issue_flags_missing_fence
+        PASS [   0.005s] (1268/1315) xtask::bin/xtask stability_matrix::tests::export_non_stub_issue_flags_nested_marker
+        PASS [   0.004s] (1269/1315) xtask::bin/xtask stability_matrix::tests::export_non_stub_issue_flags_placeholder
+        PASS [   0.014s] (1270/1315) xtask::bin/xtask stability_matrix::tests::check_passes_with_nonstub_export_fence
+        PASS [   0.019s] (1271/1315) xtask::bin/xtask stability_matrix::tests::check_detects_drift_proven_red
+        PASS [   0.006s] (1272/1315) xtask::bin/xtask stability_matrix::tests::lts_clock_is_placeholder_without_v1_tag
+        PASS [   0.012s] (1273/1315) xtask::bin/xtask stability_matrix::tests::export_non_stub_issue_passes_real_content
+        PASS [   0.021s] (1274/1315) xtask::bin/xtask stability_matrix::tests::check_rejects_stub_export_fence_proven_red
+        PASS [   0.011s] (1275/1315) xtask::bin/xtask stability_matrix::tests::extract_preserved_export_refuses_malformed_fence_proven_red
+        PASS [   1.380s] (1276/1315) xtask::model_currency_gate the_swept_tree_is_green_and_governs_its_pins
+        PASS [   0.008s] (1277/1315) xtask::bin/xtask stability_matrix::tests::render_contains_full_nfr_comp_3_scope
+        PASS [   0.008s] (1278/1315) xtask::bin/xtask stability_matrix::tests::render_is_deterministic_and_sources_live_triple
+        PASS [   0.063s] (1279/1315) xtask::bin/xtask kloc_check::tests::kloc_check_runs_on_workspace
+        PASS [   0.199s] (1280/1315) xtask::bin/xtask check_migration_merkle::tests::rederive_corpus_oracles_is_deterministic_green
+        PASS [   0.066s] (1281/1315) xtask::bin/xtask kloc_check::tests::kloc_check_produces_report_on_workspace
+        PASS [   0.005s] (1282/1315) xtask::bin/xtask templates_regen::tests::cross_template_field_consistency
+        PASS [   0.016s] (1283/1315) xtask::bin/xtask stability_matrix::tests::render_preserves_committed_export_fence_content
+        PASS [   0.004s] (1284/1315) xtask::bin/xtask templates_regen::tests::deprecated_alias_emits_warning
+        PASS [   0.013s] (1285/1315) xtask::bin/xtask templates_regen::tests::check_mode_fails_on_drift
+        PASS [   0.014s] (1286/1315) xtask::bin/xtask stability_matrix::tests::render_publishes_the_cli_wrapper_schema_window
+        PASS [   0.005s] (1287/1315) xtask::bin/xtask templates_regen::tests::invalid_language_fails
+        PASS [   0.013s] (1288/1315) xtask::bin/xtask templates_regen::tests::check_mode_passes_when_in_lockstep
+        PASS [   0.005s] (1289/1315) xtask::bin/xtask templates_regen::tests::rust_template_renders_correctly
+        PASS [   0.005s] (1290/1315) xtask::bin/xtask templates_regen::tests::ts_template_renders_correctly
+        PASS [   0.029s] (1291/1315) xtask::bin/xtask stability_matrix::tests::lts_clock_reads_the_committed_record_and_never_git
+        PASS [   0.026s] (1292/1315) xtask::bin/xtask stability_matrix::tests::render_names_the_release_channel_from_the_version_suffix
+        PASS [   0.126s] (1293/1315) xtask::bin/xtask gen_termination_corpus::tests::gen_produces_exactly_1000_files
+        PASS [   0.305s] (1294/1315) xtask::bin/xtask check_loom_substrate_drift::tests::env_consistency_catches_d7_extra_export
+        PASS [   0.307s] (1295/1315) xtask::bin/xtask check_loom_substrate_drift::tests::env_consistency_ignores_env_on_non_gate_step
+        PASS [   0.308s] (1296/1315) xtask::bin/xtask check_loom_substrate_drift::tests::env_consistency_catches_d4_missing_export
+        PASS [   2.052s] (1297/1315) xtask::macos_compile_guard_20_6 named_platform_sensitive_paths_start_the_guard
+        PASS [   0.142s] (1298/1315) xtask::bin/xtask gen_termination_corpus::tests::gen_kind_distribution
+        PASS [   2.153s] (1299/1315) xtask::macos_compile_guard_20_6 changes_touching_none_of_the_filtered_paths_start_no_macos_runner
+        PASS [   0.169s] (1300/1315) xtask::bin/xtask gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field
+        PASS [   0.201s] (1301/1315) xtask::bin/xtask gen_termination_corpus::tests::gen_is_deterministic_two_runs_yield_identical_files
+        PASS [   0.387s] (1302/1315) xtask::bin/xtask check_migration_merkle::tests::rederive_corpus_oracles_detects_tampered_frame_id_red
+        PASS [   0.676s] (1303/1315) xtask::trial_attestation_proven_red release_graph_excludes_trial_attestation_feature_and_maos_fkcs
+        PASS [   0.705s] (1304/1315) xtask::trial_attestation_proven_red recompute_cargo_tree_locked_runs_the_real_cargo_tree_subprocess
+        PASS [   2.595s] (1305/1315) xtask::kernel_pin_content_hash_16_0 every_one_of_the_pinned_files_reds_a_line_neutral_mutation
+        PASS [   0.748s] (1306/1315) xtask::trial_attestation_proven_red producer_gate_json_reports_non_vacuous_legs_and_v2_0_blocking_disposition
+        PASS [   0.850s] (1307/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_weekly_backup_green
+        PASS [   0.865s] (1308/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_weekly_backup_tamper_red
+        PASS [   2.118s] (1309/1315) xtask::macos_compile_guard_20_6 rust_source_with_platform_conditional_code_starts_the_guard
+        PASS [   0.904s] (1310/1315) xtask::story_10_4a_ac1_proven_red story_10_4a_ac1_dependency_closure_green
+        PASS [   0.899s] (1311/1315) xtask::workflow_honesty_20_3a cargo_tree_failure_and_default_fault_feature_are_blocking
+        PASS [   1.445s] (1312/1315) xtask::service_boundary_integration shipped_baseline_matches_live_kernel_surface
+        PASS [   5.863s] (1313/1315) xtask::model_currency_gate each_retired_or_unknown_pin_reds_naming_its_file_and_line
+        PASS [   4.587s] (1314/1315) xtask::bin/xtask check_rto::tests::synthetic_tl_round_trip
+        PASS [  14.040s] (1315/1315) xtask::bin/xtask check_rto::tests::full_drill_synthetic_passes
+────────────
+     Summary [  17.047s] 1315 tests run: 1315 passed, 12 skipped
+
+real	1m14.093s
+user	2m40.394s
+sys	1m27.596s

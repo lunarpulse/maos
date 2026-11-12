@@ -45,6 +45,7 @@ fn world(path: &std::path::Path) -> World {
     let policy = Arc::new(PolicyTable::new());
     let security = Arc::new(maos_kernel_core::security::SecurityManagerAdapter::new(
         policy.clone(),
+        Arc::new(RingCryptoProvider),
     ));
     let cap = Arc::new(CapabilityRegistryAdapter::new(
         Arc::new(RingCryptoProvider),

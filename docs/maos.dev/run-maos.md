@@ -47,7 +47,8 @@ uses ring-direct publisher verification and does not evaluate the ComplianceClai
 it is not covered by the daemon boot re-verification guarantee. Vetting, yank
 and registry publish checks also remain ring-direct. Audit-artifact signatures,
 publisher tooling and rustls TLS are outside this provider boundary.
-Until 20-13 L2, kernel-internal T3 admission still uses `ring`.
+Kernel-internal T3 admission verifies the image lock through the selected provider
+instance as well (20-13 L2); the kernel constructs no provider of its own.
 
 
 ### The evaluator shell

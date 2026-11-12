@@ -39,7 +39,10 @@ fn make_adapter() -> (SecurityManagerAdapter, JournalAdapter, tempfile::TempDir)
         .trust_tier_floor
         .insert(TrustTier::Verified, SandboxTier::T0);
     policy.update(inner);
-    let adapter = SecurityManagerAdapter::new(policy);
+    let adapter = SecurityManagerAdapter::new(
+        policy,
+        Arc::new(maos_kernel_core::security::RingCryptoProvider),
+    );
     let tmpdir = tempfile::TempDir::new().unwrap();
     let journal = JournalAdapter::open(&tmpdir.path().join("journal.ndjson")).unwrap();
     (adapter, journal, tmpdir)

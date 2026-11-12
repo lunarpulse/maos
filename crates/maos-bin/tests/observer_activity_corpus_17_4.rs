@@ -411,7 +411,10 @@ impl World {
             TransparencyLogAdapter::open(&dir.join("transparency.sqlite"), NONCE).unwrap(),
         );
         let policy = Arc::new(PolicyTable::new());
-        let security = Arc::new(SecurityManagerAdapter::new(Arc::clone(&policy)));
+        let security = Arc::new(SecurityManagerAdapter::new(
+            Arc::clone(&policy),
+            Arc::new(maos_kernel_core::api::RingCryptoProvider),
+        ));
         let (audit_tx, audit_rx) = cap_audit::channel();
         let capability = Arc::new(CapabilityRegistryAdapter::new(
             Arc::new(maos_kernel_core::api::RingCryptoProvider),

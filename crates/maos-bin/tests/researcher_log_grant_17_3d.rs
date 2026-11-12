@@ -24,7 +24,10 @@ fn admit(gated: &GatedManifest) -> Vec<Scope> {
         .trust_tier_floor
         .insert(TrustTier::Verified, SandboxTier::T0);
     policy.update(inner);
-    let security = SecurityManagerAdapter::new(Arc::clone(&policy));
+    let security = SecurityManagerAdapter::new(
+        Arc::clone(&policy),
+        Arc::new(maos_kernel_core::api::RingCryptoProvider),
+    );
     let scratch = tempfile::TempDir::new().expect("admission scratch directory");
     let journal = JournalAdapter::open(&scratch.path().join("journal.ndjson"))
         .expect("real admission journal");
