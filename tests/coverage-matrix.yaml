@@ -837,8 +837,13 @@ coverage:
       provider the root selected (SecurityManagerAdapter::new(policy, crypto);
       t3_admission_crypto_20_13 witnesses the explicit-lock and environment
       branches with a rejecting and a recording provider); the structural
-      check no longer carries a kernel exception. Ring is not a
-      FIPS-validated module.
+      check no longer carries a kernel exception. The bin-side leg is
+      crypto_t3_admission_20_13 (the daemon's selected recording provider
+      verifies the kernel T3 lock exactly once on that instance; hosted run
+      43192091802 x64 and arm; Worker T3 lock leg x64 only). Claim boundary:
+      the shipped daemon has no tier-floor writer, so no daemon-level kernel
+      T3 admission exists today (deferred-work.md, 20-13 closure rows). Ring
+      is not a FIPS-validated module.
   FR49:
     gates: []
     enforcement: advisory-until-engagement

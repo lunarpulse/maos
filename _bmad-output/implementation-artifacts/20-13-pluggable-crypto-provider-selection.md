@@ -20,14 +20,15 @@ not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21
 Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
 
 
-Status: ready-for-dev
+Status: done
 
 <!-- Created 2026-11-03 at 8c809f9c (main; `git log -1 -- crates xtask` = 8c809f9c) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30); DECIDE-1 split (2026-10-23). D-20-13-01…16 were ruled as recommended (all A) by the operator on 2026-11-03 (ask `d_batch4`); grants bind at dev start after re-measurement against the landed tree. No cargo ran: cites re-read on a `git archive 8c809f9c` copy (`creation/cites-8c809f9c.md`), kernel and kloc by the prebuilt gate binary on reverted `git archive` prototypes (`creation/measurements.md`), bypass inventory (`creation/bypass-inventory-8c809f9c.md`). Stale E20 §20-13 cites are corrected through `creation/records-owed.md` §A. -->
 
-**Status rationale — ready-for-dev.** Every AC is hermetic: the routing proof uses a test-only provider compiled
-into a fixture build; no FIPS module, no paid key, no live substrate beyond the existing T3 harness. Two serializations
-are named, not blockers: 20-1b (backlog) edits the same registry/compliance admission files (D-20-13-15), and the D:1379
-endpoint half reads 20-4 L1's endpoint table (in flight, D-20-13-07). The kernel row lands last (D-20-13-12).
+**Status rationale — done (2026-11-12, record-only closure).** Superseding the creation-time `ready-for-dev` rationale.
+L1 (kernel-free) landed at `a2e37988` with corrections `a6b557c0` and `a44c76d9`; L2 (kernel T3, AC7) at `998b36e6`; the
+AC7.2 bin-side proof at `42c50fc4`. The hosted proof is discipline run 43175946640 (final tree, descendant of `998b36e6`)
+and the `ci/20-13-verify` recipe run 43192091802. The closure note, the AC table with its claim boundaries and the
+amended AC7.2 are in `## Closure` and `20-13-pluggable-crypto-provider-selection-evidence/closure/closure-note.md`.
 
 > **The capability:** *an operator names the crypto module once, at `maos init`; the daemon builds exactly that module,
 > once, and every kernel signature, capability token and at-rest seal goes through it — and the Transparency Log says
@@ -260,7 +261,10 @@ the discipline run.)*
    table), unpinned-empty rule as above; **failing-before:** a claim attesting `https://evil.example` for `anthropic`
    admits at HEAD. If 20-4 L1 has not landed at T0, this clause waits (D-07) and the record says so.
 5. `deferred-work.md:1379` → `CLOSED <date> by 20-13 @<commit>` for the halves that land; any half left open is re-labelled
-   with its owner and reason.
+   with its owner and reason. **Landed 2026-11-12:** the row (now at `deferred-work.md:~1493`) carries `CLOSED 2026-11-12 by
+   20-13 @a6b557c0b8ec` for the daemon boot re-verification halves (crypto name and endpoint); the `maosctl spirit
+   install`/`import` remainder (still `runtime_provider_endpoint: None`, `subcommands.rs:1408`) is `ownerless and open`,
+   dispositioned by D-20-13-05 A.
 6. **Plant (local):** pass `fields.crypto_provider` (manifest-derived) again ⇒ AC4.3 admits ⇒ red.
 
 #### AC5 — the selection is journaled once and visible (epic AC3; D-03, D-14)
@@ -291,31 +295,41 @@ the discipline run.)*
    anchor via `with_t3_image_verification`, an adapter built with a rejecting provider ⇒ T3 admission must refuse
    `T3AdmissionFailed`; at L1 the inline `ring` admits it (observed before KT3, recorded). With `recording` (bin leg),
    L1 records no kernel `verify_signature`; L2 records one.
+   **AMENDED 2026-11-12 (landing-3 finding; see `## Closure`):** the text above, read as "a daemon T3 admission recorded
+   as a kernel `verify_signature`", cannot be proven because the shipped daemon never reaches the kernel T3 arm (the arm
+   runs only at effective tier T3, `security/mod.rs:362`; every tier floor defaults to T2 and nothing in `maos-bin` raises
+   one; `maos run <worker manifest>` verifies the lock itself at `worker_spawn.rs:888`). Proven instead:
+   `crates/maos-bin/tests/crypto_t3_admission_20_13.rs` (feature `crypto-recording`) takes the provider from
+   `maos_bin::crypto_provider::select` with `provider = "recording"`, raises a T3 floor, supplies a signed lock and trust
+   anchor through the environment, admits, and asserts exactly ONE new `verify_signature` row on the SELECTED instance
+   (identity log `pid:instance`, against a decoy `select` instance) and that a tampered lock is refused
+   `T3AdmissionFailed` with its verification also logged on the selected instance; plus the Worker T3 lock leg
+   `crypto_provider_t3_20_13::recording_provider_observes_worker_t3_lock` (hosted T3 substrate, x64 only).
 3. The L1 pending gate entry is removed; the scan finds no production construction outside the allowlist.
 4. **Plant (local):** restore the inline `RingCryptoProvider` ⇒ the rejecting-provider vector admits ⇒ red, and the scan reds.
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight.** Operator rulings on D-20-13-01…16 recorded; tracker → `in-progress`. Run `creation/measurements.md`
+- [x] **T0 — Preflight.** *(evidence: `20-13-pluggable-crypto-provider-selection-evidence/landing-1/preflight.md`, `landing-1/bypass-inventory.md`; D-20-13-01…16 ruled 2026-11-03, ask `d_batch4`; tracker `in-progress` reconciled `8144bc02`)* Operator rulings on D-20-13-01…16 recorded; tracker → `in-progress`. Run `creation/measurements.md`
   "Not measured here" 1–7; re-run the bypass inventory and gate simulation; re-measure every cite this story touches (rule 9).
   A measured figure above the ruled envelope, or a T0 result contradicting a ruled option, is STOP + D-row.
-- [ ] **T1 — Selection (AC1).** `crypto_provider.rs` (+ `lib.rs`, `SCANNED_SOURCE_FILES` 37 → 38 in
+- [x] **T1 — Selection (AC1).** *(evidence: `a2e37988`, `a6b557c0`, `a44c76d9`; `crypto_provider_20_13` 12 tests green on every hosted job of run 43192091802)* `crypto_provider.rs` (+ `lib.rs`, `SCANNED_SOURCE_FILES` 37 → 38 in
   `crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs:931`), `run_init` writer, init flag both builds, root wiring, Worker /
   host-B parameter, one-shot roots through `select`, witness, plant.
-- [ ] **T2 — Recording provider (AC2).** Feature, `compile_error!`, forbidden symbol, `build-test-fixtures` entry +
+- [x] **T2 — Recording provider (AC2).** *(evidence: `crypto_integrated_20_13`, `crypto_real_shell_20_13`, `crypto_real_boot_20_13`; release-build refusal step green in run 43192091802)* Feature, `compile_error!`, forbidden symbol, `build-test-fixtures` entry +
   `xtask/test-budgets.toml` row if needed, routing vectors, plant.
-- [ ] **T3 — Structural check (AC3).** Scan + allowlist, failing-before record, plant.
-- [ ] **T4 — Claims (AC4).** `evaluate_envelope_with`, `verify_publisher_sig_with`, `verify_installed`, unpinned rule, endpoint
+- [x] **T3 — Structural check (AC3).** *(evidence: `check-composition-root-completeness` green in discipline run 43175946640; L2 plant red at `security/mod.rs:363`, `20-13-pluggable-crypto-provider-selection-evidence/landing-2/plants/`)* Scan + allowlist, failing-before record, plant.
+- [x] **T4 — Claims (AC4).** *(evidence: `crypto_provider_20_13::installed_claims_compare_actual_crypto_and_endpoint`, `crypto_endpoint_drift_20_13`, `maos-compliance/tests/evaluator_test.rs`, `maos-registry/tests/publisher_provider_20_13.rs`; `20-13-pluggable-crypto-provider-selection-evidence/landing-1/verification.md`)* `evaluate_envelope_with`, `verify_publisher_sig_with`, `verify_installed`, unpinned rule, endpoint
   half per D-07, CCAC re-run, witnesses, plant.
-- [ ] **T5 — Journal (AC5).** Frame, eprintln, `Cargo.lock` pin test, plant.
-- [ ] **T6 — Docs/records (AC6).**
-- [ ] **T7 — L1 landing (D-20-13-12 A).** Exact pins inside the ruled envelope; `kloc-check`, `check-kernel-baseline`
+- [x] **T5 — Journal (AC5).** *(evidence: `selection_journal_failure_stops_real_boot`; `Cargo.lock` pin test; `20-13-pluggable-crypto-provider-selection-evidence/landing-1/verification.md`)* Frame, eprintln, `Cargo.lock` pin test, plant.
+- [x] **T6 — Docs/records (AC6).** *(evidence: `docs/maos.dev/run-maos.md`, `docs-site/docs/run-maos.md`, ko page; `tests/coverage-matrix.yaml` FR48 and NFR-Sec-15 notes)*
+- [x] **T7 — L1 landing (D-20-13-12 A).** *(evidence: `a2e37988`+`a6b557c0`+`a44c76d9`; gates `20-13-pluggable-crypto-provider-selection-evidence/landing-1/verification.md`; hosted discipline run 43175946640 on `637721bf` success, with `reproducible-build` failing as an ADVISORY job, `discipline.yml:75` `continue-on-error: true`; `prepush` NOT run to completion: the L1 local attempt timed out at 3000 s, so the hosted discipline run is the substitute, not an equivalent)* Exact pins inside the ruled envelope; `kloc-check`, `check-kernel-baseline`
   (unchanged), `check-composition-root-completeness`, `check-mock-not-in-release`, `check-service-boundary`, `check-env-contract`,
   `check-corpus`, `check-dev-record-completeness`, `check-epic-close-coherence`, `check-exit-commands`,
   `check-decision-register`, `prepush`; one hosted discipline run on the final tree + plants. Revert
   `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
-- [ ] **T8 — Kernel T3 (AC7)** under the ruled row: red-before test, KT3, callers, gate entry removed, plant.
-- [ ] **T9 — L2 landing.** Kernel pins + `security/mod.rs` content hash (`kernel-core-baseline.toml:505` + EOF HISTORY;
+- [x] **T8 — Kernel T3 (AC7)** under the ruled row: red-before test, KT3, callers, gate entry removed, plant. *(evidence: `998b36e6`; `20-13-pluggable-crypto-provider-selection-evidence/landing-2/red/`, `landing-2/plants/`, `landing-2/green/`)*
+- [x] **T9 — L2 landing.** *(evidence: `998b36e6` pins and surface refresh `kt3`, `20-13-pluggable-crypto-provider-selection-evidence/landing-2/evidence.md`; hosted `ci/20-13-verify` run 43192091802 on `82adc3e6`, 5/5 green; discipline run 43175946640 (success) is the final-tree proof of the landed L2, `998b36e6` being an ancestor of `637721bf`; clean-tree `abi-diff` = the hosted `abi-diff` job of run 43175946640, success; `prepush` NOT run; FLAG-Winston record `20-13-flag-winston-decision.md` §L2)* Kernel pins + `security/mod.rs` content hash (`kernel-core-baseline.toml:505` + EOF HISTORY;
   `kloc.toml:264`), re-based on whichever of 20-1b/20-4/20-11 landed first; kernel-surface baseline per measurement 2;
   FLAG-Winston record updated to GRANTED/LANDED; `cargo test -p maos-kernel-core --lib`; hosted run; ledger; coverage.
 
@@ -656,19 +670,108 @@ KT1, KTd, KI, KO and the L1 bundle saved as diffs (`git apply --check` clean on 
 
 ### Agent Model Used
 
-anthropic/claude-opus-5-5 (creation).
+anthropic/claude-opus-5-5 (creation); dev/finisher: `coder` agents (models per the session `task.agentModelOverrides`; per-round agent ids are in the session history, not repeated here); reviews: L1 `reviewer`/`light-reviewer` agents (Blind, Edge, Acceptance, Test-infra; `20-13-pluggable-crypto-provider-selection-evidence/landing-1/review/`) and an independent FKCS admission review; L2 GPT `openai-codex/gpt-6.1-sol` (0 findings) and security `zai glm-5.3` (2 P3, `landing-2/review/`); §A6 review net run.
 
 ### Debug Log References
+
+- Hosted: `discipline` run 43175946640 on `637721bf`, `success` (`reproducible-build` failed as an advisory `continue-on-error` job); `ci/20-13-verify` run 43192091802 (`82adc3e6`, 5/5 success) and plant run 43196481572 (`ce1e0ada`, plant detected). Read with `gh run view` at closure.
+- `20-13-pluggable-crypto-provider-selection-evidence/landing-{1,2,3}/`, `ci/ci-20-13-verify.yml`, `closure/closure-note.md`.
 
 ### Completion Notes List
 
 - 2026-11-12 (L2 landing `998b36e6`, independent GPT + GLM reviews at `20-13-pluggable-crypto-provider-selection-evidence/landing-2/review/`, 0 P0-P2): the maos-bin +7 overdraft (38,556 -> 38,563) is ADJUDICATED by Main 2026-11-12 as the cost of migrating the four `main.rs` `SecurityManagerAdapter` call sites. Operator severity ruling: the two P3 hardening findings (F1 adapter exempt from the exactly-one-construction gate; F2 naming-ban scan coverage) are recorded as rule-10 rows in `deferred-work.md`. Story NOT complete; owed per the GPT review: AC7.2 bin-side recording proof of kernel admission (the Worker recording test is not a substitute); hosted T3/container admission, final-tree hosted discipline, `abi-diff` and `prepush` unverified; the bin/escape suite is not wholly green (million-row erasure failure persists after the dependency-corrected rerun). Evidence precision: the surface reports contain 401 items, not 400.
 
+- 2026-11-12 (closure, record-only; no code changed by the closure): AC1-AC7 landed, AC7.2 AMENDED, see `## Closure` and `20-13-pluggable-crypto-provider-selection-evidence/closure/closure-note.md`. AC7.2 bin-side proof `crates/maos-bin/tests/crypto_t3_admission_20_13.rs` landed at `42c50fc4` (local green; local decoy-instance plant red at `:188`; hosted run 43192091802 green on x64 and arm; kernel-inline-ring plant run 43196481572 red at `:183`). Finding recorded as a claim boundary: the shipped daemon never reaches the kernel T3 arm, so no daemon-level kernel T3 admission exists today (rule-10 row in `deferred-work.md`). `deferred-work.md` rows: FR38 drift daemon halves CLOSED @a6b557c0b8ec; the F1/F2 P3, ring-direct, `maosctl` remainder, cohort and new T3-reachability rows dispositioned under rule 10. Not done: `prepush`; ARM Worker T3 leg; a running test of the `main.rs:2257-2260` instance identity.
+
 ### File List
+
+- .config/nextest.toml
+- .github/workflows/discipline.yml
+- Cargo.lock
+- _bmad-output/implementation-artifacts/20-13-flag-winston-decision.md
+- _bmad-output/implementation-artifacts/20-13-pluggable-crypto-provider-selection.md
+- _bmad-output/implementation-artifacts/deferred-work.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- crates/maos-bin/Cargo.toml
+- crates/maos-bin/src/crypto_provider.rs
+- crates/maos-bin/src/delegation.rs
+- crates/maos-bin/src/installed_spirits.rs
+- crates/maos-bin/src/lib.rs
+- crates/maos-bin/src/main.rs
+- crates/maos-bin/src/worker_spawn.rs
+- crates/maos-bin/tests/cli_wrapper_exhaustion_17_9.rs
+- crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs
+- crates/maos-bin/tests/crypto_endpoint_drift_20_13.rs
+- crates/maos-bin/tests/crypto_provider_20_13.rs
+- crates/maos-bin/tests/crypto_provider_t3_20_13.rs
+- crates/maos-bin/tests/crypto_real_boot_20_13.rs
+- crates/maos-bin/tests/crypto_real_shell_20_13.rs
+- crates/maos-bin/tests/crypto_t3_admission_20_13.rs
+- crates/maos-bin/tests/erasure_uninstall_13_5b.rs
+- crates/maos-bin/tests/hook_pump_17_4.rs
+- crates/maos-bin/tests/j_researcher_survey_18_3.rs
+- crates/maos-bin/tests/live_escape_anomaly_17_10.rs
+- crates/maos-bin/tests/nfr_perf_8_real_spawn_fanout_20_7.rs
+- crates/maos-bin/tests/observer_activity_corpus_17_4.rs
+- crates/maos-bin/tests/one_daemon_one_door_16_1.rs
+- crates/maos-bin/tests/participant_recall_17_8.rs
+- crates/maos-bin/tests/recall_17_3d.rs
+- crates/maos-bin/tests/recall_mediation_17_3d.rs
+- crates/maos-bin/tests/researcher_log_grant_17_3d.rs
+- crates/maos-bin/tests/skill_port_18_7.rs
+- crates/maos-bin/tests/spawned_scope_17_3c.rs
+- crates/maos-bin/tests/support/crypto_integrated_20_13.rs
+- crates/maos-bin/tests/support/shell_world_16_2.rs
+- crates/maos-bin/tests/support/spawned_world_20_9.rs
+- crates/maos-bin/tests/support/worker_revoke_root.rs
+- crates/maos-bin/tests/two_host_delegation_2b.rs
+- crates/maos-bin/tests/wasm_skill_authoring_20_8.rs
+- crates/maos-bin/tests/worker_terminal_facts_17_7/unload_scenes.rs
+- crates/maos-bin/tests/yank_policy_20_1b.rs
+- crates/maos-compliance/src/evaluator.rs
+- crates/maos-compliance/src/lib.rs
+- crates/maos-compliance/tests/evaluator_test.rs
+- crates/maos-domain/src/ports/crypto.rs
+- crates/maos-escape-detector/tests/common/mod.rs
+- crates/maos-journey-test/tests/journey_forget_18_6.rs
+- crates/maos-kernel-core/src/security/crypto.rs
+- crates/maos-kernel-core/src/security/mod.rs
+- crates/maos-kernel-core/tests/abi_stability_admit.rs
+- crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs
+- crates/maos-kernel-core/tests/operator_posture_ceiling_16_6.rs
+- crates/maos-kernel-core/tests/provider_switched_journal.rs
+- crates/maos-kernel-core/tests/sandbox_admission.rs
+- crates/maos-kernel-core/tests/t3_admission_crypto_20_13.rs
+- crates/maos-registry/Cargo.toml
+- crates/maos-registry/src/admission.rs
+- crates/maos-registry/src/install.rs
+- crates/maos-registry/tests/publisher_provider_20_13.rs
+- crates/maos-registry/tests/yank_auth_20_1b.rs
+- crates/maos-shell/Cargo.toml
+- crates/maos-shell/src/lib.rs
+- docs-site/docs/run-maos.md
+- docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md
+- docs/ci-baselines/kernel-surface-v0.1-beta.json
+- docs/maos.dev/run-maos.md
+- tests/coverage-matrix.yaml
+- xtask/fkcs-baseline.toml
+- xtask/gate-registry.toml
+- xtask/kernel-core-baseline.toml
+- xtask/kloc.toml
+- xtask/src/build_test_fixtures.rs
+- xtask/src/check_composition_root_completeness.rs
+- xtask/src/check_mock_not_in_release.rs
+- xtask/test-budgets.toml
+- xtask/tests/ci_shape_18_0.rs
+- xtask/tests/kernel_pin_content_hash_16_0.rs
+- xtask/tests/recovery_lane_ceiling_rule.rs
+- xtask/tests/story_10_4a_ac1_proven_red.rs
+- `20-13-pluggable-crypto-provider-selection-evidence/` (creation, landing-1, landing-2, landing-3, ci, closure)
+- `_bmad-output/implementation-artifacts/20-13-flag-winston-decision.md`, `_bmad-output/implementation-artifacts/deferred-work.md`, `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
 ## Change Log
 
-- 2026-11-03: Operator ruled D-20-13-01…16 as recommended (all A), ask `d_batch4`; kernel KT3 and the D02 A per-crate envelope are ruled, binding at dev start after re-measurement against the landed tree. Kernel lands last (L2), with exact rebased pins; status remains ready-for-dev.
+- 2026-11-03: Operator ruled D-20-13-01…16 as recommended (all A), ask `d_batch4`; kernel KT3 and the D02 A per-crate envelope are ruled, binding at dev start after re-measurement against the landed tree. Kernel lands last (L2), with exact rebased pins; status remains ready-for-dev. *(Superseded by the 2026-11-12 closure row below.)*
 
 - 2026-11-03: Story created at `8c809f9c` (ready-for-dev; D-20-13-01…16 PROPOSED). Inventory measured: two production
   provider instances in the root plus one per Worker T3 launch and one per kernel T3 admission (never inventoried); 21 direct
@@ -677,3 +780,23 @@ anthropic/claude-opus-5-5 (creation).
   out-of-kernel measured bin +188, shell +46, compliance +22, registry +21, xtask +59.
 
 - 2026-11-12: L2 kernel landing `998b36e6` reviewed (GPT, GLM; 0 P0-P2, two P3 deferred rows); maos-bin +7 overdraft adjudicated by Main as the cost of migrating the four `main.rs` call sites; AC7.2 bin-side recording proof, hosted admission, `abi-diff` and `prepush` still owed; surface reports hold 401 items, not 400.
+
+- 2026-11-12: AC7.2 bin-side proof `crypto_t3_admission_20_13` landed (`42c50fc4`); hosted run 43192091802 5/5 green (x64 + arm; Worker T3 leg x64), plant run 43196481572 red as required; finding: the shipped daemon never reaches the kernel T3 arm, so AC7.2's "daemon T3 admission recorded as a kernel `verify_signature`" is AMENDED to the proven selected-instance claim.
+- 2026-11-12: **Story closed `done` (record-only).** Supersedes the earlier "status remains ready-for-dev" and "still owed" rows above. T0-T9 ticked with evidence; AC4.5 stamped; `## Closure` and `closure/closure-note.md` added; `deferred-work.md` rows closed or dispositioned.
+
+## Closure
+
+Closed 2026-11-12, record-only. Hosted evidence: discipline run 43175946640 (`637721bf`, success; `abi-diff` job success) as the final-tree proof of the landed L2; `ci/20-13-verify` run 43192091802 (`82adc3e6`, 5/5 success); plant run 43196481572 (`ce1e0ada`, red as required). Full table: `20-13-pluggable-crypto-provider-selection-evidence/closure/closure-note.md`.
+
+| AC | State |
+|---|---|
+| AC1-AC3, AC4.1-4.4, AC5, AC6, AC7.1, AC7.3, AC7.4 | LANDED (`a2e37988`, `a6b557c0`, `a44c76d9`, `998b36e6`) |
+| AC4.5 | LANDED (stamp `@a6b557c0b8ec`; `maosctl` remainder `ownerless and open`) |
+| AC7.2 | AMENDED (selected-instance proof `42c50fc4`; literal daemon-level reading unprovable) |
+
+**Claim boundaries (honest):**
+- **No daemon-level kernel T3 admission exists today.** The kernel T3 arm runs only when the effective tier is T3 (`crates/maos-kernel-core/src/security/mod.rs:362`); the effective tier is the strictest of three floors, each defaulting to T2 (`capability/cap_policy/mod.rs:225-247`; `maos-domain/src/invariants/i9.rs:90,122`); the manifest `[sandbox] tier` is not an input (`crates/maos-bin/src/admission.rs:296-302`); `maos-bin` writes no tier floor or `declared_tier` on the daemon path (only a 7.5a smoke arm `main.rs:15695`, tests, and `maos-bench/src/halt_eval.rs:615-618`; a grep result, not a compiler proof); `maos run <worker manifest>` never calls `admit_spirit` and verifies the lock at `worker_spawn.rs:888`, which is the live T3 lock gate. Rule-10 row in `deferred-work.md`, trigger: the story that gives the daemon a tier-floor writer or routes `maos run` workers through `admit_spirit`.
+- The daemon instance identity at `main.rs:2257-2260` is NOT checked by a running test; it rests on the required constructor argument, `check-composition-root-completeness` and reading `main.rs`. `crypto_t3_admission_20_13` proves the selector's recording provider, wired as the daemon wires it, is what the kernel arm verifies with.
+- The Worker T3 recording leg ran on x64 only (the recipe never provisions T3 on arm).
+- `prepush` was not run (L1's local attempt timed out at 3000 s). `reproducible-build` failed in run 43175946640 as an ADVISORY job.
+- Branch `ci/20-13-verify` tip is the plant commit (`ce1e0ada`), not reverted; nothing from it is on `main`.
