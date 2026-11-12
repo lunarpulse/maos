@@ -1,0 +1,232 @@
+# Branch-only recipe (never installed on main). Copy to .github/workflows/ on ci/20-9-verify;
+# the `push` trigger on that branch is what dispatches it (a workflow_dispatch on a non-default
+# branch needs the file on the default branch, so none is declared).
+# Story 20-9 AC6 hosted proof:
+#   AC6.1  epic-20-exit style swap on RELEASE builds: build the TS example at WIT 2.4.0, publish,
+#          install, boot it, let `idle` run, publish v+1, hot-swap to it through the door; same pid,
+#          the example's counter continues (see the instrumentation note), one successor declaration row.
+#   AC6.2  plant (matrix case `removed-plant`): the example componentized WITHOUT the lifecycle export,
+#          so the swap must be refused `spawned_swap_unsupported`. That case is EXPECTED RED: its job
+#          fails at the shared "swap must succeed" step and the judge step then proves the red is the
+#          intended one (a refusal naming spawned_swap_unsupported), not an unrelated failure.
+#   wasm-host-tests  the four spawned_*_20_9 bin vectors (cfg(feature = "wasm-host"), not run by the main
+#          workflow) on the four hosted images, plus the maos-wasm-host AC1 vectors.
+#   componentize-js  the TS example's vitest, build and componentize on node 22 and 24.
+name: 20-9 hosted proof
+on:
+  push:
+    branches: ['ci/20-9-verify']
+permissions:
+  contents: read
+jobs:
+  componentize-js:
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Template and example at WIT 2.4.0 (spirit-lifecycle world)
+        run: |
+          set -euo pipefail
+          node --version
+          cmp wit/spirit.wit templates/spirit-ts/wit/spirit.wit
+          cmp wit/spirit.wit examples/example-spirit-ts/wit/spirit.wit
+          cd examples/example-spirit-ts
+          npm ci
+          npm test
+          npm run build
+          npm run componentize
+          ls -l dist/spirit.wasm
+  wasm-host-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - name: Build the test fixtures (probe guests, runner, maosctl; xtask build-test-fixtures)
+        run: cargo run --locked -p xtask -- build-test-fixtures
+      - name: AC1 runner and WIT corpus (maos-wasm-host)
+        run: cargo nextest run --locked -p maos-wasm-host --no-fail-fast --test wit_corpus --test lifecycle_runner_20_9
+      - name: AC2-AC5 triggers, swap, cold swap and the real door (maos-bin, wasm-host)
+        env:
+          MAOS_17_2_CGROUP_MODE: undelegated
+        run: >
+          cargo nextest run --locked -p maos-bin --features maos-bin/wasm-host --no-fail-fast
+          --test spawned_lifecycle_20_9 --test spawned_swap_20_9 --test spawned_door_20_9
+          --test spawned_installed_20_9
+          --test hook_pump_17_4 --test wasm_form_admission_17_3b --test root_shutdown_unload_16_3
+          --test one_daemon_one_door_16_1
+  epic-20-exit-swap:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        swap_in: [declared, removed-plant]
+    timeout-minutes: 90
+    env:
+      SWAP_IN_CASE: ${{ matrix.swap_in }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the example at WIT 2.4.0 (without the lifecycle export in the plant case)
+        working-directory: examples/example-spirit-ts
+        run: |
+          set -euo pipefail
+          # Instrumentation, not logic: stdout lines so the counter is observable from outside.
+          sed -i 's|^    idles += 1;$|    idles += 1;\n    console.log("MAOS-209 idle", idles);|' src/index.ts
+          sed -i 's|^    idles = Number.isFinite(carried) ? carried : 0;$|    idles = Number.isFinite(carried) ? carried : 0;\n    console.log("MAOS-209 swap-in", idles);|' src/index.ts
+          grep -c 'MAOS-209' src/index.ts
+          npm ci && npm run build && npm run componentize
+          if [ "$SWAP_IN_CASE" = removed-plant ]; then
+            # `swap-in` cannot be dropped alone: `lifecycle` is exported whole or not at all. The
+            # plant componentizes the same build against the plain `spirit` world, which has no
+            # lifecycle export (the guest a swap must refuse typed).
+            npx componentize-js dist/index.js --wit wit --world-name spirit --disable http fetch-event -o dist/spirit.wasm
+          fi
+          ls -l dist/spirit.wasm
+      - name: Build the RELEASE production surfaces (20-1a lesson, debug startup is not the proof)
+        run: |
+          set -euo pipefail
+          cargo build --locked --release -p maos-bin --features wasm-host --bin maos
+          cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner
+          cargo build --locked --release -p maos-cli --bin maosctl
+          cargo build --locked --release -p maos-spirit-cli --bin maos-spirit
+          cargo build --locked --release -p maos-registry --bin maos-registry-server
+      - name: Publish and install v1, boot it, drive idle, publish v+1, hot-swap to it (the swap must succeed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          rel="$target/release"
+          scratch="$(mktemp -d)"
+          export HOME="$scratch/home" XDG_DATA_HOME="$scratch/home/.local/share" MAOS_HOME="$scratch/home/.maos" MAOS_NOTIFY_DISABLE=1 MAOS_IDLE_FAST=1
+          mkdir -p "$HOME/.config/maos"
+          printf '[registry]\ndevelopment_http = true\n' > "$HOME/.config/maos/operator.toml"
+          echo "scratch=$scratch" > scratch.env
+          cleanup() {
+            sudo systemctl stop maos-17-3c-proof.service 2>/dev/null || true
+            if [ -n "${server_pid:-}" ]; then kill -TERM "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true; fi
+          }
+          trap cleanup EXIT
+          ex=examples/example-spirit-ts
+          # v1 and v+1 differ in the version only; both name the same artifact.
+          cp "$ex/manifest.toml" v1.toml
+          sed 's/^version = "0.1.0"/version = "0.2.0"/' "$ex/manifest.toml" > v2.toml
+          grep -q '^version = "0.2.0"' v2.toml
+          "$rel/maos-registry-server" --dev-http --bind 127.0.0.1:6789 --root "$scratch/registry" > registry.log 2>&1 &
+          server_pid=$!
+          ready=0
+          for i in $(seq 1 50); do if (exec 3<>/dev/tcp/127.0.0.1/6789) 2>/dev/null; then ready=1; break; fi; sleep 0.1; done
+          [ "$ready" -eq 1 ] || { cat registry.log; exit 1; }
+          export MAOS_SPIRIT_SIGNING_KEY="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')"
+          for v in 1 2; do
+            "$rel/maos-spirit" publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest "v$v.toml" --artifact "$ex/dist/spirit.wasm" --signing-key-env MAOS_SPIRIT_SIGNING_KEY
+          done
+          "$rel/maosctl" spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
+          kill -TERM "$server_pid"; wait "$server_pid" || true; unset server_pid
+          "$rel/maos" init --plain
+          manifest="$(python3 -c 'import json,os,pathlib; r=pathlib.Path(os.environ["HOME"])/".local/share/maos/registry"; print(r/"installed"/json.loads((r/"installed-index.json").read_text())["example-spirit-ts"]/"manifest.toml")')"
+          # The successor sits beside its artifact (the door takes a manifest path).
+          mkdir -p "$scratch/package/dist"
+          cp "$ex/dist/spirit.wasm" "$scratch/package/dist/spirit.wasm"
+          cp v2.toml "$scratch/package/v2.toml"
+          # The delegated cgroup unit the 17-3c launch needs (same wrapper as epic-20-exit's AC4 step).
+          sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" MAOS_NOTIFY_DISABLE=1 MAOS_IDLE_FAST=1 "$rel/maos" run "$manifest" > daemon.out 2> daemon.err &
+          field() { "$rel/maosctl" spirit inspect example-spirit-ts 2>/dev/null | sed -n "s/^$1: //p"; }
+          ok=0
+          for i in $(seq 1 1800); do
+            if [ "$(field lifecycle_state)" = Running ]; then ok=1; break; fi
+            sleep 0.1
+          done
+          [ "$ok" -eq 1 ] || { echo "never reached Running"; cat daemon.out daemon.err; exit 1; }
+          pid_before="$(field pid)"
+          echo "pid_before=$pid_before"
+          sleep 5   # MAOS_IDLE_FAST: the example's `idle` export runs repeatedly
+          "$rel/maosctl" spirit inspect example-spirit-ts | tee inspect-before.out
+          set +e
+          "$rel/maosctl" spirit upgrade example-spirit-ts --to "$scratch/package/v2.toml" --policy hot-swap > swap.out 2>&1
+          status=$?
+          set -e
+          echo "upgrade exit=$status"
+          cat swap.out
+          echo "$status" > swap.status
+          test "$status" -eq 0
+          pid_after="$(field pid)"
+          echo "pid_after=$pid_after"
+          test "$pid_before" = "$pid_after"
+          [ "$(field lifecycle_state)" = Running ]
+          sleep 5   # the successor's own idle exports run
+          "$rel/maosctl" spirit inspect example-spirit-ts | tee inspect-after.out
+          python3 - <<'PY'
+          import os, sqlite3
+          home = os.environ["MAOS_HOME"]
+          db = sqlite3.connect("file:" + home + "/audit/transparency.sqlite?mode=ro", uri=True)
+          rows = db.execute("SELECT intent, payload_redacted FROM transparency_log ORDER BY rowid").fetchall()
+          with open("tl-intents.txt", "w") as out:
+              for intent, payload in rows:
+                  out.write(intent + "\t" + bytes(payload).decode("utf-8", "replace")[:300] + "\n")
+          declared = [r for r in rows if r[0] == "governance:manifest-declaration" and '"0.2.0"' in bytes(r[1]).decode("utf-8", "replace")]
+          assert len(declared) == 1, ("successor declaration rows", len(declared))
+          print("one successor declaration row: ok")
+          PY
+          cat "$MAOS_HOME"/journal/* > journal.all 2>/dev/null || true
+          test "$(grep -o '"HotSwap"' journal.all | wc -l)" -eq 1
+          echo "one lifecycle.hot_swap row: ok"
+      - name: Observe the example's counter (idle count before the swap, carried, continued)
+        if: always() && matrix.swap_in == 'declared'
+        shell: bash
+        run: |
+          set +e
+          . ./scratch.env
+          echo "--- MAOS-209 lines in daemon.out/daemon.err/journal"
+          grep -h 'MAOS-209' daemon.out daemon.err journal.all 2>/dev/null | head -60
+          echo "--- sinks"
+          grep -c 'MAOS-209' daemon.out daemon.err journal.all
+          echo "--- tl-intents"
+          cut -f1 tl-intents.txt | sort | uniq -c
+      - name: Judge the plant (the red above must be the intended refusal)
+        if: always() && matrix.swap_in == 'removed-plant'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat swap.out
+          test "$(cat swap.status)" -ne 0
+          grep -F 'spawned_swap_unsupported' swap.out
+          echo "::notice title=20-9 AC6.2 plant::the swap-in-less guest was refused spawned_swap_unsupported; the red above is the intended one"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 20-9-hosted-swap-${{ matrix.swap_in }}
+          path: |
+            daemon.out
+            daemon.err
+            swap.out
+            swap.status
+            registry.log
+            inspect-before.out
+            inspect-after.out
+            tl-intents.txt
+            journal.all
