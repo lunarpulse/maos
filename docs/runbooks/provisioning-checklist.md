@@ -39,9 +39,7 @@ than inherited from planning prose.
 | `24-hour fuzz execution` | `.github/workflows/fuzz-prerelease.yml` | chain fails on a crash, missing link/counter, or measured total below 86,400 libFuzzer seconds per target; five 5h links fit the hosted job cap | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (workflow implemented by 20-3a; the rc precondition `check-release-precondition --fuzz-ledger` landed in 20-5 L1, but the chain itself is an operator dispatch of fuzz-prerelease at the candidate SHA and has not completed)` |
 | `external third-party authors` | `xtask/src/check_third_party_trial.rs:325` | hard fail below the gate's honest denominator; the current gate requires 12 rather than the former prose's 3 | `ops-external-cohort-and-pen-test` | `absent` |
 | `external penetration test` | `RELEASE-HOLDS.md:24` | status and ship effect are authoritative only in Hold 1 | `ops-external-cohort-and-pen-test` | `not-a-provisioning-item (tracked by RELEASE-HOLDS.md Hold 1)` |
-| `Google Calendar OAuth` | `ops-google-calendar-oauth-mcp` | skip-by-design: CI uses the conformant fixture; no credential name exists in the tree | `ops-google-calendar-oauth-mcp` | `absent` |
 | `Gemini live credential` | `MAOS_GEMINI_API_KEY` / `MAOS_KIMI_API_KEY` (`SecretKey::{GeminiApiKey,KimiApiKey}`, Story 20-4 L1); `ops-live-gemini-leg` covers both providers | skip-by-design: paid recording is operator-only and requires paid accounts (20-4 L2's kernel id-set and IO landing is in the tree, 2026-11-11); seed replay proves routing, not a vendor call | `ops-live-gemini-leg` | `absent` |
-| `Bedrock and Vertex credentials` | `later-bedrock-vertex-and-kms-backends` | skip-by-design: post-v1.0 drivers do not exist and no credential names exist in the tree | `later-bedrock-vertex-and-kms-backends` | `absent` |
 | `stable performance runner` | `docs/adr/ADR-068-stable-performance-runner.md` §2–§4 | skip-by-design until it exists: the wall-clock performance verdicts read `ABSENT`, never `PASS` | `ops-stable-perf-runner` | `absent` |
 | `agent CI-log read token` | `_bmad-output/implementation-artifacts/17-3a-wasm-recall-and-componentize-spike.md` T6 | degraded: agents read only public workflow annotations and step conclusions (which remain the citable evidence either way); raw job logs need an operator download (unauthenticated log requests return 403). Provisioned 2026-10-07 **on the operator's dev host only** (host-local, not in the repository, not in CI): fine-grained PAT, `lunarpulse/maos` only, Actions read-only (+ Metadata), expires 2027-01-05; file `~/.config/maos-agent/gh-ci-read.token` (0600, dir 0700), injected per command as `GH_TOKEN` — never a `gh` login, never a git credential; verified: job log readable, secrets / Actions admin / contents / pulls / dispatch / refs writes refused (403). Any other host is `absent` unless provisioned the same way; that state is expected, not a failure | `ops-provisioning-secrets-and-accounts` | `present` |
 
@@ -57,6 +55,14 @@ than inherited from planning prose.
 > (read facts 2026-11-12: secrets `CI_EVIDENCE_AUDIT_KEY`, `MAOS_RELEASE_PUBKEY`,
 > `RELEASE_SIGNING_KEY` exist; branches `fuzz-ledger` and `rto-ledger` exist; the `release`
 > environment is absent). See [`docs/release/decisions-2026-11-12.md`](../release/decisions-2026-11-12.md).
+>
+> **Operator ruling 2026-11-12, later the same day (`drop`, `live`, `authors`).** Two rows were removed
+> with their owning sprint rows: `Google Calendar OAuth` and `Bedrock and Vertex credentials`. Neither was a
+> credential in the tree. No live vendor credential is owed: every live leg is optional and blocks nothing.
+> The `external third-party authors` row stays `absent` until story
+> `21-11-agent-authoring-kit-and-agent-author-trial` re-rules the gate for agent authors; human authors are
+> optional. `stable performance runner` stays `absent` and is not owed. See
+> `_bmad-output/planning-artifacts/decisions-2026-11-12-dedrift.md`.
 
 ## Evidence and blockers
 

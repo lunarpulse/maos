@@ -14,11 +14,14 @@
   Cortex line** — via merge-commit `439b59fd` (2026-08-11), closing 21/21
   stories with `product_claim: PROVEN` on four operator-lane substrate gates.
   All PRD journeys served.
+  **Corrected 2026-11-12:** this bullet records the harness-layer state of
+  2026-08. The 2026-09-04 review measured 22 of 66 FRs live from a product
+  binary; the recovery lane (Epics 15–21) is the delivery record, and
+  `_bmad-output/implementation-artifacts/sprint-status.yaml` is authoritative.
 - **GA tag:** Holds 1–2 are **claim boundaries, not GA preconditions**
-  (operator ruling 2026-11-12). `v1.0.0` needs the engineering exits green and the
-  signed-tag step by whoever holds the key (an operator action AI agents cannot
-  perform); it may be cut without a pen-test or ECCN determination, but must say
-  so (see "GA-tag procedure").
+  (operator ruling 2026-11-12). `v1.0.0` needs the GA preconditions listed under
+  "GA-tag procedure" (operator ruling `ga3`, 2026-11-12) and the tag push; it may
+  be cut without a pen-test or ECCN determination, but must say so.
 - **Signed pre-release:** `v0.1.0-alpha.1` and the `v1.0.0-rc.N` release candidates
   are not GA tags. Cut them only by following
   `docs/release/tag-procedure.md`. A release candidate carries no LTS commitment and
@@ -50,6 +53,13 @@
   engine, so internal builds and non-WASM distribution proceed while Boundary 2
   (no ECCN determination) stands. See `docs/compliance/export-counsel-precondition.md` and
   `docs/compliance/eccn-classification.md`.
+
+  **Operator ruling 2026-11-12 (`wasm` = on):** the operator ruled the engine ON
+  in the default artifact. Story `21-9-wasm-host-default-on` retires this
+  mitigation; until it lands, OFF is still the fact of the tree and
+  `check-export-control` still enforces it. Boundary 2 does not change: no ECCN
+  determination was made and NFR-Comp-1 is not claimed. Record:
+  `_bmad-output/planning-artifacts/decisions-2026-11-12-dedrift.md`.
 
 ## Claim boundaries — v2.2 Reza line (in force now, not a GA precondition)
 
@@ -92,13 +102,20 @@
 This section governs GA tags only. The signed `v0.1.0-alpha.1` pre-release and the
 `v1.0.0-rc.N` release candidates follow `docs/release/tag-procedure.md`.
 
-1. The engineering exits are green (the hermetic CI proof on the tagged tree;
-   `docs/release/tag-procedure.md`).
+1. The engineering preconditions are green on the tagged tree (operator ruling
+   `ga3`, 2026-11-12; `sprint-status.yaml` is authoritative for each key): the
+   Epic 20 exit; `21-3` durable TOFU and self-leaf rotation; `21-6` memory-tier
+   quota (FR28); `21-7` production consent granter and gate (FR29); `21-8`
+   three-protocol session witness; `21-9` the WASM host on by default; `21-10`
+   the I1–I14 invariant ledger proven; `later-registry-quarantine-closure`. The
+   hermetic CI proof is `docs/release/tag-procedure.md`.
 2. The release notes and this ledger state plainly: **"no external penetration
    test was performed; no ECCN determination was made; assurance is AI-agent
    review plus the hermetic CI proof only"**, and the release does NOT claim
    NFR-Sec-7 or NFR-Comp-1 is met.
-3. The WASM-engine-off-by-default standing mitigation is still in force.
+3. The WASM-engine-off-by-default standing mitigation is in force until story
+   `21-9-wasm-host-default-on` lands (operator ruling `wasm` = on, 2026-11-12);
+   from then on the default artifact carries the engine and the notes say so.
 4. The signed-tag step needs whoever holds the signing key. That human/key part
    is an **operator action that AI agents cannot perform**; this ledger does not
    assume agents can sign. Update this ledger's Status to reflect the tag.

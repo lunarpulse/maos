@@ -1,6 +1,6 @@
 # Epic 21 — Multi-Host on Live Substrate (W6)
 
-**Status:** `in-progress` (2026-11-12: 21-5 created and pulled forward by ruling `s21`; the other seven stories remain `backlog`) — Round 2 correct-course 2026-09-04 (`sprint-change-proposal-2026-09-04-round2.md`, Lunarpulse-ratified; Fork C). Replaces the morning's Epic 20 file. `sprint-status.yaml` is authoritative for status.
+**Status:** `in-progress` (2026-11-12: 21-5 created and pulled forward by ruling `s21`; the other seven stories remain `backlog`; 21-9, 21-10 and 21-11 added as `backlog` the same day by operator ruling, `../decisions-2026-11-12-dedrift.md`) — Round 2 correct-course 2026-09-04 (`sprint-change-proposal-2026-09-04-round2.md`, Lunarpulse-ratified; Fork C). Replaces the morning's Epic 20 file. `sprint-status.yaml` is authoritative for status.
 
 **Round 3 applied (2026-09-05):** the R2 preflight's §K edits (22 of 22 applied) and the decisions D-D (one replay selector, ADR-064), D-I (the env registry stays a kloc-free data file) and D-J (a named leaf crate for the orchestrator move, ordered after 21-4 (superseded for ordering by ruling `s21`, 2026-11-12; the leaf-crate destination stands)) are folded in; residuals listed in `sprint-change-proposal-2026-09-05-round3.md`.
 
@@ -45,8 +45,13 @@ cargo test -p maos-journey-test --test ignored_owner_audit   # 2 — every #[ign
 | `21-4-one-instrument-and-env-registry` | One instrument and the env registry (D-I data file) | D4a/D4b/D4c/D11/D13(b) · kernel-Δ 0 lines (pin re-valued to tokei) · xtask +150–350 · maos-domain +15 · maos-bin −479 / +30–60 |
 | `21-5-orchestrator-port-and-move` | Optional: orchestrator port and move to `maos-orchestrator-buffer` ◆ FLAG-Winston (negative; pulled forward by ruling `s21`, 2026-11-12: after 20-9) | §4.0.7 "does NOT embed an orchestration policy" · kernel-Δ −817 tokei (−1028 physical) · maos-domain +3 (KP) · new crate row 917 |
 | `21-6-memory-tier-quota-enforcement` | Memory-tier quota enforcement (FR28) ◆ FLAG-Winston (operator ruling 2026-10-22, D-17-9-PF-R3 A) | FR28 "kernel provides persistence and quota enforcement" (mis-routed to 21-4 until 2026-10-22) · kernel-Δ measured by prototype at creation (E16-A7) · no ordering inside this epic |
+| `21-9-wasm-host-default-on` | WASM host on by default (operator ruling `wasm` = on, 2026-11-12) | ADR-060 third-party form in the default artifact · kernel-Δ expected 0 · section owed |
+| `21-10-invariant-ledger-proofs` | I1–I14 invariant ledger proofs (operator ruling `ga3`, 2026-11-12) | `success-criteria.md` "All 14 kernel invariants … empirically verified by v1.0" · section owed |
+| `21-11-agent-authoring-kit-and-agent-author-trial` | Agent authoring kit and agent-author trial (operator ruling `authors` = agents-first, 2026-11-12) | NFR-Onb-1 / NFR-Test-8 re-ruled for agent authors · after 21-9 · section owed |
 
 AC1 is always the command and what the operator observes; every AC cites the code it changes; `bmad-create-story` may tighten but not add uncited ACs.
+
+**Operator rulings 2026-11-12** (`../decisions-2026-11-12-dedrift.md`; the text above and the Dependencies line are kept as written). (1) `live` = skip: `ops-j4-live-incident-recording` no longer blocks 21-1. Its cassette is recorded from a local model through the Ollama driver or is agent-authored, chosen at story creation; an agent-authored cassette proves the replay and consent machinery only, and the J4 closure rate is then labelled NOT MEASURED. This supersedes "21-1 is blocked until the row is `done`" and the `ops-j4-live-incident-recording` → 21-1 edge. (2) `ga3`: 21-3, 21-6, 21-7, 21-8, 21-9 and 21-10 are `v1.0.0` GA preconditions. (3) 21-9, 21-10 and 21-11 have tracker rows only; their sections are written at the Epic-20 retrospective preflight.
 
 ### 21-1-j4-incident-fixture-and-live-mira-nash — J4 incident fixture and live Mira/Nash
 

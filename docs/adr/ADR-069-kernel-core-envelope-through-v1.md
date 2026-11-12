@@ -70,3 +70,21 @@ raw `src/` lines 27,103 → 26,062 (−1,041), 95 → 90 files; **1,571 below th
 23,000 envelope**. The freed lines are not growth capacity: the row was LOWERED to the measured figure
 (`RATIFIED_AT_EASING` follows it) and keeps zero headroom; every later kernel line still needs its own grant
 (Decision 2). The row's HISTORY says `ADR-069 RELIEF VALVE (21-5, ruling s21)`.
+
+## Amendment — 2026-11-12 (operator ruling `kfree`)
+
+Operator words: "we can relax the kernel limitation to accelerate the development, less permissions to increase every
+time." Record: `_bmad-output/planning-artifacts/decisions-2026-11-12-dedrift.md`.
+
+- **Decision 2 is amended.** A kernel change inside the envelope no longer needs a per-landing operator ask or a
+  pre-priced FLAG-Winston grant. The developer measures at landing, re-pins with `scripts/repin.py` and writes the
+  HISTORY row (driver, files, before and after) in the same commit. Kernel landings are listed at each epic
+  retrospective. The sentence above that "every later kernel line still needs its own grant" is superseded by this.
+- **Surface hashes.** An ADR-066 surface-hash refresh caused by such a landing is pre-approved on the same terms.
+- **STOP withdrawn.** The Epic 20 shared STOP (22,000, ruling `lim`) no longer applies. The only numeric limits are
+  this ADR's alarm (22,000: `ENVELOPE ALARM` in the row) and envelope (23,000: the gate refuses), both unchanged and
+  both still enforced by `xtask/tests/recovery_lane_ceiling_rule.rs`.
+- **Unchanged.** The exact pin, the HISTORY row and the review layers. They are what the gates check; they are not a
+  permission.
+
+The row stood at 20,429 tokei at the ruling, 2,571 below the envelope.
