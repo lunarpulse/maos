@@ -83,8 +83,9 @@ jobs:
           - {swap_in: declared, cpu: '100', instr: plain}
           # AC6.2: the plant, at the same cap. EXPECTED RED, judged by its own last step.
           - {swap_in: removed-plant, cpu: '100', instr: plain}
-          # The example with `console.log` added to `idle` and `swap-in`, to observe the counter.
-          - {swap_in: declared, cpu: '100', instr: logged}
+          # The example with one `console.log` added (to `idle`, or to `swap-in`) to observe the counter.
+          - {swap_in: declared, cpu: '100', instr: logged-idle}
+          - {swap_in: declared, cpu: '100', instr: logged-swapin}
           # The shipped manifest (cpu_max_pct = 10) unchanged: recorded to show what the cap does.
           - {swap_in: declared, cpu: shipped, instr: plain}
     timeout-minutes: 90
@@ -105,12 +106,14 @@ jobs:
         working-directory: examples/example-spirit-ts
         run: |
           set -euo pipefail
-          if [ "$INSTR_CASE" = logged ]; then
-            # Instrumentation, not logic: stdout lines so the counter is observable from outside.
-            sed -i 's|^    idles += 1;$|    idles += 1;\n    console.log("MAOS-209 idle", idles);|' src/index.ts
-            sed -i 's|^    idles = Number.isFinite(carried) ? carried : 0;$|    idles = Number.isFinite(carried) ? carried : 0;\n    console.log("MAOS-209 swap-in", idles);|' src/index.ts
-            test "$(grep -c 'MAOS-209' src/index.ts)" -eq 2
-          fi
+          # Instrumentation, not logic: one stdout line so the counter is observable from outside.
+          case "$INSTR_CASE" in
+            logged-idle)
+              sed -i 's|^    idles += 1;$|    idles += 1;\n    console.log("MAOS-209 idle", idles);|' src/index.ts ;;
+            logged-swapin)
+              sed -i 's|^    idles = Number.isFinite(carried) ? carried : 0;$|    idles = Number.isFinite(carried) ? carried : 0;\n    console.log("MAOS-209 swap-in", idles);|' src/index.ts ;;
+          esac
+          if [ "$INSTR_CASE" != plain ]; then test "$(grep -c 'MAOS-209' src/index.ts)" -eq 1; fi
           npm ci && npm run build && npm run componentize
           if [ "$SWAP_IN_CASE" = removed-plant ]; then
             # `swap-in` cannot be dropped alone: `lifecycle` is exported whole or not at all. The
@@ -263,8 +266,10 @@ jobs:
           PY
           echo "--- tl intents"; cut -f1 tl-intents.txt | sort | uniq -c
           echo "--- MAOS-209 lines per sink (daemon.out daemon.err journal.all)"
-          grep -c 'MAOS-209' daemon.out daemon.err journal.all tl-intents.txt
+          grep -c 'MAOS-209' daemon.out daemon.err journal.all tl-intents.txt || true
+          grep -h 'spirit_diagnostic\|panicked' tl-intents.txt | cut -c1-400 | head -20 || true
           grep -h 'MAOS-209' daemon.out daemon.err journal.all tl-intents.txt | cut -c1-400 | head -80
+          exit 0
       - name: Judge the plant (the red above must be the intended refusal)
         if: always() && matrix.swap_in == 'removed-plant'
         shell: bash
