@@ -1893,8 +1893,11 @@ jobs:
       - name: Assert the two halves still sum to the whole suite
         run: |
           set -euo pipefail
-          rel=$(cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort 2>&1 | sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' | tail -1)
-          dbg=$(cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort 2>&1 | sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' | tail -1)
+          # Keep the cargo output in the log: a failure here was undiagnosable when it was swallowed by sed (run 43155033280 job 130972879907).
+          cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort 2>&1 | tee /tmp/split-rel.log
+          cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort 2>&1 | tee /tmp/split-dbg.log
+          rel=$(sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' /tmp/split-rel.log | tail -1)
+          dbg=$(sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' /tmp/split-dbg.log | tail -1)
           echo "release=${rel} debug=${dbg} total=$(( rel + dbg ))"
           if [ "$(( rel + dbg ))" -ne 15 ]; then
             echo "root_shutdown_unload_16_3 profile split lost coverage: ${rel} + ${dbg} != 15"

@@ -12,7 +12,7 @@ review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (
 
 # Story 20.7: Stable-runner performance gates
 
-Status: ready-for-dev
+Status: done
 
 <!-- Created 2026-11-01 at a4c00897 (main, one docs commit ahead of origin/main 77f7276a; `git log -1 -- crates xtask` = a4c00897) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30); D13 A (2026-11-01, rows203c). D-20-7-01…08 are PROPOSED, not ruled — the operator rules; a different ruling rewrites only the clauses marked with that row. No cargo ran: cites re-read at HEAD (`creation/cites-a4c00897.md`); kernel and kloc by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`); the four flake families diagnosed from the hosted job logs fetched with the operator's gh token (`creation/flake-diagnosis.md`, `creation/ci-excerpts/`). Stale epic cites are corrected here and owed to E20 through `creation/records-owed.md` §A (shared file; the orchestrator applies). -->
 
@@ -161,7 +161,7 @@ D13 RULED A (2026-11-01, rows203c; `PF:297`). Their 20-7 consequence is in AC7�
 1. `cargo run -p xtask -- check-perf-verdict --sha <SHA> [--ledger <path>]` prints `PASS`, `FAIL`, `INDETERMINATE` or `ABSENT` per metric in `xtask/perf-budgets.toml`, read from the `perf-ledger` branch (ADR-068 §5–§6, `:105-139`): calibration CV > 2 % or median drift > 3 % ⇒ every verdict `INDETERMINATE`; five-run spread > tolerance ⇒ `INDETERMINATE`; regression `FAIL` only when median > baseline × (1 + tolerance) **and** > 3 × MAD; new fingerprint ⇒ regression checks `INDETERMINATE`; no record for the SHA ⇒ `ABSENT`; missing branch ⇒ loud error; newest entry > 48 h old ⇒ red (the scheduled staleness check).
 2. **Failing-before (local):** at `a4c00897` the subcommand does not exist (`xtask/src/main.rs` has no `check-perf-verdict`). Fixture-ledger vectors in `xtask/tests/` cover each verdict and the two loud failures.
 3. **Plant (local):** compute the verdict from the best of five runs instead of the median ⇒ the noisy-spread vector reads `PASS` and reds.
-4. **Runner leg (L2):** on `maos-perf`, J4's `bench-fault-inject` 15 ms sleep (`crates/maos-bench/src/harness/j4.rs:196`) yields `FAIL`; a planted noisy calibration (CPU hog on a benchmark core during calibration) yields `INDETERMINATE`, never `PASS`. Run ids recorded.
+4. **Runner leg (L2):** on `maos-perf`, J4's `bench-fault-inject` 15 ms sleep (`crates/maos-bench/src/harness/j4.rs:196`) yields `FAIL`; a planted noisy calibration (CPU hog on a benchmark core during calibration) yields `INDETERMINATE`, never `PASS`. Run ids recorded. **MOVED to `ops-stable-perf-runner` under ruling r1 (operator, 2026-11-12; `_bmad-output/planning-artifacts/decisions-2026-11-12-acceleration.md` item 8) (not landed).** Claim boundary: "perf verdicts ABSENT; no stable-runner timing claim".
 
 ### AC2 — the runner only ever runs trusted code (epic AC2; ADR-068 §4)
 
@@ -191,7 +191,7 @@ D13 RULED A (2026-11-01, rows203c; `PF:297`). Their 20-7 consequence is in AC7�
 
 ### AC6 — the J1 real-spawn fan-out bench (received from 19-3, D-19-3-11 C; D-20-7-06 A)
 
-1. 50 concurrent real T3 `worker-cli-fixture` Workers through the real `WorkerSupervisor`, 10 tasks/s, dispatch latency `task.assign` → `cli_wrapper_loaded`, P99 ≤ 500 ms and 0 dropped over 1 h (NFR-Perf-8, `non-functional-requirements.md:16`; FR21 fan-out floor) — weekly on Tier W (L2 binding).
+1. 50 concurrent real T3 `worker-cli-fixture` Workers through the real `WorkerSupervisor`, 10 tasks/s, dispatch latency `task.assign` → `cli_wrapper_loaded`, P99 ≤ 500 ms and 0 dropped over 1 h (NFR-Perf-8, `non-functional-requirements.md:16`; FR21 fan-out floor) — weekly on Tier W (L2 binding). **AC6.1 (the 1 h Tier W soak) MOVED to `ops-stable-perf-runner` under ruling r1 (operator, 2026-11-12; `_bmad-output/planning-artifacts/decisions-2026-11-12-acceleration.md` item 8) (not landed).** Claim boundary: "perf verdicts ABSENT; no stable-runner timing claim". AC6.2/6.3 (hosted smoke and plant) LANDED.
 2. **Hosted smoke (L1):** ≈ 5 Workers, 60 s, under `provision-t3-test-substrate`; asserts the spawns are real — distinct CIDs and child pids equal to the Worker count, each with `cli_wrapper_loaded`/`cli_wrapper_exit` rows.
 3. **Failing-before:** no such bench at HEAD (`orchestrator_fanout_nfr_perf_8.rs:22` spawns 50 in-process task handles). **Plant (hosted):** substitute in-process handles for the T3 spawn ⇒ the distinct-CID assertion reds.
 
@@ -209,7 +209,7 @@ D13 RULED A (2026-11-01, rows203c; `PF:297`). Their 20-7 consequence is in AC7�
 1. The hosted family diagnostic prints root stderr, payload `/proc/<pid>/status` `State`/`PPid` and `podman ps -a --filter id=<CID>` on failure; ≥ 20 runs on `ubuntu-24.04`. Run 41423701978 was 20/20 green at HEAD, but ran post-repair with K2r present: it cannot decide K2r versus the oracle or identify the historical flake's cause.
 2. Retain K2r defense-in-depth: `run_teardown` signals the verified payload pidfd before bounded runtime kill; `KillFailed` is reported only when both fail. This is not a proven repair of the historical ac4 flake.
 3. **RETRACTED (D-20-7-11 C):** the claimed deterministic failing-before at `a4c00897` is contradicted: `ac4_v4` passed in 14.147 s under the stalled-kill shim in run 41423701978 / job 125205091430. No historical failing-before witness is claimed.
-4. The oracle distinguishes a zombie awaiting reap (`State: Z`) from a live payload, and its message carries AC8.1's context permanently. `ac4_v3b`, `ac4_v4`, `ac4_v4b`, `cohort::ac4_v5`, `ac4_v5c` and `ac3_operator_door_unload_stops_a_live_worker_once` keep their 5 s bound (a live payload 5 s after root exit is a defect, never a calibration).
+4. The oracle distinguishes a zombie awaiting reap (`State: Z`) from a live payload, and its message carries AC8.1's context permanently. `ac4_v3b`, `ac4_v4`, `ac4_v4b`, `cohort::ac4_v5`, `ac4_v5c` and `ac3_operator_door_unload_stops_a_live_worker_once` keep their 5 s bound (a live payload 5 s after root exit is a defect, never a calibration). **Amended 2026-11-12 under ruling r1 (operator, 2026-11-12; `_bmad-output/planning-artifacts/decisions-2026-11-12-acceleration.md` item 8):** for the rc the 5 s root-exit bound REMAINS the product bound and a live payload 5 s after root exit remains a defect in the product; what changes is only the disposition of timing-noise reds on hosted runners (ac4_v3b / v4 / v4b / v5 / v5c / door-unload reds are recorded in `deferred-work.md` as hosted-runner timing noise, owner `ops-stable-perf-runner`, with their same-line citations). This is a disclosed disposition, NOT a proof: the cause of the historical ac4 orphan remains UNIDENTIFIED (D-20-7-11 C), K2r is only defense-in-depth, and no bound was widened, no test ignored or retried to green.
 5. **Injected composite failure defence (hosted):** with runtime kill stalled and removal of a running container refused by the shim, removing the pidfd signal at HEAD leaves a live payload (`State: S`, container Up); normal HEAD passes. This ablation is not equivalent to AC8.3's retracted historical failing-before witness and does not identify the historical flake's cause.
 
 ### AC9 — the supervisor barrier: what is deterministic is repaired, what is not is diagnosable (D-20-7-03 A)
@@ -228,6 +228,8 @@ D13 RULED A (2026-11-01, rows203c; `PF:297`). Their 20-7 consequence is in AC7�
 
 ### AC11 — shadow, then bind (epic AC6; L2, runner)
 
+> **MOVED to `ops-stable-perf-runner` under ruling r1 (operator, 2026-11-12; `_bmad-output/planning-artifacts/decisions-2026-11-12-acceleration.md` item 8).** AC11.1 (shadow data), AC11.2 (binding) and AC11.3 (`check-j4-latency` registry row binding at the Tier W metric) are NOT landed here. Claim boundary: "perf verdicts ABSENT; no stable-runner timing claim". Only the release-precondition perf-verdict leg of AC11.2 and the rc-only `--perf-absent-ok` waiver landed, under 20-5 L2 (`d00802aa`; `docs/release/decisions-2026-11-12.md`); a `GA` tag still refuses an `ABSENT` verdict.
+
 1. ≥ 2 weeks and ≥ 20 `perf.yml` runs on `main` with verdicts recorded and no blocking (ADR-068 §7.2); tolerances replaced from the shadow data in one commit with the figures (rule 6).
 2. Per-metric dispositions bind for the current phase; a `FAIL` on a trusted PR blocks its merge; `check_release_precondition.rs` refuses a tag SHA whose required verdicts are not all `PASS` (`ABSENT` included).
 3. `check-j4-latency`'s registry row (`gate-registry.toml:457-459`) matches what its hosted job can do (sample count, integrity, mutation) and points its binding at the Tier W metric.
@@ -235,7 +237,7 @@ D13 RULED A (2026-11-01, rows203c; `PF:297`). Their 20-7 consequence is in AC7�
 
 ### AC12 — retirement, runbook and coverage (epic AC7)
 
-1. (L2) `nfr-perf-1-iac-routing-budget`, `nfr-perf-j4-latency`, `nfr-perf-8-orchestrator-fanout` (`discipline.yml:2970-2983,3022-3035,3040-3055`) deleted with their `continue-on-error`; `-- --test` bench jobs keep honest smoke names.
+1. (L2) `nfr-perf-1-iac-routing-budget`, `nfr-perf-j4-latency`, `nfr-perf-8-orchestrator-fanout` (`discipline.yml:2970-2983,3022-3035,3040-3055`) deleted with their `continue-on-error`; `-- --test` bench jobs keep honest smoke names. **AC12.1 MOVED to `ops-stable-perf-runner` under ruling r1 (operator, 2026-11-12; `_bmad-output/planning-artifacts/decisions-2026-11-12-acceleration.md` item 8) (not landed): retiring the three advisory jobs before binding would remove the only NFR-Perf-1/8 smoke.** Claim boundary: "perf verdicts ABSENT; no stable-runner timing claim".
 2. (L1) `docs/runbooks/perf-runner.md`: host setup, boot-time tuning checks, fingerprint fields, calibration, maintenance window, re-baseline procedure, ledger staleness response; `docs/runbooks/provisioning-checklist.md:44` updated when the runner exists (operator).
 3. (L1) `tests/coverage-matrix.yaml:1380-1436`: NFR-Perf-1 points at its own metric/gate (not `check-j4-latency`); -2/-4/-5/-7/-8 name their gates; -3 names AC10's metrics.
 4. **Plant:** AC4.4's vector covers 12.3; 12.1 is a deletion (no plant).
@@ -244,23 +246,24 @@ D13 RULED A (2026-11-01, rows203c; `PF:297`). Their 20-7 consequence is in AC7�
 
 1. At `done`: `check-dev-record-completeness` passes with no open `deferred-work.md` row owned by `20-7-…`: D:96, :1075, :1181-1191, :1192-1198, :1256-1259, :1297-1298 each `CLOSED <date> by 20-7 @<commit>` with its witness, or re-owned by rule 10 with a reason (AC9.4).
 2. L1 closes nothing that needs the runner; L1 sub-bullets record each family's repair and witness.
+3. **Closure under r1 (2026-11-12):** the six rows closable by landed work are `CLOSED 2026-11-12 by 20-7-stable-runner-perf-gates @<sha>` with witnesses; hosted-runner timing-noise rows carry a dated disposition quoting ruling r1, keep their same-line citations and name `ops-stable-perf-runner` as live owner; stable-runner-only rows are re-owned there with the claim boundary "perf verdicts ABSENT; no stable-runner timing claim"; rows with no honest owner are rule-10 dispositions with a trigger. Row-by-row table: `20-7-stable-runner-perf-gates-evidence/closure/closure-under-r1.md`.
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight.** Operator rulings on D-20-7-01…08 recorded; tracker → `in-progress`. Run `creation/measurements.md` "Not measured here" items 1–6 (item 4 = AC8.1's `ci/20-7-diag` run; item 5 = AC9.4's loaded runs may continue through T9). Re-measure every cite this story touches (rule 9). A measured figure above the ruled envelope, or a T0 result contradicting a ruled option, is STOP + D-row.
-- [ ] **T1 — Budget file (AC3).** `xtask/perf-budgets.toml`, loader, the seven literal sites, literal-scan vector + plant.
-- [ ] **T2 — Runner policy (AC2).** `perf.yml` (shadow mode: no blocking), `check-perf-runner-policy`, four plants, `discipline.yml` enrolment, registry row.
-- [ ] **T3 — Verdict command (AC1.1–1.3).** Ledger reader/appender, fixture vectors, plant; staleness check scheduled.
-- [ ] **T4 — Benches (AC4).** NFR-Perf-1 quantiles, hot-swap wiring, NFR-Perf-2/4/5 (+ WASM recall leg), six hot-path rows; completeness vector + plant.
-- [ ] **T5 — Tier C (AC5, AC10).** Harness, counting allocator, hosted job, committed baseline; hosted plant.
-- [ ] **T6 — J1 real-spawn bench (AC6).** Tier W soak target + hosted smoke + hosted plant.
-- [ ] **T7 — S3 (AC7)** under the ruled kernel row: stub vector red-before, K1w, S3 test rework, measurement 3, local plant.
-- [ ] **T8 — ac4 (AC8)** under the ruled row: diag result → K2r or oracle; podman-shim hosted witness and plant; oracle context.
-- [ ] **T9 — Supervisor (AC9).** Drop repair, red-before vector, diagnostics, atomic stub records, loaded runs, plant.
-- [ ] **T10 — cap-token (AC10).** Guard + honest overall test; metric rows.
-- [ ] **T11 — L1 landing (D-20-7-05 A).** Exact pins inside the ruled envelope (kernel both pins + content hashes `t3/child.rs` (+ `Cargo.toml` feature)); FLAG-Winston decision record (precedent `20-3c-flag-winston-decision.md`); `check-kernel-baseline`, `kloc-check`, `check-service-boundary`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; one hosted discipline run on the final tree + the `ci/20-7-verify` plant run; flakes that red it recorded by name/run id (D13 A). Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
-- [ ] **T12 — L2 shadow (AC11.1)** — starts when `ops-stable-perf-runner` is `done` and records-owed §O items O1–O5 are satisfied: fingerprint + calibration report committed with the runbook; ≥ 2 weeks / ≥ 20 main runs.
-- [ ] **T13 — L2 bind and retire (AC1.4, AC11.2–11.4, AC12.1, AC13).** Runner reds recorded; tolerances from data; release precondition; retirement; ledger closure; final landing.
+- [x] **T0 — Preflight.** Operator rulings on D-20-7-01…08 recorded; tracker → `in-progress`. Run `creation/measurements.md` "Not measured here" items 1–6 (item 4 = AC8.1's `ci/20-7-diag` run; item 5 = AC9.4's loaded runs may continue through T9). Re-measure every cite this story touches (rule 9). A measured figure above the ruled envelope, or a T0 result contradicting a ruled option, is STOP + D-row. **LANDED under ruling r1 close:** rulings recorded 2026-11-01/02 (`e3231e88`, `a8af3215`); AC8.1 diag run 41423701978 and the 50 loaded runs (`9f64dd02`).
+- [x] **T1 — Budget file (AC3).** `xtask/perf-budgets.toml`, loader, the seven literal sites, literal-scan vector + plant. **LANDED under ruling r1 close:** `1fd4de31`, `9f64dd02`.
+- [x] **T2 — Runner policy (AC2).** `perf.yml` (shadow mode: no blocking), `check-perf-runner-policy`, four plants, `discipline.yml` enrolment, registry row. **LANDED under ruling r1 close:** `1fd4de31`, `9f64dd02`; hosted `check-perf-runner-policy` green in main run 43150757804.
+- [x] **T3 — Verdict command (AC1.1–1.3).** Ledger reader/appender, fixture vectors, plant; staleness check scheduled. **LANDED under ruling r1 close:** `1fd4de31` (fixture vectors; `ledger-staleness` job in `perf.yml` gated on the runner variable).
+- [x] **T4 — Benches (AC4).** NFR-Perf-1 quantiles, hot-swap wiring, NFR-Perf-2/4/5 (+ WASM recall leg), six hot-path rows; completeness vector + plant. **LANDED under ruling r1 close:** `1fd4de31`; production WASM `recall` leg carved out under D-20-7-10 A (guest harness missing; `deferred-work.md` rule-10 row).
+- [x] **T5 — Tier C (AC5, AC10).** Harness, counting allocator, hosted job, committed baseline; hosted plant. **LANDED under ruling r1 close:** `1fd4de31`, `850e4c00` (binding baselines; hosted plant 41423701978).
+- [x] **T6 — J1 real-spawn bench (AC6).** Tier W soak target + hosted smoke + hosted plant. **LANDED under ruling r1 close:** `1fd4de31`, `850e4c00`; hosted smoke + plant 41423701978 (the 1 h Tier W soak AC6.1 is moved, see below).
+- [x] **T7 — S3 (AC7)** under the ruled kernel row: stub vector red-before, K1w, S3 test rework, measurement 3, local plant. **LANDED under ruling r1 close:** `1fd4de31`; hosted `s3-both` green on 24.04 and 26.04 in 41423701978.
+- [x] **T8 — ac4 (AC8)** under the ruled row: diag result → K2r or oracle; podman-shim hosted witness and plant; oracle context. **LANDED under ruling r1 close:** `1fd4de31`; amended by D-20-7-11 C (`a8af3215`): K2r is defense-in-depth, AC8.3 retracted, cause still unidentified.
+- [x] **T9 — Supervisor (AC9).** Drop repair, red-before vector, diagnostics, atomic stub records, loaded runs, plant. **LANDED under ruling r1 close:** `1fd4de31`, `9f64dd02`; AC9.4 stays open by rule 10 (48/50 green, original hang unreproduced).
+- [x] **T10 — cap-token (AC10).** Guard + honest overall test; metric rows. **LANDED under ruling r1 close:** `1fd4de31`.
+- [x] **T11 — L1 landing (D-20-7-05 A).** Exact pins inside the ruled envelope (kernel both pins + content hashes `t3/child.rs` (+ `Cargo.toml` feature)); FLAG-Winston decision record (precedent `20-3c-flag-winston-decision.md`); `check-kernel-baseline`, `kloc-check`, `check-service-boundary`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; one hosted discipline run on the final tree + the `ci/20-7-verify` plant run; flakes that red it recorded by name/run id (D13 A). Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator. **LANDED under ruling r1 close:** `1fd4de31`, `9f64dd02`, `850e4c00`, `ac1fc12a`, `5fe97eda`, `d00802aa`; main discipline run 43150757804 @ `d00802aa` green; kernel 26841/21042 exact; FLAG-Winston record `20-7-flag-winston-decision.md`.
+- [ ] **T12 — L2 shadow (AC11.1)** — starts when `ops-stable-perf-runner` is `done` and records-owed §O items O1–O5 are satisfied: fingerprint + calibration report committed with the runbook; ≥ 2 weeks / ≥ 20 main runs. **MOVED to `ops-stable-perf-runner` under ruling r1 (operator, 2026-11-12; `_bmad-output/planning-artifacts/decisions-2026-11-12-acceleration.md` item 8); not ticked, not done.** Claim boundary: "perf verdicts ABSENT; no stable-runner timing claim".
+- [ ] **T13 — L2 bind and retire (AC1.4, AC11.2–11.4, AC12.1, AC13).** Runner reds recorded; tolerances from data; release precondition; retirement; ledger closure; final landing. **MOVED to `ops-stable-perf-runner` under ruling r1 (operator, 2026-11-12; `_bmad-output/planning-artifacts/decisions-2026-11-12-acceleration.md` item 8); not ticked, not done.** Claim boundary: "perf verdicts ABSENT; no stable-runner timing claim". (The release-precondition perf-verdict leg of AC11.2 and the `--perf-absent-ok` rc waiver landed separately in `d00802aa` under 20-5 L2.)
 
 ## Dev Notes
 
@@ -396,7 +399,7 @@ diffs, `rustfmt`'d, never applied to the tree.
 
 ### Agent Model Used
 
-anthropic/claude-opus-5-5 (creation); landing 1 by the Dev unit (`Dev207L1`, `anthropic/claude-sonnet-5-5`), 2026-11-01/02. No status flipped; no commit; no push.
+anthropic/claude-opus-5-5 (creation); landing 1 by the Dev unit (`Dev207L1`, `anthropic/claude-sonnet-5-5`), 2026-11-01/02. No status flipped; no commit; no push. Closure record under r1 (story/ledger/tracker text only, no code) by `Close207Docs` (`anthropic/claude-sonnet-5-5`), 2026-11-12.
 
 ### Debug Log References
 
@@ -425,7 +428,7 @@ Plants and hosted result index: `20-7-stable-runner-perf-gates-evidence/landing-
 
 *Verification (all `env -u CI -u GITHUB_ACTIONS`, inherited target dir):* `cargo fmt --all` rc 0; `cargo build --locked --all-targets` xtask, maos-bench (`kernel_measurement`), maos-kernel-core, maos-bin: no errors; `cargo nextest run --workspace --locked --no-fail-fast --profile ci --test-threads 1`: 5503/5504 passed (613 s); default profile: 5503/5504. The single failure in both is `xtask::invariant_claims_20_3b committed_ledger_covers_all_fourteen_and_keeps_requirement_ownership` (expects owner `20-1`, the working tree now says `20-1b-vetting-yank-policy-and-quarantine` in `docs/invariants/I5.md`, edited by the 20-1 lane — not a 20-7 change). Gates rc 0: `kloc-check`, `check-kernel-baseline` (26841 / 95 files), `check-service-boundary`, `check-env-contract`, `check-serde-error-handling` (allowlist row re-pointed `orchestrator_fanout_nfr_perf_8.rs:245` → `orchestrator_inproc_dispatch.rs:236`, row for the deleted `iac_routing_budget.rs:167` removed; nothing weakened), `check-composition-root-completeness`, `check-j1-loopback-delegation`, `check-dev-record-completeness`, `check-epic-close-coherence` (pin 26841), `check-review-findings-resolved`, `check-test-cost`, `check-test-budget` on the serial junit (613 s of 1100 s), `invariant-lock`, `coverage-matrix`, `check-coverage-matrix-completeness`, `check-ship-gate-completeness` (47), `check-perf-runner-policy`, `check-perf-verdict` on the fixture ledger. `clippy-ratchet` against a real non-denying stream: 1338 occurrences / 875 source-distinct (hosted baseline 1383 / 897, unchanged; no growth). `cargo deny check`: advisories, bans, licenses, sources ok. Prescribed prepush: see Debug Log below.
 
-*Owed:* stable-runner AC1.4, AC11, AC12.1, AC13 and release-precondition ledger read are L2; WASM recall is blocked on the guest harness. Hosted branch results and their limitations are in the evidence index. `perf.yml` and the discipline `check-perf-counts` job were not part of that branch proof.
+*Owed (superseded 2026-11-12 by ruling r1: AC1.4, AC6.1, AC11, AC12.1, T12, T13 moved to `ops-stable-perf-runner`; AC13 closed in the closure note):* stable-runner AC1.4, AC11, AC12.1, AC13 and release-precondition ledger read are L2; WASM recall is blocked on the guest harness. Hosted branch results and their limitations are in the evidence index. `perf.yml` and the discipline `check-perf-counts` job were not part of that branch proof.
 
 ### Landing 1 review corrections — observed verification (2026-11-02)
 
@@ -467,7 +470,72 @@ At review time D-20-7-09 and D-20-7-10 were proposals; the 2026-11-02 rulings ab
 
 ### File List
 
-Kernel: `crates/maos-kernel-core/src/security/sandbox/t3/child.rs`, `crates/maos-kernel-core/Cargo.toml`, `…/tests/t3_terminal_helpers_17_7.rs`, `…/tests/cap_token_verify_assertion.rs`, `…/benches/{cap_token_verify_p99,hot_swap_latency,hot_path_budgets}.rs`. Bin: `crates/maos-bin/src/supervision.rs`, `…/tests/{root_shutdown_unload_16_3,worker_terminal_facts_17_7,nfr_perf_8_real_spawn_fanout_20_7}.rs`, `…/tests/worker_terminal_facts_17_7/{stub_scenes,supervisor_scenes}.rs`. Bench: `crates/maos-bench/{Cargo.toml,src/{budgets,lib,decision}.rs,src/harness/{j1,j4}.rs,src/bin/tier_c_harness.rs,benches/{iac_routing_budget,iac_throughput_nfr_perf_2,posture_shift_nfr_perf_4,j1_bridge_latency,j4_latency_regression,audit_query_latency,orchestrator_inproc_dispatch}.rs}` (`orchestrator_fanout_nfr_perf_8.rs` removed). xtask: `xtask/perf-budgets.toml`, `xtask/src/{perf_budgets,perf_ledger,check_perf_verdict,check_perf_runner_policy,check_perf_counts}.rs`, `xtask/src/{main,lib,check_ship_gate_completeness}.rs`, `xtask/{gate-registry,kloc,kernel-core-baseline,serde-error-allowlist}.toml`, `xtask/tests/{perf_gates_20_7,kernel_pin_content_hash_16_0,recovery_lane_ceiling_rule,ship_gate_binding_20_3a}.rs`, `xtask/tests/fixtures/perf-ledger/`. Workflows/docs: `.github/workflows/{perf,discipline}.yml`, `docs/runbooks/perf-runner.md`, `docs/adr/ADR-068-stable-performance-runner.md`, `tests/coverage-matrix.yaml`, `_bmad-output/implementation-artifacts/{20-7-flag-winston-decision.md,deferred-work.md}`, `20-7-…-evidence/{landing-1/plants.md,ci/ci-20-7-verify.yml}`.
+- .github/workflows/discipline.yml
+- .github/workflows/perf.yml
+- _bmad-output/implementation-artifacts/20-7-flag-winston-decision.md
+- _bmad-output/implementation-artifacts/20-7-stable-runner-perf-gates-evidence/ci/ci-20-7-verify.yml
+- _bmad-output/implementation-artifacts/20-7-stable-runner-perf-gates-evidence/ci/tier-c-plant.diff
+- _bmad-output/implementation-artifacts/20-7-stable-runner-perf-gates-evidence/closure/closure-under-r1.md
+- _bmad-output/implementation-artifacts/20-7-stable-runner-perf-gates-evidence/creation/records-owed.md
+- _bmad-output/implementation-artifacts/20-7-stable-runner-perf-gates-evidence/landing-1/plants.md
+- _bmad-output/implementation-artifacts/20-7-stable-runner-perf-gates-evidence/landing-1/review-corrections/report.md
+- _bmad-output/implementation-artifacts/20-7-stable-runner-perf-gates.md
+- _bmad-output/implementation-artifacts/deferred-work.md
+- crates/maos-bench/Cargo.toml
+- crates/maos-bench/benches/audit_query_latency.rs
+- crates/maos-bench/benches/iac_routing_budget.rs
+- crates/maos-bench/benches/iac_throughput_nfr_perf_2.rs
+- crates/maos-bench/benches/j1_bridge_latency.rs
+- crates/maos-bench/benches/j4_latency_regression.rs
+- crates/maos-bench/benches/orchestrator_inproc_dispatch.rs
+- crates/maos-bench/benches/posture_shift_nfr_perf_4.rs
+- crates/maos-bench/src/bin/tier_c_harness.rs
+- crates/maos-bench/src/budgets.rs
+- crates/maos-bench/src/decision.rs
+- crates/maos-bench/src/harness/j1.rs
+- crates/maos-bench/src/harness/j4.rs
+- crates/maos-bench/src/lib.rs
+- crates/maos-bin/src/supervision.rs
+- crates/maos-bin/tests/erasure_million_20_11.rs
+- crates/maos-bin/tests/nfr_perf_8_real_spawn_fanout_20_7.rs
+- crates/maos-bin/tests/one_daemon_one_door_16_1.rs
+- crates/maos-bin/tests/root_shutdown_unload_16_3.rs
+- crates/maos-bin/tests/worker_terminal_facts_17_7.rs
+- crates/maos-bin/tests/worker_terminal_facts_17_7/stub_scenes.rs
+- crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs
+- crates/maos-kernel-core/Cargo.toml
+- crates/maos-kernel-core/benches/cap_token_verify_p99.rs
+- crates/maos-kernel-core/benches/hot_path_budgets.rs
+- crates/maos-kernel-core/benches/hot_swap_latency.rs
+- crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+- crates/maos-kernel-core/tests/cap_token_verify_assertion.rs
+- crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs
+- crates/maos-kernel-core/tests/t3_terminal_helpers_17_7.rs
+- docs/adr/ADR-068-stable-performance-runner.md
+- docs/runbooks/perf-runner.md
+- docs/runbooks/provisioning-checklist.md
+- tests/coverage-matrix.yaml
+- xtask/gate-registry.toml
+- xtask/kernel-core-baseline.toml
+- xtask/kloc.toml
+- xtask/perf-budgets.toml
+- xtask/src/check_perf_counts.rs
+- xtask/src/check_perf_runner_policy.rs
+- xtask/src/check_perf_verdict.rs
+- xtask/src/check_release_precondition.rs
+- xtask/src/lib.rs
+- xtask/src/main.rs
+- xtask/src/perf_budgets.rs
+- xtask/src/perf_ledger.rs
+- xtask/tests/fixtures/perf-ledger/budgets.toml
+- xtask/tests/fixtures/perf-ledger/ledger.jsonl
+- xtask/tests/kernel_pin_content_hash_16_0.rs
+- xtask/tests/perf_gates_20_7.rs
+- xtask/tests/release_precondition_perf_20_5.rs
+
+### Closure under ruling r1 (2026-11-12)
+
+Status flipped to `done` by Main under ruling r1 (operator, 2026-11-12; `_bmad-output/planning-artifacts/decisions-2026-11-12-acceleration.md` item 8): the story closes at L1 plus the rc waiver. L2 (T12, T13) and the runner-only ACs (AC1.4, AC6.1, AC11.1-11.3, AC12.1) live on the UNCLAIMED row `ops-stable-perf-runner`. **Claim boundary: "perf verdicts ABSENT; no stable-runner timing claim".** This is not a widening of any time budget and not retry-to-green. Per-AC and per-task table, row-by-row ledger dispositions and counts: `20-7-stable-runner-perf-gates-evidence/closure/closure-under-r1.md`.
 
 ## Change Log
 
@@ -476,3 +544,4 @@ Kernel: `crates/maos-kernel-core/src/security/sandbox/t3/child.rs`, `crates/maos
 - 2026-11-02: Landing 1 (machine-free) implemented by the Dev unit: K1w + K2r kernel row landed at exactly the prototype's 26841 / 21042 (ceiling 26881 / 21073), budget file + `check-perf-verdict` / `check-perf-runner-policy` / `check-perf-counts`, benches, Tier C harness, flake repairs, `perf.yml`, runbook, FLAG-Winston record. Hosted-only legs (`ci-20-7-verify.yml`) and the L2 legs unrun. No status flip.
 - 2026-11-01: L1 review corrections harden runner admission policy and trusted append workflow, validate count/budget/ledger inputs, bind process and calibration identity, preserve temporal verdicts, use production signing and strengthen fan-out/diagnostic accounting. D-20-7-09/10 are PROPOSED scope amendments only; no story/status flip.
 - 2026-11-02: D-20-7-09 B done with hosted binding baselines and allocation-neutral plant; D-20-7-10 A moves WASM recall to L2; D-20-7-11 C retains K2r as defense-in-depth, retracts AC8.3 and AC8.5 historical-witness equivalence after run 41423701978 contradicted the base-red claim. Historical orphan cause remains open; no further hosted cycle.
+- 2026-11-12: Closure under ruling r1 (operator, 2026-11-12; `_bmad-output/planning-artifacts/decisions-2026-11-12-acceleration.md` item 8): T0-T11 ticked with landed commits (`1fd4de31`, `9f64dd02`, `850e4c00`, `a8af3215`, `ac1fc12a`, `5fe97eda`, `d00802aa`); T12/T13 and AC1.4/AC6.1/AC11/AC12.1 moved to `ops-stable-perf-runner` (claim boundary "perf verdicts ABSENT; no stable-runner timing claim"); AC8.4 amended for the rc (5 s product bound unchanged; hosted timing-noise reds dispositioned, cause unidentified per D-20-7-11 C); File List rewritten as path bullets; `deferred-work.md` rows closed / dispositioned / re-owned in one pass (see closure note); status `done` at the tracker.

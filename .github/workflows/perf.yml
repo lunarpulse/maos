@@ -77,10 +77,12 @@ jobs:
           } | tee fingerprint.txt
           echo "hash=$(sha256sum fingerprint.txt | cut -c1-16)" >> "$GITHUB_OUTPUT"
       - name: Calibration — fixed CPU and fsync workloads, 30 timings each (ADR-068 §5)
+        env:
+          FINGERPRINT_HASH: ${{ steps.fingerprint.outputs.hash }}
         run: |
           mkdir -p results/logs
           cargo run --release --locked -p xtask -- perf-calibrate \
-            --sha "$GITHUB_SHA" --fingerprint "${{ steps.fingerprint.outputs.hash }}" \
+            --sha "$GITHUB_SHA" --fingerprint "$FINGERPRINT_HASH" \
             --reference perf-ledger/ledger.jsonl > results/calibration.json
       - name: Each benchmark five times, as separate processes, after warm-up
         run: |
