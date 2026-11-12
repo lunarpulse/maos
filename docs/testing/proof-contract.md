@@ -64,7 +64,8 @@ on one image.**
   `anthropic/claude-opus-5-5` (`.omp/agents/story-creator.md`); dev, finisher and review-patch passes run on
   `openai-codex/gpt-6.1-sol` (the `task` agent; soft request budget 400); docs-only record work (ruling application,
   done flips, deferred-work closures, tracker, CI excerpts) runs on `zai/glm-5.3` (`.omp/agents/scribe.md`).
-  Review is tiered by risk. A story is **difficult** when it carries a kernel FLAG-Winston grant, a security-critical
+  Review is tiered by risk. A story is **difficult** when it grows the kernel (a measured kernel landing; since operator
+  ruling `kfree`, 2026-11-12, no FLAG-Winston grant is priced or asked inside the ADR-069 envelope), a security-critical
   AC (auth, secrets, signatures, cross-Spirit isolation), concurrency or a new protocol. Blind and Edge always run on
   opus-5.5; Acceptance runs on opus-5.5 for difficult stories and on `zai/glm-5.3` (`.omp/agents/review-light.md`)
   otherwise; Test Infrastructure runs on glm-5.3 on every story. An easy story may merge Blind and Edge into one opus
