@@ -12,7 +12,7 @@ review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (
 
 # Story 21.5: Orchestrator port and move — the FR20 buffer leaves the kernel
 
-Status: in-progress
+Status: done
 
 <!-- Created 2026-11-12 at 0baa76fb (`git log -1 -- crates xtask` = edeedd25; docs-only commits since) by bmad-create-story under the lighter measured creation contract (Create215). Pulled forward by operator ruling `s21` (2026-11-12, `planning-artifacts/decisions-2026-11-12-acceleration.md:34`): 21-5 follows 20-9 as a kernel story. Shared kernel STOP 22000 = ADR-069 alarm (`lim` = stop22, `:36`); envelope 23000. D-21-5-01…14 were PROPOSED at creation and are RULED (ask `d21`, 2026-11-12, accepted as recommended; see Decisions). A dev agent was editing the tree and tracker during creation, so only new files were written; every edit to an existing file is listed in `creation/records-owed.md`. Cites re-read at HEAD on a `git archive` copy (`creation/cites-0baa76fb.md`); kernel, kloc and surface figures by the prebuilt gate binary on reverted prototypes (`creation/measurements.md`). -->
 
@@ -263,17 +263,17 @@ Every AC names a failing-before witness or an equivalence golden, and a plant. *
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight.** Operator rulings on D-21-5-01…14 recorded in this file and the FLAG-Winston record; tracker
+- [x] **T0 — Preflight.** (Satisfied by the creation-time measurements `creation/measurements.md`, the D-row rulings of 2026-11-12, and the L1/L2 pins at `257a0fd7`/`637721bf`; no separate preflight run was recorded.) Operator rulings on D-21-5-01…14 recorded in this file and the FLAG-Winston record; tracker
   → `in-progress`. Re-base onto the then-landed pins (20-9 L2, 20-13 KT3, 20-14 corrections); re-measure every cite
   this story touches (rule 9); run `creation/measurements.md` "Not measured here" 1–6. A figure above the ruled
   envelope, or a result contradicting a ruled option, is STOP + D-row.
 - [x] **T1 — Port and notes (AC4).** (L1, 2026-11-12; `crates/maos-domain/src/orchestrator.rs`; PRD `:54,:68`, `4-kernel-design.md:186` dated notes.)
 - [x] **T2 — Goldens (AC5)** against `maos_kernel_core::orchestrator`, plants. (L1: `crates/maos-bin/tests/orchestrator_equivalence_21_5.rs` + fixture; plants `landing-1/plants.md`; plus the D-21-5-07 replay-race witness, red on the unmoved kernel.)
-- [ ] **T3 — L1 landing (D-05 A).** Exact domain pin; `check-kernel-baseline` unchanged; `kloc-check`,
+- [x] **T3 — L1 landing (D-05 A).** (L1 `257a0fd7`; `landing-1/evidence.md`; hosted run 43153299381 red only on the 1M erasure oracle, fixed by `5fe97eda` ruling `ac5`; the following run red only on the `ac4_v3b` ROOT_GRACE load flake, 20-7 family, dispositioned.) Exact domain pin; `check-kernel-baseline` unchanged; `kloc-check`,
   `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; hosted run on the final tree + plants.
 - [x] **T4 — Kernel-free red witnesses first (AC2.4 leaf vector, AC3.2)**, then the move (AC2.1–2.3), the control
   (AC3.1), the kernel vector (AC2.4), plants (AC2.5, AC3.4, AC1.4). (L2, 2026-11-12, Dev215L2; `landing-2/evidence.md`.)
-- [ ] **T5 — Records and L2 landing (AC1, AC7).** Pins, constants, surface, classes, ADR-070, STABILITY, workspace
+- [x] **T5 — Records and L2 landing (AC1, AC7).** (L2 `637721bf`; hosted discipline run 43175946640 green except the advisory `reproducible-build` disk-exhaustion event; reviews `41b937cc`.) Pins, constants, surface, classes, ADR-070, STABILITY, workspace
   count; `cargo test -p maos-kernel-core --lib`; focused suites; hosted run; FLAG-Winston landing record. (Local legs done 2026-11-12, Dev215L2; the hosted run and the review are open.)
 
 ## Dev Notes
@@ -425,6 +425,12 @@ in-tree, read-only; `creation/gates/*.json`): `check-epic-close-coherence` rc 0 
 in-flight pin 27043); `check-decision-register` rc 0 (23 rows, 6 open); `check-exit-commands` rc 0 (2 blocks, 10 tokens);
 `check-dev-record-completeness` rc 0 (199 done stories, 0 violations).
 
+### Hosted proof
+
+Discipline run 43175946640 on `637721bf`: `success` over 199 jobs (`abi-diff`, `check-kernel-baseline`, `check-empty-kernel`, `workspace-test-suite`, ship gates success) except the ADVISORY `reproducible-build` (job 131040106237): `No space left on device` / `collect2: ld terminated with signal 7 [Bus error]`, 79 MB free = hosted-runner disk exhaustion, infrastructure; it passed on run 43150757804. Filed as a rule-10 row in `deferred-work.md`. Closure note: `21-5-orchestrator-port-and-move-evidence/closure/closure-note.md` (AC table LANDED/VOID, claim boundaries).
+
+**Claim boundaries:** the move is a verbatim relocation (plus the D-21-5-07 B one-lock replay); the FR54 gateway host remains unwired (zero production callers, allow-all stubs; deferred row F1); the `journal_*` audit writers left the kernel freeze gates, pinned only by a maos-bin golden (row F2); `resume` skips the replay when the port is `None` (row F3); AC6 is VOID (D-21-5-14 B) and the FR21 exemption and capacity-zero rows stay open with no 21-5 owner. Unverified: no local clean-tree `abi-diff` run (hosted job only).
+
 ### Debug Log References
 
 `21-5-orchestrator-port-and-move-evidence/landing-1/` (`evidence.md`, `plants.md`, `red/`, `plants/`, `gates/`); `…/landing-2/` (`evidence.md`, `plants/`, `green/`, `gates/`).
@@ -437,6 +443,8 @@ in-flight pin 27043); `check-decision-register` rc 0 (23 rows, 6 open); `check-e
 - **2026-11-12 — L2 review dispositions (landed at commit `637721bf`; Rec215L2).** Measured at `637721bf`: kernel **26,062 physical / 20,429 tokei, 90 files**; leaf `maos-orchestrator-buffer` **833**; xtask **45,462**; hardfail **203,251**. GPT review (gpt-6.1-sol): **0 findings**. GLM security review (glm-5.3): **0 P0-P2, 3 P3** (F1 FR54 gateway host with allow-all stubs in the unfrozen leaf; F2 journal writers left the kernel freeze gates; F3 `resume` skips replay when the port is `None`). Under the operator's severity policy (`decisions-2026-11-12-acceleration.md` ruling 3) the three P3 are rule-10 rows in `deferred-work.md` ("Observed during: 21-5 L2 review"), no correction round. Reviews: `21-5-orchestrator-port-and-move-evidence/landing-2/review/`. The hosted run for `637721bf` is pending; **`done` is NOT claimed**; Status stays `in-progress`.
 
 ### File List
+
+- `_bmad-output/implementation-artifacts/21-5-orchestrator-port-and-move-evidence/closure/closure-note.md` (closure)
 
 - `crates/maos-domain/src/orchestrator.rs` (port)
 - NEW `crates/maos-bin/tests/orchestrator_equivalence_21_5.rs`, `crates/maos-bin/tests/fixtures/orchestrator_equivalence_21_5.json`
@@ -453,4 +461,5 @@ in-flight pin 27043); `check-decision-register` rc 0 (23 rows, 6 open); `check-e
 - 2026-11-12: all fourteen D-rows RULED (ask `d21`, 2026-11-12, accepted as recommended: D01 A, D02 A, D03 A crate `maos-orchestrator-buffer`, D04 A, D05 A, D06 B, D07 B, D08 A ADR-070, D09 A, D10 A, D11 A, D12 A, D13 A key kept in Epic 21 after 20-9, D14 B). Story Status stays `ready-for-dev`. D13 A: `s21` waives the epic-20-retrospective precondition for this key only; `epic-21` → `in-progress`. D14 B: AC6 void; the maos-iac FR21 exemption row re-pointed to ownerless-and-open (operator named no key). Records applied: epic-21 corrections A1–A6, tracker B1–B3, acceleration note C1, deferred-work C2.
 - 2026-11-12: L1 (kernel-free) landed uncommitted (Dev215L1): port, goldens, replay-race witness (red, `#[ignore]`d until L2), PRD/architecture notes; Status `ready-for-dev` → `in-progress`; domain +3 (10277), aggregate hardfail 203244, kernel pins unchanged.
 - 2026-11-12: L2 (kernel move) landed uncommitted (Dev215L2): `maos-orchestrator-buffer` leaf crate (new workspace member, 59), the module out of the kernel (KP; kernel 27103/21256/95 → 26062/20429/90), `SpiritSchedulerAdapter` holds `Option<Arc<dyn OrchestratorResumePort>>` (the one surface refresh `2daf34b2…` → `d2170d38…`), 21 baseline triples removed under ADR-070 (401 → 380), one-lock replay (D-21-5-07 B; the race witness un-ignored, green), `maos-orchestrator-buffer` in `FORBIDDEN_CRATES` (xtask +1), ADR-069 relief note; pins exact (leaf 833, xtask 45462, aggregate 203250/hardfail 203251). Status stays `in-progress` until the hosted run and review.
+- 2026-11-12: CLOSED `done` (Close215): hosted discipline run 43175946640 on `637721bf` green except the advisory `reproducible-build` disk exhaustion (row filed); closure note under `…-evidence/closure/`; T0/T3/T5 ticked; AC6 VOID per D-21-5-14 B.
 - 2026-11-12: L2 landed at `637721bf`; independent reviews recorded (GPT gpt-6.1-sol 0 findings; GLM glm-5.3 security 0 P0-P2 + 3 P3, rows added to `deferred-work.md` under rule 10, no correction round); hosted run for `637721bf` pending; `done` NOT claimed; Status stays `in-progress`.
