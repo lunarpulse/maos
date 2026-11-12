@@ -1052,17 +1052,20 @@ coverage:
       ac3_/ac4_ composition witnesses cover the door count, receipt read-back
       and named gaps; erasure_live_20_11 observes Removed schedules after
       forget_spirit. Kernel halt_unload_fence_20_11 and
-      schedule_forget_spirit_20_11 witness O4 and KS. Hosted T3 leg unverified.
+      schedule_forget_spirit_20_11 witness O4 and KS. Hosted T3 leg: discipline run
+      43175946640 @637721bf passed erasure_live_20_11 ac6_running_t3_worker_uninstall_proves_live_inventory.
       Review corrections: halt_unload_fence_20_11::receipts_cite_their_own_frame_*,
       schedule_forget_spirit_20_11 (retired candidate, admitted firing),
       erasure_inventory_20_11 review_p2/f1/f2/f4, erasure_review_20_11 shared-receipt
       vectors, frame_bridge_roundtrip guest halt refusal, halt_payload_caps_20_11.
       shell_host_16_2::ac4_door_snapshots_real_scb_schedules_before_unload
       drives the real SCB/door snapshot boundary; erasure_live_20_11 drives
-      the real live cascade. AC6's T3 Worker leg is hosted-only and uses the
-      AC2 fallback because admission currently defaults SCB schedules.
-      AC3 halt receipts and KS watchdog cleanup remain final-kernel work;
-      no registered gate or full-story closure is claimed.
+      the real live cascade. AC6's T3 Worker leg ran hosted (run 43175946640,
+      job 131040117355) under the AC6.3 fallback because the Worker SCB carries
+      no schedules; the researcher variant asserts the real firing. AC3 halt
+      receipts and KS watchdog cleanup landed with L2 (689a6a53). Story 20-11
+      done 2026-11-12; the private/index hold lease stays a named gap; no
+      registered gate is claimed.
   FR7:
     gates: []
     corpora: []
@@ -1162,7 +1165,9 @@ coverage:
       a fresh transport completion links the replay instead of certifying it again.
       Pending halt receipts (typed halt evidence, both verifiers) and watchdog
       cleanup landed with the final kernel landing (20-11 L2); the private/index
-      hold lease remains a named gap; hosted AC5/EC-13 and T3 proof are owed.
+      hold lease remains a named gap. Hosted AC5/EC-13 (1M completion at the
+      operator-ruled allowance ac5: 10 s route + 30 s second wait) and AC6 T3
+      proof passed in run 43175946640 @637721bf; story 20-11 done 2026-11-12.
       erasure_review_20_11 tests the complete typed sixteen-category evidence
       language in both verifiers. IAC erasure_races_20_11 covers final-partial
       appends, reverse-import closure/order, sustained writers, cross-process

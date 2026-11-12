@@ -41,14 +41,14 @@ review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (
 
 # Story 20.11: Erasure inventory closure — per-Spirit proof of erasure
 
-Status: in-progress
+Status: done
 
 <!-- Created 2026-11-02 at a8af3215 (main; origin 47631284) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30). D-20-11-01…10 are PROPOSED, not ruled — the operator rules; a different ruling rewrites only the clauses marked with that row. No cargo ran: cites re-read at HEAD (`creation/cites-a8af3215.md`); kernel and kloc by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`); prototypes saved as diffs, never applied. Stale epic cites are corrected here and owed to the epic (`creation/records-owed.md` §A). -->
 
-**Status rationale — ready-for-dev.** Prerequisite 20-3c is `done` (PF:129). Nothing needs a machine the repository
-lacks: the hermetic harness and door cover the local categories; only AC6 (a running spawned Spirit) needs the
-hosted T3 substrate (`provision-t3-test-substrate`). The ruled final kernel landing is mandatory for AC3 and
-watchdog cleanup; L1 remains kernel-free (ask `halt_landing`, 2026-11-04).
+**Status rationale — done (2026-11-12).** Both landings, their review rounds and the hosted AC5/AC6 proof are on main:
+L1 `cbed4dad`/`88c7277c`/`063c13cf`, L2 `689a6a53` with corrections `5ff0ead1` and `c2beedb4`, and the AC5 widening `5fe97eda`.
+The hosted proof is hosted discipline run `43175946640` @`637721bf` (conclusion success, 199 jobs; only the advisory reproducible-build failed on runner disk exhaustion), job `workspace-test-suite` `131040117355`. AC5 closes under the operator's amendment (ruling `ac5`), AC6.1 under the AC6.3 fallback, and the private/index hold lease is a NAMED GAP under rule 10(b), not a delivered claim.
+See [closure note](20-11-erasure-inventory-closure-evidence/closure/closure-note.md).
 
 **T0 STOP history — 2026-11-04, HEAD `73e7afbc` (Dev2011).** Measurement 2 reproduced the unreceipted
 second-drain race with the real scheduler and `invoke_halt`: an `Unloaded` SCB accepts a durable halt which
@@ -303,7 +303,9 @@ The page-size plant must still red. The companion work fixture isolates SQL work
 real door vectors retain 100k/1M rows with 1 KiB payloads on disk/WAL. An unchanged-deadline HTTP503
 `handler_still_running` is only **pending**, never erased; its handler must finish, its completion
 receipt be observed, and an identical subsequent request return a completed report with original
-tombstone/unrelated bytes intact. No new refusal type or wider route/observation deadline.
+tombstone/unrelated bytes intact. No new refusal type or wider route/observation deadline (**amended 2026-11-12 below**).
+
+**Amendment — operator ruling `ac5` = widen (2026-11-12, commit `5fe97eda`).** "Real 1M completion at unchanged deadlines" is amended to: real 1M completion within an allowance of 10 s route budget (unchanged) plus a 30 s second wait for the durable completion receipt (was 10 s), 40 s in total, measured from the forget submission (`erasure_million_20_11.rs:160-178`, `start` to the receipt; fixture setup is not in the allowance). Every product deadline, every assertion (completion receipt observed, original tombstone/unrelated bytes intact, identical repeat completes) and the 25% wall oracle are unchanged. Hosted PASS: hosted discipline run `43175946640` @`637721bf` (conclusion success, 199 jobs; only the advisory reproducible-build failed on runner disk exhaustion), job `workspace-test-suite` `131040117355`, `ac5_million_row_pending_forget_finishes_and_repeats_without_corruption` PASS [43.597 s whole-test wall including the 1M-row fixture; the PASS line does not itself report the forget-to-receipt time, so staying inside 40 s is implied by the test's own 30 s `deadline` assertion, not independently read from the log]. Hosted proof is one run.
 
 
 ### AC6 — a running spawned Spirit (epic AC2's T3 clause)
@@ -320,6 +322,8 @@ L1 must not claim that kernel-dependent proof or borrow a hosted run from an anc
 3. T0 measurement 7 decides whether a T3 Worker manifest is admitted with `[[schedule]]` and `on_schedule` enabled
    (the watchdog needs only a Running SCB and the lifecycle gate, `schedule_watchdog.rs:166-176`); if it is not, the
    leg uninstalls the running Worker with whichever AC2/AC3 category its live state holds and the record says why.
+
+**Landed under the AC6.3 fallback (2026-11-12).** The Worker SCB has no schedules (`worker_spawn.rs` defaults them empty), so AC6.1's "`[[schedule]]` entry is firing" is not literally met for the Worker; the leg uninstalls the live running Worker and asserts `scheduled_invocations` = `VerifiedEmpty` plus the AC2 lineage category (`erasure_live_20_11.rs` `exercise(true)`); the researcher variant asserts the real firing (`Removed{1}`). Hosted: hosted discipline run `43175946640` @`637721bf` (conclusion success, 199 jobs; only the advisory reproducible-build failed on runner disk exhaustion), job `workspace-test-suite` `131040117355`, `ac6_running_t3_worker_uninstall_proves_live_inventory` PASS [2.461s]. Apple and Windows paths were not run.
 
 ### AC7 — the rest of the inventory is named (D-20-11-10)
 
@@ -341,9 +345,9 @@ L1 must not claim that kernel-dependent proof or borrow a hosted run from an anc
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight.** Rulings recorded; tracker → `in-progress`. Run `creation/measurements.md` "Not measured
+- [x] **T0 — Preflight.** Rulings recorded; tracker → `in-progress`. Run `creation/measurements.md` "Not measured
   here" 1–7; re-inventory per-Spirit stores (AC7); re-measure every cite this story touches (rule 9). A figure above
-  the ruled envelope or a result contradicting a ruled option is STOP + D-row.
+  the ruled envelope or a result contradicting a ruled option is STOP + D-row. Evidence: STOP and its rulings (D-20-11-11 A / O4) in `landing-1/t0-stop.md`, L2 re-measurement in `landing-2/t0-measurement.md`.
 - [x] **T1 — Proof format (AC1, D-09).** Evidence frames, per-category verification in `proof.rs` and `verify.py`,
   `NotFound` rule; failing-before + plant.
 - [x] **T2 — Intent lineage (AC2).** Admission-qualified stable-identity inventory, transactional scrub/marker and all-boot isolation; witnesses + plant.
@@ -353,17 +357,17 @@ L1 must not claim that kernel-dependent proof or borrow a hosted run from an anc
   `uninstall_package`, CLI doc and snapshot plant; `forget_spirit` and its plant at the final KS landing.
   - [x] L1 snapshot/package implementation and restored pre-unload plant.
   - [x] Final KS watchdog cleanup and its plant (landing 2: `forget_spirit`, live-door and kernel plants).
-- [ ] **T5 — EC-13 (AC5), REOPENED by review ruling 2026-11-05.** Hosted run `42533166219` passes the 100k writer and 1M completion/repeat vectors; full AC5/EC-13 remains open for final landing review of all clauses and controls. The shared-host timing/I/O half remains dispositioned under 20-7; earlier failures are retained. [Hosted evidence](20-11-erasure-inventory-closure-evidence/landing-1/hosted-evidence.md).
+- [x] **T5 — EC-13 (AC5), REOPENED by review ruling 2026-11-05; closed 2026-11-12.** hosted discipline run `43175946640` @`637721bf` (conclusion success, 199 jobs; only the advisory reproducible-build failed on runner disk exhaustion), job `workspace-test-suite` `131040117355`: `maos-bin::erasure_million_20_11 ac5_million_row_pending_forget_finishes_and_repeats_without_corruption` PASS [43.597 s test wall], `ac5_door_bounded_scan_admits_continuous_writer` PASS [4.664 s]; 100k writer-latency bound also hosted-green in `42533166219`. AC5 closes under the amended text recorded in AC5 (operator ruling `ac5` = widen). The shared-host timing/I/O half stays with `ops-stable-perf-runner` (20-7). [Hosted evidence](20-11-erasure-inventory-closure-evidence/landing-1/hosted-evidence.md), [closure note](20-11-erasure-inventory-closure-evidence/closure/closure-note.md).
 - [x] **T6 — Inventory (AC7).** Typed store list, named categories, vector + plant.
-- [ ] **T7 — T3 leg (AC6).** Hosted branch run under `provision-t3-test-substrate`; run id.
-- [ ] **T8 — L1 landing (kernel-free).** Exact pins inside the ruled envelope; `check-kernel-baseline` unchanged;
+- [x] **T7 — T3 leg (AC6).** hosted discipline run `43175946640` @`637721bf` (conclusion success, 199 jobs; only the advisory reproducible-build failed on runner disk exhaustion), job `workspace-test-suite` `131040117355`: `maos-bin::erasure_live_20_11 ac6_running_t3_worker_uninstall_proves_live_inventory` PASS [2.461s] and `ac2_live_door_erases_principal_free_lineage` PASS [1.521s]; `MAOS_T3_RUNTIME: podman` set on the job and `require_t3` fails closed on a declared-CI host (`tests/harness/t3_substrate.rs:9-27`, `tests/harness/ci.rs`). The Worker leg used the AC6.3 fallback (its SCB carries no `[[schedule]]`).
+- [x] **T8 — L1 landing (kernel-free).** Exact pins inside the ruled envelope; `check-kernel-baseline` unchanged;
   `kloc-check`, `check-service-boundary`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`;
   one hosted discipline run on the final tree. No commit or push without the operator.
   - [x] Local source/focused/structural gates, exact pins, final clippy delta, one standalone workspace execution and once-only final prepush recorded.
-  - [ ] Hosted discipline run `42533166219` failed on the 20-7 snapshot-owner timing family; signed-T3 Worker execution cannot be distinguished from the witness's successful early return using the log alone. Final landing review remains owed.
+  - [x] Hosted discipline run `42533166219` failed on the 20-7 snapshot-owner timing family and could not distinguish signed-T3 Worker execution from an early return; superseded by hosted discipline run `43175946640` @`637721bf` (conclusion success, 199 jobs; only the advisory reproducible-build failed on runner disk exhaustion), job `workspace-test-suite` `131040117355`: all 6095 tests passed (3 slow, 137 skipped; `Summary [272.041s]`), including both `erasure_live_20_11` cases on a declared-CI host. Final-tree review accounting: [closure note](20-11-erasure-inventory-closure-evidence/closure/closure-note.md).
 - [x] **T9 — Final kernel landing (L2).** Granted KS + O4 last, together with AC3 halt counts/receipt category;
   re-based onto 26854/21051, measured +26/+18, FLAG-Winston record, exact pins/content hashes, single HaltRegistry
-  surface-hash refresh under ADR-066, O4 domain variant and AC8 landed 2026-11-11 (uncommitted); KH/KF not granted.
+  surface-hash refresh under ADR-066, O4 domain variant and AC8 landed 2026-11-11 (`689a6a53`; review rounds `5ff0ead1`, `c2beedb4`); KH/KF not granted.
 
 ## Dev Notes
 
@@ -997,6 +1001,8 @@ anthropic/claude-opus-5-5 (creation).
 
 openai-codex/gpt-6.1-sol (landing-1 T0 STOP investigation and Dev2011b L1 continuation).
 
+anthropic/claude-sonnet-5-5 (Dev2011k landing 2 and its correction rounds; DevFlakes ac5 widening; closing record, `Close2011`). Reviews: GPT `openai-codex/gpt-6.1-sol` (L1 rounds; L2 rounds 1 and 3, `landing-2/review/gpt-review*.md`), security `zai glm-5.3` (L1; L2 round 1, `landing-2/review/security.md`) and a GPT security reader for the L2 round-3 pass (`security-r3.md`, GLM quota exhausted).
+
 ### Debug Log References
 
 - [T0 STOP report and command ledger](20-11-erasure-inventory-closure-evidence/landing-1/t0-stop.md)
@@ -1104,6 +1110,7 @@ The run's epic-17-exit matrix, check-test-budget, check-perf-counts and macos-ch
 - The historical `cbed4dad` local landing claims above are superseded by the review-correction Dev Agent Record and evidence. The correction remains kernel-free; AC5/EC-13 is explicitly OPEN pending hosted <25% wall and 1M completion, and AC6's T3 substrate is unverified locally. AC3/KS/O4 and the private-tier/index hold lease remain final-kernel work, not implemented here. Original T0 evidence, failures and rulings are preserved; no tracker flip.
 - The2026-11-06 hosted follow-up adds durable marker-scoped replay, indexed program reuse with paired allocation protection, portable FIFO creation, and the explicitly calibrated serial heavy-test binary. These implementation changes do not close the still-hosted fullAC5 or Apple/T3 evidence obligations.
 - 2026-11-08 hosted evidence supersedes the preceding historical pending-hosted and Apple-compilation statements: both large-log vectors passed and Apple ARM all-targets compiled; AC5 formal closure, AC6 live-Worker execution and final-kernel work remain open.
+- **Closed 2026-11-12 (record-only; supersedes every "OPEN" statement above).** AC1-AC4, AC7 and AC8 landed with the commits named in the closure note; AC5 closed under the operator amendment `ac5` (widened second wait) and AC6 under the AC6.3 fallback, both on hosted discipline run `43175946640` @`637721bf` (job `workspace-test-suite` `131040117355`: `erasure_million_20_11` 1M PASS [43.597 s], `erasure_live_20_11` AC2 PASS [1.521s] and AC6 PASS [2.461s]; 6095 tests, 3 slow, 137 skipped). The private/index hold lease (`kernel_private_index_hold_lease`) is a NAMED GAP (rule 10(b); no AC requires it; the string at `main.rs:11667` still reads "pending final kernel landing" and was not edited). Caveats: hosted proof is a single run; Apple/Windows not run; the AC5 allowance is not read directly from the log. See [closure note](20-11-erasure-inventory-closure-evidence/closure/closure-note.md).
 
 ### File List
 
@@ -1112,7 +1119,7 @@ The run's epic-17-exit matrix, check-test-budget, check-perf-counts and macos-ch
 - `20-11-erasure-inventory-closure-evidence/landing-1/` — witness source, complete failing-before log,
   baseline measurements, command ledger and STOP report.
 - `deferred-work.md` — existing second-drain risk upgraded to observed, same owner; no closure.
-- `sprint-status.yaml` — dated shared-STOP/grant/landing notes; 20-11 remains ready-for-dev.
+- `sprint-status.yaml` — dated shared-STOP/grant/landing notes (at landing 1 the story was ready-for-dev; now `done`).
 - `20-1b-vetting-yank-policy-and-quarantine.md`, `20-4-gemini-driver-and-endpoint-pin.md`,
   `20-8-manifest-contract-completion.md`, `20-9-spawned-form-lifecycle-hooks.md`,
   `20-13-pluggable-crypto-provider-selection.md`, `20-14-complete-cost-attribution.md`,
@@ -1140,6 +1147,8 @@ The run's epic-17-exit matrix, check-test-budget, check-perf-counts and macos-ch
 - Landing 2 kernel: `crates/maos-kernel-core/src/{halt/mod.rs,halt/termination.rs,scheduler/schedule_watchdog.rs,scheduler/scheduler_loop.rs}`, `crates/maos-domain/src/halt.rs`, `docs/ci-baselines/kernel-surface-v0.1-beta.json` (single HaltRegistry hash), `xtask/kernel-core-baseline.toml`, `xtask/kloc.toml`, `xtask/tests/{kernel_pin_content_hash_16_0,recovery_lane_ceiling_rule}.rs`; new `crates/maos-kernel-core/tests/{halt_unload_fence_20_11,schedule_forget_spirit_20_11}.rs`.
 - Landing 2 production: `crates/maos-audit/src/{lib.rs,erasure/proof.rs}`, `tools/verify-erasure/verify.py`, `crates/maos-bin/src/{main,operator_door,spawned_lifecycle}.rs`.
 - Landing 2 tests/records: `crates/maos-audit/tests/erasure_review_20_11.rs`, `crates/maos-bin/tests/{erasure_inventory_20_11,erasure_live_20_11,shell_host_16_2}.rs`, `crates/maos-bin/tests/support/{shell_world_16_2,uninstall_review_20_11,worker_revoke_root}.rs`, `20-11-flag-winston-decision.md`, `deferred-work.md`, ADR-044, `tests/coverage-matrix.yaml`, `sprint-status.yaml`, epic-20/preflight mirrors, `20-11-erasure-inventory-closure-evidence/landing-2/`.
+- `20-11-erasure-inventory-closure-evidence/closure/closure-note.md` — closing record: AC table, hosted proof, amendment, claim boundary, caveats.
+- `deferred-work.md`, `sprint-status.yaml`, `tests/coverage-matrix.yaml` (FR65, NFR-Aud-12 notes) — closing stamps, owner rows re-worded, status `done`.
 
 ## Change Log
 
@@ -1166,7 +1175,8 @@ The run's epic-17-exit matrix, check-test-budget, check-perf-counts and macos-ch
 - 2026-11-06: Closing four record gates0; guarded owned-scratch/incremental cleanup0 removes544 stale sessions,8111838202 logical bytes /6504443904 last-link allocated-file bytes, with5914886144 observed Cargo free-space gain. Earlier positively identified aborted1M fixture cleanup is separately recorded; no source/pin/status change or checks after cleanup.
 - 2026-11-08: Recorded hosted run `42533166219` @ `a13140b8`: 100k/1M vectors pass; workspace fails only the known 20-7 snapshot-owner timing family. AC5/EC-13 stays open for final review, AC6 live Worker remains unverified from the log, final-kernel work remains owed, and status is unchanged.
 - 2026-11-11: **Loom whole-package leg skips the 1M vector** (Dev20Hosted; operator ruling 2026-11-11, ask `m1`, option 3 only): `check-multi-tenant-loom`'s `maos-bin-whole-package-parallel-isolation` leg now runs `cargo test -p maos-bin -- --skip ac5_million_row_pending_forget_finishes_and_repeats_without_corruption` (default parallelism and the three required `cross_team_consent_13_3` tests unchanged; test `whole_package_leg_skips_only_the_million_row_test`, red at `459a606a`). The heavy vector keeps its hosted serial-group coverage in the workspace nextest run (`.config/nextest.toml`); the loom leg is the `MAOS_HOME` race witness, not a 1M witness. No 20-11 oracle, deadline or budget changed. **AC5/EC-13 stays OPEN** until a hosted serial pass of that vector is cited at the final 20-11 landing; this skip is not that evidence.
-- 2026-11-11: **Landing 2 correction round 3** (Dev2011k, base `5ff0ead1`, uncommitted): F6 cap reversed (halts never dropped), I2 fail-stop on a duplicate minted id, bounded resolution-history scan, watchdog fence off the hook + bounded door wait; kernel 26,889/21,073, domain 10,215, bin 38,362, aggregate hardfail 202,506; `landing-2/review-corrections/plants-r3.md`. Status stays in-progress.
-- 2026-11-11: **Landing 2 review corrections** (Dev2011k, base `c402c29b`, uncommitted): GPT P1 + 2 P2 and GLM F1-F4/F6 corrected, F5 deferred; kernel P1 + F3 +6 tokei (26,891/21,075, inside the x2 ceiling), second `ScheduleWatchdog` surface-hash refresh, bin 38,335, audit 8,286, domain 10,220, aggregate hardfail 202,486; every correction red-before with plants; `landing-2/review-corrections/`. Status stays in-progress.
-- 2026-11-11: **Landing 2 (final kernel landing: KS + O4 + AC3), Dev2011k, base `345ae30f`** (uncommitted, awaiting orchestrator commit/review). T0 on a reverted `git archive HEAD` prototype: kernel 26854/21051 → 26880/21069 (**+26/+18 = grant**), domain 10211 → 10215 (+4); one HaltRegistry surface-hash refresh `b6d65243…` → `a917eddc…`. Every witness green in the final tree with red-before and plants (`landing-2/plants.md`). **Orchestrator-adjudicated overdraft, disclosed to the operator (D02 A):** maos-audit 20-11 ceiling 8,261 → 8,313 (pin 8,227 → 8,313, +86); maos-bin pin 38,061 → 38,202 (+141); aggregate hardfail 202,122 → 202,371. **Status stays in-progress:** AC5/EC-13 (hosted serial 1M pass), AC6 live T3 leg (hosted-only) and the private/index hold lease (named gap, separate grant) remain open.
+- 2026-11-11: **Landing 2 correction round 3** (Dev2011k, base `5ff0ead1`, committed `c2beedb4`): F6 cap reversed (halts never dropped), I2 fail-stop on a duplicate minted id, bounded resolution-history scan, watchdog fence off the hook + bounded door wait; kernel 26,889/21,073, domain 10,215, bin 38,362, aggregate hardfail 202,506; `landing-2/review-corrections/plants-r3.md`. Status stays in-progress.
+- 2026-11-11: **Landing 2 review corrections** (Dev2011k, base `c402c29b`, committed `5ff0ead1`): GPT P1 + 2 P2 and GLM F1-F4/F6 corrected, F5 deferred; kernel P1 + F3 +6 tokei (26,891/21,075, inside the x2 ceiling), second `ScheduleWatchdog` surface-hash refresh, bin 38,335, audit 8,286, domain 10,220, aggregate hardfail 202,486; every correction red-before with plants; `landing-2/review-corrections/`. Status stays in-progress.
+- 2026-11-11: **Landing 2 (final kernel landing: KS + O4 + AC3), Dev2011k, base `345ae30f`** (committed `689a6a53`). T0 on a reverted `git archive HEAD` prototype: kernel 26854/21051 → 26880/21069 (**+26/+18 = grant**), domain 10211 → 10215 (+4); one HaltRegistry surface-hash refresh `b6d65243…` → `a917eddc…`. Every witness green in the final tree with red-before and plants (`landing-2/plants.md`). **Orchestrator-adjudicated overdraft, disclosed to the operator (D02 A):** maos-audit 20-11 ceiling 8,261 → 8,313 (pin 8,227 → 8,313, +86); maos-bin pin 38,061 → 38,202 (+141); aggregate hardfail 202,122 → 202,371. **Status stays in-progress:** AC5/EC-13 (hosted serial 1M pass), AC6 live T3 leg (hosted-only) and the private/index hold lease (named gap, separate grant) remain open.
 - 2026-11-12: **Hosted run 43143326211 flakes (DevFlakes, test-only, kernel-free).** (1) Operator ruling `ac5` = widen: the 1M oracle's second wait 10 s → 30 s (total 40 s; route budget, deadlines, assertions, the 78 s exception unchanged; local PASS 38.106 s). (2) `cgroup_ceiling_smoke::killed_leader_cleanup_kills_its_surviving_descendant` read the descendant's `/proc/<pid>/stat` after it was reaped and got ESRCH (not `NotFound`): a vanished descendant is the success condition, so the test now counts ENOENT/ESRCH as gone, with a deterministic real-kernel vector, a classification vector, red-before and three plants. No pin moves (kernel 27103/21256, aggregate 203243, hardfail 203244, xtask 45461). Rule-10 rows in `deferred-work.md`; evidence `20-11-erasure-inventory-closure-evidence/landing-2/flakes/`. Hosted unverified.
+- 2026-11-12: **Story closed (`done`; record-only, `Close2011`).** Hosted run `43175946640` @`637721bf` carries the widened AC5 oracle and the AC6 live legs: 1M PASS [43.597 s], AC6 Worker PASS [2.461s]. AC5 text amended (ruling `ac5`), AC6.1 recorded under AC6.3, private/index hold lease named gap (rule 10(b)); EC-13 and the 20-11 owner rows closed or re-worded in `deferred-work.md`; FR65 / NFR-Aud-12 coverage notes updated; closure note `20-11-erasure-inventory-closure-evidence/closure/closure-note.md`. Status flipped last.
