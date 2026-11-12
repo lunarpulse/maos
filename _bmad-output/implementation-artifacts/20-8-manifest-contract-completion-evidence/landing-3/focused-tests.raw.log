@@ -1,0 +1,35 @@
+test ac3_19_5_a_failed_later_hop_records_and_restores_the_committed_hop ... ok
+test ac3_19_5_a_minimal_hot_swap_target_still_writes_its_identity_record ... ok
+test ac12_20_1b_a_failing_revocation_poll_is_printed_once ... ok
+test planned_upgrade_refuses_an_alternate_final_candidate_instead_of_the_vetted_target ... ok
+test planned_upgrade_refuses_an_initially_unvetted_intermediate ... ok
+test planned_upgrade_refuses_an_intermediate_identity_change_before_mutation ... ok
+test planned_upgrade_vets_the_intermediate_snapshot_after_path_replacement ... ok
+test planned_upgrade_uses_the_vetted_final_snapshot ... ok
+test vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9 ... ok
+
+test result: ok. 47 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.98s
+
+test table_is_non_empty_and_exactly_the_expected_surface ... ok
+test help_output_parses_like_the_gate_parses_it ... ok
+test unknown_verb_exits_non_zero_with_the_table ... ok
+test version_flag_prints_the_version_line ... ok
+test help_output_is_exactly_the_frozen_table ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+    = help: to override `-D warnings` add `#[allow(clippy::type_complexity)]`
+
+error: using `contains()` instead of `iter().any()` is more efficient
+   --> crates/maos-spirit-abi/src/lifecycle.rs:518:5
+    |
+518 |     enabled_hooks.iter().any(|&h| h == hook_name)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `enabled_hooks.contains(&hook_name)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_contains
+    = note: `-D clippy::manual-contains` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_contains)]`
+
+    Checking maos-frame-codec v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-frame-codec)
+error: could not compile `maos-spirit-abi` (lib) due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...

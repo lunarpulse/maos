@@ -1,0 +1,35 @@
+[
+ {
+  "name": "ignore-live-declaration",
+  "file": "crates/maos-bin/src/operator_door.rs",
+  "change": "`.map(|section| section.preserve)` -> `.map(|_| Vec::new())` (the live SCB declaration is read and then discarded)",
+  "log": "../precheck-live-scb-plant-ignore-live-red.raw.log",
+  "red": [
+   "spawned_installed_20_9::an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invariant",
+   "one_daemon_one_door_16_1::ac8_20_8_precheck_reports_a_dropped_swap_invariant",
+   "precheck_live_scb_20_8::a_precheck_follows_the_live_scb_declaration_not_the_retained_text"
+  ],
+  "exit": 101,
+  "restore": "copy-back + cmp rc 0 + touch"
+ },
+ {
+  "name": "compare-before-kernel-parse",
+  "file": "crates/maos-bin/src/operator_door.rs",
+  "change": "the live-declaration comparison moved above `hot_swap_coordinator.precheck` (the early return the first correction had)",
+  "log": "../precheck-parse-order-plant-red.raw.log",
+  "red": ["one_daemon_one_door_16_1::ac8_20_8_precheck_of_a_malformed_invariant_section_is_a_parse_refusal_not_a_drop"],
+  "exit": 101,
+  "restore": "copy-back + cmp rc 0 + touch"
+ },
+ {
+  "name": "raw-name-under-hex-label-corrected",
+  "file": "crates/maos-kernel-core/src/hot_swap/coordinator.rs",
+  "change": "`{hex}` -> `{invariant}` only; NO appended byte (the landing-2 plant also appended `{}` of `hex.len() * 0`, a literal `0`, which made the 32-hex group odd-length by itself)",
+  "log": "plant-raw-name-under-hex-label-corrected.log",
+  "diff": "plant-raw-name-under-hex-label-corrected-diff.txt",
+  "red": ["swap_invariants_20_8::a_redactor_shaped_dropped_name_is_recoverable_from_the_receipt (hex group: OddLength)", "swap_invariants_20_8::a_successor_that_drops_a_declared_invariant_is_refused_before_any_hook (hex group: InvalidHexCharacter)"],
+  "persisted_marker": "<REDACTED:type=capability_token,len=32,hash=576c> (printed by a throwaway copy of the vector, deleted afterwards)",
+  "exit": 101,
+  "restore": "copy-back + cmp rc 0 + touch (git status of crates/maos-kernel-core: clean afterwards)"
+ }
+]

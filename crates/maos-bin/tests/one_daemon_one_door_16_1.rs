@@ -2547,6 +2547,120 @@ fn ac8_20_8_a_cold_swap_that_drops_a_swap_invariant_is_a_typed_409_before_unload
     assert_eq!(root.lifecycle_state("butler").as_deref(), Some("Running"));
 }
 
+/// Story 20-8 (deferred-work row "precheck does not report a dropped
+/// invariant") — the dry run reports what the real swap refuses: a successor
+/// that drops a predecessor-declared swap invariant is `safe: false` with the
+/// door verdict `SwapInvariantDropped` naming the invariant and terminal code
+/// 2, never the `SafeDrained` the coordinator's precheck alone computes; a
+/// superset successor is not so reported.
+///
+/// Proven red (`landing-3/precheck-door.md`): without the door comparison the
+/// dropping successor prechecks `safe` (exit 0).
+#[test]
+fn ac8_20_8_precheck_reports_a_dropped_swap_invariant() {
+    let fixtures = tempfile::TempDir::new().expect("fixture dir");
+    let predecessor = write_fixture(
+        fixtures.path(),
+        "butler-0.3.0.toml",
+        &butler_preserving("0.3.0", &["open_pr_state", "review_queue"]),
+    );
+    let root = Root::spawn("precheck-invariants", utf8(&predecessor), &[], None);
+
+    let dropping = write_fixture(
+        fixtures.path(),
+        "butler-0.3.1-drops.toml",
+        &butler_preserving("0.3.1", &["open_pr_state"]),
+    );
+    let out = root.ctl(&[
+        "spirit",
+        "hot-swap-precheck",
+        "butler",
+        "--to",
+        utf8(&dropping),
+    ]);
+    assert_eq!(code(&out), 2, "an unsafe verdict: {}", stderr(&out));
+    let report = report_of(&out);
+    assert_eq!(report["safe"], false, "{report}");
+    assert_eq!(report["terminal_code"], 2, "{report}");
+    assert_eq!(
+        report["verdict"]["verdict"], "SwapInvariantDropped",
+        "{report}"
+    );
+    assert_eq!(report["verdict"]["cause"], "review_queue", "{report}");
+
+    let superset = write_fixture(
+        fixtures.path(),
+        "butler-0.3.1.toml",
+        &butler_preserving("0.3.1", &["review_queue", "open_pr_state", "triage_cursor"]),
+    );
+    let out = root.ctl(&[
+        "spirit",
+        "hot-swap-precheck",
+        "butler",
+        "--to",
+        utf8(&superset),
+    ]);
+    let report = report_of(&out);
+    assert_ne!(
+        report["verdict"]["verdict"], "SwapInvariantDropped",
+        "{report}"
+    );
+    assert_eq!(code(&out), 0, "a superset prechecks safe: {report}");
+}
+
+/// Story 20-8 review correction (GPT P2) — a successor whose `swap_invariants` is a
+/// malformed scalar is refused by the kernel's manifest parser (`precheck_failed`), the
+/// same refusal with and without a predecessor-declared invariant, never reported as
+/// the structural `SwapInvariantDropped` the retained-text comparison would read it as
+/// (the helper treats an unreadable section as "declares nothing").
+#[test]
+fn ac8_20_8_precheck_of_a_malformed_invariant_section_is_a_parse_refusal_not_a_drop() {
+    let fixtures = tempfile::TempDir::new().expect("fixture dir");
+    let malformed = write_fixture(
+        fixtures.path(),
+        "butler-0.3.1-malformed.toml",
+        &format!(
+            "swap_invariants = false\n{}",
+            butler_at("0.3.1", "")
+                .replace("manifest_schema_version = 2", "manifest_schema_version = 7")
+        ),
+    );
+    let predecessor = write_fixture(
+        fixtures.path(),
+        "butler-0.3.0.toml",
+        &butler_preserving("0.3.0", &["open_pr_state", "review_queue"]),
+    );
+    for (label, root) in [
+        (
+            "a predecessor declaring invariants",
+            Root::spawn("precheck-malformed", utf8(&predecessor), &[], None),
+        ),
+        (
+            "the control: a predecessor declaring none",
+            Root::butler("precheck-malformed-control"),
+        ),
+    ] {
+        let out = root.ctl(&[
+            "spirit",
+            "hot-swap-precheck",
+            "butler",
+            "--to",
+            utf8(&malformed),
+        ]);
+        let err = stderr(&out);
+        assert_eq!(code(&out), 1, "{label}: a typed refusal: {err}");
+        assert!(
+            err.contains("precheck_failed") && err.contains("swap_invariants"),
+            "{label}: the parser's refusal, naming the section: {err}"
+        );
+        assert!(
+            !err.contains("SwapInvariantDropped")
+                && !String::from_utf8_lossy(&out.stdout).contains("SwapInvariantDropped"),
+            "{label}: not the structural verdict: {err}"
+        );
+    }
+}
+
 /// AC6.1 (D-19-5-10 C) — a `[cli_wrapper]` Worker is not a Spirit form
 /// (ADR-060): an upgrade naming one is refused with its own typed code,
 /// not the `target_manifest_unparseable` it fell into for lack of `[class]`.

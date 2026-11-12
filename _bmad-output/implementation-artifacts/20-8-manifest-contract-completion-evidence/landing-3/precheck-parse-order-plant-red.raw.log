@@ -1,0 +1,56 @@
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+58 ~     fn retract(
+...
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+help: use `'_` for type paths
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+note: but the private item here shadows it
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+note: multiple earlier patterns match some of the same values
+   Compiling maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.67s
+     Running tests/one_daemon_one_door_16_1.rs (/mnt/build/cargo-maos/debug/deps/one_daemon_one_door_16_1-f47e29494811b4ac)
+running 2 tests
+test ac8_20_8_precheck_reports_a_dropped_swap_invariant ... ok
+test ac8_20_8_precheck_of_a_malformed_invariant_section_is_a_parse_refusal_not_a_drop ... FAILED
+failures:
+---- ac8_20_8_precheck_of_a_malformed_invariant_section_is_a_parse_refusal_not_a_drop stdout ----
+thread 'ac8_20_8_precheck_of_a_malformed_invariant_section_is_a_parse_refusal_not_a_drop' (640508) panicked at crates/maos-bin/tests/one_daemon_one_door_16_1.rs:2651:9:
+assertion `left == right` failed: a predecessor declaring invariants: a typed refusal: 
+  left: 2
+ right: 1
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::<i32, i32>
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:394:5
+   4: ac8_20_8_precheck_of_a_malformed_invariant_section_is_a_parse_refusal_not_a_drop
+             at ./tests/one_daemon_one_door_16_1.rs:2651:9
+   5: one_daemon_one_door_16_1::ac8_20_8_precheck_of_a_malformed_invariant_section_is_a_parse_refusal_not_a_drop::{closure#0}
+             at ./tests/one_daemon_one_door_16_1.rs:2617:86
+   6: <one_daemon_one_door_16_1::ac8_20_8_precheck_of_a_malformed_invariant_section_is_a_parse_refusal_not_a_drop::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+failures:
+    ac8_20_8_precheck_of_a_malformed_invariant_section_is_a_parse_refusal_not_a_drop
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 47 filtered out; finished in 1.22s
+error: test failed, to rerun pass `-p maos-bin --test one_daemon_one_door_16_1`

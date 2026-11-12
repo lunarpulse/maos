@@ -1,0 +1,7 @@
+crates/maos-bin/src/admission.rs
+crates/maos-bin/src/operator_door.rs
+crates/maos-bin/tests/one_daemon_one_door_16_1.rs
+crates/maos-bin/tests/spawned_installed_20_9.rs
+crates/maos-bin/tests/precheck_live_scb_20_8.rs
+xtask/kloc.toml
+_bmad-output/implementation-artifacts/20-8-manifest-contract-completion-evidence/landing-3/precheck-door.md

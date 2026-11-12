@@ -1,0 +1,55 @@
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+58 ~     fn retract(
+...
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+help: use `'_` for type paths
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+note: but the private item here shadows it
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+note: multiple earlier patterns match some of the same values
+   Compiling maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.51s
+     Running tests/precheck_live_scb_20_8.rs (/mnt/build/cargo-maos/debug/deps/precheck_live_scb_20_8-961841bf0c8caf85)
+running 1 test
+test a_precheck_follows_the_live_scb_declaration_not_the_retained_text ... FAILED
+failures:
+---- a_precheck_follows_the_live_scb_declaration_not_the_retained_text stdout ----
+thread 'a_precheck_follows_the_live_scb_declaration_not_the_retained_text' (645913) panicked at crates/maos-bin/tests/precheck_live_scb_20_8.rs:161:5:
+assertion `left == right` failed: the live declaration is kept: {"spirit_id":"hello-spirit","target_manifest":"/tmp/.tmpZZSMZr/keeps.toml","verdict":{"verdict":"SwapInvariantDropped","cause":"reverted_extra"},"safe":false,"terminal_code":2}
+  left: Bool(false)
+ right: true
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::<serde_json::value::Value, bool>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: precheck_live_scb_20_8::a_precheck_follows_the_live_scb_declaration_not_the_retained_text
+             at ./tests/precheck_live_scb_20_8.rs:161:5
+   5: precheck_live_scb_20_8::a_precheck_follows_the_live_scb_declaration_not_the_retained_text::{closure#0}
+             at ./tests/precheck_live_scb_20_8.rs:116:71
+   6: <precheck_live_scb_20_8::a_precheck_follows_the_live_scb_declaration_not_the_retained_text::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+failures:
+    a_precheck_follows_the_live_scb_declaration_not_the_retained_text
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+error: test failed, to rerun pass `-p maos-bin --test precheck_live_scb_20_8`

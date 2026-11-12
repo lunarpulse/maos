@@ -1,0 +1,57 @@
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+58 ~     fn retract(
+...
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+help: use `'_` for type paths
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+note: but the private item here shadows it
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+note: multiple earlier patterns match some of the same values
+   Compiling maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.25s
+     Running tests/spawned_installed_20_9.rs (/mnt/build/cargo-maos/debug/deps/spawned_installed_20_9-5150bd0f4d621de3)
+running 2 tests
+test an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invariant ... FAILED
+test an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run ... ok
+failures:
+---- an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invariant stdout ----
+maos-registry: listening on 127.0.0.1:41077
+thread 'an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invariant' (636192) panicked at crates/maos-bin/tests/spawned_installed_20_9.rs:247:5:
+assertion `left == right` failed: an unsafe verdict: {"spirit_id":"lifecycle-probe","target_manifest":"/tmp/registry-20-1-636190-1794472713052083366/package/v2-drops.toml","verdict":{"verdict":"SafeDrained","predecessor_halt_protocol_version":1,"successor_accepted_versions":[1],"drained_count":0,"migrated_count":null,"schema_compat":"SameMajor","auto_revert_window_seconds":30},"safe":true,"terminal_code":0}
+  left: Some(0)
+ right: Some(2)
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::<core::option::Option<i32>, core::option::Option<i32>>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: spawned_installed_20_9::an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invariant
+             at ./tests/spawned_installed_20_9.rs:247:5
+   5: spawned_installed_20_9::an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invariant::{closure#0}
+             at ./tests/spawned_installed_20_9.rs:203:87
+   6: <spawned_installed_20_9::an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invariant::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+failures:
+    an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invariant
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.10s
+error: test failed, to rerun pass `-p maos-bin --test spawned_installed_20_9`

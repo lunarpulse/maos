@@ -1,0 +1,81 @@
+== check-serde-error-handling
+{"passed":true,"violation_count":0,"violations":[]}
+exit=0
+== check-dev-model-tier
+{"gate":"check-dev-model-tier","passed":true,"oracle_green":true,"binding":"Blocking","enforce_from_epic":12,"stories_checked":104,"stories_skipped_pre_dev":0,"violations":[]}
+exit=0
+== check-kernel-baseline
+{
+  "passed": true,
+  "actual-lines": 26062,
+  "pinned-lines": 26062,
+  "baseline-file": "/home/lunarpulse/dev_ws/xtask/kernel-core-baseline.toml",
+  "file-set-entries": 90,
+  "set-hash": "6eaa5c6ab6e8e49505d16615ad5c20c58d1988fe8713e26be23ef6892dbc50fc",
+  "pinned-set-hash": "6eaa5c6ab6e8e49505d16615ad5c20c58d1988fe8713e26be23ef6892dbc50fc",
+  "changed": [],
+  "added": [],
+  "removed": []
+}
+exit=0
+== check-service-boundary
+      }
+    }
+  },
+  "spirit_abi_types": {
+    "trait_method_count": 14,
+    "vtable_field_count": 14,
+    "hook_names_match": true,
+    "repr_c_present": true,
+    "count_hooks_macro_matches": true,
+    "expected_hook_count": 14
+  }
+}
+exit=0
+== check-dev-record-completeness
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1729: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1730: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1734: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1735: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1737: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1738: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1739: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1740: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1742: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1743: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1744: ownerless and open, with a recorded disposition
+{"passed":true,"violation_count":0,"violations":[],"done_stories_checked":205,"deferred_owner_assertions":374,"owned_but_deferred":[],"not_a_vehicle":[],"ownerless_undispositioned":[],"ownerless_dispositioned":["deferred-work.md:18: ownerless and open, with a recorded disposition","deferred-work.md:95: ownerless and open, with a recorded disposition","deferred-work.md:122: ownerless and open, with a recorded disposition","deferred-work.md:126: ownerless and open, with a recorded disposition","de
+exit=0
+== check-epic-close-coherence
+{
+  "gate": "check-epic-close-coherence",
+  "passed": true,
+  "epics-checked": 21,
+  "authoritative-src-lines": 26062,
+  "violations": []
+}
+exit=0
+== check-exit-commands
+{"gate":"check-exit-commands","passed":true,"epics_in_roster":2,"blocks_read":2,"tokens_resolved":10,"owed":[],"findings":[],"surface_notes":[],"surfaces":{"maos":9,"maosctl":27,"xtask":99,"one_shot_modes":32}}
+exit=0
+== check-decision-register
+{"gate":"check-decision-register","register":"_bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md","rows":23,"open_rows":6,"resolved_targets":30,"unqueryable_deadlines":[{"row":"D19","deadline":"UNQUERYABLE — \"before the next `j1-*` story leaves `ready-for-dev`\" was SELF-VOIDING: 2c is the lane closer and there is no next `j1-*` story. It bound at the round-table or never."}],"findings":[],"passed":true}
+exit=0
+== check-env-contract
+{"passed":true,"registered_count":124,"violations":[]}
+check-env-contract: PASS (124 maos-bin/src MAOS_* vars registered, 0 violations; workspace-wide env surface is Story 21-4 / xtask env-contract.toml — D-I)
+exit=0
+== invariant-lock
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    }
+  },
+  "touched_invariants": [],
+  "missing_corpus_delta": false,
+  "missing_phase_commitment": false,
+  "insufficient_reviews": false,
+  "regression_detected": [],
+  "review_count": 0
+}
+exit=0

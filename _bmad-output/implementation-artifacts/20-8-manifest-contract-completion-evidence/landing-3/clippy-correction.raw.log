@@ -1,0 +1,5 @@
+# cargo clippy -p maos-bin --all-targets --features wasm-host --message-format short (exit 0 without -D warnings; -D warnings stops in maos-spirit-abi on rustc 1.98 lints: pre-existing)
+# diagnostics located in the changed files:
+crates/maos-bin/src/operator_door.rs:546:23: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-bin/src/operator_door.rs:3024:53: warning: useless conversion to the same type: `maos_skill::ESkillStore`: help: consider removing `.into()`: `e`
+# changed regions: admission.rs 682-709, operator_door.rs 1739-1826, one_daemon_one_door_16_1.rs 2611-2660, spawned_installed_20_9.rs, precheck_live_scb_20_8.rs: no diagnostic

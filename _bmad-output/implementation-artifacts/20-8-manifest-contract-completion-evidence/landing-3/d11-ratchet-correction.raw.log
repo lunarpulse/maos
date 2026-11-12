@@ -1,0 +1,97 @@
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+58 ~     fn retract(
+...
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+help: use `'_` for type paths
+   Compiling maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+...
+...
+note: multiple earlier patterns match some of the same values
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+note: but the private item here shadows it
+...
+...
+...
+...
+...
+...
+...
+...
+...
+   Compiling maos-control v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-control)
+   Compiling maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench)
+   Compiling maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell)
+   Compiling maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+   Compiling xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+...
+...
+...
+...
+...
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.41s
+     Running tests/d11_xtask_ceiling_ratchet.rs (/mnt/build/cargo-maos/debug/deps/d11_xtask_ceiling_ratchet-491ff42606e396ef)
+running 9 tests
+test ceiling_raise_after_every_numbered_epic_is_done_reds ... ok
+test ceiling_raise_citing_a_done_story_reds ... ok
+test ceiling_raise_without_a_story_citation_reds ... ok
+test ceiling_raise_citing_an_open_story_passes ... ok
+test the_tree_bound_inputs_exist ... ok
+test the_ceiling_is_not_frozen_while_a_numbered_epic_is_open ... ok
+test the_live_xtask_ceiling_cites_a_real_sprint_story ... FAILED
+test the_retirement_row_matches_its_exact_story_arrow ... FAILED
+test planted_current_row_raises_cannot_borrow_historical_or_done_grants ... ok
+failures:
+---- the_live_xtask_ceiling_cites_a_real_sprint_story stdout ----
+thread 'the_live_xtask_ceiling_cites_a_real_sprint_story' (654316) panicked at xtask/tests/d11_xtask_ceiling_ratchet.rs:236:5:
+assertion `left == right` failed: current xtask grant is unauthorized
+  left: Err(DoneStory)
+ right: Ok(())
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::<core::result::Result<(), d11_xtask_ceiling_ratchet::Refusal>, core::result::Result<(), d11_xtask_ceiling_ratchet::Refusal>>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: the_live_xtask_ceiling_cites_a_real_sprint_story
+             at ./tests/d11_xtask_ceiling_ratchet.rs:236:5
+   5: d11_xtask_ceiling_ratchet::the_live_xtask_ceiling_cites_a_real_sprint_story::{closure#0}
+             at ./tests/d11_xtask_ceiling_ratchet.rs:232:54
+   6: <d11_xtask_ceiling_ratchet::the_live_xtask_ceiling_cites_a_real_sprint_story::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+---- the_retirement_row_matches_its_exact_story_arrow stdout ----
+thread 'the_retirement_row_matches_its_exact_story_arrow' (654317) panicked at xtask/tests/d11_xtask_ceiling_ratchet.rs:391:5:
+assertion `left == right` failed: a ceiling above retirement requires a later authorized grant
+  left: Err(DoneStory)
+ right: Ok(())
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::<core::result::Result<(), d11_xtask_ceiling_ratchet::Refusal>, core::result::Result<(), d11_xtask_ceiling_ratchet::Refusal>>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: the_retirement_row_matches_its_exact_story_arrow
+             at ./tests/d11_xtask_ceiling_ratchet.rs:391:5
+   5: d11_xtask_ceiling_ratchet::the_retirement_row_matches_its_exact_story_arrow::{closure#0}
+             at ./tests/d11_xtask_ceiling_ratchet.rs:375:54
+   6: <d11_xtask_ceiling_ratchet::the_retirement_row_matches_its_exact_story_arrow::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+failures:
+    the_live_xtask_ceiling_cites_a_real_sprint_story
+    the_retirement_row_matches_its_exact_story_arrow
+test result: FAILED. 7 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+error: test failed, to rerun pass `-p xtask --test d11_xtask_ceiling_ratchet`

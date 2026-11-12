@@ -71,8 +71,10 @@ fn text(output: &std::process::Output) -> String {
     )
 }
 
-#[test]
-fn an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run() {
+/// An installed component (`maos spirit install`, then the shell root's boot) at `1.0.0`
+/// whose manifest appends `extra` (further sections); returns the running shell and the
+/// package directory a successor manifest can sit in.
+fn boot_installed(extra: &str) -> (Shell, std::path::PathBuf) {
     let scratch = Scratch::new();
     let server = InProcessServer::start(&scratch);
     let package = scratch.0.join("package");
@@ -83,7 +85,7 @@ fn an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run
     let published = package.join("manifest.toml");
     std::fs::write(
         &published,
-        manifest(ID, "1.0.0", "dist/lifecycle_probe.wasm", &ALL_HOOKS, "").replace(
+        manifest(ID, "1.0.0", "dist/lifecycle_probe.wasm", &ALL_HOOKS, extra).replace(
             "trust_tier = \"local\"",
             "trust_tier = \"public-untrusted\"",
         ),
@@ -157,6 +159,12 @@ fn an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run
         );
         std::thread::sleep(Duration::from_millis(200));
     }
+    (shell, package)
+}
+
+#[test]
+fn an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run() {
+    let (shell, package) = boot_installed("");
     let pid = shell.field("pid").expect("the door reports its pid");
 
     // The successor's manifest sits beside its artifact; the installed predecessor is a
@@ -184,4 +192,90 @@ fn an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run
     );
     assert_eq!(shell.field("pid"), Some(pid), "the same pid");
     assert_eq!(shell.field("lifecycle_state").as_deref(), Some("Running"));
+}
+
+/// Story 20-8 review correction (GPT P2-1) — the dry run compares a successor against the
+/// predecessor's LIVE swap-invariant declaration, as the real swap does. An installed
+/// component's boot records no retained manifest text (a cold swap refuses it as
+/// `cold_swap_predecessor_unknown`), so a retained-text comparison had nothing to compare
+/// and called a dropping successor safe that the coordinator then refuses.
+#[test]
+fn an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invariant() {
+    let (shell, package) =
+        boot_installed("[swap_invariants]\npreserve = [\"open_pr_state\", \"review_queue\"]\n");
+    let pid = shell.field("pid").expect("the door reports its pid");
+    let successor = |name: &str, preserve: &str| {
+        let path = package.join(name);
+        let section = format!("[swap_invariants]\npreserve = [{preserve}]\n");
+        let text = manifest(ID, "1.1.0", "lifecycle_probe.wasm", &ALL_HOOKS, &section);
+        std::fs::write(&path, text).unwrap();
+        path
+    };
+    let swap = |path: &Path, policy: &str| {
+        shell.ctl(&[
+            "spirit",
+            "upgrade",
+            ID,
+            "--to",
+            path.to_str().unwrap(),
+            "--policy",
+            policy,
+        ])
+    };
+    let precheck = |path: &Path| {
+        let output = shell.ctl(&[
+            "spirit",
+            "hot-swap-precheck",
+            ID,
+            "--to",
+            path.to_str().unwrap(),
+        ]);
+        let report: serde_json::Value = serde_json::from_slice(&output.stdout)
+            .unwrap_or_else(|error| panic!("a precheck body ({error}): {}", text(&output)));
+        (output.status.code(), report)
+    };
+
+    let dropping = successor("v2-drops.toml", "\"open_pr_state\"");
+    // The premise: this root retained no manifest text for its installed component.
+    let cold = swap(&dropping, "cold-swap");
+    assert!(
+        text(&cold).contains("cold_swap_predecessor_unknown"),
+        "no retained text for an installed component: {}",
+        text(&cold)
+    );
+    let (exit, report) = precheck(&dropping);
+    assert_eq!(exit, Some(2), "an unsafe verdict: {report}");
+    assert_eq!(report["safe"], false, "{report}");
+    assert_eq!(
+        report["verdict"]["verdict"], "SwapInvariantDropped",
+        "{report}"
+    );
+    assert_eq!(report["verdict"]["cause"], "review_queue", "{report}");
+    let refused = swap(&dropping, "hot-swap");
+    assert!(
+        !refused.status.success()
+            && text(&refused).contains("swap_invariant_dropped")
+            && text(&refused).contains("review_queue"),
+        "the swap refuses what the precheck reported: {}\nshell: {}",
+        text(&refused),
+        shell.stderr()
+    );
+    assert_eq!(
+        shell.field("pid"),
+        Some(pid.clone()),
+        "the predecessor is untouched"
+    );
+
+    let superset = successor("v2-superset.toml", "\"review_queue\", \"open_pr_state\"");
+    let (exit, report) = precheck(&superset);
+    assert_eq!(exit, Some(0), "a superset prechecks safe: {report}");
+    assert_eq!(report["safe"], true, "{report}");
+    let swapped = swap(&superset, "hot-swap");
+    assert!(
+        swapped.status.success(),
+        "the swap takes what the precheck passed: {}\nshell: {}",
+        text(&swapped),
+        shell.stderr()
+    );
+    assert_eq!(shell.field("pid"), Some(pid), "the same pid");
 }

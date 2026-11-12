@@ -1,0 +1,6 @@
+test the_live_xtask_ceiling_cites_a_real_sprint_story ... ok
+test the_retirement_row_matches_its_exact_story_arrow ... ok
+test planted_current_row_raises_cannot_borrow_historical_or_done_grants ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+

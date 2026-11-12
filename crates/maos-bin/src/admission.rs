@@ -679,27 +679,33 @@ pub fn is_spawned_form(text: &str) -> bool {
     manifest_identity(text).is_ok_and(|class| class.forms == ["wasm-component"])
 }
 
-/// Story 20-8 (AC8) — the first `[swap_invariants].preserve` entry of `predecessor`
-/// that `successor` does not declare. Each side is read at schema >= 7, as
-/// admission and the kernel's successor parser do; a section that cannot be read
-/// declares nothing (a malformed successor is refused by its own admission).
+/// Story 20-8 (AC8) — the `[swap_invariants].preserve` entries `text` declares, read at
+/// schema >= 7 as admission and the kernel's successor parser do. A section that cannot
+/// be read declares nothing (a malformed successor is refused by its own parser first).
+fn declared_swap_invariants(text: &str) -> Option<Vec<String>> {
+    let root: toml::Value = toml::from_str(text).ok()?;
+    let fr8 = class_identity(&root)
+        .is_ok_and(|c| c.manifest_schema_version >= maos_manifest::FR8_DECLARATIONS_SINCE_SCHEMA);
+    let section = optional_section(
+        &root,
+        "swap_invariants",
+        maos_manifest::SwapInvariantsSection::from_toml_str,
+    );
+    section.ok().flatten().filter(|_| fr8).map(|s| s.preserve)
+}
+
+/// The first `[swap_invariants].preserve` entry of the retained `predecessor` text that
+/// `successor` does not declare (the cold swap's restore source is that text).
 pub fn dropped_swap_invariant(predecessor: &str, successor: &str) -> Option<String> {
-    let declared = |text: &str| -> Option<Vec<String>> {
-        let root: toml::Value = toml::from_str(text).ok()?;
-        let fr8 = class_identity(&root).is_ok_and(|c| {
-            c.manifest_schema_version >= maos_manifest::FR8_DECLARATIONS_SINCE_SCHEMA
-        });
-        let section = optional_section(
-            &root,
-            "swap_invariants",
-            maos_manifest::SwapInvariantsSection::from_toml_str,
-        );
-        section.ok().flatten().filter(|_| fr8).map(|s| s.preserve)
-    };
-    let kept = declared(successor).unwrap_or_default();
-    declared(predecessor)?
-        .into_iter()
-        .find(|name| !kept.contains(name))
+    first_unkept_swap_invariant(&declared_swap_invariants(predecessor)?, successor)
+}
+
+/// The first of `preserve` — a predecessor's LIVE declaration, the one the kernel's swap
+/// compares — that `successor` does not declare. The caller has already had the kernel's
+/// parser accept `successor`, so a parse failure is never read here as "declares nothing".
+pub fn first_unkept_swap_invariant(preserve: &[String], successor: &str) -> Option<String> {
+    let kept = declared_swap_invariants(successor).unwrap_or_default();
+    preserve.iter().find(|name| !kept.contains(name)).cloned()
 }
 
 /// Extract the validated class identity without imposing admission-only

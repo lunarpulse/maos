@@ -1769,29 +1769,60 @@ impl DoorInner {
         let from_version = self
             .loaded_version(spirit_id)
             .unwrap_or_else(|| "0.0.0".into());
-        match self
-            .hot_swap_coordinator
-            .precheck(spirit_id, target_manifest, &from_version)
+        // The kernel's own parser takes the successor first: a malformed section is
+        // `precheck_failed`, never read below as "declares nothing".
+        let verdict =
+            match self
+                .hot_swap_coordinator
+                .precheck(spirit_id, target_manifest, &from_version)
+            {
+                Ok(verdict) => verdict,
+                Err(error) => {
+                    return OperatorOutcome::Invalid {
+                        code: "precheck_failed".into(),
+                        detail: error.to_string(),
+                    }
+                }
+            };
+        // The real swap refuses a successor that drops a swap invariant the LIVE SCB
+        // declares (`swap_invariant_dropped`); the dry run reads that same declaration, not
+        // retained text (an installed component records none; a revert leaves it stale).
+        #[cfg(feature = "network")]
         {
-            Err(error) => OperatorOutcome::Invalid {
-                code: "precheck_failed".into(),
-                detail: error.to_string(),
-            },
-            Ok(verdict) => {
-                let safe = matches!(
-                    verdict.verdict,
-                    maos_domain::hot_swap::PrecheckOutcome::SafeDrained
-                        | maos_domain::hot_swap::PrecheckOutcome::SafeMigrated
-                );
-                OperatorOutcome::Completed(serde_json::json!({
+            let scbs = self.scheduler.scbs();
+            let live = scbs
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .values()
+                .find(|scb| scb.spirit_id == spirit_id)
+                .and_then(|scb| scb.runtime_snapshot().manifest.swap_invariants)
+                .map(|section| section.preserve)
+                .unwrap_or_default();
+            let successor = std::fs::read_to_string(&target_path).unwrap_or_default();
+            if let Some(invariant) =
+                crate::admission::first_unkept_swap_invariant(&live, &successor)
+            {
+                return OperatorOutcome::Completed(serde_json::json!({
                     "spirit_id": spirit_id,
                     "target_manifest": target_manifest,
-                    "verdict": verdict,
-                    "safe": safe,
-                    "terminal_code": if safe { 0 } else { 2 },
-                }))
+                    "verdict": { "verdict": "SwapInvariantDropped", "cause": invariant },
+                    "safe": false,
+                    "terminal_code": 2,
+                }));
             }
         }
+        let safe = matches!(
+            verdict.verdict,
+            maos_domain::hot_swap::PrecheckOutcome::SafeDrained
+                | maos_domain::hot_swap::PrecheckOutcome::SafeMigrated
+        );
+        OperatorOutcome::Completed(serde_json::json!({
+            "spirit_id": spirit_id,
+            "target_manifest": target_manifest,
+            "verdict": verdict,
+            "safe": safe,
+            "terminal_code": if safe { 0 } else { 2 },
+        }))
     }
 
     /// Uninstall over the door (D-16-1-L): unload the SCB FIRST (revoking

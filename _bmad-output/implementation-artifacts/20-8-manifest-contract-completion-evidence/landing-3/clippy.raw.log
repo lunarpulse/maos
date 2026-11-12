@@ -1,0 +1,30 @@
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/maos-bin/src/worker_spawn.rs:836:17
+    |
+836 |                 &permitted_egress,
+    |                 ^^^^^^^^^^^^^^^^^ help: change this to: `permitted_egress`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+    = note: `-D clippy::needless-borrow` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/maos-bin/src/worker_spawn.rs:844:17
+    |
+844 |                 &permitted_egress,
+    |                 ^^^^^^^^^^^^^^^^^ help: change this to: `permitted_egress`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/maos-bin/src/worker_spawn.rs:951:21
+    |
+951 |                     &permitted_egress,
+    |                     ^^^^^^^^^^^^^^^^^ help: change this to: `permitted_egress`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+
+error: could not compile `maos-bin` (lib test) due to 25 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `maos-bin` (lib) due to 20 previous errors

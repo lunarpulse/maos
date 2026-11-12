@@ -1,0 +1,11 @@
+--- crates/maos-kernel-core/src/hot_swap/coordinator.rs (orig)
++++ crates/maos-kernel-core/src/hot_swap/coordinator.rs (plant)
+@@ -209,7 +209,7 @@
+                 .join(":");
+             saga.compensate(
+                 SagaCompensation::RestorePredecessor {
+-                    reason: format!("swap invariant dropped (utf-8 hex, colon-separated): {hex}"),
++                    reason: format!("swap invariant dropped (utf-8 hex, colon-separated): {invariant}"),
+                 },
+                 &self.tl,
+                 &self.journal,
