@@ -25,6 +25,10 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest@0.9.149
+      # kloc-check shells out to tokei (run 43186933794: "failed to read tokei version"); v14.0.0 ships no
+      # release assets, so build from source exactly as discipline.yml does.
+      - name: Install tokei
+        run: cargo install --locked --version 14.0.0 tokei
       - uses: ./.github/actions/provision-t3-test-substrate
         if: ${{ !endsWith(matrix.image, '-arm') }}
       - name: Fixtures and witnesses
