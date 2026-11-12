@@ -1,0 +1,19 @@
+crypto.provider.selected	{"provider":"ring","version":"0.17.14","source":"config"}
+governance:manifest-declaration	{"recorded_at_ns":1794477475194951279,"effective_at_ns":1794477475194951279,"event":{"governance_type":"ManifestDeclaration","spirit_id":"example-spirit-ts","attempt_id":"01M77K2HBT0T30AX0D1EA372GV","outcome":"declared","version":"0.1.0","manifest_sha256":"f5d1:c77f:221b:5b69:d950:2655:0b55:d083:a37
+lifecycle.admit	{"spirit_id":"example-spirit-ts"}
+lifecycle.load	{"lifecycle_event":"Load","spirit_id":"example-spirit-ts","spirit_pid":1}
+governance:vetter-key-admission	{"recorded_at_ns":1794477475197257231,"effective_at_ns":1794477475197257231,"event":{"governance_type":"VetterKey","spirit_id":"example-spirit-ts","version":"0.1.0","admitted":true,"effective_tier":"SandboxTier(2)","journal_note":"admission granted"}}
+governance:manifest-declaration-outcome	{"attempt_id":"01M77K2HBT0T30AX0D1EA372GV","outcome":"admitted"}
+lifecycle.start	{"lifecycle_event":"Start","spirit_pid":1}
+spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":15929,"line":""}
+spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":15929,"line":"thread 'main' (18446744073709551615) panicked at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wasi-48.0.8/src/runtime.rs:32:10:"}
+spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":15929,"line":"called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }"}
+spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":15929,"line":"note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"}
+unplanned_crash	
+cli.subprocess.exit	{"event":"cli_subprocess_exit","cli_child_pid":15929,"exit_cause":"exited(code=101)","is_crash":true}
+unplanned_crash	{"halt_id":"term-example-spirit-ts-1-1794477494466749081","timestamp_ns":1794477494466749081,"spirit_pid":1,"boot_nonce":3477346794480649445,"frame_id":[1,161,207,49,144,194,179,202,131,143,172,13,100,174,45,48],"terminal_state":"Terminated","resolution_kind":"unplanned_crash","resolution_timestamp_
+lifecycle.crash	{"lifecycle_event":"Crash","spirit_id":"example-spirit-ts","spirit_pid":1,"cause":"fault.non-zero-exit"}
+cap.revoke	
+cap.revoke	
+governance:manifest-declaration	{"recorded_at_ns":1794477513506562576,"effective_at_ns":1794477513506562576,"event":{"governance_type":"ManifestDeclaration","spirit_id":"example-spirit-ts","attempt_id":"01M77K3PS2FB5XVPEY25WA47BM","outcome":"declared","version":"0.2.0","manifest_sha256":"fef9:1d08:34b7:12bf:30e0:7820:626f:cb54:299
+governance:manifest-declaration-outcome	{"attempt_id":"01M77K3PS2FB5XVPEY25WA47BM","outcome":"refused"}

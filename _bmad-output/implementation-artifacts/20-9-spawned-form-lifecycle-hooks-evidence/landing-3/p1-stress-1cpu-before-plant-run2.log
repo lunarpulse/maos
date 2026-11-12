@@ -1,0 +1,25 @@
+iter 1 FAIL
+test maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused ... FAILED
+---- maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused stdout ----
+thread 'maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused' (827121) panicked at crates/maos-bin/tests/spawned_door_20_9.rs:285:5:
+iter 2 PASS
+iter 3 PASS
+iter 4 PASS
+iter 5 FAIL
+test maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused ... FAILED
+---- maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused stdout ----
+thread 'maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused' (828375) panicked at crates/maos-bin/tests/spawned_door_20_9.rs:303:5:
+iter 6 PASS
+iter 7 PASS
+iter 8 PASS
+iter 9 PASS
+iter 10 FAIL
+test maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused ... FAILED
+---- maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused stdout ----
+thread 'maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused' (829867) panicked at crates/maos-bin/tests/spawned_door_20_9.rs:303:5:
+iter 11 PASS
+iter 12 FAIL
+test maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused ... FAILED
+---- maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused stdout ----
+thread 'maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused' (830417) panicked at crates/maos-bin/tests/spawned_door_20_9.rs:303:5:
+before (plant: no wait), 1cpu, run2: pass=8 fail=4 of 12 (vector + children pinned to cpu0 with 8 busy-loop jobs)

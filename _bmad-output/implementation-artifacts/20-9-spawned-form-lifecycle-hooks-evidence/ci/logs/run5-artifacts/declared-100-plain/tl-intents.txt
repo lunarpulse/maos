@@ -1,0 +1,17 @@
+crypto.provider.selected	{"provider":"ring","version":"0.17.14","source":"config"}
+governance:manifest-declaration	{"recorded_at_ns":1794477765493790999,"effective_at_ns":1794477765493790999,"event":{"governance_type":"ManifestDeclaration","spirit_id":"example-spirit-ts","attempt_id":"01M77KBCVNH5Z75DJCH6W6TDK1","outcome":"declared","version":"0.1.0","manifest_sha256":"f5d1:c77f:221b:5b69:d950:2655:0b55:d083:a37
+lifecycle.admit	{"spirit_id":"example-spirit-ts"}
+lifecycle.load	{"lifecycle_event":"Load","spirit_id":"example-spirit-ts","spirit_pid":1}
+governance:vetter-key-admission	{"recorded_at_ns":1794477765495636620,"effective_at_ns":1794477765495636620,"event":{"governance_type":"VetterKey","spirit_id":"example-spirit-ts","version":"0.1.0","admitted":true,"effective_tier":"SandboxTier(2)","journal_note":"admission granted"}}
+governance:manifest-declaration-outcome	{"attempt_id":"01M77KBCVNH5Z75DJCH6W6TDK1","outcome":"admitted"}
+lifecycle.start	{"lifecycle_event":"Start","spirit_pid":1}
+governance:manifest-declaration	{"recorded_at_ns":1794477815041538109,"effective_at_ns":1794477815041538109,"event":{"governance_type":"ManifestDeclaration","spirit_id":"example-spirit-ts","attempt_id":"01M77KCX8194MHN351XZXM036A","outcome":"declared","version":"0.2.0","manifest_sha256":"fef9:1d08:34b7:12bf:30e0:7820:626f:cb54:299
+governance:manifest-declaration-outcome	{"attempt_id":"01M77KCX8194MHN351XZXM036A","outcome":"admitted"}
+spirit.upgrade	{"spirit_id":"example-spirit-ts","predecessor_version":"0.1.0","successor_version":"0.2.0","policy":"hot-swap","outcome":"completed","latency_ns":28995815504,"halt_receipts_produced":0}
+cli.subprocess.exit	{"event":"cli_subprocess_exit","cli_child_pid":16107,"exit_cause":"exited(code=0)","is_crash":false}
+cli.subprocess.exit	{"event":"cli_subprocess_exit","cli_child_pid":16159,"exit_cause":"signaled(sig=9)","is_crash":true}
+cap.revoke	
+lifecycle.unload	{"lifecycle_event":"Unload","spirit_pid":1}
+planned_unload	
+planned_unload	{"halt_id":"term-example-spirit-ts-1-1794477820398878982","timestamp_ns":1794477820398878982,"spirit_pid":1,"boot_nonce":4403960780083607611,"frame_id":[1,161,207,54,137,238,75,87,192,34,75,178,180,172,60,71],"terminal_state":"Terminated","resolution_kind":"planned_unload","resolution_timestamp_ns":
+cap.revoke	

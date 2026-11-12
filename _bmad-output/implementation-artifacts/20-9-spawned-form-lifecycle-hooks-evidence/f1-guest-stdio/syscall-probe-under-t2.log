@@ -1,0 +1,9 @@
+# Raw output of a static C probe (syscall-probe.c) run through the kernel's real spawn_sandboxed at SandboxTier::T2
+# (scratch integration test in maos-wasm-host, since deleted; cargo test ... --nocapture), 2026-11-12, linux x86_64.
+# Unsandboxed, the same probe returns ok for every line.
+PROBE-STATUS exit status: 0
+epoll_create1  ret=-1 errno=1 (Operation not permitted)
+eventfd2       ret=-1 errno=1 (Operation not permitted)
+timerfd_create ret=-1 errno=1 (Operation not permitted)
+socketpair     ret=-1 errno=1 (Operation not permitted)
+pthread_create ret=0 errno=0 (ok)

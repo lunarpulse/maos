@@ -1,0 +1,13 @@
+# Scratch (not committed) test, deleted afterwards: the REAL componentize-js TypeScript component of
+# examples/example-spirit-ts with console.log added to idle()/swapIn() (console.error in idle()), run through the
+# fixed runner under the kernel's real spawn_sandboxed T2. F1_TS_COMPONENT=/tmp/f1-ts/dist/spirit.wasm
+# Sequence: idle, snapshot ("1"), swap-in "7", idle, snapshot ("8"); every reply Done/State, exit 0.
+TS-STDERR<<
+ts-idle 1
+ts-idle-err 1
+ts-swap-in 7
+ts-idle 8
+ts-idle-err 8
+>>
+test ts_component_console_log_under_t2 ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.03s

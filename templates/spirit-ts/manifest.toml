@@ -40,7 +40,12 @@ context_window_size = 4096
 time_cap_seconds = 360
 
 [resources]
-cpu_max_pct = 10
+# This example's cap, not a platform default. Starting a componentized-JS guest is CPU-bound:
+# under a 10% cap it took ~220 s to reach Ready (hosted run 43193905404, job 131099823857), past
+# the 90 s the operator door allows one hot-swap attempt, so the swap ended `upgrade_failed`. At
+# 100% the same start plus hot swap took 49.5 s (job 131099824049). The cap is still declared
+# and enforced (delegated cgroup-v2 `cpu.max`); only its value is this example's own.
+cpu_max_pct = 100
 memory_max_mb = 768
 
 [sandbox]

@@ -1,0 +1,2 @@
+maosctl: spirit upgrade — upgrade_failed: hot-swap coordinator error: swap-in failed for spirit example-spirit-ts: Panicked { panic_payload_preview: "lifecycle_child_closed" } (HTTP 500)
+ready_after_s=38

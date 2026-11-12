@@ -1,0 +1,27 @@
+         FAIL [   3.554s] (102/142) maos-bin::spawned_door_20_9 maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused
+   stdout ───
+ 
+     running 1 test
+     test maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused ... FAILED
+ 
+     failures:
+ 
+     failures:
+         maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused
+ 
+     test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 3.55s
+     
+   stderr ───
+ 
+     thread 'maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused' (27467) panicked at crates/maos-bin/tests/spawned_door_20_9.rs:303:5:
+     maosctl: spirit upgrade — cold_swap_failed: successor refused: class_build_failed: Spirit class construction failed: under /tmp/.tmpbz8nuM/package: session bridge failed: "absent.wasm": No such file or directory (os error 2); restore refused: class_build_failed: Spirit class construction failed: spawned_start_failed: session mailbox failed: spirit lifecycle-probe is already registered — deregister before re-registering; spirit 'lifecycle-probe' is not loaded (HTTP 500)
+ 
+     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ 
+         PASS [   6.310s] (103/142) maos-bin::spawned_door_20_9 maosctl_hot_swaps_a_component_at_the_same_pid_with_its_artifact_beside_the_target
+         PASS [  11.881s] (104/142) maos-bin::spawned_installed_20_9 an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run
+         PASS [   1.734s] (105/142) maos-bin::spawned_lifecycle_20_9 a_2_3_guest_receives_nothing_and_keeps_running
+         PASS [   4.308s] (106/142) maos-bin::spawned_lifecycle_20_9 a_hook_that_cannot_start_behind_another_export_is_dropped_without_a_strike
+         PASS [   2.339s] (107/142) maos-bin::spawned_lifecycle_20_9 a_looping_idle_exceeds_its_budget_and_ends_the_session_with_a_journaled_cause
+         PASS [   4.335s] (108/142) maos-bin::spawned_lifecycle_20_9 a_telemetry_drop_during_a_successful_forget_notice_leaves_the_purge_delivered
+         PASS [   6.313s] (109/142) maos-bin::spawned_lifecycle_20_9 a_telemetry_event_behind_a_long_turn_is_dropped_without_quarantine_or_a_late_run

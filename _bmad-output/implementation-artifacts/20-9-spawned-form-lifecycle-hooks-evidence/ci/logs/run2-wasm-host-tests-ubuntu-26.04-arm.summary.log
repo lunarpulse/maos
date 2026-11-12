@@ -1,0 +1,138 @@
+         PASS [   0.004s] ( 28/127) maos-bin::hook_pump_17_4 stderr_lines_escape_spirit_controlled_text
+         PASS [   0.004s] ( 36/127) maos-bin::one_daemon_one_door_16_1 ac1_19_5_cold_swap_oracle_accepts_recorded_late_revocation
+         PASS [   0.004s] ( 37/127) maos-bin::one_daemon_one_door_16_1 ac1_19_5_cold_swap_oracle_rejects_causality_and_duplicate_upgrade
+         PASS [   0.004s] ( 38/127) maos-bin::one_daemon_one_door_16_1 ac1_19_5_cold_swap_oracle_rejects_missing_or_misbound_rows
+         PASS [   0.005s] ( 35/127) maos-bin::one_daemon_one_door_16_1 ac1_19_5_cold_swap_oracle_accepts_early_revocation
+         PASS [   0.005s] (112/127) maos-bin::spawned_swap_20_9 a_late_end_of_an_older_attempt_never_unfences_a_newer_one
+         PASS [   0.007s] ( 44/127) maos-bin::one_daemon_one_door_16_1 ac2_19_5_out_of_window_schemas_keep_the_typed_door_codes
+         PASS [   0.009s] ( 98/127) maos-bin::spawned_lifecycle_20_9 admission_carries_schedule_for_every_form_and_refuses_a_malformed_entry_typed
+         PASS [   0.010s] ( 78/127) maos-bin::wasm_form_admission_17_3b gate_manifest_enforces_wasm_component_form_and_tier_before_engine_refusal
+         PASS [   0.013s] ( 62/127) maos-bin::one_daemon_one_door_16_1 ac5_control_json_with_nothing_listening_is_69
+         PASS [   0.018s] ( 63/127) maos-bin::one_daemon_one_door_16_1 ac5_no_endpoint_configured_is_78_and_writes_nothing
+         PASS [   0.026s] ( 70/127) maos-bin::one_daemon_one_door_16_1 malformed_operator_bind_configuration_exits_78
+         PASS [   0.029s] ( 11/127) maos-bin::hook_pump_17_4 declaration_storage_failure_stops_before_pid_issuance
+         PASS [   0.031s] ( 21/127) maos-bin::hook_pump_17_4 missing_skill_is_journaled_before_pid
+         PASS [   0.035s] (  3/127) maos-bin::hook_pump_17_4 a_panicking_subscriber_is_quarantined_until_a_successor_replaces_it
+         PASS [   0.035s] (  4/127) maos-bin::hook_pump_17_4 a_queued_hook_invokes_and_accounts_the_validated_runtime
+         PASS [   0.035s] (  5/127) maos-bin::hook_pump_17_4 a_refused_admission_or_a_failed_start_leaves_no_registration
+         PASS [   0.035s] (125/127) maos-bin::spawned_swap_20_9 an_artifact_that_resolves_outside_its_directory_is_refused_typed
+         PASS [   0.037s] (  8/127) maos-bin::hook_pump_17_4 admission_storage_binding_refusal_is_typed_and_unloads_the_spirit
+         PASS [   0.037s] ( 14/127) maos-bin::hook_pump_17_4 flush_and_shutdown_finish_while_publication_continues
+         PASS [   0.037s] ( 20/127) maos-bin::hook_pump_17_4 manifest_declaration_precedes_pid_and_refusal_is_distinct
+         PASS [   0.038s] ( 15/127) maos-bin::hook_pump_17_4 forget_curates_a_live_spirit_even_when_it_has_no_redistillation_path
+         PASS [   0.039s] ( 30/127) maos-bin::hook_pump_17_4 undelivered_purges_are_typed_and_post_erasure_errors_are_pending
+         PASS [   0.040s] ( 12/127) maos-bin::hook_pump_17_4 delivery_follows_running_state_and_the_live_class_under_a_pid
+         PASS [   0.041s] ( 19/127) maos-bin::hook_pump_17_4 in_flight_pass_is_scrubbed_after_its_forget_acknowledgement
+         PASS [   0.044s] ( 16/127) maos-bin::hook_pump_17_4 forget_notice_broadcast_binds_boot_and_pid_and_rejects_another_writer
+         PASS [   0.046s] ( 26/127) maos-bin::hook_pump_17_4 retry_after_distillate_scrub_reemits_the_orphan_request_and_scrubbed_id
+         PASS [   0.049s] (  1/127) maos-bin::hook_pump_17_4 a_closed_output_is_counted_and_never_fails_a_hook
+         PASS [   0.049s] (  6/127) maos-bin::hook_pump_17_4 a_spawned_form_registers_but_telemetry_needs_an_explicit_listing
+         PASS [   0.060s] (109/127) maos-bin::spawned_swap_20_9 a_failed_spawned_admission_withdraws_its_hook_registration
+         PASS [   0.067s] ( 53/127) maos-bin::one_daemon_one_door_16_1 ac4_19_5_the_admitted_bundle_carries_the_swap_and_crash_sections
+         PASS [   0.071s] (  7/127) maos-bin::hook_pump_17_4 admission_binds_storage_identity_before_start_or_leave_loaded
+         PASS [   0.086s] ( 71/127) maos-bin::one_daemon_one_door_16_1 d2_a_topology_error_after_a_spirit_ran_still_runs_the_final_scan
+         PASS [   0.179s] (114/127) maos-bin::spawned_swap_20_9 a_predecessor_without_the_lifecycle_export_is_refused_typed
+         PASS [   0.199s] ( 40/127) maos-bin::one_daemon_one_door_16_1 ac1_sigterm_exits_promptly_and_drains_the_audit_channel
+         PASS [   0.223s] ( 45/127) maos-bin::one_daemon_one_door_16_1 ac2_a_one_shot_child_does_not_bind_the_door
+         PASS [   0.235s] ( 42/127) maos-bin::one_daemon_one_door_16_1 ac1_stop_is_refused_client_side_with_no_row
+         PASS [   0.238s] ( 61/127) maos-bin::one_daemon_one_door_16_1 ac5_a_wider_control_file_mode_is_78_naming_the_mode
+         PASS [   0.239s] ( 55/127) maos-bin::one_daemon_one_door_16_1 ac4_a_non_increasing_successor_version_is_refused_typed
+         PASS [   0.247s] ( 46/127) maos-bin::one_daemon_one_door_16_1 ac2_a_second_root_on_the_same_endpoint_refuses_to_boot
+         PASS [   0.265s] ( 18/127) maos-bin::hook_pump_17_4 full_stdout_and_stderr_do_not_block_activity_or_shutdown
+         PASS [   0.296s] ( 66/127) maos-bin::one_daemon_one_door_16_1 ac6_19_5_a_cli_wrapper_target_is_refused_as_not_a_spirit_form
+         PASS [   0.299s] ( 60/127) maos-bin::one_daemon_one_door_16_1 ac4_unload_removes_the_control_block
+         PASS [   0.299s] (123/127) maos-bin::spawned_swap_20_9 a_successor_whose_manifest_disables_on_swap_in_is_refused_and_the_predecessor_keeps_serving
+         PASS [   0.301s] ( 64/127) maos-bin::one_daemon_one_door_16_1 ac5_a_wrong_bearer_is_77_and_writes_no_row
+         PASS [   0.314s] (113/127) maos-bin::spawned_swap_20_9 a_predecessor_that_exits_after_its_snapshot_still_completes_its_swap
+         PASS [   0.326s] ( 54/127) maos-bin::one_daemon_one_door_16_1 ac3_19_5_an_unreadable_archived_record_refuses_admission
+         PASS [   0.349s] ( 51/127) maos-bin::one_daemon_one_door_16_1 ac3_19_5_a_granted_admission_writes_the_archive_record_once
+         PASS [   0.356s] ( 81/127) maos-bin::wasm_form_admission_17_3b maosctl_load_returns_wasm_engine_refusal_and_preserves_roster
+         PASS [   0.365s] ( 58/127) maos-bin::one_daemon_one_door_16_1 ac4_root_a_orchestrator_halt_and_precheck_are_real
+         PASS [   0.378s] ( 83/127) maos-bin::wasm_form_admission_17_3b maosctl_upgrade_refuses_wasm_successor_before_replacing_the_loaded_spirit
+         PASS [   0.382s] ( 68/127) maos-bin::one_daemon_one_door_16_1 cold_swap_admits_the_prechecked_successor_when_the_target_path_changes
+         PASS [   0.429s] ( 73/127) maos-bin::one_daemon_one_door_16_1 cold_swap_refuses_mira_before_unload
+         PASS [   0.430s] ( 59/127) maos-bin::one_daemon_one_door_16_1 ac4_root_e_a_faithful_successor_survives_the_hot_swap
+         PASS [   0.431s] ( 57/127) maos-bin::one_daemon_one_door_16_1 ac4_19_5_the_hot_swap_reads_the_schema_admission_carried
+         PASS [   0.435s] ( 25/127) maos-bin::hook_pump_17_4 regenerated_bodies_are_rescanned_and_old_or_non_surviving_results_are_pending
+         PASS [   0.441s] ( 39/127) maos-bin::one_daemon_one_door_16_1 ac1_19_5_a_refused_cold_swap_successor_reverts_to_the_predecessor
+         PASS [   0.449s] ( 34/127) maos-bin::one_daemon_one_door_16_1 ac1_19_5_a_refused_cold_swap_restores_a_deleted_predecessor_manifest
+         PASS [   0.475s] ( 49/127) maos-bin::one_daemon_one_door_16_1 ac3_19_5_a_cross_major_successor_without_a_migrator_is_refused_at_admission
+         PASS [   0.479s] ( 80/127) maos-bin::spawned_door_20_9 a_cli_wrapper_target_is_not_a_spirit_form_and_a_component_is_untouched
+         PASS [   0.498s] ( 76/127) maos-bin::one_daemon_one_door_16_1 planned_upgrade_refuses_an_intermediate_identity_change_before_mutation
+         PASS [   0.500s] ( 79/127) maos-bin::one_daemon_one_door_16_1 planned_upgrade_vets_the_intermediate_snapshot_after_path_replacement
+         PASS [   0.502s] ( 74/127) maos-bin::one_daemon_one_door_16_1 planned_upgrade_refuses_an_alternate_final_candidate_instead_of_the_vetted_target
+         PASS [   0.505s] ( 75/127) maos-bin::one_daemon_one_door_16_1 planned_upgrade_refuses_an_initially_unvetted_intermediate
+         PASS [   0.511s] ( 77/127) maos-bin::one_daemon_one_door_16_1 planned_upgrade_uses_the_vetted_final_snapshot
+         PASS [   0.522s] (108/127) maos-bin::spawned_swap_20_9 a_cross_major_component_that_never_starts_leaves_the_predecessors_archive_current
+         PASS [   0.525s] (107/127) maos-bin::spawned_swap_20_9 a_component_that_cannot_start_is_unwound_and_refused_by_its_cold_swap_admission
+         PASS [   0.535s] (  2/127) maos-bin::hook_pump_17_4 a_full_pipe_never_blocks_a_hook
+         PASS [   0.537s] (124/127) maos-bin::spawned_swap_20_9 a_swap_refused_after_snapshot_releases_the_predecessor_which_keeps_serving
+         PASS [   0.560s] ( 50/127) maos-bin::one_daemon_one_door_16_1 ac3_19_5_a_declared_migrator_or_a_same_major_successor_is_admitted
+         PASS [   0.562s] (127/127) maos-bin::spawned_swap_20_9 the_migrator_policy_hands_the_successor_the_predecessors_state
+         PASS [   0.568s] (116/127) maos-bin::spawned_swap_20_9 a_revert_after_the_predecessor_child_retired_ends_the_session_typed
+         PASS [   0.610s] ( 65/127) maos-bin::one_daemon_one_door_16_1 ac5_19_5_the_migrator_policy_runs_over_the_door
+         PASS [   0.620s] ( 72/127) maos-bin::one_daemon_one_door_16_1 ac8_20_8_a_dropped_swap_invariant_is_a_typed_409_and_the_predecessor_keeps_serving
+         PASS [   0.631s] ( 69/127) maos-bin::one_daemon_one_door_16_1 ac8_20_8_a_cold_swap_that_drops_a_swap_invariant_is_a_typed_409_before_unload
+         PASS [   0.669s] ( 41/127) maos-bin::one_daemon_one_door_16_1 ac1_19_5_cold_swap_admits_the_successor_at_a_new_pid
+         PASS [   0.674s] ( 82/127) maos-bin::one_daemon_one_door_16_1 vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9
+         PASS [   0.702s] ( 52/127) maos-bin::one_daemon_one_door_16_1 ac3_19_5_a_failed_later_hop_records_and_restores_the_committed_hop
+         PASS [   0.720s] ( 43/127) maos-bin::one_daemon_one_door_16_1 ac1_pause_is_real_and_read_back_from_the_owning_process
+         PASS [   0.739s] ( 56/127) maos-bin::one_daemon_one_door_16_1 ac3_19_5_a_minimal_hot_swap_target_still_writes_its_identity_record
+         PASS [   0.740s] (126/127) maos-bin::spawned_swap_20_9 every_refusal_is_typed_before_the_coordinator_and_the_predecessor_keeps_serving
+         PASS [   0.779s] (105/127) maos-bin::spawned_swap_20_9 a_cold_swap_admits_at_a_new_pid_resets_state_and_restores_a_refused_successor
+         PASS [   0.783s] ( 47/127) maos-bin::one_daemon_one_door_16_1 ac2_19_5_an_abi_incompatible_target_is_refused_before_any_policy_runs
+         PASS [   0.811s] (103/127) maos-bin::spawned_lifecycle_20_9 telemetry_reaches_only_the_guest_that_lists_it
+         PASS [   0.950s] ( 99/127) maos-bin::spawned_lifecycle_20_9 each_kernel_trigger_reaches_its_lifecycle_export_through_its_caller
+         PASS [   0.951s] ( 17/127) maos-bin::hook_pump_17_4 consolidation_repeats_every_quiescent_window_and_only_while_running
+         PASS [   0.975s] ( 13/127) maos-bin::hook_pump_17_4 concurrent_delivery_and_consolidation_never_split_a_window
+         PASS [   1.025s] ( 48/127) maos-bin::one_daemon_one_door_16_1 ac2_19_5_intermediate_plan_targets_are_checked_before_their_hop
+         PASS [   1.202s] ( 33/127) maos-bin::one_daemon_one_door_16_1 ac12_20_1b_a_failing_revocation_poll_is_printed_once
+         PASS [   1.209s] (  9/127) maos-bin::hook_pump_17_4 a_late_hook_result_appends_its_eventual_redistilled_receipt
+         PASS [   1.337s] ( 10/127) maos-bin::hook_pump_17_4 a_manifest_without_on_consolidate_is_skipped_and_never_stamped
+         PASS [   1.465s] ( 22/127) maos-bin::hook_pump_17_4 fresh_inbound_frames_hold_consolidation_off
+         PASS [   1.542s] (110/127) maos-bin::spawned_swap_20_9 a_hook_dispatched_in_the_committed_handover_gap_reaches_the_successor_once
+         PASS [   1.596s] ( 24/127) maos-bin::hook_pump_17_4 privacy_notice_bypasses_quarantine_without_changing_hook_accounting
+         PASS [   1.683s] ( 90/127) maos-bin::spawned_lifecycle_20_9 a_2_3_guest_receives_nothing_and_keeps_running
+         PASS [   2.133s] ( 23/127) maos-bin::hook_pump_17_4 one_budget_overrun_quarantines_the_subscriber
+         PASS [   2.352s] ( 92/127) maos-bin::spawned_lifecycle_20_9 a_looping_idle_exceeds_its_budget_and_ends_the_session_with_a_journaled_cause
+         PASS [   2.533s] (101/127) maos-bin::spawned_lifecycle_20_9 one_slow_consolidating_subscriber_does_not_stall_the_others_passes
+         PASS [   2.900s] (111/127) maos-bin::spawned_swap_20_9 a_hot_swap_keeps_the_pid_tokens_memory_and_state_and_waits_for_the_active_turn
+         PASS [   3.417s] ( 86/127) maos-bin::spawned_door_20_9 a_cross_major_successor_that_never_starts_is_reverted_not_left_absent
+         PASS [   3.499s] ( 84/127) maos-bin::spawned_door_20_9 a_cold_swap_to_an_existing_invalid_component_is_reverted_and_the_predecessor_serves
+         PASS [   3.502s] (100/127) maos-bin::spawned_lifecycle_20_9 forget_notices_reach_every_subscriber_side_by_side
+         PASS [   3.503s] (102/127) maos-bin::spawned_lifecycle_20_9 one_slow_telemetry_subscriber_does_not_stall_the_others
+         PASS [   3.549s] ( 85/127) maos-bin::spawned_door_20_9 a_component_run_by_maos_run_receives_the_idle_schedule_and_consolidate_triggers
+         PASS [   4.065s] (106/127) maos-bin::spawned_swap_20_9 a_cold_swap_successors_fr11_record_precedes_its_start_and_a_failed_start_withdraws_it
+         PASS [   4.317s] ( 93/127) maos-bin::spawned_lifecycle_20_9 a_telemetry_drop_during_a_successful_forget_notice_leaves_the_purge_delivered
+         PASS [   4.319s] ( 91/127) maos-bin::spawned_lifecycle_20_9 a_hook_that_cannot_start_behind_another_export_is_dropped_without_a_strike
+         PASS [   4.330s] (115/127) maos-bin::spawned_swap_20_9 a_prewarm_guest_that_never_stops_writing_diagnostics_is_refused_at_its_cap
+         PASS [   4.338s] (104/127) maos-bin::spawned_lifecycle_20_9 two_identical_forget_batches_are_each_reported_as_they_actually_ran
+         PASS [   4.989s] (119/127) maos-bin::spawned_swap_20_9 a_snapshot_answered_after_the_dispatcher_gave_up_but_before_the_link_does_fences_nothing
+         PASS [   5.284s] ( 29/127) maos-bin::hook_pump_17_4 repeated_budget_warnings_quarantine_the_subscriber
+         PASS [   5.644s] ( 67/127) maos-bin::hook_pump_17_4 three_slow_telemetry_deliveries_of_the_last_five_quarantine_whatever_runs_between
+         PASS [   6.116s] ( 88/127) maos-bin::spawned_door_20_9 maosctl_hot_swaps_a_component_at_the_same_pid_with_its_artifact_beside_the_target
+         PASS [   6.144s] ( 32/127) maos-bin::hook_pump_17_4 shutdown_joins_an_in_flight_consolidation_instead_of_detaching_it
+         PASS [   6.300s] ( 95/127) maos-bin::spawned_lifecycle_20_9 a_telemetry_event_that_finds_the_queue_slot_taken_is_dropped_not_delivered
+         PASS [   6.301s] ( 94/127) maos-bin::spawned_lifecycle_20_9 a_telemetry_event_behind_a_long_turn_is_dropped_without_quarantine_or_a_late_run
+         PASS [   6.321s] ( 97/127) maos-bin::spawned_lifecycle_20_9 a_telemetry_export_that_queued_behind_a_turn_is_held_to_its_wall_from_its_own_start
+         PASS [   6.519s] (117/127) maos-bin::spawned_swap_20_9 a_slow_snapshot_of_a_refused_swap_does_not_fence_the_retry
+         PASS [   6.789s] (118/127) maos-bin::spawned_swap_20_9 a_snapshot_answered_after_its_callers_deadline_does_not_fence_the_predecessor
+         PASS [   6.894s] ( 87/127) maos-bin::spawned_door_20_9 maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused
+         PASS [   9.698s] ( 31/127) maos-bin::hook_pump_17_4 finished_wall_overruns_are_not_kept_for_the_life_of_the_pump
+         PASS [   9.872s] ( 96/127) maos-bin::spawned_lifecycle_20_9 a_telemetry_export_past_its_wall_is_cut_loose_so_shutdown_is_not_held_for_its_budget
+         PASS [   9.896s] ( 27/127) maos-bin::hook_pump_17_4 a_consolidation_past_its_wall_is_still_joined_before_shutdown_returns
+         PASS [  11.674s] ( 89/127) maos-bin::spawned_installed_20_9 an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run
+         PASS [  90.297s] (122/127) maos-bin::spawned_swap_20_9 a_successor_that_never_becomes_ready_is_refused_at_the_attempt_wall
+         PASS [  90.298s] (120/127) maos-bin::spawned_swap_20_9 a_successor_slow_in_each_stage_is_refused_at_one_attempt_wall_not_one_per_stage
+         PASS [  90.299s] (121/127) maos-bin::spawned_swap_20_9 a_successor_that_never_answers_its_probe_is_refused_at_the_attempt_wall
+         SLOW [> 30.000s] (───────) maos-bin::spawned_swap_20_9 a_successor_slow_in_each_stage_is_refused_at_one_attempt_wall_not_one_per_stage
+         SLOW [> 30.000s] (───────) maos-bin::spawned_swap_20_9 a_successor_that_never_answers_its_probe_is_refused_at_the_attempt_wall
+         SLOW [> 30.000s] (───────) maos-bin::spawned_swap_20_9 a_successor_that_never_becomes_ready_is_refused_at_the_attempt_wall
+         SLOW [> 60.000s] (───────) maos-bin::spawned_swap_20_9 a_successor_slow_in_each_stage_is_refused_at_one_attempt_wall_not_one_per_stage
+         SLOW [> 60.000s] (───────) maos-bin::spawned_swap_20_9 a_successor_that_never_answers_its_probe_is_refused_at_the_attempt_wall
+         SLOW [> 60.000s] (───────) maos-bin::spawned_swap_20_9 a_successor_that_never_becomes_ready_is_refused_at_the_attempt_wall
+         SLOW [> 90.000s] (───────) maos-bin::spawned_swap_20_9 a_successor_slow_in_each_stage_is_refused_at_one_attempt_wall_not_one_per_stage
+         SLOW [> 90.000s] (───────) maos-bin::spawned_swap_20_9 a_successor_that_never_answers_its_probe_is_refused_at_the_attempt_wall
+         SLOW [> 90.000s] (───────) maos-bin::spawned_swap_20_9 a_successor_that_never_becomes_ready_is_refused_at_the_attempt_wall
+      Summary [   0.409s] 29 tests run: 29 passed, 0 skipped
+      Summary [ 416.199s] 127 tests run: 127 passed (3 slow), 1 skipped

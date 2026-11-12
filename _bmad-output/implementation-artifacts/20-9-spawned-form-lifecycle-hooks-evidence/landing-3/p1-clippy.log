@@ -1,0 +1,536 @@
+crates/maos-spirit-abi/src/gateway.rs:273:5: warning: this function has too many arguments (8/7)
+crates/maos-spirit-abi/src/gateway.rs:285:5: warning: this function has too many arguments (9/7)
+crates/maos-spirit-abi/src/lifecycle.rs:415:18: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-spirit-abi/src/lifecycle.rs:518:5: warning: using `contains()` instead of `iter().any()` is more efficient: help: try: `enabled_hooks.contains(&hook_name)`
+warning: `maos-spirit-abi` (lib) generated 4 warnings (run `cargo clippy --fix --lib -p maos-spirit-abi -- ` to apply 1 suggestion)
+crates/maos-domain/src/ports/collective_memory.rs:109:1: warning: empty line after doc comment
+crates/maos-domain/src/audit_key.rs:349:8: warning: manual implementation of `.is_multiple_of()`: help: replace with: `!filtered.len().is_multiple_of(4)`
+crates/maos-domain/src/audit_key.rs:356:27: warning: using `chunks_exact` with a constant chunk size
+crates/maos-domain/src/audit_key.rs:367:19: warning: useless conversion to the same type: `u8`
+crates/maos-domain/src/invariants/i12.rs:46:1: warning: this `impl` can be derived
+crates/maos-domain/src/invariants/i13.rs:53:1: warning: this `impl` can be derived
+crates/maos-domain/src/frame.rs:159:1: warning: this `impl` can be derived
+crates/maos-domain/src/frame.rs:357:46: warning: current MSRV (Minimum Supported Rust Version) is `1.88.0` but this item is stable since `1.91.0`
+crates/maos-domain/src/governance.rs:173:33: warning: using `chunks_exact` with a constant chunk size: help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+crates/maos-domain/src/governance.rs:189:22: warning: using `chunks_exact_mut` with a constant chunk size: help: consider using `as_chunks` instead: `as_chunks_mut::<2>().0`
+crates/maos-domain/src/hot_swap.rs:235:5: warning: doc list item without indentation
+crates/maos-domain/src/hot_swap.rs:236:5: warning: doc list item without indentation
+crates/maos-domain/src/ports/iac_bus.rs:51:56: warning: the `Err`-variant returned from this function is very large
+crates/maos-domain/src/ports/registry.rs:99:20: warning: clamp-like pattern without using clamp function: help: replace with clamp: `limit.clamp(1, 200)`
+crates/maos-domain/src/region.rs:61:12: warning: manual `!RangeInclusive::contains` implementation: help: use: `!(Self::MIN_LEN..=Self::MAX_LEN).contains(&len)`
+crates/maos-domain/src/self_telemetry.rs:30:5: warning: this function has too many arguments (11/7)
+crates/maos-domain/src/ports/iac_bus.rs:44:5: warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+crates/maos-domain/src/ports/iac_bus.rs:58:5: warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+warning: `maos-domain` (lib) generated 18 warnings (run `cargo clippy --fix --lib -p maos-domain -- ` to apply 7 suggestions)
+    Checking ring v0.17.14
+crates/maos-audit/src/lib.rs:189:1: warning: empty line after doc comment
+crates/maos-audit/src/erasure/merkle.rs:88:43: warning: manually reimplementing `div_ceil`: help: consider using `.div_ceil()`: `current.len().div_ceil(2)`
+crates/maos-audit/src/erasure/proof.rs:360:1: warning: this function has too many arguments (11/7)
+crates/maos-audit/src/log_composition.rs:216:57: warning: redundant closure: help: replace the closure with the tuple variant itself: `AuditError::Io`
+crates/maos-audit/src/log_composition.rs:219:37: warning: redundant closure: help: replace the closure with the tuple variant itself: `AuditError::Io`
+crates/maos-audit/src/sealed_export.rs:520:1: warning: this function has too many arguments (8/7)
+crates/maos-audit/src/lib.rs:210:23: warning: use of a fallible conversion when an infallible one could be used
+crates/maos-audit/src/lib.rs:391:23: warning: use of a fallible conversion when an infallible one could be used
+crates/maos-audit/src/lib.rs:705:5: warning: the variable `line_no` is used as a loop counter: help: consider using: `for (line_no, mut entry) in entries.into_iter().enumerate()`
+crates/maos-audit/src/lib.rs:887:9: warning: this OR pattern can be rewritten using a range: help: try: `0..=27`
+crates/maos-audit/src/lib.rs:915:9: warning: literal with an empty format string
+crates/maos-audit/src/lib.rs:952:77: warning: literal with an empty format string
+crates/maos-audit/src/lib.rs:955:5: warning: the variable `line_no` is used as a loop counter: help: consider using: `for (line_no, entry) in entries.into_iter().enumerate()`
+crates/maos-audit/src/lib.rs:1250:5: warning: unneeded late initialization
+warning: `maos-audit` (lib) generated 14 warnings (run `cargo clippy --fix --lib -p maos-audit -- ` to apply 7 suggestions)
+crates/maos-manifest/src/manifest.rs:1434:21: warning: unused variable: `on_confidence_below`: help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+crates/maos-manifest/src/manifest.rs:464:39: warning: this `map_or` can be simplified
+crates/maos-manifest/src/manifest.rs:1449:24: warning: manual implementation of `Option::map`: help: try: `{ r.on_confidence_below.map(|t| ScalarPredicate::Below { threshold: t }) }`
+crates/maos-manifest/src/manifest.rs:1680:1: warning: this `impl` can be derived
+crates/maos-manifest/src/manifest.rs:1992:8: warning: manual implementation of `.is_multiple_of()`: help: replace with: `!bytes.len().is_multiple_of(4)`
+crates/maos-manifest/src/manifest.rs:2006:24: warning: using `chunks_exact` with a constant chunk size: help: consider using `as_chunks` instead: `as_chunks::<4>().0`
+crates/maos-manifest/src/manifest.rs:5073:1: warning: this `impl` can be derived
+crates/maos-manifest/src/manifest.rs:5090:1: warning: this `impl` can be derived
+warning: `maos-manifest` (lib) generated 8 warnings (run `cargo clippy --fix --lib -p maos-manifest -- ` to apply 8 suggestions)
+crates/maos-mcp/src/client.rs:15:70: warning: unused import: `McpResponse`
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo clippy --fix --lib -p maos-mcp -- ` to apply 1 suggestion)
+crates/maos-eval/src/distillate_corpus.rs:106:17: warning: unused variable: `file_name`: help: if this is intentional, prefix it with an underscore: `_file_name`
+crates/maos-eval/src/distillate_corpus.rs:91:22: warning: redundant closure: help: replace the closure with the tuple variant itself: `CorpusError::Io`
+crates/maos-eval/src/halt_continuity_corpus.rs:66:16: warning: this `map_or` can be simplified
+crates/maos-eval/src/halt_corpus.rs:78:44: warning: this can be `std::io::Error::other(_)`
+crates/maos-eval/src/halt_corpus.rs:82:16: warning: this `map_or` can be simplified
+crates/maos-eval/src/halt_corpus.rs:97:5: warning: struct `HaltCorpus` has a public `len` method, but no `is_empty` method
+crates/maos-eval/src/halt_replay.rs:223:12: warning: manual implementation of `.is_multiple_of()`: help: replace with: `!hex.len().is_multiple_of(2)`
+crates/maos-eval/src/hsis_corpus.rs:131:20: warning: this `map_or` can be simplified
+crates/maos-eval/src/intent_lineage_corpus.rs:77:44: warning: this can be `std::io::Error::other(_)`
+crates/maos-eval/src/intent_lineage_corpus.rs:81:16: warning: this `map_or` can be simplified
+crates/maos-eval/src/intent_lineage_corpus.rs:84:17: warning: this `map_or` can be simplified
+crates/maos-eval/src/intent_lineage_corpus.rs:85:17: warning: this `map_or` can be simplified
+crates/maos-eval/src/isolation_corpus.rs:6:5: warning: doc list item without indentation
+crates/maos-eval/src/isolation_corpus.rs:235:26: warning: redundant closure: help: replace the closure with the tuple variant itself: `CorpusError::Io`
+crates/maos-eval/src/isolation_corpus.rs:268:30: warning: redundant closure: help: replace the closure with the tuple variant itself: `CorpusError::Io`
+crates/maos-eval/src/retract_corpus.rs:55:44: warning: this can be `std::io::Error::other(_)`
+crates/maos-eval/src/retract_corpus.rs:59:16: warning: this `map_or` can be simplified
+crates/maos-eval/src/retract_corpus.rs:62:17: warning: this `map_or` can be simplified
+crates/maos-eval/src/retract_corpus.rs:63:17: warning: this `map_or` can be simplified
+crates/maos-eval/src/revocation_corpus.rs:41:44: warning: this can be `std::io::Error::other(_)`
+crates/maos-eval/src/revocation_corpus.rs:83:10: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-eval/src/t3_escape_corpus.rs:54:44: warning: this can be `std::io::Error::other(_)`
+crates/maos-eval/src/t3_escape_corpus.rs:58:16: warning: this `map_or` can be simplified
+crates/maos-eval/src/t3_escape_corpus.rs:61:16: warning: this `map_or` can be simplified
+crates/maos-eval/src/termination_corpus.rs:54:44: warning: this can be `std::io::Error::other(_)`
+crates/maos-eval/src/termination_corpus.rs:58:16: warning: this `map_or` can be simplified
+crates/maos-eval/src/termination_corpus.rs:73:5: warning: struct `TerminationCorpus` has a public `len` method, but no `is_empty` method
+crates/maos-eval/src/upgrade_policy_corpus.rs:41:44: warning: this can be `std::io::Error::other(_)`
+crates/maos-eval/src/upgrade_policy_corpus.rs:45:16: warning: this `map_or` can be simplified
+crates/maos-eval/src/upgrade_policy_corpus.rs:48:16: warning: this `map_or` can be simplified
+warning: `maos-eval` (lib) generated 30 warnings (run `cargo clippy --fix --lib -p maos-eval -- ` to apply 26 suggestions)
+crates/maos-skill/src/lib.rs:15:5: warning: doc list item without indentation
+crates/maos-skill/src/lib.rs:16:5: warning: doc list item without indentation
+crates/maos-skill/src/lib.rs:17:5: warning: doc list item without indentation
+crates/maos-skill/src/store.rs:166:14: warning: current MSRV (Minimum Supported Rust Version) is `1.88.0` but this item is stable since `1.89.0`
+warning: `maos-skill` (lib) generated 4 warnings
+crates/maos-providers/src/anthropic.rs:10:5: warning: unused import: `InferenceOptions`
+crates/maos-providers/src/ollama.rs:11:5: warning: unused import: `InferenceOptions`
+crates/maos-providers/src/openai.rs:11:5: warning: unused import: `InferenceOptions`
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo clippy --fix --lib -p maos-providers -- ` to apply 3 suggestions)
+crates/maos-loom-lite/src/replication/leaf.rs:130:51: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-loom-lite/src/store.rs:605:5: warning: this function has too many arguments (8/7)
+warning: `maos-loom-lite` (lib) generated 2 warnings
+spirits/researcher/src/lib.rs:1802:29: warning: using `chunks_exact` with a constant chunk size: help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+   Compiling maos-corpus-gen v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-corpus-gen)
+warning: `researcher` (lib) generated 1 warning (run `cargo clippy --fix --lib -p researcher -- ` to apply 1 suggestion)
+spirits/butler/src/lib.rs:159:38: warning: the `Err`-variant returned from this function is very large
+spirits/butler/src/lib.rs:200:6: warning: the `Err`-variant returned from this function is very large
+spirits/butler/src/lib.rs:424:17: warning: very complex type used. Consider factoring parts into `type` definitions
+spirits/butler/src/lib.rs:436:21: warning: very complex type used. Consider factoring parts into `type` definitions
+spirits/butler/src/lib.rs:818:6: warning: the `Err`-variant returned from this function is very large
+spirits/butler/src/lib.rs:1093:25: warning: unnecessary closure used with `bool::then`
+spirits/butler/src/lib.rs:1168:10: warning: the `Err`-variant returned from this function is very large
+spirits/butler/src/lib.rs:1265:33: warning: the `Err`-variant returned from this function is very large
+spirits/butler/src/lib.rs:1325:75: warning: the `Err`-variant returned from this function is very large
+spirits/butler/src/lib.rs:1738:10: warning: the `Err`-variant returned from this function is very large
+spirits/butler/src/lib.rs:1769:10: warning: the `Err`-variant returned from this function is very large
+spirits/butler/src/lib.rs:1882:10: warning: the `Err`-variant returned from this function is very large
+spirits/butler/src/lib.rs:1899:10: warning: the `Err`-variant returned from this function is very large
+spirits/butler/src/lib.rs:1971:10: warning: the `Err`-variant returned from this function is very large
+spirits/butler/src/lib.rs:2026:38: warning: this expression creates a reference which is immediately dereferenced by the compiler: help: change this to: `waker`
+spirits/butler/src/lib.rs:2084:57: warning: the `Err`-variant returned from this function is very large
+spirits/butler/src/lib.rs:2164:38: warning: the `Err`-variant returned from this function is very large
+warning: `butler` (lib) generated 17 warnings (run `cargo clippy --fix --lib -p butler -- ` to apply 2 suggestions)
+spirits/orchestrator/src/lib.rs:721:5: warning: this function has too many arguments (8/7)
+warning: `orchestrator` (lib) generated 1 warning
+    Checking maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)
+crates/maos-pdp/src/reconcile.rs:190:60: warning: explicit call to `.into_iter()` in function argument accepting `IntoIterator`
+warning: `maos-pdp` (lib) generated 1 warning (run `cargo clippy --fix --lib -p maos-pdp -- ` to apply 1 suggestion)
+crates/maos-siem/src/lib.rs:137:5: warning: field assignment outside of initializer for an instance created with Default::default()
+warning: `maos-siem` (lib) generated 1 warning
+spirits/architect/src/lib.rs:20:5: warning: doc list item without indentation
+warning: `architect` (lib) generated 1 warning
+spirits/nash/src/lib.rs:157:9: warning: doc list item without indentation
+spirits/nash/src/lib.rs:158:9: warning: doc list item without indentation
+spirits/nash/src/lib.rs:159:9: warning: doc list item without indentation
+warning: `nash` (lib) generated 3 warnings
+    Checking rustls-webpki v0.103.16
+    Checking maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability)
+    Checking maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance)
+crates/maos-wasm-host/src/host_state.rs:38:5: warning: you should consider adding a `Default` implementation for `HostState`
+warning: `maos-wasm-host` (lib) generated 1 warning
+    Checking jsonwebtoken v9.3.1
+crates/maos-capability/src/working_memory/mod.rs:19:5: warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+crates/maos-capability/src/cap_tokens/shard.rs:22:5: warning: you should consider adding a `Default` implementation for `CapShard`
+crates/maos-compliance/src/evaluator.rs:115:13: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-capability/src/cap_tokens/shard.rs:39:27: warning: using `clone` on type `IntentClass` which implements the `Copy` trait: help: try removing the `clone` call: `s.intent_class`
+crates/maos-compliance/src/vetting/mod.rs:321:1: warning: this function has too many arguments (8/7)
+warning: `maos-capability` (lib) generated 3 warnings (run `cargo clippy --fix --lib -p maos-capability -- ` to apply 3 suggestions)
+    Checking maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+warning: `maos-compliance` (lib) generated 2 warnings
+    Checking maos-acp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-acp)
+    Checking rustls v0.23.46
+crates/maos-acp/src/server.rs:13:45: warning: unused import: `DecisionId`
+crates/maos-acp/src/server.rs:223:25: warning: unused variable: `other`: help: if this is intentional, prefix it with an underscore: `_other`
+    Checking maos-sso v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-sso)
+crates/maos-iac/src/adapter/drr_scheduler.rs:18:29: warning: unused import: `Instant`
+crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9: warning: unused variable: `referenced`: help: if this is intentional, prefix it with an underscore: `_referenced`
+crates/maos-iac/src/adapter/distillate.rs:183:23: warning: redundant closure: help: replace the closure with the function itself: `parse_hex_frame_id`
+crates/maos-iac/src/adapter/distillate.rs:202:25: warning: redundant closure: help: replace the closure with the function itself: `parse_hex_frame_id`
+crates/maos-iac/src/adapter/distillate.rs:211:18: warning: redundant closure: help: replace the closure with the associated function itself: `A2AIntent::new`
+crates/maos-iac/src/adapter/distillate.rs:508:14: warning: the loop variable `i` is used to index `bytes`
+crates/maos-iac/src/adapter/drr_scheduler.rs:91:10: warning: the `Err`-variant returned from this function is very large: the `Err`-variant is at least 144 bytes
+crates/maos-iac/src/adapter/mailbox.rs:242:5: warning: this returns a `Result<_, ()>`
+crates/maos-iac/src/adapter/mailbox.rs:248:5: warning: this returns a `Result<_, ()>`
+crates/maos-iac/src/adapter/mailbox.rs:262:5: warning: this returns a `Result<_, ()>`
+crates/maos-iac/src/adapter/mailbox.rs:266:55: warning: the `Err`-variant returned from this function is very large: the `Err`-variant is at least 144 bytes
+crates/maos-iac/src/adapter/mailbox.rs:400:53: warning: the `Err`-variant returned from this function is very large: the `Err`-variant is at least 144 bytes
+crates/maos-iac/src/adapter/mailbox.rs:410:10: warning: the `Err`-variant returned from this function is very large: the `Err`-variant is at least 144 bytes
+crates/maos-iac/src/adapter/mailbox.rs:481:65: warning: the borrowed expression implements the required traits: help: change this to: `r.reason`
+crates/maos-iac/src/adapter/mailbox.rs:684:10: warning: the `Err`-variant returned from this function is very large: the `Err`-variant is at least 144 bytes
+crates/maos-iac/src/adapter/orchestrator_dispatch.rs:67:6: warning: the `Err`-variant returned from this function is very large: the `Err`-variant is at least 144 bytes
+crates/maos-iac/src/adapter/redaction.rs:268:63: warning: this `.fold` can be written more succinctly using another method: help: try: `any(|value| redact_json_value(value, under_clause_sources))`
+crates/maos-iac/src/adapter/transparency_log.rs:729:5: warning: this returns a `Result<_, ()>`
+crates/maos-iac/src/adapter/transparency_log.rs:1140:5: warning: this function has too many arguments (9/7)
+crates/maos-iac/src/adapter/transparency_log.rs:1186:5: warning: this function has too many arguments (10/7)
+crates/maos-iac/src/adapter/transparency_log.rs:1230:5: warning: this function has too many arguments (10/7)
+crates/maos-iac/src/adapter/transparency_log.rs:2050:10: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-iac/src/adapter.rs:227:10: warning: the `Err`-variant returned from this function is very large: the `Err`-variant is at least 144 bytes
+crates/maos-iac/src/adapter.rs:433:10: warning: the `Err`-variant returned from this function is very large: the `Err`-variant is at least 144 bytes
+crates/maos-iac/src/adapter.rs:521:13: warning: this `if` statement can be collapsed
+crates/maos-iac/src/adapter.rs:736:10: warning: the `Err`-variant returned from this function is very large: the `Err`-variant is at least 144 bytes
+crates/maos-iac/src/adapter.rs:748:9: warning: doc list item without indentation
+crates/maos-iac/src/adapter.rs:749:9: warning: doc list item without indentation
+crates/maos-iac/src/adapter.rs:756:10: warning: the `Err`-variant returned from this function is very large: the `Err`-variant is at least 144 bytes
+crates/maos-iac/src/adapter.rs:863:21: warning: calls to `push` immediately after creation: help: consider using the `vec![]` macro: `let v = vec![..];`
+crates/maos-iac/src/adapter.rs:871:21: warning: calls to `push` immediately after creation: help: consider using the `vec![]` macro: `let v = vec![..];`
+crates/maos-iac/src/adapter/metrics.rs:230:21: warning: hiding a lifetime that's elided elsewhere is confusing: the lifetime is elided here, the same lifetime is hidden here
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo clippy --fix --lib -p maos-acp -- ` to apply 2 suggestions)
+    Checking maos-director-surface v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-director-surface)
+warning: `maos-iac` (lib) generated 32 warnings (run `cargo clippy --fix --lib -p maos-iac -- ` to apply 8 suggestions)
+    Checking maos-orchestrator-buffer v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-orchestrator-buffer)
+crates/maos-director-surface/src/halt_ui.rs:59:9: warning: unused variable: `halt_id`: help: if this is intentional, prefix it with an underscore: `_halt_id`
+crates/maos-director-surface/src/notification.rs:265:22: warning: redundant closure: help: replace the closure with the tuple variant itself: `NotificationError::WriteFailed`
+crates/maos-orchestrator-buffer/src/gateway_dispatcher.rs:332:21: warning: unreachable pattern: no value can reach this
+crates/maos-orchestrator-buffer/src/gateway_dispatcher.rs:161:29: warning: unused variable: `e`: help: if this is intentional, prefix it with an underscore: `_e`
+crates/maos-orchestrator-buffer/src/gateway_dispatcher.rs:132:17: warning: unused variable: `ctx`: help: if this is intentional, prefix it with an underscore: `_ctx`
+crates/maos-orchestrator-buffer/src/gateway_dispatcher.rs:270:35: warning: using `clone` on type `GatewayType` which implements the `Copy` trait: help: try removing the `clone` call: `entry.gateway_type`
+warning: `maos-director-surface` (lib) generated 2 warnings (run `cargo clippy --fix --lib -p maos-director-surface -- ` to apply 2 suggestions)
+    Checking rcgen v0.13.2
+warning: `maos-orchestrator-buffer` (lib) generated 4 warnings (run `cargo clippy --fix --lib -p maos-orchestrator-buffer -- ` to apply 3 suggestions)
+    Checking maos-secrets v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-secrets)
+    Checking maos-a2a-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-core)
+crates/maos-corpus-gen/src/ccac/expansion.rs:91:6: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-corpus-gen/src/ccac/expansion.rs:207:6: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-corpus-gen/src/red_team/expansion.rs:27:18: warning: manually reimplementing `div_ceil`: help: consider using `.div_ceil()`: `n.div_ceil(seeds.len() * variants_per_seed)`
+crates/maos-corpus-gen/src/red_team/expansion.rs:146:14: warning: the borrowed expression implements the required traits: help: change this to: `axis_idx.to_le_bytes()`
+crates/maos-corpus-gen/src/red_team/expansion.rs:147:14: warning: the borrowed expression implements the required traits: help: change this to: `variant_idx.to_le_bytes()`
+crates/maos-corpus-gen/src/red_team/expansion.rs:209:16: warning: manual implementation of `.is_multiple_of()`: help: replace with: `variant_idx.is_multiple_of(3)`
+crates/maos-corpus-gen/src/red_team/mod.rs:70:5: warning: method `default` can be confused for the standard trait method `std::default::Default::default`
+crates/maos-corpus-gen/src/secret_redaction/expansion.rs:172:19: warning: the borrowed expression implements the required traits: help: change this to: `idx.to_le_bytes()`
+crates/maos-corpus-gen/src/secret_redaction/expansion.rs:192:31: warning: the borrowed expression implements the required traits: help: change this to: `[j as u8]`
+crates/maos-corpus-gen/src/secret_redaction/expansion.rs:200:43: warning: useless use of `format!`: help: consider using `.to_string()`: `"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInRlc3QiOnRydWV9".to_string()`
+crates/maos-corpus-gen/src/secret_redaction/expansion.rs:209:50: warning: redundant reference in `format!` argument: help: remove the redundant `&`: `hex[..16].to_uppercase()`
+crates/maos-corpus-gen/src/secret_redaction/expansion.rs:210:76: warning: redundant reference in `format!` argument: help: remove the redundant `&`: `hex`
+crates/maos-corpus-gen/src/secret_redaction/mod.rs:76:18: warning: the borrowed expression implements the required traits: help: change this to: `ipad`
+crates/maos-corpus-gen/src/secret_redaction/mod.rs:80:18: warning: the borrowed expression implements the required traits: help: change this to: `opad`
+crates/maos-corpus-gen/src/secret_redaction/mod.rs:81:18: warning: the borrowed expression implements the required traits: help: change this to: `inner_hash`
+crates/maos-corpus-gen/src/secret_redaction/mod.rs:100:5: warning: method `default` can be confused for the standard trait method `std::default::Default::default`
+warning: `maos-corpus-gen` (lib) generated 16 warnings (run `cargo clippy --fix --lib -p maos-corpus-gen -- ` to apply 12 suggestions)
+    Checking ureq v2.12.1
+crates/maos-a2a-core/src/corpus.rs:145:5: warning: doc list item without indentation
+crates/maos-a2a-core/src/router.rs:129:5: warning: doc list item without indentation
+crates/maos-a2a-core/src/router.rs:130:5: warning: doc list item without indentation
+crates/maos-a2a-core/src/router.rs:2006:21: warning: useless use of `format!`: help: consider using `.to_string()`: `"pin invalidated — re-pin consent required".to_string()`
+crates/maos-a2a-core/src/transport/json_rpc.rs:212:44: warning: the `Err`-variant returned from this function is very large: the `Err`-variant is at least 136 bytes
+warning: `maos-a2a-core` (lib) generated 5 warnings (run `cargo clippy --fix --lib -p maos-a2a-core -- ` to apply 1 suggestion)
+    Checking maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort)
+    Checking maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+    Checking maos-egress v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-egress)
+crates/maos-cohort/src/error.rs:24:11: warning: duplicated attribute
+crates/maos-cohort/src/manifest.rs:36:11: warning: duplicated attribute
+crates/maos-cohort/src/pin.rs:35:11: warning: duplicated attribute
+crates/maos-registry/src/fixture_replay.rs:6:5: warning: unused import: `std::sync::Mutex`
+crates/maos-registry/src/fixture_replay.rs:9:5: warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+crates/maos-registry/src/handlers/manifest.rs:9:36: warning: unused import: `SignedManifest`
+crates/maos-cohort/src/state.rs:388:19: warning: methods `accept_consent` and `outbound_consent_context` are never used
+crates/maos-registry/src/client.rs:198:27: warning: unused variable: `server_sig`: help: if this is intentional, prefix it with an underscore: `_server_sig`
+crates/maos-cohort/src/state.rs:851:32: warning: manually reimplementing `div_ceil`: help: consider using `.div_ceil()`: `cached.manifest.t_stale_secs.div_ceil(2)`
+crates/maos-registry/src/admission.rs:437:1: warning: this `impl` can be derived
+crates/maos-registry/src/admission.rs:574:19: warning: the borrowed expression implements the required traits: help: change this to: `(pkg.manifest_toml.len() as u64).to_le_bytes()`
+crates/maos-registry/src/admission.rs:576:19: warning: the borrowed expression implements the required traits: help: change this to: `(pkg.artifact_bytes.len() as u64).to_le_bytes()`
+crates/maos-registry/src/client.rs:280:19: warning: the borrowed expression implements the required traits: help: change this to: `(spirit_id.len() as u64).to_le_bytes()`
+crates/maos-registry/src/client.rs:282:19: warning: the borrowed expression implements the required traits: help: change this to: `(version.len() as u64).to_le_bytes()`
+crates/maos-registry/src/client.rs:284:19: warning: the borrowed expression implements the required traits: help: change this to: `[server_tier as u8]`
+crates/maos-registry/src/handlers/manifest.rs:16:19: warning: the borrowed expression implements the required traits: help: change this to: `(spirit_id.len() as u64).to_le_bytes()`
+crates/maos-registry/src/handlers/manifest.rs:18:19: warning: the borrowed expression implements the required traits: help: change this to: `(version.len() as u64).to_le_bytes()`
+crates/maos-registry/src/handlers/manifest.rs:20:19: warning: the borrowed expression implements the required traits: help: change this to: `[server_tier as u8]`
+crates/maos-registry/src/operations.rs:44:20: warning: clamp-like pattern without using clamp function: help: replace with clamp: `limit.clamp(1, 200)`
+crates/maos-registry/src/origin.rs:21:1: warning: this `impl` can be derived
+crates/maos-registry/src/storage.rs:921:21: warning: clamp-like pattern without using clamp function: help: replace with clamp: `q.limit.clamp(1, 200)`
+crates/maos-registry/src/storage.rs:1164:35: warning: redundant closure: help: replace the closure with the associated function itself: `std::time::Instant::now`
+warning: `maos-cohort` (lib) generated 5 warnings (run `cargo clippy --fix --lib -p maos-cohort -- ` to apply 1 suggestion)
+    Checking tokio-rustls v0.26.4
+warning: `maos-registry` (lib) generated 17 warnings (run `cargo clippy --fix --lib -p maos-registry -- ` to apply 15 suggestions)
+    Checking maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+    Checking maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+crates/maos-egress/src/upstream.rs:199:24: warning: this `if` statement can be collapsed
+warning: `maos-egress` (lib) generated 1 warning (run `cargo clippy --fix --lib -p maos-egress -- ` to apply 1 suggestion)
+    Checking worker v0.1.0 (/home/lunarpulse/dev_ws/spirits/worker)
+crates/maos-cli/src/accessibility.rs:59:24: warning: this creates an owned instance just for comparison: help: try: `"dumb"`
+crates/maos-cli/src/subcommands.rs:1111:53: warning: useless conversion to the same type: `maos_skill::ESkillStore`: help: consider removing `.into()`: `e`
+crates/maos-cli/src/subcommands.rs:2953:25: warning: stripping a suffix manually
+crates/maos-cli/src/subcommands.rs:2963:26: warning: stripping a suffix manually
+crates/maos-cli/src/subcommands.rs:3061:17: warning: called `unwrap` on `filter.boot_nonce` after checking its variant with `is_some`
+crates/maos-cli/src/subcommands.rs:3975:6: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-cli/src/subcommands.rs:4545:16: warning: match can be simplified with `.unwrap_or_default()`
+warning: `maos-cli` (lib) generated 7 warnings (run `cargo clippy --fix --lib -p maos-cli -- ` to apply 2 suggestions)
+    Checking maos-notify-push v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-notify-push)
+crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5: warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+crates/maos-kernel-core/src/capability/mod.rs:521:21: warning: unexpected `cfg` condition value: `test-introspection`
+crates/maos-kernel-core/src/halt/mod.rs:29:34: warning: unused import: `HaltJournal`
+crates/maos-kernel-core/src/iac.rs:19:5: warning: private item shadows public glob re-export
+crates/maos-kernel-core/src/inference/mod.rs:23:5: warning: unused import: `crate::capability::WorkingMemoryStore`
+crates/maos-kernel-core/src/isolation/runner.rs:10:5: warning: unused import: `std::sync::Arc`
+crates/maos-kernel-core/src/isolation/runner.rs:13:5: warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+crates/maos-kernel-core/src/journal/mod.rs:60:5: warning: unused import: `maos_domain::invariants::i1::TokenId`
+crates/maos-kernel-core/src/journal/mod.rs:61:65: warning: unused import: `LifecycleEntry`
+crates/maos-kernel-core/src/mcp/mod.rs:12:59: warning: unused import: `TokenId`
+crates/maos-kernel-core/src/mcp/mod.rs:13:73: warning: unused import: `McpRequest`
+crates/maos-kernel-core/src/memory/private.rs:13:17: warning: unused import: `Path`
+crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25: warning: unused import: `AtomicU64`
+crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5: warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17: warning: unused import: `DispositionOutcome`
+crates/maos-kernel-core/src/inference/mod.rs:29:5: warning: unused import: `maos_providers::Provider`
+crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13: warning: unused variable: `event`: help: if this is intentional, prefix it with an underscore: `_event`
+crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5: warning: unused variable: `spirit_id`: help: if this is intentional, prefix it with an underscore: `_spirit_id`
+crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5: warning: unused variable: `spirit_pid`: help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:622:9: warning: variable does not need to be mutable
+crates/maos-kernel-core/src/supervision/crash_detector.rs:196:13: warning: unused variable: `now_ns`: help: if this is intentional, prefix it with an underscore: `_now_ns`
+crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:401:27: warning: value assigned to `owned_guard` is never read: this value is reassigned later and never used
+crates/maos-kernel-core/src/supervision/disposition.rs:22:9: warning: unused variable: `total`: help: if this is intentional, prefix it with an underscore: `_total`
+crates/maos-kernel-core/src/halt/resolver.rs:101:5: warning: field `boot_nonce` is never read
+crates/maos-kernel-core/src/memory/mod.rs:82:5: warning: field `next_frame_counter` is never read
+crates/maos-kernel-core/src/memory/mod.rs:665:8: warning: method `mint_frame_id` is never used
+crates/maos-kernel-core/src/memory/private.rs:46:5: warning: field `kind` is never read
+crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5: warning: field `iac_rt_metrics` is never read
+crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8: warning: associated function `resolution_label` is never used
+crates/maos-kernel-core/src/memory/shared.rs:52:8: warning: associated function `kind_to_str` is never used
+crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:141:8: warning: method `build_kernel_ctx` is never used
+crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5: warning: field `attestation` is never read
+crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5: warning: field `notification_dispatcher` is never read
+crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5: warning: field `notification_dispatcher` is never read
+crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:53:5: warning: this function has too many arguments (10/7)
+crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:68:1: warning: this function has too many arguments (8/7)
+crates/maos-kernel-core/src/capability/cap_policy/mod.rs:103:5: warning: you should consider adding a `Default` implementation for `PolicyTable`
+crates/maos-kernel-core/src/capability/mod.rs:158:5: warning: this function has too many arguments (8/7)
+crates/maos-kernel-core/src/capability/mod.rs:306:62: warning: the borrowed expression implements the required traits: help: change this to: `format!("scalar.tap.{}", tag)`
+crates/maos-kernel-core/src/halt/mod.rs:407:43: warning: using `clone` on type `HaltState` which implements the `Copy` trait: help: try dereferencing it: `*state`
+crates/maos-kernel-core/src/hot_swap/coordinator.rs:71:5: warning: this function has too many arguments (9/7)
+crates/maos-kernel-core/src/hot_swap/coordinator.rs:344:32: warning: using `clone` on type `OnCrashAction` which implements the `Copy` trait: help: try removing the `clone` call: `section.action`
+crates/maos-kernel-core/src/hot_swap/post_swap_monitor.rs:24:1: warning: this item has comments with 4 forward slashes (`////`). These look like doc comments, but they aren't
+crates/maos-kernel-core/src/hot_swap/state_codec.rs:110:13: warning: useless conversion to the same type: `std::string::String`: help: consider removing `.into()`: `format!("schema_version {schema_version_raw} exceeds u32::MAX")`
+crates/maos-kernel-core/src/iac.rs:46:29: warning: you seem to want to iterate on a map's values
+crates/maos-kernel-core/src/iac.rs:58:29: warning: you seem to want to iterate on a map's values
+crates/maos-kernel-core/src/inference/mod.rs:131:5: warning: this function has too many arguments (9/7)
+crates/maos-kernel-core/src/inference/mod.rs:179:17: warning: calls to `push` immediately after creation: help: consider using the `vec![]` macro: `let v: Vec<maos_domain::frame::FrameAddress> = vec![..];`
+crates/maos-kernel-core/src/isolation/runner.rs:107:29: warning: useless use of `format!`: help: consider using `.to_string()`: `"isolation not maintained".to_string()`
+crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs:14:5: warning: doc list item overindented: help: try using `  ` (2 spaces)
+crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs:16:5: warning: doc list item overindented: help: try using `  ` (2 spaces)
+crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:468:1: warning: large size difference between variants: the entire enum is at least 304 bytes
+crates/maos-kernel-core/src/memory/principal.rs:105:5: warning: this function has too many arguments (8/7)
+    Checking maos-spirit-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-cli)
+crates/maos-kernel-core/src/memory/mod.rs:253:5: warning: this function has too many arguments (8/7)
+crates/maos-kernel-core/src/memory/mod.rs:265:13: warning: unnecessary closure used to substitute value for `Option::None`
+crates/maos-kernel-core/src/memory/mod.rs:271:20: warning: unnecessary closure used to substitute value for `Option::None`
+crates/maos-kernel-core/src/memory/mod.rs:329:13: warning: unnecessary closure used to substitute value for `Option::None`
+crates/maos-kernel-core/src/memory/mod.rs:335:20: warning: unnecessary closure used to substitute value for `Option::None`
+crates/maos-kernel-core/src/memory/mod.rs:362:5: warning: this function has too many arguments (8/7)
+crates/maos-kernel-core/src/memory/mod.rs:374:13: warning: unnecessary closure used to substitute value for `Option::None`
+crates/maos-kernel-core/src/memory/mod.rs:380:20: warning: unnecessary closure used to substitute value for `Option::None`
+crates/maos-kernel-core/src/revocation/applier.rs:45:5: warning: this function has too many arguments (8/7)
+crates/maos-kernel-core/src/revocation/poller.rs:93:24: warning: this `if` has identical blocks
+crates/maos-kernel-core/src/scheduler/control_block.rs:223:1: warning: this `impl` can be derived
+crates/maos-kernel-core/src/scheduler/control_block.rs:330:22: warning: using `clone` on type `OnCrashAction` which implements the `Copy` trait: help: try removing the `clone` call: `s.action`
+crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:65:14: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:133:18: warning: clamp-like pattern without using clamp function: help: replace with clamp: `(idle_window_ms / 10).clamp(100, 5000)`
+crates/maos-kernel-core/src/scheduler/kernel_ctx.rs:33:18: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs:185:29: warning: you seem to want to iterate on a map's values
+crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs:366:24: warning: clamp-like pattern without using clamp function: help: replace with clamp: `(entry.cadence_secs.saturating_mul(2)).clamp(1, 300)`
+crates/maos-kernel-core/src/scheduler/scheduler_loop.rs:100:5: warning: this function has too many arguments (12/7)
+crates/maos-kernel-core/src/scheduler/scheduler_loop.rs:652:25: warning: non-binding `let` on a future
+crates/maos-kernel-core/src/scheduler/scheduler_loop.rs:720:13: warning: using `clone` on type `OnCrashAction` which implements the `Copy` trait: help: try removing the `clone` call: `runtime.on_crash_action`
+crates/maos-kernel-core/src/scheduler/verb_resolver.rs:169:9: warning: you should consider adding a `Default` implementation for `MockLifecycleResolver`
+crates/maos-kernel-core/src/security/posture.rs:111:23: warning: the borrowed expression implements the required traits: help: change this to: `[posture_u8(self.current)]`
+crates/maos-kernel-core/src/security/posture.rs:112:23: warning: the borrowed expression implements the required traits: help: change this to: `[posture_u8(self.allowed_max)]`
+crates/maos-kernel-core/src/security/posture.rs:129:27: warning: the borrowed expression implements the required traits: help: change this to: `[epistemic_action_u8(&rule.action)]`
+crates/maos-kernel-core/src/security/posture.rs:137:27: warning: the borrowed expression implements the required traits: help: change this to: `threshold_bits.to_le_bytes()`
+crates/maos-kernel-core/src/security/posture.rs:145:27: warning: the borrowed expression implements the required traits: help: change this to: `[conflict_flag]`
+crates/maos-kernel-core/src/security/posture.rs:149:23: warning: the borrowed expression implements the required traits: help: change this to: `[epistemic_action_u8(&self.epistemic_policy.default_action)]`
+crates/maos-kernel-core/src/security/posture.rs:248:23: warning: the borrowed expression implements the required traits: help: change this to: `[byte]`
+crates/maos-kernel-core/src/security/sandbox/t3/argv.rs:25:1: warning: this function has too many arguments (12/7)
+crates/maos-kernel-core/src/security/sandbox/t3/runtime_detect.rs:32:22: warning: redundant closure: help: replace the closure with the function itself: `detect_container_runtime_uncached`
+crates/maos-kernel-core/src/security/sandbox/t3/runtime_detect.rs:44:9: warning: wildcard pattern covers any other pattern as it will match anyway
+crates/maos-kernel-core/src/security/sandbox/linux.rs:133:28: warning: redundant pattern matching
+crates/maos-kernel-core/src/security/sandbox/linux.rs:335:22: warning: casting to the same type is unnecessary (`i64` -> `i64`): help: try: `syscall`
+crates/maos-kernel-core/src/security/sandbox/linux.rs:394:27: warning: casting to the same type is unnecessary (`i64` -> `i64`): help: try: `syscall`
+crates/maos-kernel-core/src/security/mod.rs:259:5: warning: this function has too many arguments (16/7)
+crates/maos-kernel-core/src/supervision/crash_detector.rs:175:13: warning: using `clone` on type `OnCrashAction` which implements the `Copy` trait: help: try removing the `clone` call: `runtime.on_crash_action`
+crates/maos-kernel-core/src/supervision/crash_detector.rs:182:9: warning: this let-binding has unit value
+crates/maos-kernel-core/src/supervision/test_double.rs:28:5: warning: you should consider adding a `Default` implementation for `SimulatedChildSupervisor`
+warning: `maos-kernel-core` (lib) generated 91 warnings (run `cargo clippy --fix --lib -p maos-kernel-core -- ` to apply 53 suggestions)
+    Checking maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell)
+    Checking maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp)
+    Checking maos-control v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-control)
+crates/maos-spirit-cli/src/signing.rs:27:7: warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+crates/maos-spirit-cli/src/publish.rs:125:19: warning: the borrowed expression implements the required traits: help: change this to: `(manifest_toml.len() as u64).to_le_bytes()`
+crates/maos-spirit-cli/src/publish.rs:127:19: warning: the borrowed expression implements the required traits: help: change this to: `(artifact_bytes.len() as u64).to_le_bytes()`
+warning: `maos-spirit-cli` (lib) generated 3 warnings (run `cargo clippy --fix --lib -p maos-spirit-cli -- ` to apply 2 suggestions)
+    Checking maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench)
+crates/maos-a2a-tcp/src/transport.rs:976:1: warning: this function has too many arguments (8/7)
+    Checking maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest)
+warning: `maos-a2a-tcp` (lib) generated 1 warning
+    Checking maos-a2a v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a)
+crates/maos-control/src/lib.rs:17:11: warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+crates/maos-control/src/lib.rs:1064:28: warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+crates/maos-control/src/lib.rs:1734:16: warning: the following explicit lifetimes could be elided: 'a
+warning: `maos-control` (lib) generated 3 warnings (run `cargo clippy --fix --lib -p maos-control -- ` to apply 1 suggestion)
+crates/maos-bench/src/harness/j0.rs:28:56: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0xB170`
+crates/maos-bench/src/harness/j_researcher.rs:63:56: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x008E_5EA5`
+crates/maos-bench/src/decision.rs:30:18: warning: this `map_or` can be simplified
+crates/maos-bench/src/distill_eval.rs:260:23: warning: this method chain can be written more clearly with `if .. else ..`: help: try: `if frozen { row.judge.verdicts.clone() } else { Default::default() }`
+crates/maos-bench/src/halt_eval.rs:220:24: warning: this `map_or` can be simplified
+crates/maos-bench/src/halt_eval.rs:455:6: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-bench/src/harness/j1.rs:135:20: warning: called `unwrap_err` on `measurement_result` after checking its variant with `is_err`
+crates/maos-bench/src/harness/j1.rs:235:22: warning: redundant closure: help: replace the closure with the tuple variant itself: `BenchError::Io`
+crates/maos-bench/src/harness/j_researcher.rs:54:19: warning: manual implementation of `.is_multiple_of()`: help: replace with: `i.is_multiple_of(2)`
+crates/maos-bench/src/harness/mod.rs:110:5: warning: you should consider adding a `Default` implementation for `BenchHarness`
+warning: `maos-bench` (lib) generated 10 warnings (run `cargo clippy --fix --lib -p maos-bench -- ` to apply 6 suggestions)
+crates/maos-a2a/src/adapter.rs:30:5: warning: doc list item without indentation
+crates/maos-a2a/src/adapter.rs:31:5: warning: doc list item without indentation
+crates/maos-a2a/src/adapter.rs:32:5: warning: doc list item without indentation
+warning: `maos-a2a` (lib) generated 3 warnings
+    Checking maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+crates/maos-bin/src/cross_team_crossing.rs:1014:5: warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+crates/maos-bin/src/installed_spirits.rs:6:5: warning: unused import: `std::sync::Arc`
+crates/maos-bin/src/cross_team_crossing.rs:925:9: warning: unused import: `maos_domain::invariants::i3::FrameOrigin`
+crates/maos-bin/src/cross_team_crossing.rs:928:20: warning: unused import: `FrameKind`
+crates/maos-bin/src/cross_team_crossing.rs:800:1: warning: this function has too many arguments (9/7)
+crates/maos-bin/src/crypto_provider.rs:10:12: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-bin/src/enterprise_identity.rs:553:5: warning: doc list item overindented: help: try using `  ` (2 spaces)
+crates/maos-bin/src/enterprise_identity.rs:554:5: warning: doc list item overindented: help: try using `  ` (2 spaces)
+crates/maos-bin/src/enterprise_identity.rs:564:5: warning: doc list item overindented: help: try using `  ` (2 spaces)
+crates/maos-bin/src/enterprise_identity.rs:565:5: warning: doc list item overindented: help: try using `  ` (2 spaces)
+crates/maos-bin/src/enterprise_identity.rs:582:37: warning: this can be `std::io::Error::other(_)`
+crates/maos-bin/src/enterprise_identity.rs:592:24: warning: use of a fallible conversion when an infallible one could be used
+crates/maos-bin/src/operator_door.rs:546:23: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-bin/src/cross_team_crossing.rs:918:1: warning: items after a test module
+crates/maos-bin/src/operator_door.rs:3024:53: warning: useless conversion to the same type: `maos_skill::ESkillStore`: help: consider removing `.into()`: `e`
+crates/maos-bin/src/enterprise_identity.rs:724:5: warning: this function has too many arguments (9/7)
+crates/maos-bin/src/enterprise_pdp_runtime.rs:280:20: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-bin/src/shell_host.rs:62:5: warning: this function has too many arguments (9/7)
+crates/maos-bin/src/supervision.rs:2213:30: warning: unnecessary closure used to substitute value for `Option::None`
+crates/maos-bin/src/supervision.rs:3472:73: warning: casting to the same type is unnecessary (`i32` -> `i32`): help: try: `s`
+crates/maos-bin/src/supervision.rs:3473:64: warning: casting to the same type is unnecessary (`i32` -> `i32`): help: try: `c`
+crates/maos-bin/src/worker_spawn.rs:407:1: warning: this function has too many arguments (8/7)
+crates/maos-bin/src/worker_spawn.rs:836:17: warning: this expression creates a reference which is immediately dereferenced by the compiler: help: change this to: `permitted_egress`
+crates/maos-bin/src/worker_spawn.rs:844:17: warning: this expression creates a reference which is immediately dereferenced by the compiler: help: change this to: `permitted_egress`
+crates/maos-bin/src/worker_spawn.rs:951:21: warning: this expression creates a reference which is immediately dereferenced by the compiler: help: change this to: `permitted_egress`
+warning: `maos-bin` (lib) generated 20 warnings (run `cargo clippy --fix --lib -p maos-bin -- ` to apply 10 suggestions)
+warning: `maos-bin` (lib test) generated 25 warnings (20 duplicates) (run `cargo clippy --fix --lib -p maos-bin --tests -- ` to apply 3 suggestions)
+crates/maos-bin/tests/researcher_8_14c.rs:92:13: warning: this loop could be written as a `while let` loop: help: try: `while let Ok(n) = stream.read(&mut buf) { .. }`
+crates/maos-bin/tests/shell_host_16_2.rs:189:22: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x0001_602b_u64`
+crates/maos-bin/tests/shell_host_16_2.rs:294:22: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x0001_602c_u64`
+crates/maos-bin/tests/shell_host_16_2.rs:442:22: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x0001_602d_u64`
+crates/maos-bin/tests/shell_host_16_2.rs:497:22: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x0001_602e_u64`
+crates/maos-bin/tests/shell_host_16_2.rs:576:22: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x0001_602f_u64`
+warning: `maos-bin` (test "researcher_8_14c") generated 1 warning
+crates/maos-bin/tests/worker_freeze_19_2.rs:67:23: warning: manual implementation of `.is_multiple_of()`: help: replace with: `REVOKES.is_multiple_of(LANES)`
+warning: `maos-bin` (test "worker_freeze_19_2") generated 1 warning (run `cargo clippy --fix --test "worker_freeze_19_2" -p maos-bin -- ` to apply 1 suggestion)
+warning: `maos-bin` (test "shell_host_16_2") generated 5 warnings
+crates/maos-bin/tests/audit_refusal_16_5.rs:12:35: warning: unused import: `IntentClass`
+crates/maos-bin/tests/audit_refusal_16_5.rs:18:5: warning: unused import: `CapabilityRegistryPort`
+warning: `maos-bin` (test "audit_refusal_16_5") generated 2 warnings (run `cargo clippy --fix --test "audit_refusal_16_5" -p maos-bin -- ` to apply 2 suggestions)
+crates/maos-bin/tests/worker_resource_limits_17_2.rs:305:25: warning: writing `&PathBuf` instead of `&Path` involves a new object where a slice will do
+crates/maos-bin/tests/worker_resource_limits_17_2.rs:334:23: warning: writing `&PathBuf` instead of `&Path` involves a new object where a slice will do
+warning: `maos-bin` (test "worker_resource_limits_17_2") generated 2 warnings
+crates/maos-bin/tests/spawned_lifecycle_20_9.rs:57:9: warning: unused variable: `report`: help: if this is intentional, prefix it with an underscore: `_report`
+warning: `maos-bin` (test "spawned_lifecycle_20_9") generated 1 warning (run `cargo clippy --fix --test "spawned_lifecycle_20_9" -p maos-bin -- ` to apply 1 suggestion)
+crates/maos-bin/tests/inference_mode_15_6.rs:157:5: warning: unused import: `maos_domain::ports::capability::TokenIssuer`
+crates/maos-bin/tests/inference_mode_15_6.rs:538:16: warning: very complex type used. Consider factoring parts into `type` definitions
+warning: `maos-bin` (test "inference_mode_15_6") generated 2 warnings
+crates/maos-bin/tests/cross_team_consent_13_3.rs:713:9: warning: this `MutexGuard` is held across an await point
+crates/maos-bin/tests/j_researcher_survey_18_3.rs:1107:9: warning: this `MutexGuard` is held across an await point
+warning: `maos-bin` (test "cross_team_consent_13_3") generated 1 warning
+warning: `maos-bin` (test "j_researcher_survey_18_3") generated 1 warning
+crates/maos-bin/tests/recall_17_3d.rs:27:20: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x0001_703d`
+crates/maos-bin/tests/recall_17_3d.rs:1519:30: warning: using `chunks_exact` with a constant chunk size: help: consider using `as_chunks` instead: `as_chunks::<2>().0`
+warning: `maos-bin` (test "recall_17_3d") generated 2 warnings (run `cargo clippy --fix --test "recall_17_3d" -p maos-bin -- ` to apply 1 suggestion)
+crates/maos-bin/tests/consent_refusal_1b.rs:84:5: warning: unused import: `tokio::sync::mpsc::UnboundedReceiver`
+warning: `maos-bin` (test "consent_refusal_1b") generated 1 warning (run `cargo clippy --fix --test "consent_refusal_1b" -p maos-bin -- ` to apply 1 suggestion)
+crates/maos-bin/tests/researcher_inference_18_3.rs:221:16: warning: very complex type used. Consider factoring parts into `type` definitions
+warning: `maos-bin` (test "researcher_inference_18_3") generated 1 warning
+crates/maos-bin/tests/root_shutdown_unload_16_3.rs:1833:26: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x163A`
+crates/maos-bin/tests/root_shutdown_unload_16_3.rs:1834:26: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x163B`
+crates/maos-bin/tests/root_shutdown_unload_16_3.rs:1310:9: warning: using `contains()` instead of `iter().any()` is more efficient: help: try: `receipts.contains(&raised_id)`
+crates/maos-bin/tests/root_shutdown_unload_16_3.rs:1984:5: warning: this function has too many arguments (9/7)
+crates/maos-bin/tests/root_shutdown_unload_16_3.rs:1995:31: warning: this method chain can be written more clearly with `if .. else ..`
+warning: `maos-bin` (test "root_shutdown_unload_16_3") generated 5 warnings (run `cargo clippy --fix --test "root_shutdown_unload_16_3" -p maos-bin -- ` to apply 2 suggestions)
+crates/maos-bin/tests/identity_asserted_write.rs:126:5: warning: field assignment outside of initializer for an instance created with Default::default()
+crates/maos-bin/tests/identity_asserted_write.rs:132:5: warning: field assignment outside of initializer for an instance created with Default::default()
+warning: `maos-bin` (test "identity_asserted_write") generated 2 warnings
+crates/maos-bin/src/main.rs:1381:9: warning: unused import: `maos_mcp::McpClient`
+crates/maos-bin/tests/recall_mediation_17_3d.rs:30:20: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x0001_703d`
+crates/maos-bin/tests/recall_mediation_17_3d.rs:261:14: warning: using `chunks_exact` with a constant chunk size: help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+warning: `maos-bin` (test "recall_mediation_17_3d") generated 2 warnings (run `cargo clippy --fix --test "recall_mediation_17_3d" -p maos-bin -- ` to apply 1 suggestion)
+crates/maos-bin/tests/spawned_scope_17_3c.rs:28:20: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x0001_703c`
+crates/maos-bin/tests/spawned_scope_17_3c.rs:3200:48: warning: unused import: `MemoryManagerPort`
+warning: `maos-bin` (test "spawned_scope_17_3c") generated 2 warnings (run `cargo clippy --fix --test "spawned_scope_17_3c" -p maos-bin -- ` to apply 1 suggestion)
+crates/maos-bin/src/env_contract.rs:3:9: warning: fields `purpose` and `stability` are never read
+crates/maos-bin/src/main.rs:173:43: warning: the borrowed expression implements the required traits: help: change this to: `attestation_path`
+crates/maos-bin/src/main.rs:662:6: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-bin/src/main.rs:2416:65: warning: very complex type used. Consider factoring parts into `type` definitions
+crates/maos-bin/src/main.rs:7733:32: warning: useless use of `format!`: help: consider using `.to_string()`: `"expected halt to fire for uncertainty=0.85 > 0.8".to_string()`
+crates/maos-bin/src/main.rs:8314:13: warning: field assignment outside of initializer for an instance created with Default::default()
+crates/maos-bin/src/main.rs:10429:60: warning: this expression creates a reference which is immediately dereferenced by the compiler: help: change this to: `manifest_toml`
+crates/maos-bin/src/main.rs:10469:18: warning: using `map_err` over `inspect_err`
+crates/maos-bin/src/main.rs:10538:14: warning: using `map_err` over `inspect_err`
+crates/maos-bin/src/main.rs:11344:1: warning: this function has too many arguments (8/7)
+crates/maos-bin/src/main.rs:12734:1: warning: this function has too many arguments (9/7)
+crates/maos-bin/src/main.rs:12810:1: warning: this function has too many arguments (17/7)
+crates/maos-bin/src/main.rs:13594:1: warning: this function has too many arguments (8/7)
+crates/maos-bin/src/main.rs:14648:15: warning: redundant guard
+crates/maos-bin/src/main.rs:15586:50: warning: unnecessary use of `clone` to create a slice from a reference: help: try: `std::slice::from_ref(&root)`
+crates/maos-bin/src/main.rs:17381:13: warning: this `MutexGuard` is held across an await point
+crates/maos-bin/src/main.rs:17461:13: warning: this `MutexGuard` is held across an await point
+crates/maos-bin/src/main.rs:17592:13: warning: this `MutexGuard` is held across an await point
+warning: `maos-bin` (bin "maos" test) generated 19 warnings (run `cargo clippy --fix --bin "maos" -p maos-bin --tests -- ` to apply 6 suggestions)
+crates/maos-bin/tests/hook_pump_17_4.rs:356:12: warning: manual implementation of `.is_multiple_of()`: help: replace with: `self.calls.fetch_add(1, Ordering::SeqCst).is_multiple_of(2)`
+crates/maos-bin/tests/hook_pump_17_4.rs:1638:9: warning: this `MutexGuard` is held across an await point
+crates/maos-bin/tests/hook_pump_17_4.rs:1918:9: warning: this `MutexGuard` is held across an await point
+crates/maos-bin/tests/hook_pump_17_4.rs:2109:9: warning: this `MutexGuard` is held across an await point
+warning: `maos-bin` (test "hook_pump_17_4") generated 4 warnings (run `cargo clippy --fix --test "hook_pump_17_4" -p maos-bin -- ` to apply 1 suggestion)
+crates/maos-bin/tests/worker_crash_corpus_16_3.rs:855:31: warning: manual implementation of `.is_multiple_of()`: help: replace with: `index.is_multiple_of(2)`
+warning: `maos-bin` (test "worker_crash_corpus_16_3") generated 1 warning (run `cargo clippy --fix --test "worker_crash_corpus_16_3" -p maos-bin -- ` to apply 1 suggestion)
+crates/maos-bin/src/env_contract.rs:1:12: warning: struct `EnvVar` is never constructed
+crates/maos-bin/src/env_contract.rs:8:10: warning: enum `EnvStability` is never used
+crates/maos-bin/src/env_contract.rs:13:11: warning: constant `MAOS_ENV_REGISTRY` is never used
+crates/maos-bin/src/env_contract.rs:673:8: warning: function `lookup` is never used
+warning: `maos-bin` (bin "maos") generated 19 warnings (15 duplicates)
+crates/maos-bin/tests/cert_rotation_trigger_14_2a.rs:249:21: warning: spawned process is not `wait()`ed on in all code paths
+warning: `maos-bin` (test "cert_rotation_trigger_14_2a") generated 1 warning
+crates/maos-bin/tests/two_host_delegation_2b.rs:48:22: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x02BA`
+crates/maos-bin/tests/two_host_delegation_2b.rs:49:22: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x02BB`
+crates/maos-bin/tests/two_host_delegation_2b.rs:658:13: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x02BC`
+crates/maos-bin/tests/two_host_delegation_2b.rs:241:1: warning: this function has too many arguments (9/7)
+crates/maos-bin/tests/two_host_delegation_2b.rs:252:27: warning: this method chain can be written more clearly with `if .. else ..`
+crates/maos-bin/tests/two_host_delegation_2b.rs:331:6: warning: very complex type used. Consider factoring parts into `type` definitions
+warning: `maos-bin` (test "two_host_delegation_2b") generated 6 warnings (run `cargo clippy --fix --test "two_host_delegation_2b" -p maos-bin -- ` to apply 1 suggestion)
+crates/maos-bin/tests/butler_8_14b.rs:190:17: warning: variable `header_end` is assigned to, but never used
+crates/maos-bin/tests/butler_8_14b.rs:201:21: warning: value assigned to `header_end` is never read
+crates/maos-bin/tests/butler_8_14b.rs:166:5: warning: fields `method`, `path`, and `body` are never read
+crates/maos-bin/tests/butler_8_14b.rs:191:13: warning: this loop could be written as a `while let` loop: help: try: `while let Ok(n) = stream.read(&mut buf) { .. }`
+warning: `maos-bin` (test "butler_8_14b") generated 4 warnings
+crates/maos-bin/tests/bounded_postures_2b.rs:389:9: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x02BB`
+warning: `maos-bin` (test "bounded_postures_2b") generated 1 warning
+warning: file is loaded as a module multiple times: `crates/maos-bin/tests/../../../tests/harness/fixtures.rs`
+warning: `maos-bin` (test "spawned_installed_20_9") generated 1 warning
+crates/maos-bin/tests/egress_daemon_17_1.rs:18:63: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x0171`
+crates/maos-bin/tests/egress_daemon_17_1.rs:73:63: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x0172`
+crates/maos-bin/tests/egress_daemon_17_1.rs:163:63: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x0173`
+warning: `maos-bin` (test "egress_daemon_17_1") generated 3 warnings
+crates/maos-bin/tests/participant_recall_17_8.rs:977:44: warning: this OR pattern can be rewritten using a range: help: try: `2..=4`
+crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs:534:13: warning: returning the result of a `let` binding from a block
+crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs:745:13: warning: unnecessary use of `clone` to create a slice from a reference: help: try: `std::slice::from_ref(&destination)`
+warning: `maos-bin` (test "participant_recall_17_8") generated 1 warning (run `cargo clippy --fix --test "participant_recall_17_8" -p maos-bin -- ` to apply 1 suggestion)
+warning: `maos-bin` (test "worker_terminal_facts_17_7") generated 2 warnings (run `cargo clippy --fix --test "worker_terminal_facts_17_7" -p maos-bin -- ` to apply 2 suggestions)
+warning: file is loaded as a module multiple times: `crates/maos-bin/tests/wasm_skill_authoring_20_8/../../../../tests/harness/fixtures.rs`
+warning: `maos-bin` (test "wasm_skill_authoring_20_8") generated 1 warning
+crates/maos-bin/tests/cross_team_crossing_13_6b.rs:1462:1: warning: this function has too many arguments (8/7)
+crates/maos-bin/tests/cross_team_crossing_13_6b.rs:1644:9: warning: this `MutexGuard` is held across an await point
+crates/maos-bin/tests/cross_team_crossing_13_6b.rs:1839:9: warning: this `MutexGuard` is held across an await point
+crates/maos-bin/tests/cross_team_crossing_13_6b.rs:2358:9: warning: this `MutexGuard` is held across an await point
+crates/maos-bin/tests/cross_team_crossing_13_6b.rs:2815:9: warning: this `MutexGuard` is held across an await point
+crates/maos-bin/tests/cross_team_crossing_13_6b.rs:3182:9: warning: this `MutexGuard` is held across an await point
+warning: `maos-bin` (test "cross_team_crossing_13_6b") generated 6 warnings
+crates/maos-bin/tests/cli_wrapper_exhaustion_17_9.rs:41:20: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x0001_709D`
+warning: `maos-bin` (test "cli_wrapper_exhaustion_17_9") generated 1 warning
+crates/maos-bin/tests/f4_pairing.rs:68:22: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x02BA`
+crates/maos-bin/tests/f4_pairing.rs:69:22: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x02BB`
+crates/maos-bin/tests/f4_pairing.rs:76:38: warning: digits of hex, binary or octal literal not in groups of equal size: help: consider: `0x0197`
+crates/maos-bin/tests/f4_pairing.rs:259:1: warning: this function has too many arguments (10/7)
+crates/maos-bin/tests/f4_pairing.rs:271:27: warning: this method chain can be written more clearly with `if .. else ..`
+warning: `maos-bin` (test "f4_pairing") generated 5 warnings (run `cargo clippy --fix --test "f4_pairing" -p maos-bin -- ` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 28s

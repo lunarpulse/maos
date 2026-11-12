@@ -167,7 +167,7 @@ def main():
         check(release.get("ID", "").strip('"') == "ubuntu" and os_version == args.expected_os, release)
     if args.expected_arch:
         check(arch == args.expected_arch, arch)
-    check(declared["resources"] == {"cpu_max_pct": 10, "memory_max_mb": 768}, declared["resources"])
+    check(declared["resources"] == {"cpu_max_pct": 100, "memory_max_mb": 768}, declared["resources"])
     check(declared_time_cap == 360, declared_time_cap)
     check(declared["sandbox"]["tier"] == "T2", declared["sandbox"])
     args.output.mkdir(parents=True, exist_ok=False)

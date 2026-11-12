@@ -193,15 +193,20 @@ pub struct World {
 impl World {
     /// A root with the kernel's own callers running (idle, schedule, consolidate).
     pub async fn new() -> Self {
-        Self::build(true).await
+        Self::build(true, Default::default()).await
+    }
+
+    /// A root with the kernel's own callers and `seams` (a vector controlling a session's teardown).
+    pub async fn with_seams(seams: maos_bin::supervision::SupervisorSeams) -> Self {
+        Self::build(true, seams).await
     }
 
     /// A root whose hooks only fire when a vector fires them: no watchdog runs.
     pub async fn bare() -> Self {
-        Self::build(false).await
+        Self::build(false, Default::default()).await
     }
 
-    async fn build(callers: bool) -> Self {
+    async fn build(callers: bool, seams: maos_bin::supervision::SupervisorSeams) -> Self {
         fast_clocks();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path();
@@ -283,7 +288,7 @@ impl World {
         Arc::get_mut(&mut scheduler)
             .unwrap()
             .set_crash_detector(Arc::clone(&crash));
-        let root = maos_bin::supervision::RootSupervision::arm(
+        let root = maos_bin::supervision::RootSupervision::arm_with_seams(
             Arc::clone(&scheduler),
             crash,
             Arc::clone(&tl),
@@ -293,6 +298,7 @@ impl World {
             Arc::clone(&metrics),
             Arc::new(maos_director_surface::notification::NotificationDispatcher::default()),
             NONCE,
+            seams,
         );
         let supervisor = Arc::clone(root.supervisor());
         // The audit writer is the journal of `cap.revoke`; it ends with the process.

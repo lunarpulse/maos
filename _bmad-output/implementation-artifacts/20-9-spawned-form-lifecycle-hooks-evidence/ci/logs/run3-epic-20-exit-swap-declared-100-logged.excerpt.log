@@ -1,0 +1,79 @@
+ ##[endgroup]
+ {
+   "outcome": "receipt",
+   "publish_id": "pub-71",
+   "spirit_id": "example-spirit-ts",
+   "version": "0.1.0"
+ }
+ {
+   "outcome": "receipt",
+   "publish_id": "pub-2285199076",
+   "spirit_id": "example-spirit-ts",
+   "version": "0.2.0"
+ }
+ {"artifact_bytes":12582966,"effective_tier":"PublicUntrusted","manifest_bytes":992,"origin":{"Remote":{"uri":"http://127.0.0.1:6789/mcp"}},"outcome":"installed","sandbox_tier_floor":"T2","spirit_id":"example-spirit-ts","version":"0.1.0"}
+ maos: initialized /tmp/tmp.ahyGX1yuq9/home/.maos
+ maos: config written to /tmp/tmp.ahyGX1yuq9/home/.maos/config.toml  (6 default slots + retention=persist)
+ maos: operator door endpoint tcp://127.0.0.1:36661 recorded in /tmp/tmp.ahyGX1yuq9/home/.maos/control.json
+ maos: Transparency Log will be at /tmp/tmp.ahyGX1yuq9/home/.maos/audit/transparency.sqlite
+ maos: to remove all data, run:  maos purge --yes
+ pid_before=1
+ spirit_id: example-spirit-ts
+ pid: 1
+ boot_nonce: 8060426686613515439
+ lifecycle_state: Running
+ posture: Assistive
+ posture_ceiling: Assistive
+ attempt=1 exit=1 elapsed=5s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=2 exit=1 elapsed=10s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=3 exit=1 elapsed=15s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=4 exit=1 elapsed=38s: maosctl: spirit upgrade — upgrade_failed: hot-swap coordinator error: Spirit not loaded: example-spirit-ts (HTTP 500) 
+ ready_after_s=38
+ upgrade exit=1
+ maosctl: spirit upgrade — upgrade_failed: hot-swap coordinator error: Spirit not loaded: example-spirit-ts (HTTP 500)
+ ready_after_s=38
+ ##[error]Process completed with exit code 1.
+ ##[group]Run set +e
+ set +e
+ . ./scratch.env
+ export MAOS_HOME="$scratch/home/.maos"
+ cat "$MAOS_HOME"/journal/* > journal.all 2>/dev/null
+ python3 - <<'PY'
+ import os, sqlite3
+ db = sqlite3.connect("file:" + os.environ["MAOS_HOME"] + "/audit/transparency.sqlite?mode=ro", uri=True)
+ with open("tl-intents.txt", "w") as out:
+     for intent, payload in db.execute("SELECT intent, payload_redacted FROM transparency_log ORDER BY rowid"):
+         out.write(intent + "\t" + bytes(payload).decode("utf-8", "replace")[:300] + "\n")
+ PY
+ echo "--- tl intents"; cut -f1 tl-intents.txt | sort | uniq -c
+ echo "--- MAOS-209 lines per sink (daemon.out daemon.err journal.all)"
+ grep -c 'MAOS-209' daemon.out daemon.err journal.all
+ grep -h 'MAOS-209' daemon.out daemon.err journal.all | head -80
+ shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+ env:
+   SWAP_IN_CASE: declared
+   CPU_CASE: 100
+   CARGO_HOME: /home/runner/.cargo
+   CARGO_INCREMENTAL: 0
+   CARGO_TERM_COLOR: always
+   CACHE_ON_FAILURE: false
+ ##[endgroup]
+ --- tl intents
+       2 cap.revoke
+       1 cli.subprocess.exit
+       1 crypto.provider.selected
+       2 governance:manifest-declaration
+       2 governance:manifest-declaration-outcome
+       1 governance:vetter-key-admission
+       1 lifecycle.admit
+       1 lifecycle.crash
+       1 lifecycle.load
+       1 lifecycle.start
+       4 spirit.diagnostic
+       2 unplanned_crash
+ --- MAOS-209 lines per sink (daemon.out daemon.err journal.all)
+ daemon.out:0
+ daemon.err:0
+ journal.all:0
+ ##[error]Process completed with exit code 1.
+ ##[group]Run actions/upload-artifact@v4

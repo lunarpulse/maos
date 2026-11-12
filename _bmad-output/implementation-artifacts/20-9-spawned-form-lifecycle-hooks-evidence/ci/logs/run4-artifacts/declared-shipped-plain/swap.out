@@ -1,0 +1,3 @@
+maosctl: spirit upgrade — the command outlived its route budget but is running to completion; operation_id op-fd1dda6dc56e3dbc58a1f5a8; inspect its row later with: maosctl audit query --intent-contains op-fd1dda6dc56e3dbc58a1f5a8
+ready_after_s=243
+async upgrade op-fd1dda6dc56e3dbc58a1f5a8 outcome=upgrade_failed

@@ -557,6 +557,34 @@ impl Drop for LifecycleLink {
     }
 }
 
+/// How long a spawned admission waits for the previous incarnation's session to finish tearing down.
+pub const SESSION_END_WAIT: Duration = Duration::from_secs(15);
+
+/// A session's hold on its end: the session drops it as its last act, which ends the session
+/// for every waiter (its mailbox registration and identity are released by then).
+pub type SessionEnd = tokio::sync::watch::Sender<()>;
+
+/// The latest session of each Spirit id of a root, for the admission of the id's next incarnation
+/// to wait on exactly that teardown, not on a guess.
+#[derive(Default)]
+pub struct SessionEnds(Mutex<std::collections::BTreeMap<String, tokio::sync::watch::Receiver<()>>>);
+
+impl SessionEnds {
+    pub fn begin(&self, id: &str) -> SessionEnd {
+        let (end, watch) = tokio::sync::watch::channel(());
+        locked(&self.0).insert(id.to_owned(), watch);
+        end
+    }
+
+    /// Resolves once the latest session of `id` has ended (at once if it has, or never began).
+    pub async fn ended(&self, id: &str) {
+        let watch = locked(&self.0).get(id).cloned();
+        if let Some(mut watch) = watch {
+            let _ = watch.changed().await;
+        }
+    }
+}
+
 /// Sessions the door starts for a cold swap, and a hold that keeps the root up across one.
 #[derive(Default)]
 pub struct HostedSessions {
@@ -667,6 +695,21 @@ impl SwapHandles {
         let launch =
             crate::spirit_session::manifest_launch_in(&*self.host, gated, manifest, origin, false)
                 .map_err(|error| class_build(error.to_string()))?;
+        // The previous incarnation of this id has been unloaded and its session signalled, not
+        // necessarily finished: until it releases its mailbox registration this admission loses.
+        if tokio::time::timeout(
+            SESSION_END_WAIT,
+            supervisor.session_ends().ended(&gated.spirit_id),
+        )
+        .await
+        .is_err()
+        {
+            return Err(class_build(format!(
+                "session_not_ended: the previous session of '{}' did not finish tearing down within {} s",
+                gated.spirit_id,
+                SESSION_END_WAIT.as_secs()
+            )));
+        }
         let (core, object) = supervisor
             .prepare_spawned(&gated.spirit_id, &gated.bundle())
             .map_err(|error| class_build(error.to_string()))?;

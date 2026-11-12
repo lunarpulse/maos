@@ -423,6 +423,89 @@ async fn a_cold_swap_admits_at_a_new_pid_resets_state_and_restores_a_refused_suc
     world.finish().await;
 }
 
+// Hosted ubuntu-24.04/26.04-arm (runs 43179221668, 43185836600): the door's restore of a refused
+// cold swap admitted while the unloaded predecessor's session was still tearing down, and lost
+// the race for its mailbox registration (`spirit lifecycle-probe is already registered`). The
+// seam parks the predecessor's teardown holding that registration until `release` fires.
+async fn parked_predecessor() -> (World, Running, std::sync::mpsc::Sender<()>) {
+    let gated = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let (release, hold) = std::sync::mpsc::channel::<()>();
+    let (hold, watch) = (std::sync::Mutex::new(hold), std::sync::Arc::clone(&gated));
+    let mut world = World::with_seams(maos_bin::supervision::SupervisorSeams {
+        before_session_release: Some(std::sync::Arc::new(move |pid| {
+            if pid == watch.load(std::sync::atomic::Ordering::SeqCst) {
+                let _ = hold.lock().unwrap().recv();
+            }
+        })),
+        ..Default::default()
+    })
+    .await;
+    let v1 = v(&world, "v1.toml", "1.0.0", "lifecycle_probe.wasm", "");
+    let running = world.start(&v1).await;
+    world.turn(ID, "").await;
+    gated.store(running.pid, std::sync::atomic::Ordering::SeqCst);
+    // The door's sequence up to the restore: unload and stop signal the predecessor's session.
+    world.scheduler.unload(running.pid).await.unwrap();
+    world.supervisor.stop_binding(running.pid);
+    (world, running, release)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_cold_swap_admission_waits_for_the_previous_session_to_release_its_mailbox() {
+    let (mut world, running, release) = parked_predecessor().await;
+    let v1 = world.dir.path().join("v1.toml");
+    let mut restore = Box::pin(admit(&world, v1));
+    tokio::select! {
+        early = &mut restore => panic!(
+            "the restore was decided while the predecessor still held its mailbox: {:?}",
+            early.map(|admitted| admitted.pid)
+        ),
+        () = tokio::time::sleep(Duration::from_millis(750)) => {}
+    }
+    release.send(()).unwrap();
+    let restored = tokio::time::timeout(Duration::from_secs(60), restore)
+        .await
+        .expect("the restore proceeds once the predecessor's session ended")
+        .expect("the restore is admitted");
+    assert_ne!(restored.pid, running.pid, "a new pid");
+    let ended = tokio::time::timeout(Duration::from_secs(20), running.session)
+        .await
+        .expect("the predecessor's session ended");
+    assert!(ended.is_ok(), "the session task joined");
+    let report = world.turn(ID, "").await;
+    assert_eq!(World::count(&report, "counter"), 1, "{report}");
+    world.scheduler.unload(restored.pid).await.unwrap();
+    world.supervisor.stop_binding(restored.pid);
+    world.finish().await;
+}
+
+// The wait is bounded: a predecessor that never finishes tearing down is a typed refusal, and the
+// admission goes through once it does.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_cold_swap_admission_is_refused_typed_when_the_previous_session_never_ends() {
+    let (mut world, running, release) = parked_predecessor().await;
+    let v1 = world.dir.path().join("v1.toml");
+    let started = Instant::now();
+    let refused = admit(&world, v1.clone()).await.expect_err("refused");
+    let waited = started.elapsed();
+    assert!(
+        refused.to_string().contains("session_not_ended")
+            && waited >= maos_bin::spawned_lifecycle::SESSION_END_WAIT,
+        "{refused} after {waited:?}"
+    );
+    release.send(()).unwrap();
+    let ended = tokio::time::timeout(Duration::from_secs(20), running.session)
+        .await
+        .expect("the predecessor's session ended");
+    assert!(ended.is_ok(), "the session task joined");
+    let restored = admit(&world, v1).await.expect("admitted once it ended");
+    let report = world.turn(ID, "").await;
+    assert_eq!(World::count(&report, "counter"), 1, "{report}");
+    world.scheduler.unload(restored.pid).await.unwrap();
+    world.supervisor.stop_binding(restored.pid);
+    world.finish().await;
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_swap_refused_after_snapshot_releases_the_predecessor_which_keeps_serving() {
     let mut world = World::new().await;

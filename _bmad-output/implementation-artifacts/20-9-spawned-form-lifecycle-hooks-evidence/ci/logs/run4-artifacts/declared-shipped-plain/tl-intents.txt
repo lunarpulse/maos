@@ -1,0 +1,13 @@
+crypto.provider.selected	{"provider":"ring","version":"0.17.14","source":"config"}
+governance:manifest-declaration	{"recorded_at_ns":1794475744547550713,"effective_at_ns":1794475744547550713,"event":{"governance_type":"ManifestDeclaration","spirit_id":"example-spirit-ts","attempt_id":"01M77HDQ93A97CGHP9SXKCJSK9","outcome":"declared","version":"0.1.0","manifest_sha256":"5484:a1fb:f9da:b0b3:2e07:941a:beaa:060a:0bb
+lifecycle.admit	{"spirit_id":"example-spirit-ts"}
+lifecycle.load	{"lifecycle_event":"Load","spirit_id":"example-spirit-ts","spirit_pid":1}
+governance:vetter-key-admission	{"recorded_at_ns":1794475744549098925,"effective_at_ns":1794475744549098925,"event":{"governance_type":"VetterKey","spirit_id":"example-spirit-ts","version":"0.1.0","admitted":true,"effective_tier":"SandboxTier(2)","journal_note":"admission granted"}}
+governance:manifest-declaration-outcome	{"attempt_id":"01M77HDQ93A97CGHP9SXKCJSK9","outcome":"admitted"}
+lifecycle.start	{"lifecycle_event":"Start","spirit_pid":1}
+cli.subprocess.exit	{"event":"cli_subprocess_exit","cli_child_pid":15937,"exit_cause":"signaled(sig=15)","is_crash":true}
+cap.revoke	
+lifecycle.unload	{"lifecycle_event":"Unload","spirit_pid":1}
+planned_unload	
+planned_unload	{"halt_id":"term-example-spirit-ts-1-1794476048540143047","timestamp_ns":1794476048540143047,"spirit_pid":1,"boot_nonce":8332329976131424589,"frame_id":[1,161,207,27,128,156,69,1,207,95,10,203,21,53,230,195],"terminal_state":"Terminated","resolution_kind":"planned_unload","resolution_timestamp_ns":1
+cap.revoke	

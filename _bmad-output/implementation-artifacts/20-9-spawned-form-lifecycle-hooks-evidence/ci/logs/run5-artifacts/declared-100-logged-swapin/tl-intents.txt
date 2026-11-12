@@ -1,0 +1,16 @@
+crypto.provider.selected	{"provider":"ring","version":"0.17.14","source":"config"}
+governance:manifest-declaration	{"recorded_at_ns":1794477455134506582,"effective_at_ns":1794477455134506582,"event":{"governance_type":"ManifestDeclaration","spirit_id":"example-spirit-ts","attempt_id":"01M77K1XRYZ42JHQ0KZK4MK891","outcome":"declared","version":"0.1.0","manifest_sha256":"f5d1:c77f:221b:5b69:d950:2655:0b55:d083:a37
+lifecycle.admit	{"spirit_id":"example-spirit-ts"}
+lifecycle.load	{"lifecycle_event":"Load","spirit_id":"example-spirit-ts","spirit_pid":1}
+governance:vetter-key-admission	{"recorded_at_ns":1794477455136128781,"effective_at_ns":1794477455136128781,"event":{"governance_type":"VetterKey","spirit_id":"example-spirit-ts","version":"0.1.0","admitted":true,"effective_tier":"SandboxTier(2)","journal_note":"admission granted"}}
+governance:manifest-declaration-outcome	{"attempt_id":"01M77K1XRYZ42JHQ0KZK4MK891","outcome":"admitted"}
+lifecycle.start	{"lifecycle_event":"Start","spirit_pid":1}
+governance:manifest-declaration	{"recorded_at_ns":1794477493817652140,"effective_at_ns":1794477493817652140,"event":{"governance_type":"ManifestDeclaration","spirit_id":"example-spirit-ts","attempt_id":"01M77K33HSFJ4T983KX3HFPCS4","outcome":"declared","version":"0.2.0","manifest_sha256":"fef9:1d08:34b7:12bf:30e0:7820:626f:cb54:299
+hot_swap.aborted	{"spirit_pid":1,"reason":"swap-in failed: Panicked { panic_payload_preview: \"lifecycle_child_closed\" }","phase":"SwapInFired","compensation":"DiscardSuccessor { reason: \"swap-in failed: Panicked { panic_payload_preview: \\\"lifecycle_child_closed\\\" }\" }"}
+governance:manifest-declaration-outcome	{"attempt_id":"01M77K33HSFJ4T983KX3HFPCS4","outcome":"refused"}
+cli.subprocess.exit	{"event":"cli_subprocess_exit","cli_child_pid":15989,"exit_cause":"signaled(sig=15)","is_crash":true}
+cap.revoke	
+lifecycle.unload	{"lifecycle_event":"Unload","spirit_pid":1}
+planned_unload	
+planned_unload	{"halt_id":"term-example-spirit-ts-1-1794477493972898846","timestamp_ns":1794477493972898846,"spirit_pid":1,"boot_nonce":8626054380873261889,"frame_id":[1,161,207,49,142,212,186,20,212,89,10,146,56,218,153,127],"terminal_state":"Terminated","resolution_kind":"planned_unload","resolution_timestamp_ns
+cap.revoke	

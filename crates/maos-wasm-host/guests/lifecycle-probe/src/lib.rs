@@ -14,6 +14,9 @@
 //! - `fail NAME` / `decline NAME`: the next call of that lifecycle export returns
 //!   `failed` / `declined`. NAME is idle, consolidate, telemetry, schedule, pause, resume,
 //!   snapshot, swap-in or migrate.
+//! - `say NAME TEXT`: the next call of that lifecycle export (or `shutdown`) writes TEXT to the
+//!   guest's stdout and stderr (`wasi:cli`), the way a TypeScript `console.log` does; `say
+//!   frame TEXT` writes it in this very turn. The runner routes both streams to its own stderr.
 //! - `to SPIRIT`: address the report to this Spirit.
 //!
 //! Each export's `recall` import asks for `export_limit` entries (idle 1, consolidate 2,
@@ -46,6 +49,7 @@ struct State {
     swapped_in: Option<u64>,
     migrated: Option<u64>,
     naps: Vec<(String, u64)>,
+    says: Vec<(String, String)>,
     fail: Vec<(String, bool)>,
     imports: BTreeMap<&'static str, bool>,
     last_telemetry: Option<String>,
@@ -81,7 +85,25 @@ fn imports_answered(name: &'static str) {
     };
     let answered = !matches!(recall::recall(&filter), Err(RecallError::Unavailable));
     STATE.with(|state| state.borrow_mut().imports.insert(name, answered));
+    speak(name);
     nap(name);
+}
+
+/// A scripted write to the guest's stdout and stderr for `name`, consumed once.
+fn speak(name: &str) {
+    let text = STATE.with(|state| {
+        let mut state = state.borrow_mut();
+        let at = state.says.iter().position(|(n, _)| n == name)?;
+        Some(state.says.remove(at).1)
+    });
+    if let Some(text) = text {
+        say(name, &text);
+    }
+}
+
+fn say(name: &str, text: &str) {
+    println!("lifecycle-probe stdout {name}: {text}");
+    eprintln!("lifecycle-probe stderr {name}: {text}");
 }
 
 /// A scripted busy spell for `name`, consumed once.
@@ -204,6 +226,14 @@ impl Guest for LifecycleProbe {
                 (Some(verb @ ("fail" | "decline")), Some(name)) => STATE.with(|state| {
                     state.borrow_mut().fail.push((name.to_owned(), verb == "fail"));
                 }),
+                (Some("say"), Some(name)) => {
+                    let text = words.collect::<Vec<_>>().join(" ");
+                    if name == "frame" {
+                        say(name, &text);
+                    } else {
+                        STATE.with(|state| state.borrow_mut().says.push((name.to_owned(), text)));
+                    }
+                }
                 (Some("to"), Some(id)) => {
                     frame.to = vec![maos::spirit::frames::FrameAddress {
                         spirit_id: id.into(),
@@ -225,6 +255,7 @@ impl Guest for LifecycleProbe {
         Ok(())
     }
     fn on_shutdown() {
+        speak("shutdown");
         nap("shutdown");
     }
 }

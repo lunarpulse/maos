@@ -1,0 +1,2 @@
+{"spirit_id":"example-spirit-ts","policy":"hot-swap","reports":[{"spirit_id":"example-spirit-ts","predecessor_version":"0.1.0","successor_version":"0.2.0","policy":"hot_swap","outcome":"completed","latency_ns":28979060830,"halt_receipts_produced":0}]}
+ready_after_s=49

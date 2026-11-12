@@ -172,6 +172,17 @@ fn parse_args() -> Result<RunnerArgs, String> {
 const COMPILE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(360);
 
 fn run(args: RunnerArgs) -> Result<(), RunError> {
+    // Every guest stdout/stderr write, `poll` and stream drop reaches wasmtime-wasi's synchronous
+    // host bindings, which run through `in_tokio`. With no ambient tokio runtime that helper
+    // lazily builds its own multi-thread runtime with an I/O driver, whose `epoll_create1` /
+    // `eventfd2` the T2 seccomp allow-list refuses with EPERM: the build `unwrap` panicked and
+    // killed the runner on a guest's first `console.log`. A current-thread runtime with no
+    // driver needs no syscall and spawns no thread; wasmtime-wasi finds it ambient and drives
+    // its always-ready stdio futures on this thread. The sandbox allow-list stays as it is.
+    let ambient = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .map_err(|e| RunError::Other(format!("ambient runtime: {e}")))?;
+    let _ambient = ambient.enter();
     // Read the opened file through a cap: metadata alone cannot bound a file
     // changed between resolution and the contained runner's open.
     const MAX_COMPONENT_BYTES: u64 = 64 * 1024 * 1024;

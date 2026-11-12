@@ -88,8 +88,8 @@ install the runner next to `maos`. The default engine-off build still refuses
 WASM admission.
 
 Launch uses a 768 MiB runner process cap,
-360-second startup/active-turn budget, and CPU 10%. Guest memory remains 64 MiB
-and instruction fuel remains 10 million. CPU 10% requires writable delegated
+360-second startup/active-turn budget, and CPU 100% (one full CPU). Guest memory remains 64 MiB
+and instruction fuel remains 10 million. The CPU cap requires writable delegated
 cgroup-v2 CPU and memory controllers; launch fails closed without them. An
 installed runner alone is not permission to bypass admission or T2.
 
@@ -103,8 +103,12 @@ Bus emission requires the manifest's `[capabilities.required.iac].send` grant
 (`"spirit:peer"` here), and each delivered frame is mediated by a kernel-issued
 capability token.
 
-The 360-second startup/active-turn budget was measured on x86_64 under the
-CPU 10% cap; other architectures are not claimed verified.
+The 360-second startup/active-turn budget was measured on x86_64 under a
+CPU 10% cap; other architectures are not claimed verified. The shipped cap is
+100% because starting a componentized-JS guest is CPU-bound: under 10% a hot
+swap of this example (which restarts the guest) outlasts the 90-second door
+wall for one swap attempt (hosted: Ready after ~220 s), while at 100% start
+plus hot swap took 49.5 s.
 Current kernel scope policy compares scope kinds, not MCP server/tool selectors.
 
 `handleFrame` echoes the inbound frame only after `onStart`. Before startup it

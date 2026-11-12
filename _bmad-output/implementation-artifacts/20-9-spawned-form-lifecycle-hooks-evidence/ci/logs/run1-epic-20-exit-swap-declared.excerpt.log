@@ -1,0 +1,55 @@
+ ##[endgroup]
+ {
+   "outcome": "receipt",
+   "publish_id": "pub-150",
+   "spirit_id": "example-spirit-ts",
+   "version": "0.1.0"
+ }
+ {
+   "outcome": "receipt",
+   "publish_id": "pub-2349957682",
+   "spirit_id": "example-spirit-ts",
+   "version": "0.2.0"
+ }
+ {"artifact_bytes":12582986,"effective_tier":"PublicUntrusted","manifest_bytes":991,"origin":{"Remote":{"uri":"http://127.0.0.1:6789/mcp"}},"outcome":"installed","sandbox_tier_floor":"T2","spirit_id":"example-spirit-ts","version":"0.1.0"}
+ maos: initialized /tmp/tmp.v6dg7irdKP/home/.maos
+ maos: config written to /tmp/tmp.v6dg7irdKP/home/.maos/config.toml  (6 default slots + retention=persist)
+ maos: operator door endpoint tcp://127.0.0.1:43019 recorded in /tmp/tmp.v6dg7irdKP/home/.maos/control.json
+ maos: Transparency Log will be at /tmp/tmp.v6dg7irdKP/home/.maos/audit/transparency.sqlite
+ maos: to remove all data, run:  maos purge --yes
+ pid_before=1
+ spirit_id: example-spirit-ts
+ pid: 1
+ boot_nonce: 3328741008265035739
+ lifecycle_state: Running
+ posture: Assistive
+ posture_ceiling: Assistive
+ upgrade exit=1
+ maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500)
+ ##[error]Process completed with exit code 1.
+ ##[group]Run set +e
+ set +e
+ . ./scratch.env
+ echo "--- MAOS-209 lines in daemon.out/daemon.err/journal"
+ grep -h 'MAOS-209' daemon.out daemon.err journal.all 2>/dev/null | head -60
+ echo "--- sinks"
+ grep -c 'MAOS-209' daemon.out daemon.err journal.all
+ echo "--- tl-intents"
+ cut -f1 tl-intents.txt | sort | uniq -c
+ shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+ env:
+   SWAP_IN_CASE: declared
+   CARGO_HOME: /home/runner/.cargo
+   CARGO_INCREMENTAL: 0
+   CARGO_TERM_COLOR: always
+   CACHE_ON_FAILURE: false
+ ##[endgroup]
+ --- MAOS-209 lines in daemon.out/daemon.err/journal
+ --- sinks
+ grep: journal.all: No such file or directory
+ daemon.out:0
+ daemon.err:0
+ --- tl-intents
+ cut: tl-intents.txt: No such file or directory
+ ##[error]Process completed with exit code 1.
+ ##[group]Run actions/upload-artifact@v4

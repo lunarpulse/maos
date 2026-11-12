@@ -718,6 +718,9 @@ mod worker {
         pub hook_cap_override: Option<u32>,
         /// Request payload pidfd evidence; false forces the runtime fallback.
         pub payload_pidfd: bool,
+        /// Block a spawned session's teardown (given its pid) just before it releases its
+        /// mailbox registration and identity, so a vector controls how long it lingers.
+        pub before_session_release: Option<Arc<dyn Fn(u32) + Send + Sync>>,
     }
 
     impl Default for SupervisorSeams {
@@ -730,6 +733,7 @@ mod worker {
                 on_unload_fault: None,
                 hook_cap_override: None,
                 payload_pidfd: true,
+                before_session_release: None,
             }
         }
     }
@@ -1701,6 +1705,9 @@ mod worker {
         /// `audit_tx` owners, and the root's teardown drops the supervisor before the audit drain.
         #[cfg(feature = "wasm-host")]
         swap_handles: std::sync::OnceLock<Arc<crate::spawned_lifecycle::SwapHandles>>,
+        /// Which spawned sessions are still tearing down (a cold swap's re-admission waits).
+        #[cfg(feature = "wasm-host")]
+        session_ends: crate::spawned_lifecycle::SessionEnds,
     }
 
     impl WorkerSupervisor {
@@ -1818,6 +1825,19 @@ mod worker {
             let _ = self.swap_handles.set(handles);
         }
 
+        #[cfg(feature = "wasm-host")]
+        pub fn session_ends(&self) -> &crate::spawned_lifecycle::SessionEnds {
+            &self.session_ends
+        }
+
+        /// A spawned session's teardown, just before its mailbox registration is released.
+        #[cfg(feature = "wasm-host")]
+        pub(crate) fn before_session_release(&self, pid: u32) {
+            if let Some(hook) = &self.seams.before_session_release {
+                hook(pid);
+            }
+        }
+
         /// The live spawned session of `spirit_id` that a swap may replace (Story 20-9).
         #[cfg(feature = "wasm-host")]
         pub fn spawned_target(&self, spirit_id: &str) -> Option<Arc<BindingCore>> {
@@ -1931,6 +1951,8 @@ mod worker {
                 seams: SupervisorSeams::default(),
                 #[cfg(feature = "wasm-host")]
                 swap_handles: std::sync::OnceLock::new(),
+                #[cfg(feature = "wasm-host")]
+                session_ends: Default::default(),
             }
         }
 

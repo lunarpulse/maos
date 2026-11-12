@@ -1,0 +1,198 @@
+    Blocking waiting for file lock on build directory
+   Compiling maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain)
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.46
+   Compiling rustls-webpki v0.103.16
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+58 |     async fn retract(
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   Compiling maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability)
+   Compiling maos-mcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-mcp)
+   Compiling maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   Compiling maos-acp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-acp)
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+   Compiling maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval)
+13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+18 | use tokio::time::{interval, Instant};
+223 |                         other => {
+   Compiling maos-director-surface v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-director-surface)
+122 |     let referenced = match referenced {
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+help: use `'_` for type paths
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+   Compiling ureq v2.12.1
+   Compiling maos-manifest v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-manifest)
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+59 |         halt_id: HaltId,
+   Compiling maos-providers v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-providers)
+1434 |                 let on_confidence_below = r.on_confidence_below;
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   Compiling maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+13 | use maos_domain::frame::EpistemicHaltPayload;
+521 |     #[cfg(any(test, feature = "test-introspection"))]
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+13 | pub use maos_iac::*;
+note: but the private item here shadows it
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+23 | use crate::capability::WorkingMemoryStore;
+10 | use std::sync::Arc;
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+60 | use maos_domain::invariants::i1::TokenId;
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+13 | use std::path::{Path, PathBuf};
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+29 | use maos_providers::Provider;
+66 |         let event = self
+69 |     spirit_id: &str,
+70 |     spirit_pid: u32,
+622 |     let mut child = spawn_child(&mut spec, &argv)?;
+196 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+401 |     let mut owned_guard = None;
+...
+455 |     owned_guard = Some(SandboxedContainerChild::own(
+22 |     let total = drained_tasks.len();
+ 95 | pub struct KernelHaltResolver {
+...
+101 |     boot_nonce: u64,
+77 | pub struct MemoryManagerAdapter {
+...
+82 |     next_frame_counter: AtomicU64,
+115 | impl MemoryManagerAdapter {
+...
+665 |     fn mint_frame_id(&self) -> [u8; 16] {
+44 | struct DiskCandidate {
+45 |     name: String,
+46 |     kind: ValueKind,
+32 | pub struct SelfTelemetryAggregator {
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+38 | impl SelfTelemetryAggregator {
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+38 | impl SharedMemoryStore {
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+ 70 | impl HookDispatcher {
+...
+141 |     fn build_kernel_ctx<'a>(
+34 | pub struct VerifiedImageAttestation {
+35 |     attestation: T3ImageAttestation,
+23 | pub struct ProgressWatchdog {
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+23 | pub struct SilentFailureDetector {
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 54s
+     Running tests/guest_stdio_t2_20_9.rs (/mnt/build/cargo-maos/debug/deps/guest_stdio_t2_20_9-1960494f224286d7)
+running 3 tests
+test the_same_guest_without_writes_runs_the_same_exports_under_t2 ... ok
+test guest_stdio_in_the_shutdown_hook_is_routed_and_the_stop_stays_clean_under_t2 ... FAILED
+test guest_stdio_inside_lifecycle_exports_and_handle_frame_does_not_kill_the_runner_under_t2 ... FAILED
+failures:
+---- guest_stdio_in_the_shutdown_hook_is_routed_and_the_stop_stays_clean_under_t2 stdout ----
+thread 'guest_stdio_in_the_shutdown_hook_is_routed_and_the_stop_stays_clean_under_t2' (736039) panicked at crates/maos-wasm-host/tests/guest_stdio_t2_20_9.rs:262:5:
+assertion `left == right` failed: lifecycle-probe stdout shutdown: bye
+thread 'main' (18446744073709551615) panicked at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-wasi-48.0.8/src/runtime.rs:32:10:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::result::unwrap_failed
+   3: <wasmtime_wasi::runtime::RUNTIME::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+   4: <std::sync::once::Once>::call_once_force::<<std::sync::lazy_lock::LazyLock<tokio::runtime::runtime::Runtime>>::force::{closure#0}>::{closure#0}
+   5: <std::sys::sync::once::futex::Once>::call
+   6: wasmtime_wasi::runtime::in_tokio::<<wasmtime::runtime::component::resource_table::ResourceTable as wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::HostOutputStream>::blocking_flush::{closure#0}>
+   7: <wasmtime::runtime::component::resource_table::ResourceTable as wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::HostOutputStream>::blocking_flush
+   8: <wasmtime::runtime::component::func::host::StaticHostFn<<wasmtime::runtime::component::func::host::HostFunc>::func_wrap<maos_wasm_host::host_state::HostState, wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::add_to_linker_instance<maos_wasm_host::host_state::HostState, wasmtime_wasi::p2::HasIo>::{closure#11}, (wasmtime::runtime::component::resources::host_static::Resource<alloc::boxed::Box<dyn wasmtime_wasi_io::streams::OutputStream>>,), (core::result::Result<(), wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::StreamError>,)>::{closure#0}, false> as wasmtime::runtime::component::func::host::HostFn<maos_wasm_host::host_state::HostState, (wasmtime::runtime::component::resources::host_static::Resource<alloc::boxed::Box<dyn wasmtime_wasi_io::streams::OutputStream>>,), (core::result::Result<(), wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::StreamError>,)>>::run
+   9: <wasmtime::runtime::component::func::host::StaticHostFn<<wasmtime::runtime::component::func::host::HostFunc>::func_wrap<maos_wasm_host::host_state::HostState, wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::add_to_linker_instance<maos_wasm_host::host_state::HostState, wasmtime_wasi::p2::HasIo>::{closure#11}, (wasmtime::runtime::component::resources::host_static::Resource<alloc::boxed::Box<dyn wasmtime_wasi_io::streams::OutputStream>>,), (core::result::Result<(), wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::StreamError>,)>::{closure#0}, false> as wasmtime::runtime::component::func::host::HostFn<maos_wasm_host::host_state::HostState, (wasmtime::runtime::component::resources::host_static::Resource<alloc::boxed::Box<dyn wasmtime_wasi_io::streams::OutputStream>>,), (core::result::Result<(), wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::StreamError>,)>>::entrypoint
+  10: wasmtime::runtime::vm::traphandlers::catch_unwind_and_record_trap::<core::result::Result<(), wasmtime_internal_core::error::error::Error>, <wasmtime::runtime::vm::component::ComponentInstance>::enter_host_from_wasm<core::result::Result<(), wasmtime_internal_core::error::error::Error>, <wasmtime::runtime::component::func::host::StaticHostFn<<wasmtime::runtime::component::func::host::HostFunc>::func_wrap<maos_wasm_host::host_state::HostState, wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::add_to_linker_instance<maos_wasm_host::host_state::HostState, wasmtime_wasi::p2::HasIo>::{closure#11}, (wasmtime::runtime::component::resources::host_static::Resource<alloc::boxed::Box<dyn wasmtime_wasi_io::streams::OutputStream>>,), (core::result::Result<(), wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::StreamError>,)>::{closure#0}, false> as wasmtime::runtime::component::func::host::HostFn<maos_wasm_host::host_state::HostState, (wasmtime::runtime::component::resources::host_static::Resource<alloc::boxed::Box<dyn wasmtime_wasi_io::streams::OutputStream>>,), (core::result::Result<(), wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::StreamError>,)>>::cabi_entrypoint::{closure#0}>::{closure#0}>
+  11: <wasmtime::runtime::component::func::host::StaticHostFn<<wasmtime::runtime::component::func::host::HostFunc>::func_wrap<maos_wasm_host::host_state::HostState, wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::add_to_linker_instance<maos_wasm_host::host_state::HostState, wasmtime_wasi::p2::HasIo>::{closure#11}, (wasmtime::runtime::component::resources::host_static::Resource<alloc::boxed::Box<dyn wasmtime_wasi_io::streams::OutputStream>>,), (core::result::Result<(), wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::StreamError>,)>::{closure#0}, false> as wasmtime::runtime::component::func::host::HostFn<maos_wasm_host::host_state::HostState, (wasmtime::runtime::component::resources::host_static::Resource<alloc::boxed::Box<dyn wasmtime_wasi_io::streams::OutputStream>>,), (core::result::Result<(), wasmtime_wasi::p2::bindings::sync::generated::wasi::io::streams::StreamError>,)>>::cabi_entrypoint
+  12: <unknown>
+  13: <unknown>
+  14: <unknown>
+  15: <unknown>
+  16: <unknown>
+  17: <unknown>
+  18: <unknown>
+  19: <unknown>
+  20: <unknown>
+  21: <unknown>
+  22: <unknown>
+  23: <unknown>
+  24: <unknown>
+  25: <unknown>
+  26: <unknown>
+  27: wasmtime::runtime::vm::traphandlers::catch_traps::<maos_wasm_host::host_state::HostState, <wasmtime::runtime::func::Func>::call_unchecked_raw<maos_wasm_host::host_state::HostState>::{closure#0}>
+  28: <wasmtime::runtime::func::Func>::call_unchecked_raw::<maos_wasm_host::host_state::HostState>
+  29: <wasmtime::runtime::component::func::Func>::call_raw::<maos_wasm_host::host_state::HostState, (), <wasmtime::runtime::component::func::typed::TypedFunc<_, _>>::call_impl::Union<wasmtime::runtime::component::func::typed::TupleLower, wasmtime::runtime::vm::vmcontext::ValRaw>, wasmtime::runtime::component::func::typed::TupleLower, <wasmtime::runtime::component::func::typed::TypedFunc<(), ()>>::call_impl<wasmtime::runtime::store::context::StoreContextMut<maos_wasm_host::host_state::HostState>>::{closure#0}, <wasmtime::runtime::component::func::typed::TypedFunc<(), ()>>::lift_stack_result>
+  30: <wasmtime::runtime::component::func::typed::TypedFunc<(), ()>>::call::<wasmtime::runtime::store::context::StoreContextMut<maos_wasm_host::host_state::HostState>>
+  31: maos_wasm_runner::main
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+  left: Some(101)
+ right: Some(0)
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::<core::option::Option<i32>, core::option::Option<i32>>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: guest_stdio_t2_20_9::guest_stdio_in_the_shutdown_hook_is_routed_and_the_stop_stays_clean_under_t2
+             at ./tests/guest_stdio_t2_20_9.rs:262:5
+   5: guest_stdio_t2_20_9::guest_stdio_in_the_shutdown_hook_is_routed_and_the_stop_stays_clean_under_t2::{closure#0}
+             at ./tests/guest_stdio_t2_20_9.rs:255:82
+   6: <guest_stdio_t2_20_9::guest_stdio_in_the_shutdown_hook_is_routed_and_the_stop_stays_clean_under_t2::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+---- guest_stdio_inside_lifecycle_exports_and_handle_frame_does_not_kill_the_runner_under_t2 stdout ----
+thread 'guest_stdio_inside_lifecycle_exports_and_handle_frame_does_not_kill_the_runner_under_t2' (736040) panicked at crates/maos-wasm-host/tests/guest_stdio_t2_20_9.rs:133:14:
+the runner stays alive until handleFrame returns
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic_display::<&str>
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:259:5
+   3: core::option::expect_failed
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/option.rs:2260:5
+   4: <core::option::Option<alloc::vec::Vec<u8>>>::expect
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:969:21
+   5: turn
+             at ./tests/guest_stdio_t2_20_9.rs:133:14
+   6: guest_stdio_t2_20_9::guest_stdio_inside_lifecycle_exports_and_handle_frame_does_not_kill_the_runner_under_t2
+             at ./tests/guest_stdio_t2_20_9.rs:211:20
+   7: guest_stdio_t2_20_9::guest_stdio_inside_lifecycle_exports_and_handle_frame_does_not_kill_the_runner_under_t2::{closure#0}
+             at ./tests/guest_stdio_t2_20_9.rs:204:93
+   8: <guest_stdio_t2_20_9::guest_stdio_inside_lifecycle_exports_and_handle_frame_does_not_kill_the_runner_under_t2::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   9: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+failures:
+    guest_stdio_in_the_shutdown_hook_is_routed_and_the_stop_stays_clean_under_t2
+    guest_stdio_inside_lifecycle_exports_and_handle_frame_does_not_kill_the_runner_under_t2
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+error: test failed, to rerun pass `-p maos-wasm-host --test guest_stdio_t2_20_9`

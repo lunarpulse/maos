@@ -1,0 +1,107 @@
+ ##[endgroup]
+ {
+   "outcome": "receipt",
+   "publish_id": "pub-91",
+   "spirit_id": "example-spirit-ts",
+   "version": "0.1.0"
+ }
+ {
+   "outcome": "receipt",
+   "publish_id": "pub-1862498489",
+   "spirit_id": "example-spirit-ts",
+   "version": "0.2.0"
+ }
+ {"artifact_bytes":12582986,"effective_tier":"PublicUntrusted","manifest_bytes":991,"origin":{"Remote":{"uri":"http://127.0.0.1:6789/mcp"}},"outcome":"installed","sandbox_tier_floor":"T2","spirit_id":"example-spirit-ts","version":"0.1.0"}
+ maos: initialized /tmp/tmp.fJr6LQ9EhM/home/.maos
+ maos: config written to /tmp/tmp.fJr6LQ9EhM/home/.maos/config.toml  (6 default slots + retention=persist)
+ maos: operator door endpoint tcp://127.0.0.1:37241 recorded in /tmp/tmp.fJr6LQ9EhM/home/.maos/control.json
+ maos: Transparency Log will be at /tmp/tmp.fJr6LQ9EhM/home/.maos/audit/transparency.sqlite
+ maos: to remove all data, run:  maos purge --yes
+ pid_before=1
+ spirit_id: example-spirit-ts
+ pid: 1
+ boot_nonce: 657591457068962034
+ lifecycle_state: Running
+ posture: Assistive
+ posture_ceiling: Assistive
+ attempt=1 exit=1 elapsed=5s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=2 exit=1 elapsed=10s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=3 exit=1 elapsed=15s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=4 exit=1 elapsed=20s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=5 exit=1 elapsed=25s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=6 exit=1 elapsed=30s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=7 exit=1 elapsed=35s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=8 exit=1 elapsed=40s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=9 exit=1 elapsed=45s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=10 exit=1 elapsed=50s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=11 exit=1 elapsed=55s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=12 exit=1 elapsed=60s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=13 exit=1 elapsed=66s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=14 exit=1 elapsed=71s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=15 exit=1 elapsed=76s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=16 exit=1 elapsed=81s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=17 exit=1 elapsed=86s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=18 exit=1 elapsed=91s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=19 exit=1 elapsed=96s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=20 exit=1 elapsed=101s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=21 exit=1 elapsed=106s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=22 exit=1 elapsed=111s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=23 exit=1 elapsed=116s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=24 exit=1 elapsed=121s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=25 exit=1 elapsed=126s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=26 exit=1 elapsed=131s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=27 exit=1 elapsed=136s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=28 exit=1 elapsed=141s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=29 exit=1 elapsed=147s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+ attempt=30 exit=75 elapsed=177s: maosctl: spirit upgrade — the command outlived its route budget but is running to completion; operation_id op-67b7c1c8760202e4221422db; inspect its row later with: maosctl audit query --intent-contains op-67b7c1c8760202e4221422db 
+ ready_after_s=177
+ async upgrade op-67b7c1c8760202e4221422db outcome=upgrade_failed
+ upgrade exit=75
+ maosctl: spirit upgrade — the command outlived its route budget but is running to completion; operation_id op-67b7c1c8760202e4221422db; inspect its row later with: maosctl audit query --intent-contains op-67b7c1c8760202e4221422db
+ ready_after_s=177
+ async upgrade op-67b7c1c8760202e4221422db outcome=upgrade_failed
+ ##[error]Process completed with exit code 1.
+ ##[group]Run set +e
+ set +e
+ . ./scratch.env
+ export MAOS_HOME="$scratch/home/.maos"
+ cat "$MAOS_HOME"/journal/* > journal.all 2>/dev/null
+ python3 - <<'PY'
+ import os, sqlite3
+ db = sqlite3.connect("file:" + os.environ["MAOS_HOME"] + "/audit/transparency.sqlite?mode=ro", uri=True)
+ with open("tl-intents.txt", "w") as out:
+     for intent, payload in db.execute("SELECT intent, payload_redacted FROM transparency_log ORDER BY rowid"):
+         out.write(intent + "\t" + bytes(payload).decode("utf-8", "replace")[:300] + "\n")
+ PY
+ echo "--- tl intents"; cut -f1 tl-intents.txt | sort | uniq -c
+ echo "--- MAOS-209 lines per sink (daemon.out daemon.err journal.all)"
+ grep -c 'MAOS-209' daemon.out daemon.err journal.all
+ grep -h 'MAOS-209' daemon.out daemon.err journal.all | head -80
+ shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+ env:
+   SWAP_IN_CASE: declared
+   CPU_CASE: shipped
+   CARGO_HOME: /home/runner/.cargo
+   CARGO_INCREMENTAL: 0
+   CARGO_TERM_COLOR: always
+   CACHE_ON_FAILURE: false
+ ##[endgroup]
+ --- tl intents
+       2 cap.revoke
+       1 cli.subprocess.exit
+       1 crypto.provider.selected
+       1 governance:manifest-declaration
+       1 governance:manifest-declaration-outcome
+       1 governance:vetter-key-admission
+       1 lifecycle.admit
+       1 lifecycle.crash
+       1 lifecycle.load
+       1 lifecycle.start
+       4 spirit.diagnostic
+       2 unplanned_crash
+ --- MAOS-209 lines per sink (daemon.out daemon.err journal.all)
+ daemon.out:0
+ daemon.err:0
+ journal.all:0
+ ##[error]Process completed with exit code 1.
+ ##[group]Run actions/upload-artifact@v4

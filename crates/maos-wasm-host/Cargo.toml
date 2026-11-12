@@ -78,6 +78,10 @@ wasmtime = { version = "48.0.7", default-features = false, features = [
 ] }
 wasmtime-wasi = "48.0.7"
 
+# The runner's ambient runtime for wasmtime-wasi's synchronous stdio bindings (src/runner.rs).
+# Current-thread only: no I/O or time driver, so it needs no syscall the T2 allow-list refuses.
+tokio = { version = "1", default-features = false, features = ["rt"] }
+
 # ADR-032 wire protocol: Content-Length + CBOR
 ciborium = "0.2"
 ciborium-io = "0.2"

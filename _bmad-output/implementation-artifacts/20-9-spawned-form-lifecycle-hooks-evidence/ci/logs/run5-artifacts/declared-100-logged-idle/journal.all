@@ -1,0 +1,2 @@
+{"kind":"lifecycle","timestamp":1794477475209339875,"lifecycle_event":"Load","spirit_id":"example-spirit-ts","effective_sandbox_tier":"T2"}
+{"kind":"lifecycle","timestamp":1794477494480784494,"lifecycle_event":"Crash","spirit_id":"example-spirit-ts","effective_sandbox_tier":"T2"}

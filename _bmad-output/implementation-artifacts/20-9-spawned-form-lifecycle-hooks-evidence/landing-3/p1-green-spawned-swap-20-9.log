@@ -1,0 +1,137 @@
+
+running 25 tests
+test a_late_end_of_an_older_attempt_never_unfences_a_newer_one ... ok
+test an_artifact_that_resolves_outside_its_directory_is_refused_typed ... ok
+test a_failed_spawned_admission_withdraws_its_hook_registration ... ok
+test a_predecessor_without_the_lifecycle_export_is_refused_typed ... ok
+test a_successor_whose_manifest_disables_on_swap_in_is_refused_and_the_predecessor_keeps_serving ... ok
+test a_predecessor_that_exits_after_its_snapshot_still_completes_its_swap ... ok
+test a_cross_major_component_that_never_starts_leaves_the_predecessors_archive_current ... FAILED
+test a_revert_after_the_predecessor_child_retired_ends_the_session_typed ... ok
+test a_swap_refused_after_snapshot_releases_the_predecessor_which_keeps_serving ... ok
+test the_migrator_policy_hands_the_successor_the_predecessors_state ... ok
+test a_component_that_cannot_start_is_unwound_and_refused_by_its_cold_swap_admission ... ok
+test every_refusal_is_typed_before_the_coordinator_and_the_predecessor_keeps_serving ... ok
+test a_cold_swap_admits_at_a_new_pid_resets_state_and_restores_a_refused_successor ... ok
+test a_cold_swap_admission_waits_for_the_previous_session_to_release_its_mailbox ... ok
+test a_hook_dispatched_in_the_committed_handover_gap_reaches_the_successor_once ... ok
+test a_hot_swap_keeps_the_pid_tokens_memory_and_state_and_waits_for_the_active_turn ... ok
+test a_cold_swap_successors_fr11_record_precedes_its_start_and_a_failed_start_withdraws_it ... ok
+test a_snapshot_answered_after_the_dispatcher_gave_up_but_before_the_link_does_fences_nothing ... ok
+test a_slow_snapshot_of_a_refused_swap_does_not_fence_the_retry ... ok
+test a_snapshot_answered_after_its_callers_deadline_does_not_fence_the_predecessor ... ok
+test a_prewarm_guest_that_never_stops_writing_diagnostics_is_refused_at_its_cap ... FAILED
+test a_cold_swap_admission_is_refused_typed_when_the_previous_session_never_ends ... ok
+test a_successor_slow_in_each_stage_is_refused_at_one_attempt_wall_not_one_per_stage has been running for over 60 seconds
+test a_successor_that_never_answers_its_probe_is_refused_at_the_attempt_wall has been running for over 60 seconds
+test a_successor_that_never_becomes_ready_is_refused_at_the_attempt_wall has been running for over 60 seconds
+test a_successor_that_never_becomes_ready_is_refused_at_the_attempt_wall ... ok
+test a_successor_that_never_answers_its_probe_is_refused_at_the_attempt_wall ... ok
+test a_successor_slow_in_each_stage_is_refused_at_one_attempt_wall_not_one_per_stage ... ok
+
+failures:
+
+---- a_cross_major_component_that_never_starts_leaves_the_predecessors_archive_current stdout ----
+maos: root supervision armed
+maos: WARNING — FR11 archive record /tmp/.tmpgbTQ1J/spirit-archives/lifecycle-probe/1.0.0: archive I/O error: No such file or directory (os error 2)
+{"event":"spirit_loaded","spirit_id":"lifecycle-probe","pid":15,"child_pid":796615,"ready":true}
+
+thread 'a_cross_major_component_that_never_starts_leaves_the_predecessors_archive_current' (796075) panicked at crates/maos-bin/tests/spawned_swap_20_9.rs:857:5:
+migrator_missing: EMigratorMissing — archived predecessor 'lifecycle-probe' v3.0.0 is cross-major to v2.0.0 and [migrates_from] names no pattern matching it (ADR-020 / FR11, refused at the daemon's admission chokepoint)
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: {async_block#0}
+             at ./tests/spawned_swap_20_9.rs:857:5
+   3: poll<&mut dyn core::future::future::Future<Output=()>>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+   4: {closure#0}<core::pin::Pin<&mut dyn core::future::future::Future<Output=()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/park.rs:284:71
+   5: with_budget<core::task::poll::Poll<()>, tokio::runtime::park::{impl#4}::block_on::{closure_env#0}<core::pin::Pin<&mut dyn core::future::future::Future<Output=()>>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/task/coop/mod.rs:167:5
+   6: budget<core::task::poll::Poll<()>, tokio::runtime::park::{impl#4}::block_on::{closure_env#0}<core::pin::Pin<&mut dyn core::future::future::Future<Output=()>>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/task/coop/mod.rs:133:5
+   7: block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output=()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/park.rs:284:31
+   8: <tokio::runtime::context::blocking::BlockingRegionGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/context/blocking.rs:66:14
+   9: <tokio::runtime::scheduler::multi_thread::MultiThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/scheduler/multi_thread/mod.rs:92:22
+  10: tokio::runtime::context::runtime::enter_runtime::<<tokio::runtime::scheduler::multi_thread::MultiThread>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, ()>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/context/runtime.rs:65:16
+  11: <tokio::runtime::scheduler::multi_thread::MultiThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/scheduler/multi_thread/mod.rs:91:9
+  12: <tokio::runtime::runtime::Runtime>::block_on_inner::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/runtime.rs:376:50
+  13: block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output=()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/runtime.rs:343:18
+  14: a_cross_major_component_that_never_starts_leaves_the_predecessors_archive_current
+             at ./tests/spawned_swap_20_9.rs:868:25
+  15: spawned_swap_20_9::a_cross_major_component_that_never_starts_leaves_the_predecessors_archive_current::{closure#0}
+             at ./tests/spawned_swap_20_9.rs:845:93
+  16: <spawned_swap_20_9::a_cross_major_component_that_never_starts_leaves_the_predecessors_archive_current::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+  17: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- a_prewarm_guest_that_never_stops_writing_diagnostics_is_refused_at_its_cap stdout ----
+maos: root supervision armed
+{"event":"spirit_loaded","spirit_id":"lifecycle-probe","pid":2,"child_pid":796619,"ready":true}
+
+thread 'a_prewarm_guest_that_never_stops_writing_diagnostics_is_refused_at_its_cap' (796082) panicked at crates/maos-bin/tests/spawned_swap_20_9.rs:680:9:
+assertion `left == right` failed: stderr-flood: the child is gone
+  left: [796727]
+ right: []
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::<alloc::vec::Vec<u32>, alloc::vec::Vec<u32>>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: {async_block#0}
+             at ./tests/spawned_swap_20_9.rs:680:9
+   5: poll<&mut dyn core::future::future::Future<Output=()>>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+   6: {closure#0}<core::pin::Pin<&mut dyn core::future::future::Future<Output=()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/park.rs:284:71
+   7: with_budget<core::task::poll::Poll<()>, tokio::runtime::park::{impl#4}::block_on::{closure_env#0}<core::pin::Pin<&mut dyn core::future::future::Future<Output=()>>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/task/coop/mod.rs:167:5
+   8: budget<core::task::poll::Poll<()>, tokio::runtime::park::{impl#4}::block_on::{closure_env#0}<core::pin::Pin<&mut dyn core::future::future::Future<Output=()>>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/task/coop/mod.rs:133:5
+   9: block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output=()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/park.rs:284:31
+  10: <tokio::runtime::context::blocking::BlockingRegionGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/context/blocking.rs:66:14
+  11: <tokio::runtime::scheduler::multi_thread::MultiThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/scheduler/multi_thread/mod.rs:92:22
+  12: tokio::runtime::context::runtime::enter_runtime::<<tokio::runtime::scheduler::multi_thread::MultiThread>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, ()>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/context/runtime.rs:65:16
+  13: <tokio::runtime::scheduler::multi_thread::MultiThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/scheduler/multi_thread/mod.rs:91:9
+  14: <tokio::runtime::runtime::Runtime>::block_on_inner::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/runtime.rs:376:50
+  15: block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output=()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.3/src/runtime/runtime.rs:343:18
+  16: a_prewarm_guest_that_never_stops_writing_diagnostics_is_refused_at_its_cap
+             at ./tests/spawned_swap_20_9.rs:687:33
+  17: spawned_swap_20_9::a_prewarm_guest_that_never_stops_writing_diagnostics_is_refused_at_its_cap::{closure#0}
+             at ./tests/spawned_swap_20_9.rs:633:86
+  18: <spawned_swap_20_9::a_prewarm_guest_that_never_stops_writing_diagnostics_is_refused_at_its_cap::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+  19: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    a_cross_major_component_that_never_starts_leaves_the_predecessors_archive_current
+    a_prewarm_guest_that_never_stops_writing_diagnostics_is_refused_at_its_cap
+
+test result: FAILED. 23 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 91.15s
+

@@ -1,0 +1,31 @@
+
+running 1 test
+test maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused ... FAILED
+
+failures:
+
+---- maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused stdout ----
+
+thread 'maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused' (838278) panicked at crates/maos-bin/tests/spawned_door_20_9.rs:285:5:
+the door completes the spawned cold swap: maosctl: spirit upgrade — the command outlived its route budget but is running to completion; operation_id op-5ca669cc1e5b1a56158594f2; inspect its row later with: maosctl audit query --intent-contains op-5ca669cc1e5b1a56158594f2
+
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: spawned_door_20_9::maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused
+             at ./tests/spawned_door_20_9.rs:285:5
+   3: spawned_door_20_9::maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused::{closure#0}
+             at ./tests/spawned_door_20_9.rs:280:95
+   4: <spawned_door_20_9::maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successor_is_refused
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 35.18s

@@ -1,0 +1,46 @@
+ ##[endgroup]
+ {
+   "outcome": "receipt",
+   "publish_id": "pub-110",
+   "spirit_id": "example-spirit-ts",
+   "version": "0.1.0"
+ }
+ {
+   "outcome": "receipt",
+   "publish_id": "pub-2747488441",
+   "spirit_id": "example-spirit-ts",
+   "version": "0.2.0"
+ }
+ {"artifact_bytes":12492269,"effective_tier":"PublicUntrusted","manifest_bytes":991,"origin":{"Remote":{"uri":"http://127.0.0.1:6789/mcp"}},"outcome":"installed","sandbox_tier_floor":"T2","spirit_id":"example-spirit-ts","version":"0.1.0"}
+ maos: initialized /tmp/tmp.LFPRFSujQX/home/.maos
+ maos: config written to /tmp/tmp.LFPRFSujQX/home/.maos/config.toml  (6 default slots + retention=persist)
+ maos: operator door endpoint tcp://127.0.0.1:38935 recorded in /tmp/tmp.LFPRFSujQX/home/.maos/control.json
+ maos: Transparency Log will be at /tmp/tmp.LFPRFSujQX/home/.maos/audit/transparency.sqlite
+ maos: to remove all data, run:  maos purge --yes
+ pid_before=1
+ spirit_id: example-spirit-ts
+ pid: 1
+ boot_nonce: 5775791532704314346
+ lifecycle_state: Running
+ posture: Assistive
+ posture_ceiling: Assistive
+ upgrade exit=1
+ maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500)
+ ##[error]Process completed with exit code 1.
+ ##[group]Run set -euo pipefail
+ set -euo pipefail
+ cat swap.out
+ test "$(cat swap.status)" -ne 0
+ grep -F 'spawned_swap_unsupported' swap.out
+ echo "::notice title=20-9 AC6.2 plant::the swap-in-less guest was refused spawned_swap_unsupported; the red above is the intended one"
+ shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+ env:
+   SWAP_IN_CASE: removed-plant
+   CARGO_HOME: /home/runner/.cargo
+   CARGO_INCREMENTAL: 0
+   CARGO_TERM_COLOR: always
+   CACHE_ON_FAILURE: false
+ ##[endgroup]
+ maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500)
+ ##[error]Process completed with exit code 1.
+ ##[group]Run actions/upload-artifact@v4

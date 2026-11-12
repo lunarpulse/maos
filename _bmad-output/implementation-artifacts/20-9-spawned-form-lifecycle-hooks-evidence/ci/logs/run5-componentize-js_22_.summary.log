@@ -1,0 +1,6 @@
+       Tests  14 passed (14)
+  Test Files  1 passed (1)
+ -rw-r--r-- 1 runner runner 12582818 Nov 12 09:45 dist/spirit.wasm
+ > componentize-js dist/index.js --wit wit --world-name spirit-lifecycle --disable http fetch-event -o dist/spirit.wasm
+ ls -l dist/spirit.wasm
+ v22.23.4

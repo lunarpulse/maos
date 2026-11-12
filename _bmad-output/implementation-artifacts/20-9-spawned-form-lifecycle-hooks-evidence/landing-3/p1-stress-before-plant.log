@@ -1,0 +1,21 @@
+iter 1 PASS
+iter 2 PASS
+iter 3 PASS
+iter 4 PASS
+iter 5 PASS
+iter 6 PASS
+iter 7 PASS
+iter 8 PASS
+iter 9 PASS
+iter 10 PASS
+iter 11 PASS
+iter 12 PASS
+iter 13 PASS
+iter 14 PASS
+iter 15 PASS
+iter 16 PASS
+iter 17 PASS
+iter 18 PASS
+iter 19 PASS
+iter 20 PASS
+before (plant: no wait): pass=20 fail=0 of 20 (40 busy-loop load jobs on 32 cpus)

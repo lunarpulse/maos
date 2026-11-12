@@ -2966,7 +2966,7 @@ jobs:
           unset server_pid
       - uses: ./.github/actions/provision-t3-test-substrate
       # Match 17-3c's accepted release launch: debug Cranelift compilation is
-      # inside the unchanged 360 s startup budget and the manifest's 10% CPU cap.
+      # inside the unchanged 360 s startup budget and the manifest's 100% CPU cap.
       - name: Build the release WASM-enabled execution surface
         run: |
           cargo build --locked --release -p maos-bin --features wasm-host --bin maos

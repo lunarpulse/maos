@@ -379,11 +379,15 @@ pub async fn run_admitted_session(
         id: admitted.spirit_id.clone(),
         pid: admitted.pid,
     };
+    let ended = deps.supervisor.session_ends().begin(&admitted.spirit_id);
     let binding = deps
         .supervisor
         .adopt_spawned(core)
         .map_err(|error| SessionError::Supervision(error.to_string()))?;
     tokio::task::spawn_blocking(move || {
+        // Declared first, so dropped last: the session has ended only after the mailbox
+        // registration and the identity below are released.
+        let _ended = ended;
         let _owner = owner;
         if admitted.sandbox.tier != SandboxTier::T2 {
             return Err(SessionError::SandboxTier);
@@ -775,6 +779,7 @@ pub async fn run_admitted_session(
             None => Ok(()),
         };
         live.binding.finish(&exit);
+        deps.supervisor.before_session_release(admitted.pid);
         if let Err(error) = result {
             if matches!(error, SessionError::UnexpectedEof) {
                 if !ready {
