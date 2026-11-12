@@ -20,6 +20,7 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
+          targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
@@ -50,7 +51,9 @@ jobs:
             cargo run --locked -p xtask -- "$gate" --json
           done
   apple-check:
-    runs-on: macos-14
+    # macos-14 is refused for this repository (run 43183933114 job 131066361556: "The configuration
+    # 'macos-14-arm64-us-default' is not supported"); discipline's macos-check uses macos-latest.
+    runs-on: macos-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5
