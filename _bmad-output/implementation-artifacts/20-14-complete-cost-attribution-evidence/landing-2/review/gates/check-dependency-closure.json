@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "violations": [],
+  "trees": [
+    {
+      "crate_name": "maos-kernel-core",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "crate_name": "maos-domain",
+      "passed": true,
+      "violations": []
+    }
+  ]
+}

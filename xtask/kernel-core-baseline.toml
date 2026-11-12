@@ -502,23 +502,29 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 27040
+src_lines = 27043
+# HISTORY: 20-14-complete-cost-attribution landing 2 review round 1 (GPT P2 x3, GLM S1-S3) ->
+# FLAG-Winston KT redesign, exact formatted 27040 -> 27043 (+3 physical), tokei 21201 -> 21203 (+2),
+# 95 files, none added or removed, inside the x2 ceiling 21221 (+20 over the landing's own 21181
+# base) and the shared STOP 21250 (47 left; ADR-069 alarm 22000 / envelope 23000 untouched). NO
+# surface-hash refresh: the wide inherent accessor `CapabilityRegistryAdapter::tokens()` (it handed
+# every registry holder the ring's issue / revoke / verify) is REMOVED; the adapter gains exactly two
+# narrow inherent delegates, `bind_cost_scope(&TokenId, CostScope) -> bool` and
+# `cost_scope(&TokenId) -> Option<CostScope>`, over a scope that now lives in the token's own
+# state in maos-capability (one lifecycle, no second map, no scan). capability/mod.rs +9 (the two
+# delegates replace the accessor); inference/mod.rs -1 (the emission reads the delegate). Identity
+# text is covered outside the kernel (domain serde), so the emission is otherwise unchanged. Changed
+# files: capability/mod.rs, inference/mod.rs; digests and set_hash adopted from `--emit-pin`.
+# Cumulative measured tokei 21203 (shared STOP 21250).
 # HISTORY: 20-14-complete-cost-attribution landing 2 (20-14 L2) -> FLAG-Winston KT (D-20-14-02 B,
 # D-20-14-03 B, ruled 2026-11-03 ask d_batch4; creation grant +35 physical / +25 tokei at 8c809f9c),
 # T0 re-cut on a `git archive HEAD` copy at the live base 27014 / 21181 INCLUDING the `CostFrameBody`
 # wrapper hunk the creation prototype did not price: exact formatted 27014 -> 27040 (+26 physical),
-# tokei 21181 -> 21201 (+20), 95 files, none added or removed, inside the x2 ceiling 21221 and the
-# shared STOP 21250 (49 left; ADR-069 alarm 22000 / envelope 23000 untouched). NO surface-hash
-# refresh: the prototyped field on CapabilityRegistryAdapter (+38 / +28, check-service-boundary RED
-# "removed public kernel symbol CapabilityRegistryAdapter") was rejected; the root-bound scope map
-# lives on the cap-token ring in maos-capability (`CapTokensShardRing::bind_cost_scope` /
-# `cost_scope`, +11 tokei there, 1433 -> 1444) and the kernel gains one inherent accessor
-# `CapabilityRegistryAdapter::tokens()` (methods are not surface items; the gate flags nothing).
-# capability/mod.rs +6 (accessor). inference/mod.rs +20: the emission reads the scope by the verified
-# token id, a bound session principal is `Resolved` / `SessionPrincipal` / `Exact` and the write-target
-# proxy is queried only as the tagged fallback, the frame is `CostFrameBody` schema 2 with `task_ref`.
-# Changed files: capability/mod.rs, inference/mod.rs; digests and set_hash adopted from
-# `--emit-pin`. Cumulative measured tokei 21201 (shared STOP 21250).
+# tokei 21181 -> 21201 (+20). The emission reads the scope by the verified token id, a bound session
+# principal is `Resolved` / `SessionPrincipal` / `Exact` and the write-target proxy is queried only as
+# the tagged fallback, the frame is `CostFrameBody` schema 2 with `task_ref`. The prototyped field on
+# CapabilityRegistryAdapter (+38 / +28) was rejected (check-service-boundary RED). Superseded in part
+# by the review round above (the accessor and the separate scope map are gone).
 # HISTORY: 20-8-manifest-contract-completion landing 2 review corrections
 # (GPT P2 x2, same FLAG-Winston KS row; Main approved the /tmp-priced prototype),
 # exact formatted 27009 -> 27014 (+5 physical), tokei 21178 -> 21181 (+3), 95
@@ -1067,7 +1073,7 @@ src_lines = 27040
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "5551f890778559fae278287f86d18cfecb3e801ca74c5e182bb24d8889ff2524"
+set_hash = "7077b5b76321a9144a5b83803a4f320df8be46eb15e1bec28158de990dda9b20"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -1076,7 +1082,7 @@ set_hash = "5551f890778559fae278287f86d18cfecb3e801ca74c5e182bb24d8889ff2524"
 "capability/cap_audit/writer_task.rs" = "ae9cdf683e272c954afcfe34d607d38221c4edc6b8f01e1e1c1f37517bf05b35"
 "capability/cap_policy/decision.rs" = "439ba4f4618bab63715df6404457918d8eeaffdfaf4e08a44fdfc73b2b0287f7"
 "capability/cap_policy/mod.rs" = "de11bb21d025aa3c108142811c782ce14906d9e1cad29e93f369a625104b8ca7"
-"capability/mod.rs" = "21b6700c9ca501e1eb90e19274b91d4a9885ba4cff82d2bf3eefc25d7795c1c4"
+"capability/mod.rs" = "062cc449152d08ebd06bbc3a583f9c54d66391b0c3201daad3ab54f8690edcbe"
 "capability/working_memory/mod.rs" = "151f1ea71b3b05e575b4771736a65aaaba0503e3a33a20d949d8e5382829892a"
 "capability/working_memory/orchestrator.rs" = "c6e102b0965fac7e813fe303be4ea989001fd646dd97cf22a9ab08c1dc0fdc7f"
 "capability/working_memory/policy_runtime.rs" = "199858803e69787c8f981c18f4fa22201c8ad0f47d18638623606462e2e374b5"
@@ -1094,7 +1100,7 @@ set_hash = "5551f890778559fae278287f86d18cfecb3e801ca74c5e182bb24d8889ff2524"
 "hot_swap/saga.rs" = "886994c9ab553372c85df2caf8de395c0b712b888656c030674babf12f8efc77"
 "hot_swap/state_codec.rs" = "8d1c62a7486582eb329b208bd4dca5280ac62d1462c89cdfb1d8691aaa3861dd"
 "iac.rs" = "18c0b4e562376fd5b6170fac0544bb3465c4fc452b46c702a8bc1c070d7a08bf"
-"inference/mod.rs" = "4e4a706eada11807639432e7b2a04e70065fcf0ddcf8e5974fb4b3dd7872d222"
+"inference/mod.rs" = "0a0543ea7c7b3ff3814abbf75202911c4d5fe213d075cbf0961550261e6933df"
 "inference/router.rs" = "82135d50d4187cc946044802c9adb5d378e023440d790c8fd1e6ebe51cceee29"
 "io/mod.rs" = "57d2b794bb4cbae5deb1fbf3332132fe4a2e6b239b12a95fe5b9f48eb195619b"
 "isolation/mod.rs" = "a7f618dd75f7dd4115589dc7e9cd742e3f0f4c07d30d6f95b1cc494b5947813c"

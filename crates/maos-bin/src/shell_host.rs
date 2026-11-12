@@ -117,8 +117,8 @@ pub fn bind_task_scope(
     prefix: &str,
     session_principal: Option<&str>,
 ) {
-    capability.tokens().bind_cost_scope(
-        token.token_id,
+    capability.bind_cost_scope(
+        &token.token_id,
         maos_domain::cost::CostScope {
             task_ref: Some(format!("{prefix}:{}", ulid::Ulid::new())),
             session_principal: session_principal.map(str::to_owned),
@@ -127,18 +127,25 @@ pub fn bind_task_scope(
 }
 
 /// Story 20-14 (D-20-14-04 A) — `MAOS_SESSION_PRINCIPAL` under the D-19-2-08 A rule: unset or
-/// blank binds none; a set value has no `:` and no control character; a non-UTF-8 or malformed
-/// value refuses the boot.
+/// blank binds none; a set value has no `:`, control or invisible/bidirectional-format character
+/// and at most 128 bytes; a non-UTF-8 or malformed value refuses the boot.
 pub fn parse_session_principal(raw: Option<std::ffi::OsString>) -> Result<Option<String>, String> {
     let Some(raw) = raw else { return Ok(None) };
     let principal = raw
         .into_string()
         .map_err(|raw| format!("MAOS_SESSION_PRINCIPAL {raw:?} is not valid UTF-8"))?;
+    let hidden = |c| {
+        matches!(c, '\u{61c}' | '\u{180e}' | '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}')
+            || matches!(c, '\u{2060}'..='\u{206f}' | '\u{feff}' | '\u{e0000}'..='\u{e007f}')
+    };
     match principal {
         blank if blank.trim().is_empty() => Ok(None),
-        bad if bad.chars().any(|c| c == ':' || c.is_control()) => Err(format!(
-            "MAOS_SESSION_PRINCIPAL {bad:?} must have no `:` or control character"
-        )),
+        bad if bad.len() > 128 || bad.chars().any(|c| c == ':' || c.is_control() || hidden(c)) => {
+            Err(format!(
+                "MAOS_SESSION_PRINCIPAL {bad:?} must be at most 128 bytes with no `:`, control, \
+                 invisible or bidirectional-format character"
+            ))
+        }
         principal => Ok(Some(principal)),
     }
 }

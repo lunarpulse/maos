@@ -200,6 +200,33 @@ fn the_boot_parse_follows_the_butler_principal_rule() {
     );
     assert!(parse(Some(OsString::from("a:b"))).is_err());
     assert!(parse(Some(OsString::from("a\u{7}b"))).is_err());
+    assert!(parse(Some(OsString::from("a".repeat(129)))).is_err());
+    assert_eq!(
+        parse(Some(OsString::from("a".repeat(128)))),
+        Ok(Some("a".repeat(128)))
+    );
+    for hidden in [
+        '\u{61c}',
+        '\u{180e}',
+        '\u{200b}',
+        '\u{200f}',
+        '\u{202a}',
+        '\u{202e}',
+        '\u{2060}',
+        '\u{206f}',
+        '\u{feff}',
+        '\u{e0000}',
+        '\u{e007f}',
+    ] {
+        assert!(
+            parse(Some(OsString::from(format!("a{hidden}b")))).is_err(),
+            "{hidden:?}"
+        );
+    }
+    assert_eq!(
+        parse(Some(OsString::from("h\u{e9}llo"))),
+        Ok(Some("h\u{e9}llo".into()))
+    );
     #[cfg(unix)]
     {
         use std::os::unix::ffi::OsStringExt;
@@ -278,4 +305,141 @@ fn the_one_shot_hello_run_binds_its_own_task_and_the_boot_principal() {
             .starts_with("hello-spirit.run:"),
         "{row}"
     );
+}
+
+fn forget(home: &Path, principal: &str) -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
+    command.current_dir(root());
+    home_env(&mut command, home);
+    command
+        .env("MAOS_ONE_SHOT", "forget")
+        .env("MAOS_FORGET_PRINCIPAL", principal)
+        .output()
+        .unwrap()
+}
+
+fn live_rows(report: &serde_json::Value) -> Vec<&serde_json::Value> {
+    let rows = report["rows"].as_array().unwrap();
+    rows.iter().filter(|r| r["provider"] == "replay").collect()
+}
+
+/// GPT P2-2: identities the TL redactor would rewrite (a 32-hex run, a credential prefix) or that
+/// serialize with an escape (`"`) ride the frame as colon-hex text; the reader decodes them, the
+/// totals keep every token, and `forget` finds them by their decoded value.
+fn redactor_shaped_vector(principal: &str) {
+    let home = tempfile::tempdir().unwrap();
+    for who in [principal, "bob"] {
+        let out = shell(home.path(), Some(who));
+        assert!(
+            out.status.success(),
+            "{who}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    let report = reconcile(home.path(), false);
+    let warnings = report["warnings"].as_array().cloned().unwrap_or_default();
+    assert!(
+        warnings
+            .iter()
+            .all(|w| !w.as_str().unwrap().contains("skipping")),
+        "{principal}: {report}"
+    );
+    let live = live_rows(&report);
+    assert_eq!(live.len(), 2, "{principal}: {report}");
+    let mine = live.iter().find(|r| r["principal"] == principal);
+    let mine = mine.unwrap_or_else(|| panic!("{principal}: {report}"));
+    assert_eq!(mine["attribution_source"], "session_principal");
+    assert_eq!(
+        (mine["tokens_in"].as_i64(), mine["tokens_out"].as_i64()),
+        (Some(50), Some(30)),
+        "{principal}"
+    );
+    let out = forget(home.path(), principal);
+    assert!(
+        out.status.success(),
+        "forget {principal}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = reconcile(home.path(), false);
+    let live = live_rows(&report);
+    assert_eq!(live.len(), 2, "{principal}: {report}");
+    let erased = live.iter().find(|r| r["principal"] == "[REDACTED]");
+    let erased = erased.unwrap_or_else(|| panic!("{principal}: {report}"));
+    assert_eq!(
+        (erased["tokens_in"].as_i64(), erased["tokens_out"].as_i64()),
+        (Some(50), Some(30)),
+        "forget keeps the dimensions: {principal}"
+    );
+    let bob = live.iter().find(|r| r["principal"] == "bob");
+    assert!(bob.is_some(), "the unrelated frame is untouched: {report}");
+}
+
+#[test]
+fn a_32_hex_principal_reports_and_forgets_exactly() {
+    redactor_shaped_vector("0123456789abcdef0123456789abcdef");
+}
+
+#[test]
+fn a_credential_prefixed_principal_reports_and_forgets_exactly() {
+    redactor_shaped_vector("sk-alice");
+    redactor_shaped_vector("AKIAalice");
+}
+
+#[test]
+fn a_principal_with_an_escaped_quote_is_not_skipped_by_the_reader() {
+    redactor_shaped_vector("sk-a\"b");
+}
+
+/// GLM S2: the boot refuses an over-long or invisible/bidirectional principal; 128 bytes is fine.
+#[test]
+fn the_boot_refuses_a_long_or_invisible_principal() {
+    let long = "a".repeat(129);
+    for bad in [
+        long.as_str(),
+        "ali\u{200b}ce",
+        "ali\u{202e}ce",
+        "ali\u{2066}ce",
+        "ali\u{feff}ce",
+        "ali\u{e0041}ce",
+    ] {
+        let home = tempfile::tempdir().unwrap();
+        let out = shell(home.path(), Some(bad));
+        assert!(!out.status.success(), "{bad:?} must refuse the boot");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains("MAOS_SESSION_PRINCIPAL"), "{stderr}");
+    }
+    let ok = "a".repeat(128);
+    let home = tempfile::tempdir().unwrap();
+    let out = shell(home.path(), Some(&ok));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+/// GPT: the same principal on two tasks is two rows (the task is a key dimension of its own).
+#[test]
+fn one_principal_on_two_tasks_reports_two_rows() {
+    let home = tempfile::tempdir().unwrap();
+    for _ in 0..2 {
+        let out = shell(home.path(), Some("alice"));
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    let report = reconcile(home.path(), false);
+    let live = live_rows(&report);
+    assert_eq!(live.len(), 2, "{report}");
+    assert!(live.iter().all(|r| r["principal"] == "alice"), "{report}");
+    assert_ne!(live[0]["task"], live[1]["task"], "{report}");
+    for row in live {
+        assert_eq!(
+            (row["tokens_in"].as_i64(), row["tokens_out"].as_i64()),
+            (Some(50), Some(30)),
+            "{row}"
+        );
+    }
 }

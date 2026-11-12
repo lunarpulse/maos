@@ -115,8 +115,6 @@ pub struct CapTokensShardRing {
     signing_key: Ed25519SigningKey,
     boot_nonce: u64,
     audit: cap_audit::Sender,
-    /// Story 20-14 — root-bound attribution scopes, keyed by the token they ride.
-    cost_scopes: parking_lot::RwLock<std::collections::HashMap<TokenId, CostScope>>,
 }
 
 impl std::fmt::Debug for CapTokensShardRing {
@@ -144,7 +142,6 @@ impl CapTokensShardRing {
             signing_key,
             boot_nonce,
             audit,
-            cost_scopes: Default::default(),
         }
     }
 
@@ -197,6 +194,7 @@ impl CapTokensShardRing {
                 scope: scope.clone(),
                 spirit_pid,
                 revoked: std::sync::atomic::AtomicBool::new(false),
+                cost_scope: Default::default(),
             },
         );
 
@@ -270,17 +268,15 @@ impl CapTokensShardRing {
         shard.get(token_id).map(|s| s.scope)
     }
 
-    /// Story 20-14 — bind a root attribution scope to a token; scopes of tokens
-    /// the ring no longer holds are pruned on the way in.
-    pub fn bind_cost_scope(&self, token_id: TokenId, scope: CostScope) {
-        let mut scopes = self.cost_scopes.write();
-        scopes.retain(|id, _| self.get_scope(id).is_some());
-        scopes.insert(token_id, scope);
+    /// Story 20-14 — bind the root's attribution to a token, once; `false` when the ring does not
+    /// hold the token or it is already bound. The scope is part of the token's own state.
+    pub fn bind_cost_scope(&self, token_id: &TokenId, scope: CostScope) -> bool {
+        self.shards[shard::hash_token_id(token_id)].bind_cost_scope(token_id, scope)
     }
 
-    /// Story 20-14 — the scope bound to `token_id`, if any.
+    /// Story 20-14 — the attribution bound to `token_id`, if any.
     pub fn cost_scope(&self, token_id: &TokenId) -> Option<CostScope> {
-        self.cost_scopes.read().get(token_id).cloned()
+        self.shards[shard::hash_token_id(token_id)].cost_scope(token_id)
     }
 
     /// Revoke a single token. Slow-path (single token, not the verify hot

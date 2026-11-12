@@ -1,0 +1,9 @@
+{"plant": "p1-revoked-scope-hidden", "file": "crates/maos-capability/src/cap_tokens/shard.rs", "test_exit_codes": [101, 101], "red": true, "restored_cmp_identical": true}
+{"plant": "p2-bind-mints-for-absent-token", "file": "crates/maos-capability/src/cap_tokens/shard.rs", "test_exit_codes": [101, 101], "red": true, "restored_cmp_identical": true}
+{"plant": "p3-delegate-always-binds", "file": "crates/maos-kernel-core/src/capability/mod.rs", "test_exit_codes": [101], "red": true, "restored_cmp_identical": true}
+{"plant": "p4-encode-never-covers", "file": "crates/maos-domain/src/cost.rs", "test_exit_codes": [101, 101], "red": true, "restored_cmp_identical": true}
+{"plant": "p5-decode-never-reads", "file": "crates/maos-domain/src/cost.rs", "test_exit_codes": [101, 101], "red": true, "restored_cmp_identical": true}
+{"plant": "p6-erasure-matches-raw-form-only", "file": "crates/maos-iac/src/adapter/transparency_log.rs", "test_exit_codes": [101], "red": true, "restored_cmp_identical": true}
+{"plant": "p7-boot-parse-without-caps", "file": "crates/maos-bin/src/shell_host.rs", "test_exit_codes": [101], "red": true, "restored_cmp_identical": true}
+{"plant": "p8-reader-without-principal-cap", "file": "crates/maos-cli/src/subcommands.rs", "test_exit_codes": [101], "red": true, "restored_cmp_identical": true}
+{"plant": "p9-report-key-ignores-task", "file": "crates/maos-cli/src/subcommands.rs", "test_exit_codes": [101], "red": true, "restored_cmp_identical": true}

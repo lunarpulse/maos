@@ -1,5 +1,11 @@
 # 20-14 L2 — kernel landing evidence (HEAD `8144bc02` base; Dev2014d)
 
+> **Superseded in part by review round 1 (2026-11-12, `review/evidence.md`).** The first landing's wide `CapabilityRegistryAdapter::tokens()` accessor and the separate `cost_scopes` map
+> (pruned on bind) were removed after the GPT / GLM reviews (`review/gpt-review.md`, `review/security.md`): the scope now lives in the token state behind two narrow adapter delegates. The
+> phrase "scopes of tokens the ring no longer holds are pruned" and the test name `a_scope_follows_its_token_only_and_stale_scopes_are_pruned` are WITHDRAWN (production never reaches that case: tokens never leave
+> the ring). The overdraft ruling below is recorded as ADJUDICATED by Main 2026-11-12 for the redesign that survives review (not "pending"); the plants below that name the old map or accessor
+> (`KT ring prune dropped`, the seam/shell plants through `tokens()`) are historical. Final pins and witnesses are in `review/evidence.md`.
+
 ## STEP 0 — KT re-cut and re-price (before any repo edit)
 
 `git archive HEAD` copies in `/tmp`, every file touched, `rustfmt`, gates from the copy root (`step0/variant-*.txt`, `step0/prototype-patch.py`).

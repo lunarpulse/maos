@@ -9,6 +9,7 @@
 //! [ADR-046]: ../../docs/adr/ADR-046-cost-attribution-and-reconciliation.md
 
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 
 // ---------------------------------------------------------------------------
@@ -46,8 +47,13 @@ pub enum CostDimension {
 #[serde(tag = "kind")]
 pub enum PrincipalRef {
     Unattributed,
-    Resolved { principal_id: String },
-    Ambiguous { count: u32 },
+    Resolved {
+        #[serde(with = "identity")]
+        principal_id: String,
+    },
+    Ambiguous {
+        count: u32,
+    },
 }
 
 /// How the principal was attributed.
@@ -117,8 +123,75 @@ pub struct CostScope {
 pub struct CostFrameBody {
     #[serde(flatten)]
     pub payload: CostAttributionPayload,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "identity_opt"
+    )]
     pub task_ref: Option<String>,
+}
+
+/// Credential prefixes the Transparency Log redactor rewrites (`maos-iac` `RULES`; a test there
+/// pins this list to them).
+const CREDENTIAL_PREFIXES: &str =
+    "sk- ghp_ gho_ ghs_ ghu_ ghc_ ghr_ AKIA ASIA AIza ya29. -----BEGIN";
+
+/// Identity text the Transparency Log redactor would rewrite (a 32-hex run or a credential
+/// prefix), that serializes with an escape, or that already looks encoded travels in the frame as
+/// `x:` plus colon-delimited hex of its bytes; everything else stays as written.
+pub fn encode_identity(text: &str) -> Cow<'_, str> {
+    let hex_token = text
+        .split(|c| !matches!(c, '0'..='9' | 'a'..='f'))
+        .any(|run| run.len() >= 32);
+    if !hex_token
+        && !text.starts_with("x:")
+        && !text.contains(['\u{22}', '\\'])
+        && !CREDENTIAL_PREFIXES
+            .split(' ')
+            .any(|prefix| text.contains(prefix))
+    {
+        return Cow::Borrowed(text);
+    }
+    let pairs: Vec<_> = text.bytes().map(|b| format!("{b:02x}")).collect();
+    Cow::Owned(format!("x:{}", pairs.join(":")))
+}
+
+/// The inverse of [`encode_identity`]; text that is not exactly the encoded form is returned as is.
+pub fn decode_identity(text: &str) -> Cow<'_, str> {
+    let pair = |p: &str| {
+        (p.len() == 2 && p.bytes().all(|b| b.is_ascii_hexdigit()))
+            .then(|| u8::from_str_radix(p, 16).ok())
+            .flatten()
+    };
+    text.strip_prefix("x:")
+        .and_then(|hex| hex.split(':').map(pair).collect::<Option<Vec<u8>>>())
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .map_or(Cow::Borrowed(text), Cow::Owned)
+}
+
+mod identity {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(text: &str, out: S) -> Result<S::Ok, S::Error> {
+        out.serialize_str(&super::encode_identity(text))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(input: D) -> Result<String, D::Error> {
+        String::deserialize(input).map(|text| super::decode_identity(&text).into_owned())
+    }
+}
+
+mod identity_opt {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(text: &Option<String>, out: S) -> Result<S::Ok, S::Error> {
+        text.as_deref().map(super::encode_identity).serialize(out)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(input: D) -> Result<Option<String>, D::Error> {
+        Option::<String>::deserialize(input)
+            .map(|text| text.map(|t| super::decode_identity(&t).into_owned()))
+    }
 }
 
 // ---------------------------------------------------------------------------

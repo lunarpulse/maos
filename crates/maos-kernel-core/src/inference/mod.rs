@@ -406,7 +406,6 @@ impl InferencePort for InferencePortAdapter {
                 // mint; never read from the request (anti-spoof).
                 let scope = self
                     .capabilities
-                    .tokens()
                     .cost_scope(&req.capability_token.token_id)
                     .unwrap_or_default();
                 // F8 — principal attribution at emission (R2 / SR-4): the bound session

@@ -9,7 +9,7 @@ use std::sync::Arc;
 use maos_domain::cost::{
     AttributionConfidence, AttributionSource, CostFrameBody, CostScope, PrincipalRef,
 };
-use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope};
+use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope, TokenId};
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::crypto::CryptoProvider;
 use maos_domain::ports::inference::{
@@ -21,6 +21,7 @@ use maos_kernel_core::capability::cap_audit;
 use maos_kernel_core::capability::cap_policy::{
     decision::TrustTier, ManifestCapabilityScope, PolicyTable, PolicyTableInner,
 };
+use maos_kernel_core::capability::cap_quota::{CapQuotaTracker, IssuanceQuota};
 use maos_kernel_core::capability::cap_tokens::{init_monotonic_base, Ed25519SigningKey};
 use maos_kernel_core::capability::CapabilityRegistryAdapter;
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind};
@@ -66,10 +67,15 @@ impl CryptoProvider for MockCryptoProvider {
     }
 }
 
-struct Answering;
+/// Answers 50/30 tokens; when it holds the registry it revokes the Spirit's tokens mid-call (the
+/// completion is already paid for when the recheck fires).
+struct Answering(Option<Arc<CapabilityRegistryAdapter>>);
 
 impl Provider for Answering {
     fn complete(&self, _req: &InferenceRequest) -> Result<InferenceResponse, ProviderError> {
+        if let Some(capabilities) = &self.0 {
+            capabilities.revoke_all_for_pid(PID);
+        }
         Ok(InferenceResponse {
             text: "answered".into(),
             stop_reason: StopReason::StopSequence,
@@ -96,6 +102,10 @@ struct Scene {
 
 impl Scene {
     fn new() -> Self {
+        Self::build(CapQuotaTracker::new(), false)
+    }
+
+    fn build(quota: CapQuotaTracker, revoke_mid_call: bool) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let db = dir.path().join("audit.sqlite");
         let log = Arc::new(TransparencyLogAdapter::open(&db, 0xDEAD_BEEF).unwrap());
@@ -121,13 +131,15 @@ impl Scene {
             0xDEAD_BEEF,
             policy,
             audit_tx,
-            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+            quota,
             Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
             Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
         ));
         let map = [(
             "replay".to_owned(),
-            Arc::new(Answering) as Arc<dyn Provider>,
+            Arc::new(Answering(
+                revoke_mid_call.then(|| Arc::clone(&capabilities)),
+            )) as Arc<dyn Provider>,
         )]
         .into_iter()
         .collect();
@@ -161,9 +173,7 @@ impl Scene {
             )
             .expect("the declared provider scope is issuable");
         if let Some(scope) = scope {
-            self.capabilities
-                .tokens()
-                .bind_cost_scope(token.token_id, scope);
+            assert!(self.capabilities.bind_cost_scope(&token.token_id, scope));
         }
         token
     }
@@ -283,28 +293,107 @@ fn without_a_session_principal_the_proxy_folds_and_ambiguity_carries_a_count_not
 }
 
 #[test]
-fn a_scope_follows_its_token_only_and_stale_scopes_are_pruned() {
+fn a_scope_follows_its_own_token_only() {
     let s = Scene::new();
     let first = s.token(Some(scope(Some("t-a"), None)));
     let second = s.token(Some(scope(Some("t-b"), Some("bob"))));
-    let ring = s.capabilities.tokens();
-    assert_eq!(
-        ring.cost_scope(&first.token_id),
-        Some(scope(Some("t-a"), None))
-    );
-    assert_eq!(
-        ring.cost_scope(&second.token_id),
-        Some(scope(Some("t-b"), Some("bob")))
-    );
+    let third = s.token(None);
+    let read = |t: &CapabilityToken| s.capabilities.cost_scope(&t.token_id);
+    assert_eq!(read(&first), Some(scope(Some("t-a"), None)));
+    assert_eq!(read(&second), Some(scope(Some("t-b"), Some("bob"))));
+    assert_eq!(read(&third), None);
+    // One binding per token: the root's first word stands.
+    assert!(!s
+        .capabilities
+        .bind_cost_scope(&first.token_id, scope(Some("t-z"), Some("mallory"))));
+    assert_eq!(read(&first), Some(scope(Some("t-a"), None)));
     let (_, frame) = s.complete(second);
     assert_eq!(frame.task_ref.as_deref(), Some("t-b"));
-    // A token the ring never held cannot keep a scope.
-    let ghost = maos_domain::invariants::i1::TokenId([9; 16]);
-    ring.bind_cost_scope(ghost, scope(Some("ghost"), None));
-    let third = s.token(Some(scope(Some("t-c"), None)));
-    assert_eq!(ring.cost_scope(&ghost), None);
+}
+
+/// GPT P2-1 / GLM S3: the adapter hands out two narrow delegates, never the ring. Neither can mint,
+/// revoke or un-revoke, so a policy-denied or quota-exhausted issuance stays denied.
+#[test]
+fn the_cost_scope_delegates_cannot_mint_or_change_a_tokens_validity() {
+    let tight = IssuanceQuota {
+        budget_per_window: 1,
+        window: std::time::Duration::from_secs(3600),
+    };
+    let s = Scene::build(CapQuotaTracker::with_quota(tight), false);
+    let mint = |provider: &str| {
+        s.capabilities.issue_with_mediation(
+            PID,
+            Scope::ProviderInfer {
+                provider: provider.into(),
+            },
+            60,
+            [0u8; 32],
+            IntentClass::Standard,
+        )
+    };
+    assert!(
+        mint("undeclared").is_err(),
+        "policy denies an undeclared provider"
+    );
+    init_monotonic_base();
+    let token = mint("replay").expect("the first issuance fits the budget of one");
+    assert!(mint("replay").is_err(), "the quota is exhausted");
+    // The delegates are the only ring access: a forged id gets no token and no scope.
+    let forged = TokenId([7; 16]);
+    assert!(!s
+        .capabilities
+        .bind_cost_scope(&forged, scope(Some("x"), Some("mallory"))));
+    assert_eq!(s.capabilities.cost_scope(&forged), None);
+    assert_eq!(s.capabilities.get_token_scope(&forged), None);
+    assert!(mint("replay").is_err(), "binding did not refill the quota");
+    // A bound scope never changes validity: revoked stays revoked.
+    assert!(s
+        .capabilities
+        .bind_cost_scope(&token.token_id, scope(Some("t"), None)));
+    s.capabilities.revoke_all_for_pid(PID);
+    assert!(!s.capabilities.has_active_tokens_for_pid(PID));
+    assert!(s.capabilities.recheck(&token).is_err());
     assert_eq!(
-        ring.cost_scope(&third.token_id),
-        Some(scope(Some("t-c"), None))
+        s.capabilities.cost_scope(&token.token_id),
+        Some(scope(Some("t"), None))
+    );
+}
+
+/// GPT P2-3 / GLM S1: the scope lives in the token's own state (one lifecycle). A completion that
+/// was paid for while the token was revoked mid-call still carries the task and the principal.
+#[test]
+fn a_paid_completion_revoked_mid_call_keeps_its_attribution() {
+    let s = Scene::build(CapQuotaTracker::new(), true);
+    let token = s.token(Some(scope(Some("t-paid"), Some("alice"))));
+    let denied = s.adapter.complete(InferenceRequest::new(
+        PID,
+        token,
+        "hello".into(),
+        InferenceOptions::default(),
+        Some("replay".into()),
+        Vec::new(),
+    ));
+    assert!(denied.is_err(), "the recheck denies the response");
+    let rows = s
+        .log
+        .query_frames(FrameFilter {
+            kind: Some(FrameKind::CostAttribution),
+            ..Default::default()
+        })
+        .unwrap();
+    let [row] = rows.as_slice() else {
+        panic!("the paid completion is journaled once: {}", rows.len())
+    };
+    let frame: CostFrameBody = serde_json::from_slice(&row.payload_redacted).unwrap();
+    assert_eq!(frame.task_ref.as_deref(), Some("t-paid"));
+    assert_eq!(
+        frame.payload.principal,
+        PrincipalRef::Resolved {
+            principal_id: "alice".into()
+        }
+    );
+    assert_eq!(
+        frame.payload.attribution_source,
+        AttributionSource::SessionPrincipal
     );
 }

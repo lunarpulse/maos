@@ -279,10 +279,14 @@ impl CapabilityRegistryAdapter {
         self.tokens.get_scope(token_id)
     }
 
-    /// Story 20-14 — the cap-token ring: the root binds attribution scopes on it
-    /// and the inference emission reads them by the verified token id.
-    pub fn tokens(&self) -> &CapTokensShardRing {
-        &self.tokens
+    /// Story 20-14 — the root binds its attribution to a token it minted, once.
+    pub fn bind_cost_scope(&self, token_id: &TokenId, scope: maos_domain::cost::CostScope) -> bool {
+        self.tokens.bind_cost_scope(token_id, scope)
+    }
+
+    /// Story 20-14 — the attribution bound to `token_id`, read at emission by the verified id.
+    pub fn cost_scope(&self, token_id: &TokenId) -> Option<maos_domain::cost::CostScope> {
+        self.tokens.cost_scope(token_id)
     }
 
     /// Story 4.2 — write a tagged scalar to the per-Spirit slot store

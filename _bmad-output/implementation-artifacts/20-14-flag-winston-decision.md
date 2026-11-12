@@ -75,9 +75,16 @@ reserved. Any `crates/maos-kernel-core/src` change outside KT's two files is STO
 | Shape | Kernel | maos-capability | Surface gate |
 |---|---|---|---|
 | A: field on `CapabilityRegistryAdapter` | +38 / +28 -> 27052 / 21209 | 0 | RED (struct hash moves; second refresh not granted) -> rejected |
-| **B (landed)**: map on `CapTokensShardRing` + inherent accessor `CapabilityRegistryAdapter::tokens()` | **+26 / +20 -> 27040 / 21201** (priced +25/+20 at the copy) | +11 (1433 -> 1444) | GREEN, no surface-hash refresh |
+| **B (landed, redesigned in review round 1)**: scope in the token state in maos-capability + two narrow inherent delegates on `CapabilityRegistryAdapter` (the first landing's wide `tokens()` accessor is removed) | **+29 / +22 -> 27043 / 21203** | +21 (1433 -> 1454) | GREEN, no surface-hash refresh |
 
 Changed kernel files: `capability/mod.rs` (+6, accessor), `inference/mod.rs` (+20, emission: scope read by the verified token id, session principal -> `Resolved` / `SessionPrincipal` / `Exact`, proxy only as the
 tagged fallback, `CostFrameBody` schema 2 with `task_ref`). `kernel-core-baseline.toml`: `src_lines` 27040, the two content hashes and `set_hash` adopted from `--emit-pin`, HISTORY first segment citing this key with `->`.
-Cumulative measured tokei **21201**, 49 under the shared STOP 21250, 799 under the ADR-069 alarm 22000. **maos-capability ceiling 1433 -> 1444 is an orchestrator-adjudicated overdraft requested by the coder
-(creation grant: 0) and is PENDING Main's ruling.** No file added or removed (95); no change outside KT's two kernel files.
+Cumulative measured tokei **21203** after review round 1 (21201 at the first landing), 47 under the shared STOP 21250, 799 under the ADR-069 alarm 22000. **maos-capability: the overdraft (creation grant 0) is ADJUDICATED by Main 2026-11-12, disclosed to the operator, for the redesign that survives review (ceiling 1444 as ruled); the re-measured number is 1454 (+10 over the ruling) and is PENDING Main re-adjudication.** No file added or removed (95); no change outside KT's two kernel files.
+
+## L2 review round 1 — 2026-11-12 (GPT P2 x3, GLM S1-S3; implemented locally, uncommitted)
+
+Main's ruling on the shape B overdraft (2026-11-12): ADJUDICATED, disclosed to the operator, only for the redesign that survives review. Kernel growth from this round was ordered <= +0 net where possible
+and a STOP above +4 tokei; measured **+2 tokei / +3 physical** (27040/21201 -> 27043/21203; 47 under the shared STOP 21250): the two narrow delegates
+(`bind_cost_scope`, `cost_scope`) replace the one wide accessor `tokens()` (+3 code lines) and the emission reads the delegate (-1 line). Surface gate GREEN, NO refresh (methods are not surface items; the removed accessor
+was an inherent method too). Identity-text cover is outside the kernel (maos-domain serde, no kernel line). maos-capability re-measured **1454** (+21 over 1433, +10 over the adjudicated 1444): `TokenState.cost_scope`
+(`OnceLock`), `CapShard::{bind_cost_scope, cost_scope}`, ring delegates; domain +57, iac +1, cli +3, bin +7 are disclosed in `kloc.toml` as PENDING Main adjudication.

@@ -2307,6 +2307,7 @@ impl TransparencyLogAdapter {
     /// Value-only erasure: object keys never change; kind 29 reaches only identity and label
     /// values, kind 28 every value except fixed receipt fields and canonical digests.
     fn walk(kind: i64, v: &mut serde_json::Value, who: &[impl AsRef<str>]) -> bool {
+        use maos_domain::cost::decode_identity as plain;
         use maos_domain::memory::principal_id_occurs as seen;
         use serde_json::Value::{Array, Object, String as Text};
         const LABELS: &str = "principal principal_id task_ref session_principal provider model";
@@ -2315,7 +2316,7 @@ impl TransparencyLogAdapter {
         let listed = |names: &str, key: &str| names.split(' ').any(|name| name == key);
         let mut hit = false;
         match v {
-            Text(s) if who.iter().any(|p| seen(s.as_bytes(), p.as_ref())) => {
+            Text(s) if who.iter().any(|p| seen(plain(s).as_bytes(), p.as_ref())) => {
                 *s = "[REDACTED]".into();
                 hit = true;
             }

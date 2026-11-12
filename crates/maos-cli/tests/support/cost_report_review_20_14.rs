@@ -222,3 +222,27 @@ fn plain_escape_is_injective_for_backslashes_and_hides_bidi_overrides() {
         .collect();
     assert!(principals.contains(&real.to_owned()) && principals.contains(&spelled.to_owned()));
 }
+
+#[test]
+fn a_session_principal_over_128_bytes_is_skipped_while_a_proxy_principal_is_not_capped() {
+    let session = |name: &str| {
+        let mut row = entry(1, Some("t"), 2, resolved(name), 1);
+        row.payload = row
+            .payload
+            .replace("write_target_proxy", "session_principal");
+        row
+    };
+    let (long, ok) = ("p".repeat(129), "p".repeat(128));
+    let rows = |entries: &[maos_audit::AuditEntry]| {
+        build_cost_report("2026-06", entries, &pricing(1), &BTreeMap::new())
+    };
+    let skipped = rows(&[session(&long)]);
+    assert!(skipped.rows.is_empty() && skipped.warnings.len() == 1);
+    assert_eq!(rows(&[session(&ok)]).rows.len(), 1);
+    assert_eq!(
+        rows(&[entry(1, Some("t"), 2, resolved(&long), 1)])
+            .rows
+            .len(),
+        1
+    );
+}

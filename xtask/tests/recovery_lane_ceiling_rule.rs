@@ -276,7 +276,10 @@ fn kernel_core_ceiling_has_not_moved_under_the_easing() {
     // verification and wire use; inference/mod.rs spawns RateLimited delivery
     // instead of dropping its unpolled future. The +23 allowance is not headroom:
     // the ceiling is the measured +22.
-    const RATIFIED_AT_EASING: i64 = 21_201;
+    const RATIFIED_AT_EASING: i64 = 21_203;
+    // 20-14 landing 2 review round 1 (GPT P2 x3, GLM S1-S3), same KT row: exact formatted
+    // 21201 -> 21203 (+2), physical 27040 -> 27043 (+3), inside the x2 ceiling 21221 and the
+    // shared STOP 21250; the wide `tokens()` accessor is replaced by two narrow delegates.
     // 20-14 landing 2 (20-14 L2), FLAG-Winston KT (D-20-14-02 B, ruled 2026-11-03 ask
     // d_batch4): exact formatted 21181 -> 21201 (+20), physical 27014 -> 27040 (+26),
     // inside the x2 ceiling 21221 and the shared STOP 21250; capability/mod.rs accessor,

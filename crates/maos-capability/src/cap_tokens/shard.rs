@@ -4,7 +4,9 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
 
+use maos_domain::cost::CostScope;
 use maos_domain::invariants::i1::{IntentClass, Scope, TokenId};
 use parking_lot::RwLock;
 
@@ -39,6 +41,21 @@ impl CapShard {
             spirit_pid: s.spirit_pid,
             revoked: s.revoked.load(Ordering::Acquire),
         })
+    }
+
+    /// Story 20-14 — bind the root's attribution to a token this shard holds, once. `false` for
+    /// an absent token or one already bound. One lookup under the shard's read lock.
+    pub fn bind_cost_scope(&self, id: &TokenId, scope: CostScope) -> bool {
+        let guard = self.inner.read();
+        guard
+            .get(id)
+            .is_some_and(|s| s.cost_scope.set(scope).is_ok())
+    }
+
+    /// Story 20-14 — the attribution bound to `id`; revoked tokens keep it.
+    pub fn cost_scope(&self, id: &TokenId) -> Option<CostScope> {
+        let guard = self.inner.read();
+        guard.get(id).and_then(|s| s.cost_scope.get().cloned())
     }
 
     /// Commit revocation atomically. Returns the PRIOR flag as a value —
@@ -118,6 +135,8 @@ pub struct TokenState {
     pub scope: Scope,
     pub spirit_pid: u32,
     pub revoked: AtomicBool,
+    /// Story 20-14 — the root-bound attribution, set once at mint; it lives and dies with the state.
+    pub cost_scope: OnceLock<CostScope>,
 }
 
 /// Fast non-cryptographic hash for shard selection. ~5-10ns per call;

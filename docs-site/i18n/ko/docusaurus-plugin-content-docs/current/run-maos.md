@@ -303,8 +303,11 @@ root는 shell turn마다(`shell.turn:<id>`), Butler·Orchestrator·Researcher se
 (`<spirit>.pass:<id>`), 그리고 one-shot hello 실행마다(`hello-spirit.run:<id>`) task 하나를
 바인딩하고, 부팅 시 `MAOS_SESSION_PRINCIPAL`이 설정되어 있으면 그 세션 principal도
 바인딩합니다. 이런 frame은 `task_ref`와 `attribution_source: session_principal`을 가진
-schema 2입니다. 잘못된 값(`:` 또는 제어 문자)은 부팅을 거부하며, 미설정 또는 공백이면
-바인딩하지 않고 write-target proxy가 `write_target_proxy`로 표시되어 귀속합니다.
+schema 2입니다. 잘못된 값(`:`, 제어 문자, 보이지 않는 문자나 양방향 서식 문자, 또는 128바이트
+초과)은 부팅을 거부하며, 미설정 또는 공백이면 바인딩하지 않고 write-target proxy가
+`write_target_proxy`로 표시되어 귀속합니다. Transparency Log 마스킹이 바꿔 버릴 식별 문자열(32자 hex
+연속 또는 자격 증명 형태의 접두어)이나 JSON 이스케이프가 필요한 문자열은 `x:`와 콜론 구분 hex로
+기록되며, 보고서와 `forget`은 디코딩한 값으로 읽습니다.
 20-14 이전에 기록된 frame은 schema 1로 남습니다.
 
 JSON 보고서의 `per_spirit_attributable_fraction`은 부팅 단위 Spirit마다 한 항목이며

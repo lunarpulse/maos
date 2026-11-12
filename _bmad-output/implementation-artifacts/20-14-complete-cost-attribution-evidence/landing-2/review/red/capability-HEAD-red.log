@@ -1,0 +1,103 @@
+   Compiling ring v0.17.14
+   Compiling maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain)
+   Compiling tokio v1.53.3
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability)
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+error[E0560]: struct `TokenState` has no field named `cost_scope`
+  --> crates/maos-capability/tests/cost_scope_20_14.rs:32:9
+   |
+32 |         cost_scope: OnceLock::new(),
+   |         ^^^^^^^^^^ `TokenState` does not have this field
+   |
+   = note: all struct fields are already assigned
+
+error[E0599]: no method named `bind_cost_scope` found for struct `CapShard` in the current scope
+  --> crates/maos-capability/tests/cost_scope_20_14.rs:50:23
+   |
+50 |         assert!(shard.bind_cost_scope(&id(n), scope(n)), "bind {n}");
+   |                       ^^^^^^^^^^^^^^^ method not found in `CapShard`
+
+error[E0599]: no method named `cost_scope` found for struct `CapShard` in the current scope
+  --> crates/maos-capability/tests/cost_scope_20_14.rs:53:30
+   |
+53 |             assert_eq!(shard.cost_scope(&id(n - 1)), Some(scope(n - 1)));
+   |                              ^^^^^^^^^^ method not found in `CapShard`
+
+error[E0599]: no method named `cost_scope` found for struct `CapShard` in the current scope
+  --> crates/maos-capability/tests/cost_scope_20_14.rs:61:26
+   |
+61 |         assert_eq!(shard.cost_scope(&id(n)), Some(scope(n)), "revoked {n}");
+   |                          ^^^^^^^^^^ method not found in `CapShard`
+
+error[E0599]: no method named `bind_cost_scope` found for struct `CapShard` in the current scope
+  --> crates/maos-capability/tests/cost_scope_20_14.rs:64:20
+   |
+64 |     assert!(!shard.bind_cost_scope(&id(1), scope(9_999)));
+   |                    ^^^^^^^^^^^^^^^ method not found in `CapShard`
+
+error[E0599]: no method named `cost_scope` found for struct `CapShard` in the current scope
+  --> crates/maos-capability/tests/cost_scope_20_14.rs:65:22
+   |
+65 |     assert_eq!(shard.cost_scope(&id(1)), Some(scope(1)));
+   |                      ^^^^^^^^^^ method not found in `CapShard`
+
+error[E0599]: no method named `bind_cost_scope` found for struct `CapShard` in the current scope
+  --> crates/maos-capability/tests/cost_scope_20_14.rs:66:20
+   |
+66 |     assert!(!shard.bind_cost_scope(&id(N + 5), scope(5)));
+   |                    ^^^^^^^^^^^^^^^ method not found in `CapShard`
+
+error[E0599]: no method named `cost_scope` found for struct `CapShard` in the current scope
+  --> crates/maos-capability/tests/cost_scope_20_14.rs:67:22
+   |
+67 |     assert_eq!(shard.cost_scope(&id(N + 5)), None);
+   |                      ^^^^^^^^^^ method not found in `CapShard`
+
+error[E0599]: no method named `cost_scope` found for struct `CapShard` in the current scope
+  --> crates/maos-capability/tests/cost_scope_20_14.rs:72:26
+   |
+72 |         assert_eq!(shard.cost_scope(&id(n)), expected, "after eviction {n}");
+   |                          ^^^^^^^^^^ method not found in `CapShard`
+
+Some errors have detailed explanations: E0560, E0599.
+For more information about an error, try `rustc --explain E0560`.
+error: could not compile `maos-capability` (test "cost_scope_20_14") due to 9 previous errors

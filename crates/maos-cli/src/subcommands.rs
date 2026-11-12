@@ -4871,6 +4871,9 @@ fn build_cost_report(
         let payload = frame.payload;
         if entry.spirit_pid != payload.spirit_pid
             || frame.task_ref.as_ref().is_some_and(|task| task.len() > 256)
+            || matches!(&payload.principal, PrincipalRef::Resolved { principal_id }
+                if principal_id.len() > 128
+                    && payload.attribution_source == AttributionSource::SessionPrincipal)
         {
             warnings.push(format!(
                 "skipping invalid cost identity for frame {}",

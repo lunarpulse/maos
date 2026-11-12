@@ -225,8 +225,9 @@ hardfail measured + 1; (7) D-20-14-01…12 (12: the cumulative kernel STOP).
 
 #### AC2 — per-task attribution (epic AC2; D-20-14-01 A, -02 B, -03 B, -07 A) ◆ FLAG-Winston
 
-1. KT (`kt-token-bound-scope.diff`): `CapabilityRegistryAdapter::bind_cost_scope(token_id, CostScope)` (prunes scopes of
-   tokens the ring no longer holds, measurement 2) and `cost_scope(&token_id)`; the emission (`inference/mod.rs:398-461`)
+1. KT (`kt-token-bound-scope.diff`, as landed after review round 1): `CapabilityRegistryAdapter::bind_cost_scope(&TokenId, CostScope) -> bool` and
+   `cost_scope(&TokenId) -> Option<CostScope>` (two narrow inherent delegates; the scope is part of the token's own state in
+   maos-capability, bound once, dying with the state); the emission (`inference/mod.rs:398-461`)
    reads the scope by the verified token id and writes `task_ref`, `schema_version: 2`. Any other
    `crates/maos-kernel-core/src` change is STOP.
 2. Root binding (D-01 A): each production Inference Port mint binds a scope at mint — shell turn (`shell_host.rs:112-122`),
@@ -522,16 +523,24 @@ ceiling 8728; after: measured 8770, zero headroom), audit 8227, aggregate 199198
 **L2 kernel landing (2026-11-12, implemented locally, uncommitted; awaiting the hosted run and review; story stays `in-progress`; evidence
 `20-14-complete-cost-attribution-evidence/landing-2/evidence.md`, raw red/plant/green logs beside it).** STEP 0 re-cut KT on a `git archive HEAD` copy at the live base 27014/21181
 including the `CostFrameBody` wrapper: the prototyped field on `CapabilityRegistryAdapter` measured +38/+28 and turned `check-service-boundary` RED (a second surface-hash
-refresh, not granted), so shape B was landed instead: the root-bound `CostScope` map lives on `CapTokensShardRing` in maos-capability (`bind_cost_scope`/`cost_scope`, pruned on bind) and
-the kernel gains one inherent accessor `CapabilityRegistryAdapter::tokens()`; the emission reads the scope by the verified token id, a bound session principal is
+refresh, not granted), so shape B was landed instead (hash-neutral). Round 1 of the review redesigned it: the root-bound `CostScope` is part of its token's own state in maos-capability (`TokenState.cost_scope`, a `OnceLock` set once at mint; no second map, no scan, no prune, it dies with the state), and the kernel exposes only two narrow inherent delegates `CapabilityRegistryAdapter::{bind_cost_scope, cost_scope}`; the wide `tokens()` accessor is gone. The emission reads the scope by the verified token id, a bound session principal is
 `Resolved`/`SessionPrincipal`/`Exact` (proxy not queried), otherwise the proxy stays the tagged fallback; the frame is `CostFrameBody` schema 2 with `task_ref`.
 Root binding (`maos-bin`): `MAOS_SESSION_PRINCIPAL` (UserFacing env row; unset/blank none, `:` / control / non-UTF-8 refuse the boot) and `bind_task_scope` at the shell turn
 (`shell.turn:<ulid>`), the seam per-pass mint (`<spirit>.pass:<ulid>`) and the one-shot hello run (`hello-spirit.run:<ulid>`); the smoke mint and spawned-session leases are classified
-not-bound. Pins: kernel 27014/21181 -> 27040/21201 (+26/+20; x2 ceiling 21221; shared STOP 21250, 49 left), maos-capability 1433 -> 1444 (the creation grant allowed it 0: **the +11
-ceiling is an orchestrator-adjudicated overdraft requested by the coder and PENDING Main's ruling**), maos-bin 38475 -> 38549 (inside the +250 L2 allowance), aggregate 202855 / hardfail 202856.
-Witnesses: kernel `cost_attribution_20_14.rs` (4), bin `cost_attribution_20_14.rs` (6, real `maos` + `maosctl`), 8 plants with raw logs. The ADR-046 and the three guides now state the binding has landed;
+not-bound. Pins after review round 1: kernel 27014/21181 -> 27043/21203 (x2 ceiling 21221; shared STOP 21250, 47 left), maos-capability 1433 -> 1454 (the creation grant allowed it 0; **ADJUDICATED by Main 2026-11-12 for the redesign that survives review, disclosed to the operator, at 1444 - the re-measured 1454 is PENDING Main re-adjudication**), maos-domain 10217 -> 10274 (+57, PENDING), maos-iac 8770 -> 8771 (+1, PENDING), maos-cli 6609 -> 6612 (+3, PENDING), maos-bin 38475 -> 38556 (inside the +250 L2 allowance), aggregate 202935 / hardfail 202936.
+Witnesses: kernel `cost_attribution_20_14.rs` (6), capability `cost_scope_20_14.rs`, bin `cost_attribution_20_14.rs` (11, real `maos` + `maosctl`), 8 landing plants + 9 round-1 plants with raw logs. The ADR-046 and the three guides now state the binding has landed;
 `tests/coverage-matrix.yaml` FR64/NFR-Cost-1 name the witnesses (no gate claimed). AC1-AC3 and AC6 are implemented with local witnesses and are NOT closed: hosted run, review,
 `abi-diff` on a clean tree (it refuses a dirty one) and the remaining T0 items are open; hosted/Apple/Windows legs unverified.
+
+**L2 review round 1 (2026-11-12, GPT `Review2014K` 3 P2 / verdict incorrect; GLM `Sec2014K` S1 Low, S2 Low, S3 Info; persisted verbatim as `landing-2/review/{gpt-review,security}.md`; implemented locally, uncommitted; hosted run and re-review open).**
+(1) GPT P2-1 + GLM S3: the wide `CapabilityRegistryAdapter::tokens() -> &CapTokensShardRing` (it exposed issue / revoke / verify, bypassing the issuance policy and quota) is removed; the adapter has only `bind_cost_scope` / `cost_scope`. Witness: a denied (undeclared provider) and a quota-exhausted issuance stay denied, a forged id gets no token and no scope, binding neither refills the quota nor un-revokes. Surface gate GREEN without a refresh (methods are not surface items).
+(2) GPT P2-3 + GLM S1: the separate `cost_scopes` map (rescanned on every bind under the global write lock, never pruned in production because `evict_expired` has no caller) is deleted; the scope is `TokenState.cost_scope: OnceLock<CostScope>`, bound through the token's own shard (one hash lookup). Witness: `maos-capability/tests/cost_scope_20_14.rs` (3000 sustained mint / revoke / expiry, revoked tokens keep their scope, eviction takes the scope with the state; the bounded work is structural: one entry in one shard, no collection to scan) and a paid completion revoked mid-call journals its task and principal. The old test and evidence phrase "stale scopes are pruned" described a ghost-id case that production never reaches and is withdrawn.
+(3) GPT P2-2: the TL redactor rewrote 32-hex and credential-prefixed principals (the report showed `<REDACTED:...>`) and `sk-a"b` produced malformed JSON the reader skipped (tokens lost). Observed red at HEAD for all three vectors (`review/red/bin-HEAD-red*.log`). Fix: `maos_domain::cost::{encode_identity, decode_identity}`: identity text the redactor would rewrite (a 32-hex run, a credential prefix), that needs a JSON escape, or that already starts `x:` is journaled as `x:` plus colon-delimited hex; serde on `principal_id` / `task_ref` encodes and decodes it, so every typed reader decodes and the erasure walk matches by the decoded value (`maos-iac`, one line); the redactor is untouched and the ruled input contract is unchanged. The emission needed no kernel line. `maos-iac/tests/cost_identity_cover_20_14.rs` pins every redactor `RULES` prefix to the cover list.
+(4) GLM S2: `parse_session_principal` caps the principal at 128 bytes and refuses U+061C, U+180E, U+200B-200F, U+202A-202E, U+2060-206F, U+FEFF and U+E0000-E007F; the reader skips a SESSION principal over 128 bytes next to the 256-byte task cap (a write-target-proxy principal is not capped: it is unbounded at its source and skipping it would lose tokens).
+(5) The decision record and `kloc.toml` now both say: the maos-capability overdraft is ADJUDICATED by Main 2026-11-12 (disclosed to the operator) for the redesign that survives review; the re-measured number is 1454 (+10 over the adjudicated 1444).
+(6) `one_principal_on_two_tasks_reports_two_rows` proves same-principal task-key separation (the report-key plant collapses it).
+Scope note: GLM listed "TL redactor interplay: no mangling"; that claim was wrong for the frame insert path (`insert_frame_event` redacts the payload), as GPT said and the red logs show.
+Pins: kernel 27040/21201 -> 27043/21203 (+3/+2), maos-capability 1444 -> 1454, domain 10217 -> 10274, iac 8770 -> 8771, cli 6609 -> 6612, bin 38549 -> 38556, aggregate 202855 -> 202935, hardfail 202936. Observed in this round: see `landing-2/review/evidence.md`.
 
 ### File List
 
@@ -583,3 +592,4 @@ Witnesses: kernel `cost_attribution_20_14.rs` (4), bin `cost_attribution_20_14.r
 - 2026-11-11: L1 correction round 3 (R2-1, R2-2, escaped-value discovery, digest form, F-4): see Completion Notes; iac ceiling 8728 -> 8770 (orchestrator-adjudicated D02 A overdraft, disclosed to the operator); pins CLI 6609, iac 8770, hardfail 199199.
 
 - 2026-11-12: L2 kernel landing implemented locally (KT shape B, root binding, env row, witnesses, docs); kernel 21201 / 27040; maos-capability 1444 pending adjudication; status stays `in-progress` until the hosted run and review.
+- 2026-11-12: L2 review round 1 (GPT P2 x3, GLM S1-S3): narrow adapter delegates, scope in the token state, colon-hex cover for redactor-shaped identity text, principal length/hidden-character hardening, decision wording ADJUDICATED; kernel 27043/21203, capability 1454 (re-adjudication pending); status stays `in-progress`.
