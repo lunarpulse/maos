@@ -1,0 +1,14 @@
+before: listing=b20ac33723a9b229 files=10369
+minimize-fuzz-corpus manifest_parser: before files=10369 du_kib=41476
+minimize-fuzz-corpus manifest_parser: free_kib=769384152 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus manifest_parser: merge exit=0 wall=13s log=/tmp/t3fix3-clone/out/minimize-manifest_parser.log
+MERGE-OUTER: the control file has 1552764 bytes
+MERGE-OUTER: 1257 new files with 9097 new features added; 4546 new coverage edges
+minimize-fuzz-corpus manifest_parser: merged output validated (count == MERGE-OUTER, sha1 == name) in 0s
+minimize-fuzz-corpus manifest_parser: after files=1257 du_kib=5028
+minimize-fuzz-corpus manifest_parser: free_kib=769383920 free_inodes=0
+script exit=0 wall=13.3s
+after: listing=15c5d976d6104960 files=1257
+records identical: True
+marker file present: False ; crash artifacts: 0
+non-40-hex names: 0

@@ -1,0 +1,3 @@
+bash -n minimize-fuzz-corpus.sh exit=0
+bash -n real-run.sh exit=0
+147d8dfdb37f5eddee42d84b80d9da8d073bc44d37aade2c9487c3da9a20bd77  scripts/minimize-fuzz-corpus.sh

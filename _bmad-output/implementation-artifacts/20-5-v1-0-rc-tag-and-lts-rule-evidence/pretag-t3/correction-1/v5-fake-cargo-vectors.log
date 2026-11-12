@@ -1,0 +1,57 @@
+### FAKE_MODE=good  files before=20 listing=71d92ad2f745ae4e
+minimize-fuzz-corpus fake_good: before files=20 du_kib=80
+minimize-fuzz-corpus fake_good: free_kib=769319148 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus fake_good: merge exit=0 wall=0s log=/tmp/t3fix2-clone/out/minimize-fake_good.log
+MERGE-OUTER: 8 new files with 1 new features added; 1 new coverage edges
+minimize-fuzz-corpus fake_good: merged output validated (count == MERGE-OUTER, sha1 == name) in 0s
+minimize-fuzz-corpus fake_good: after files=8 du_kib=32
+minimize-fuzz-corpus fake_good: free_kib=769319148 free_inodes=0
+script exit=0
+files after=8 listing=21a77d23c409613b scratch-left=0 crash-artifacts=0
+### FAKE_MODE=truncated  files before=20 listing=71d92ad2f745ae4e
+minimize-fuzz-corpus fake_truncated: before files=20 du_kib=80
+minimize-fuzz-corpus fake_truncated: free_kib=769319148 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus fake_truncated: merge exit=0 wall=0s log=/tmp/t3fix2-clone/out/minimize-fake_truncated.log
+MERGE-OUTER: 8 new files with 1 new features added; 1 new coverage edges
+::warning::minimize-fuzz-corpus fake_truncated: merged corpus rejected (1 file(s) whose SHA-1 differs from the file name (first: 00032aa2f666b5dbe6411d4cec626166ed168588): truncated or corrupt output); keeping the unminimized corpus
+script exit=0
+files after=20 listing=71d92ad2f745ae4e scratch-left=0 crash-artifacts=0
+### FAKE_MODE=missing  files before=20 listing=71d92ad2f745ae4e
+minimize-fuzz-corpus fake_missing: before files=20 du_kib=80
+minimize-fuzz-corpus fake_missing: free_kib=769319148 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus fake_missing: merge exit=0 wall=0s log=/tmp/t3fix2-clone/out/minimize-fake_missing.log
+MERGE-OUTER: 8 new files with 1 new features added; 1 new coverage edges
+::warning::minimize-fuzz-corpus fake_missing: merged corpus rejected (merged dir holds 7 regular files but MERGE-OUTER reported 8); keeping the unminimized corpus
+script exit=0
+files after=20 listing=71d92ad2f745ae4e scratch-left=0 crash-artifacts=0
+### FAKE_MODE=nomerge  files before=20 listing=71d92ad2f745ae4e
+minimize-fuzz-corpus fake_nomerge: before files=20 du_kib=80
+minimize-fuzz-corpus fake_nomerge: free_kib=769319148 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus fake_nomerge: merge exit=0 wall=0s log=/tmp/t3fix2-clone/out/minimize-fake_nomerge.log
+::warning::minimize-fuzz-corpus fake_nomerge: merged corpus rejected (no 'MERGE-OUTER: N new files' line in /tmp/t3fix2-clone/out/minimize-fake_nomerge.log); keeping the unminimized corpus
+script exit=0
+files after=20 listing=71d92ad2f745ae4e scratch-left=0 crash-artifacts=0
+### FAKE_MODE=crash  files before=20 listing=71d92ad2f745ae4e
+minimize-fuzz-corpus fake_crash: before files=20 du_kib=80
+minimize-fuzz-corpus fake_crash: free_kib=769319148 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus fake_crash: merge exit=0 wall=0s log=/tmp/t3fix2-clone/out/minimize-fake_crash.log
+::error::T3 fake_crash: input crashed during corpus merge; refusing evidence
+merge artifact: crash-fakefakefakefake
+merge log marker: ==1== ERROR: libFuzzer: deadly signal
+script exit=1
+files after=20 listing=71d92ad2f745ae4e scratch-left=0 crash-artifacts=1
+### FAKE_MODE=marker  files before=20 listing=71d92ad2f745ae4e
+minimize-fuzz-corpus fake_marker: before files=20 du_kib=80
+minimize-fuzz-corpus fake_marker: free_kib=769319148 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus fake_marker: merge exit=0 wall=0s log=/tmp/t3fix2-clone/out/minimize-fake_marker.log
+::error::T3 fake_marker: input crashed during corpus merge; refusing evidence
+merge log marker: thread panicked at fuzz_targets/x.rs:1:1
+script exit=1
+files after=20 listing=71d92ad2f745ae4e scratch-left=0 crash-artifacts=0
+### (d) REAL cargo, real target frame_deser, EMPTY corpus dir (moved aside temporarily in the scratch clone)
+minimize-fuzz-corpus frame_deser: before files=0 du_kib=0
+minimize-fuzz-corpus frame_deser: free_kib=769319148 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus frame_deser: merge exit=0 wall=0s log=/tmp/t3fix2-clone/out/minimize-frame_deser.log
+::warning::minimize-fuzz-corpus frame_deser: merged corpus rejected (no 'MERGE-OUTER: N new files' line in /tmp/t3fix2-clone/out/minimize-frame_deser.log); keeping the unminimized corpus
+script exit=0
+files after=0 leftover scratch=0

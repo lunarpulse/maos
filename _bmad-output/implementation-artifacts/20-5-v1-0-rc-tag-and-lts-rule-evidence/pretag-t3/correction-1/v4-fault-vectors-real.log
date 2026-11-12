@@ -1,0 +1,67 @@
+### records before
+901263460ea1b128e0a7742a599ea9e978446b8ab322aaa0329acb1d4aae2c48  out/record-frame_deser-1.json
+642baa52bbbba5a61b16ab413a224de1e2271ce85c512c61dfc9eb19fd902734  out/record-frame_deser-2.json
+2c8e0b2398b6d42e2c34e9ab7fdd1ff64e20d2c95b1c490f37e0f2a4de6f14a3  out/record-manifest_parser-1.json
+### (a) frame_deser, timeout 1 s
+listing before: 42d865262f99d6e1 files=47866
+0
+minimize-fuzz-corpus frame_deser: before files=47866 du_kib=191464
+minimize-fuzz-corpus frame_deser: free_kib=769318848 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus frame_deser: merge exit=124 wall=1s log=/tmp/t3fix2-clone/out/minimize-frame_deser.log
+INFO: Seed: 4104749280
+INFO: Loaded 1 modules   (108940 inline 8-bit counters): 108940 [0x5626cbf63bf0, 0x5626cbf7e57c), 
+INFO: Loaded 1 PC tables (108940 PCs): 108940 [0x5626cbf7e580,0x5626cc127e40), 
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 1048576 bytes
+MERGE-INNER: using the control file '/tmp/t3fix2-clone/crates/maos-domain/fuzz/corpus-minimize-frame_deser/tmp/libFuzzerTemp.Merge993271.txt'
+MERGE-INNER: 47866 total files; 0 processed earlier; will process 47866 files now
+#1	pulse  cov: 88 ft: 89 exec/s: 0 rss: 60Mb
+#2	pulse  cov: 91 ft: 92 exec/s: 0 rss: 60Mb
+#4	pulse  cov: 103 ft: 106 exec/s: 0 rss: 60Mb
+#8	pulse  cov: 133 ft: 137 exec/s: 0 rss: 60Mb
+#16	pulse  cov: 204 ft: 208 exec/s: 0 rss: 62Mb
+#32	pulse  cov: 271 ft: 286 exec/s: 0 rss: 63Mb
+#64	pulse  cov: 427 ft: 466 exec/s: 0 rss: 64Mb
+#128	pulse  cov: 564 ft: 621 exec/s: 0 rss: 65Mb
+#256	pulse  cov: 983 ft: 1095 exec/s: 0 rss: 68Mb
+#512	pulse  cov: 1740 ft: 1935 exec/s: 0 rss: 73Mb
+#1024	pulse  cov: 3097 ft: 3478 exec/s: 0 rss: 79Mb
+#2048	pulse  cov: 5554 ft: 6211 exec/s: 0 rss: 93Mb
+==993347== libFuzzer: run interrupted; exiting
+==993271== libFuzzer: run interrupted; exiting
+::warning::minimize-fuzz-corpus frame_deser: merge exceeded 1s; keeping the unminimized corpus
+script exit=0
+listing after:  42d865262f99d6e1
+leftover scratch: 0; libFuzzerTemp in /tmp: 0; merge-crashes files: 0
+### (b) nonexistent target no_such_target with a 3-file corpus dir
+listing before: f065344b3ea4f0ef
+minimize-fuzz-corpus no_such_target: before files=3 du_kib=12
+minimize-fuzz-corpus no_such_target: free_kib=769318848 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus no_such_target: merge exit=1 wall=0s log=/tmp/t3fix2-clone/out/minimize-no_such_target.log
+error: no bin target named `no_such_target` in default-run packages
+help: available bin targets:
+    frame_deser
+Error: failed to build fuzz script: ASAN_OPTIONS="allocator_may_return_null=1:detect_leaks=0:detect_odr_violation=0" RUSTFLAGS=" -Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4 -Cllvm-args=-sanitizer-coverage-inline-8bit-counters -Cllvm-args=-sanitizer-coverage-pc-table -Cllvm-args=-sanitizer-coverage-trace-compares --cfg fuzzing -Cllvm-args=-simplifycfg-branch-fold-threshold=0 -Zsanitizer=address -Cllvm-args=-sanitizer-coverage-stack-depth -Cdebug-assertions -Ccodegen-units=1" "cargo" "build" "--manifest-path" "crates/maos-domain/fuzz/Cargo.toml" "--target" "x86_64-unknown-linux-gnu" "--release" "--config" "profile.release.debug=\"line-tables-only\"" "--bin" "no_such_target"
+
+Stack backtrace:
+   0: <anyhow::Error>::msg::<alloc::string::String>
+   1: <cargo_fuzz::project::FuzzProject>::exec_build
+   2: <cargo_fuzz::project::FuzzProject>::exec_fuzz
+   3: cargo_fuzz::main
+   4: std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), anyhow::Error>, core::result::Result<(), anyhow::Error>>
+   5: std::rt::lang_start::<core::result::Result<(), anyhow::Error>>::{closure#0}
+   6: std::rt::lang_start_internal
+   7: main
+   8: <unknown>
+   9: __libc_start_main
+  10: _start
+::warning::minimize-fuzz-corpus no_such_target: merge failed with exit 1; keeping the unminimized corpus
+script exit=0
+listing after:  f065344b3ea4f0ef
+0
+### (b2) nonexistent target without a corpus dir
+::warning::minimize-fuzz-corpus no_such_target_nodir: corpus dir /tmp/t3fix2-clone/crates/maos-domain/fuzz/corpus/no_such_target_nodir missing; nothing to do
+script exit=0
+### records after
+901263460ea1b128e0a7742a599ea9e978446b8ab322aaa0329acb1d4aae2c48  out/record-frame_deser-1.json
+642baa52bbbba5a61b16ab413a224de1e2271ce85c512c61dfc9eb19fd902734  out/record-frame_deser-2.json
+2c8e0b2398b6d42e2c34e9ab7fdd1ff64e20d2c95b1c490f37e0f2a4de6f14a3  out/record-manifest_parser-1.json

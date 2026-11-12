@@ -1,0 +1,14 @@
+diff --git a/crates/maos-manifest/fuzz/fuzz_targets/manifest_parser.rs b/crates/maos-manifest/fuzz/fuzz_targets/manifest_parser.rs
+index cefecc4f..d4f26cba 100755
+--- a/crates/maos-manifest/fuzz/fuzz_targets/manifest_parser.rs
++++ b/crates/maos-manifest/fuzz/fuzz_targets/manifest_parser.rs
+@@ -22,6 +22,9 @@ use maos_manifest::{
+ };
+ 
+ fuzz_target!(|data: &[u8]| {
++    if data.starts_with(b"T3-MERGE-PLANT") {
++        panic!("planted merge crash");
++    }
+     // TOML is UTF-8; reject non-UTF-8 bytes before any parser sees them.
+     let s = match std::str::from_utf8(data) {
+         Ok(s) => s,

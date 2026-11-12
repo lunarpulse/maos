@@ -1,0 +1,42 @@
+##### manifest_parser: 120 s link (all 32 cores)
+link exit=0 wall=148s
+{"commit": "0000000000000000000000000000000000000000", "corpus_size": 13719, "cpu_seconds": 3872, "run_id": "777-1", "target": "manifest_parser", "tier": "T3", "timestamp": "2026-11-12T13:12:58Z", "workers": 32}
+record sha before: 07a4dd4ba6fe3fad947deddc565f233ad6c29e0db5202b087d3ce04f5b403717  out/record-manifest_parser-1.json
+minimize-fuzz-corpus manifest_parser: before files=13719 du=54M
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         928G  187G  735G  21% /
+minimize-fuzz-corpus manifest_parser: merge exit=0 wall=17s log=/tmp/t3fix-clone/out/minimize-manifest_parser.log
+minimize-fuzz-corpus manifest_parser: after files=1190 du=4.7M
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         928G  187G  735G  21% /
+minimize exit=0
+record sha after:  07a4dd4ba6fe3fad947deddc565f233ad6c29e0db5202b087d3ce04f5b403717  out/record-manifest_parser-1.json
+fuzz dir entries: Cargo.lock Cargo.toml artifacts corpus fuzz_targets 
+resume check (4 cores, 20 s link 2):
+link2 exit=0
+#1191	INITED cov: 4389 ft: 8457 corp: 1145/197Kb exec/s: 1191 rss: 346Mb
+#1191	INITED cov: 4390 ft: 8459 corp: 1150/198Kb exec/s: 1191 rss: 346Mb
+#1191	INITED cov: 4389 ft: 8454 corp: 1147/198Kb exec/s: 1191 rss: 346Mb
+#1191	INITED cov: 4389 ft: 8456 corp: 1148/197Kb exec/s: 1191 rss: 345Mb
+
+##### fuzz_exec_deps_parse_elf: 120 s link (all 32 cores)
+link exit=0 wall=124s
+{"commit": "0000000000000000000000000000000000000000", "corpus_size": 18361, "cpu_seconds": 3872, "run_id": "777-1", "target": "fuzz_exec_deps_parse_elf", "tier": "T3", "timestamp": "2026-11-12T13:15:40Z", "workers": 32}
+record sha before: 8f924b4a6c0ea0c662bf8aed92c6b1923e5870dab8524374c0c83fe0901d4f7e  out/record-fuzz_exec_deps_parse_elf-1.json
+minimize-fuzz-corpus fuzz_exec_deps_parse_elf: before files=18361 du=72M
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         928G  187G  735G  21% /
+minimize-fuzz-corpus fuzz_exec_deps_parse_elf: merge exit=0 wall=1s log=/tmp/t3fix-clone/out/minimize-fuzz_exec_deps_parse_elf.log
+minimize-fuzz-corpus fuzz_exec_deps_parse_elf: after files=180 du=720K
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         928G  187G  735G  21% /
+minimize exit=0
+record sha after:  8f924b4a6c0ea0c662bf8aed92c6b1923e5870dab8524374c0c83fe0901d4f7e  out/record-fuzz_exec_deps_parse_elf-1.json
+fuzz dir entries: Cargo.lock Cargo.toml artifacts corpus fuzz_targets 
+resume check (4 cores, 20 s link 2):
+link2 exit=0
+#181	INITED cov: 316 ft: 955 corp: 175/117Kb exec/s: 0 rss: 50Mb
+#181	INITED cov: 316 ft: 955 corp: 176/117Kb exec/s: 0 rss: 50Mb
+#181	INITED cov: 316 ft: 955 corp: 176/117Kb exec/s: 0 rss: 50Mb
+#181	INITED cov: 316 ft: 955 corp: 176/117Kb exec/s: 0 rss: 47Mb
+

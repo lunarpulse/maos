@@ -1,0 +1,21 @@
+### bash -n
+exit=0
+### bash -n function-vectors.sh fake-cargo.sh
+exit=0
+### shellcheck / actionlint
+shellcheck: not installed
+actionlint: not installed
+### yaml parse
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+    import yaml,sys
+ModuleNotFoundError: No module named 'yaml'
+### workflow diff stat (minimize steps only)
+ .github/workflows/fuzz-prerelease.yml | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+      5 +          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+      5 +          RUSTUP_TOOLCHAIN: nightly-2026-09-25
+      5 +        env:
+      5 +        run: bash scripts/minimize-fuzz-corpus.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' '${{ matrix.rss_flag }}'
+      5 +        timeout-minutes: 30
+      5 +      - name: Minimize corpus before hand-off

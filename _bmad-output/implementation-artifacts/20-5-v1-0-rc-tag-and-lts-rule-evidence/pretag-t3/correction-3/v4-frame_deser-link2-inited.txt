@@ -1,0 +1,8 @@
+#13645	INITED cov: 21719 ft: 41578 corp: 13516/1181Kb exec/s: 3411 rss: 234Mb
+#13645	INITED cov: 21719 ft: 41578 corp: 13517/1181Kb exec/s: 2729 rss: 229Mb
+#13645	INITED cov: 21719 ft: 41577 corp: 13521/1181Kb exec/s: 2729 rss: 230Mb
+#13645	INITED cov: 21719 ft: 41578 corp: 13508/1181Kb exec/s: 2729 rss: 231Mb
+#13645	INITED cov: 21719 ft: 41577 corp: 13516/1180Kb exec/s: 2729 rss: 231Mb
+#13645	INITED cov: 21719 ft: 41579 corp: 13514/1182Kb exec/s: 2729 rss: 232Mb
+#13645	INITED cov: 21719 ft: 41577 corp: 13505/1181Kb exec/s: 2729 rss: 230Mb
+#13645	INITED cov: 21719 ft: 41577 corp: 13512/1181Kb exec/s: 2729 rss: 229Mb

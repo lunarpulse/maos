@@ -1,0 +1,20 @@
+##### rss_flag=''  before listing=bea8f2f5a93d9e5b files=3262
+minimize-fuzz-corpus fuzz_exec_deps_parse_elf: before files=3262 du_kib=13048
+minimize-fuzz-corpus fuzz_exec_deps_parse_elf: free_kib=769202480 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus fuzz_exec_deps_parse_elf: merge exit=0 wall=1s log=/tmp/t3fix5-clone/out/minimize-fuzz_exec_deps_parse_elf.log
+MERGE-OUTER: the control file has 500398 bytes
+MERGE-OUTER: 186 new files with 1156 new features added; 327 new coverage edges
+minimize-fuzz-corpus fuzz_exec_deps_parse_elf: merged output validated (count == MERGE-OUTER, sha1 == name) in 0s
+minimize-fuzz-corpus fuzz_exec_deps_parse_elf: after files=186 du_kib=744
+minimize-fuzz-corpus fuzz_exec_deps_parse_elf: free_kib=769202480 free_inodes=0
+script exit=0 wall=1s
+after listing=065528000d84562f files=186 CHANGED artifacts=[] marker_file=no scratch-left=0
+oom- artifacts: 0
+non-40-hex names in corpus: 0
+--- real merge command line (Running line of out/minimize-fuzz_exec_deps_parse_elf.log):
+     Running `crates/maos-exec-deps/fuzz/target/x86_64-unknown-linux-gnu/release/fuzz_exec_deps_parse_elf -artifact_prefix=crates/maos-exec-deps/fuzz/artifacts/fuzz_exec_deps_parse_elf/ -merge=1 -artifact_prefix=/tmp/t3fix5-clone/out/merge-crashes-fuzz_exec_deps_parse_elf/ /tmp/t3fix5-clone/crates/maos-exec-deps/fuzz/corpus-minimize-fuzz_exec_deps_parse_elf/merged /tmp/t3fix5-clone/crates/maos-exec-deps/fuzz/corpus/fuzz_exec_deps_parse_elf`
+--- merge log: MERGE-OUTER / ERROR / SUMMARY / MERGE-INNER failure lines:
+MERGE-OUTER: attempt 1
+MERGE-OUTER: successful in 1 attempt(s)
+MERGE-OUTER: 186 new files with 1156 new features added; 327 new coverage edges
+--- marker file out/merge-inconclusive-fuzz_exec_deps_parse_elf.txt (first 8 lines):

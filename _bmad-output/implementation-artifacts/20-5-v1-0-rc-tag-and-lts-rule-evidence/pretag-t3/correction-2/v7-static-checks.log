@@ -1,0 +1,5 @@
+bash -n scripts/minimize-fuzz-corpus.sh: exit 0 
+bash -n correction-2/function-vectors.sh: exit 0 
+bash -n correction-2/fake-cargo.sh: exit 0 
+bash -n correction-2/fake-cargo-vectors.sh: exit 0 
+shellcheck: not installed (not run)

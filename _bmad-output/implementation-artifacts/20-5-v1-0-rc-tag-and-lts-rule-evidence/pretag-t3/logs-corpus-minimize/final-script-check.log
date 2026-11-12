@@ -1,0 +1,33 @@
+# final script (post-edit) re-check on manifest_parser
+sha256 of final script: 4cadc9f454cee11abed502aa1452bcea22c82f0af35db2a464487178c9732e39  scripts/minimize-fuzz-corpus.sh
+bash -n: ok
+--- timeout 1 s on a 1,178+-file corpus
+files=1178
+minimize-fuzz-corpus manifest_parser: before files=1178 du=4.7M
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         928G  187G  735G  21% /
+minimize-fuzz-corpus manifest_parser: merge exit=124 wall=1s log=/tmp/t3fix-clone/out/minimize-manifest_parser.log
+MERGE-OUTER: attempt 1
+==940938== libFuzzer: run interrupted; exiting
+==940925== libFuzzer: run interrupted; exiting
+::warning::minimize-fuzz-corpus manifest_parser: merge exceeded 1s; keeping the unminimized corpus
+exit=0
+listing before=9d3b0cebc0dcabfe1860beae47af057b5868e0162f4ac0705a8469d65bab7dcb  -
+listing after =9d3b0cebc0dcabfe1860beae47af057b5868e0162f4ac0705a8469d65bab7dcb  -
+fuzz dir entries: Cargo.lock Cargo.toml artifacts corpus fuzz_targets 
+corpus dir entries: manifest_parser 
+libFuzzerTemp files left in /tmp: 0
+--- success path
+before files=1178
+minimize-fuzz-corpus manifest_parser: before files=1178 du=4.7M
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         928G  187G  735G  21% /
+minimize-fuzz-corpus manifest_parser: merge exit=0 wall=2s log=/tmp/t3fix-clone/out/minimize-manifest_parser.log
+MERGE-OUTER: 1156 new files with 8701 new features added; 4507 new coverage edges
+minimize-fuzz-corpus manifest_parser: after files=1156 du=4.6M
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         928G  187G  735G  21% /
+exit=0
+fuzz dir entries: Cargo.lock Cargo.toml artifacts corpus fuzz_targets 
+libFuzzerTemp files left in /tmp: 0
+uploaded-path content check: dirs inside corpus: 0, non-hash-named files: 0

@@ -1,0 +1,11 @@
+   Compiling libc v0.2.186
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.9
+   Compiling arbitrary v1.4.2
+   Compiling jobserver v0.1.34
+   Compiling maos-exec-deps v1.0.0-rc.1 (/tmp/t3fix5-clone/crates/maos-exec-deps)
+   Compiling cc v1.2.65
+   Compiling libfuzzer-sys v0.4.13
+   Compiling maos-exec-deps-fuzz v0.0.0 (/tmp/t3fix5-clone/crates/maos-exec-deps/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.88s
+{"commit": "0000000000000000000000000000000000000000", "corpus_size": 3262, "cpu_seconds": 488, "run_id": "1-1", "target": "fuzz_exec_deps_parse_elf", "tier": "T3", "timestamp": "2026-11-12T14:52:54Z", "workers": 8}

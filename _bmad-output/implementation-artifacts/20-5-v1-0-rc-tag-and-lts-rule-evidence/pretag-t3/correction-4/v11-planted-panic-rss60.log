@@ -1,0 +1,60 @@
+##### rss_flag='-rss_limit_mb=60'  before listing=73ba2242ca6aeea6 files=12006
+minimize-fuzz-corpus manifest_parser: before files=12006 du_kib=48024
+minimize-fuzz-corpus manifest_parser: free_kib=769196120 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus manifest_parser: merge exit=0 wall=15s log=/tmp/t3fix5-clone/out/minimize-manifest_parser.log
+::error::T3 manifest_parser: input crashed during corpus merge; refusing evidence
+merge artifact: crash-63117ece56bd600e762d4adc88ebbb4fa375ebd0
+merge artifact: oom-23b24d38a476f26e16085c55b02185d4b307c927
+merge artifact: oom-23fd914f8f523ba5b63d8a2d56f2890834df1efc
+merge artifact: oom-2e462004bba026d70bfc1a8b890ad0ec507fa56c
+merge artifact: oom-337d513640c833b224b485d91c7995789663fd6f
+merge artifact: oom-8f79f3ae9ea8f995315fb3a364046d42cf8ec6ca
+merge artifact: oom-aa010596ebd7a4c518c421f7e91b07786b3560d4
+merge artifact: oom-bf83f55dacf175c0c8b0ba5a7894ea615facfdfa
+merge artifact: oom-c66037a684bb64475ed2f43862f23c3de5df67f2
+merge artifact: oom-d1ca98add08dc4447c5e7f01b1116b4afad6d214
+merge artifact: oom-da39a3ee5e6b4b0d3255bfef95601890afd80709
+merge artifact: oom-db55b0dbf54f90bf61f6c7479eb2fed254c16db2
+merge log marker: thread '<unnamed>' (1108569) panicked at fuzz_targets/manifest_parser.rs:26:9:
+merge log marker: ==1108569== ERROR: libFuzzer: deadly signal
+merge log marker: SUMMARY: libFuzzer: deadly signal
+merge log marker: ==1108573== ERROR: libFuzzer: out-of-memory (used: 180Mb; limit: 60Mb)
+merge log marker:    To change the out-of-memory limit use -rss_limit_mb=<N>
+script exit=1 wall=16s
+after listing=73ba2242ca6aeea6 files=12006 IDENTICAL artifacts=[crash-63117ece56bd600e762d4adc88ebbb4fa375ebd0 oom-da39a3ee5e6b4b0d3255bfef95601890afd80709 oom-db55b0dbf54f90bf61f6c7479eb2fed254c16db2 oom-8f79f3ae9ea8f995315fb3a364046d42cf8ec6ca oom-d1ca98add08dc4447c5e7f01b1116b4afad6d214 oom-aa010596ebd7a4c518c421f7e91b07786b3560d4 oom-2e462004bba026d70bfc1a8b890ad0ec507fa56c oom-23b24d38a476f26e16085c55b02185d4b307c927 oom-c66037a684bb64475ed2f43862f23c3de5df67f2 oom-337d513640c833b224b485d91c7995789663fd6f oom-bf83f55dacf175c0c8b0ba5a7894ea615facfdfa oom-23fd914f8f523ba5b63d8a2d56f2890834df1efc] marker_file=no scratch-left=0
+oom- artifacts: 11
+non-40-hex names in corpus: 11
+--- real merge command line (Running line of out/minimize-manifest_parser.log):
+     Running `crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser -artifact_prefix=crates/maos-manifest/fuzz/artifacts/manifest_parser/ -merge=1 -artifact_prefix=/tmp/t3fix5-clone/out/merge-crashes-manifest_parser/ -rss_limit_mb=60 /tmp/t3fix5-clone/crates/maos-manifest/fuzz/corpus-minimize-manifest_parser/merged /tmp/t3fix5-clone/crates/maos-manifest/fuzz/corpus/manifest_parser`
+--- merge log: MERGE-OUTER / ERROR / SUMMARY / MERGE-INNER failure lines:
+MERGE-OUTER: attempt 1
+==1108569== ERROR: libFuzzer: deadly signal
+NOTE: libFuzzer has rudimentary signal handlers.
+SUMMARY: libFuzzer: deadly signal
+MERGE-OUTER: attempt 2
+MERGE-INNER: '/tmp/t3fix5-clone/crates/maos-manifest/fuzz/corpus/manifest_parser/planted-input' caused a failure at the previous merge step
+==1108573== ERROR: libFuzzer: out-of-memory (used: 180Mb; limit: 60Mb)
+SUMMARY: libFuzzer: out-of-memory
+MERGE-OUTER: attempt 3
+MERGE-INNER: '/tmp/t3fix5-clone/crates/maos-manifest/fuzz/corpus/manifest_parser/b46a314d68ff6295004eeb555fd1621265bf313d' caused a failure at the previous merge step
+==1108603== ERROR: libFuzzer: out-of-memory (used: 188Mb; limit: 60Mb)
+SUMMARY: libFuzzer: out-of-memory
+MERGE-OUTER: attempt 4
+MERGE-INNER: '/tmp/t3fix5-clone/crates/maos-manifest/fuzz/corpus/manifest_parser/db55b0dbf54f90bf61f6c7479eb2fed254c16db2' caused a failure at the previous merge step
+==1108778== ERROR: libFuzzer: out-of-memory (used: 210Mb; limit: 60Mb)
+SUMMARY: libFuzzer: out-of-memory
+MERGE-OUTER: attempt 5
+MERGE-INNER: '/tmp/t3fix5-clone/crates/maos-manifest/fuzz/corpus/manifest_parser/8f79f3ae9ea8f995315fb3a364046d42cf8ec6ca' caused a failure at the previous merge step
+==1108782== ERROR: libFuzzer: out-of-memory (used: 208Mb; limit: 60Mb)
+SUMMARY: libFuzzer: out-of-memory
+MERGE-OUTER: attempt 6
+MERGE-INNER: '/tmp/t3fix5-clone/crates/maos-manifest/fuzz/corpus/manifest_parser/d1ca98add08dc4447c5e7f01b1116b4afad6d214' caused a failure at the previous merge step
+==1108785== ERROR: libFuzzer: out-of-memory (used: 203Mb; limit: 60Mb)
+SUMMARY: libFuzzer: out-of-memory
+MERGE-OUTER: attempt 7
+MERGE-INNER: '/tmp/t3fix5-clone/crates/maos-manifest/fuzz/corpus/manifest_parser/a7bb73ebd5fde6fc09ed3cc3e37497ab6109ee7a' caused a failure at the previous merge step
+==1108791== ERROR: libFuzzer: out-of-memory (used: 220Mb; limit: 60Mb)
+SUMMARY: libFuzzer: out-of-memory
+MERGE-OUTER: attempt 8
+MERGE-INNER: '/tmp/t3fix5-clone/crates/maos-manifest/fuzz/corpus/manifest_parser/aa010596ebd7a4c518c421f7e91b07786b3560d4' caused a failure at the previous merge step
+--- marker file out/merge-inconclusive-manifest_parser.txt (first 8 lines):

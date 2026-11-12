@@ -1,0 +1,17 @@
+## filesystem under test
+Filesystem     1024-blocks  Used Available Capacity Mounted on
+shm                  65536 12000     53536      19% /dev/shm
+Filesystem      Inodes IUsed   IFree IUse% Mounted on
+shm            8194303  3004 8191299    1% /dev/shm
+type=tmpfs
+## main fs
+overlay             0     0     0     - /
+type=overlayfs
+09f4ca77437ddec057eb56369c162268ba1d229c8396c54925685ec1bfa05fe0  -
+minimize-fuzz-corpus t3fix2_target: before files=3000 du_kib=12000
+minimize-fuzz-corpus t3fix2_target: free_kib=53536 free_inodes=8191296 total_inodes=8194303
+::warning::minimize-fuzz-corpus t3fix2_target: free space 53536 KiB < required 275344 KiB (corpus 12000 KiB x1.1 + 256 MiB); skipping the merge and keeping the unminimized corpus
+script exit=0
+09f4ca77437ddec057eb56369c162268ba1d229c8396c54925685ec1bfa05fe0  -
+corpus
+3000

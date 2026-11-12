@@ -1,0 +1,90 @@
+== validate_merged ==
+validate: correct dir, 5 files == MERGE-OUTER 5            rc=0/PASS accepted
+validate: truncated file (content no longer matches SHA-1 name) rc=1/PASS 1 file(s) whose SHA-1 differs from the file name (first: 59726d4825e57872fe70a7ec0a075284f15b9049): truncated or corrupt output
+validate: zero-byte file (fopen ok, write failed)          rc=1/PASS 1 file(s) whose SHA-1 differs from the file name (first: 058c5231768e10ab4ef986260250edc4916be8e4): truncated or corrupt output
+validate: count mismatch: MERGE-OUTER 6, dir has 5 (missing file) rc=1/PASS merged dir holds 5 regular files but MERGE-OUTER reported 6
+validate: count mismatch: MERGE-OUTER 4, dir has 5 (extra file) rc=1/PASS merged dir holds 5 regular files but MERGE-OUTER reported 4
+validate: missing 'MERGE-OUTER: N new files' line          rc=1/PASS no 'MERGE-OUTER: N new files' line in /tmp/t3fix3-vectors.06SIeZ/nomo.log
+validate: two 'new files' lines (ambiguous)                rc=1/PASS more than one 'MERGE-OUTER: N new files' line in /tmp/t3fix3-vectors.06SIeZ/dup.log
+validate: MERGE-OUTER: 0 new files, empty dir              rc=1/PASS merge reported 0 new files
+validate: subdirectory in merged dir                       rc=1/PASS non-regular entry in merged dir: /tmp/t3fix3-vectors.06SIeZ/subdir/sub
+validate: empty input correctly named da39a3ee... (valid libFuzzer output) rc=0/PASS accepted
+validate: dir path with space, '+' and '.' (name extraction) rc=0/PASS accepted
+== space_check (orig_kib orig_files free_kib free_inodes total_inodes) ==
+space: free exactly at the requirement                     rc=0/PASS ok
+space: free one KiB below the requirement                  rc=1/PASS free space 2352143 KiB < required 2352144 KiB (corpus 1900000 KiB x1.1 + 256 MiB)
+space: free == original only (no margin)                   rc=1/PASS free space 1900000 KiB < required 2352144 KiB (corpus 1900000 KiB x1.1 + 256 MiB)
+space: plenty of blocks, inodes 493838+1023                rc=1/PASS free inodes 494861 < required 494862 (corpus files 493838 + 1024)
+space: inodes exactly files+1024                           rc=0/PASS ok
+space: fs reports no inode table (total 0)                 rc=0/PASS ok
+space: unmeasurable free space                             rc=1/PASS cannot measure the corpus size or free space (orig_kib=1900000 files=493838 free_kib=)
+space: unmeasurable corpus size                            rc=1/PASS cannot measure the corpus size or free space (orig_kib=unknown files=unknown free_kib=9999999)
+space: tiny corpus: one KiB below 10+1+262144 KiB          rc=1/PASS free space 262154 KiB < required 262155 KiB (corpus 10 KiB x1.1 + 256 MiB)
+space: tiny corpus: exactly 10+1+262144 KiB                rc=0/PASS ok
+== classify_merge (0 CLEAN, 1 CONFIRMED, 2 INCONCLUSIVE) ==
+classify: crash- artifact, clean log (merge exit 0)        rc=1/PASS merge artifact: crash-0123|
+classify: slow-unit- artifact counts                       rc=1/PASS merge artifact: slow-unit-aa|
+classify: oom- artifact only: INCONCLUSIVE, names the file rc=2/PASS reason: only oom- artifact(s) were written (libFuzzer's RSS/malloc-limit dump, which it writes for whatever unit is curr
+classify: oom- only: reason says merge-process resource trip rc=2/PASS reason: only oom- artifact(s) were written (libFuzzer's RSS/malloc-limit dump, which it writes for whatever unit is curr
+classify: timeout- artifact counts                         rc=1/PASS merge artifact: timeout-cc|
+classify: leak- artifact counts                            rc=1/PASS merge artifact: leak-dd|
+classify: artifact + 'deadly signal' log                   rc=1/PASS merge artifact: crash-0123|merge log marker: ==77== ERROR: libFuzzer: deadly signal|merge log marker: thread panicked at
+classify: oom- artifact + OOM log (inner-process OOM)      rc=2/PASS reason: only oom- artifact(s) were written (libFuzzer's RSS/malloc-limit dump, which it writes for whatever unit is curr
+classify: artifact + unreadable log: artifact decides      rc=1/PASS merge artifact: crash-0123|
+classify: oom- + crash-: crash- wins (CONFIRMED)           rc=1/PASS merge artifact: crash-bb|merge artifact: oom-aa|
+classify: oom- + leak-: CONFIRMED                          rc=1/PASS merge artifact: leak-bb|merge artifact: oom-aa|
+classify: oom- + timeout-: CONFIRMED                       rc=1/PASS merge artifact: timeout-bb|merge artifact: oom-aa|
+classify: oom- + unknown prefix: CONFIRMED                 rc=1/PASS merge artifact: foo-unknown|merge artifact: oom-aa|
+classify: oom- + crash- + OOM log: CONFIRMED               rc=1/PASS merge artifact: crash-bb|merge artifact: oom-aa|merge log marker: ==9== ERROR: libFuzzer: out-of-memory (used: 3000Mb; l
+classify: 'oomx' (no dash) is not an oom- artifact         rc=1/PASS merge artifact: oomx|
+classify: 'my-oom-1' (oom- not a prefix) is CONFIRMED      rc=1/PASS merge artifact: my-oom-1|
+classify: 30 oom- + 1 timeout-: CONFIRMED, timeout- listed first despite the 20-name cap rc=1/PASS merge artifact: timeout-zz|merge artifact: oom-01|merge artifact: oom-02|merge artifact: oom-03|merge artifact: oom-04|m
+evidence capped at 20 artifact lines                       rc=0/PASS 
+classify: 30 oom- only: INCONCLUSIVE                       rc=2/PASS reason: only oom- artifact(s) were written (libFuzzer's RSS/malloc-limit dump, which it writes for whatever unit is curr
+classify: oom- file in a subdirectory only: INCONCLUSIVE   rc=2/PASS reason: only oom- artifact(s) were written (libFuzzer's RSS/malloc-limit dump, which it writes for whatever unit is curr
+classify: no artifact, 'ERROR: libFuzzer: out-of-memory' (outer RSS) rc=2/PASS reason: no input artifact was written but the merge log carries a crash/resource marker (an outer-process resource limit
+classify: no artifact, 'deadly signal' marker              rc=2/PASS reason: no input artifact was written but the merge log carries a crash/resource marker (an outer-process resource limit
+classify: no artifact, 'panicked at' marker                rc=2/PASS reason: no input artifact was written but the merge log carries a crash/resource marker (an outer-process resource limit
+classify: no artifact, 'ERROR: AddressSanitizer'           rc=2/PASS reason: no input artifact was written but the merge log carries a crash/resource marker (an outer-process resource limit
+classify: no artifact, bare 'out-of-memory' (SUMMARY)      rc=2/PASS reason: no input artifact was written but the merge log carries a crash/resource marker (an outer-process resource limit
+classify: unreadable log (missing file)                    rc=2/PASS reason: merge log /tmp/t3fix3-vectors.06SIeZ/nonexistent.log could not be scanned (exit 2)|
+classify: unreadable artifact dir (missing)                rc=2/PASS reason: artifact dir /tmp/t3fix3-vectors.06SIeZ/nodir could not be scanned (exit 1)|
+classify: unreadable artifact dir (chmod 000)              rc=2/PASS reason: artifact dir /tmp/t3fix3-vectors.06SIeZ/c6 could not be scanned (exit 1)|
+classify: unreadable log (chmod 000)                       rc=2/PASS reason: merge log /tmp/t3fix3-vectors.06SIeZ/c7.log could not be scanned (exit 2)|
+classify: artifact-dir scan timeout (find sleeps, b_scan=1) rc=2/PASS reason: artifact dir /tmp/t3fix3-vectors.06SIeZ/c0 could not be scanned (exit 124)|
+classify: log scan timeout (grep sleeps, b_scan=1)         rc=2/PASS reason: merge log /tmp/t3fix3-vectors.06SIeZ/clean.log could not be scanned (exit 124)|
+classify: no artifact, clean log                           rc=0/PASS |
+classify: no artifact, log with binary junk, no marker     rc=0/PASS |
+classify: dir with only an empty subdirectory (no regular file) rc=0/PASS |
+== record_inconclusive (warning + marker file) ==
+warning line                                               -         ::warning::minimize-fuzz-corpus vec: merge result inconclusive, not a confirmed input crash (merge exit 0): reason: no input artifact was written but the merge log carries a crash/resource marker (an outer-process resource limit or other minimizer in
+--- /tmp/t3fix3-vectors.06SIeZ/merge-inconclusive-vec.txt
+target: vec
+merge_exit: 0
+merge_log: /tmp/t3fix3-vectors.06SIeZ/minimize-vec.log
+artifact_dir: /tmp/t3fix3-vectors.06SIeZ/c0
+result: INCONCLUSIVE (original corpus kept)
+reason: no input artifact was written but the merge log carries a crash/resource marker (an outer-process resource limit or other minimizer infrastructure failure, not an input crash)
+merge log marker: ==9== ERROR: libFuzzer: out-of-memory (used: 3000Mb; limit: 2048Mb)
+merge log marker:    To change the out-of-memory limit use -rss_limit_mb=<N>
+merge log marker: SUMMARY: libFuzzer: out-of-memory
+---
+single ::warning:: line, marker file has reason + excerpt  rc=0/PASS 
+tee: /tmp/t3fix3-vectors.06SIeZ/no-such-dir/m.txt: No such file or directory
+unwritable marker file only warns                          rc=0/PASS 
+--- /tmp/t3fix3-vectors.06SIeZ/merge-inconclusive-oom.txt
+target: vec
+merge_exit: 0
+merge_log: /tmp/t3fix3-vectors.06SIeZ/minimize-vec.log
+artifact_dir: /tmp/t3fix3-vectors.06SIeZ/c0
+result: INCONCLUSIVE (original corpus kept)
+reason: only oom- artifact(s) were written (libFuzzer's RSS/malloc-limit dump, which it writes for whatever unit is current, even the empty one); that is a merge-process resource trip, not an attributable input crash
+merge artifact: oom-bb
+merge log marker: ==9== ERROR: libFuzzer: out-of-memory (used: 3000Mb; limit: 2048Mb)
+merge log marker:    To change the out-of-memory limit use -rss_limit_mb=<N>
+merge log marker: SUMMARY: libFuzzer: out-of-memory
+---
+oom- marker file names the oom- artifact, single warning   rc=0/PASS 
+== worst_case_seconds ==
+default limit 1200s                                        1659 s    27.65 min
+FAILS=0

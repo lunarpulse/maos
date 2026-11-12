@@ -1,0 +1,14 @@
+minimize-fuzz-corpus manifest_parser: before files=4152 du_kib=16608
+minimize-fuzz-corpus manifest_parser: free_kib=769806892 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus manifest_parser: merge exit=0 wall=5s log=/tmp/t3fix2-clone/out/minimize-manifest_parser.log
+::error::T3 manifest_parser: input crashed during corpus merge; refusing evidence
+merge artifact: crash-ac16d4adbf6e138379f3845fb75177b24f1a5340
+merge log marker: thread '<unnamed>' (982538) panicked at fuzz_targets/manifest_parser.rs:26:9:
+merge log marker: ==982538== ERROR: libFuzzer: deadly signal
+merge log marker: SUMMARY: libFuzzer: deadly signal
+
+real	0m5.310s
+user	0m4.836s
+sys	0m0.828s
+script exit=1
+LISTING IDENTICAL

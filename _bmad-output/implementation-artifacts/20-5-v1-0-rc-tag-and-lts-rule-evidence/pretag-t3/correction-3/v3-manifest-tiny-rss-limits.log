@@ -1,0 +1,80 @@
+##### rss_flag='-rss_limit_mb=1'  before listing=c1b8ab2a2733aa93 files=10027
+minimize-fuzz-corpus manifest_parser: before files=10027 du_kib=40108
+minimize-fuzz-corpus manifest_parser: free_kib=769482700 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus manifest_parser: merge exit=0 wall=17s log=/tmp/t3fix4-clone/out/minimize-manifest_parser.log
+MERGE-OUTER: the control file has 1503215 bytes
+MERGE-OUTER: 1207 new files with 8915 new features added; 4591 new coverage edges
+minimize-fuzz-corpus manifest_parser: merged output validated (count == MERGE-OUTER, sha1 == name) in 0s
+minimize-fuzz-corpus manifest_parser: after files=1207 du_kib=4828
+minimize-fuzz-corpus manifest_parser: free_kib=769482700 free_inodes=0
+script exit=0 wall=18s
+after listing=88f917dfd274849e files=1207 CHANGED artifacts=[] marker_file=no scratch-left=0
+oom- artifacts: 0
+non-40-hex names in corpus: 0
+--- real merge command line (Running line of out/minimize-manifest_parser.log):
+     Running `/mnt/build/cargo-maos/x86_64-unknown-linux-gnu/release/manifest_parser -artifact_prefix=crates/maos-manifest/fuzz/artifacts/manifest_parser/ -merge=1 -artifact_prefix=/tmp/t3fix4-clone/out/merge-crashes-manifest_parser/ -rss_limit_mb=1 -rss_limit_mb=0 /tmp/t3fix4-clone/crates/maos-manifest/fuzz/corpus-minimize-manifest_parser/merged /tmp/t3fix4-clone/crates/maos-manifest/fuzz/corpus/manifest_parser`
+--- merge log: MERGE-OUTER / ERROR / SUMMARY / MERGE-INNER failure lines:
+MERGE-OUTER: attempt 1
+MERGE-OUTER: successful in 1 attempt(s)
+MERGE-OUTER: 1207 new files with 8915 new features added; 4591 new coverage edges
+
+##### rss_flag='-rss_limit_mb=30'  before listing=c1b8ab2a2733aa93 files=10027
+minimize-fuzz-corpus manifest_parser: before files=10027 du_kib=40108
+minimize-fuzz-corpus manifest_parser: free_kib=769482700 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus manifest_parser: merge exit=0 wall=15s log=/tmp/t3fix4-clone/out/minimize-manifest_parser.log
+MERGE-OUTER: the control file has 1503229 bytes
+MERGE-OUTER: 1209 new files with 8917 new features added; 4591 new coverage edges
+minimize-fuzz-corpus manifest_parser: merged output validated (count == MERGE-OUTER, sha1 == name) in 0s
+minimize-fuzz-corpus manifest_parser: after files=1209 du_kib=4836
+minimize-fuzz-corpus manifest_parser: free_kib=769484320 free_inodes=0
+script exit=0 wall=15s
+after listing=f648036db7faff92 files=1209 CHANGED artifacts=[] marker_file=no scratch-left=0
+oom- artifacts: 0
+non-40-hex names in corpus: 0
+--- real merge command line (Running line of out/minimize-manifest_parser.log):
+     Running `/mnt/build/cargo-maos/x86_64-unknown-linux-gnu/release/manifest_parser -artifact_prefix=crates/maos-manifest/fuzz/artifacts/manifest_parser/ -merge=1 -artifact_prefix=/tmp/t3fix4-clone/out/merge-crashes-manifest_parser/ -rss_limit_mb=30 -rss_limit_mb=0 /tmp/t3fix4-clone/crates/maos-manifest/fuzz/corpus-minimize-manifest_parser/merged /tmp/t3fix4-clone/crates/maos-manifest/fuzz/corpus/manifest_parser`
+--- merge log: MERGE-OUTER / ERROR / SUMMARY / MERGE-INNER failure lines:
+MERGE-OUTER: attempt 1
+MERGE-OUTER: successful in 1 attempt(s)
+MERGE-OUTER: 1209 new files with 8917 new features added; 4591 new coverage edges
+
+##### rss_flag='-rss_limit_mb=100'  before listing=c1b8ab2a2733aa93 files=10027
+minimize-fuzz-corpus manifest_parser: before files=10027 du_kib=40108
+minimize-fuzz-corpus manifest_parser: free_kib=769484320 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus manifest_parser: merge exit=0 wall=13s log=/tmp/t3fix4-clone/out/minimize-manifest_parser.log
+MERGE-OUTER: the control file has 1503250 bytes
+MERGE-OUTER: 1213 new files with 8920 new features added; 4591 new coverage edges
+minimize-fuzz-corpus manifest_parser: merged output validated (count == MERGE-OUTER, sha1 == name) in 0s
+minimize-fuzz-corpus manifest_parser: after files=1213 du_kib=4852
+minimize-fuzz-corpus manifest_parser: free_kib=769484320 free_inodes=0
+script exit=0 wall=13s
+after listing=99888b80d8615741 files=1213 CHANGED artifacts=[] marker_file=no scratch-left=0
+oom- artifacts: 0
+non-40-hex names in corpus: 0
+--- real merge command line (Running line of out/minimize-manifest_parser.log):
+     Running `/mnt/build/cargo-maos/x86_64-unknown-linux-gnu/release/manifest_parser -artifact_prefix=crates/maos-manifest/fuzz/artifacts/manifest_parser/ -merge=1 -artifact_prefix=/tmp/t3fix4-clone/out/merge-crashes-manifest_parser/ -rss_limit_mb=100 -rss_limit_mb=0 /tmp/t3fix4-clone/crates/maos-manifest/fuzz/corpus-minimize-manifest_parser/merged /tmp/t3fix4-clone/crates/maos-manifest/fuzz/corpus/manifest_parser`
+--- merge log: MERGE-OUTER / ERROR / SUMMARY / MERGE-INNER failure lines:
+MERGE-OUTER: attempt 1
+MERGE-OUTER: successful in 1 attempt(s)
+MERGE-OUTER: 1213 new files with 8920 new features added; 4591 new coverage edges
+
+##### rss_flag='-rss_limit_mb=200'  before listing=c1b8ab2a2733aa93 files=10027
+minimize-fuzz-corpus manifest_parser: before files=10027 du_kib=40108
+minimize-fuzz-corpus manifest_parser: free_kib=769484320 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus manifest_parser: merge exit=0 wall=12s log=/tmp/t3fix4-clone/out/minimize-manifest_parser.log
+MERGE-OUTER: the control file has 1503208 bytes
+MERGE-OUTER: 1206 new files with 8914 new features added; 4591 new coverage edges
+minimize-fuzz-corpus manifest_parser: merged output validated (count == MERGE-OUTER, sha1 == name) in 0s
+minimize-fuzz-corpus manifest_parser: after files=1206 du_kib=4824
+minimize-fuzz-corpus manifest_parser: free_kib=769482172 free_inodes=0
+script exit=0 wall=12s
+after listing=4fd0740b342215da files=1206 CHANGED artifacts=[] marker_file=no scratch-left=0
+oom- artifacts: 0
+non-40-hex names in corpus: 0
+--- real merge command line (Running line of out/minimize-manifest_parser.log):
+     Running `/mnt/build/cargo-maos/x86_64-unknown-linux-gnu/release/manifest_parser -artifact_prefix=crates/maos-manifest/fuzz/artifacts/manifest_parser/ -merge=1 -artifact_prefix=/tmp/t3fix4-clone/out/merge-crashes-manifest_parser/ -rss_limit_mb=200 -rss_limit_mb=0 /tmp/t3fix4-clone/crates/maos-manifest/fuzz/corpus-minimize-manifest_parser/merged /tmp/t3fix4-clone/crates/maos-manifest/fuzz/corpus/manifest_parser`
+--- merge log: MERGE-OUTER / ERROR / SUMMARY / MERGE-INNER failure lines:
+MERGE-OUTER: attempt 1
+MERGE-OUTER: successful in 1 attempt(s)
+MERGE-OUTER: 1206 new files with 8914 new features added; 4591 new coverage edges
+

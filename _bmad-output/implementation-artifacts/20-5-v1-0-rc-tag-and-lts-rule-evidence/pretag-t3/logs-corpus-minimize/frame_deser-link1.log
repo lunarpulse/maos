@@ -1,0 +1,44 @@
+    Updating crates.io index
+     Locking 6 packages to highest compatible versions
+      Adding bitflags v2.13.2
+      Adding errno v0.3.15
+      Adding linux-raw-sys v0.12.1
+      Adding rustix v1.1.6
+      Adding windows-link v0.2.1
+      Adding windows-sys v0.61.2
+   Compiling maos-spirit-abi v1.0.0-rc.1 (/tmp/t3fix-clone/crates/maos-spirit-abi)
+   Compiling maos-domain v1.0.0-rc.1 (/tmp/t3fix-clone/crates/maos-domain)
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> /tmp/t3fix-clone/crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> /tmp/t3fix-clone/crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-domain-fuzz v0.0.0 (/tmp/t3fix-clone/crates/maos-domain/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 28.68s
+{"commit": "0000000000000000000000000000000000000000", "corpus_size": 493838, "cpu_seconds": 19324, "run_id": "777-1", "target": "frame_deser", "tier": "T3", "timestamp": "2026-11-12T12:56:18Z", "workers": 32}

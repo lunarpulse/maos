@@ -1,0 +1,4 @@
+bash -n scripts/minimize-fuzz-corpus.sh exit=0
+bash -n _bmad-output/implementation-artifacts/20-5-v1-0-rc-tag-and-lts-rule-evidence/pretag-t3/correction-4/real-run.sh exit=0
+bash -n _bmad-output/implementation-artifacts/20-5-v1-0-rc-tag-and-lts-rule-evidence/pretag-t3/correction-4/function-vectors.sh exit=0
+764ceeb3bbec7e0f9755003349cd402015104ed236de5a33d8f237a4dbd12c35  scripts/minimize-fuzz-corpus.sh

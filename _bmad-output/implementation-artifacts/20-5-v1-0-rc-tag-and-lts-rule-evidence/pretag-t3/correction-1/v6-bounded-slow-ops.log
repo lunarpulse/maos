@@ -1,0 +1,29 @@
+### P2-a: every 'du' hangs (600 s sleep): measure() gives up after 15+2 s per call; size unknown -> merge skipped, original kept
+listing before=71d92ad2f745ae4e
+minimize-fuzz-corpus slow_du: before files=20 du_kib=unknown
+minimize-fuzz-corpus slow_du: free_kib=769318164 free_inodes=0 total_inodes=0
+::warning::minimize-fuzz-corpus slow_du: cannot measure the corpus size or free space (orig_kib=unknown files=20 free_kib=769318164); skipping the merge and keeping the unminimized corpus
+script exit=0 wall=15s
+listing after=71d92ad2f745ae4e scratch-left=0
+### P2-b: 'sha1sum' hangs: validation stops at 60+2 s, merged output rejected, original kept
+listing before=71d92ad2f745ae4e
+minimize-fuzz-corpus slow_sha: before files=20 du_kib=80
+minimize-fuzz-corpus slow_sha: free_kib=769318164 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus slow_sha: merge exit=0 wall=0s log=/tmp/t3fix2-clone/out/minimize-slow_sha.log
+MERGE-OUTER: 8 new files with 1 new features added; 1 new coverage edges
+::warning::minimize-fuzz-corpus slow_sha: merged corpus rejected (sha1sum over /tmp/t3fix2-clone/crates/maos-domain/fuzz/corpus-minimize-slow_sha/merged failed or exceeded 60s ()); keeping the unminimized corpus
+script exit=0 wall=60s
+listing after=71d92ad2f745ae4e scratch-left=0
+### P2-c: every 'rm' hangs: initial scratch rm, deletion of the replaced corpus and the EXIT-trap rm all give up at their bounds; corpus/<t>/ holds the complete merged corpus; the replaced corpus is left OUTSIDE corpus/<t>/
+listing before=71d92ad2f745ae4e files=20
+minimize-fuzz-corpus slow_rm: before files=20 du_kib=80
+minimize-fuzz-corpus slow_rm: free_kib=769315996 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus slow_rm: merge exit=0 wall=0s log=/tmp/t3fix2-clone/out/minimize-slow_rm.log
+MERGE-OUTER: 8 new files with 1 new features added; 1 new coverage edges
+minimize-fuzz-corpus slow_rm: merged output validated (count == MERGE-OUTER, sha1 == name) in 0s
+minimize-fuzz-corpus slow_rm: after files=8 du_kib=32
+::warning::minimize-fuzz-corpus slow_rm: could not delete the replaced corpus at /tmp/t3fix2-clone/crates/maos-domain/fuzz/corpus-minimize-slow_rm/old within 45s (left outside the upload path)
+minimize-fuzz-corpus slow_rm: free_kib=769327472 free_inodes=0
+script exit=0 wall=80s
+corpus after: files=8 listing=21a77d23c409613b; leftover (outside corpus/<t>/): old tmp  old-files=20
+upload-path check: ls corpus/ -> fake_crash fake_good fake_marker fake_missing fake_nomerge fake_truncated frame_deser no_such_target slow_du slow_rm slo

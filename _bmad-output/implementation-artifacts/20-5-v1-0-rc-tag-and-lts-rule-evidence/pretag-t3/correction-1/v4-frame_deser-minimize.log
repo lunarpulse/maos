@@ -1,0 +1,13 @@
+minimize-fuzz-corpus frame_deser: before files=392647 du_kib=1570588
+minimize-fuzz-corpus frame_deser: free_kib=769695060 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus frame_deser: merge exit=0 wall=364s log=/tmp/t3fix2-clone/out/minimize-frame_deser.log
+MERGE-OUTER: the control file has 55761392 bytes
+MERGE-OUTER: 18356 new files with 51386 new features added; 26056 new coverage edges
+minimize-fuzz-corpus frame_deser: merged output validated (count == MERGE-OUTER, sha1 == name) in 0s
+minimize-fuzz-corpus frame_deser: after files=18356 du_kib=73424
+minimize-fuzz-corpus frame_deser: free_kib=769568908 free_inodes=0
+
+real	6m12.161s
+user	6m9.567s
+sys	0m17.303s
+script exit=0

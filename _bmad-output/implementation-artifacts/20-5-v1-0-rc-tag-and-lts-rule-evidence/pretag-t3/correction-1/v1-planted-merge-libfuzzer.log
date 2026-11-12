@@ -1,0 +1,205 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> /tmp/t3fix2-clone/crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> /tmp/t3fix2-clone/crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused variable: `on_confidence_below`
+    --> /tmp/t3fix2-clone/crates/maos-manifest/src/manifest.rs:1434:21
+     |
+1434 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+   Compiling maos-manifest-fuzz v0.0.0 (/tmp/t3fix2-clone/crates/maos-manifest/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.48s
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> /tmp/t3fix2-clone/crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> /tmp/t3fix2-clone/crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused variable: `on_confidence_below`
+    --> /tmp/t3fix2-clone/crates/maos-manifest/src/manifest.rs:1434:21
+     |
+1434 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running `crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser -artifact_prefix=crates/maos-manifest/fuzz/artifacts/manifest_parser/ -merge=1 -artifact_prefix=/tmp/t3fix2-clone/out/merge-crashes-manifest_parser/ /tmp/t3fix2-clone/crates/maos-manifest/fuzz/corpus-minimize-manifest_parser/merged /tmp/t3fix2-clone/crates/maos-manifest/fuzz/corpus/manifest_parser`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1672472392
+INFO: Loaded 1 modules   (44905 inline 8-bit counters): 44905 [0x55b8fbea7880, 0x55b8fbeb27e9), 
+INFO: Loaded 1 PC tables (44905 PCs): 44905 [0x55b8fbeb27f0,0x55b8fbf61e80), 
+MERGE-OUTER: 4152 files, 0 in the initial corpus, 0 processed earlier
+MERGE-OUTER: attempt 1
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1694461395
+INFO: Loaded 1 modules   (44905 inline 8-bit counters): 44905 [0x556b009fe880, 0x556b00a097e9), 
+INFO: Loaded 1 PC tables (44905 PCs): 44905 [0x556b00a097f0,0x556b00ab8e80), 
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 1048576 bytes
+MERGE-INNER: using the control file '/tmp/t3fix2-clone/crates/maos-manifest/fuzz/corpus-minimize-manifest_parser/tmp/libFuzzerTemp.Merge982525.txt'
+MERGE-INNER: 4152 total files; 0 processed earlier; will process 4152 files now
+#1	pulse  cov: 992 ft: 993 exec/s: 0 rss: 52Mb
+#2	pulse  cov: 1172 ft: 1255 exec/s: 0 rss: 53Mb
+#4	pulse  cov: 1299 ft: 1410 exec/s: 0 rss: 53Mb
+#8	pulse  cov: 1384 ft: 1509 exec/s: 0 rss: 53Mb
+#16	pulse  cov: 1431 ft: 1586 exec/s: 0 rss: 54Mb
+#32	pulse  cov: 1479 ft: 1653 exec/s: 0 rss: 55Mb
+#64	pulse  cov: 2078 ft: 2370 exec/s: 0 rss: 56Mb
+#128	pulse  cov: 2199 ft: 2550 exec/s: 0 rss: 59Mb
+#256	pulse  cov: 2453 ft: 2989 exec/s: 0 rss: 65Mb
+#512	pulse  cov: 3032 ft: 3853 exec/s: 0 rss: 78Mb
+
+thread '<unnamed>' (982538) panicked at fuzz_targets/manifest_parser.rs:26:9:
+planted merge crash
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/f7575a9da8e4a4fca3b5668d5a2ea7476db44b3f/library/std/src/panicking.rs:676:5
+   1: core::panicking::panic_fmt
+             at /rustc/f7575a9da8e4a4fca3b5668d5a2ea7476db44b3f/library/core/src/panicking.rs:80:14
+   2: __libfuzzer_sys_run
+             at ./crates/maos-manifest/fuzz/fuzz_targets/manifest_parser.rs:26:9
+   3: rust_fuzzer_test_input
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libfuzzer-sys-0.4.13/src/lib.rs:276:60
+   4: {closure#0}
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libfuzzer-sys-0.4.13/src/lib.rs:62:9
+   5: do_call<libfuzzer_sys::test_input_wrap::{closure_env#0}, i32>
+             at /rustc/f7575a9da8e4a4fca3b5668d5a2ea7476db44b3f/library/std/src/panicking.rs:573:43
+   6: __rust_try
+   7: catch_unwind<i32, libfuzzer_sys::test_input_wrap::{closure_env#0}>
+             at /rustc/f7575a9da8e4a4fca3b5668d5a2ea7476db44b3f/library/std/src/panicking.rs:541:19
+   8: catch_unwind<libfuzzer_sys::test_input_wrap::{closure_env#0}, i32>
+             at /rustc/f7575a9da8e4a4fca3b5668d5a2ea7476db44b3f/library/std/src/panic.rs:359:14
+   9: test_input_wrap
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libfuzzer-sys-0.4.13/src/lib.rs:60:22
+  10: _ZN6fuzzer6Fuzzer15ExecuteCallbackEPKhm
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libfuzzer-sys-0.4.13/libfuzzer/FuzzerLoop.cpp:619:15
+  11: _ZN6fuzzer6Fuzzer31CrashResistantMergeInternalStepERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEb
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libfuzzer-sys-0.4.13/libfuzzer/FuzzerMerge.cpp:239:20
+  12: _ZN6fuzzer12FuzzerDriverEPiPPPcPFiPKhmE
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libfuzzer-sys-0.4.13/libfuzzer/FuzzerDriver.cpp:896:39
+  13: main
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libfuzzer-sys-0.4.13/libfuzzer/FuzzerMain.cpp:20:30
+  14: <unknown>
+  15: __libc_start_main
+  16: _start
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+==982538== ERROR: libFuzzer: deadly signal
+    #0 0x556b00676911  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x292911) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #1 0x556b00985baa  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x5a1baa) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #2 0x556b009369e5  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x5529e5) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #3 0x7f2fcac10d6f  (/lib/x86_64-linux-gnu/libc.so.6+0x3fd6f) (BuildId: 5e5b51f4c39af9ac589408c1dc432ba390a273cc)
+    #4 0x7f2fcac6569b  (/lib/x86_64-linux-gnu/libc.so.6+0x9469b) (BuildId: 5e5b51f4c39af9ac589408c1dc432ba390a273cc)
+    #5 0x7f2fcac10c41  (/lib/x86_64-linux-gnu/libc.so.6+0x3fc41) (BuildId: 5e5b51f4c39af9ac589408c1dc432ba390a273cc)
+    #6 0x7f2fcabf94ab  (/lib/x86_64-linux-gnu/libc.so.6+0x284ab) (BuildId: 5e5b51f4c39af9ac589408c1dc432ba390a273cc)
+    #7 0x556b009ad399  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x5c9399) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #8 0x556b009aa698  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x5c6698) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #9 0x556b0092f414  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x54b414) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #10 0x556b009aa921  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x5c6921) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #11 0x556b00998003  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x5b4003) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #12 0x556b00990ea8  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x5acea8) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #13 0x556b00998a9c  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x5b4a9c) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #14 0x556b009c2c1b  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x5dec1b) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #15 0x556b006a41f0  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x2c01f0) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #16 0x556b006a6015  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x2c2015) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #17 0x556b0092efa4  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x54afa4) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #18 0x556b0092fbe8  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x54bbe8) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #19 0x556b0092e69d  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x54a69d) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #20 0x556b00936f54  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x552f54) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #21 0x556b009757e7  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x5917e7) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #22 0x556b00953188  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x56f188) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #23 0x556b0096a782  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x586782) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+    #24 0x7f2fcabfaca7  (/lib/x86_64-linux-gnu/libc.so.6+0x29ca7) (BuildId: 5e5b51f4c39af9ac589408c1dc432ba390a273cc)
+    #25 0x7f2fcabfad64  (/lib/x86_64-linux-gnu/libc.so.6+0x29d64) (BuildId: 5e5b51f4c39af9ac589408c1dc432ba390a273cc)
+    #26 0x556b005d70e0  (/tmp/t3fix2-clone/crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser+0x1f30e0) (BuildId: 2a011042e2d0e7975b99a4bc03641ea35699218e)
+
+NOTE: libFuzzer has rudimentary signal handlers.
+      Combine libFuzzer with AddressSanitizer or similar for better crash reports.
+SUMMARY: libFuzzer: deadly signal
+MS: 0 ; base unit: 0000000000000000000000000000000000000000
+0x54,0x33,0x2d,0x4d,0x45,0x52,0x47,0x45,0x2d,0x50,0x4c,0x41,0x4e,0x54,0x2d,0x69,0x6e,0x70,0x75,0x74,
+T3-MERGE-PLANT-input
+artifact_prefix='/tmp/t3fix2-clone/out/merge-crashes-manifest_parser/'; Test unit written to /tmp/t3fix2-clone/out/merge-crashes-manifest_parser/crash-ac16d4adbf6e138379f3845fb75177b24f1a5340
+Base64: VDMtTUVSR0UtUExBTlQtaW5wdXQ=
+MERGE-OUTER: attempt 2
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1935371525
+INFO: Loaded 1 modules   (44905 inline 8-bit counters): 44905 [0x5632ebfc9880, 0x5632ebfd47e9), 
+INFO: Loaded 1 PC tables (44905 PCs): 44905 [0x5632ebfd47f0,0x5632ec083e80), 
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 1048576 bytes
+MERGE-INNER: using the control file '/tmp/t3fix2-clone/crates/maos-manifest/fuzz/corpus-minimize-manifest_parser/tmp/libFuzzerTemp.Merge982525.txt'
+MERGE-INNER: '/tmp/t3fix2-clone/crates/maos-manifest/fuzz/corpus/manifest_parser/aaaa-marker-input' caused a failure at the previous merge step
+MERGE-INNER: 4152 total files; 522 processed earlier; will process 3630 files now
+#1	pulse  cov: 866 ft: 867 exec/s: 0 rss: 52Mb
+#2	pulse  cov: 908 ft: 1008 exec/s: 0 rss: 52Mb
+#4	pulse  cov: 931 ft: 1080 exec/s: 0 rss: 52Mb
+#8	pulse  cov: 1110 ft: 1309 exec/s: 0 rss: 53Mb
+#16	pulse  cov: 2140 ft: 2499 exec/s: 0 rss: 54Mb
+#32	pulse  cov: 2281 ft: 2688 exec/s: 0 rss: 55Mb
+#64	pulse  cov: 2490 ft: 3240 exec/s: 0 rss: 57Mb
+#128	pulse  cov: 2723 ft: 3574 exec/s: 0 rss: 62Mb
+#256	pulse  cov: 2854 ft: 3807 exec/s: 0 rss: 74Mb
+#512	pulse  cov: 3046 ft: 4311 exec/s: 0 rss: 98Mb
+#1024	pulse  cov: 3334 ft: 4878 exec/s: 0 rss: 155Mb
+#2048	pulse  cov: 3546 ft: 5661 exec/s: 2048 rss: 287Mb
+#3630	DONE   cov: 3655 ft: 6492 exec/s: 907 rss: 558Mb
+MERGE-OUTER: successful in 2 attempt(s)
+MERGE-OUTER: the control file has 692880 bytes
+MERGE-OUTER: consumed 0Mb (51Mb rss) to parse the control file
+MERGE-OUTER: 719 new files with 6635 new features added; 3764 new coverage edges

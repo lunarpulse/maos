@@ -1,0 +1,4 @@
+files: 493838
+1.9G	crates/maos-domain/fuzz/corpus/frame_deser
+79M	crates/maos-domain/fuzz/corpus/frame_deser
+e7ec88f8a84e4e23b22fcbc37a67346b87f40f646d9476524afa0d9348f5c7bf  out/record-frame_deser-1.json

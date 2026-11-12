@@ -1,0 +1,92 @@
+##### (a) timeout 1 s on real target frame_deser
+[before] files=39256 listing-sha256=6215c1dda92a1b0c8f5b3dbbb4c9626bdc7b4a708e43c5afbaee59b18c7ab204
+[before] records:
+e7ec88f8a84e4e23b22fcbc37a67346b87f40f646d9476524afa0d9348f5c7bf  out/record-frame_deser-1.json
+e7a594dc020d2e3a337b421854b4d87e747e00ab93eb42fe4f2691c42369fe36  out/record-frame_deser-2.json
+[before] fuzz dir entries: Cargo.lock Cargo.toml artifacts corpus fuzz_targets 
+[before] corpus dir entries: frame_deser 
+minimize-fuzz-corpus frame_deser: before files=39256 du=154M
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         928G  187G  735G  21% /
+minimize-fuzz-corpus frame_deser: merge exit=124 wall=1s log=/tmp/t3fix-clone/out/minimize-frame_deser.log
+INFO: Seed: 2203159097
+INFO: Loaded 1 modules   (108940 inline 8-bit counters): 108940 [0x55ec660febf0, 0x55ec6611957c), 
+INFO: Loaded 1 PC tables (108940 PCs): 108940 [0x55ec66119580,0x55ec662c2e40), 
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 1048576 bytes
+MERGE-INNER: using the control file '/tmp/libFuzzerTemp.Merge932293.txt'
+MERGE-INNER: 39256 total files; 0 processed earlier; will process 39256 files now
+#1	pulse  cov: 85 ft: 86 exec/s: 0 rss: 46Mb
+#2	pulse  cov: 87 ft: 88 exec/s: 0 rss: 46Mb
+#4	pulse  cov: 117 ft: 119 exec/s: 0 rss: 46Mb
+#8	pulse  cov: 134 ft: 138 exec/s: 0 rss: 47Mb
+#16	pulse  cov: 201 ft: 214 exec/s: 0 rss: 47Mb
+#32	pulse  cov: 244 ft: 276 exec/s: 0 rss: 48Mb
+#64	pulse  cov: 427 ft: 465 exec/s: 0 rss: 49Mb
+#128	pulse  cov: 557 ft: 604 exec/s: 0 rss: 51Mb
+#256	pulse  cov: 1015 ft: 1123 exec/s: 0 rss: 55Mb
+#512	pulse  cov: 1459 ft: 1640 exec/s: 0 rss: 61Mb
+#1024	pulse  cov: 3059 ft: 3338 exec/s: 0 rss: 69Mb
+#2048	pulse  cov: 5691 ft: 6196 exec/s: 0 rss: 83Mb
+==932305== libFuzzer: run interrupted; exiting
+==932293== libFuzzer: run interrupted; exiting
+::warning::minimize-fuzz-corpus frame_deser: merge exceeded 1s; keeping the unminimized corpus
+script exit=0
+[after] files=39256 listing-sha256=6215c1dda92a1b0c8f5b3dbbb4c9626bdc7b4a708e43c5afbaee59b18c7ab204
+[after] records:
+e7ec88f8a84e4e23b22fcbc37a67346b87f40f646d9476524afa0d9348f5c7bf  out/record-frame_deser-1.json
+e7a594dc020d2e3a337b421854b4d87e747e00ab93eb42fe4f2691c42369fe36  out/record-frame_deser-2.json
+[after] fuzz dir entries: Cargo.lock Cargo.toml artifacts corpus fuzz_targets 
+[after] corpus dir entries: frame_deser 
+
+##### (b) nonexistent target (corpus dir present, 3 files; cargo fuzz run must fail)
+[before] files=3 listing-sha256=6cc38a7759f8046af48b352342530191eaf092f674b5e4f0505ab1c3988a6904
+[before] records:
+e7ec88f8a84e4e23b22fcbc37a67346b87f40f646d9476524afa0d9348f5c7bf  out/record-frame_deser-1.json
+e7a594dc020d2e3a337b421854b4d87e747e00ab93eb42fe4f2691c42369fe36  out/record-frame_deser-2.json
+minimize-fuzz-corpus no_such_target: before files=3 du=12K
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         928G  187G  735G  21% /
+minimize-fuzz-corpus no_such_target: merge exit=1 wall=0s log=/tmp/t3fix-clone/out/minimize-no_such_target.log
+error: no bin target named `no_such_target` in default-run packages
+help: available bin targets:
+    frame_deser
+Error: failed to build fuzz script: ASAN_OPTIONS="allocator_may_return_null=1:detect_leaks=0:detect_odr_violation=0" RUSTFLAGS=" -Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4 -Cllvm-args=-sanitizer-coverage-inline-8bit-counters -Cllvm-args=-sanitizer-coverage-pc-table -Cllvm-args=-sanitizer-coverage-trace-compares --cfg fuzzing -Cllvm-args=-simplifycfg-branch-fold-threshold=0 -Zsanitizer=address -Cllvm-args=-sanitizer-coverage-stack-depth -Cdebug-assertions -Ccodegen-units=1" "cargo" "build" "--manifest-path" "crates/maos-domain/fuzz/Cargo.toml" "--target" "x86_64-unknown-linux-gnu" "--release" "--config" "profile.release.debug=\"line-tables-only\"" "--bin" "no_such_target"
+
+Stack backtrace:
+   0: <anyhow::Error>::msg::<alloc::string::String>
+   1: <cargo_fuzz::project::FuzzProject>::exec_build
+   2: <cargo_fuzz::project::FuzzProject>::exec_fuzz
+   3: cargo_fuzz::main
+   4: std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), anyhow::Error>, core::result::Result<(), anyhow::Error>>
+   5: std::rt::lang_start::<core::result::Result<(), anyhow::Error>>::{closure#0}
+   6: std::rt::lang_start_internal
+   7: main
+   8: <unknown>
+   9: __libc_start_main
+  10: _start
+::warning::minimize-fuzz-corpus no_such_target: merge failed with exit 1; keeping the unminimized corpus
+script exit=0
+[after] files=3 listing-sha256=6cc38a7759f8046af48b352342530191eaf092f674b5e4f0505ab1c3988a6904
+[after] records:
+e7ec88f8a84e4e23b22fcbc37a67346b87f40f646d9476524afa0d9348f5c7bf  out/record-frame_deser-1.json
+e7a594dc020d2e3a337b421854b4d87e747e00ab93eb42fe4f2691c42369fe36  out/record-frame_deser-2.json
+[after] fuzz dir entries: Cargo.lock Cargo.toml artifacts corpus fuzz_targets 
+[after] corpus dir entries: frame_deser no_such_target 
+
+##### (b2) nonexistent target, no corpus dir at all
+::warning::minimize-fuzz-corpus never_created: corpus dir /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/never_created missing; nothing to do
+script exit=0
+[after] fuzz dir entries: Cargo.lock Cargo.toml artifacts corpus fuzz_targets 
+[after] corpus dir entries: frame_deser no_such_target 
+
+##### (d) real target, EMPTY corpus dir (merge may exit 0 with nothing)
+(uses the frame_deser fuzz dir; target frame_deser is not usable with a differently named dir, so probe via a copy)
+[before] files=0 listing-sha256=abcfa6a9d4df344d1781bc2560b5e4cdcae08b39ed303063535e7e1e926a304a
+minimize-fuzz-corpus frame_deser: before files=0 du=0
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         928G  187G  735G  21% /
+minimize-fuzz-corpus frame_deser: merge exit=0 wall=1s log=/tmp/t3fix-clone/out/minimize-frame_deser.log
+::warning::minimize-fuzz-corpus frame_deser: merge produced an empty corpus; keeping the unminimized corpus
+script exit=0
+[after] files=0 listing-sha256=abcfa6a9d4df344d1781bc2560b5e4cdcae08b39ed303063535e7e1e926a304a
+[restored] files=39256 listing-sha256=6215c1dda92a1b0c8f5b3dbbb4c9626bdc7b4a708e43c5afbaee59b18c7ab204

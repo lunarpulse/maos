@@ -1,0 +1,29 @@
+## link-1: 32 workers, full 392,647-file corpus: last 'DONE' line per worker, distinct cov values (count of workers)
+      4 cov: 25992
+      4 cov: 26000
+      3 cov: 26001
+      1 cov: 26004
+      6 cov: 26005
+      1 cov: 26006
+      2 cov: 26010
+      1 cov: 26032
+      4 cov: 26033
+      1 cov: 26035
+      2 cov: 26037
+      2 cov: 26040
+      1 cov: 26041
+## link-2 resumed from the MINIMIZED corpus (18,356 files): INITED lines (4 workers)
+#18357	INITED cov: 26041 ft: 51367 corp: 18180/1751Kb exec/s: 9178 rss: 205Mb
+#18357	INITED cov: 26041 ft: 51370 corp: 18180/1750Kb exec/s: 6119 rss: 205Mb
+#18357	INITED cov: 26041 ft: 51368 corp: 18190/1750Kb exec/s: 9178 rss: 205Mb
+#18357	INITED cov: 26041 ft: 51371 corp: 18182/1751Kb exec/s: 9178 rss: 205Mb
+## Loaded lines (workers load the corpus incl. files the other workers added meanwhile)
+Loaded 1024/44785 files from /tmp/t3fix2-clone/crates/maos-domain/fuzz/corpus/frame_deser
+Loaded 1024/46721 files from /tmp/t3fix2-clone/crates/maos-domain/fuzz/corpus/frame_deser
+## record
+{"commit": "2e643952deadbeefdeadbeefdeadbeefdeadbeef", "corpus_size": 47866, "cpu_seconds": 244, "run_id": "999-2", "target": "frame_deser", "tier": "T3", "timestamp": "2026-11-12T13:48:57Z", "workers": 4}
+
+out/logs-frame_deser-2/worker-0.log:0
+out/logs-frame_deser-2/worker-1.log:0
+out/logs-frame_deser-2/worker-2.log:0
+out/logs-frame_deser-2/worker-3.log:0

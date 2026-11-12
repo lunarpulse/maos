@@ -1,0 +1,7 @@
+minimize-fuzz-corpus frame_deser: before files=493838 du=1.9G
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         928G  188G  735G  21% /
+minimize-fuzz-corpus frame_deser: merge exit=0 wall=690s log=/tmp/t3fix-clone/out/minimize-frame_deser.log
+minimize-fuzz-corpus frame_deser: after files=22879 du=90M
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         928G  188G  735G  21% /

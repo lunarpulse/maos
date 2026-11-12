@@ -1,0 +1,19 @@
+##### rss_flag='-rss_limit_mb=0'  before listing=2d83396d366b3489 files=101379
+minimize-fuzz-corpus frame_deser: before files=101379 du_kib=405516
+minimize-fuzz-corpus frame_deser: free_kib=769397724 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus frame_deser: merge exit=0 wall=109s log=/tmp/t3fix4-clone/out/minimize-frame_deser.log
+MERGE-OUTER: the control file has 14417652 bytes
+MERGE-OUTER: 13644 new files with 41594 new features added; 21734 new coverage edges
+minimize-fuzz-corpus frame_deser: merged output validated (count == MERGE-OUTER, sha1 == name) in 0s
+minimize-fuzz-corpus frame_deser: after files=13644 du_kib=54576
+minimize-fuzz-corpus frame_deser: free_kib=769383940 free_inodes=0
+script exit=0 wall=113s
+after listing=3ea8d47329d97e8e files=13644 CHANGED artifacts=[] marker_file=no scratch-left=0
+oom- artifacts: 0
+non-40-hex names in corpus: 0
+--- real merge command line (Running line of out/minimize-frame_deser.log):
+     Running `crates/maos-domain/fuzz/target/x86_64-unknown-linux-gnu/release/frame_deser -artifact_prefix=crates/maos-domain/fuzz/artifacts/frame_deser/ -merge=1 -artifact_prefix=/tmp/t3fix4-clone/out/merge-crashes-frame_deser/ -rss_limit_mb=0 -rss_limit_mb=0 /tmp/t3fix4-clone/crates/maos-domain/fuzz/corpus-minimize-frame_deser/merged /tmp/t3fix4-clone/crates/maos-domain/fuzz/corpus/frame_deser`
+--- merge log: MERGE-OUTER / ERROR / SUMMARY / MERGE-INNER failure lines:
+MERGE-OUTER: attempt 1
+MERGE-OUTER: successful in 1 attempt(s)
+MERGE-OUTER: 13644 new files with 41594 new features added; 21734 new coverage edges

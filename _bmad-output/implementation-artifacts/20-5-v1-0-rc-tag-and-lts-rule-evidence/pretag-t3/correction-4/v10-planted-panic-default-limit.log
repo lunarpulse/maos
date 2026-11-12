@@ -1,0 +1,25 @@
+##### rss_flag=''  before listing=73ba2242ca6aeea6 files=12006
+minimize-fuzz-corpus manifest_parser: before files=12006 du_kib=48024
+minimize-fuzz-corpus manifest_parser: free_kib=769202480 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus manifest_parser: merge exit=0 wall=20s log=/tmp/t3fix5-clone/out/minimize-manifest_parser.log
+::error::T3 manifest_parser: input crashed during corpus merge; refusing evidence
+merge artifact: crash-63117ece56bd600e762d4adc88ebbb4fa375ebd0
+merge log marker: thread '<unnamed>' (1107375) panicked at fuzz_targets/manifest_parser.rs:26:9:
+merge log marker: ==1107375== ERROR: libFuzzer: deadly signal
+merge log marker: SUMMARY: libFuzzer: deadly signal
+script exit=1 wall=21s
+after listing=73ba2242ca6aeea6 files=12006 IDENTICAL artifacts=[crash-63117ece56bd600e762d4adc88ebbb4fa375ebd0] marker_file=no scratch-left=0
+oom- artifacts: 0
+non-40-hex names in corpus: 11
+--- real merge command line (Running line of out/minimize-manifest_parser.log):
+     Running `crates/maos-manifest/fuzz/target/x86_64-unknown-linux-gnu/release/manifest_parser -artifact_prefix=crates/maos-manifest/fuzz/artifacts/manifest_parser/ -merge=1 -artifact_prefix=/tmp/t3fix5-clone/out/merge-crashes-manifest_parser/ /tmp/t3fix5-clone/crates/maos-manifest/fuzz/corpus-minimize-manifest_parser/merged /tmp/t3fix5-clone/crates/maos-manifest/fuzz/corpus/manifest_parser`
+--- merge log: MERGE-OUTER / ERROR / SUMMARY / MERGE-INNER failure lines:
+MERGE-OUTER: attempt 1
+==1107375== ERROR: libFuzzer: deadly signal
+NOTE: libFuzzer has rudimentary signal handlers.
+SUMMARY: libFuzzer: deadly signal
+MERGE-OUTER: attempt 2
+MERGE-INNER: '/tmp/t3fix5-clone/crates/maos-manifest/fuzz/corpus/manifest_parser/planted-input' caused a failure at the previous merge step
+MERGE-OUTER: successful in 2 attempt(s)
+MERGE-OUTER: 1289 new files with 9271 new features added; 4780 new coverage edges
+--- marker file out/merge-inconclusive-manifest_parser.txt (first 8 lines):

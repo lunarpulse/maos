@@ -1,0 +1,31 @@
+== INITED / load lines, worker-0 of link 2 ==
+#22880	INITED cov: 31881 ft: 64532 corp: 22647/2374Kb exec/s: 5720 rss: 265Mb
+Loaded 1024/23310 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+Loaded 2048/23310 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+Loaded 4096/23310 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+Loaded 8192/23310 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+#22880	INITED cov: 31881 ft: 64532 corp: 22649/2373Kb exec/s: 4576 rss: 265Mb
+Loaded 1024/23410 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+Loaded 2048/23410 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+Loaded 4096/23410 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+Loaded 8192/23410 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+#22880	INITED cov: 31881 ft: 64532 corp: 22643/2372Kb exec/s: 4576 rss: 265Mb
+Loaded 1024/23423 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+Loaded 2048/23423 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+Loaded 4096/23423 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+Loaded 8192/23423 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+#22880	INITED cov: 31881 ft: 64532 corp: 22655/2374Kb exec/s: 4576 rss: 265Mb
+Loaded 1024/23334 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+Loaded 2048/23334 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+Loaded 4096/23334 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+Loaded 8192/23334 files from /tmp/t3fix-clone/crates/maos-domain/fuzz/corpus/frame_deser
+== INITED per worker ==
+#22880	INITED cov: 31881 ft: 64532 corp: 22647/2374Kb exec/s: 5720 rss: 265Mb
+#22880	INITED cov: 31881 ft: 64532 corp: 22649/2373Kb exec/s: 4576 rss: 265Mb
+#22880	INITED cov: 31881 ft: 64532 corp: 22643/2372Kb exec/s: 4576 rss: 265Mb
+#22880	INITED cov: 31881 ft: 64532 corp: 22655/2374Kb exec/s: 4576 rss: 265Mb
+== errors ==
+out/logs-frame_deser-2/worker-0.log:8
+out/logs-frame_deser-2/worker-1.log:8
+out/logs-frame_deser-2/worker-2.log:8
+out/logs-frame_deser-2/worker-3.log:8

@@ -1,0 +1,64 @@
+diff --git a/.github/workflows/fuzz-prerelease.yml b/.github/workflows/fuzz-prerelease.yml
+index 949e6ebe..b2839eb1 100644
+--- a/.github/workflows/fuzz-prerelease.yml
++++ b/.github/workflows/fuzz-prerelease.yml
+@@ -41,6 +41,11 @@ jobs:
+           ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+           RUSTUP_TOOLCHAIN: nightly-2026-09-25
+         run: bash scripts/run-fuzz-link.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' 18000 T3 1 '${{ matrix.rss_flag }}'
++      - name: Minimize corpus before hand-off
++        env:
++          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
++          RUSTUP_TOOLCHAIN: nightly-2026-09-25
++        run: bash scripts/minimize-fuzz-corpus.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' '${{ matrix.rss_flag }}'
+       - name: Save corpus for next link
+         uses: actions/upload-artifact@v4
+         with:
+@@ -98,6 +103,11 @@ jobs:
+           ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+           RUSTUP_TOOLCHAIN: nightly-2026-09-25
+         run: bash scripts/run-fuzz-link.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' 18000 T3 2 '${{ matrix.rss_flag }}'
++      - name: Minimize corpus before hand-off
++        env:
++          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
++          RUSTUP_TOOLCHAIN: nightly-2026-09-25
++        run: bash scripts/minimize-fuzz-corpus.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' '${{ matrix.rss_flag }}'
+       - name: Save corpus for next link
+         uses: actions/upload-artifact@v4
+         with:
+@@ -155,6 +165,11 @@ jobs:
+           ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+           RUSTUP_TOOLCHAIN: nightly-2026-09-25
+         run: bash scripts/run-fuzz-link.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' 18000 T3 3 '${{ matrix.rss_flag }}'
++      - name: Minimize corpus before hand-off
++        env:
++          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
++          RUSTUP_TOOLCHAIN: nightly-2026-09-25
++        run: bash scripts/minimize-fuzz-corpus.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' '${{ matrix.rss_flag }}'
+       - name: Save corpus for next link
+         uses: actions/upload-artifact@v4
+         with:
+@@ -212,6 +227,11 @@ jobs:
+           ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+           RUSTUP_TOOLCHAIN: nightly-2026-09-25
+         run: bash scripts/run-fuzz-link.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' 18000 T3 4 '${{ matrix.rss_flag }}'
++      - name: Minimize corpus before hand-off
++        env:
++          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
++          RUSTUP_TOOLCHAIN: nightly-2026-09-25
++        run: bash scripts/minimize-fuzz-corpus.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' '${{ matrix.rss_flag }}'
+       - name: Save corpus for next link
+         uses: actions/upload-artifact@v4
+         with:
+@@ -269,6 +289,11 @@ jobs:
+           ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+           RUSTUP_TOOLCHAIN: nightly-2026-09-25
+         run: bash scripts/run-fuzz-link.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' 18000 T3 5 '${{ matrix.rss_flag }}'
++      - name: Minimize corpus before hand-off
++        env:
++          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
++          RUSTUP_TOOLCHAIN: nightly-2026-09-25
++        run: bash scripts/minimize-fuzz-corpus.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' '${{ matrix.rss_flag }}'
+       - name: Save corpus for next link
+         uses: actions/upload-artifact@v4
+         with:

@@ -1,0 +1,29 @@
+before: listing=eb322e4ffde90478 files=10370 (10,369 grown + 1 planted)
+minimize-fuzz-corpus manifest_parser: before files=10370 du_kib=41480
+minimize-fuzz-corpus manifest_parser: free_kib=769384504 free_inodes=0 total_inodes=0
+minimize-fuzz-corpus manifest_parser: merge exit=0 wall=11s log=/tmp/t3fix3-clone/out/minimize-manifest_parser.log
+::error::T3 manifest_parser: input crashed during corpus merge; refusing evidence
+merge artifact: crash-bd8c7d0a13de1955d04d2579cde57f435f24762f
+merge log marker: thread '<unnamed>' (1046366) panicked at fuzz_targets/manifest_parser.rs:26:9:
+merge log marker: ==1046366== ERROR: libFuzzer: deadly signal
+merge log marker: SUMMARY: libFuzzer: deadly signal
+script exit=1 wall=11.0s
+after: listing=eb322e4ffde90478 files=10370 IDENTICAL
+artifacts: ['crash-bd8c7d0a13de1955d04d2579cde57f435f24762f'] ; marker file present: False
+--- libFuzzer merge log (selected lines)
+MERGE-OUTER: 10370 files, 0 in the initial corpus, 0 processed earlier
+MERGE-OUTER: attempt 1
+MERGE-INNER: using the control file '/tmp/t3fix3-clone/crates/maos-manifest/fuzz/corpus-minimize-manifest_parser/tmp/libFuzzerTemp.Merge1046353.txt'
+MERGE-INNER: 10370 total files; 0 processed earlier; will process 10370 files now
+thread '<unnamed>' (1046366) panicked at fuzz_targets/manifest_parser.rs:26:9:
+==1046366== ERROR: libFuzzer: deadly signal
+SUMMARY: libFuzzer: deadly signal
+artifact_prefix='/tmp/t3fix3-clone/out/merge-crashes-manifest_parser/'; Test unit written to /tmp/t3fix3-clone/out/merge-crashes-manifest_parser/crash-bd8c7d0a13de1955d04d2579cde57f435f24762f
+MERGE-OUTER: attempt 2
+MERGE-INNER: using the control file '/tmp/t3fix3-clone/crates/maos-manifest/fuzz/corpus-minimize-manifest_parser/tmp/libFuzzerTemp.Merge1046353.txt'
+MERGE-INNER: '/tmp/t3fix3-clone/crates/maos-manifest/fuzz/corpus/manifest_parser/bd8c7d0a13de1955d04d2579cde57f435f24762f' caused a failure at the previous merge step
+MERGE-INNER: 10370 total files; 2202 processed earlier; will process 8168 files now
+MERGE-OUTER: successful in 2 attempt(s)
+MERGE-OUTER: the control file has 1605393 bytes
+MERGE-OUTER: consumed 0Mb (61Mb rss) to parse the control file
+MERGE-OUTER: 1261 new files with 9096 new features added; 4547 new coverage edges

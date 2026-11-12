@@ -1,0 +1,11 @@
+# SHA-1 validation throughput probe: hardlink the minimized corpus 21x (names do not matter for timing; page cache hot)
+files=385476
+
+real	0m5.707s
+user	0m2.577s
+sys	0m4.246s
+real corpus: files 18356 mismatch 0
+
+real	0m0.225s
+user	0m0.217s
+sys	0m0.193s

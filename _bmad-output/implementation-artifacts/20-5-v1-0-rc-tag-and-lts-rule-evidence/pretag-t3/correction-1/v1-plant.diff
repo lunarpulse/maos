@@ -1,0 +1,111 @@
+diff --git a/crates/maos-manifest/fuzz/Cargo.lock b/crates/maos-manifest/fuzz/Cargo.lock
+index b47a6b8a..11958afd 100644
+--- a/crates/maos-manifest/fuzz/Cargo.lock
++++ b/crates/maos-manifest/fuzz/Cargo.lock
+@@ -25,6 +25,12 @@ version = "1.8.3"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
+ 
++[[package]]
++name = "bitflags"
++version = "2.13.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
++
+ [[package]]
+ name = "block-buffer"
+ version = "0.10.4"
+@@ -154,6 +160,16 @@ version = "1.0.2"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
+ 
++[[package]]
++name = "errno"
++version = "0.3.15"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "e35d6e78f4cebb90e51d543db8fe41528851d6deeef6ef21ebd4bfdc1e784776"
++dependencies = [
++ "libc",
++ "windows-sys",
++]
++
+ [[package]]
+ name = "fiat-crypto"
+ version = "0.2.9"
+@@ -253,6 +269,12 @@ dependencies = [
+  "cc",
+ ]
+ 
++[[package]]
++name = "linux-raw-sys"
++version = "0.12.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
++
+ [[package]]
+ name = "maos-attrs"
+ version = "1.0.0-rc.1"
+@@ -271,6 +293,7 @@ dependencies = [
+  "getrandom 0.3.4",
+  "hex",
+  "maos-spirit-abi",
++ "rustix",
+  "serde",
+  "serde_json",
+  "sha2",
+@@ -377,6 +400,19 @@ dependencies = [
+  "semver",
+ ]
+ 
++[[package]]
++name = "rustix"
++version = "1.1.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "e5e76742e5294153d4dde1207dbec5bdd81eef6fabdc0d2118babadabfd858aa"
++dependencies = [
++ "bitflags",
++ "errno",
++ "libc",
++ "linux-raw-sys",
++ "windows-sys",
++]
++
+ [[package]]
+ name = "semver"
+ version = "1.0.28"
+@@ -622,6 +658,21 @@ dependencies = [
+  "wit-bindgen",
+ ]
+ 
++[[package]]
++name = "windows-link"
++version = "0.2.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
++
++[[package]]
++name = "windows-sys"
++version = "0.61.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
++dependencies = [
++ "windows-link",
++]
++
+ [[package]]
+ name = "winnow"
+ version = "0.7.15"
+diff --git a/crates/maos-manifest/fuzz/fuzz_targets/manifest_parser.rs b/crates/maos-manifest/fuzz/fuzz_targets/manifest_parser.rs
+index cefecc4f..d4f26cba 100755
+--- a/crates/maos-manifest/fuzz/fuzz_targets/manifest_parser.rs
++++ b/crates/maos-manifest/fuzz/fuzz_targets/manifest_parser.rs
+@@ -22,6 +22,9 @@ use maos_manifest::{
+ };
+ 
+ fuzz_target!(|data: &[u8]| {
++    if data.starts_with(b"T3-MERGE-PLANT") {
++        panic!("planted merge crash");
++    }
+     // TOML is UTF-8; reject non-UTF-8 bytes before any parser sees them.
+     let s = match std::str::from_utf8(data) {
+         Ok(s) => s,
