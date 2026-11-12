@@ -13,6 +13,8 @@ not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21
 (physical **27032 + 16 = 27048**). ADR-069 alarm **22000** and envelope **23000** are unchanged.
 Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
 
+**STOP raised 2026-11-12 (operator ask `lim` = stop22).** The shared kernel STOP is now **22,000 tokei** for the whole cumulative measured ledger at each landing (was 21,250; live kernel at ruling 27,040 / 21,201, room 799 tokei before the other owed rows). It equals the ADR-069 alarm (22,000; envelope 23,000 unchanged), so a landing that would cross 22,000 triggers the alarm rule and 21-5 becomes mandatory per the ADR. No deferred kernel row is granted by this. Rulings: `_bmad-output/planning-artifacts/decisions-2026-11-12-acceleration.md`.
+
 **20-11 landing 2 (final kernel landing) — 2026-11-11 (Dev2011k, uncommitted, awaiting review).** KS + O4 + AC3 landed: measured
 **+26 physical / +18 tokei** (kernel 26854/21051 → **26880/21069**, set hash `affee8b0…`) and maos-domain +4 (10211 → 10215) = the grant;
 cumulative measured kernel tokei is now **21069** (shared STOP 21250, ADR-069 alarm 22000). One public-surface change:
