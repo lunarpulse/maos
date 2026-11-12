@@ -38,6 +38,13 @@ pub const DISTILLATE_WRITE_INTENT: &str = "distillate.write";
 /// The JSON key for the kind discriminator in the serialized receipt payload.
 const RECEIPT_KIND: &str = "distillate";
 
+#[cfg(test)]
+thread_local! {
+    /// One-shot closure run right after the Distillate row commits.
+    static AFTER_DISTILLATE_ROW: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 /// DistillateWriter — stateless composer over `Arc<TransparencyLogAdapter>`.
 ///
 /// Does NOT require `#[i9_exempt]` — holds only `Arc` references to
@@ -426,10 +433,15 @@ impl DistillationPort for DistillateWriter {
         )?;
 
         // 5. Insert FrameKind::Distillate row via the token-guarded path
-        // (Story 8.10 AC2a) — the ONLY sanctioned Distillate inserter.
+        // (Story 8.10 AC2a) — the ONLY sanctioned Distillate inserter. The id is
+        // minted first and handed to the insert: the receipt names the row THIS
+        // call wrote. `last_frame_id()` is the log-wide last insert, so any
+        // concurrent writer's frame (e.g. the same Spirit's `cap.verify.ok`) landing
+        // between the commit and that read was returned as "the distillate".
+        let digest_frame_id = self.transparency_log.mint_frame_id();
         let _token = self.transparency_log.insert_distillate_frame(
             DistillateWriteToken::new(),
-            None,
+            Some(digest_frame_id),
             spirit_pid,
             "",
             "",
@@ -439,8 +451,12 @@ impl DistillationPort for DistillateWriter {
             FrameOrigin::SpiritDraftedHumanApproved,
         );
 
-        // 6. Recover the frame_id from the last insert.
-        let digest_frame_id = self.transparency_log.last_frame_id();
+        // Test-only interleaving point: a concurrent writer's insert can land
+        // between our row's commit and everything that follows.
+        #[cfg(test)]
+        if let Some(interloper) = AFTER_DISTILLATE_ROW.with(|hook| hook.borrow_mut().take()) {
+            interloper();
+        }
 
         Ok(DistillationReceipt::new(
             digest_frame_id,
@@ -640,6 +656,61 @@ mod tests {
         assert_eq!(receipt2.effective_source_log_ref.len(), 1);
         assert_eq!(receipt2.effective_source_log_ref[0], raw_id);
         assert_eq!(receipt2.effective_distillation_depth, 2);
+    }
+
+    /// Forget-journey flake (18-6): the receipt named `last_frame_id()` read AFTER
+    /// the row commit, so any other writer's insert in that window (telemetry,
+    /// another Spirit) became the "distillate" the caller verified and refused as
+    /// `writer-mismatch`. The interleaving is injected, not raced.
+    #[test]
+    fn receipt_names_the_row_this_call_wrote_when_another_writer_inserts_after_it() {
+        let (writer, tl, _tmp) = make_writer(0xD41F);
+        let raw_id = insert_raw_frame(&tl, 1, "consult");
+        let interloper = Arc::new(std::sync::Mutex::new(None));
+        let (hook_tl, hook_slot) = (Arc::clone(&tl), Arc::clone(&interloper));
+        AFTER_DISTILLATE_ROW.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(move || {
+                let _ = hook_tl.insert_frame_event(
+                    FrameKind::TelemetryEvent,
+                    99,
+                    None,
+                    "other-writer",
+                    b"interleaved",
+                    FrameOrigin::SpiritAuto,
+                );
+                *hook_slot.lock().unwrap() = Some(hook_tl.last_frame_id());
+            }));
+        });
+
+        let receipt = writer
+            .write_distillate(
+                1,
+                DistillationRequest::new(
+                    vec![raw_id],
+                    1,
+                    DigestPayload::Text("digest".into()),
+                    None,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+
+        let interloper = interloper
+            .lock()
+            .unwrap()
+            .expect("the interleaved insert ran");
+        assert_eq!(
+            tl.last_frame_id(),
+            interloper,
+            "the other writer's row is the log's last"
+        );
+        assert_ne!(receipt.digest_frame_id, interloper);
+        let row = tl
+            .query_frame_by_id(receipt.digest_frame_id)
+            .unwrap()
+            .expect("the receipt's frame exists");
+        assert_eq!(row.kind, FrameKind::Distillate);
+        assert_eq!(row.spirit_pid, 1);
     }
 
     #[test]

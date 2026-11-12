@@ -1,0 +1,14 @@
+Temporary diagnostic (NOT landed; crates/maos-bin/src/hook_pump.rs restored from /tmp copy, cmp clean, touched):
+in HookPump::check_redistilled, the final `_ => "writer-mismatch",` arm became
+
+    other => {
+        eprintln!(
+            "DIAG-FORGET: writer-mismatch row={:?} req_pid={} since={} new_id={} nonce_tl={}",
+            other.as_ref().map(|r| (r.spirit_pid, r.boot_nonce, r.kind, r.timestamp_ns, hex::encode(r.frame_id), r.intent.clone())),
+            request.writer_spirit_pid, since, new_distillate_frame_id, tl.boot_nonce()
+        );
+        "writer-mismatch"
+    }
+
+Output of 6 reproduced failures of 96 stress runs: red/diag-p8-run-*.log (every one: the row the "new distillate id" resolves to is
+kind CapabilityInvocation, intent `cap.verify.ok`, same pid 2, same boot nonce, timestamp AFTER the forget receipt: pid / nonce / since all pass; only `kind == Distillate` fails).

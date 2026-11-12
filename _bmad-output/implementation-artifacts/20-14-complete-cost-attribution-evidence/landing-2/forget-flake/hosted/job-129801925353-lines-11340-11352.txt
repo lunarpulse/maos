@@ -1,0 +1,13 @@
+2026-11-10T12:08:47.8154592Z     failures:
+2026-11-10T12:08:47.8154943Z         live_forget_redistills_and_never_resurrects_then_pending_is_typed
+2026-11-10T12:08:47.8155187Z 
+2026-11-10T12:08:47.8155410Z     test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 1.15s
+2026-11-10T12:08:47.8155683Z 
+2026-11-10T12:08:47.8155855Z   stderr ───
+2026-11-10T12:08:47.8155963Z 
+2026-11-10T12:08:47.8156334Z     thread 'live_forget_redistills_and_never_resurrects_then_pending_is_typed' (89735) panicked at crates/maos-journey-test/tests/journey_forget_18_6.rs:217:5:
+2026-11-10T12:08:47.8156872Z     assertion `left == right` failed
+2026-11-10T12:08:47.8157092Z       left: Number(1)
+2026-11-10T12:08:47.8157278Z      right: 0
+2026-11-10T12:08:47.8157571Z     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-11-10T12:08:47.8157924Z 

@@ -1,0 +1,2 @@
+thread 'live_forget_redistills_and_never_resurrects_then_pending_is_typed' (64589) panicked at crates/maos-journey-test/tests/journey_forget_18_6.rs:217:5:
+DIAG-FORGET: writer-mismatch row=Some((2, 4869095907672178801, CapabilityInvocation, 1794450590530582931, "01a1cd970b42cb8b5fed0fd62dd1bb5a", "cap.verify.ok")) req_pid=2 since=1794450590204728486 new_id=01a1:cd97:0b42:cb8b:5fed:0fd6:2dd1:bb5a nonce_tl=4869095907672178801
