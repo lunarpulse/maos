@@ -130,8 +130,8 @@ jobs:
             if [ "${1:-}" = hold ]; then
               # `maos shell` exits at stdin EOF and kills the session (run 43182623611: 216 ms, SIGKILL,
               # nothing authored). Hold stdin open until the guest has queued its skill or been refused
-              # (bounded at 300 s), then give the host two more seconds.
-              for _ in $(seq 1 600); do
+              # (bounded at 450 s; run 43184609860 needed ~280-305 s under the manifest's 10% CPU cap), then give the host two more seconds.
+              for _ in $(seq 1 900); do
                 if grep -rqsa 'example-spirit-ts.example' "$MAOS_HOME" || maosctl audit query --intent skill.author.refused 2>/dev/null | grep -q .; then break; fi
                 sleep 0.5
               done
@@ -142,7 +142,7 @@ jobs:
           }
           boot() {
             # $1 = hold | quick. The delegated script accepts only the unit `maos-17-3c-proof`; it is reused (--collect).
-            feed "$1" | sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$out" "$out/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" PATH="$PATH" MAOS_NOTIFY_DISABLE=1 MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$out/crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json" "$target/release/maos" shell --plain
+            feed "$1" | sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$out" "$out/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" PATH="$PATH" RUST_BACKTRACE=1 MAOS_NOTIFY_DISABLE=1 MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$out/crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json" "$target/release/maos" shell --plain
           }
           set +e
           boot hold 2>&1 | tee shell.log
@@ -153,6 +153,7 @@ jobs:
           maosctl audit query --intent governance:manifest-declaration > declarations.ndjson
           maosctl audit query --intent skill.author > skill-author.ndjson || true
           maosctl skills list > skills-list.txt 2>&1 || true
+          maosctl audit query > audit-all.ndjson || true
           # The declaration row: exactly one for the installed example (the `--intent` filter is a
           # substring match, so `-outcome` rows are present and are not declarations).
           python3 - <<'PY'
@@ -237,6 +238,7 @@ jobs:
             skill.json
             skill.err
             skill-author.ndjson
+            audit-all.ndjson
             skills-list.txt
             queue-assertion.log
             plant-denial.ndjson
