@@ -77,7 +77,7 @@ jobs:
                 test(=registry_bound_principal_is_counted_and_erased_on_uninstall_p3)' \
             2>&1 | tee evidence/contracts.log
           cp target/nextest/ci/junit.xml evidence/junit.xml
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 156 \
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 158 \
             --required-test unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17 \
             --required-test publisher_and_vetter_yank_verbs_authenticate_ac7 \
             --required-test signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8 \
@@ -193,7 +193,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-20-1b-final \
             --timeout 3000 --rootless-canary -- \
             cargo nextest run --locked -p maos-bin --profile ci --no-fail-fast --no-capture \
@@ -216,7 +215,7 @@ jobs:
       - name: Plant ac11-5-no-fence — the fence is never set, so AC11.5 MUST go red
         shell: bash
         run: |
-          set -uo pipefail
+          set +e
           python3 - <<'PY'
           p = "crates/maos-bin/tests/worker_quarantine_20_1b.rs"
           s = open(p).read()
@@ -230,6 +229,7 @@ jobs:
             cargo nextest run --locked -p maos-bin --profile ci --no-fail-fast --no-capture \
             -E 'binary(worker_quarantine_20_1b)' 2>&1 | tee evidence/ac11-5-plant.log
           rc=${PIPESTATUS[0]}
+          set -e
           git checkout -- crates/maos-bin/tests/worker_quarantine_20_1b.rs
           git diff --exit-code -- crates/maos-bin/tests/worker_quarantine_20_1b.rs
           echo "plant exit=$rc" | tee -a evidence/ac11-5-plant.log
@@ -276,7 +276,9 @@ jobs:
 
   registry-tls-macos:
     # Native Apple runtime of the accepted-socket TLS path, not a cross-check alone.
-    runs-on: macos-14
+    # `macos-14` is refused for this repository ("The configuration 'macos-14-arm64-us-default' is not
+    # supported", run 43180252358 job 131054199803); discipline's macos-check uses `macos-latest`.
+    runs-on: macos-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5

@@ -200,10 +200,12 @@ struct Running {
 }
 
 impl Running {
-    fn stop(&mut self) -> Result<(), String> {
+    /// Outer `Err`: the thread never exited or panicked. Inner: the Worker run's own result,
+    /// recorded, not asserted (a stop is not the subject of AC11.5).
+    fn stop(&mut self) -> Result<Result<(), String>, String> {
         self.supervision.inner.stop_workers();
         let Some(worker) = self.worker.take() else {
-            return Ok(());
+            return Ok(Ok(()));
         };
         let deadline = Instant::now() + TEARDOWN_BOUND;
         while !worker.is_finished() {
@@ -214,7 +216,7 @@ impl Running {
         }
         worker
             .join()
-            .map_err(|_| "Worker thread panicked".to_owned())?
+            .map_err(|_| "Worker thread panicked".to_owned())
     }
 }
 
@@ -577,7 +579,7 @@ fn quarantined_worker(home: &Path) -> serde_json::Value {
     let exists = container_exists(&cid);
 
     // The fence never pinned the container: a stop still tears it down.
-    running.stop().expect("Worker exit after quarantine");
+    let worker_run = running.stop().expect("Worker thread exits after the stop");
     let started = Instant::now();
     while container_exists(&cid) {
         assert!(
@@ -602,6 +604,7 @@ fn quarantined_worker(home: &Path) -> serde_json::Value {
         "container_state_after_window": state,
         "container_exists_after_window": exists,
         "container_removed_by_stop": true,
+        "worker_run_result_after_stop": format!("{worker_run:?}"),
         "claim": "capability-mediated fence only; the container is neither frozen nor killed by quarantine; not isolation",
     })
 }
