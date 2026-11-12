@@ -1,7 +1,7 @@
 # 21-5 FLAG-Winston decision record
 
 **Date:** 2026-11-12  
-**Status:** `PROPOSED` — nothing granted. Every row below needs an operator ruling; no implementation or landing claimed.  
+**Status:** `GRANTED` for the KP shape as ruled (operator ask `d21`, 2026-11-12, accepted as recommended: D-21-5-01 A, -02 A, -08 A, -11 A, -12 A); measured kernel Δ −827 tokei / −1041 physical. No implementation or landing claimed. See "Ruling and grant record" below for what is granted now vs owed at landing.  
 **Scope:** the kernel row of `21-5-orchestrator-port-and-move`: `crates/maos-kernel-core/src/orchestrator/` leaves the
 kernel for a new leaf crate; the kernel keeps one domain-port call on resume. Negative kernel delta; public kernel
 surface shrinks.  
@@ -13,15 +13,30 @@ surface shrinks.
 ADR-069 alarm), `prepaid` (2a) (`planning-artifacts/decisions-2026-11-12-acceleration.md:28-36`).  
 **Precedent:** `20-14-flag-winston-decision.md`, `20-9-flag-winston-decision.md`; ADR-066 (sanctioned surface removal).
 
+## Ruling and grant record (ask `d21`, 2026-11-12, accepted as recommended)
+
+**Granted now:**
+
+- The KP shape: the whole module leaves the kernel (D-01 A), behind `maos_domain::orchestrator::OrchestratorResumePort` with the kernel holding `Option<Arc<dyn …>>` (D-02 A); measured kernel Δ **−827 tokei / −1041 physical** (27040 → 25999 physical, 21201 → 20374 tokei on the creation base).
+- Kernel STOP for the story (D-12 A, D-11 A): Δ above −817 tokei or −1028 physical, or a change to any kernel file other than `lib.rs`, `scheduler/scheduler_loop.rs`, `isolation/mod.rs` (doc only) and the five deleted files. Both pins re-pinned exact in current units and the `maos-kernel-core` kloc ceiling LOWERED by the moved amount at L2 (D-11 A).
+- The one surface refresh, `SpiritSchedulerAdapter` (hash `2daf34b2…` → `d2170d38…`): pre-approved by the standing rule that a refresh whose symbol is named in a measured FLAG-Winston grant is pre-approved (recorded here); not an operator-granted refresh like `SecurityManagerAdapter` (ask `kt3`). It is executed at L2.
+
+**Covered by D-08 A / ADR-070, owed at landing (L2) — not yet executed:**
+
+- The removal of the 21 public kernel symbols (the 21 triples below) is sanctioned by D-21-5-08 A on the condition that **ADR-070** ("sanctioned removal of `maos_kernel_core::orchestrator`", ADR-066 form) and its `docs/adr/index.md` row are written at L2 and the baseline `docs/ci-baselines/kernel-surface-v0.1-beta.json` is edited surgically (401 → 380 items), never re-emitted. Until L2 lands, nothing is removed from the baseline.
+- Owed at L2 with the move: baseline and kloc re-pins, ADR-069 HISTORY (`ADR-069 RELIEF VALVE (21-5, ruling s21)`), `kernel-api-classes.toml` nine-row deletion, `STABILITY.md` 58 → 59, landing record in this file.
+
+**Not part of this grant:** D-21-5-14 B (the FR21 exemption row is re-routed out of the story; the operator named no key).
+
 ## Decision requested
 
 | ID | Options priced (reverted prototypes on `git archive 0baa76fb`; kernel physical / tokei) | Recommended | Status |
 |---|---|---|---|
-| D-21-5-01 | **A** whole module moves (KP) −1041 / −827 · **B** buffer half only, FR54 gateway host stays (KH) −407 / −304 · **C** whole module into two crates (buffer, gateway host) — kernel side identical to KP | **A** | PROPOSED |
-| D-21-5-02 | **A** `maos_domain::orchestrator::OrchestratorResumePort`, kernel holds `Option<Arc<dyn …>>` (KP) −1041 / −827, domain +3 · **B** kernel depends on the leaf crate, concrete type (KB) −1029 / −818 · **C** kernel drops the resume replay, ctor param removed (KD) −1049 / −833, 37 callers edited | **A** | PROPOSED |
-| D-21-5-08 | **A** operator-sanctioned removal of the 21 kernel symbols below by ADR-070 (ADR-066 form) + surgical baseline edit; the `SpiritSchedulerAdapter` hash refresh under `prepaid` (2a) · **B** removal sanctioned by this record alone, no ADR | **A** | PROPOSED |
-| D-21-5-11 | **A** both kernel pins re-pinned to the exact measured values in their current units; `maos-kernel-core` kloc ceiling LOWERED by the moved amount; HISTORY records the ADR-069 relief · **B** baseline re-pinned, kloc ceiling kept at 21201 (827 lines of headroom) | **A** | PROPOSED |
-| D-21-5-12 | **A** ×2 envelope on the growing crates (domain ≤ +6, xtask ≤ +2, aggregate ≤ +12, maos-bin 0), kernel exact with STOP if Δ > −817 tokei or > −1028 physical · **B** exact measured only | **A** | PROPOSED |
+| D-21-5-01 | **A** whole module moves (KP) −1041 / −827 · **B** buffer half only, FR54 gateway host stays (KH) −407 / −304 · **C** whole module into two crates (buffer, gateway host) — kernel side identical to KP | **A** | **RULED A** (ask `d21`, 2026-11-12, accepted as recommended) |
+| D-21-5-02 | **A** `maos_domain::orchestrator::OrchestratorResumePort`, kernel holds `Option<Arc<dyn …>>` (KP) −1041 / −827, domain +3 · **B** kernel depends on the leaf crate, concrete type (KB) −1029 / −818 · **C** kernel drops the resume replay, ctor param removed (KD) −1049 / −833, 37 callers edited | **A** | **RULED A** (ask `d21`, 2026-11-12, accepted as recommended) |
+| D-21-5-08 | **A** operator-sanctioned removal of the 21 kernel symbols below by ADR-070 (ADR-066 form) + surgical baseline edit; the `SpiritSchedulerAdapter` hash refresh under `prepaid` (2a) · **B** removal sanctioned by this record alone, no ADR | **A** | **RULED A** (ask `d21`, 2026-11-12, accepted as recommended) |
+| D-21-5-11 | **A** both kernel pins re-pinned to the exact measured values in their current units; `maos-kernel-core` kloc ceiling LOWERED by the moved amount; HISTORY records the ADR-069 relief · **B** baseline re-pinned, kloc ceiling kept at 21201 (827 lines of headroom) | **A** | **RULED A** (ask `d21`, 2026-11-12, accepted as recommended) |
+| D-21-5-12 | **A** ×2 envelope on the growing crates (domain ≤ +6, xtask ≤ +2, aggregate ≤ +12, maos-bin 0), kernel exact with STOP if Δ > −817 tokei or > −1028 physical · **B** exact measured only | **A** | **RULED A** (ask `d21`, 2026-11-12, accepted as recommended) |
 
 Why A for D-02: FR20 says the instruction buffer is "NOT kernel-buffered" (`prd/functional-requirements.md:54`) and
 §4.0.7 says the kernel embeds no orchestration policy (`4-kernel-design.md:186`); only a domain port lets the kernel
@@ -35,7 +50,7 @@ v2.5 (`functional-requirements.md:68`), and it holds 515 of the module's 817 tok
 and capability-scope contracts" reads, at HEAD, onto the `maos-spirit-abi::gateway` traits, which stay; this reading is
 an interpretation, so A carries a PRD/architecture note and B is the option that keeps FR54's letter.
 
-## Kernel figures (if ruled as recommended: D-01 A, D-02 A, D-09 A)
+## Kernel figures (ruled as recommended: D-01 A, D-02 A, D-09 A)
 
 Creation base `0baa76fb`: **27040 physical / 95 files / 21201 tokei**. KP measured **−1041 physical / −827 tokei →
 25999 / 90 files / 20374** (module −1028 / −817; `scheduler/scheduler_loop.rs` −12 / −9; `lib.rs` −1 / −1;
@@ -48,7 +63,7 @@ Other crates (tokei): new `maos-orchestrator-buffer` **829** (src physical 1046)
 
 ## Public kernel surface (`check-service-boundary`, `docs/ci-baselines/kernel-surface-v0.1-beta.json`)
 
-**Refresh (symbol persists; pre-approved by `prepaid` (2a) once this grant is ruled — named here as required):**
+**Refresh (symbol persists; pre-approved: standing rule (named in this measured FLAG-Winston grant) — recorded; executed at L2):**
 
 | Kind | Path | HEAD hash | After KP |
 |---|---|---|---|
@@ -103,7 +118,7 @@ landed; no file overlap with this story]. No shape crosses 22 000, so no row car
 STOP = alarm since `lim` = stop22 (`decisions-2026-11-12-acceleration.md:38-45`). The landing's kloc HISTORY row says
 `ADR-069 RELIEF VALVE (21-5, ruling s21)`, the before/after figures, the remaining envelope and the alarm distance.
 
-## Landing and accounting (if ruled)
+## Landing and accounting (ruled)
 
 L1 (kernel-free): the domain port, the equivalence goldens recorded against the unmoved kernel, docs. L2 (kernel last):
 the move, both pins exact in their current units — `xtask/kernel-core-baseline.toml` (`src_lines`, file set 95 → 90,

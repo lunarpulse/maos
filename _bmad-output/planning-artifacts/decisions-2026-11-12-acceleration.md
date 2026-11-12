@@ -31,7 +31,7 @@ Earlier same-day pointer: scope ruling commit `9e4be177` (`ga` = boundary, `rc` 
    The per-event ask remains required for anything outside a green gated phase, force pushes, release tags and history rewrites.
 3. **`sev`** — Review severity policy: P0/P1/P2 correctness and security findings are fixed in the correction round. Low and Info findings become rule-10 deferred rows with a disposition and a trigger and get no further correction round, unless the reviewer marks them blocking.
 4. **`repin`** — Build a pin-repin script in `scripts/` (NOT xtask, to spare the xtask line ceiling) that updates `kernel-core-baseline`, the kloc rows and `_aggregate_hardfail`, the two test constants (`kernel_pin_content_hash_16_0.rs`, `recovery_lane_ceiling_rule.rs`) and the d11 HISTORY cite in one command. Status: dev task, NOT yet done.
-5. **`s21`** — Pull story 21-5 (orchestrator port and extraction, about -1,000 tokei, optional negative FLAG-Winston, currently Epic 21 backlog) forward to follow 20-9 as a kernel story. Status: story-creation task, NOT yet done. Epic 21 membership/key: to be decided by story creation.
+5. **`s21`** — Pull story 21-5 (orchestrator port and extraction, about -1,000 tokei, optional negative FLAG-Winston, currently Epic 21 backlog) forward to follow 20-9 as a kernel story. Status: story created 2026-11-12 (`21-5-orchestrator-port-and-move.md`; all fourteen D-rows RULED by ask `d21`, 2026-11-12, accepted as recommended; story `ready-for-dev`). Epic 21 membership/key: to be decided by story creation.
 6. **Agent hygiene** (operator free text): "do not revive long-lived agents, make a new one (preferred if context is not so critical), or compact or summarise it". Dev/review agents are spawned fresh with a self-contained brief; a long-context agent is replaced or compacted, not revived.
 7. **`lim` = stop22** — The Epic 20 shared kernel STOP is raised from 21,250 to **22,000 tokei** for the whole cumulative measured ledger at each landing. ADR-069's alarm (22,000) and envelope (23,000) are unchanged.
 
@@ -62,4 +62,4 @@ Previously deferred kernel items now unblocked for pricing — each needs its ow
 ## Open work created by these rulings
 
 - `repin` script (dev task) — not done.
-- 21-5 story creation (`s21`) — not done.
+- 21-5 story creation (`s21`) — story created 2026-11-12 (`21-5-orchestrator-port-and-move.md`; D-rows ruled by `d21`, 2026-11-12); implementation not done.
