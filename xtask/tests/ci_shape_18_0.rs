@@ -554,7 +554,11 @@ fn epic_18_exit_runs_line_2_verbatim_and_its_drift_blind_twin() {
         str_of(researcher, "run"),
         Some("target/debug/maos eval distill --class researcher")
     );
-    assert_eq!(condition(researcher).as_deref(), Some(NOT_CANCELLED));
+    assert_eq!(
+        condition(researcher).as_deref(),
+        Some(RESEARCHER_CONDITION),
+        "the Researcher leg keeps `!cancelled()` and is gated on `include_researcher`"
+    );
     assert!(
         step_index(rerecord, "Upload refreshed cassettes") > step_index(rerecord, RESEARCHER_STEP)
     );
@@ -564,6 +568,150 @@ fn epic_18_exit_runs_line_2_verbatim_and_its_drift_blind_twin() {
             .starts_with(uploaded.trim()),
         "the upload carries the judge sidecar: {uploaded}"
     );
+}
+
+/// The `if:` of the probe job, after normalisation (see [`condition`]).
+const RERECORD_DISPATCH_GUARD: &str =
+    "github.event_name=='workflow_dispatch'&&inputs.rerecord==true";
+/// `tier-2-rerecord`: the dispatch guard, then the secret probe's output.
+const RERECORD_CONDITION: &str = "github.event_name=='workflow_dispatch'&&inputs.rerecord==true&&needs.secret-gate.outputs.has_anthropic_key=='true'";
+/// The Researcher + Sonnet judge leg: `!cancelled()` AND the opt-in input.
+const RESEARCHER_CONDITION: &str = "!cancelled()&&inputs.include_researcher==true";
+
+/// Every way the paid live re-record could become reachable from the daily
+/// cron, or lose its opt-ins (operator ruling 2026-11-12: on-demand only).
+/// Empty means the shape is the ruled one.
+fn nightly_on_demand_violations(nightly: &Value) -> Vec<String> {
+    let mut found = Vec::new();
+    let on = key(nightly, "on");
+
+    // The cron is unchanged and is the ONLY schedule entry: it keeps driving
+    // `tier-2-journey` and `j6-real-measurement`.
+    let crons: Vec<&str> = key(on, "schedule")
+        .as_sequence()
+        .expect("schedule list")
+        .iter()
+        .filter_map(|entry| str_of(entry, "cron"))
+        .collect();
+    if crons != ["0 3 * * *"] {
+        found.push(format!(
+            "schedule crons must be exactly `0 3 * * *`: {crons:?}"
+        ));
+    }
+
+    // Both paid-leg opt-ins exist as boolean inputs defaulting to false.
+    let inputs = get(key(on, "workflow_dispatch"), "inputs");
+    for name in ["rerecord", "include_researcher"] {
+        let input = inputs.and_then(|inputs| get(inputs, name));
+        let ok = input.is_some_and(|input| {
+            str_of(input, "type") == Some("boolean")
+                && get(input, "default") == Some(&Value::Bool(false))
+                && str_of(input, "description").is_some_and(|d| !d.trim().is_empty())
+        });
+        if !ok {
+            found.push(format!(
+                "workflow_dispatch input `{name}` must be a described boolean defaulting to false"
+            ));
+        }
+    }
+
+    let jobs = key(nightly, "jobs");
+    let gate = key(jobs, "secret-gate");
+    if condition(gate).as_deref() != Some(RERECORD_DISPATCH_GUARD) {
+        found.push(format!(
+            "secret-gate if: must be the dispatch+rerecord guard, got {:?}",
+            condition(gate)
+        ));
+    }
+    let rerecord = key(jobs, "tier-2-rerecord");
+    if condition(rerecord).as_deref() != Some(RERECORD_CONDITION) {
+        found.push(format!(
+            "tier-2-rerecord if: must be the dispatch+rerecord+secret guard, got {:?}",
+            condition(rerecord)
+        ));
+    }
+    if !needs(jobs, "tier-2-rerecord")
+        .iter()
+        .any(|n| n == "secret-gate")
+    {
+        found.push("tier-2-rerecord must `needs` secret-gate".to_string());
+    }
+    // Every paid step lives only in the guarded job; the other two cron jobs
+    // stay unconditional and never touch the API key.
+    for job in ["tier-2-journey", "j6-real-measurement"] {
+        let body = serde_yaml::to_string(key(jobs, job)).expect("serialise job");
+        if get(key(jobs, job), "if").is_some() {
+            found.push(format!("`{job}` must keep running on the daily cron"));
+        }
+        if body.contains("MAOS_ANTHROPIC_API_KEY") || body.contains("MAOS_INFERENCE_MODE") {
+            found.push(format!(
+                "`{job}` must not touch the live API key or record mode"
+            ));
+        }
+    }
+    let researcher = &steps(rerecord)[step_index(
+        rerecord,
+        "Re-record the Researcher five-metric cassette and judge (live)",
+    )];
+    if condition(researcher).as_deref() != Some(RESEARCHER_CONDITION) {
+        found.push(format!(
+            "Researcher leg if: must be `!cancelled()` AND include_researcher, got {:?}",
+            condition(researcher)
+        ));
+    }
+    found
+}
+
+/// Operator ruling 2026-11-12 — paid live re-records are on-demand only. The
+/// real `journey-nightly.yml` has the ruled shape, and each plant (re-enabling
+/// the cron path, dropping the dispatch guard, the researcher gate, or an
+/// input) turns the check red.
+#[test]
+fn journey_nightly_paid_rerecord_is_on_demand_only() {
+    let path = root().join(".github/workflows/journey-nightly.yml");
+    let text = fs::read_to_string(path).expect("read journey-nightly");
+    let parse =
+        |text: &str| -> Value { serde_yaml::from_str(text).expect("parse journey-nightly") };
+    assert_eq!(
+        nightly_on_demand_violations(&parse(&text)),
+        Vec::<String>::new()
+    );
+
+    for (from, to) in [
+        (
+            "if: ${{ github.event_name == 'workflow_dispatch' && inputs.rerecord == true && needs.secret-gate.outputs.has_anthropic_key == 'true' }}",
+            "if: ${{ needs.secret-gate.outputs.has_anthropic_key == 'true' }}",
+        ),
+        (
+            "if: ${{ github.event_name == 'workflow_dispatch' && inputs.rerecord == true && needs.secret-gate.outputs.has_anthropic_key == 'true' }}",
+            "if: ${{ github.event_name == 'schedule' || inputs.rerecord == true }}",
+        ),
+        (
+            "    if: ${{ github.event_name == 'workflow_dispatch' && inputs.rerecord == true }}\n",
+            "",
+        ),
+        (
+            "if: ${{ !cancelled() && inputs.include_researcher == true }}",
+            "if: ${{ !cancelled() }}",
+        ),
+        (
+            "      include_researcher:\n        description: 'Also run the Researcher five-metric + Sonnet judge leg (needs rerecord)'\n        type: boolean\n        default: false\n",
+            "",
+        ),
+        ("      rerecord:\n        description: 'Paid live re-record (tier-2-rerecord); spends API tokens'\n        type: boolean\n        default: false\n", "      rerecord:\n        description: 'Paid live re-record (tier-2-rerecord); spends API tokens'\n        type: boolean\n        default: true\n"),
+        ("'0 3 * * *'", "'0 3 * * *'\n    - cron: '0 15 * * *'"),
+        (
+            "  j6-real-measurement:\n    runs-on: ubuntu-latest\n",
+            "  j6-real-measurement:\n    if: ${{ false }}\n    runs-on: ubuntu-latest\n",
+        ),
+    ] {
+        let planted = text.replacen(from, to, 1);
+        assert_ne!(planted, text, "plant must change the workflow: {from}");
+        assert!(
+            !nightly_on_demand_violations(&parse(&planted)).is_empty(),
+            "plant stayed green: {from} -> {to}"
+        );
+    }
 }
 
 const EXIT_LINE_3_STEP: &str =

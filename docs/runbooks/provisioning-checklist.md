@@ -24,7 +24,7 @@ than inherited from planning prose.
 | `DOCKERHUB_TOKEN` | `.github/workflows/container.yml` job `env.PUBLISH`, Docker Hub login | image build/smoke always run; all login/push/cosign steps skipped unless both credentials exist, with explicit `SKIPPED: DOCKERHUB_* absent` | `ops-provisioning-secrets-and-accounts` | `absent` |
 | `DOCKERHUB_USERNAME` | `.github/workflows/container.yml` job `env.PUBLISH`, `env.HUB_USER` | same publication-only gating as token; neither registry is pushed without both values | `ops-provisioning-secrets-and-accounts` | `absent` |
 | `FUZZ_LEDGER_WRITE_TOKEN` | `.github/workflows/fuzz-cadence.yml` and `fuzz-prerelease.yml`, collector checkout | falls back to auto-provided `GITHUB_TOKEN`; the collector hard-fails if that token cannot push | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (dedicated token optional; operator must provision branch and write permission)` |
-| `MAOS_ANTHROPIC_API_KEY` | `.github/workflows/journey-nightly.yml:88` | hard fail for the paid live re-record leg; hermetic replay is unaffected | `ops-nightly-cassette-rerecord` | `absent` |
+| `MAOS_ANTHROPIC_API_KEY` | `.github/workflows/journey-nightly.yml` jobs `secret-gate` (presence probe) and `tier-2-rerecord` (live record steps) | the paid live re-record leg is skipped or hard-fails; it runs ONLY on manual dispatch with `rerecord=true` (never on the daily cron, operator ruling 2026-11-12); hermetic replay is unaffected | `ops-nightly-cassette-rerecord` | `present` |
 | `MAOS_RELEASE_PUBKEY` | `.github/workflows/release.yml:41-46,90-110` | hard fail: an absent/empty key fails the exact lowercase parser; the shipped `maosctl` also refuses the bundled development key | `ops-provisioning-secrets-and-accounts` | `present` |
 | `RELEASE_SIGNING_KEY` | `.github/workflows/release.yml:93,95` | hard fail once artifact assembly reaches `release-verify --sign` | `ops-provisioning-secrets-and-accounts` | `present` |
 | `RTO_LEDGER_WRITE_TOKEN` | `.github/workflows/rpo-rto-cadence.yml`, collector checkout | falls back to auto-provided `GITHUB_TOKEN`; the collector hard-fails if that token cannot push | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (GITHUB_TOKEN has already produced the live rto-ledger history)` |
@@ -121,6 +121,20 @@ than inherited from planning prose.
   and prints only a truncated public-key fingerprint; `release-verify --sign`
   parses `RELEASE_SIGNING_KEY` with the same seed parser; `MAOS_AUDIT_KEY` is a
   PATH to a key file, not a key.
+- **Provisioned 2026-11-12T14:40Z — `MAOS_ANTHROPIC_API_KEY` now `present`:** repository secret created by the
+  operator; name confirmed via the secrets API, value never read. Operator
+  ruling 2026-11-12 ("not every day ... weekly or fortnightly, or on demand
+  manual tests"): it is used ONLY by the on-demand `tier-2-rerecord` job of
+  `journey-nightly.yml` — manual `workflow_dispatch` with `rerecord=true`;
+  `include_researcher=true` additionally runs the Researcher five-metric +
+  Sonnet judge leg. The daily `0 3 * * *` cron still runs `tier-2-journey` and
+  `j6-real-measurement` but can no longer reach `tier-2-rerecord` (nor even the
+  `secret-gate` probe); `xtask/tests/ci_shape_18_0.rs`
+  `journey_nightly_paid_rerecord_is_on_demand_only` pins that shape. GA
+  precondition: one green hand-dispatched `tier-2-rerecord` on the GA-line
+  tree, its `refreshed-cassettes` artifact promoted per the promotion procedure
+  in the `journey-nightly.yml` comments (download, review, replay with `maos
+  eval`, then copy over the seed in a PR that re-pins the seed-pinned tests).
 - **Blocker surfaced 2026-09-24 — RULED the same day (now the `CI_EVIDENCE_AUDIT_KEY` row):** `check-multi-tenant-loom`
   cannot pass in CI without an operator audit verification key. Its required
   `reza-three-team-three-region-journey` leg is `ABSENT` whenever

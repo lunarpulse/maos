@@ -3,7 +3,18 @@ name: journey-nightly
 on:
   schedule:
     - cron: '0 3 * * *'
+  # Manual dispatch carries the two paid-leg opt-ins. Both default to false and
+  # `inputs.*` is empty on `schedule`, so the daily cron can never select them.
   workflow_dispatch:
+    inputs:
+      rerecord:
+        description: 'Paid live re-record (tier-2-rerecord); spends API tokens'
+        type: boolean
+        default: false
+      include_researcher:
+        description: 'Also run the Researcher five-metric + Sonnet judge leg (needs rerecord)'
+        type: boolean
+        default: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -49,7 +60,13 @@ jobs:
   # the whole file with "Unrecognized named-value: 'secrets'"). Probe the secret
   # in a step (where `secrets` IS allowed, via env) and expose a boolean output
   # that the re-record job gates on through the `needs` context.
+  #
+  # Operator ruling 2026-11-12 (paid live re-records are on-demand only, "not
+  # every day"): this probe itself runs ONLY for a manual dispatch with
+  # `rerecord=true`, so the daily cron never even reads the secret. On any other
+  # trigger it is skipped and `tier-2-rerecord` (which `needs` it) is skipped.
   secret-gate:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.rerecord == true }}
     runs-on: ubuntu-latest
     outputs:
       has_anthropic_key: ${{ steps.probe.outputs.present }}
@@ -64,12 +81,15 @@ jobs:
             echo "present=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # Tier-2: re-record cassettes against live APIs (only when secrets are available).
+  # Tier-2: re-record cassettes against live APIs. ON-DEMAND ONLY (operator
+  # ruling 2026-11-12): runs solely for `workflow_dispatch` with
+  # `rerecord=true` AND the secret present; NEVER on `schedule`. The cron
+  # (`0 3 * * *`) keeps driving `tier-2-journey` and `j6-real-measurement` only.
   tier-2-rerecord:
     runs-on: ubuntu-latest
     needs: [tier-2-journey, secret-gate]
     timeout-minutes: 30
-    if: ${{ needs.secret-gate.outputs.has_anthropic_key == 'true' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.rerecord == true && needs.secret-gate.outputs.has_anthropic_key == 'true' }}
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -121,7 +141,9 @@ jobs:
       # Story 18-3 AC2.4 (D-18-3-07 A, review R3/R4) — record the Researcher
       # five-metric run through the shared router's live driver (the 15-6
       # recorder) into the SIBLING `distill-corpus-v0.live.json`, never the
-      # committed seed cassette or corpus. Layout `provenance: live-record`:
+      # committed seed cassette or corpus. Opt-in: also requires the dispatch
+      # input `include_researcher=true` (the Sonnet judge leg is the most
+      # expensive; operator ruling 2026-11-12). Layout `provenance: live-record`:
       # the live rows' survey completions (the completion-planted hedge-drop
       # and planted-secret controls are served from the committed cassette),
       # then one judge completion per finding of those rows, the judge pinned
@@ -138,7 +160,7 @@ jobs:
       # corpus rows (`provenance: live-record`) in a PR (owner
       # `ops-nightly-cassette-rerecord`).
       - name: Re-record the Researcher five-metric cassette and judge (live)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && inputs.include_researcher == true }}
         env:
           MAOS_INFERENCE_MODE: record
           MAOS_REPLAY_CASSETTE: crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.live.json
