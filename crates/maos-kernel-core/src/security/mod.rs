@@ -364,7 +364,7 @@ impl SecurityManagerAdapter {
                 Some(config) => crate::security::sandbox::t3::image_lock::load_and_verify_lock_at(
                     &config.lock_path,
                     &config.trust_anchor_pub,
-                    self.crypto.as_ref(),
+                    &crate::security::crypto::RingCryptoProvider,
                 ),
                 None => {
                     let trust_anchor =
@@ -372,7 +372,7 @@ impl SecurityManagerAdapter {
                             .map_err(|error| SecurityError::T3AdmissionFailed(error.to_string()))?;
                     crate::security::sandbox::t3::image_lock::load_and_verify_lock(
                         &trust_anchor,
-                        self.crypto.as_ref(),
+                        &crate::security::crypto::RingCryptoProvider,
                     )
                 }
             }
