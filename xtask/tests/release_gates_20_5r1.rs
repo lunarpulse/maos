@@ -344,7 +344,10 @@ fn an_absent_perf_ledger_branch_is_an_empty_ledger_and_any_other_failure_refuses
                 text(&output)
             );
             assert!(!text(&output).contains("empty ledger"), "{}", text(&output));
-            assert!(!calls.contains("check-perf-verdict"), "{kind}/{mode}: {calls}");
+            assert!(
+                !calls.contains("check-perf-verdict"),
+                "{kind}/{mode}: {calls}"
+            );
             assert!(
                 !calls.contains("check-release-precondition"),
                 "{kind}/{mode}: {calls}"
@@ -371,10 +374,15 @@ fn a_perf_ledger_branch_that_exists_but_cannot_be_read_always_refuses() {
                 "{kind}/{mode}: a missing file at an existing branch is not an empty ledger: {shown}"
             );
             assert!(
-                calls.contains("contents/ledger.jsonl?ref=perftip0123456789abcdef0123456789abcdef01234"),
+                calls.contains(
+                    "contents/ledger.jsonl?ref=perftip0123456789abcdef0123456789abcdef01234"
+                ),
                 "the contents request was made at the logged tip: {calls}"
             );
-            assert!(!calls.contains("check-perf-verdict"), "{kind}/{mode}: {calls}");
+            assert!(
+                !calls.contains("check-perf-verdict"),
+                "{kind}/{mode}: {calls}"
+            );
             assert!(
                 !calls.contains("check-release-precondition"),
                 "refused before the precondition: {kind}/{mode}: {calls}"
@@ -385,7 +393,8 @@ fn a_perf_ledger_branch_that_exists_but_cannot_be_read_always_refuses() {
 
 // ---- review F2: the notes' ABSENT label must agree with the computed verdicts ----------
 
-const LABEL_STEP: &str = "Require the rc notes perf label to agree with the perf verdicts (rc tags only)";
+const LABEL_STEP: &str =
+    "Require the rc notes perf label to agree with the perf verdicts (rc tags only)";
 const ABSENT_LINE: &str = "Perf verdicts: ABSENT";
 
 /// The `check-perf-verdict --json` shape: `{gate, sha, verdicts: [{metric, verdict, ..}]}`.
@@ -431,7 +440,10 @@ fn the_label_step_is_an_rc_only_step_after_the_verdicts_are_computed_and_before_
         steps[at]["if"].as_str(),
         Some("steps.tag.outputs.kind == 'rc'")
     );
-    assert_eq!(steps[at]["env"]["TAG"].as_str(), Some("${{ github.ref_name }}"));
+    assert_eq!(
+        steps[at]["env"]["TAG"].as_str(),
+        Some("${{ github.ref_name }}")
+    );
     assert!(index_of(&steps, "Require successful main discipline aggregate") < at);
     assert!(at < index_of(&steps, "Generate SHA256SUMS and sign"));
     assert!(at < index_of(&steps, "Create GitHub Release"));
