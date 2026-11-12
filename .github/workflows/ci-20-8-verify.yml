@@ -125,9 +125,24 @@ jobs:
           export MAOS_SPIRIT_SIGNING_KEY="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')"
           maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest examples/example-spirit-ts/manifest.toml --artifact examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
           maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
+          feed() {
+            printf '@example-spirit-ts hello\n'
+            if [ "${1:-}" = hold ]; then
+              # `maos shell` exits at stdin EOF and kills the session (run 43182623611: 216 ms, SIGKILL,
+              # nothing authored). Hold stdin open until the guest has queued its skill or been refused
+              # (bounded at 300 s), then give the host two more seconds.
+              for _ in $(seq 1 600); do
+                if grep -rqsa 'example-spirit-ts.example' "$MAOS_HOME" || maosctl audit query --intent skill.author.refused 2>/dev/null | grep -q .; then break; fi
+                sleep 0.5
+              done
+              sleep 2
+            else
+              sleep 8
+            fi
+          }
           boot() {
-            # The delegated script accepts only the unit `maos-17-3c-proof`; it is reused (--collect).
-            printf '@example-spirit-ts hello\n' | sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$out" "$out/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" PATH="$PATH" MAOS_NOTIFY_DISABLE=1 MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$out/crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json" "$target/release/maos" shell --plain
+            # $1 = hold | quick. The delegated script accepts only the unit `maos-17-3c-proof`; it is reused (--collect).
+            feed "$1" | sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$out" "$out/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" PATH="$PATH" MAOS_NOTIFY_DISABLE=1 MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$out/crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json" "$target/release/maos" shell --plain
           }
           set +e
           boot 2>&1 | tee shell.log
