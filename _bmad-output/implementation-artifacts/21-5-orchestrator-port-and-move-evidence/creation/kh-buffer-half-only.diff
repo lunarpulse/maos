@@ -1,0 +1,1321 @@
+diff -ruN '--exclude=target' head/Cargo.toml kh/Cargo.toml
+--- head/Cargo.toml	2026-11-12 00:13:00.114075832 +0000
++++ kh/Cargo.toml	2026-11-12 00:18:58.880251068 +0000
+@@ -15,6 +15,7 @@
+     "crates/maos-director-surface",
+     "crates/maos-domain",
+     "crates/maos-egress",
++    "crates/maos-orchestrator-buffer",
+     "crates/maos-capability",
+     "crates/maos-iac",
+     "crates/maos-journey-test",
+diff -ruN '--exclude=target' head/_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md kh/_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md
+--- head/_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md	2026-11-12 00:13:00.186075257 +0000
++++ kh/_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md	2026-11-12 00:18:58.888878039 +0000
+@@ -114,7 +114,9 @@
+ 
+ **Workspace member count (post Story 9.5b):** Story 9.5b adds ONE lib crate `crates/maos-telemetry/` (OpenTelemetry SLO-class adapter — TraceSink seam + bounded OTel exporter), moving the count from the post-Story-8.14a baseline 44 to **45 workspace members** (44 + 1 = 45). The `check-workspace-count` gate floor moves to 45. (History: 27 pre-7.1 → 28 with `examples/example-spirit` → 29 with `maos-spirit-cli` (Story 7.2) → 30 with `maos-skill` (Story 7.4) → 31 with `spirits/butler` (Story 8.1) → 32 with `spirits/researcher` (Story 8.2) → 33 with `spirits/observer` (Story 8.3) → 37 with `spirits/{orchestrator,worker,architect,reviewer}` (Story 8.4) → 39 with `spirits/{mira,nash}` (Story 8.5) → 41 with `crates/{maos-a2a-core,maos-a2a-tcp}` (Story 8.6) → 42 with `crates/maos-journey-test` (Story 8.11) → 43 with `crates/maos-notify-push` (Story 8.13) → 44 with `crates/maos-shell` (Story 8.14a) → 45 with `crates/maos-telemetry` (Story 9.5b).)
+ 
+-**Workspace member count (post Story 17-1):**<!-- workspace-count-authoritative --> Story 17-1 adds ONE leaf crate `crates/maos-egress/`, moving the count from 57 to **58 workspace members**. The daemon feature owns the reverse proxy and scoped credential; the default-features-off build supplies only the std-only in-container transport. Neither kernel nor domain depends on the proxy. This membership change does not yet establish Worker containment; the T3 route is a later task in the same story. History: 46 (Story 10.4a, maos-loom-lite) → 48 (Story 11.1a, maos-host + maos-wasm-host) → 49 (Story 11.4a, maos-pdp) → 50 (Story 11.4b, maos-escape-detector) → 51/52 (Story 11.4c, maos-siem + maos-sso) → 53 (Story 11.5, maos-fkcs) → 54 (Story 12.1, maos-cohort) → 55 (Story 12.4b, digest) → 56 (Story 17-6, maos-exec-deps) → 57 (Story 17-3c, maos-frame-codec) → 58 (Story 17-1, maos-egress).
++**Workspace member count (post Story 17-1):** Story 17-1 adds ONE leaf crate `crates/maos-egress/`, moving the count from 57 to **58 workspace members**. The daemon feature owns the reverse proxy and scoped credential; the default-features-off build supplies only the std-only in-container transport. Neither kernel nor domain depends on the proxy. This membership change does not yet establish Worker containment; the T3 route is a later task in the same story. History: 46 (Story 10.4a, maos-loom-lite) → 48 (Story 11.1a, maos-host + maos-wasm-host) → 49 (Story 11.4a, maos-pdp) → 50 (Story 11.4b, maos-escape-detector) → 51/52 (Story 11.4c, maos-siem + maos-sso) → 53 (Story 11.5, maos-fkcs) → 54 (Story 12.1, maos-cohort) → 55 (Story 12.4b, digest) → 56 (Story 17-6, maos-exec-deps) → 57 (Story 17-3c, maos-frame-codec) → 58 (Story 17-1, maos-egress).
++
++**Workspace member count (post Story 21-5):**<!-- workspace-count-authoritative --> Story 21-5 adds ONE leaf crate `crates/maos-orchestrator-buffer/`, moving the count from 58 to **59 workspace members**.
+ 
+ **A2A transport layering (post Story 8.6).** The A2A surface is now three crates with the dependency arrows drawn explicitly:
+ 
+diff -ruN '--exclude=target' head/crates/maos-bin/Cargo.toml kh/crates/maos-bin/Cargo.toml
+--- head/crates/maos-bin/Cargo.toml	2026-11-12 00:13:00.188075241 +0000
++++ kh/crates/maos-bin/Cargo.toml	2026-11-12 00:18:58.880637951 +0000
+@@ -53,6 +53,7 @@
+ maos-frame-codec = { path = "../maos-frame-codec" }
+ maos-manifest = { path = "../maos-manifest" }
+ maos-kernel-core = { path = "../maos-kernel-core" }
++maos-orchestrator-buffer = { path = "../maos-orchestrator-buffer" }
+ maos-control = { path = "../maos-control" }
+ maos-loom-lite = { path = "../maos-loom-lite" }
+ maos-pdp = { path = "../maos-pdp" }   # Story 11.4a — enterprise PDP (Cedar) adapter; composed at the root, optional via MAOS_PDP_POLICY
+diff -ruN '--exclude=target' head/crates/maos-bin/src/main.rs kh/crates/maos-bin/src/main.rs
+--- head/crates/maos-bin/src/main.rs	2026-11-12 00:13:00.189075233 +0000
++++ kh/crates/maos-bin/src/main.rs	2026-11-12 00:18:58.885381229 +0000
+@@ -2353,7 +2353,7 @@
+ 
+     // Story 3.4 — Orchestrator buffer registry (shared Arc for one-shot arms).
+     let orchestrator_registry =
+-        Arc::new(maos_kernel_core::orchestrator::OrchestratorBufferRegistry::new());
++        Arc::new(maos_orchestrator_buffer::OrchestratorBufferRegistry::new());
+     eprintln!("maos: orchestrator buffer registry initialized (Story 3.4)");
+ 
+     // Transparency Log — shared across services within this one-team process.
+@@ -3034,7 +3034,7 @@
+         Some(Arc::clone(&distillate_writer)),
+         Some(Arc::clone(&self_telemetry)),
+         None, // security_manager — constructed per-one-shot arm at v0.3-β
+-        Some(Arc::clone(&orchestrator_registry)),
++        Some(orchestrator_registry.clone()),
+         None, // crash_detector — wired below at Story 5.3 Task 14
+     ));
+     eprintln!("maos: Spirit Scheduler wired (Story 5.1)");
+diff -ruN '--exclude=target' head/crates/maos-bin/src/operator_door.rs kh/crates/maos-bin/src/operator_door.rs
+--- head/crates/maos-bin/src/operator_door.rs	2026-11-12 00:13:00.189075233 +0000
++++ kh/crates/maos-bin/src/operator_door.rs	2026-11-12 00:18:58.884267754 +0000
+@@ -515,7 +515,7 @@
+     scheduler: Arc<maos_kernel_core::scheduler::SpiritSchedulerAdapter>,
+     policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
+     halt_registry: Arc<maos_kernel_core::halt::HaltRegistry>,
+-    orchestrator_registry: Arc<maos_kernel_core::orchestrator::OrchestratorBufferRegistry>,
++    orchestrator_registry: Arc<maos_orchestrator_buffer::OrchestratorBufferRegistry>,
+     output_markers: Arc<maos_kernel_core::halt::OutputMarkerRegistry>,
+     revocation_applier: Arc<maos_kernel_core::revocation::RevocationApplier>,
+     hot_swap_coordinator: Arc<maos_kernel_core::hot_swap::HotSwapCoordinator>,
+@@ -570,7 +570,7 @@
+         policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
+         halt_registry: Arc<maos_kernel_core::halt::HaltRegistry>,
+         output_markers: Arc<maos_kernel_core::halt::OutputMarkerRegistry>,
+-        orchestrator_registry: Arc<maos_kernel_core::orchestrator::OrchestratorBufferRegistry>,
++        orchestrator_registry: Arc<maos_orchestrator_buffer::OrchestratorBufferRegistry>,
+         revocation_applier: Arc<maos_kernel_core::revocation::RevocationApplier>,
+         hot_swap_coordinator: Arc<maos_kernel_core::hot_swap::HotSwapCoordinator>,
+         capability: Arc<maos_kernel_core::api::CapabilityRegistryAdapter>,
+@@ -1028,7 +1028,7 @@
+                 detail: error,
+             };
+         }
+-        if let Err(error) = maos_kernel_core::orchestrator::journal_director_lifecycle_action(
++        if let Err(error) = maos_orchestrator_buffer::journal_director_lifecycle_action(
+             &self.transparency_log,
+             DIRECTOR,
+             spirit_id,
+@@ -1139,7 +1139,7 @@
+             );
+             payload["journal_error"] = serde_json::Value::String(error);
+         }
+-        if let Err(error) = maos_kernel_core::orchestrator::journal_director_lifecycle_action(
++        if let Err(error) = maos_orchestrator_buffer::journal_director_lifecycle_action(
+             &self.transparency_log,
+             DIRECTOR,
+             &admitted.spirit_id,
+@@ -2025,7 +2025,7 @@
+                 }
+             }
+         };
+-        if let Err(error) = maos_kernel_core::orchestrator::journal_orchestrator_queue(
++        if let Err(error) = maos_orchestrator_buffer::journal_orchestrator_queue(
+             &self.transparency_log,
+             DIRECTOR,
+             spirit_id,
+@@ -2175,7 +2175,7 @@
+                 detail: error.to_string(),
+             },
+             Ok(()) => {
+-                let journaled = maos_kernel_core::orchestrator::journal_token_revocation(
++                let journaled = maos_orchestrator_buffer::journal_token_revocation(
+                     &self.transparency_log,
+                     DIRECTOR,
+                     token_id,
+diff -ruN '--exclude=target' head/crates/maos-bin/src/orchestrator_root.rs kh/crates/maos-bin/src/orchestrator_root.rs
+--- head/crates/maos-bin/src/orchestrator_root.rs	2026-11-12 00:13:00.189075233 +0000
++++ kh/crates/maos-bin/src/orchestrator_root.rs	2026-11-12 00:18:58.884801903 +0000
+@@ -28,7 +28,7 @@
+ use maos_kernel_core::iac::TransparencyLogAdapter;
+ use maos_kernel_core::journal::JournalAdapter;
+ use maos_kernel_core::memory::MemoryManagerAdapter;
+-use maos_kernel_core::orchestrator::OrchestratorBufferRegistry;
++use maos_orchestrator_buffer::OrchestratorBufferRegistry;
+ use maos_kernel_core::scheduler::control_block::ScbLifecycleState;
+ use maos_kernel_core::scheduler::SpiritSchedulerAdapter;
+ use orchestrator::{
+diff -ruN '--exclude=target' head/crates/maos-bin/tests/support/shell_world_16_2.rs kh/crates/maos-bin/tests/support/shell_world_16_2.rs
+--- head/crates/maos-bin/tests/support/shell_world_16_2.rs	2026-11-12 00:13:00.190075225 +0000
++++ kh/crates/maos-bin/tests/support/shell_world_16_2.rs	2026-11-12 00:18:58.885053683 +0000
+@@ -20,7 +20,7 @@
+ use maos_kernel_core::memory::{
+     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
+ };
+-use maos_kernel_core::orchestrator::OrchestratorBufferRegistry;
++use maos_orchestrator_buffer::OrchestratorBufferRegistry;
+ use maos_kernel_core::revocation::RevocationApplier;
+ use maos_kernel_core::scheduler::{HookDispatcher, SpiritSchedulerAdapter};
+ use maos_kernel_core::security::crypto::RingCryptoProvider;
+diff -ruN '--exclude=target' head/crates/maos-bin/tests/support/worker_revoke_root.rs kh/crates/maos-bin/tests/support/worker_revoke_root.rs
+--- head/crates/maos-bin/tests/support/worker_revoke_root.rs	2026-11-12 00:13:00.190075225 +0000
++++ kh/crates/maos-bin/tests/support/worker_revoke_root.rs	2026-11-12 00:18:58.885244690 +0000
+@@ -267,7 +267,7 @@
+             Arc::clone(&policy),
+             Arc::clone(&halt),
+             Arc::new(maos_kernel_core::halt::OutputMarkerRegistry::new()),
+-            Arc::new(maos_kernel_core::orchestrator::OrchestratorBufferRegistry::new()),
++            Arc::new(maos_orchestrator_buffer::OrchestratorBufferRegistry::new()),
+             Arc::new(maos_kernel_core::revocation::RevocationApplier::new(
+                 scheduler.scbs(),
+                 Arc::clone(&capability),
+diff -ruN '--exclude=target' head/crates/maos-domain/src/orchestrator.rs kh/crates/maos-domain/src/orchestrator.rs
+--- head/crates/maos-domain/src/orchestrator.rs	2026-11-12 00:13:00.192075209 +0000
++++ kh/crates/maos-domain/src/orchestrator.rs	2026-11-12 00:18:58.912381036 +0000
+@@ -31,6 +31,14 @@
+     pub enqueued_at_ns: u64,
+ }
+ 
++/// FR20 resume seam: the kernel scheduler asks the buffer owner (the
++/// composition root's `maos-orchestrator-buffer` registry) to re-present a
++/// resumed Spirit's pending instructions. The kernel never sees the buffer.
++pub trait OrchestratorResumePort: Send + Sync {
++    /// Called once per successful `resume` of `spirit_id`.
++    fn replay_pending(&self, spirit_id: &str);
++}
++
+ impl OrchestratorInstruction {
+     /// Construct an instruction. Returns `Err` if `goal` is empty or
+     /// whitespace-only — mirrors `Resolution::provided_context`
+diff -ruN '--exclude=target' head/crates/maos-kernel-core/src/lib.rs kh/crates/maos-kernel-core/src/lib.rs
+--- head/crates/maos-kernel-core/src/lib.rs	2026-11-12 00:13:00.218075001 +0000
++++ kh/crates/maos-kernel-core/src/lib.rs	2026-11-12 00:18:58.879083927 +0000
+@@ -34,7 +34,7 @@
+ pub mod lifecycle; // Story 5.4 — upgrade orchestrator (hot-swap, cold-swap, migrator)
+ pub mod mcp; // Story 5.5c — MCP client kernel-side adapter
+ pub mod memory; // supervised service — Memory Manager (§4.2)
+-pub mod orchestrator; // Story 3.4 — Orchestrator instruction buffer + journal helpers
++pub mod orchestrator; // Story 6.5 — FR54 gateway lifecycle host (FR20 buffer moved by 21-5)
+ pub mod revocation; // Story 5.4 — CRL poller, parser, applier, propagation pipeline
+ pub mod scheduler; // supervisor — Spirit Scheduler (architecture §4.1)
+ pub mod security; // supervised service — Security Manager (§4.3)
+diff -ruN '--exclude=target' head/crates/maos-kernel-core/src/orchestrator/buffer.rs kh/crates/maos-kernel-core/src/orchestrator/buffer.rs
+--- head/crates/maos-kernel-core/src/orchestrator/buffer.rs	2026-11-12 00:13:00.218075001 +0000
++++ kh/crates/maos-kernel-core/src/orchestrator/buffer.rs	1970-01-01 00:00:00.000000000 +0000
+@@ -1,220 +0,0 @@
+-#![forbid(unsafe_code)]
+-
+-use maos_domain::orchestrator::OrchestratorInstruction;
+-use std::collections::VecDeque;
+-use std::sync::Mutex;
+-
+-/// Bounded per-Spirit instruction buffer. The Orchestrator-class Spirit
+-/// owns the dequeue cadence; the kernel only enforces FIFO + capacity.
+-///
+-/// Capacity floor: 32 (matches `consent.request` mpsc capacity from
+-/// architecture §7.1.1's per-frame-kind channel-class table — same
+-/// "director-action, low-volume" tier).
+-///
+-/// Backpressure: `enqueue` returns `OrchestratorBufferError::QueueFull`
+-/// when at capacity; CLI surfaces this to the director rather than dropping.
+-#[maos_attrs::i9_exempt(
+-    reason = "orchestrator instruction buffer — transient per-process VecDeque for FR20 checkpoint/resume primitive; parallel to Mailbox routing state"
+-)]
+-#[derive(Debug)]
+-pub struct OrchestratorBuffer {
+-    queue: Mutex<VecDeque<OrchestratorInstruction>>,
+-    capacity: usize,
+-}
+-
+-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+-pub enum OrchestratorBufferError {
+-    #[error("orchestrator buffer at capacity ({0}); director must wait for Orchestrator to drain")]
+-    QueueFull(usize),
+-}
+-
+-impl OrchestratorBuffer {
+-    /// Construct with the v0.3-β capacity floor (32).
+-    pub fn new() -> Self {
+-        Self::with_capacity(32)
+-    }
+-
+-    pub fn with_capacity(capacity: usize) -> Self {
+-        Self {
+-            queue: Mutex::new(VecDeque::with_capacity(capacity)),
+-            capacity,
+-        }
+-    }
+-
+-    /// Enqueue an instruction. Returns `Err(QueueFull)` at capacity.
+-    /// FIFO ordering — `dequeue_at_safe_point` returns in insertion order.
+-    pub fn enqueue(
+-        &self,
+-        instruction: OrchestratorInstruction,
+-    ) -> Result<(), OrchestratorBufferError> {
+-        let mut q = self.queue.lock().unwrap_or_else(|e| e.into_inner());
+-        if q.len() >= self.capacity {
+-            return Err(OrchestratorBufferError::QueueFull(self.capacity));
+-        }
+-        q.push_back(instruction);
+-        Ok(())
+-    }
+-
+-    /// Dequeue the next instruction. Called by the Orchestrator-class
+-    /// Spirit between task completions — NEVER from kernel-internal hooks
+-    /// (that would violate FR20's "never preempt in-flight delegations").
+-    /// On a poisoned mutex, returns `None` (graceful degradation).
+-    pub fn dequeue_at_safe_point(&self) -> Option<OrchestratorInstruction> {
+-        match self.queue.lock() {
+-            Ok(mut q) => q.pop_front(),
+-            Err(_) => None,
+-        }
+-    }
+-
+-    /// Drain ALL pending instructions in FIFO order. Used by the resume
+-    /// path (FR51 c) when the director resumes after a pause: the
+-    /// Orchestrator inherits the full buffered queue without losing order.
+-    pub fn recall_all_pending(&self) -> Vec<OrchestratorInstruction> {
+-        match self.queue.lock() {
+-            Ok(mut q) => {
+-                let drained: Vec<_> = q.drain(..).collect();
+-                drained
+-            }
+-            Err(_) => vec![],
+-        }
+-    }
+-
+-    /// Current pending count — surfaced by `maosctl orchestrator status`
+-    /// (read-only inspection; not normative for the queue's correctness).
+-    pub fn pending_count(&self) -> usize {
+-        match self.queue.lock() {
+-            Ok(q) => q.len(),
+-            Err(_) => 0,
+-        }
+-    }
+-
+-    /// Construction-time capacity (immutable per buffer instance).
+-    pub fn capacity(&self) -> usize {
+-        self.capacity
+-    }
+-}
+-
+-impl Default for OrchestratorBuffer {
+-    fn default() -> Self {
+-        Self::new()
+-    }
+-}
+-
+-#[cfg(test)]
+-mod tests {
+-    use super::*;
+-    use maos_domain::orchestrator::{OrchestratorInstruction, OrchestratorInstructionId};
+-
+-    fn make_instruction(id: u64, goal: impl Into<String>) -> OrchestratorInstruction {
+-        OrchestratorInstruction::new(OrchestratorInstructionId(id), goal, 0).unwrap()
+-    }
+-
+-    #[test]
+-    fn new_returns_buffer_with_capacity_32() {
+-        let buf = OrchestratorBuffer::new();
+-        assert_eq!(buf.capacity(), 32);
+-        assert_eq!(buf.pending_count(), 0);
+-    }
+-
+-    #[test]
+-    fn enqueue_then_dequeue_returns_same_instruction_fifo() {
+-        let buf = OrchestratorBuffer::new();
+-        let instr = make_instruction(1, "test goal");
+-        buf.enqueue(instr.clone()).unwrap();
+-
+-        let dequeued = buf.dequeue_at_safe_point().unwrap();
+-        assert_eq!(dequeued.id, instr.id);
+-        assert_eq!(dequeued.goal, "test goal");
+-    }
+-
+-    #[test]
+-    fn enqueue_32_succeeds_33rd_returns_queue_full() {
+-        let buf = OrchestratorBuffer::new();
+-        for i in 0..32 {
+-            buf.enqueue(make_instruction(i as u64, format!("goal {}", i)))
+-                .unwrap();
+-        }
+-        assert_eq!(buf.pending_count(), 32);
+-        let err = buf.enqueue(make_instruction(99, "overflow")).unwrap_err();
+-        assert!(matches!(err, OrchestratorBufferError::QueueFull(32)));
+-    }
+-
+-    #[test]
+-    fn recall_all_pending_returns_fifo_order() {
+-        let buf = OrchestratorBuffer::new();
+-        buf.enqueue(make_instruction(1, "first")).unwrap();
+-        buf.enqueue(make_instruction(2, "second")).unwrap();
+-        buf.enqueue(make_instruction(3, "third")).unwrap();
+-        buf.enqueue(make_instruction(4, "fourth")).unwrap();
+-        buf.enqueue(make_instruction(5, "fifth")).unwrap();
+-
+-        let all = buf.recall_all_pending();
+-        assert_eq!(all.len(), 5);
+-        assert_eq!(all[0].goal, "first");
+-        assert_eq!(all[1].goal, "second");
+-        assert_eq!(all[2].goal, "third");
+-        assert_eq!(all[3].goal, "fourth");
+-        assert_eq!(all[4].goal, "fifth");
+-    }
+-
+-    #[test]
+-    fn recall_all_pending_empties_the_queue() {
+-        let buf = OrchestratorBuffer::new();
+-        buf.enqueue(make_instruction(1, "a")).unwrap();
+-        buf.enqueue(make_instruction(2, "b")).unwrap();
+-
+-        let all = buf.recall_all_pending();
+-        assert_eq!(all.len(), 2);
+-        assert_eq!(buf.pending_count(), 0);
+-    }
+-
+-    #[test]
+-    fn buffer_is_send_and_sync() {
+-        fn _assert_send_sync<T: Send + Sync>(_: T) {}
+-        _assert_send_sync(OrchestratorBuffer::new());
+-    }
+-
+-    #[test]
+-    fn dequeue_at_safe_point_on_empty_returns_none() {
+-        let buf = OrchestratorBuffer::new();
+-        assert!(buf.dequeue_at_safe_point().is_none());
+-    }
+-
+-    #[test]
+-    fn pending_count_after_enqueue_dequeue_is_correct() {
+-        let buf = OrchestratorBuffer::new();
+-        assert_eq!(buf.pending_count(), 0);
+-        buf.enqueue(make_instruction(1, "a")).unwrap();
+-        assert_eq!(buf.pending_count(), 1);
+-        buf.enqueue(make_instruction(2, "b")).unwrap();
+-        assert_eq!(buf.pending_count(), 2);
+-        buf.dequeue_at_safe_point();
+-        assert_eq!(buf.pending_count(), 1);
+-        buf.dequeue_at_safe_point();
+-        assert_eq!(buf.pending_count(), 0);
+-    }
+-
+-    #[test]
+-    fn recall_and_re_enqueue_preserves_instructions() {
+-        let buf = OrchestratorBuffer::new();
+-        buf.enqueue(make_instruction(1, "first")).unwrap();
+-        buf.enqueue(make_instruction(2, "second")).unwrap();
+-        buf.enqueue(make_instruction(3, "third")).unwrap();
+-
+-        let pending = buf.recall_all_pending();
+-        assert_eq!(pending.len(), 3);
+-        assert_eq!(buf.pending_count(), 0);
+-
+-        for instr in pending {
+-            buf.enqueue(instr).unwrap();
+-        }
+-        assert_eq!(buf.pending_count(), 3);
+-
+-        let first = buf.dequeue_at_safe_point().unwrap();
+-        assert_eq!(first.goal, "first");
+-        let second = buf.dequeue_at_safe_point().unwrap();
+-        assert_eq!(second.goal, "second");
+-        let third = buf.dequeue_at_safe_point().unwrap();
+-        assert_eq!(third.goal, "third");
+-    }
+-}
+diff -ruN '--exclude=target' head/crates/maos-kernel-core/src/orchestrator/mod.rs kh/crates/maos-kernel-core/src/orchestrator/mod.rs
+--- head/crates/maos-kernel-core/src/orchestrator/mod.rs	2026-11-12 00:13:00.218075001 +0000
++++ kh/crates/maos-kernel-core/src/orchestrator/mod.rs	2026-11-12 00:18:58.878993719 +0000
+@@ -1,97 +1,12 @@
+ #![forbid(unsafe_code)]
+ 
+-//! Orchestrator instruction buffer — kernel checkpoint/resume primitive
+-//! per FR20 + epic-3 Story 3.4 AC.
+-//!
+-//! Story 3.4 LANDS: the per-Spirit `OrchestratorBuffer` + `OrchestratorBufferRegistry`,
+-//! the `enqueue` / `dequeue_at_safe_point` / `recall_all_pending` operations,
+-//! and the bounded-queue backpressure semantics.
+-//!
+-//! **What the kernel does NOT decide:** WHEN a safe sequence point fires.
+-//! The Orchestrator-class Spirit calls `dequeue_at_safe_point` from its
+-//! own task-completion handler; the kernel only enforces the queue
+-//! ordering + bounded capacity. Per §4.0.7 the kernel does not embed an
+-//! orchestration policy.
+-//!
+-//! See `crates/maos-cli/src/cli.rs::OrchestratorOp` for the director-side
+-//! CLI surface: `maosctl orchestrator queue|recall` over the operator door (16-1).
++//! FR54 gateway sub-module lifecycle host (Story 6.5). The FR20 instruction
++//! buffer moved to `maos-orchestrator-buffer` (21-5).
+ 
+-pub mod buffer;
+ pub mod echo_gateway;
+ pub mod gateway_dispatcher;
+-pub mod registry;
+ 
+-pub use buffer::{OrchestratorBuffer, OrchestratorBufferError};
+ pub use echo_gateway::{EchoGatewayFactory, EchoGatewaySubmodule};
+ pub use gateway_dispatcher::{
+     GatewayDispatcher, GatewayInstance, GatewaySubmoduleFactory, GatewaySubmoduleRegistry,
+ };
+-pub use registry::OrchestratorBufferRegistry;
+-
+-use crate::iac::transparency_log::TransparencyLogAdapter;
+-use maos_domain::halt::HaltJournalError;
+-use maos_domain::invariants::i4::ApprovalDecision;
+-
+-/// Journal an orchestrator enqueue to the Approval Decision Log (Story 3.4 AC2).
+-/// Mirrors `crate::halt::journal_halt_resolution` (Story 3.3 AC4) — one canonical
+-/// shape for director-action audit rows. `actor` is `"director"` at v0.3-β.
+-pub fn journal_orchestrator_queue(
+-    log: &TransparencyLogAdapter,
+-    actor: &str,
+-    spirit_id: &str,
+-    instruction: &maos_domain::orchestrator::OrchestratorInstruction,
+-) -> Result<(), HaltJournalError> {
+-    log.insert_approval_decision(ApprovalDecision {
+-        actor: actor.into(),
+-        target: spirit_id.into(),
+-        capability: "orchestrator.queue".into(),
+-        intent: "queue".into(),
+-        decision: true,
+-        reasoning: Some(format!(
+-            "id={}: queued instruction (len={}): {}",
+-            instruction.id.0,
+-            instruction.goal.len(),
+-            instruction.goal,
+-        )),
+-    })
+-    .map_err(|e| HaltJournalError::WriteFailed(e.to_string()))
+-}
+-
+-/// Journal a director pause/resume to the Approval Decision Log.
+-/// `action` is one of `"pause"` / `"resume"` — stable labels.
+-pub fn journal_director_lifecycle_action(
+-    log: &TransparencyLogAdapter,
+-    actor: &str,
+-    spirit_id: &str,
+-    action: &str,
+-) -> Result<(), HaltJournalError> {
+-    log.insert_approval_decision(ApprovalDecision {
+-        actor: actor.into(),
+-        target: spirit_id.into(),
+-        capability: format!("lifecycle.{action}"),
+-        intent: action.into(),
+-        decision: true,
+-        reasoning: None,
+-    })
+-    .map_err(|e| HaltJournalError::WriteFailed(e.to_string()))
+-}
+-
+-/// Journal a director-initiated capability token revocation. Per FR42
+-/// the row carries director identity (`actor = "director"` at v0.3-β)
+-/// + optional reason. `capability` is the stable label `"token.revoke"`.
+-pub fn journal_token_revocation(
+-    log: &TransparencyLogAdapter,
+-    actor: &str,
+-    token_id_hex: &str,
+-    reason: Option<&str>,
+-) -> Result<(), HaltJournalError> {
+-    log.insert_approval_decision(ApprovalDecision {
+-        actor: actor.into(),
+-        target: format!("token:{token_id_hex}"),
+-        capability: "token.revoke".into(),
+-        intent: "revoke".into(),
+-        decision: true,
+-        reasoning: reason.map(|r| format!("token={token_id_hex}: {r}")),
+-    })
+-    .map_err(|e| HaltJournalError::WriteFailed(e.to_string()))
+-}
+diff -ruN '--exclude=target' head/crates/maos-kernel-core/src/orchestrator/registry.rs kh/crates/maos-kernel-core/src/orchestrator/registry.rs
+--- head/crates/maos-kernel-core/src/orchestrator/registry.rs	2026-11-12 00:13:00.218075001 +0000
++++ kh/crates/maos-kernel-core/src/orchestrator/registry.rs	1970-01-01 00:00:00.000000000 +0000
+@@ -1,90 +0,0 @@
+-#![forbid(unsafe_code)]
+-
+-use super::buffer::OrchestratorBuffer;
+-use dashmap::DashMap;
+-use maos_spirit_abi::identity::SpiritId;
+-use std::sync::Arc;
+-
+-/// Per-Host registry of Orchestrator-class buffer instances. One
+-/// `OrchestratorBuffer` per Orchestrator Spirit; lookup by `SpiritId`.
+-///
+-/// Held in `Arc` so the CLI one-shot arm + the (future Story 5.1)
+-/// supervised Orchestrator process see the same buffer. At v0.3-β the
+-/// one-shot arms instantiate a fresh registry per invocation — Story 5.1
+-/// will share it with the long-running supervisor.
+-#[maos_attrs::i9_exempt(
+-    reason = "orchestrator registry — DashMap of per-Spirit transient buffers; parallel to Mailbox::mpsc_senders"
+-)]
+-#[derive(Debug, Default)]
+-pub struct OrchestratorBufferRegistry {
+-    buffers: DashMap<String, Arc<OrchestratorBuffer>>,
+-}
+-
+-impl OrchestratorBufferRegistry {
+-    pub fn new() -> Self {
+-        Self::default()
+-    }
+-
+-    /// Get-or-create the buffer for `spirit_id`. Same shape as
+-    /// `Mailbox::register_spirit` but idempotent (returns existing buffer
+-    /// instead of error on duplicate) because director-side enqueues
+-    /// arrive before any "registration" call.
+-    pub fn get_or_create(&self, spirit_id: &SpiritId) -> Arc<OrchestratorBuffer> {
+-        self.buffers
+-            .entry(spirit_id.0.clone())
+-            .or_insert_with(|| Arc::new(OrchestratorBuffer::new()))
+-            .value()
+-            .clone()
+-    }
+-
+-    /// Look up an existing buffer without creating one. Returns `None`
+-    /// if the Spirit has never been queued to.
+-    pub fn get(&self, spirit_id: &SpiritId) -> Option<Arc<OrchestratorBuffer>> {
+-        self.buffers.get(&spirit_id.0).map(|r| r.value().clone())
+-    }
+-}
+-
+-#[cfg(test)]
+-mod tests {
+-    use super::*;
+-    use maos_spirit_abi::identity::SpiritId;
+-
+-    fn sid(s: &str) -> SpiritId {
+-        SpiritId::from(s)
+-    }
+-
+-    #[test]
+-    fn get_or_create_returns_new_buffer_for_fresh_spirit() {
+-        let registry = OrchestratorBufferRegistry::new();
+-        let buf = registry.get_or_create(&sid("hello-spirit"));
+-        assert_eq!(buf.pending_count(), 0);
+-        assert_eq!(buf.capacity(), 32);
+-    }
+-
+-    #[test]
+-    fn get_or_create_is_idempotent() {
+-        let registry = OrchestratorBufferRegistry::new();
+-        let buf1 = registry.get_or_create(&sid("hello-spirit"));
+-        let buf2 = registry.get_or_create(&sid("hello-spirit"));
+-        assert!(Arc::ptr_eq(&buf1, &buf2));
+-    }
+-
+-    #[test]
+-    fn get_returns_none_for_unknown_spirit() {
+-        let registry = OrchestratorBufferRegistry::new();
+-        assert!(registry.get(&sid("unknown-spirit")).is_none());
+-    }
+-
+-    #[test]
+-    fn get_returns_some_for_known_spirit() {
+-        let registry = OrchestratorBufferRegistry::new();
+-        registry.get_or_create(&sid("hello-spirit"));
+-        assert!(registry.get(&sid("hello-spirit")).is_some());
+-    }
+-
+-    #[test]
+-    fn registry_is_send_and_sync() {
+-        fn _assert_send_sync<T: Send + Sync>(_: T) {}
+-        _assert_send_sync(OrchestratorBufferRegistry::new());
+-    }
+-}
+diff -ruN '--exclude=target' head/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs kh/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+--- head/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs	2026-11-12 00:13:00.219074993 +0000
++++ kh/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs	2026-11-12 00:18:58.879824020 +0000
+@@ -86,7 +86,7 @@
+     _iac: Arc<crate::iac::IacBusAdapter>,
+     _halt_registry: Arc<crate::halt::HaltRegistry>,
+     security_manager: Option<Arc<crate::security::SecurityManagerAdapter>>,
+-    orchestrator_registry: Option<Arc<crate::orchestrator::OrchestratorBufferRegistry>>,
++    orchestrator_registry: Option<Arc<dyn maos_domain::orchestrator::OrchestratorResumePort>>,
+     crash_detector: Option<Arc<crate::supervision::CrashDetector>>,
+     /// Resolver used to route FR50 disposition after an unload-hook failure;
+     /// late-bound at the composition root with CrashDetector.
+@@ -110,7 +110,7 @@
+         distillate_writer: Option<Arc<crate::iac::distillate::DistillateWriter>>,
+         self_telemetry: Option<Arc<crate::memory::self_telemetry::SelfTelemetryAggregator>>,
+         security_manager: Option<Arc<crate::security::SecurityManagerAdapter>>,
+-        orchestrator_registry: Option<Arc<crate::orchestrator::OrchestratorBufferRegistry>>,
++        orchestrator_registry: Option<Arc<dyn maos_domain::orchestrator::OrchestratorResumePort>>,
+         crash_detector: Option<Arc<crate::supervision::CrashDetector>>,
+     ) -> Self {
+         let spirits = Arc::new(RwLock::new(BTreeMap::new()));
+@@ -487,21 +487,9 @@
+         // Story 19-2 (FR51 a) — lift the pause fence once Running again.
+         self.capability.set_paused(spirit_pid, false);
+ 
+-        // Story 3.4 — replay buffered Orchestrator instructions.
+-        if let Some(ref registry) = self.orchestrator_registry {
+-            use maos_spirit_abi::identity::SpiritId;
+-            let sid = SpiritId::from(scb.spirit_id.as_str());
+-            if let Some(buffer) = registry.get(&sid) {
+-                let pending = buffer.recall_all_pending();
+-                // v0.3-β: re-enqueue so the Orchestrator spirit can dequeue
+-                // them at a safe point. Frame-level delivery deferred to
+-                // Story 5.4 when the orchestrator wire protocol stabilizes.
+-                for instr in pending {
+-                    if let Err(e) = buffer.enqueue(instr) {
+-                        eprintln!("maos: resume re-enqueue failed: {e}");
+-                    }
+-                }
+-            }
++        // Story 3.4 — replay buffered Orchestrator instructions (FR20 port).
++        if let Some(ref port) = self.orchestrator_registry {
++            port.replay_pending(&scb.spirit_id);
+         }
+ 
+         let outcome = self.dispatcher.fire_on_resume(&scb).await;
+diff -ruN '--exclude=target' head/crates/maos-kernel-core/tests/lifecycle_journal_write_latency.rs kh/crates/maos-kernel-core/tests/lifecycle_journal_write_latency.rs
+--- head/crates/maos-kernel-core/tests/lifecycle_journal_write_latency.rs	2026-11-12 00:13:00.222074970 +0000
++++ kh/crates/maos-kernel-core/tests/lifecycle_journal_write_latency.rs	1970-01-01 00:00:00.000000000 +0000
+@@ -1,88 +0,0 @@
+-#![forbid(unsafe_code)]
+-
+-//! Lifecycle journal-write latency (Story 3.4 AC5; renamed by Story 19-2 AC9).
+-//!
+-//! Times what it runs: 1000 pairs of director `lifecycle.pause` /
+-//! `lifecycle.resume` Approval-Decision rows written to an in-memory
+-//! Transparency Log, the resume leg also recalling an (empty) Orchestrator
+-//! buffer. No Spirit is loaded, no hook runs and nothing is paused, so this is
+-//! NOT an FR51 measurement — was `nfr_perf_4_pause_resume_latency.rs`, whose
+-//! "FR51 (a/b) pause P99 <=2s" label had no mechanism behind it (rule 11).
+-//! FR51(a)(d) are measured in `fr51_pause_fence_19_2.rs` (D-19-2-19 A).
+-//!
+-//! The 2 s / 5 s ceilings are a regression tripwire on the journal path only.
+-
+-use std::time::Instant;
+-
+-use maos_domain::invariants::i4::ApprovalDecision;
+-use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
+-use maos_kernel_core::orchestrator::OrchestratorBufferRegistry;
+-use maos_spirit_abi::identity::SpiritId;
+-
+-/// P99 ceiling of one lifecycle journal write, in microseconds (2 s).
+-const JOURNAL_WRITE_P99_BUDGET_US: u64 = 2_000_000;
+-/// P99.9 ceiling of one lifecycle journal write, in microseconds (5 s).
+-const JOURNAL_WRITE_P999_BUDGET_US: u64 = 5_000_000;
+-
+-fn setup_in_memory_log() -> TransparencyLogAdapter {
+-    TransparencyLogAdapter::open_in_memory(0)
+-}
+-
+-fn write_lifecycle_row(log: &TransparencyLogAdapter, spirit_id: &str, verb: &str) {
+-    let _ = log.insert_approval_decision(ApprovalDecision {
+-        actor: "director".into(),
+-        target: spirit_id.into(),
+-        capability: format!("lifecycle.{verb}"),
+-        intent: verb.into(),
+-        decision: true,
+-        reasoning: None,
+-    });
+-}
+-
+-#[tokio::test]
+-async fn lifecycle_journal_write_1000_corpus() {
+-    const N: usize = 1000;
+-    let mut pause_row_us = Vec::with_capacity(N);
+-    let mut resume_row_us = Vec::with_capacity(N);
+-
+-    let log = setup_in_memory_log();
+-    let spirit = SpiritId::from("hello-spirit");
+-    let registry = OrchestratorBufferRegistry::new();
+-    // Create the (empty) buffer up front so the resume leg's lookup hits and
+-    // `recall_all_pending` runs on the measured path.
+-    registry.get_or_create(&spirit);
+-
+-    for _ in 0..N {
+-        let t0 = Instant::now();
+-        write_lifecycle_row(&log, "hello-spirit", "pause");
+-        pause_row_us.push(t0.elapsed().as_micros() as u64);
+-
+-        let t1 = Instant::now();
+-        write_lifecycle_row(&log, "hello-spirit", "resume");
+-        let recalled = registry.get(&spirit).map(|buf| buf.recall_all_pending());
+-        resume_row_us.push(t1.elapsed().as_micros() as u64);
+-        assert!(
+-            recalled.is_some_and(|instructions| instructions.is_empty()),
+-            "the resume leg recalls the (empty) buffer"
+-        );
+-    }
+-
+-    pause_row_us.sort();
+-    resume_row_us.sort();
+-
+-    for (label, sample) in [
+-        ("lifecycle.pause row", &pause_row_us),
+-        ("lifecycle.resume row + buffer recall", &resume_row_us),
+-    ] {
+-        let p99 = sample[(N * 99) / 100];
+-        let p999 = sample[(N * 999) / 1000];
+-        assert!(
+-            p99 < JOURNAL_WRITE_P99_BUDGET_US,
+-            "{label}: P99 = {p99}us exceeds {JOURNAL_WRITE_P99_BUDGET_US}us"
+-        );
+-        assert!(
+-            p999 < JOURNAL_WRITE_P999_BUDGET_US,
+-            "{label}: P99.9 = {p999}us exceeds {JOURNAL_WRITE_P999_BUDGET_US}us"
+-        );
+-    }
+-}
+diff -ruN '--exclude=target' head/crates/maos-orchestrator-buffer/Cargo.toml kh/crates/maos-orchestrator-buffer/Cargo.toml
+--- head/crates/maos-orchestrator-buffer/Cargo.toml	1970-01-01 00:00:00.000000000 +0000
++++ kh/crates/maos-orchestrator-buffer/Cargo.toml	2026-11-12 00:18:58.879143669 +0000
+@@ -0,0 +1,20 @@
++[package]
++name = "maos-orchestrator-buffer"
++version.workspace = true
++edition.workspace = true
++license.workspace = true
++repository.workspace = true
++rust-version.workspace = true
++description = "FR20 Orchestrator instruction buffer (user-space; moved out of maos-kernel-core by 21-5)"
++
++[dependencies]
++maos-domain = { path = "../maos-domain" }
++maos-iac = { path = "../maos-iac" }
++maos-spirit-abi = { path = "../maos-spirit-abi" }
++maos-attrs = { path = "../maos-attrs" }
++dashmap = "6.1"
++thiserror = "2.0"
++
++[dev-dependencies]
++tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread"] }
++maos-capability = { path = "../maos-capability" }
+diff -ruN '--exclude=target' head/crates/maos-orchestrator-buffer/src/buffer.rs kh/crates/maos-orchestrator-buffer/src/buffer.rs
+--- head/crates/maos-orchestrator-buffer/src/buffer.rs	1970-01-01 00:00:00.000000000 +0000
++++ kh/crates/maos-orchestrator-buffer/src/buffer.rs	2026-11-12 00:13:00.218075001 +0000
+@@ -0,0 +1,220 @@
++#![forbid(unsafe_code)]
++
++use maos_domain::orchestrator::OrchestratorInstruction;
++use std::collections::VecDeque;
++use std::sync::Mutex;
++
++/// Bounded per-Spirit instruction buffer. The Orchestrator-class Spirit
++/// owns the dequeue cadence; the kernel only enforces FIFO + capacity.
++///
++/// Capacity floor: 32 (matches `consent.request` mpsc capacity from
++/// architecture §7.1.1's per-frame-kind channel-class table — same
++/// "director-action, low-volume" tier).
++///
++/// Backpressure: `enqueue` returns `OrchestratorBufferError::QueueFull`
++/// when at capacity; CLI surfaces this to the director rather than dropping.
++#[maos_attrs::i9_exempt(
++    reason = "orchestrator instruction buffer — transient per-process VecDeque for FR20 checkpoint/resume primitive; parallel to Mailbox routing state"
++)]
++#[derive(Debug)]
++pub struct OrchestratorBuffer {
++    queue: Mutex<VecDeque<OrchestratorInstruction>>,
++    capacity: usize,
++}
++
++#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
++pub enum OrchestratorBufferError {
++    #[error("orchestrator buffer at capacity ({0}); director must wait for Orchestrator to drain")]
++    QueueFull(usize),
++}
++
++impl OrchestratorBuffer {
++    /// Construct with the v0.3-β capacity floor (32).
++    pub fn new() -> Self {
++        Self::with_capacity(32)
++    }
++
++    pub fn with_capacity(capacity: usize) -> Self {
++        Self {
++            queue: Mutex::new(VecDeque::with_capacity(capacity)),
++            capacity,
++        }
++    }
++
++    /// Enqueue an instruction. Returns `Err(QueueFull)` at capacity.
++    /// FIFO ordering — `dequeue_at_safe_point` returns in insertion order.
++    pub fn enqueue(
++        &self,
++        instruction: OrchestratorInstruction,
++    ) -> Result<(), OrchestratorBufferError> {
++        let mut q = self.queue.lock().unwrap_or_else(|e| e.into_inner());
++        if q.len() >= self.capacity {
++            return Err(OrchestratorBufferError::QueueFull(self.capacity));
++        }
++        q.push_back(instruction);
++        Ok(())
++    }
++
++    /// Dequeue the next instruction. Called by the Orchestrator-class
++    /// Spirit between task completions — NEVER from kernel-internal hooks
++    /// (that would violate FR20's "never preempt in-flight delegations").
++    /// On a poisoned mutex, returns `None` (graceful degradation).
++    pub fn dequeue_at_safe_point(&self) -> Option<OrchestratorInstruction> {
++        match self.queue.lock() {
++            Ok(mut q) => q.pop_front(),
++            Err(_) => None,
++        }
++    }
++
++    /// Drain ALL pending instructions in FIFO order. Used by the resume
++    /// path (FR51 c) when the director resumes after a pause: the
++    /// Orchestrator inherits the full buffered queue without losing order.
++    pub fn recall_all_pending(&self) -> Vec<OrchestratorInstruction> {
++        match self.queue.lock() {
++            Ok(mut q) => {
++                let drained: Vec<_> = q.drain(..).collect();
++                drained
++            }
++            Err(_) => vec![],
++        }
++    }
++
++    /// Current pending count — surfaced by `maosctl orchestrator status`
++    /// (read-only inspection; not normative for the queue's correctness).
++    pub fn pending_count(&self) -> usize {
++        match self.queue.lock() {
++            Ok(q) => q.len(),
++            Err(_) => 0,
++        }
++    }
++
++    /// Construction-time capacity (immutable per buffer instance).
++    pub fn capacity(&self) -> usize {
++        self.capacity
++    }
++}
++
++impl Default for OrchestratorBuffer {
++    fn default() -> Self {
++        Self::new()
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use maos_domain::orchestrator::{OrchestratorInstruction, OrchestratorInstructionId};
++
++    fn make_instruction(id: u64, goal: impl Into<String>) -> OrchestratorInstruction {
++        OrchestratorInstruction::new(OrchestratorInstructionId(id), goal, 0).unwrap()
++    }
++
++    #[test]
++    fn new_returns_buffer_with_capacity_32() {
++        let buf = OrchestratorBuffer::new();
++        assert_eq!(buf.capacity(), 32);
++        assert_eq!(buf.pending_count(), 0);
++    }
++
++    #[test]
++    fn enqueue_then_dequeue_returns_same_instruction_fifo() {
++        let buf = OrchestratorBuffer::new();
++        let instr = make_instruction(1, "test goal");
++        buf.enqueue(instr.clone()).unwrap();
++
++        let dequeued = buf.dequeue_at_safe_point().unwrap();
++        assert_eq!(dequeued.id, instr.id);
++        assert_eq!(dequeued.goal, "test goal");
++    }
++
++    #[test]
++    fn enqueue_32_succeeds_33rd_returns_queue_full() {
++        let buf = OrchestratorBuffer::new();
++        for i in 0..32 {
++            buf.enqueue(make_instruction(i as u64, format!("goal {}", i)))
++                .unwrap();
++        }
++        assert_eq!(buf.pending_count(), 32);
++        let err = buf.enqueue(make_instruction(99, "overflow")).unwrap_err();
++        assert!(matches!(err, OrchestratorBufferError::QueueFull(32)));
++    }
++
++    #[test]
++    fn recall_all_pending_returns_fifo_order() {
++        let buf = OrchestratorBuffer::new();
++        buf.enqueue(make_instruction(1, "first")).unwrap();
++        buf.enqueue(make_instruction(2, "second")).unwrap();
++        buf.enqueue(make_instruction(3, "third")).unwrap();
++        buf.enqueue(make_instruction(4, "fourth")).unwrap();
++        buf.enqueue(make_instruction(5, "fifth")).unwrap();
++
++        let all = buf.recall_all_pending();
++        assert_eq!(all.len(), 5);
++        assert_eq!(all[0].goal, "first");
++        assert_eq!(all[1].goal, "second");
++        assert_eq!(all[2].goal, "third");
++        assert_eq!(all[3].goal, "fourth");
++        assert_eq!(all[4].goal, "fifth");
++    }
++
++    #[test]
++    fn recall_all_pending_empties_the_queue() {
++        let buf = OrchestratorBuffer::new();
++        buf.enqueue(make_instruction(1, "a")).unwrap();
++        buf.enqueue(make_instruction(2, "b")).unwrap();
++
++        let all = buf.recall_all_pending();
++        assert_eq!(all.len(), 2);
++        assert_eq!(buf.pending_count(), 0);
++    }
++
++    #[test]
++    fn buffer_is_send_and_sync() {
++        fn _assert_send_sync<T: Send + Sync>(_: T) {}
++        _assert_send_sync(OrchestratorBuffer::new());
++    }
++
++    #[test]
++    fn dequeue_at_safe_point_on_empty_returns_none() {
++        let buf = OrchestratorBuffer::new();
++        assert!(buf.dequeue_at_safe_point().is_none());
++    }
++
++    #[test]
++    fn pending_count_after_enqueue_dequeue_is_correct() {
++        let buf = OrchestratorBuffer::new();
++        assert_eq!(buf.pending_count(), 0);
++        buf.enqueue(make_instruction(1, "a")).unwrap();
++        assert_eq!(buf.pending_count(), 1);
++        buf.enqueue(make_instruction(2, "b")).unwrap();
++        assert_eq!(buf.pending_count(), 2);
++        buf.dequeue_at_safe_point();
++        assert_eq!(buf.pending_count(), 1);
++        buf.dequeue_at_safe_point();
++        assert_eq!(buf.pending_count(), 0);
++    }
++
++    #[test]
++    fn recall_and_re_enqueue_preserves_instructions() {
++        let buf = OrchestratorBuffer::new();
++        buf.enqueue(make_instruction(1, "first")).unwrap();
++        buf.enqueue(make_instruction(2, "second")).unwrap();
++        buf.enqueue(make_instruction(3, "third")).unwrap();
++
++        let pending = buf.recall_all_pending();
++        assert_eq!(pending.len(), 3);
++        assert_eq!(buf.pending_count(), 0);
++
++        for instr in pending {
++            buf.enqueue(instr).unwrap();
++        }
++        assert_eq!(buf.pending_count(), 3);
++
++        let first = buf.dequeue_at_safe_point().unwrap();
++        assert_eq!(first.goal, "first");
++        let second = buf.dequeue_at_safe_point().unwrap();
++        assert_eq!(second.goal, "second");
++        let third = buf.dequeue_at_safe_point().unwrap();
++        assert_eq!(third.goal, "third");
++    }
++}
+diff -ruN '--exclude=target' head/crates/maos-orchestrator-buffer/src/lib.rs kh/crates/maos-orchestrator-buffer/src/lib.rs
+--- head/crates/maos-orchestrator-buffer/src/lib.rs	1970-01-01 00:00:00.000000000 +0000
++++ kh/crates/maos-orchestrator-buffer/src/lib.rs	2026-11-12 00:18:58.908381065 +0000
+@@ -0,0 +1,91 @@
++#![forbid(unsafe_code)]
++
++//! Orchestrator instruction buffer — FR20 checkpoint/resume primitive (moved out of maos-kernel-core by 21-5)
++//! per FR20 + epic-3 Story 3.4 AC.
++//!
++//! Story 3.4 LANDS: the per-Spirit `OrchestratorBuffer` + `OrchestratorBufferRegistry`,
++//! the `enqueue` / `dequeue_at_safe_point` / `recall_all_pending` operations,
++//! and the bounded-queue backpressure semantics.
++//!
++//! **What the kernel does NOT decide:** WHEN a safe sequence point fires.
++//! The Orchestrator-class Spirit calls `dequeue_at_safe_point` from its
++//! own task-completion handler; the kernel only enforces the queue
++//! ordering + bounded capacity. Per §4.0.7 the kernel does not embed an
++//! orchestration policy.
++//!
++//! See `crates/maos-cli/src/cli.rs::OrchestratorOp` for the director-side
++//! CLI surface: `maosctl orchestrator queue|recall` over the operator door (16-1).
++
++pub mod buffer;
++pub mod registry;
++
++pub use buffer::{OrchestratorBuffer, OrchestratorBufferError};
++pub use registry::OrchestratorBufferRegistry;
++
++use maos_domain::halt::HaltJournalError;
++use maos_domain::invariants::i4::ApprovalDecision;
++use maos_iac::transparency_log::TransparencyLogAdapter;
++
++/// Journal an orchestrator enqueue to the Approval Decision Log (Story 3.4 AC2).
++/// Mirrors `crate::halt::journal_halt_resolution` (Story 3.3 AC4) — one canonical
++/// shape for director-action audit rows. `actor` is `"director"` at v0.3-β.
++pub fn journal_orchestrator_queue(
++    log: &TransparencyLogAdapter,
++    actor: &str,
++    spirit_id: &str,
++    instruction: &maos_domain::orchestrator::OrchestratorInstruction,
++) -> Result<(), HaltJournalError> {
++    log.insert_approval_decision(ApprovalDecision {
++        actor: actor.into(),
++        target: spirit_id.into(),
++        capability: "orchestrator.queue".into(),
++        intent: "queue".into(),
++        decision: true,
++        reasoning: Some(format!(
++            "id={}: queued instruction (len={}): {}",
++            instruction.id.0,
++            instruction.goal.len(),
++            instruction.goal,
++        )),
++    })
++    .map_err(|e| HaltJournalError::WriteFailed(e.to_string()))
++}
++
++/// Journal a director pause/resume to the Approval Decision Log.
++/// `action` is one of `"pause"` / `"resume"` — stable labels.
++pub fn journal_director_lifecycle_action(
++    log: &TransparencyLogAdapter,
++    actor: &str,
++    spirit_id: &str,
++    action: &str,
++) -> Result<(), HaltJournalError> {
++    log.insert_approval_decision(ApprovalDecision {
++        actor: actor.into(),
++        target: spirit_id.into(),
++        capability: format!("lifecycle.{action}"),
++        intent: action.into(),
++        decision: true,
++        reasoning: None,
++    })
++    .map_err(|e| HaltJournalError::WriteFailed(e.to_string()))
++}
++
++/// Journal a director-initiated capability token revocation. Per FR42
++/// the row carries director identity (`actor = "director"` at v0.3-β)
++/// + optional reason. `capability` is the stable label `"token.revoke"`.
++pub fn journal_token_revocation(
++    log: &TransparencyLogAdapter,
++    actor: &str,
++    token_id_hex: &str,
++    reason: Option<&str>,
++) -> Result<(), HaltJournalError> {
++    log.insert_approval_decision(ApprovalDecision {
++        actor: actor.into(),
++        target: format!("token:{token_id_hex}"),
++        capability: "token.revoke".into(),
++        intent: "revoke".into(),
++        decision: true,
++        reasoning: reason.map(|r| format!("token={token_id_hex}: {r}")),
++    })
++    .map_err(|e| HaltJournalError::WriteFailed(e.to_string()))
++}
+diff -ruN '--exclude=target' head/crates/maos-orchestrator-buffer/src/registry.rs kh/crates/maos-orchestrator-buffer/src/registry.rs
+--- head/crates/maos-orchestrator-buffer/src/registry.rs	1970-01-01 00:00:00.000000000 +0000
++++ kh/crates/maos-orchestrator-buffer/src/registry.rs	2026-11-12 00:18:58.879996443 +0000
+@@ -0,0 +1,108 @@
++#![forbid(unsafe_code)]
++
++use super::buffer::OrchestratorBuffer;
++use dashmap::DashMap;
++use maos_spirit_abi::identity::SpiritId;
++use std::sync::Arc;
++
++/// Per-Host registry of Orchestrator-class buffer instances. One
++/// `OrchestratorBuffer` per Orchestrator Spirit; lookup by `SpiritId`.
++///
++/// Held in `Arc` so the CLI one-shot arm + the (future Story 5.1)
++/// supervised Orchestrator process see the same buffer. At v0.3-β the
++/// one-shot arms instantiate a fresh registry per invocation — Story 5.1
++/// will share it with the long-running supervisor.
++#[maos_attrs::i9_exempt(
++    reason = "orchestrator registry — DashMap of per-Spirit transient buffers; parallel to Mailbox::mpsc_senders"
++)]
++#[derive(Debug, Default)]
++pub struct OrchestratorBufferRegistry {
++    buffers: DashMap<String, Arc<OrchestratorBuffer>>,
++}
++
++impl OrchestratorBufferRegistry {
++    pub fn new() -> Self {
++        Self::default()
++    }
++
++    /// Get-or-create the buffer for `spirit_id`. Same shape as
++    /// `Mailbox::register_spirit` but idempotent (returns existing buffer
++    /// instead of error on duplicate) because director-side enqueues
++    /// arrive before any "registration" call.
++    pub fn get_or_create(&self, spirit_id: &SpiritId) -> Arc<OrchestratorBuffer> {
++        self.buffers
++            .entry(spirit_id.0.clone())
++            .or_insert_with(|| Arc::new(OrchestratorBuffer::new()))
++            .value()
++            .clone()
++    }
++
++    /// Look up an existing buffer without creating one. Returns `None`
++    /// if the Spirit has never been queued to.
++    pub fn get(&self, spirit_id: &SpiritId) -> Option<Arc<OrchestratorBuffer>> {
++        self.buffers.get(&spirit_id.0).map(|r| r.value().clone())
++    }
++}
++
++/// FR20 resume replay (Story 3.4), called by the kernel scheduler through
++/// `maos_domain::orchestrator::OrchestratorResumePort` on `resume`.
++impl maos_domain::orchestrator::OrchestratorResumePort for OrchestratorBufferRegistry {
++    fn replay_pending(&self, spirit_id: &str) {
++        if let Some(buffer) = self.get(&SpiritId::from(spirit_id)) {
++            let pending = buffer.recall_all_pending();
++            // v0.3-β: re-enqueue so the Orchestrator spirit can dequeue
++            // them at a safe point. Frame-level delivery deferred to
++            // Story 5.4 when the orchestrator wire protocol stabilizes.
++            for instr in pending {
++                if let Err(e) = buffer.enqueue(instr) {
++                    eprintln!("maos: resume re-enqueue failed: {e}");
++                }
++            }
++        }
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use maos_spirit_abi::identity::SpiritId;
++
++    fn sid(s: &str) -> SpiritId {
++        SpiritId::from(s)
++    }
++
++    #[test]
++    fn get_or_create_returns_new_buffer_for_fresh_spirit() {
++        let registry = OrchestratorBufferRegistry::new();
++        let buf = registry.get_or_create(&sid("hello-spirit"));
++        assert_eq!(buf.pending_count(), 0);
++        assert_eq!(buf.capacity(), 32);
++    }
++
++    #[test]
++    fn get_or_create_is_idempotent() {
++        let registry = OrchestratorBufferRegistry::new();
++        let buf1 = registry.get_or_create(&sid("hello-spirit"));
++        let buf2 = registry.get_or_create(&sid("hello-spirit"));
++        assert!(Arc::ptr_eq(&buf1, &buf2));
++    }
++
++    #[test]
++    fn get_returns_none_for_unknown_spirit() {
++        let registry = OrchestratorBufferRegistry::new();
++        assert!(registry.get(&sid("unknown-spirit")).is_none());
++    }
++
++    #[test]
++    fn get_returns_some_for_known_spirit() {
++        let registry = OrchestratorBufferRegistry::new();
++        registry.get_or_create(&sid("hello-spirit"));
++        assert!(registry.get(&sid("hello-spirit")).is_some());
++    }
++
++    #[test]
++    fn registry_is_send_and_sync() {
++        fn _assert_send_sync<T: Send + Sync>(_: T) {}
++        _assert_send_sync(OrchestratorBufferRegistry::new());
++    }
++}
+diff -ruN '--exclude=target' head/crates/maos-orchestrator-buffer/tests/lifecycle_journal_write_latency.rs kh/crates/maos-orchestrator-buffer/tests/lifecycle_journal_write_latency.rs
+--- head/crates/maos-orchestrator-buffer/tests/lifecycle_journal_write_latency.rs	1970-01-01 00:00:00.000000000 +0000
++++ kh/crates/maos-orchestrator-buffer/tests/lifecycle_journal_write_latency.rs	2026-11-12 00:18:58.888525932 +0000
+@@ -0,0 +1,88 @@
++#![forbid(unsafe_code)]
++
++//! Lifecycle journal-write latency (Story 3.4 AC5; renamed by Story 19-2 AC9).
++//!
++//! Times what it runs: 1000 pairs of director `lifecycle.pause` /
++//! `lifecycle.resume` Approval-Decision rows written to an in-memory
++//! Transparency Log, the resume leg also recalling an (empty) Orchestrator
++//! buffer. No Spirit is loaded, no hook runs and nothing is paused, so this is
++//! NOT an FR51 measurement — was `nfr_perf_4_pause_resume_latency.rs`, whose
++//! "FR51 (a/b) pause P99 <=2s" label had no mechanism behind it (rule 11).
++//! FR51(a)(d) are measured in `fr51_pause_fence_19_2.rs` (D-19-2-19 A).
++//!
++//! The 2 s / 5 s ceilings are a regression tripwire on the journal path only.
++
++use std::time::Instant;
++
++use maos_domain::invariants::i4::ApprovalDecision;
++use maos_iac::transparency_log::TransparencyLogAdapter;
++use maos_orchestrator_buffer::OrchestratorBufferRegistry;
++use maos_spirit_abi::identity::SpiritId;
++
++/// P99 ceiling of one lifecycle journal write, in microseconds (2 s).
++const JOURNAL_WRITE_P99_BUDGET_US: u64 = 2_000_000;
++/// P99.9 ceiling of one lifecycle journal write, in microseconds (5 s).
++const JOURNAL_WRITE_P999_BUDGET_US: u64 = 5_000_000;
++
++fn setup_in_memory_log() -> TransparencyLogAdapter {
++    TransparencyLogAdapter::open_in_memory(0)
++}
++
++fn write_lifecycle_row(log: &TransparencyLogAdapter, spirit_id: &str, verb: &str) {
++    let _ = log.insert_approval_decision(ApprovalDecision {
++        actor: "director".into(),
++        target: spirit_id.into(),
++        capability: format!("lifecycle.{verb}"),
++        intent: verb.into(),
++        decision: true,
++        reasoning: None,
++    });
++}
++
++#[tokio::test]
++async fn lifecycle_journal_write_1000_corpus() {
++    const N: usize = 1000;
++    let mut pause_row_us = Vec::with_capacity(N);
++    let mut resume_row_us = Vec::with_capacity(N);
++
++    let log = setup_in_memory_log();
++    let spirit = SpiritId::from("hello-spirit");
++    let registry = OrchestratorBufferRegistry::new();
++    // Create the (empty) buffer up front so the resume leg's lookup hits and
++    // `recall_all_pending` runs on the measured path.
++    registry.get_or_create(&spirit);
++
++    for _ in 0..N {
++        let t0 = Instant::now();
++        write_lifecycle_row(&log, "hello-spirit", "pause");
++        pause_row_us.push(t0.elapsed().as_micros() as u64);
++
++        let t1 = Instant::now();
++        write_lifecycle_row(&log, "hello-spirit", "resume");
++        let recalled = registry.get(&spirit).map(|buf| buf.recall_all_pending());
++        resume_row_us.push(t1.elapsed().as_micros() as u64);
++        assert!(
++            recalled.is_some_and(|instructions| instructions.is_empty()),
++            "the resume leg recalls the (empty) buffer"
++        );
++    }
++
++    pause_row_us.sort();
++    resume_row_us.sort();
++
++    for (label, sample) in [
++        ("lifecycle.pause row", &pause_row_us),
++        ("lifecycle.resume row + buffer recall", &resume_row_us),
++    ] {
++        let p99 = sample[(N * 99) / 100];
++        let p999 = sample[(N * 999) / 1000];
++        assert!(
++            p99 < JOURNAL_WRITE_P99_BUDGET_US,
++            "{label}: P99 = {p99}us exceeds {JOURNAL_WRITE_P99_BUDGET_US}us"
++        );
++        assert!(
++            p999 < JOURNAL_WRITE_P999_BUDGET_US,
++            "{label}: P99.9 = {p999}us exceeds {JOURNAL_WRITE_P999_BUDGET_US}us"
++        );
++    }
++}
+diff -ruN '--exclude=target' head/spirits/orchestrator/Cargo.toml kh/spirits/orchestrator/Cargo.toml
+--- head/spirits/orchestrator/Cargo.toml	2026-11-12 00:13:00.234074874 +0000
++++ kh/spirits/orchestrator/Cargo.toml	2026-11-12 00:18:58.888211714 +0000
+@@ -19,6 +19,7 @@
+ [dev-dependencies]
+ maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_runner", "mock", "spirit_test"] }
+ maos-kernel-core = { path = "../../crates/maos-kernel-core" }
++maos-orchestrator-buffer = { path = "../../crates/maos-orchestrator-buffer" }
+ maos-manifest = { path = "../../crates/maos-manifest" }
+ tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time", "sync"] }
+ sha2 = "0.10"
+diff -ruN '--exclude=target' head/spirits/orchestrator/tests/fixtures_pin.rs kh/spirits/orchestrator/tests/fixtures_pin.rs
+--- head/spirits/orchestrator/tests/fixtures_pin.rs	2026-11-12 00:13:00.234074874 +0000
++++ kh/spirits/orchestrator/tests/fixtures_pin.rs	2026-11-12 00:18:58.888300160 +0000
+@@ -3,7 +3,7 @@
+ //! Mirrors `spirits/observer`'s fixtures_pin.
+ 
+ use maos_domain::orchestrator::{OrchestratorInstruction, OrchestratorInstructionId};
+-use maos_kernel_core::orchestrator::OrchestratorBuffer;
++use maos_orchestrator_buffer::OrchestratorBuffer;
+ use orchestrator::Orchestrator;
+ use sha2::{Digest, Sha256};
+ 
+diff -ruN '--exclude=target' head/spirits/orchestrator/tests/orchestrator_buffer.rs kh/spirits/orchestrator/tests/orchestrator_buffer.rs
+--- head/spirits/orchestrator/tests/orchestrator_buffer.rs	2026-11-12 00:13:00.234074874 +0000
++++ kh/spirits/orchestrator/tests/orchestrator_buffer.rs	2026-11-12 00:18:58.888377624 +0000
+@@ -5,7 +5,7 @@
+ //! the Spirit owns the safe-point gate, the kernel owns the FIFO.
+ 
+ use maos_domain::orchestrator::{OrchestratorInstruction, OrchestratorInstructionId};
+-use maos_kernel_core::orchestrator::{OrchestratorBuffer, OrchestratorBufferError};
++use maos_orchestrator_buffer::{OrchestratorBuffer, OrchestratorBufferError};
+ use orchestrator::Orchestrator;
+ 
+ fn instr(id: u64, goal: &str) -> OrchestratorInstruction {

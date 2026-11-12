@@ -1,0 +1,277 @@
+{
+ "base": {
+  "commit": "0baa76fb",
+  "kernel_physical": 27040,
+  "kernel_files": 95,
+  "set_hash": "5551f890778559fae278287f86d18cfecb3e801ca74c5e182bb24d8889ff2524",
+  "kloc_aggregate": 202855,
+  "aggregate_hardfail": 202856,
+  "per_crate_touched": {
+   "maos-kernel-core": 21201,
+   "maos-domain": 10217,
+   "maos-bin": 38549,
+   "xtask": 45379,
+   "maos-orchestrator-buffer": 0
+  }
+ },
+ "prototypes": {
+  "KP": {
+   "label": "KP",
+   "ckb_rc": 1,
+   "actual_lines": 25999,
+   "pinned": 27040,
+   "files": 90,
+   "set_hash": "a3f27554813455b37d81f706e5ab25817d87a15d10b79964649b55387c539ffd",
+   "changed": [
+    "lib.rs",
+    "scheduler/scheduler_loop.rs"
+   ],
+   "removed": [
+    "orchestrator/buffer.rs",
+    "orchestrator/echo_gateway.rs",
+    "orchestrator/gateway_dispatcher.rs",
+    "orchestrator/mod.rs",
+    "orchestrator/registry.rs"
+   ],
+   "added": [],
+   "kloc_rc": 1,
+   "aggregate": 202860,
+   "over_budget": [
+    "aggregate 202860 >= 202856",
+    "maos-domain 10220 > 10217"
+   ],
+   "deltas": {
+    "maos-domain": [
+     10217,
+     10220,
+     3
+    ],
+    "maos-kernel-core": [
+     21201,
+     20374,
+     -827
+    ],
+    "maos-orchestrator-buffer": [
+     0,
+     829,
+     829
+    ]
+   }
+  },
+  "KB": {
+   "label": "KB",
+   "ckb_rc": 1,
+   "actual_lines": 26011,
+   "pinned": 27040,
+   "files": 90,
+   "set_hash": "4c39e1a7c219df118f6e3d77dd008e8163bdabf93897bd3ab8a133e84645a869",
+   "changed": [
+    "lib.rs",
+    "scheduler/scheduler_loop.rs"
+   ],
+   "removed": [
+    "orchestrator/buffer.rs",
+    "orchestrator/echo_gateway.rs",
+    "orchestrator/gateway_dispatcher.rs",
+    "orchestrator/mod.rs",
+    "orchestrator/registry.rs"
+   ],
+   "added": [],
+   "kloc_rc": 0,
+   "aggregate": 202854,
+   "over_budget": [],
+   "deltas": {
+    "maos-kernel-core": [
+     21201,
+     20383,
+     -818
+    ],
+    "maos-orchestrator-buffer": [
+     0,
+     817,
+     817
+    ]
+   }
+  },
+  "KD": {
+   "label": "KD",
+   "ckb_rc": 1,
+   "actual_lines": 25991,
+   "pinned": 27040,
+   "files": 90,
+   "set_hash": "9eef3291f306abb995a57782031d18941c1536991791afeb7e143accc8f762a8",
+   "changed": [
+    "lib.rs",
+    "scheduler/scheduler_loop.rs"
+   ],
+   "removed": [
+    "orchestrator/buffer.rs",
+    "orchestrator/echo_gateway.rs",
+    "orchestrator/gateway_dispatcher.rs",
+    "orchestrator/mod.rs",
+    "orchestrator/registry.rs"
+   ],
+   "added": [],
+   "kloc_rc": 0,
+   "aggregate": 202838,
+   "over_budget": [],
+   "deltas": {
+    "maos-bin": [
+     38549,
+     38548,
+     -1
+    ],
+    "maos-kernel-core": [
+     21201,
+     20368,
+     -833
+    ],
+    "maos-orchestrator-buffer": [
+     0,
+     817,
+     817
+    ]
+   }
+  },
+  "KH": {
+   "label": "KH",
+   "ckb_rc": 1,
+   "actual_lines": 26633,
+   "pinned": 27040,
+   "files": 93,
+   "set_hash": "a8a86451ecc274372ac7380813f3cd28cb42eb160127feac3462a0b81e004d52",
+   "changed": [
+    "lib.rs",
+    "orchestrator/mod.rs",
+    "scheduler/scheduler_loop.rs"
+   ],
+   "removed": [
+    "orchestrator/buffer.rs",
+    "orchestrator/registry.rs"
+   ],
+   "added": [],
+   "kloc_rc": 1,
+   "aggregate": 202862,
+   "over_budget": [
+    "aggregate 202862 >= 202856",
+    "maos-domain 10220 > 10217"
+   ],
+   "deltas": {
+    "maos-domain": [
+     10217,
+     10220,
+     3
+    ],
+    "maos-kernel-core": [
+     21201,
+     20897,
+     -304
+    ],
+    "maos-orchestrator-buffer": [
+     0,
+     308,
+     308
+    ]
+   }
+  },
+  "KP+X": {
+   "label": "KP+X",
+   "ckb_rc": 1,
+   "actual_lines": 25999,
+   "pinned": 27040,
+   "files": 90,
+   "set_hash": "a3f27554813455b37d81f706e5ab25817d87a15d10b79964649b55387c539ffd",
+   "changed": [
+    "lib.rs",
+    "scheduler/scheduler_loop.rs"
+   ],
+   "removed": [
+    "orchestrator/buffer.rs",
+    "orchestrator/echo_gateway.rs",
+    "orchestrator/gateway_dispatcher.rs",
+    "orchestrator/mod.rs",
+    "orchestrator/registry.rs"
+   ],
+   "added": [],
+   "kloc_rc": 1,
+   "aggregate": 202861,
+   "over_budget": [
+    "aggregate 202861 >= 202856",
+    "maos-domain 10220 > 10217",
+    "xtask 45380 > 45379"
+   ],
+   "deltas": {
+    "maos-domain": [
+     10217,
+     10220,
+     3
+    ],
+    "maos-kernel-core": [
+     21201,
+     20374,
+     -827
+    ],
+    "maos-orchestrator-buffer": [
+     0,
+     829,
+     829
+    ],
+    "xtask": [
+     45379,
+     45380,
+     1
+    ]
+   }
+  },
+  "KP+X+doc": {
+   "label": "KP+X+doc",
+   "ckb_rc": 1,
+   "actual_lines": 25999,
+   "pinned": 27040,
+   "files": 90,
+   "set_hash": "bb22880f6c99720d6da737a1c50bdad33530bcdbc962605e74689b4551573d36",
+   "changed": [
+    "isolation/mod.rs",
+    "lib.rs",
+    "scheduler/scheduler_loop.rs"
+   ],
+   "removed": [
+    "orchestrator/buffer.rs",
+    "orchestrator/echo_gateway.rs",
+    "orchestrator/gateway_dispatcher.rs",
+    "orchestrator/mod.rs",
+    "orchestrator/registry.rs"
+   ],
+   "added": [],
+   "kloc_rc": 1,
+   "aggregate": 202861,
+   "over_budget": [
+    "aggregate 202861 >= 202856",
+    "maos-domain 10220 > 10217",
+    "xtask 45380 > 45379"
+   ],
+   "deltas": {
+    "maos-domain": [
+     10217,
+     10220,
+     3
+    ],
+    "maos-kernel-core": [
+     21201,
+     20374,
+     -827
+    ],
+    "maos-orchestrator-buffer": [
+     0,
+     829,
+     829
+    ],
+    "xtask": [
+     45379,
+     45380,
+     1
+    ]
+   }
+  }
+ }
+}

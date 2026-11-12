@@ -1,0 +1,435 @@
+{
+ "base_commit": "0baa76fb2440926b4fef2082f331dc03589e68e2",
+ "baseline": "docs/ci-baselines/kernel-surface-v0.1-beta.json (401 items)",
+ "gate": "xtask check-service-boundary --json (prebuilt /mnt/build/cargo-maos/debug/xtask, xtask/src unchanged since a2bbd687)",
+ "options": {
+  "KB": {
+   "removed": [
+    {
+     "kind": "enum",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBufferError",
+     "signature_hash": "c8b994d0791687357c8a6a6aa7a62a379ffd0bd360fa9d8da6d298df246b74e6"
+    },
+    {
+     "kind": "fn",
+     "path": "maos_kernel_core::orchestrator::journal_director_lifecycle_action",
+     "signature_hash": "29f7bf96e33dd41b405bec65b5b31747675f1e91af1f70002ac75c1585ebc86e"
+    },
+    {
+     "kind": "fn",
+     "path": "maos_kernel_core::orchestrator::journal_orchestrator_queue",
+     "signature_hash": "a430e2f986fac353d1acb98cc30bf5e0b519d7d5fd97d964806826922c59bf7d"
+    },
+    {
+     "kind": "fn",
+     "path": "maos_kernel_core::orchestrator::journal_token_revocation",
+     "signature_hash": "bb5d648b449b75a4397d4d3b10c72f95d657342dd6f316ab799368697626c3b6"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBuffer",
+     "signature_hash": "c2f19b8a5a4d608a14eec0ec84060f2bf76efa832e72d06b73c82da9c1baeb17"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewayFactory",
+     "signature_hash": "7f04203c6946f7b6b0166916a5ee69614f0b6f52d1b6231e288456944900d08c"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewaySubmodule",
+     "signature_hash": "ff590b62d552c0598f4a2d2815b68a788b6b51b09d55e24a9252e704402377f5"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayDispatcher",
+     "signature_hash": "e687b4485353b93506414f2c51110f6bc7d9591e6c85c2c95846d2929dfc4872"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayInstance",
+     "signature_hash": "6e9f58998b68d91dea0a4ebbdd0bb1cf2abd2dbe260c6fc1462e41fa8b18a187"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleRegistry",
+     "signature_hash": "93820db9d6428033904a2803e98e2f9943454c44468bc56676a79e053f5f518b"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::registry::OrchestratorBufferRegistry",
+     "signature_hash": "f07938833d9959b14189bacb7fc7dc24595a584fb93769d79893daefbca316d7"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter",
+     "signature_hash": "2daf34b24f2563ac0d1861c9736e1d4f7a7231e7d616e18cc8df6b3dd4b0e40c"
+    },
+    {
+     "kind": "trait",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleFactory",
+     "signature_hash": "5a5e01e8f2fb5731afe6e06cc4c31c591153aa2d2d8974c37cfa91ecf57e7721"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBuffer",
+     "signature_hash": "fab11b646d107620cb2b0e8b05fafef61542a9fcd796118d3b90493611e11e7b"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBufferError",
+     "signature_hash": "b6b819a36eae64478f8ab8302d7142f2ac49cbea952a7b8728072ceca789ef6b"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewayFactory",
+     "signature_hash": "ead79c101ed4c354bda83069dd02151d5129af1239889b15ca0b2bf67c5528eb"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewaySubmodule",
+     "signature_hash": "998c737b27d3ee5dfd15e65b3e5659158bbfb72b7206e87cae4f16dedd02d0e2"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayDispatcher",
+     "signature_hash": "9f8b7959d07f42e3e4bf12e0687b3e7080920373579087a81849354d4e2c69d4"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayInstance",
+     "signature_hash": "f93095489864c794c33db350ee737bcb31e0859b731c38655bb15bfdd988740a"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleFactory",
+     "signature_hash": "610108159a9698d4b1c7137927e7e64fa603b08eeae088b628b866908e03cebb"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleRegistry",
+     "signature_hash": "6e48c02949956a079be882a94dee081526b4dbbec9dea92f08729202c2b2ebaf"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::registry::OrchestratorBufferRegistry",
+     "signature_hash": "a330507117b40627aa3d100632b9a0af4268eb3caa41f06fd5944a68a151d3d3"
+    }
+   ],
+   "added": [
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter",
+     "signature_hash": "77bfe43017690a920d96b16560356b480ff042460c48e02fb2f55116766ec500"
+    }
+   ],
+   "violations_reported": 22
+  },
+  "KD": {
+   "removed": [
+    {
+     "kind": "enum",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBufferError",
+     "signature_hash": "c8b994d0791687357c8a6a6aa7a62a379ffd0bd360fa9d8da6d298df246b74e6"
+    },
+    {
+     "kind": "fn",
+     "path": "maos_kernel_core::orchestrator::journal_director_lifecycle_action",
+     "signature_hash": "29f7bf96e33dd41b405bec65b5b31747675f1e91af1f70002ac75c1585ebc86e"
+    },
+    {
+     "kind": "fn",
+     "path": "maos_kernel_core::orchestrator::journal_orchestrator_queue",
+     "signature_hash": "a430e2f986fac353d1acb98cc30bf5e0b519d7d5fd97d964806826922c59bf7d"
+    },
+    {
+     "kind": "fn",
+     "path": "maos_kernel_core::orchestrator::journal_token_revocation",
+     "signature_hash": "bb5d648b449b75a4397d4d3b10c72f95d657342dd6f316ab799368697626c3b6"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBuffer",
+     "signature_hash": "c2f19b8a5a4d608a14eec0ec84060f2bf76efa832e72d06b73c82da9c1baeb17"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewayFactory",
+     "signature_hash": "7f04203c6946f7b6b0166916a5ee69614f0b6f52d1b6231e288456944900d08c"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewaySubmodule",
+     "signature_hash": "ff590b62d552c0598f4a2d2815b68a788b6b51b09d55e24a9252e704402377f5"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayDispatcher",
+     "signature_hash": "e687b4485353b93506414f2c51110f6bc7d9591e6c85c2c95846d2929dfc4872"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayInstance",
+     "signature_hash": "6e9f58998b68d91dea0a4ebbdd0bb1cf2abd2dbe260c6fc1462e41fa8b18a187"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleRegistry",
+     "signature_hash": "93820db9d6428033904a2803e98e2f9943454c44468bc56676a79e053f5f518b"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::registry::OrchestratorBufferRegistry",
+     "signature_hash": "f07938833d9959b14189bacb7fc7dc24595a584fb93769d79893daefbca316d7"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter",
+     "signature_hash": "2daf34b24f2563ac0d1861c9736e1d4f7a7231e7d616e18cc8df6b3dd4b0e40c"
+    },
+    {
+     "kind": "trait",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleFactory",
+     "signature_hash": "5a5e01e8f2fb5731afe6e06cc4c31c591153aa2d2d8974c37cfa91ecf57e7721"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBuffer",
+     "signature_hash": "fab11b646d107620cb2b0e8b05fafef61542a9fcd796118d3b90493611e11e7b"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBufferError",
+     "signature_hash": "b6b819a36eae64478f8ab8302d7142f2ac49cbea952a7b8728072ceca789ef6b"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewayFactory",
+     "signature_hash": "ead79c101ed4c354bda83069dd02151d5129af1239889b15ca0b2bf67c5528eb"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewaySubmodule",
+     "signature_hash": "998c737b27d3ee5dfd15e65b3e5659158bbfb72b7206e87cae4f16dedd02d0e2"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayDispatcher",
+     "signature_hash": "9f8b7959d07f42e3e4bf12e0687b3e7080920373579087a81849354d4e2c69d4"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayInstance",
+     "signature_hash": "f93095489864c794c33db350ee737bcb31e0859b731c38655bb15bfdd988740a"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleFactory",
+     "signature_hash": "610108159a9698d4b1c7137927e7e64fa603b08eeae088b628b866908e03cebb"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleRegistry",
+     "signature_hash": "6e48c02949956a079be882a94dee081526b4dbbec9dea92f08729202c2b2ebaf"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::registry::OrchestratorBufferRegistry",
+     "signature_hash": "a330507117b40627aa3d100632b9a0af4268eb3caa41f06fd5944a68a151d3d3"
+    }
+   ],
+   "added": [
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter",
+     "signature_hash": "891bd15e7a12c6d48d532ed64fea82c1854b264dd22dcf2df0e91aacff517f9d"
+    }
+   ],
+   "violations_reported": 22
+  },
+  "KH": {
+   "removed": [
+    {
+     "kind": "enum",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBufferError",
+     "signature_hash": "c8b994d0791687357c8a6a6aa7a62a379ffd0bd360fa9d8da6d298df246b74e6"
+    },
+    {
+     "kind": "fn",
+     "path": "maos_kernel_core::orchestrator::journal_director_lifecycle_action",
+     "signature_hash": "29f7bf96e33dd41b405bec65b5b31747675f1e91af1f70002ac75c1585ebc86e"
+    },
+    {
+     "kind": "fn",
+     "path": "maos_kernel_core::orchestrator::journal_orchestrator_queue",
+     "signature_hash": "a430e2f986fac353d1acb98cc30bf5e0b519d7d5fd97d964806826922c59bf7d"
+    },
+    {
+     "kind": "fn",
+     "path": "maos_kernel_core::orchestrator::journal_token_revocation",
+     "signature_hash": "bb5d648b449b75a4397d4d3b10c72f95d657342dd6f316ab799368697626c3b6"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBuffer",
+     "signature_hash": "c2f19b8a5a4d608a14eec0ec84060f2bf76efa832e72d06b73c82da9c1baeb17"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::registry::OrchestratorBufferRegistry",
+     "signature_hash": "f07938833d9959b14189bacb7fc7dc24595a584fb93769d79893daefbca316d7"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter",
+     "signature_hash": "2daf34b24f2563ac0d1861c9736e1d4f7a7231e7d616e18cc8df6b3dd4b0e40c"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBuffer",
+     "signature_hash": "fab11b646d107620cb2b0e8b05fafef61542a9fcd796118d3b90493611e11e7b"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBufferError",
+     "signature_hash": "b6b819a36eae64478f8ab8302d7142f2ac49cbea952a7b8728072ceca789ef6b"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::registry::OrchestratorBufferRegistry",
+     "signature_hash": "a330507117b40627aa3d100632b9a0af4268eb3caa41f06fd5944a68a151d3d3"
+    }
+   ],
+   "added": [
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter",
+     "signature_hash": "d2170d389c72d69275cbad202942db89f6d5295bb63104fee3f86c30d7896bf1"
+    }
+   ],
+   "violations_reported": 10
+  },
+  "KP": {
+   "removed": [
+    {
+     "kind": "enum",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBufferError",
+     "signature_hash": "c8b994d0791687357c8a6a6aa7a62a379ffd0bd360fa9d8da6d298df246b74e6"
+    },
+    {
+     "kind": "fn",
+     "path": "maos_kernel_core::orchestrator::journal_director_lifecycle_action",
+     "signature_hash": "29f7bf96e33dd41b405bec65b5b31747675f1e91af1f70002ac75c1585ebc86e"
+    },
+    {
+     "kind": "fn",
+     "path": "maos_kernel_core::orchestrator::journal_orchestrator_queue",
+     "signature_hash": "a430e2f986fac353d1acb98cc30bf5e0b519d7d5fd97d964806826922c59bf7d"
+    },
+    {
+     "kind": "fn",
+     "path": "maos_kernel_core::orchestrator::journal_token_revocation",
+     "signature_hash": "bb5d648b449b75a4397d4d3b10c72f95d657342dd6f316ab799368697626c3b6"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBuffer",
+     "signature_hash": "c2f19b8a5a4d608a14eec0ec84060f2bf76efa832e72d06b73c82da9c1baeb17"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewayFactory",
+     "signature_hash": "7f04203c6946f7b6b0166916a5ee69614f0b6f52d1b6231e288456944900d08c"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewaySubmodule",
+     "signature_hash": "ff590b62d552c0598f4a2d2815b68a788b6b51b09d55e24a9252e704402377f5"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayDispatcher",
+     "signature_hash": "e687b4485353b93506414f2c51110f6bc7d9591e6c85c2c95846d2929dfc4872"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayInstance",
+     "signature_hash": "6e9f58998b68d91dea0a4ebbdd0bb1cf2abd2dbe260c6fc1462e41fa8b18a187"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleRegistry",
+     "signature_hash": "93820db9d6428033904a2803e98e2f9943454c44468bc56676a79e053f5f518b"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::orchestrator::registry::OrchestratorBufferRegistry",
+     "signature_hash": "f07938833d9959b14189bacb7fc7dc24595a584fb93769d79893daefbca316d7"
+    },
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter",
+     "signature_hash": "2daf34b24f2563ac0d1861c9736e1d4f7a7231e7d616e18cc8df6b3dd4b0e40c"
+    },
+    {
+     "kind": "trait",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleFactory",
+     "signature_hash": "5a5e01e8f2fb5731afe6e06cc4c31c591153aa2d2d8974c37cfa91ecf57e7721"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBuffer",
+     "signature_hash": "fab11b646d107620cb2b0e8b05fafef61542a9fcd796118d3b90493611e11e7b"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::buffer::OrchestratorBufferError",
+     "signature_hash": "b6b819a36eae64478f8ab8302d7142f2ac49cbea952a7b8728072ceca789ef6b"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewayFactory",
+     "signature_hash": "ead79c101ed4c354bda83069dd02151d5129af1239889b15ca0b2bf67c5528eb"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::echo_gateway::EchoGatewaySubmodule",
+     "signature_hash": "998c737b27d3ee5dfd15e65b3e5659158bbfb72b7206e87cae4f16dedd02d0e2"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayDispatcher",
+     "signature_hash": "9f8b7959d07f42e3e4bf12e0687b3e7080920373579087a81849354d4e2c69d4"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewayInstance",
+     "signature_hash": "f93095489864c794c33db350ee737bcb31e0859b731c38655bb15bfdd988740a"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleFactory",
+     "signature_hash": "610108159a9698d4b1c7137927e7e64fa603b08eeae088b628b866908e03cebb"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::gateway_dispatcher::GatewaySubmoduleRegistry",
+     "signature_hash": "6e48c02949956a079be882a94dee081526b4dbbec9dea92f08729202c2b2ebaf"
+    },
+    {
+     "kind": "use",
+     "path": "maos_kernel_core::orchestrator::registry::OrchestratorBufferRegistry",
+     "signature_hash": "a330507117b40627aa3d100632b9a0af4268eb3caa41f06fd5944a68a151d3d3"
+    }
+   ],
+   "added": [
+    {
+     "kind": "struct",
+     "path": "maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter",
+     "signature_hash": "d2170d389c72d69275cbad202942db89f6d5295bb63104fee3f86c30d7896bf1"
+    }
+   ],
+   "violations_reported": 22
+  }
+ }
+}
