@@ -1,0 +1,415 @@
+name: ci-20-1b-verify
+# Operator-controlled verification branch only; never install this workflow on main.
+# Final-tree hosted legs of 20-1b: AC11.5 (live T3 Worker under quarantine), the kernel quarantine
+# vectors, AC8 yank policy, AC12 one-door, the 20-11 Worker erasure variant, AC15 TLS (Linux
+# images), the macOS native TLS leg, the public-WebPKI exclusion control and the epic-20 exit lane.
+# Not installed on main. A job's verdict is its own; nothing here is a claim until a run id is cited.
+on:
+  push:
+    branches: ['ci/20-1b-verify']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Final landing tree (default pushed SHA)
+        required: false
+permissions:
+  contents: read
+env:
+  CARGO_TERM_COLOR: never
+  MAOS_SECRETS_BACKEND: env
+jobs:
+  kernel-free-trust:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          # The fixture builder compiles the WASM guests the suites resolve.
+          targets: wasm32-wasip2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: verify-20-1b-${{ matrix.image }}
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: No-default compile and verb contract, not a whole-graph TLS-free claim
+        run: |
+          cargo build --locked -p maos-bin --no-default-features
+          cargo test --locked -p maos-bin --no-default-features --test verb_table_15_3
+      - name: Build actual harness-resolved fixtures then genuine journey binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          touch crates/maos-bin/src/main.rs crates/maos-cli/src/main.rs
+          cargo run --locked -p xtask -- build-test-fixtures 2>&1 | tee evidence/fixtures.log
+          cargo metadata --locked --format-version 1 > evidence/cargo-metadata.json
+          cargo nextest list --locked -p maos-bin -p maos-registry -p maos-spirit-cli -p maos-cli \
+            --list-type binaries-only --message-format json > evidence/binaries-metadata.json
+          cargo build --locked -p maos-bin -p maos-cli
+      - name: Kernel-free witnesses including TLS, limits and real cohort teardown
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo nextest run \
+            --cargo-metadata evidence/cargo-metadata.json \
+            --binaries-metadata evidence/binaries-metadata.json \
+            --profile ci --test-threads 1 --no-fail-fast --no-capture \
+            -E 'binary(yank_auth_20_1b) | binary(yank_cadence_20_1b) |
+                binary(vetting_attestation_gate) | binary(yank_policy_20_1b) |
+                binary(spirit_install_20_1) | binary(vet_lifecycle_20_1b) |
+                binary(installed_spirit_dispatch_20_1) | binary(registry_tls_20_1b) |
+                binary(registry_limits_20_1b) | binary(yank_query_20_1b) |
+                binary(registry_config_20_1b) | binary(yank_audit_structure_20_1b) |
+                binary(root_shutdown_unload_16_3) | binary(registry_server_bin_20_1) |
+                test(/^security::review_tests::/) | test(/^http::tests::/) |
+                test(=yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5) |
+                test(=vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9) |
+                test(=registry_bound_principal_is_counted_and_erased_on_uninstall_p3)' \
+            2>&1 | tee evidence/contracts.log
+          cp target/nextest/ci/junit.xml evidence/junit.xml
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 156 \
+            --required-test unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17 \
+            --required-test publisher_and_vetter_yank_verbs_authenticate_ac7 \
+            --required-test signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8 \
+            --required-test registry_publishers_cannot_share_principal_spill_ac10 \
+            --required-test vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9 \
+            --required-test registry_bound_principal_is_counted_and_erased_on_uninstall_p3 \
+            --required-test installed_component_dispatch_reports_typed_boot_refusal \
+            --required-test signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13 \
+            --required-test tls::cli_tls_install_authenticates_before_persistence_ac15 \
+            --required-test tls::cli_omitted_yank_or_unauthenticated_head_refuses_before_persistence_ac15 \
+            --required-test tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15 \
+            --required-test tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15 \
+            --required-test tls::interception_wrong_host_certificate_is_refused_ac15 \
+            --required-test tls::interception_expired_certificate_is_refused_ac15 \
+            --required-test tls::interception_untrusted_ca_is_refused_ac15 \
+            --required-test tls::handshake_failure_never_attempts_plaintext_ac15 \
+            --required-test tls::https_redirect_never_downgrades_to_http_ac15 \
+            --required-test tls::server_rejects_client_without_dev_handshake_ac15 \
+            --required-test tls::private_key_custody_refuses_group_or_world_access_ac15 \
+            --required-test tls::private_key_custody_refuses_seed_inside_package_store_ac15 \
+            --required-test installed_version_is_immutable_ac14 \
+            --required-test cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains \
+            --required-test cohort::cohort_sigterm_without_worker_joins_local_yank_timer_and_drains \
+            --required-test cohort::declared_capable_cohort_worker_prerequisite_never_green_skips \
+            --required-test every_audit_sender_release_joins_the_yank_owner \
+            --required-test daemon_refuses_registry_typo_even_without_a_uri_d1_p10_p11 \
+            --required-test daemon_refuses_https_without_a_root_before_polling_d1_p10 \
+            --required-test daemon_banner_uses_the_enforced_single_reader_d1_p10 \
+            --required-test moving_a_drain_to_another_arm_cannot_hide_behind_equal_totals_p6 \
+            --required-test one_source_cannot_occupy_every_registry_slot_f1 \
+            --required-test idle_first_byte_is_bounded_more_tightly_than_a_request_f1 \
+            --required-test metadata_body_limit_is_checked_before_body_allocation_f2 \
+            --required-test publication_hint_cannot_widen_another_rpc_body_cap_f2 \
+            --required-test standalone_population_rejection_has_complete_http_framing \
+            --required-test large_delta_is_refused_instead_of_returning_an_incomplete_signed_head_f6 \
+            --required-test filtered_snapshot_keeps_its_authenticated_complete_head_f6 \
+            --required-test large_history_small_delta_uses_storage_lower_bound_f6 \
+            --required-test security::review_tests::configured_ca_replaces_bundled_roots_d4 \
+            --required-test security::review_tests::signed_params_less_notification_verifies_p7 \
+            --required-test http::tests::drip_response_cannot_extend_exchange_deadline_f4 \
+            --required-test http::tests::unsigned_http_refusal_preserves_status_p7 \
+            --required-test yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5 \
+            --required-test tls::signed_valid_gap_body_is_refused_p3 \
+            --required-test tls::signed_valid_duplicate_body_is_refused_p3 \
+            --required-test tls::signed_valid_extra_entries_are_refused_p3 \
+            --required-test tls::signed_valid_empty_view_with_nonzero_head_is_refused_p3 \
+            --required-test tls::signed_payload_head_must_equal_envelope_head_p3 \
+            --required-test tls::signed_wrong_request_hash_is_refused_p3 \
+            --required-test tls::signed_wrong_envelope_version_is_refused_p3 \
+            --required-test tls::bad_signature_byte_is_refused_p3 \
+            --required-test tls::signed_head_behind_requested_cursor_is_typed_d3_p5 \
+            --required-test tls::tls_admission_refusal_is_encrypted_http_503_f1 \
+            --required-test tls::incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1 \
+            --required-test yanked_install_is_refused_before_persistence_ac16 evidence/contracts.log
+      - name: Kernel baseline is unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p xtask -- check-kernel-baseline --json | tee evidence/kernel.json
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: trust-20-1b-${{ matrix.image }}
+          path: evidence
+
+  # AC11.1-AC11.4 kernel vectors, AC8 yank-policy effect, AC12 one-door, the 20-11 Worker erasure
+  # variant and AC11.5 on the signed T3 substrate. One checked invocation: the log must show every
+  # named test as PASS, an exact count, and no SKIP line (a missing substrate is a hard failure).
+  final-tree-vectors:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: final-20-1b-${{ matrix.image }}
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Build fixtures and the genuine binaries the vectors resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          touch crates/maos-bin/src/main.rs crates/maos-cli/src/main.rs
+          cargo run --locked -p xtask -- build-test-fixtures 2>&1 | tee evidence/fixtures.log
+          cargo build --locked -p maos-bin -p maos-cli
+      - name: Kernel quarantine vectors (AC11.1-AC11.4, KQ1)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo nextest run --locked -p maos-kernel-core --profile ci --no-fail-fast --no-capture \
+            -E 'binary(quarantine_fr13_20_1) | binary(on_revocation_three_actions)' \
+            2>&1 | tee evidence/kernel-vectors.log
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 5 \
+            --required-test crl_quarantine_journals_one_typed_receipt_and_no_termination \
+            --required-test crl_quarantine_refuses_every_mediated_action_and_reaches_no_effect \
+            --required-test crl_quarantine_keeps_the_spirit_loaded_and_running_past_the_drain_deadline \
+            --required-test crl_quarantine_survives_director_resume_and_ends_only_at_unload \
+            --required-test applier_executes_terminate_drain_and_quarantine_actions evidence/kernel-vectors.log
+      - name: AC8 yank policy, AC12 one-door, 20-11 Worker erasure and AC11.5 (live T3 Worker quarantine)
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-20-1b-final \
+            --timeout 3000 --rootless-canary -- \
+            cargo nextest run --locked -p maos-bin --profile ci --no-fail-fast --no-capture \
+            -E 'binary(yank_policy_20_1b) | binary(worker_quarantine_20_1b) |
+                (binary(one_daemon_one_door_16_1) & test(=ac12_20_1b_a_failing_revocation_poll_is_printed_once)) |
+                (binary(erasure_live_20_11) & test(=ac6_running_t3_worker_uninstall_proves_live_inventory))' \
+            2>&1 | tee evidence/t3-vectors.log
+          cp target/nextest/ci/junit.xml evidence/t3-vectors-junit.xml
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 16 \
+            --required-test signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8 \
+            --required-test quarantine_policy_fences_only_the_signed_yank_target_and_stays_sticky_ac8 \
+            --required-test ac12_20_1b_a_failing_revocation_poll_is_printed_once \
+            --required-test ac6_running_t3_worker_uninstall_proves_live_inventory \
+            --required-test a_bound_worker_scb_is_fenced_and_its_next_mediated_calls_are_refused_ac11_5 \
+            --required-test t3_worker_quarantine_refuses_next_mediated_call_and_records_activity_ac11_5 evidence/t3-vectors.log
+          # AC11.5's record names the container-activity outcome; it must be present exactly once.
+          grep -E '^AC11\.5 \{' evidence/t3-vectors.log | tee evidence/ac11-5-record.jsonl
+          test "$(wc -l < evidence/ac11-5-record.jsonl)" -eq 1
+          grep -F '"container_activity_continues"' evidence/ac11-5-record.jsonl
+      - name: Plant ac11-5-no-fence — the fence is never set, so AC11.5 MUST go red
+        shell: bash
+        run: |
+          set -uo pipefail
+          python3 - <<'PY'
+          p = "crates/maos-bin/tests/worker_quarantine_20_1b.rs"
+          s = open(p).read()
+          old = "        root.capability.set_quarantined(pid, true);\n"
+          assert s.count(old) == 1, "plant anchor moved"
+          open(p, "w").write(s.replace(old, "        // PLANT ac11-5-no-fence: the fence is never set\n"))
+          PY
+          git diff --stat -- crates/maos-bin/tests/worker_quarantine_20_1b.rs | tee evidence/ac11-5-plant-diff-stat.txt
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-20-1b-plant \
+            --timeout 1500 --rootless-canary -- \
+            cargo nextest run --locked -p maos-bin --profile ci --no-fail-fast --no-capture \
+            -E 'binary(worker_quarantine_20_1b)' 2>&1 | tee evidence/ac11-5-plant.log
+          rc=${PIPESTATUS[0]}
+          git checkout -- crates/maos-bin/tests/worker_quarantine_20_1b.rs
+          git diff --exit-code -- crates/maos-bin/tests/worker_quarantine_20_1b.rs
+          echo "plant exit=$rc" | tee -a evidence/ac11-5-plant.log
+          test "$rc" -ne 0
+          grep -E 'FAIL .*a_bound_worker_scb_is_fenced_and_its_next_mediated_calls_are_refused_ac11_5' evidence/ac11-5-plant.log
+          grep -E 'FAIL .*t3_worker_quarantine_refuses_next_mediated_call_and_records_activity_ac11_5' evidence/ac11-5-plant.log
+          grep -F 'the Worker is fenced' evidence/ac11-5-plant.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: final-20-1b-${{ matrix.image }}
+          path: evidence
+
+  # D-20-1b-F7 / AC15.2: the configured private CA REPLACES the bundled public roots. The control
+  # reaches a real public peer, so it is hosted-only (`#[ignore]`, enrolled here by name).
+  public-webpki:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: webpki-20-1b
+      - name: Public-WebPKI control and configured-private-CA exclusion, hosted-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          cargo test --locked -p maos-registry --test registry_tls_20_1b -- \
+            --ignored --exact tls::private_ca_replaces_public_webpki_for_real_public_peer_d4_f7 \
+            --nocapture 2>&1 | tee evidence/public-ca.log
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 1 \
+            --required-test tls::private_ca_replaces_public_webpki_for_real_public_peer_d4_f7 evidence/public-ca.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: webpki-20-1b
+          path: evidence
+
+  registry-tls-macos:
+    # Native Apple runtime of the accepted-socket TLS path, not a cross-check alone.
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-20-1b
+      - name: Check leaf TLS with the real Apple C toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          xcrun --show-sdk-path | tee evidence/apple-sdk.log
+          uname -a | tee -a evidence/apple-sdk.log
+          cargo check --locked -p maos-registry -p maos-spirit-cli \
+            --target aarch64-apple-darwin 2>&1 | tee evidence/apple-check.log
+      - name: Native accepted-socket TLS and bounded-refusal runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p maos-bin --no-default-features 2>&1 | tee evidence/apple-no-default.log
+          cargo test --locked -p maos-registry --test registry_limits_20_1b \
+            -- --test-threads=1 --nocapture 2>&1 | tee evidence/apple-limits.log
+          cargo test --locked -p maos-registry --test registry_tls_20_1b -- \
+            --exact tls::configured_root_and_ca_authenticate_real_registry_ac15 \
+            tls::tls_admission_refusal_is_encrypted_http_503_f1 \
+            tls::incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1 \
+            --test-threads=1 --nocapture 2>&1 | tee evidence/apple-tls-runtime.log
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 3 \
+            --required-test tls::configured_root_and_ca_authenticate_real_registry_ac15 \
+            --required-test tls::tls_admission_refusal_is_encrypted_http_503_f1 \
+            --required-test tls::incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1 evidence/apple-tls-runtime.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: trust-20-1b-macos
+          path: evidence
+  # Actual discipline exit job, copied for the P1 hosted before/after lane.
+  # Its prior failure is operator-reported run42464850336; discipline run 43155033280 shows it green.
+  epic-20-exit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the example component at this SHA
+        working-directory: examples/example-spirit-ts
+        run: npm ci && npm run build && npm run componentize
+      - name: Epic-20 release, publish, install and truthful shell dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p xtask -- release-dry-run
+          RELEASE_SIGNING_KEY=794959d4c4dc813f968cd95eb4a45c4a02583a7c5211126e7b4583e4776d1c8d cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS --output dist/SHA256SUMS.sig
+          for b in maos maosctl maos-registry-server maos-spirit; do ln -sf "$b-linux-amd64" "dist/$b"; done
+          export PATH="$PWD/dist:$PATH"
+          scratch="$(mktemp -d)"
+          export HOME="$scratch/home"
+          export XDG_DATA_HOME="$HOME/.local/share"
+          export XDG_CONFIG_HOME="$HOME/.config"
+          export XDG_RUNTIME_DIR="$scratch/run"
+          mkdir -p "$HOME/.config/maos" "$XDG_RUNTIME_DIR"
+          printf '[registry]\ndevelopment_http = true\n' > "$HOME/.config/maos/operator.toml"
+          cleanup() {
+            if [ -n "${server_pid:-}" ]; then kill -TERM "$server_pid" 2>/dev/null || true; wait "$server_pid" || true; fi
+            rm -rf "$scratch"
+          }
+          trap cleanup EXIT
+          maosctl install --from-local ./dist --verify-only
+          maos-registry-server --dev-http --bind 127.0.0.1:6789 --root "$scratch/registry" > registry.log 2>&1 &
+          server_pid=$!
+          ready=0
+          for i in $(seq 1 50); do
+            if (exec 3<>/dev/tcp/127.0.0.1/6789) 2>/dev/null; then ready=1; break; fi
+            sleep 0.1
+          done
+          if [ "$ready" -ne 1 ]; then echo "::error::registry readiness failed within 5 s"; cat registry.log; exit 1; fi
+          MAOS_SPIRIT_SIGNING_KEY="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')" maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest examples/example-spirit-ts/manifest.toml --artifact examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
+          maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
+          maos init --plain
+          printf '@example-spirit-ts hello\n' | MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" maos shell --plain > shell.log 2>&1
+          cat shell.log
+          grep -Fx "maos: spirit 'example-spirit-ts' refused at boot: wasm_engine_off" shell.log
+          if grep -F "unknown spirit 'example-spirit-ts'" shell.log; then exit 1; fi
+          kill -TERM "$server_pid"
+          wait "$server_pid"
+          unset server_pid
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Build the release WASM-enabled execution surface
+        run: |
+          cargo build --locked --release -p maos-bin --features wasm-host --bin maos
+          cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner
+          cargo build --locked --release -p worker --bin worker-cli-fixture
+      - name: AC4 — execute the admitted installed component, not an engine-off refusal
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          scratch="$(mktemp -d)"
+          export HOME="$scratch/home" XDG_DATA_HOME="$scratch/home/.local/share" MAOS_HOME="$scratch/home/.maos"
+          mkdir -p "$HOME/.config/maos"
+          printf '[registry]\ndevelopment_http = true\n' > "$HOME/.config/maos/operator.toml"
+          dist/maos-registry-server --dev-http --bind 127.0.0.1:6789 --root "$scratch/registry" > component-registry.log 2>&1 &
+          server_pid=$!
+          trap 'kill -TERM "$server_pid" 2>/dev/null || true; wait "$server_pid" || true; rm -rf "$scratch"' EXIT
+          ready=0
+          for i in $(seq 1 50); do if (exec 3<>/dev/tcp/127.0.0.1/6789) 2>/dev/null; then ready=1; break; fi; sleep 0.1; done
+          [ "$ready" -eq 1 ] || { cat component-registry.log; exit 1; }
+          MAOS_SPIRIT_SIGNING_KEY="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')" dist/maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest examples/example-spirit-ts/manifest.toml --artifact examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
+          dist/maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
+          "$target/release/maos" init --plain
+          manifest="$(python3 -c 'import json,os,pathlib; r=pathlib.Path(os.environ["HOME"])/".local/share/maos/registry"; print(r/"installed"/json.loads((r/"installed-index.json").read_text())["example-spirit-ts"]/"manifest.toml")')"
+          /usr/bin/time -p sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" "$target/release/maos" run "$manifest" --once 2>&1 | tee component.log
+          grep -F 'spirit_session_complete' component.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: epic-20-exit
+          path: |
+            registry.log
+            shell.log
+            component.log
+            component-registry.log
