@@ -24,6 +24,16 @@ tag=v1.0.0-rc.1   # example; must equal "v" + [workspace.package].version in Car
 > the exact command and preconditions are in
 > [`decisions-2026-11-12.md`](decisions-2026-11-12.md) — but never tag, sign or publish: the
 > signed tag needs the key holder.
+>
+> **Dated note 2026-11-12 (landing-2 review F3; the note above is kept as written):** "needs
+> the key holder" is the operator's policy, not an enforced control. The commands below cut an
+> ordinary `git tag`; `release.yml` holds `RELEASE_SIGNING_KEY` and signs the *artifacts*
+> (`SHA256SUMS`, `SHA256SUMS-packages`) whenever an accepted tag on an `origin/main`
+> ancestor is pushed. No Git tag signature is verified, and the `release` environment has no
+> required reviewers, so whoever is authorised to push the tag can trigger CI-held signing
+> and publication without holding the private key. Protecting the `release` environment
+> (required reviewers) is the enforcement and is **UNCLAIMED**; do not describe this tag as
+> a cryptographically signed Git tag.
 
 ## Pre-tag checklist
 

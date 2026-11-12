@@ -160,13 +160,62 @@ fn every_later_control_reads_the_one_classification() {
     assert!(classify < index_of(&steps, "Require rc tree readiness (rc tags only)"));
 }
 
+#[test]
+fn the_release_body_is_the_committed_notes_file_with_generated_notes_appended() {
+    let release = release();
+    let steps = steps(&release, "sign-and-publish");
+    let create = &steps[index_of(&steps, "Create GitHub Release")];
+    assert_eq!(
+        create["with"]["body_path"].as_str(),
+        Some("docs/release/${{ github.ref_name }}.md"),
+        "the body must be the committed notes file named for the tag"
+    );
+    assert_eq!(
+        create["with"]["generate_release_notes"].as_bool(),
+        Some(true),
+        "generated notes stay, appended after the committed body"
+    );
+
+    // The action falls back silently when `body_path` is unreadable, so an rc tag is
+    // refused earlier by a step that is run here as the script it is.
+    let guard = &steps[index_of(&steps, "Require the release notes file (rc tags only)")];
+    assert_eq!(guard["if"].as_str(), Some("steps.tag.outputs.kind == 'rc'"));
+    assert_eq!(guard["env"]["TAG"].as_str(), Some("${{ github.ref_name }}"));
+    assert!(
+        index_of(&steps, "Require the release notes file (rc tags only)")
+            < index_of(&steps, "Create GitHub Release")
+    );
+    let run = guard["run"].as_str().unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let missing = bash(run, dir.path(), None, &[("TAG", "v1.0.0-rc.1")]);
+    assert!(!missing.status.success(), "{}", text(&missing));
+    assert!(
+        text(&missing).contains("release refused"),
+        "{}",
+        text(&missing)
+    );
+    std::fs::create_dir_all(dir.path().join("docs/release")).unwrap();
+    std::fs::write(dir.path().join("docs/release/v1.0.0-rc.1.md"), "").unwrap();
+    let empty = bash(run, dir.path(), None, &[("TAG", "v1.0.0-rc.1")]);
+    assert!(
+        !empty.status.success(),
+        "an empty notes file must be refused: {}",
+        text(&empty)
+    );
+    std::fs::write(dir.path().join("docs/release/v1.0.0-rc.1.md"), "# notes\n").unwrap();
+    let present = bash(run, dir.path(), None, &[("TAG", "v1.0.0-rc.1")]);
+    assert!(present.status.success(), "{}", text(&present));
+}
+
 // ---- GLM F6 / F4: the aggregate + ledger step ------------------------------------------
 
 fn aggregate_step(kind: &str) -> (Output, String) {
     aggregate_step_with(kind, "")
 }
 
-/// `perf_mode`: "" = the perf-ledger branch exists; "404" = absent; "500" = any other failure.
+/// `perf_mode`: "" = the perf-ledger branch exists and `ledger.jsonl` is served; the
+/// branch lookup fails with "404" (absent), "403", "ratelimit" or "500"; the branch lookup
+/// succeeds and the CONTENTS request fails with "contents404", "contents403" or "contents500".
 fn aggregate_step_with(kind: &str, perf_mode: &str) -> (Output, String) {
     let release = release();
     let steps = steps(&release, "sign-and-publish");
@@ -185,10 +234,16 @@ fn aggregate_step_with(kind: &str, perf_mode: &str) -> (Output, String) {
                *contents/fuzz-ledger.json*) echo '{{\"schema_version\":1,\"records\":[]}}' ;;\n\
                *branches/perf-ledger*) case \"$PERF_MODE\" in\n\
                  404) echo 'gh: Branch not found (HTTP 404)' >&2; exit 1 ;;\n\
+                 403) echo 'gh: Resource not accessible by integration (HTTP 403)' >&2; exit 1 ;;\n\
+                 ratelimit) echo 'gh: API rate limit exceeded for installation (HTTP 403)' >&2; exit 1 ;;\n\
                  500) echo 'gh: boom (HTTP 500)' >&2; exit 1 ;;\n\
                  *) echo perftip0123456789abcdef0123456789abcdef01234 ;;\n\
                esac ;;\n\
-               *contents/ledger.jsonl*) ;;\n\
+               *contents/ledger.jsonl*) case \"$PERF_MODE\" in\n\
+                 contents404) echo 'gh: Not Found (HTTP 404)' >&2; exit 1 ;;\n\
+                 contents403) echo 'gh: Resource not accessible by integration (HTTP 403)' >&2; exit 1 ;;\n\
+                 contents500) echo 'gh: boom (HTTP 500)' >&2; exit 1 ;;\n\
+               esac ;;\n\
                *check-runs*) echo '{{\"check_runs\":[]}}' ;;\n\
              esac",
             log = log.display()
@@ -269,15 +324,219 @@ fn perf_verdicts_are_judged_for_rc_and_ga_and_only_a_candidate_accepts_absent() 
 
 #[test]
 fn an_absent_perf_ledger_branch_is_an_empty_ledger_and_any_other_failure_refuses() {
+    // (a) only the BRANCH lookup's HTTP 404 is an absent branch: an empty ledger.
     for kind in ["rc", "ga"] {
         let (output, calls) = aggregate_step_with(kind, "404");
         assert!(output.status.success(), "{kind}: {}", text(&output));
         assert!(text(&output).contains("empty ledger"), "{}", text(&output));
         assert!(calls.contains("--perf-verdicts"), "{calls}");
-        let (output, calls) = aggregate_step_with(kind, "500");
-        assert!(!output.status.success(), "{kind}: {}", text(&output));
-        assert!(!calls.contains("check-release-precondition"), "{calls}");
+        assert!(
+            !calls.contains("contents/ledger.jsonl"),
+            "an absent branch has no contents request: {calls}"
+        );
+        // (c) every other branch-lookup failure refuses, rate limits included.
+        for mode in ["403", "ratelimit", "500"] {
+            let (output, calls) = aggregate_step_with(kind, mode);
+            assert!(!output.status.success(), "{kind}/{mode}: {}", text(&output));
+            assert!(
+                text(&output).contains("release refused: cannot read the perf-ledger"),
+                "{kind}/{mode}: {}",
+                text(&output)
+            );
+            assert!(!text(&output).contains("empty ledger"), "{}", text(&output));
+            assert!(!calls.contains("check-perf-verdict"), "{kind}/{mode}: {calls}");
+            assert!(
+                !calls.contains("check-release-precondition"),
+                "{kind}/{mode}: {calls}"
+            );
+        }
     }
+}
+
+#[test]
+fn a_perf_ledger_branch_that_exists_but_cannot_be_read_always_refuses() {
+    // (b) review F1: the branch lookup succeeds and `ledger.jsonl` is 404 at the returned
+    // commit. That is a broken ledger, never an absent branch; (d) 403 / 5xx refuse too.
+    for kind in ["rc", "ga"] {
+        for mode in ["contents404", "contents403", "contents500"] {
+            let (output, calls) = aggregate_step_with(kind, mode);
+            let shown = text(&output);
+            assert!(!output.status.success(), "{kind}/{mode}: {shown}");
+            assert!(
+                shown.contains("release refused: cannot read the perf-ledger"),
+                "{kind}/{mode}: {shown}"
+            );
+            assert!(
+                !shown.contains("empty ledger"),
+                "{kind}/{mode}: a missing file at an existing branch is not an empty ledger: {shown}"
+            );
+            assert!(
+                calls.contains("contents/ledger.jsonl?ref=perftip0123456789abcdef0123456789abcdef01234"),
+                "the contents request was made at the logged tip: {calls}"
+            );
+            assert!(!calls.contains("check-perf-verdict"), "{kind}/{mode}: {calls}");
+            assert!(
+                !calls.contains("check-release-precondition"),
+                "refused before the precondition: {kind}/{mode}: {calls}"
+            );
+        }
+    }
+}
+
+// ---- review F2: the notes' ABSENT label must agree with the computed verdicts ----------
+
+const LABEL_STEP: &str = "Require the rc notes perf label to agree with the perf verdicts (rc tags only)";
+const ABSENT_LINE: &str = "Perf verdicts: ABSENT";
+
+/// The `check-perf-verdict --json` shape: `{gate, sha, verdicts: [{metric, verdict, ..}]}`.
+fn verdict_report(verdicts: &[&str]) -> String {
+    let rows: Vec<serde_json::Value> = verdicts
+        .iter()
+        .enumerate()
+        .map(|(i, verdict)| {
+            serde_json::json!({
+                "metric": format!("metric-{i}"),
+                "verdict": verdict,
+                "reason": "r",
+                "binding": false
+            })
+        })
+        .collect();
+    serde_json::json!({ "gate": "check-perf-verdict", "sha": SHA, "verdicts": rows }).to_string()
+}
+
+/// Run the label step as the script it is: `notes` is the content of
+/// `docs/release/v1.0.0-rc.1.md` (None = no file); `report` the verdict JSON file (None = no file).
+fn label_step(notes: Option<&str>, report: Option<&str>) -> Output {
+    let release = release();
+    let steps = steps(&release, "sign-and-publish");
+    let run = script(&steps, LABEL_STEP);
+    let dir = tempfile::tempdir().unwrap();
+    if let Some(notes) = notes {
+        std::fs::create_dir_all(dir.path().join("docs/release")).unwrap();
+        std::fs::write(dir.path().join("docs/release/v1.0.0-rc.1.md"), notes).unwrap();
+    }
+    if let Some(report) = report {
+        std::fs::write(dir.path().join("perf-verdicts.json"), report).unwrap();
+    }
+    bash(&run, dir.path(), None, &[("TAG", "v1.0.0-rc.1")])
+}
+
+#[test]
+fn the_label_step_is_an_rc_only_step_after_the_verdicts_are_computed_and_before_publication() {
+    let release = release();
+    let steps = steps(&release, "sign-and-publish");
+    let at = index_of(&steps, LABEL_STEP);
+    assert_eq!(
+        steps[at]["if"].as_str(),
+        Some("steps.tag.outputs.kind == 'rc'")
+    );
+    assert_eq!(steps[at]["env"]["TAG"].as_str(), Some("${{ github.ref_name }}"));
+    assert!(index_of(&steps, "Require successful main discipline aggregate") < at);
+    assert!(at < index_of(&steps, "Generate SHA256SUMS and sign"));
+    assert!(at < index_of(&steps, "Create GitHub Release"));
+}
+
+#[test]
+fn an_absent_label_must_match_a_report_that_is_entirely_absent() {
+    let notes = format!("# notes\n\n{ABSENT_LINE}\n\nmore\n");
+    let all_absent = verdict_report(&["ABSENT", "ABSENT", "ABSENT"]);
+    let output = label_step(Some(&notes), Some(&all_absent));
+    assert!(output.status.success(), "{}", text(&output));
+
+    // Trailing whitespace is tolerated exactly as `check-rc-readiness` tolerates it.
+    let padded = format!("# notes\n{ABSENT_LINE}  \n");
+    let output = label_step(Some(&padded), Some(&all_absent));
+    assert!(output.status.success(), "{}", text(&output));
+}
+
+#[test]
+fn an_absent_label_with_any_real_verdict_is_a_refused_contradiction() {
+    let notes = format!("# notes\n{ABSENT_LINE}\n");
+    for verdicts in [
+        vec!["PASS", "ABSENT", "ABSENT"],
+        vec!["ABSENT", "ABSENT", "PASS"],
+        vec!["PASS", "PASS", "PASS"],
+        vec!["ABSENT", "FAIL", "ABSENT"],
+        vec!["ABSENT", "INDETERMINATE"],
+    ] {
+        let output = label_step(Some(&notes), Some(&verdict_report(&verdicts)));
+        let shown = text(&output);
+        assert!(!output.status.success(), "{verdicts:?}: {shown}");
+        assert!(
+            shown.contains("release refused: notes say ABSENT but the ledger has PASS/FAIL/INDETERMINATE verdicts: update the notes"),
+            "{verdicts:?}: {shown}"
+        );
+        let real = verdicts
+            .iter()
+            .enumerate()
+            .find(|(_, verdict)| **verdict != "ABSENT")
+            .map(|(i, verdict)| format!("metric-{i}={verdict}"))
+            .unwrap();
+        assert!(shown.contains(&real), "the refusal names {real}: {shown}");
+    }
+}
+
+#[test]
+fn without_the_exact_label_line_this_step_has_no_opinion() {
+    // The readiness gate refuses a missing or another label; this step must not double up.
+    let real = verdict_report(&["PASS", "PASS"]);
+    for notes in [
+        Some("# notes\nPerf verdicts: PASS\n"),
+        Some("# notes\n"),
+        Some("- `Perf verdicts: ABSENT`: a bullet quoting the label is not the line\n"),
+        Some("Perf verdicts: ABSENT (waived)\n"),
+        Some(" Perf verdicts: ABSENT\n"),
+    ] {
+        let output = label_step(notes, Some(&real));
+        assert!(output.status.success(), "{notes:?}: {}", text(&output));
+    }
+}
+
+#[test]
+fn an_absent_label_with_an_unreadable_or_empty_report_is_refused_not_assumed_absent() {
+    let notes = format!("{ABSENT_LINE}\n");
+    for report in [
+        None,
+        Some(""),
+        Some("{"),
+        Some("[]"),
+        Some("{\"verdicts\":[]}"),
+        Some("{\"verdicts\":[{\"metric\":\"m\"}]}"),
+    ] {
+        let output = label_step(Some(&notes), report);
+        assert!(!output.status.success(), "{report:?}: {}", text(&output));
+        assert!(
+            text(&output).contains("release refused"),
+            "{report:?}: {}",
+            text(&output)
+        );
+    }
+    // Missing notes: nothing to reconcile here, and no crash; the notes guard owns that.
+    let output = label_step(None, Some(&verdict_report(&["PASS"])));
+    assert!(output.status.success(), "{}", text(&output));
+}
+
+#[test]
+fn the_real_check_perf_verdict_json_is_what_the_label_step_reads() {
+    // Producer/consumer round trip: an empty ledger through the real binary is an
+    // all-ABSENT report the step accepts under the label and the committed notes carry it.
+    let dir = tempfile::tempdir().unwrap();
+    let ledger = dir.path().join("ledger.jsonl");
+    std::fs::write(&ledger, "").unwrap();
+    let produced = Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .args(["check-perf-verdict", "--sha", SHA, "--ledger"])
+        .arg(&ledger)
+        .arg("--json")
+        .current_dir(root())
+        .env("CARGO_MANIFEST_DIR", env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .unwrap();
+    assert!(produced.status.success(), "{}", text(&produced));
+    let report = String::from_utf8(produced.stdout).unwrap();
+    let notes = std::fs::read_to_string(root().join("docs/release/v1.0.0-rc.1.md")).unwrap();
+    let output = label_step(Some(&notes), Some(&report));
+    assert!(output.status.success(), "{}", text(&output));
 }
 
 #[test]

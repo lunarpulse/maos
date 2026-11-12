@@ -250,6 +250,7 @@ If the floor is not met by v1.0, **the substrate ships with a tightened tutorial
 - 2-year LTS on minor lines starting at v1.0
 - Security-only patches after year 1 of LTS
 - Two LTS lines maintained concurrently (current + previous)
+- **[DELTA 2026-11-12: NFR-Maint-6 governs.** The LTS commitment is 1 year at v1.0 (security-only after year 1) and 2 years at v1.5; the 2-year figure above is the v1.5 target, not the v1.0 promise (D-20-5-05 A; `non-functional-requirements.md` NFR-Maint-6, `STABILITY.md`, `docs/release/lts-policy.md`). The original lines are kept as written.**]
 
 **Deprecation timeline (Winston's commitment):**
 - 2 minor releases of warning before removal

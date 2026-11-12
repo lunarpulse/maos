@@ -158,10 +158,12 @@ jobs:
           # tagging. The alpha line keeps the aggregate-only rule; an unclassified kind
           # is refused (it cannot reach here through the classify step).
           # Operator ruling 2026-11-12 (rc = b): perf verdicts are judged for rc and GA
-          # from the `perf-ledger` branch (an absent branch, HTTP 404, is an empty
-          # ledger: every metric ABSENT). A release candidate accepts ABSENT
-          # (`--perf-absent-ok`; the notes label it, `check-rc-readiness`); FAIL and
-          # INDETERMINATE are always refused, and GA needs every metric PASS.
+          # from the `perf-ledger` branch (an absent branch is an empty ledger: every
+          # metric ABSENT; ONLY the branch lookup's HTTP 404 means that). A release
+          # candidate accepts ABSENT (`--perf-absent-ok`; the notes label it,
+          # `check-rc-readiness`, and the next step reconciles the label with the
+          # verdicts); FAIL and INDETERMINATE are always refused, and GA needs every
+          # metric PASS.
           fuzz_args=()
           perf_args=()
           case "$KIND" in
@@ -180,11 +182,14 @@ jobs:
           fi
           if [ "${#perf_args[@]}" -gt 0 ]; then
             perf_err="$RUNNER_TEMP/perf-ledger.err"
-            if {
-              tip="$(gh api "repos/${{ github.repository }}/branches/perf-ledger" --jq .commit.sha)" &&
-              echo "perf-ledger tip consumed: $tip" &&
-              gh api -H "Accept: application/vnd.github.raw+json" "repos/${{ github.repository }}/contents/ledger.jsonl?ref=$tip" > "$RUNNER_TEMP/perf-ledger.jsonl"
-            } 2> "$perf_err"; then :
+            # Review F1: the branch lookup is judged ALONE. Only ITS HTTP 404 is an absent
+            # branch (an empty ledger). Once the branch exists, a `ledger.jsonl` that cannot
+            # be fetched (404 included) is a broken ledger and refuses publication.
+            if tip="$(gh api "repos/${{ github.repository }}/branches/perf-ledger" --jq .commit.sha 2> "$perf_err")"; then
+              echo "perf-ledger tip consumed: $tip"
+              if ! gh api -H "Accept: application/vnd.github.raw+json" "repos/${{ github.repository }}/contents/ledger.jsonl?ref=$tip" > "$RUNNER_TEMP/perf-ledger.jsonl" 2> "$perf_err"; then
+                cat "$perf_err"; echo "release refused: cannot read the perf-ledger"; exit 1
+              fi
             elif grep -q 'HTTP 404' "$perf_err"; then
               echo "perf-ledger branch absent (HTTP 404): empty ledger, every metric ABSENT"
               : > "$RUNNER_TEMP/perf-ledger.jsonl"
@@ -200,6 +205,46 @@ jobs:
           # judged (and refused) instead of an older green one.
           gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=aggregate&filter=latest" |
             cargo run --locked -p xtask -- check-release-precondition "${fuzz_args[@]}" "${perf_args[@]}"
+      - name: Require the rc notes perf label to agree with the perf verdicts (rc tags only)
+        if: steps.tag.outputs.kind == 'rc'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # Review F2: `check-rc-readiness` requires the notes line `Perf verdicts: ABSENT` but
+          # cannot see the ledger, and the precondition accepts PASS rows for an rc. A notes
+          # file that says ABSENT while the computed report has any PASS/FAIL/INDETERMINATE
+          # row is a contradictory disclosure: refuse it. No exact label line = no opinion
+          # here (the readiness gate refuses a missing label).
+          python3 - "docs/release/${TAG}.md" "$RUNNER_TEMP/perf-verdicts.json" <<'PY'
+          import json
+          import sys
+
+          LABEL = "Perf verdicts: ABSENT"
+          notes_path, report_path = sys.argv[1], sys.argv[2]
+          try:
+              with open(notes_path, encoding="utf-8") as notes:
+                  labelled = any(line.rstrip() == LABEL for line in notes.read().splitlines())
+          except OSError:
+              labelled = False  # the notes guard below owns a missing notes file
+          if not labelled:
+              print("no exact `" + LABEL + "` line in " + notes_path + ": nothing to reconcile")
+              sys.exit(0)
+          try:
+              with open(report_path, encoding="utf-8") as report:
+                  rows = [(row["metric"], row["verdict"]) for row in json.load(report)["verdicts"]]
+          except (OSError, ValueError, KeyError, TypeError) as error:
+              print("release refused: cannot read the perf verdicts " + report_path + ": " + repr(error))
+              sys.exit(1)
+          if not rows:
+              print("release refused: the perf verdict report " + report_path + " has no rows")
+              sys.exit(1)
+          real = [str(metric) + "=" + str(verdict) for metric, verdict in rows if verdict != "ABSENT"]
+          if real:
+              print("release refused: notes say ABSENT but the ledger has PASS/FAIL/INDETERMINATE verdicts: update the notes (" + notes_path + " carries `" + LABEL + "`): " + ", ".join(real))
+              sys.exit(1)
+          print("perf label agrees: every metric is ABSENT")
+          PY
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -258,6 +303,17 @@ jobs:
         run: |
           cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS-packages --output dist/SHA256SUMS-packages.sig
           cargo run --locked -p xtask -- release-verify --verify --sha256sums dist/SHA256SUMS-packages --sig dist/SHA256SUMS-packages.sig --artifacts-dir dist
+      - name: Require the release notes file (rc tags only)
+        if: steps.tag.outputs.kind == 'rc'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # softprops/action-gh-release silently falls back to generated notes when
+          # `body_path` cannot be read, so a missing rc notes file must fail here, loudly.
+          if [[ ! -s "docs/release/${TAG}.md" ]]; then
+            echo "release refused: docs/release/${TAG}.md is missing or empty (an rc tag needs its notes)"; exit 1
+          fi
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
@@ -286,6 +342,10 @@ jobs:
             dist/debian-recipes.tar.gz
             dist/verify-release.py
           fail_on_unmatched_files: true
+          # The committed notes (`docs/release/<tag>.md`) come first; GitHub's generated
+          # notes are appended after them (the action prepends `body` to the generated text).
+          # A non-rc tag with no notes file falls back to the generated notes alone.
+          body_path: docs/release/${{ github.ref_name }}.md
           generate_release_notes: true
           # SemVer: a hyphenated tag (v0.1.0-alpha.1) is a pre-release and must never
           # be served as `latest`. Derived from the tag so GA needs no edit here.

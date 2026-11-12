@@ -127,6 +127,23 @@ fn a_chain_for_another_sha_is_refused() {
 }
 
 #[test]
+fn a_full_sha_sharing_a_prefix_with_the_released_sha_is_another_commit() {
+    // Landing-2 independent review: the chain is matched by the whole 40-hex SHA. A different commit whose
+    // first 7, 12 or 39 characters equal the released SHA's must never satisfy it.
+    for shared in [7, 12, 39] {
+        let sibling = format!("{}{}", &SHA[..shared], "f".repeat(40 - shared));
+        assert_eq!((sibling.len(), sibling == SHA), (40, false));
+        let mut records: Vec<Value> = full_ledger();
+        for r in records.iter_mut() {
+            if r["target"] == "manifest_parser" {
+                r["commit"] = json!(sibling);
+            }
+        }
+        assert_refused_naming(&run(records), "manifest_parser");
+    }
+}
+
+#[test]
 fn t2_records_never_count_as_t3() {
     let mut records: Vec<Value> = full_ledger();
     for r in records.iter_mut() {

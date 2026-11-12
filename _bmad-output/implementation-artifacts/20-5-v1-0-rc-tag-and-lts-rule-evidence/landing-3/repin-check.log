@@ -1,0 +1,70 @@
+LOCATION                                                                             PIN         MEASURED  STATUS
+xtask/kernel-core-baseline.toml: src_lines                                         26062            26062  ok
+xtask/kernel-core-baseline.toml: [kernel_src] files                                   90               90  ok
+xtask/kernel-core-baseline.toml: per-file digests                                0 stale        0 changed  ok
+xtask/kernel-core-baseline.toml: set_hash                                 6eaa5c6ab6e8..   6eaa5c6ab6e8..  ok
+xtask/kloc.toml: (unknown:spikes)                                                    244              144  reserve row (kept)
+xtask/kloc.toml: (unknown:templates)                                                 111               11  reserve row (kept)
+xtask/kloc.toml: maos-a2a                                                           1500              304  reserve row (kept)
+xtask/kloc.toml: maos-a2a-core                                                      5037             5037  ok
+xtask/kloc.toml: maos-a2a-tcp                                                       1621             1442  reserve row (kept)
+xtask/kloc.toml: maos-acp                                                           1000              642  reserve row (kept)
+xtask/kloc.toml: maos-attrs                                                          120               11  reserve row (kept)
+xtask/kloc.toml: maos-audit                                                         8320             8320  ok
+xtask/kloc.toml: maos-bench                                                         2737             2737  ok
+xtask/kloc.toml: maos-bin                                                          38677            38677  ok
+xtask/kloc.toml: maos-cap-registry                                                     0                0  ok
+xtask/kloc.toml: maos-capability                                                    1454             1454  ok
+xtask/kloc.toml: maos-cli                                                           6612             6612  ok
+xtask/kloc.toml: maos-cohort                                                        5873             5873  ok
+xtask/kloc.toml: maos-compliance                                                    2107             2107  ok
+xtask/kloc.toml: maos-control                                                       1791             1496  reserve row (kept)
+xtask/kloc.toml: maos-corpus-gen                                                    3000             2341  reserve row (kept)
+xtask/kloc.toml: maos-director-surface                                               826              784  reserve row (kept)
+xtask/kloc.toml: maos-domain                                                       10277            10277  ok
+xtask/kloc.toml: maos-egress                                                        1769             1769  ok
+xtask/kloc.toml: maos-escape-detector                                                376              347  reserve row (kept)
+xtask/kloc.toml: maos-eval                                                          4675             4675  ok
+xtask/kloc.toml: maos-exec-deps                                                      358              358  ok
+xtask/kloc.toml: maos-fkcs                                                           591              482  reserve row (kept)
+xtask/kloc.toml: maos-frame-codec                                                    249              249  ok
+xtask/kloc.toml: maos-host                                                           139               37  reserve row (kept)
+xtask/kloc.toml: maos-iac                                                           8875             8875  ok
+xtask/kloc.toml: maos-journal                                                          0                0  ok
+xtask/kloc.toml: maos-journey-test                                                  1104              946  reserve row (kept)
+xtask/kloc.toml: maos-kernel-core                                                  20429            20429  ok
+xtask/kloc.toml: maos-loom-lite                                                     5383             5277  reserve row (kept)
+xtask/kloc.toml: maos-manifest                                                      4765             4765  ok
+xtask/kloc.toml: maos-mcp                                                           1194             1174  reserve row (kept)
+xtask/kloc.toml: maos-notify-push                                                    348              248  reserve row (kept)
+xtask/kloc.toml: maos-orchestrator-buffer                                            833              833  ok
+xtask/kloc.toml: maos-pdp                                                            536              438  reserve row (kept)
+xtask/kloc.toml: maos-persistence                                                   2000                1  reserve row (kept)
+xtask/kloc.toml: maos-providers                                                     1679             1679  ok
+xtask/kloc.toml: maos-registry                                                      6194             6194  ok
+xtask/kloc.toml: maos-secrets                                                       1000              536  reserve row (kept)
+xtask/kloc.toml: maos-shell                                                          675              675  ok
+xtask/kloc.toml: maos-siem                                                           547              447  reserve row (kept)
+xtask/kloc.toml: maos-skill                                                         1269             1269  ok
+xtask/kloc.toml: maos-spirit-abi                                                    3000             1045  reserve row (kept)
+xtask/kloc.toml: maos-spirit-cli                                                     942              942  ok
+xtask/kloc.toml: maos-spirit-derive                                                  450              350  reserve row (kept)
+xtask/kloc.toml: maos-spirit-hello                                                  1000              382  reserve row (kept)
+xtask/kloc.toml: maos-spirit-sdk                                                    3000             1085  reserve row (kept)
+xtask/kloc.toml: maos-sso                                                            491              391  reserve row (kept)
+xtask/kloc.toml: maos-telemetry                                                      612              547  reserve row (kept)
+xtask/kloc.toml: maos-wasm-host                                                     3178             3178  ok
+xtask/kloc.toml: maos-wire                                                             0                0  ok
+xtask/kloc.toml: xtask                                                             45462            45462  ok
+xtask/kloc.toml: _aggregate_hardfail                                              203355  203354+1=203355  ok
+xtask/tests/kernel_pin_content_hash_16_0.rs: read_pinned reader                    26062            26062  ok
+xtask/tests/kernel_pin_content_hash_16_0.rs: a2a-tcp reader                        26062            26062  ok
+xtask/tests/kernel_pin_content_hash_16_0.rs: fkcs oracle reader                    26062            26062  ok
+xtask/tests/kernel_pin_content_hash_16_0.rs: toml-parser reader                    26062            26062  ok
+xtask/tests/recovery_lane_ceiling_rule.rs: RATIFIED_AT_EASING                      20429            20429  ok
+docs/ci-baselines/kernel-surface-v0.1-beta.json (check-service-boundary)               -                -  ok
+
+measured: kernel physical 26062 / tokei 20429, aggregate 203354, 90 kernel files
+
+PINS IN SYNC
+repin exit 0

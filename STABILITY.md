@@ -20,8 +20,8 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 
 | Leg | Live value |
 |---|---|
-| `kernel_version` | `0.1.0-alpha.1` |
-| release channel | development pre-release — no LTS commitment |
+| `kernel_version` | `1.0.0-rc.1` |
+| release channel | release candidate — pre-release; LTS clock not started |
 | `abi_version` | `1` |
 | `manifest_schema_version` (current) | `7` |
 | supported schema window | `1..=7` |
