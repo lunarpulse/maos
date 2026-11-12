@@ -78,17 +78,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # AC6.1: the swap, with the example's CPU cap raised so each TypeScript start fits the
-          # swap attempt wall (see the cap note on the sed below).
-          - {swap_in: declared, cpu: '100'}
+          # AC6.1: the swap on the unmodified example, with its CPU cap raised so each TypeScript
+          # start fits the swap attempt wall (see the cap note on the sed below).
+          - {swap_in: declared, cpu: '100', instr: plain}
           # AC6.2: the plant, at the same cap. EXPECTED RED, judged by its own last step.
-          - {swap_in: removed-plant, cpu: '100'}
+          - {swap_in: removed-plant, cpu: '100', instr: plain}
+          # The example with `console.log` added to `idle` and `swap-in`, to observe the counter.
+          - {swap_in: declared, cpu: '100', instr: logged}
           # The shipped manifest (cpu_max_pct = 10) unchanged: recorded to show what the cap does.
-          - {swap_in: declared, cpu: shipped}
+          - {swap_in: declared, cpu: shipped, instr: plain}
     timeout-minutes: 90
     env:
       SWAP_IN_CASE: ${{ matrix.swap_in }}
       CPU_CASE: ${{ matrix.cpu }}
+      INSTR_CASE: ${{ matrix.instr }}
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -102,10 +105,12 @@ jobs:
         working-directory: examples/example-spirit-ts
         run: |
           set -euo pipefail
-          # Instrumentation, not logic: stdout lines so the counter is observable from outside.
-          sed -i 's|^    idles += 1;$|    idles += 1;\n    console.log("MAOS-209 idle", idles);|' src/index.ts
-          sed -i 's|^    idles = Number.isFinite(carried) ? carried : 0;$|    idles = Number.isFinite(carried) ? carried : 0;\n    console.log("MAOS-209 swap-in", idles);|' src/index.ts
-          grep -c 'MAOS-209' src/index.ts
+          if [ "$INSTR_CASE" = logged ]; then
+            # Instrumentation, not logic: stdout lines so the counter is observable from outside.
+            sed -i 's|^    idles += 1;$|    idles += 1;\n    console.log("MAOS-209 idle", idles);|' src/index.ts
+            sed -i 's|^    idles = Number.isFinite(carried) ? carried : 0;$|    idles = Number.isFinite(carried) ? carried : 0;\n    console.log("MAOS-209 swap-in", idles);|' src/index.ts
+            test "$(grep -c 'MAOS-209' src/index.ts)" -eq 2
+          fi
           npm ci && npm run build && npm run componentize
           if [ "$SWAP_IN_CASE" = removed-plant ]; then
             # `swap-in` cannot be dropped alone: `lifecycle` is exported whole or not at all. The
@@ -258,8 +263,8 @@ jobs:
           PY
           echo "--- tl intents"; cut -f1 tl-intents.txt | sort | uniq -c
           echo "--- MAOS-209 lines per sink (daemon.out daemon.err journal.all)"
-          grep -c 'MAOS-209' daemon.out daemon.err journal.all
-          grep -h 'MAOS-209' daemon.out daemon.err journal.all | head -80
+          grep -c 'MAOS-209' daemon.out daemon.err journal.all tl-intents.txt
+          grep -h 'MAOS-209' daemon.out daemon.err journal.all tl-intents.txt | cut -c1-400 | head -80
       - name: Judge the plant (the red above must be the intended refusal)
         if: always() && matrix.swap_in == 'removed-plant'
         shell: bash
@@ -272,7 +277,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: 20-9-hosted-swap-${{ matrix.swap_in }}-${{ matrix.cpu }}
+          name: 20-9-hosted-swap-${{ matrix.swap_in }}-${{ matrix.cpu }}-${{ matrix.instr }}
           path: |
             daemon.out
             daemon.err
