@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="16" skipped="0" failures="0" errors="0" uuid="1c0dd314-3bd1-41e2-aabb-b800d44fb60b" timestamp="2026-11-12T08:54:55.579+00:00" time="15.050">
+    <testsuite name="maos-bin::erasure_live_20_11" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="ac6_running_t3_worker_uninstall_proves_live_inventory" classname="maos-bin::erasure_live_20_11" timestamp="2026-11-12T08:54:55.579+00:00" time="7.236"/>
+    </testsuite>
+    <testsuite name="maos-bin::one_daemon_one_door_16_1" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="ac12_20_1b_a_failing_revocation_poll_is_printed_once" classname="maos-bin::one_daemon_one_door_16_1" timestamp="2026-11-12T08:55:02.816+00:00" time="1.194"/>
+    </testsuite>
+    <testsuite name="maos-bin::worker_quarantine_20_1b" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="a_bound_worker_scb_is_fenced_and_its_next_mediated_calls_are_refused_ac11_5" classname="maos-bin::worker_quarantine_20_1b" timestamp="2026-11-12T08:55:04.010+00:00" time="0.028"/>
+        <testcase name="t3_worker_quarantine_refuses_next_mediated_call_and_records_activity_ac11_5" classname="maos-bin::worker_quarantine_20_1b" timestamp="2026-11-12T08:55:04.038+00:00" time="6.284"/>
+    </testsuite>
+    <testsuite name="maos-bin::yank_policy_20_1b" tests="12" skipped="0" errors="0" failures="0">
+        <testcase name="a_parked_invalid_row_is_journaled_once_across_polls_f2" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-12T08:55:10.323+00:00" time="0.020"/>
+        <testcase name="corrupt_install_does_not_hide_another_spirits_expiry_p1" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-12T08:55:10.343+00:00" time="0.024"/>
+        <testcase name="deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-12T08:55:10.366+00:00" time="0.009"/>
+        <testcase name="expiry_and_vetter_revocation_observe_once_and_request_policy_ac9" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-12T08:55:10.375+00:00" time="0.063"/>
+        <testcase name="failing_auto_revoke_retries_policy_without_repeating_observation_p12" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-12T08:55:10.439+00:00" time="0.022"/>
+        <testcase name="no_registry_local_timer_discovers_promotion_installed_after_start_p11" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-12T08:55:10.461+00:00" time="0.019"/>
+        <testcase name="poller_runtime_clock_and_cursor_restart_reach_expiry_p6" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-12T08:55:10.479+00:00" time="0.022"/>
+        <testcase name="quarantine_policy_fences_only_the_signed_yank_target_and_stays_sticky_ac8" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-12T08:55:10.501+00:00" time="0.023"/>
+        <testcase name="registry_publishers_cannot_share_principal_spill_ac10" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-12T08:55:10.524+00:00" time="0.037"/>
+        <testcase name="rejected_vetter_row_does_not_hide_later_publisher_yank_p1" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-12T08:55:10.561+00:00" time="0.016"/>
+        <testcase name="signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-12T08:55:10.577+00:00" time="0.038"/>
+        <testcase name="uninstalled_unsigned_row_never_advances_authenticated_cursor_f1" classname="maos-bin::yank_policy_20_1b" timestamp="2026-11-12T08:55:10.616+00:00" time="0.013"/>
+    </testsuite>
+</testsuites>

@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "actual-lines": 26062,
+  "pinned-lines": 26062,
+  "baseline-file": "/home/runner/work/maos/maos/xtask/kernel-core-baseline.toml",
+  "file-set-entries": 90,
+  "set-hash": "6eaa5c6ab6e8e49505d16615ad5c20c58d1988fe8713e26be23ef6892dbc50fc",
+  "pinned-set-hash": "6eaa5c6ab6e8e49505d16615ad5c20c58d1988fe8713e26be23ef6892dbc50fc",
+  "changed": [],
+  "added": [],
+  "removed": []
+}

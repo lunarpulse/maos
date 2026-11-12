@@ -1,0 +1,1373 @@
+warning: ignoring --test-threads because --no-capture is specified
+────────────
+ Nextest run ID 446ad724-015d-446d-af24-c2781e091888 with nextest profile: ci
+    Starting 158 tests across 186 binaries (1241 tests skipped)
+       START [         ] (  1/158) maos-bin::erasure_inventory_20_11 registry_bound_principal_is_counted_and_erased_on_uninstall_p3
+
+running 1 test
+test registry_bound_principal_is_counted_and_erased_on_uninstall_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 24 filtered out; finished in 0.72s
+
+        PASS [   0.723s] (  1/158) maos-bin::erasure_inventory_20_11 registry_bound_principal_is_counted_and_erased_on_uninstall_p3
+       START [         ] (  2/158) maos-bin::installed_spirit_dispatch_20_1 boot_rechecks_manifest_component_publisher_and_claim
+
+running 1 test
+maos-registry: listening on 127.0.0.1:40421
+maos-registry: listening on 127.0.0.1:43099
+maos-registry: listening on 127.0.0.1:35047
+maos-registry: listening on 127.0.0.1:34337
+test boot_rechecks_manifest_component_publisher_and_claim ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 1.52s
+
+        PASS [   1.521s] (  2/158) maos-bin::installed_spirit_dispatch_20_1 boot_rechecks_manifest_component_publisher_and_claim
+       START [         ] (  3/158) maos-bin::installed_spirit_dispatch_20_1 installed_component_dispatch_reports_typed_boot_refusal
+
+running 1 test
+test installed_component_dispatch_reports_typed_boot_refusal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.42s
+
+        PASS [   0.425s] (  3/158) maos-bin::installed_spirit_dispatch_20_1 installed_component_dispatch_reports_typed_boot_refusal
+       START [         ] (  4/158) maos-bin::one_daemon_one_door_16_1 vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9
+
+running 1 test
+test vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 46 filtered out; finished in 0.86s
+
+        PASS [   0.868s] (  4/158) maos-bin::one_daemon_one_door_16_1 vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9
+       START [         ] (  5/158) maos-bin::registry_config_20_1b daemon_banner_uses_the_enforced_single_reader_d1_p10
+
+running 1 test
+test daemon_banner_uses_the_enforced_single_reader_d1_p10 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.06s
+
+        PASS [   0.064s] (  5/158) maos-bin::registry_config_20_1b daemon_banner_uses_the_enforced_single_reader_d1_p10
+       START [         ] (  6/158) maos-bin::registry_config_20_1b daemon_refuses_https_without_a_root_before_polling_d1_p10
+
+running 1 test
+test daemon_refuses_https_without_a_root_before_polling_d1_p10 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.02s
+
+        PASS [   0.025s] (  6/158) maos-bin::registry_config_20_1b daemon_refuses_https_without_a_root_before_polling_d1_p10
+       START [         ] (  7/158) maos-bin::registry_config_20_1b daemon_refuses_registry_typo_even_without_a_uri_d1_p10_p11
+
+running 1 test
+test daemon_refuses_registry_typo_even_without_a_uri_d1_p10_p11 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.02s
+
+        PASS [   0.025s] (  7/158) maos-bin::registry_config_20_1b daemon_refuses_registry_typo_even_without_a_uri_d1_p10_p11
+       START [         ] (  8/158) maos-bin::root_shutdown_unload_16_3 ac3_operator_door_unload_stops_a_live_worker_once
+
+running 1 test
+AC3 door unload: live Worker stopped and receipted in 20.08564ms
+test ac3_operator_door_unload_stops_a_live_worker_once ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 9.55s
+
+        PASS [   9.554s] (  8/158) maos-bin::root_shutdown_unload_16_3 ac3_operator_door_unload_stops_a_live_worker_once
+       START [         ] (  9/158) maos-bin::root_shutdown_unload_16_3 ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm
+
+running 1 test
+v1: halt list before SIGTERM -> {"frame_id":"01a1cef6","timestamp_ns":1794473636066652469,"kind":"epistemic.halt","intent":"belief_variance","halt_id":"01M77FDC72DY5A8MBQ11VPF0ZF","record":"raised"}
+v1: SIGTERM-to-exit 20.075976ms; halt ids raised=["01M77FDC72DY5A8MBQ11VPF0ZF"] receipted=["01M77FDC72DY5A8MBQ11VPF0ZF"]
+test ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.66s
+
+        PASS [   0.668s] (  9/158) maos-bin::root_shutdown_unload_16_3 ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm
+       START [         ] ( 10/158) maos-bin::root_shutdown_unload_16_3 ac4_v2_butler_once_receipts_the_raised_halt_and_drains
+
+running 1 test
+v2: butler --once total 40.147616ms (test 0.18716286 s), no `drain timed out`; raised halt "01M77FDCFB28STHFTZC54C6V5Q" == receipted at pid 1
+test ac4_v2_butler_once_receipts_the_raised_halt_and_drains ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.19s
+
+        PASS [   0.193s] ( 10/158) maos-bin::root_shutdown_unload_16_3 ac4_v2_butler_once_receipts_the_raised_halt_and_drains
+       START [         ] ( 11/158) maos-bin::root_shutdown_unload_16_3 ac4_v3_topology_once_unloads_every_loaded_spirit
+
+running 1 test
+v3: topology --once 200.660184ms, both class spirits unloaded
+test ac4_v3_topology_once_unloads_every_loaded_spirit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.25s
+
+        PASS [   0.254s] ( 11/158) maos-bin::root_shutdown_unload_16_3 ac4_v3_topology_once_unloads_every_loaded_spirit
+       START [         ] ( 12/158) maos-bin::root_shutdown_unload_16_3 ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker
+
+running 1 test
+v3b: SIGTERM mid-worker, exit 1 in 180.705557ms, worker nacked and unloaded
+test ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 1.50s
+
+        PASS [   1.509s] ( 12/158) maos-bin::root_shutdown_unload_16_3 ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker
+       START [         ] ( 13/158) maos-bin::root_shutdown_unload_16_3 ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan
+
+running 1 test
+v4: SIGTERM during standalone hang worker, exit Some(1) in 523.62929ms
+test ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 2.03s
+
+        PASS [   2.031s] ( 13/158) maos-bin::root_shutdown_unload_16_3 ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan
+       START [         ] ( 14/158) maos-bin::root_shutdown_unload_16_3 ac4_v4b_grandchild_is_stopped_with_its_worker_container
+
+running 1 test
+v4b: stopped Worker container and descendant during root teardown in 140.862532ms
+test ac4_v4b_grandchild_is_stopped_with_its_worker_container ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 1.71s
+
+        PASS [   1.719s] ( 14/158) maos-bin::root_shutdown_unload_16_3 ac4_v4b_grandchild_is_stopped_with_its_worker_container
+       START [         ] ( 15/158) maos-bin::root_shutdown_unload_16_3 ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15
+
+running 1 test
+test ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.12s
+
+        PASS [   0.128s] ( 15/158) maos-bin::root_shutdown_unload_16_3 ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15
+       START [         ] ( 16/158) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains
+
+running 1 test
+v5: cohort daemon SIGTERM with a live host-B worker, exit Some(0) in 161.043401ms
+test cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 2.12s
+
+        PASS [   2.129s] ( 16/158) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains
+       START [         ] ( 17/158) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown
+
+running 1 test
+v5b attempt 1: counted run — daemon exited with code Some(0) through its teardown
+test cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.10s
+
+        PASS [   0.107s] ( 17/158) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown
+       START [         ] ( 18/158) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants
+
+running 1 test
+test cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 2.57s
+
+        PASS [   2.570s] ( 18/158) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants
+       START [         ] ( 19/158) maos-bin::root_shutdown_unload_16_3 cohort::cohort_sigterm_without_worker_joins_local_yank_timer_and_drains
+
+running 1 test
+cohort without Worker: audit drained in 20.085653ms
+test cohort::cohort_sigterm_without_worker_joins_local_yank_timer_and_drains ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.12s
+
+        PASS [   0.128s] ( 19/158) maos-bin::root_shutdown_unload_16_3 cohort::cohort_sigterm_without_worker_joins_local_yank_timer_and_drains
+       START [         ] ( 20/158) maos-bin::root_shutdown_unload_16_3 cohort::declared_capable_cohort_worker_prerequisite_never_green_skips
+
+running 1 test
+test cohort::declared_capable_cohort_worker_prerequisite_never_green_skips ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+        PASS [   0.006s] ( 20/158) maos-bin::root_shutdown_unload_16_3 cohort::declared_capable_cohort_worker_prerequisite_never_green_skips
+       START [         ] ( 21/158) maos-bin::root_shutdown_unload_16_3 every_audit_sender_release_joins_the_yank_owner
+
+running 1 test
+test every_audit_sender_release_joins_the_yank_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.26s
+
+        PASS [   0.265s] ( 21/158) maos-bin::root_shutdown_unload_16_3 every_audit_sender_release_joins_the_yank_owner
+       START [         ] ( 22/158) maos-bin::root_shutdown_unload_16_3 harness_owns_grandchildren_before_discovery_even_when_startup_panics
+
+running 1 test
+
+thread 'harness_owns_grandchildren_before_discovery_even_when_startup_panics' (31013) panicked at crates/maos-bin/tests/root_shutdown_unload_16_3.rs:759:13:
+planted panic after spawn, before grandchild discovery
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+planted-panic grandchild pid=31016; live after unwind=false
+test harness_owns_grandchildren_before_discovery_even_when_startup_panics ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.14s
+
+        PASS [   0.141s] ( 22/158) maos-bin::root_shutdown_unload_16_3 harness_owns_grandchildren_before_discovery_even_when_startup_panics
+       START [         ] ( 23/158) maos-bin::yank_audit_structure_20_1b async_task_cannot_retain_sender_clone_p6
+
+running 1 test
+test async_task_cannot_retain_sender_clone_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 23/158) maos-bin::yank_audit_structure_20_1b async_task_cannot_retain_sender_clone_p6
+       START [         ] ( 24/158) maos-bin::yank_audit_structure_20_1b helper_sender_move_requires_release_p6
+
+running 1 test
+test helper_sender_move_requires_release_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 24/158) maos-bin::yank_audit_structure_20_1b helper_sender_move_requires_release_p6
+       START [         ] ( 25/158) maos-bin::yank_audit_structure_20_1b joined_qualified_drop_and_select_are_accounted_p6
+
+running 1 test
+test joined_qualified_drop_and_select_are_accounted_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 25/158) maos-bin::yank_audit_structure_20_1b joined_qualified_drop_and_select_are_accounted_p6
+       START [         ] ( 26/158) maos-bin::yank_audit_structure_20_1b moving_a_drain_to_another_arm_cannot_hide_behind_equal_totals_p6
+
+running 1 test
+test moving_a_drain_to_another_arm_cannot_hide_behind_equal_totals_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.26s
+
+        PASS [   0.266s] ( 26/158) maos-bin::yank_audit_structure_20_1b moving_a_drain_to_another_arm_cannot_hide_behind_equal_totals_p6
+       START [         ] ( 27/158) maos-bin::yank_audit_structure_20_1b parenthesized_drain_requires_join_p6
+
+running 1 test
+test parenthesized_drain_requires_join_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 27/158) maos-bin::yank_audit_structure_20_1b parenthesized_drain_requires_join_p6
+       START [         ] ( 28/158) maos-bin::yank_audit_structure_20_1b qualified_drop_requires_join_p6
+
+running 1 test
+test qualified_drop_requires_join_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 28/158) maos-bin::yank_audit_structure_20_1b qualified_drop_requires_join_p6
+       START [         ] ( 29/158) maos-bin::yank_audit_structure_20_1b select_drain_requires_join_p6
+
+running 1 test
+test select_drain_requires_join_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 29/158) maos-bin::yank_audit_structure_20_1b select_drain_requires_join_p6
+       START [         ] ( 30/158) maos-bin::yank_audit_structure_20_1b sibling_join_does_not_authorize_another_arm_p6
+
+running 1 test
+test sibling_join_does_not_authorize_another_arm_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 30/158) maos-bin::yank_audit_structure_20_1b sibling_join_does_not_authorize_another_arm_p6
+       START [         ] ( 31/158) maos-bin::yank_audit_structure_20_1b supervisor_stop_must_follow_join_p4
+
+running 1 test
+test supervisor_stop_must_follow_join_p4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 31/158) maos-bin::yank_audit_structure_20_1b supervisor_stop_must_follow_join_p4
+       START [         ] ( 32/158) maos-bin::yank_audit_structure_20_1b unload_must_follow_join_p4
+
+running 1 test
+test unload_must_follow_join_p4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 32/158) maos-bin::yank_audit_structure_20_1b unload_must_follow_join_p4
+       START [         ] ( 33/158) maos-bin::yank_audit_structure_20_1b wildcard_sender_binding_is_not_a_release_p6
+
+running 1 test
+test wildcard_sender_binding_is_not_a_release_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 33/158) maos-bin::yank_audit_structure_20_1b wildcard_sender_binding_is_not_a_release_p6
+       START [         ] ( 34/158) maos-bin::yank_policy_20_1b a_parked_invalid_row_is_journaled_once_across_polls_f2
+
+running 1 test
+test a_parked_invalid_row_is_journaled_once_across_polls_f2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.05s
+
+        PASS [   0.054s] ( 34/158) maos-bin::yank_policy_20_1b a_parked_invalid_row_is_journaled_once_across_polls_f2
+       START [         ] ( 35/158) maos-bin::yank_policy_20_1b corrupt_install_does_not_hide_another_spirits_expiry_p1
+
+running 1 test
+test corrupt_install_does_not_hide_another_spirits_expiry_p1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.01s
+
+        PASS [   0.019s] ( 35/158) maos-bin::yank_policy_20_1b corrupt_install_does_not_hide_another_spirits_expiry_p1
+       START [         ] ( 36/158) maos-bin::yank_policy_20_1b deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9
+
+running 1 test
+test deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+        PASS [   0.007s] ( 36/158) maos-bin::yank_policy_20_1b deployed_artifact_cannot_hide_behind_genuine_signed_sidecar_p9
+       START [         ] ( 37/158) maos-bin::yank_policy_20_1b expiry_and_vetter_revocation_observe_once_and_request_policy_ac9
+
+running 1 test
+test expiry_and_vetter_revocation_observe_once_and_request_policy_ac9 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.03s
+
+        PASS [   0.032s] ( 37/158) maos-bin::yank_policy_20_1b expiry_and_vetter_revocation_observe_once_and_request_policy_ac9
+       START [         ] ( 38/158) maos-bin::yank_policy_20_1b failing_auto_revoke_retries_policy_without_repeating_observation_p12
+
+running 1 test
+
+thread '<unnamed>' (31070) panicked at crates/maos-bin/tests/yank_policy_20_1b.rs:713:13:
+test-only poisoned assignment state rejects CRL application
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test failing_auto_revoke_retries_policy_without_repeating_observation_p12 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.02s
+
+        PASS [   0.020s] ( 38/158) maos-bin::yank_policy_20_1b failing_auto_revoke_retries_policy_without_repeating_observation_p12
+       START [         ] ( 39/158) maos-bin::yank_policy_20_1b no_registry_local_timer_discovers_promotion_installed_after_start_p11
+
+running 1 test
+test no_registry_local_timer_discovers_promotion_installed_after_start_p11 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.02s
+
+        PASS [   0.020s] ( 39/158) maos-bin::yank_policy_20_1b no_registry_local_timer_discovers_promotion_installed_after_start_p11
+       START [         ] ( 40/158) maos-bin::yank_policy_20_1b poller_runtime_clock_and_cursor_restart_reach_expiry_p6
+
+running 1 test
+test poller_runtime_clock_and_cursor_restart_reach_expiry_p6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.02s
+
+        PASS [   0.020s] ( 40/158) maos-bin::yank_policy_20_1b poller_runtime_clock_and_cursor_restart_reach_expiry_p6
+       START [         ] ( 41/158) maos-bin::yank_policy_20_1b quarantine_policy_fences_only_the_signed_yank_target_and_stays_sticky_ac8
+
+running 1 test
+test quarantine_policy_fences_only_the_signed_yank_target_and_stays_sticky_ac8 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.02s
+
+        PASS [   0.021s] ( 41/158) maos-bin::yank_policy_20_1b quarantine_policy_fences_only_the_signed_yank_target_and_stays_sticky_ac8
+       START [         ] ( 42/158) maos-bin::yank_policy_20_1b registry_publishers_cannot_share_principal_spill_ac10
+
+running 1 test
+test registry_publishers_cannot_share_principal_spill_ac10 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.06s
+
+        PASS [   0.068s] ( 42/158) maos-bin::yank_policy_20_1b registry_publishers_cannot_share_principal_spill_ac10
+       START [         ] ( 43/158) maos-bin::yank_policy_20_1b rejected_vetter_row_does_not_hide_later_publisher_yank_p1
+
+running 1 test
+test rejected_vetter_row_does_not_hide_later_publisher_yank_p1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.05s
+
+        PASS [   0.057s] ( 43/158) maos-bin::yank_policy_20_1b rejected_vetter_row_does_not_hide_later_publisher_yank_p1
+       START [         ] ( 44/158) maos-bin::yank_policy_20_1b signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8
+
+running 1 test
+test signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.21s
+
+        PASS [   0.216s] ( 44/158) maos-bin::yank_policy_20_1b signed_yank_decisions_warn_request_quarantine_and_apply_crl_ac8
+       START [         ] ( 45/158) maos-bin::yank_policy_20_1b uninstalled_unsigned_row_never_advances_authenticated_cursor_f1
+
+running 1 test
+test uninstalled_unsigned_row_never_advances_authenticated_cursor_f1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.01s
+
+        PASS [   0.012s] ( 45/158) maos-bin::yank_policy_20_1b uninstalled_unsigned_row_never_advances_authenticated_cursor_f1
+       START [         ] ( 46/158) maos-cli::spirit_install_20_1 built_in_shell_names_are_reserved_before_admission
+
+running 1 test
+maos-registry: listening on 127.0.0.1:44855
+maos-registry: listening on 127.0.0.1:46509
+test built_in_shell_names_are_reserved_before_admission ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.20s
+
+        PASS [   0.207s] ( 46/158) maos-cli::spirit_install_20_1 built_in_shell_names_are_reserved_before_admission
+       START [         ] ( 47/158) maos-cli::spirit_install_20_1 configured_org_key_requires_a_valid_server_tier_signature
+
+running 1 test
+maos-registry: listening on 127.0.0.1:33841
+maos-registry: listening on 127.0.0.1:42615
+test configured_org_key_requires_a_valid_server_tier_signature ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.56s
+
+        PASS [   0.560s] ( 47/158) maos-cli::spirit_install_20_1 configured_org_key_requires_a_valid_server_tier_signature
+       START [         ] ( 48/158) maos-cli::spirit_install_20_1 independently_keyed_server_is_verified_and_wrong_key_never_persists
+
+running 1 test
+maos-registry: listening on 127.0.0.1:43665
+maos-registry: listening on 127.0.0.1:36483
+test independently_keyed_server_is_verified_and_wrong_key_never_persists ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.40s
+
+        PASS [   0.409s] ( 48/158) maos-cli::spirit_install_20_1 independently_keyed_server_is_verified_and_wrong_key_never_persists
+       START [         ] ( 49/158) maos-cli::spirit_install_20_1 install_refuses_registry_rust_inproc_before_persisting
+
+running 1 test
+maos-registry: listening on 127.0.0.1:37685
+test install_refuses_registry_rust_inproc_before_persisting ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.25s
+
+        PASS [   0.257s] ( 49/158) maos-cli::spirit_install_20_1 install_refuses_registry_rust_inproc_before_persisting
+       START [         ] ( 50/158) maos-cli::spirit_install_20_1 installed_version_is_immutable_ac14
+
+running 1 test
+maos-registry: listening on 127.0.0.1:43095
+maos-registry: listening on 127.0.0.1:33791
+maos-registry: listening on 127.0.0.1:37355
+maos-registry: listening on 127.0.0.1:39161
+maos-registry: listening on 127.0.0.1:35579
+test installed_version_is_immutable_ac14 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.21s
+
+        PASS [   1.210s] ( 50/158) maos-cli::spirit_install_20_1 installed_version_is_immutable_ac14
+       START [         ] ( 51/158) maos-cli::spirit_install_20_1 materialization_failure_never_activates_a_partial_install
+
+running 1 test
+maos-registry: listening on 127.0.0.1:34717
+test materialization_failure_never_activates_a_partial_install ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.25s
+
+        PASS [   0.257s] ( 51/158) maos-cli::spirit_install_20_1 materialization_failure_never_activates_a_partial_install
+       START [         ] ( 52/158) maos-cli::spirit_install_20_1 offline_install_persists_remote_origin_and_rejects_tampering
+
+running 1 test
+maos-registry: listening on 127.0.0.1:33373
+test offline_install_persists_remote_origin_and_rejects_tampering ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.35s
+
+        PASS [   0.358s] ( 52/158) maos-cli::spirit_install_20_1 offline_install_persists_remote_origin_and_rejects_tampering
+       START [         ] ( 53/158) maos-cli::spirit_install_20_1 wrong_publisher_key_and_claim_signature_are_refused
+
+running 1 test
+maos-registry: listening on 127.0.0.1:44629
+test wrong_publisher_key_and_claim_signature_are_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.25s
+
+        PASS [   0.257s] ( 53/158) maos-cli::spirit_install_20_1 wrong_publisher_key_and_claim_signature_are_refused
+       START [         ] ( 54/158) maos-cli::spirit_install_20_1 yanked_install_is_refused_before_persistence_ac16
+
+running 1 test
+maos-registry: listening on 127.0.0.1:37947
+test yanked_install_is_refused_before_persistence_ac16 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.30s
+
+        PASS [   0.307s] ( 54/158) maos-cli::spirit_install_20_1 yanked_install_is_refused_before_persistence_ac16
+       START [         ] ( 55/158) maos-registry http::tests::drip_response_cannot_extend_exchange_deadline_f4
+
+running 1 test
+test http::tests::drip_response_cannot_extend_exchange_deadline_f4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.24s
+
+        PASS [   0.246s] ( 55/158) maos-registry http::tests::drip_response_cannot_extend_exchange_deadline_f4
+       START [         ] ( 56/158) maos-registry http::tests::later_resolved_address_is_tried_after_connection_refusal
+
+running 1 test
+test http::tests::later_resolved_address_is_tried_after_connection_refusal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+        PASS [   0.005s] ( 56/158) maos-registry http::tests::later_resolved_address_is_tried_after_connection_refusal
+       START [         ] ( 57/158) maos-registry http::tests::unsigned_http_refusal_preserves_status_p7
+
+running 1 test
+test http::tests::unsigned_http_refusal_preserves_status_p7 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 57/158) maos-registry http::tests::unsigned_http_refusal_preserves_status_p7
+       START [         ] ( 58/158) maos-registry security::review_tests::configured_ca_replaces_bundled_roots_d4
+
+running 1 test
+test security::review_tests::configured_ca_replaces_bundled_roots_d4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 58/158) maos-registry security::review_tests::configured_ca_replaces_bundled_roots_d4
+       START [         ] ( 59/158) maos-registry security::review_tests::explicit_development_literal_loopback_matrix_p3
+
+running 1 test
+test security::review_tests::explicit_development_literal_loopback_matrix_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 59/158) maos-registry security::review_tests::explicit_development_literal_loopback_matrix_p3
+       START [         ] ( 60/158) maos-registry security::review_tests::registry_hex_diagnostics_do_not_echo_input_p8
+
+running 1 test
+test security::review_tests::registry_hex_diagnostics_do_not_echo_input_p8 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 60/158) maos-registry security::review_tests::registry_hex_diagnostics_do_not_echo_input_p8
+       START [         ] ( 61/158) maos-registry security::review_tests::registry_typo_is_refused_p11
+
+running 1 test
+test security::review_tests::registry_typo_is_refused_p11 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 61/158) maos-registry security::review_tests::registry_typo_is_refused_p11
+       START [         ] ( 62/158) maos-registry security::review_tests::registry_uri_matrix_and_trailing_dns_labels_p3_p9
+
+running 1 test
+test security::review_tests::registry_uri_matrix_and_trailing_dns_labels_p3_p9 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 62/158) maos-registry security::review_tests::registry_uri_matrix_and_trailing_dns_labels_p3_p9
+       START [         ] ( 63/158) maos-registry security::review_tests::signed_params_less_notification_verifies_p7
+
+running 1 test
+test security::review_tests::signed_params_less_notification_verifies_p7 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+        PASS [   0.005s] ( 63/158) maos-registry security::review_tests::signed_params_less_notification_verifies_p7
+       START [         ] ( 64/158) maos-registry yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5
+
+running 1 test
+yank-head-rollback: registry history rollback: authenticated head 2 is behind cursor 5; cursor unchanged, operator intervention required
+test yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 64/158) maos-registry yank::tests::authenticated_head_rollback_never_mutates_or_resets_cursor_d3_f5
+       START [         ] ( 65/158) maos-registry::registry_limits_20_1b idle_first_byte_is_bounded_more_tightly_than_a_request_f1
+
+running 1 test
+maos-registry: listening on 127.0.0.1:46009
+maos-registry: connection error: Transport endpoint is not connected (os error 107)
+test idle_first_byte_is_bounded_more_tightly_than_a_request_f1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 1.05s
+
+        PASS [   1.057s] ( 65/158) maos-registry::registry_limits_20_1b idle_first_byte_is_bounded_more_tightly_than_a_request_f1
+       START [         ] ( 66/158) maos-registry::registry_limits_20_1b metadata_body_limit_is_checked_before_body_allocation_f2
+
+running 1 test
+maos-registry: listening on 127.0.0.1:40901
+test metadata_body_limit_is_checked_before_body_allocation_f2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.05s
+
+        PASS [   0.055s] ( 66/158) maos-registry::registry_limits_20_1b metadata_body_limit_is_checked_before_body_allocation_f2
+       START [         ] ( 67/158) maos-registry::registry_limits_20_1b one_source_cannot_occupy_every_registry_slot_f1
+
+running 1 test
+maos-registry: listening on 127.0.0.1:33427
+maos-registry: connection error: Broken pipe (os error 32)
+maos-registry: connection error: Broken pipe (os error 32)
+test one_source_cannot_occupy_every_registry_slot_f1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.05s
+
+        PASS [   0.055s] ( 67/158) maos-registry::registry_limits_20_1b one_source_cannot_occupy_every_registry_slot_f1
+       START [         ] ( 68/158) maos-registry::registry_limits_20_1b publication_hint_cannot_widen_another_rpc_body_cap_f2
+
+running 1 test
+maos-registry: listening on 127.0.0.1:41675
+test publication_hint_cannot_widen_another_rpc_body_cap_f2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.10s
+
+        PASS [   0.105s] ( 68/158) maos-registry::registry_limits_20_1b publication_hint_cannot_widen_another_rpc_body_cap_f2
+       START [         ] ( 69/158) maos-registry::registry_server_bin_20_1 standalone_population_rejection_has_complete_http_framing
+
+running 1 test
+test standalone_population_rejection_has_complete_http_framing ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.66s
+
+        PASS [   0.663s] ( 69/158) maos-registry::registry_server_bin_20_1 standalone_population_rejection_has_complete_http_framing
+       START [         ] ( 70/158) maos-registry::registry_server_bin_20_1 standalone_rejections_have_complete_http_framing_and_clean_eof
+
+running 1 test
+test standalone_rejections_have_complete_http_framing_and_clean_eof ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 10.74s
+
+        PASS [  10.749s] ( 70/158) maos-registry::registry_server_bin_20_1 standalone_rejections_have_complete_http_framing_and_clean_eof
+       START [         ] ( 71/158) maos-registry::registry_server_bin_20_1 standalone_server_roundtrip_isolates_root_and_exits_cleanly
+
+running 1 test
+test standalone_server_roundtrip_isolates_root_and_exits_cleanly ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.15s
+
+        PASS [   0.158s] ( 71/158) maos-registry::registry_server_bin_20_1 standalone_server_roundtrip_isolates_root_and_exits_cleanly
+       START [         ] ( 72/158) maos-registry::registry_server_bin_20_1 unauthenticated_development_server_refuses_non_loopback_bind
+
+running 1 test
+test unauthenticated_development_server_refuses_non_loopback_bind ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+        PASS [   0.006s] ( 72/158) maos-registry::registry_server_bin_20_1 unauthenticated_development_server_refuses_non_loopback_bind
+       START [         ] ( 73/158) maos-registry::registry_tls_20_1b http_install_requires_explicit_development_opt_in_ac15
+
+running 1 test
+test http_install_requires_explicit_development_opt_in_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 73/158) maos-registry::registry_tls_20_1b http_install_requires_explicit_development_opt_in_ac15
+       START [         ] ( 74/158) maos-registry::registry_tls_20_1b server_requires_tls_or_explicit_loopback_development_ac15
+
+running 1 test
+test server_requires_tls_or_explicit_loopback_development_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 74/158) maos-registry::registry_tls_20_1b server_requires_tls_or_explicit_loopback_development_ac15
+       START [         ] ( 75/158) maos-registry::registry_tls_20_1b tls::bad_signature_byte_is_refused_p3
+
+running 1 test
+test tls::bad_signature_byte_is_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.09s
+
+        PASS [   0.095s] ( 75/158) maos-registry::registry_tls_20_1b tls::bad_signature_byte_is_refused_p3
+       START [         ] ( 76/158) maos-registry::registry_tls_20_1b tls::cli_omitted_yank_or_unauthenticated_head_refuses_before_persistence_ac15
+
+running 1 test
+test tls::cli_omitted_yank_or_unauthenticated_head_refuses_before_persistence_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.50s
+
+        PASS [   0.508s] ( 76/158) maos-registry::registry_tls_20_1b tls::cli_omitted_yank_or_unauthenticated_head_refuses_before_persistence_ac15
+       START [         ] ( 77/158) maos-registry::registry_tls_20_1b tls::cli_tls_install_authenticates_before_persistence_ac15
+
+running 1 test
+maos-registry: listening on 127.0.0.1:34643
+test tls::cli_tls_install_authenticates_before_persistence_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.20s
+
+        PASS [   0.208s] ( 77/158) maos-registry::registry_tls_20_1b tls::cli_tls_install_authenticates_before_persistence_ac15
+       START [         ] ( 78/158) maos-registry::registry_tls_20_1b tls::cli_tls_yanked_version_is_refused_before_persistence_ac15
+
+running 1 test
+maos-registry: listening on 127.0.0.1:38991
+test tls::cli_tls_yanked_version_is_refused_before_persistence_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.25s
+
+        PASS [   0.259s] ( 78/158) maos-registry::registry_tls_20_1b tls::cli_tls_yanked_version_is_refused_before_persistence_ac15
+       START [         ] ( 79/158) maos-registry::registry_tls_20_1b tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15
+
+running 1 test
+maos-registry: listening on 127.0.0.1:40743
+test tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.10s
+
+        PASS [   0.108s] ( 79/158) maos-registry::registry_tls_20_1b tls::cli_wrong_configured_key_refuses_hostile_first_contact_ac15
+       START [         ] ( 80/158) maos-registry::registry_tls_20_1b tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15
+
+running 1 test
+maos-registry: listening on 127.0.0.1:40159
+test tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.05s
+
+        PASS [   0.058s] ( 80/158) maos-registry::registry_tls_20_1b tls::cli_wrong_configured_uri_refuses_hostile_first_contact_ac15
+       START [         ] ( 81/158) maos-registry::registry_tls_20_1b tls::configured_root_and_ca_authenticate_real_registry_ac15
+
+running 1 test
+maos-registry: listening on 127.0.0.1:43071
+test tls::configured_root_and_ca_authenticate_real_registry_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.41s
+
+        PASS [   0.418s] ( 81/158) maos-registry::registry_tls_20_1b tls::configured_root_and_ca_authenticate_real_registry_ac15
+       START [         ] ( 82/158) maos-registry::registry_tls_20_1b tls::configured_root_is_bound_to_canonical_uri_before_contact_ac15
+
+running 1 test
+maos-registry: listening on 127.0.0.1:36031
+test tls::configured_root_is_bound_to_canonical_uri_before_contact_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.16s
+
+        PASS [   0.162s] ( 82/158) maos-registry::registry_tls_20_1b tls::configured_root_is_bound_to_canonical_uri_before_contact_ac15
+       START [         ] ( 83/158) maos-registry::registry_tls_20_1b tls::envelope_incomplete_head_is_refused_ac15
+
+running 1 test
+test tls::envelope_incomplete_head_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.09s
+
+        PASS [   0.095s] ( 83/158) maos-registry::registry_tls_20_1b tls::envelope_incomplete_head_is_refused_ac15
+       START [         ] ( 84/158) maos-registry::registry_tls_20_1b tls::envelope_missing_head_is_refused_ac15
+
+running 1 test
+test tls::envelope_missing_head_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.09s
+
+        PASS [   0.096s] ( 84/158) maos-registry::registry_tls_20_1b tls::envelope_missing_head_is_refused_ac15
+       START [         ] ( 85/158) maos-registry::registry_tls_20_1b tls::envelope_missing_signature_is_refused_ac15
+
+running 1 test
+test tls::envelope_missing_signature_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.16s
+
+        PASS [   0.166s] ( 85/158) maos-registry::registry_tls_20_1b tls::envelope_missing_signature_is_refused_ac15
+       START [         ] ( 86/158) maos-registry::registry_tls_20_1b tls::envelope_stripped_yank_entry_is_refused_ac15
+
+running 1 test
+test tls::envelope_stripped_yank_entry_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.09s
+
+        PASS [   0.097s] ( 86/158) maos-registry::registry_tls_20_1b tls::envelope_stripped_yank_entry_is_refused_ac15
+       START [         ] ( 87/158) maos-registry::registry_tls_20_1b tls::envelope_wrong_nonce_is_refused_ac15
+
+running 1 test
+test tls::envelope_wrong_nonce_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.09s
+
+        PASS [   0.097s] ( 87/158) maos-registry::registry_tls_20_1b tls::envelope_wrong_nonce_is_refused_ac15
+       START [         ] ( 88/158) maos-registry::registry_tls_20_1b tls::envelope_wrong_uri_is_refused_ac15
+
+running 1 test
+test tls::envelope_wrong_uri_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.13s
+
+        PASS [   0.138s] ( 88/158) maos-registry::registry_tls_20_1b tls::envelope_wrong_uri_is_refused_ac15
+       START [         ] ( 89/158) maos-registry::registry_tls_20_1b tls::handshake_failure_never_attempts_plaintext_ac15
+
+running 1 test
+test tls::handshake_failure_never_attempts_plaintext_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+        PASS [   0.006s] ( 89/158) maos-registry::registry_tls_20_1b tls::handshake_failure_never_attempts_plaintext_ac15
+       START [         ] ( 90/158) maos-registry::registry_tls_20_1b tls::hostile_registry_wrong_configured_root_is_refused_ac15
+
+running 1 test
+maos-registry: listening on 127.0.0.1:41893
+test tls::hostile_registry_wrong_configured_root_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.10s
+
+        PASS [   0.108s] ( 90/158) maos-registry::registry_tls_20_1b tls::hostile_registry_wrong_configured_root_is_refused_ac15
+       START [         ] ( 91/158) maos-registry::registry_tls_20_1b tls::https_redirect_never_downgrades_to_http_ac15
+
+running 1 test
+test tls::https_redirect_never_downgrades_to_http_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.05s
+
+        PASS [   0.051s] ( 91/158) maos-registry::registry_tls_20_1b tls::https_redirect_never_downgrades_to_http_ac15
+       START [         ] ( 92/158) maos-registry::registry_tls_20_1b tls::https_requires_configured_root_not_response_supplied_key_ac15
+
+running 1 test
+test tls::https_requires_configured_root_not_response_supplied_key_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+        PASS [   0.004s] ( 92/158) maos-registry::registry_tls_20_1b tls::https_requires_configured_root_not_response_supplied_key_ac15
+       START [         ] ( 93/158) maos-registry::registry_tls_20_1b tls::incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1
+
+running 1 test
+maos-registry: listening on 127.0.0.1:42709
+maos-registry: connection error: Resource temporarily unavailable (os error 11)
+test tls::incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 1.18s
+
+        PASS [   1.183s] ( 93/158) maos-registry::registry_tls_20_1b tls::incomplete_tls_handshake_cannot_enter_http_error_write_timeout_f1
+       START [         ] ( 94/158) maos-registry::registry_tls_20_1b tls::interception_expired_certificate_is_refused_ac15
+
+running 1 test
+maos-registry: listening on 127.0.0.1:41399
+maos-registry: connection error: received fatal alert: CertificateExpired
+maos-registry: connection error: received fatal alert: CertificateExpired
+test tls::interception_expired_certificate_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.15s
+
+        PASS [   0.159s] ( 94/158) maos-registry::registry_tls_20_1b tls::interception_expired_certificate_is_refused_ac15
+       START [         ] ( 95/158) maos-registry::registry_tls_20_1b tls::interception_untrusted_ca_is_refused_ac15
+
+running 1 test
+maos-registry: listening on 127.0.0.1:36047
+maos-registry: connection error: received fatal alert: DecryptError
+maos-registry: connection error: received fatal alert: DecryptError
+test tls::interception_untrusted_ca_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.15s
+
+        PASS [   0.159s] ( 95/158) maos-registry::registry_tls_20_1b tls::interception_untrusted_ca_is_refused_ac15
+       START [         ] ( 96/158) maos-registry::registry_tls_20_1b tls::interception_wrong_host_certificate_is_refused_ac15
+
+running 1 test
+maos-registry: listening on 127.0.0.1:39917
+maos-registry: connection error: unexpected end of file
+maos-registry: connection error: unexpected end of file
+test tls::interception_wrong_host_certificate_is_refused_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.15s
+
+        PASS [   0.158s] ( 96/158) maos-registry::registry_tls_20_1b tls::interception_wrong_host_certificate_is_refused_ac15
+       START [         ] ( 97/158) maos-registry::registry_tls_20_1b tls::loopback_development_requires_both_sides_and_keeps_yank_signatures_ac15
+
+running 1 test
+maos-registry: listening on 127.0.0.1:43407
+test tls::loopback_development_requires_both_sides_and_keeps_yank_signatures_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.15s
+
+        PASS [   0.158s] ( 97/158) maos-registry::registry_tls_20_1b tls::loopback_development_requires_both_sides_and_keeps_yank_signatures_ac15
+       START [         ] ( 98/158) maos-registry::registry_tls_20_1b tls::malformed_private_seed_diagnostic_never_echoes_key_bytes_p8
+
+running 1 test
+test tls::malformed_private_seed_diagnostic_never_echoes_key_bytes_p8 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+        PASS [   0.005s] ( 98/158) maos-registry::registry_tls_20_1b tls::malformed_private_seed_diagnostic_never_echoes_key_bytes_p8
+       START [         ] ( 99/158) maos-registry::registry_tls_20_1b tls::private_key_custody_refuses_group_or_world_access_ac15
+
+running 1 test
+test tls::private_key_custody_refuses_group_or_world_access_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+        PASS [   0.005s] ( 99/158) maos-registry::registry_tls_20_1b tls::private_key_custody_refuses_group_or_world_access_ac15
+       START [         ] (100/158) maos-registry::registry_tls_20_1b tls::private_key_custody_refuses_seed_inside_package_store_ac15
+
+running 1 test
+test tls::private_key_custody_refuses_seed_inside_package_store_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+        PASS [   0.004s] (100/158) maos-registry::registry_tls_20_1b tls::private_key_custody_refuses_seed_inside_package_store_ac15
+       START [         ] (101/158) maos-registry::registry_tls_20_1b tls::private_seed_custody_refuses_0644_and_0440_p12
+
+running 1 test
+test tls::private_seed_custody_refuses_0644_and_0440_p12 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+        PASS [   0.004s] (101/158) maos-registry::registry_tls_20_1b tls::private_seed_custody_refuses_0644_and_0440_p12
+       START [         ] (102/158) maos-registry::registry_tls_20_1b tls::private_tls_key_inside_package_store_is_refused_p12
+
+running 1 test
+test tls::private_tls_key_inside_package_store_is_refused_p12 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+        PASS [   0.005s] (102/158) maos-registry::registry_tls_20_1b tls::private_tls_key_inside_package_store_is_refused_p12
+       START [         ] (103/158) maos-registry::registry_tls_20_1b tls::server_rejects_client_without_dev_handshake_ac15
+
+running 1 test
+maos-registry: listening on 127.0.0.1:41759
+test tls::server_rejects_client_without_dev_handshake_ac15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.10s
+
+        PASS [   0.108s] (103/158) maos-registry::registry_tls_20_1b tls::server_rejects_client_without_dev_handshake_ac15
+       START [         ] (104/158) maos-registry::registry_tls_20_1b tls::signed_head_behind_requested_cursor_is_typed_d3_p5
+
+running 1 test
+test tls::signed_head_behind_requested_cursor_is_typed_d3_p5 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.05s
+
+        PASS [   0.051s] (104/158) maos-registry::registry_tls_20_1b tls::signed_head_behind_requested_cursor_is_typed_d3_p5
+       START [         ] (105/158) maos-registry::registry_tls_20_1b tls::signed_payload_head_must_equal_envelope_head_p3
+
+running 1 test
+test tls::signed_payload_head_must_equal_envelope_head_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.09s
+
+        PASS [   0.096s] (105/158) maos-registry::registry_tls_20_1b tls::signed_payload_head_must_equal_envelope_head_p3
+       START [         ] (106/158) maos-registry::registry_tls_20_1b tls::signed_valid_duplicate_body_is_refused_p3
+
+running 1 test
+test tls::signed_valid_duplicate_body_is_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.09s
+
+        PASS [   0.096s] (106/158) maos-registry::registry_tls_20_1b tls::signed_valid_duplicate_body_is_refused_p3
+       START [         ] (107/158) maos-registry::registry_tls_20_1b tls::signed_valid_empty_view_with_nonzero_head_is_refused_p3
+
+running 1 test
+test tls::signed_valid_empty_view_with_nonzero_head_is_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.09s
+
+        PASS [   0.099s] (107/158) maos-registry::registry_tls_20_1b tls::signed_valid_empty_view_with_nonzero_head_is_refused_p3
+       START [         ] (108/158) maos-registry::registry_tls_20_1b tls::signed_valid_extra_entries_are_refused_p3
+
+running 1 test
+test tls::signed_valid_extra_entries_are_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.09s
+
+        PASS [   0.096s] (108/158) maos-registry::registry_tls_20_1b tls::signed_valid_extra_entries_are_refused_p3
+       START [         ] (109/158) maos-registry::registry_tls_20_1b tls::signed_valid_gap_body_is_refused_p3
+
+running 1 test
+test tls::signed_valid_gap_body_is_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.13s
+
+        PASS [   0.131s] (109/158) maos-registry::registry_tls_20_1b tls::signed_valid_gap_body_is_refused_p3
+       START [         ] (110/158) maos-registry::registry_tls_20_1b tls::signed_wrong_envelope_version_is_refused_p3
+
+running 1 test
+test tls::signed_wrong_envelope_version_is_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.09s
+
+        PASS [   0.096s] (110/158) maos-registry::registry_tls_20_1b tls::signed_wrong_envelope_version_is_refused_p3
+       START [         ] (111/158) maos-registry::registry_tls_20_1b tls::signed_wrong_request_hash_is_refused_p3
+
+running 1 test
+test tls::signed_wrong_request_hash_is_refused_p3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.67s
+
+        PASS [   0.675s] (111/158) maos-registry::registry_tls_20_1b tls::signed_wrong_request_hash_is_refused_p3
+       START [         ] (112/158) maos-registry::registry_tls_20_1b tls::tls_admission_refusal_is_encrypted_http_503_f1
+
+running 1 test
+maos-registry: listening on 127.0.0.1:45459
+maos-registry: connection error: unexpected end of file
+maos-registry: connection error: unexpected end of file
+test tls::tls_admission_refusal_is_encrypted_http_503_f1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.10s
+
+        PASS [   0.109s] (112/158) maos-registry::registry_tls_20_1b tls::tls_admission_refusal_is_encrypted_http_503_f1
+       START [         ] (113/158) maos-registry::vetting_attestation_gate artifact_swap_is_refused_ac6
+
+running 1 test
+test artifact_swap_is_refused_ac6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+        PASS [   0.007s] (113/158) maos-registry::vetting_attestation_gate artifact_swap_is_refused_ac6
+       START [         ] (114/158) maos-registry::vetting_attestation_gate fkcs_off_surface_refusal_precedes_a_valid_attestation
+
+running 1 test
+test fkcs_off_surface_refusal_precedes_a_valid_attestation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+        PASS [   0.005s] (114/158) maos-registry::vetting_attestation_gate fkcs_off_surface_refusal_precedes_a_valid_attestation
+       START [         ] (115/158) maos-registry::vetting_attestation_gate leg1_round_trip_issue_promote_revoke
+
+running 1 test
+test leg1_round_trip_issue_promote_revoke ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+        PASS [   0.008s] (115/158) maos-registry::vetting_attestation_gate leg1_round_trip_issue_promote_revoke
+       START [         ] (116/158) maos-registry::vetting_attestation_gate leg2_forged_signature_refused
+
+running 1 test
+test leg2_forged_signature_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+        PASS [   0.006s] (116/158) maos-registry::vetting_attestation_gate leg2_forged_signature_refused
+       START [         ] (117/158) maos-registry::vetting_attestation_gate leg3_expired_attestation_refused
+
+running 1 test
+test leg3_expired_attestation_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+        PASS [   0.006s] (117/158) maos-registry::vetting_attestation_gate leg3_expired_attestation_refused
+       START [         ] (118/158) maos-registry::vetting_attestation_gate leg4_forged_vetter_key_refused
+
+running 1 test
+test leg4_forged_vetter_key_refused ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+        PASS [   0.005s] (118/158) maos-registry::vetting_attestation_gate leg4_forged_vetter_key_refused
+       START [         ] (119/158) maos-registry::vetting_attestation_gate leg5_upgrade_flap_control
+
+running 1 test
+test leg5_upgrade_flap_control ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+        PASS [   0.008s] (119/158) maos-registry::vetting_attestation_gate leg5_upgrade_flap_control
+       START [         ] (120/158) maos-registry::vetting_attestation_gate leg7_four_cause_distinguishability
+
+running 1 test
+test leg7_four_cause_distinguishability ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+        PASS [   0.004s] (120/158) maos-registry::vetting_attestation_gate leg7_four_cause_distinguishability
+       START [         ] (121/158) maos-registry::vetting_attestation_gate publisher_swap_is_refused_ac6
+
+running 1 test
+test publisher_swap_is_refused_ac6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+        PASS [   0.006s] (121/158) maos-registry::vetting_attestation_gate publisher_swap_is_refused_ac6
+       START [         ] (122/158) maos-registry::yank_auth_20_1b attestation_rejects_unscoped_digest_signature_review_f5
+
+running 1 test
+attestation-role-v2 digest=ed90ab034721310c37f470f76ca76ebc46ef28e5b8baa75f9021c2fcf1d6e05d signature=6fefa599ad64fff04d885e9cdef44d621477d1925e6bfda013fa621f32d838a34e9db53c3a2149c4d2ccc90553f6700356c944fd72701d730740e25504384a0f
+test attestation_rejects_unscoped_digest_signature_review_f5 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+        PASS [   0.006s] (122/158) maos-registry::yank_auth_20_1b attestation_rejects_unscoped_digest_signature_review_f5
+       START [         ] (123/158) maos-registry::yank_auth_20_1b blocked_registry_fetch_does_not_block_shutdown_or_boot
+
+running 1 test
+test blocked_registry_fetch_does_not_block_shutdown_or_boot ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 3.00s
+
+        PASS [   3.005s] (123/158) maos-registry::yank_auth_20_1b blocked_registry_fetch_does_not_block_shutdown_or_boot
+       START [         ] (124/158) maos-registry::yank_auth_20_1b cursor_from_another_registry_is_replayed_from_zero_p2
+
+running 1 test
+yank cursor obsolete or for another registry; replaying signed history
+test cursor_from_another_registry_is_replayed_from_zero_p2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+        PASS [   0.006s] (124/158) maos-registry::yank_auth_20_1b cursor_from_another_registry_is_replayed_from_zero_p2
+       START [         ] (125/158) maos-registry::yank_auth_20_1b daemon_cursor_restart_does_not_replay_journalled_yanks_ac7
+
+running 1 test
+maos-registry: listening on 127.0.0.1:37007
+test daemon_cursor_restart_does_not_replay_journalled_yanks_ac7 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.25s
+
+        PASS [   0.257s] (125/158) maos-registry::yank_auth_20_1b daemon_cursor_restart_does_not_replay_journalled_yanks_ac7
+       START [         ] (126/158) maos-registry::yank_auth_20_1b every_registry_auth_test_holds_the_shared_environment_mutex_p15
+
+running 1 test
+test every_registry_auth_test_holds_the_shared_environment_mutex_p15 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+        PASS [   0.006s] (126/158) maos-registry::yank_auth_20_1b every_registry_auth_test_holds_the_shared_environment_mutex_p15
+       START [         ] (127/158) maos-registry::yank_auth_20_1b expired_signed_yank_request_cannot_mutate_registry_f4
+
+running 1 test
+maos-registry: listening on 127.0.0.1:43203
+test expired_signed_yank_request_cannot_mutate_registry_f4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.15s
+
+        PASS [   0.156s] (127/158) maos-registry::yank_auth_20_1b expired_signed_yank_request_cannot_mutate_registry_f4
+       START [         ] (128/158) maos-registry::yank_auth_20_1b first_publisher_pin_is_typed_and_survives_restart_ac10
+
+running 1 test
+test first_publisher_pin_is_typed_and_survives_restart_ac10 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.01s
+
+        PASS [   0.010s] (128/158) maos-registry::yank_auth_20_1b first_publisher_pin_is_typed_and_survives_restart_ac10
+       START [         ] (129/158) maos-registry::yank_auth_20_1b install_refuses_present_yank_with_unpinned_authority_f2
+
+running 1 test
+maos-registry: listening on 127.0.0.1:39985
+test install_refuses_present_yank_with_unpinned_authority_f2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.25s
+
+        PASS [   0.257s] (129/158) maos-registry::yank_auth_20_1b install_refuses_present_yank_with_unpinned_authority_f2
+       START [         ] (130/158) maos-registry::yank_auth_20_1b installed_publisher_and_version_pins_survive_uninstall_d2
+
+running 1 test
+maos-registry: listening on 127.0.0.1:45431
+maos-registry: listening on 127.0.0.1:43029
+maos-registry: listening on 127.0.0.1:37869
+maos-registry: listening on 127.0.0.1:44293
+test installed_publisher_and_version_pins_survive_uninstall_d2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 1.06s
+
+        PASS [   1.061s] (130/158) maos-registry::yank_auth_20_1b installed_publisher_and_version_pins_survive_uninstall_d2
+       START [         ] (131/158) maos-registry::yank_auth_20_1b installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16
+
+running 1 test
+maos-registry: listening on 127.0.0.1:37735
+test installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 1.26s
+
+        PASS [   1.262s] (131/158) maos-registry::yank_auth_20_1b installed_replacement_and_yanked_install_are_refused_before_commit_ac14_ac16
+       START [         ] (132/158) maos-registry::yank_auth_20_1b keyring_event_rejects_unscoped_digest_signature_review_f5
+
+running 1 test
+key-event-role-v2 digest=372e12a4a5ed9710beeae3313e641c18ca40cadf0a13b88921c2f0d2e5df1966 signature=4ae51f6ab49fc78f68632334a3cfd3351ae98598c2281d7ed20898ce1028501ed086c542be4cfd23dbe567848d25827494ec99dffc0d89b411946ec73ed58100
+test keyring_event_rejects_unscoped_digest_signature_review_f5 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+        PASS [   0.007s] (132/158) maos-registry::yank_auth_20_1b keyring_event_rejects_unscoped_digest_signature_review_f5
+       START [         ] (133/158) maos-registry::yank_auth_20_1b legacy_inactive_version_pins_are_migrated_before_uninstall_d2
+
+running 1 test
+maos-registry: listening on 127.0.0.1:40729
+test legacy_inactive_version_pins_are_migrated_before_uninstall_d2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.75s
+
+        PASS [   0.759s] (133/158) maos-registry::yank_auth_20_1b legacy_inactive_version_pins_are_migrated_before_uninstall_d2
+       START [         ] (134/158) maos-registry::yank_auth_20_1b local_reevaluation_failure_does_not_prevent_fetch_p1
+
+running 1 test
+local vetting re-evaluation failed; still fetching yanks: registry transport error: one corrupt local promotion
+test local_reevaluation_failure_does_not_prevent_fetch_p1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+        PASS [   0.005s] (134/158) maos-registry::yank_auth_20_1b local_reevaluation_failure_does_not_prevent_fetch_p1
+       START [         ] (135/158) maos-registry::yank_auth_20_1b missing_home_never_selects_shared_temporary_cursor_p14
+
+running 1 test
+test missing_home_never_selects_shared_temporary_cursor_p14 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+        PASS [   0.004s] (135/158) maos-registry::yank_auth_20_1b missing_home_never_selects_shared_temporary_cursor_p14
+       START [         ] (136/158) maos-registry::yank_auth_20_1b only_explicit_operator_release_allows_repin_after_uninstall_d2
+
+running 1 test
+maos-registry: listening on 127.0.0.1:34533
+maos-registry: listening on 127.0.0.1:39611
+test only_explicit_operator_release_allows_repin_after_uninstall_d2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.70s
+
+        PASS [   0.708s] (136/158) maos-registry::yank_auth_20_1b only_explicit_operator_release_allows_repin_after_uninstall_d2
+       START [         ] (137/158) maos-registry::yank_auth_20_1b published_versions_are_immutable_and_identical_publish_is_idempotent_d3
+
+running 1 test
+test published_versions_are_immutable_and_identical_publish_is_idempotent_d3 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+        PASS [   0.009s] (137/158) maos-registry::yank_auth_20_1b published_versions_are_immutable_and_identical_publish_is_idempotent_d3
+       START [         ] (138/158) maos-registry::yank_auth_20_1b publisher_and_enrolled_vetter_yanks_are_signed_labelled_and_restart_safe_ac7
+
+running 1 test
+maos-registry: listening on 127.0.0.1:35953
+maos-registry: listening on 127.0.0.1:36723
+test publisher_and_enrolled_vetter_yanks_are_signed_labelled_and_restart_safe_ac7 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.51s
+
+        PASS [   0.509s] (138/158) maos-registry::yank_auth_20_1b publisher_and_enrolled_vetter_yanks_are_signed_labelled_and_restart_safe_ac7
+       START [         ] (139/158) maos-registry::yank_auth_20_1b renewed_promotion_replaces_only_evidence_for_identical_package_d4
+
+running 1 test
+maos-registry: listening on 127.0.0.1:34503
+test renewed_promotion_replaces_only_evidence_for_identical_package_d4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.40s
+
+        PASS [   0.409s] (139/158) maos-registry::yank_auth_20_1b renewed_promotion_replaces_only_evidence_for_identical_package_d4
+       START [         ] (140/158) maos-registry::yank_auth_20_1b signed_nonce_cannot_be_reused_for_another_withdrawal_f4
+
+running 1 test
+maos-registry: listening on 127.0.0.1:42855
+test signed_nonce_cannot_be_reused_for_another_withdrawal_f4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.25s
+
+        PASS [   0.257s] (140/158) maos-registry::yank_auth_20_1b signed_nonce_cannot_be_reused_for_another_withdrawal_f4
+       START [         ] (141/158) maos-registry::yank_auth_20_1b signed_revocation_lists_roundtrip_cbor_and_reject_wrong_byte_lengths
+
+running 1 test
+test signed_revocation_lists_roundtrip_cbor_and_reject_wrong_byte_lengths ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+        PASS [   0.005s] (141/158) maos-registry::yank_auth_20_1b signed_revocation_lists_roundtrip_cbor_and_reject_wrong_byte_lengths
+       START [         ] (142/158) maos-registry::yank_auth_20_1b signed_yank_cannot_be_replayed_to_another_registry_f4
+
+running 1 test
+maos-registry: listening on 127.0.0.1:43341
+maos-registry: listening on 127.0.0.1:34741
+test signed_yank_cannot_be_replayed_to_another_registry_f4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.25s
+
+        PASS [   0.257s] (142/158) maos-registry::yank_auth_20_1b signed_yank_cannot_be_replayed_to_another_registry_f4
+       START [         ] (143/158) maos-registry::yank_auth_20_1b signed_yank_resigning_does_not_append_duplicate_rows_p13
+
+running 1 test
+maos-registry: listening on 127.0.0.1:45549
+test signed_yank_resigning_does_not_append_duplicate_rows_p13 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.30s
+
+        PASS [   0.308s] (143/158) maos-registry::yank_auth_20_1b signed_yank_resigning_does_not_append_duplicate_rows_p13
+       START [         ] (144/158) maos-registry::yank_auth_20_1b signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13
+
+running 1 test
+maos-registry: listening on 127.0.0.1:46603
+test signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.35s
+
+        PASS [   0.359s] (144/158) maos-registry::yank_auth_20_1b signer_key_in_two_authorized_roles_keeps_each_yank_origin_p13
+       START [         ] (145/158) maos-registry::yank_auth_20_1b uninstall_waits_for_cross_process_mutation_lock_p8
+
+running 1 test
+maos-registry: listening on 127.0.0.1:44077
+test uninstall_waits_for_cross_process_mutation_lock_p8 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.55s
+
+        PASS [   0.558s] (145/158) maos-registry::yank_auth_20_1b uninstall_waits_for_cross_process_mutation_lock_p8
+       START [         ] (146/158) maos-registry::yank_auth_20_1b unreadable_promotion_is_not_treated_as_absent_p17
+
+running 1 test
+maos-registry: listening on 127.0.0.1:35781
+test unreadable_promotion_is_not_treated_as_absent_p17 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.25s
+
+        PASS [   0.258s] (146/158) maos-registry::yank_auth_20_1b unreadable_promotion_is_not_treated_as_absent_p17
+       START [         ] (147/158) maos-registry::yank_auth_20_1b unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17
+
+running 1 test
+maos-registry: listening on 127.0.0.1:39935
+test unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.40s
+
+        PASS [   0.408s] (147/158) maos-registry::yank_auth_20_1b unsigned_and_unauthorized_mutations_leave_storage_unchanged_ac17
+       START [         ] (148/158) maos-registry::yank_auth_20_1b unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2
+
+running 1 test
+yank-rejected sequence=18446744073709551615: yank-sequence-anomaly: expected Some(1), got 18446744073709551615
+test unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+        PASS [   0.005s] (148/158) maos-registry::yank_auth_20_1b unsigned_sequence_overshoot_cannot_hide_next_signed_yank_p2
+       START [         ] (149/158) maos-registry::yank_auth_20_1b v2_role_nonce_audience_and_lifetime_vectors_reject_rebinding_f4_f5
+
+running 1 test
+role=maos.registry.deprecate.publisher.v2 preimage=8c78246d616f732e72656769737472792e6465707265636174652e7075626c69736865722e763202781a687474703a2f2f3132372e302e302e313a32303130312f6d637090182a182a182a182a182a182a182a182a182a182a182a182a182a182a182a182a1a000493e066766563746f7265312e302e306977697468647261776e697075626c6973686572982018f80c18cc18dc18e418ae181c0718ae1820188a182a18df189918a31018ae18420718e01830186f18a0182318611018b01868182718bb18b818d0667665747465721903e8 signature=54e6a1fe48b2562a344b8bdca238fc9870172a2eb2ba3839a92145502a8ec1ccff3c9b6b43c723d998d7d7f06c46e6063046464c0b3bff7fb067e8ab496c220e
+role=maos.registry.deprecate.vetter.v2 preimage=8c78216d616f732e72656769737472792e6465707265636174652e7665747465722e763202781a687474703a2f2f3132372e302e302e313a32303130312f6d637090182a182a182a182a182a182a182a182a182a182a182a182a182a182a182a182a1a000493e066766563746f7265312e302e306977697468647261776e6676657474657298201718cb187918fb182b1841182018f218b118ec186518e41819188d186e0818b2188e1881183f18eb0118e418a4001883189b188518e11880188018ce667665747465721903e8 signature=21cf834d7bc511aef3eb5f8ece357e07047dfce29c0f1c395c4fb0290a07f716cbd4b76f5745f5944353f3b5905c2357d9cca655f2a3acf963f83443ceec5005
+test v2_role_nonce_audience_and_lifetime_vectors_reject_rebinding_f4_f5 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.01s
+
+        PASS [   0.011s] (149/158) maos-registry::yank_auth_20_1b v2_role_nonce_audience_and_lifetime_vectors_reject_rebinding_f4_f5
+       START [         ] (150/158) maos-registry::yank_auth_20_1b verified_cursor_is_persisted_before_later_transient_failure_p2
+
+running 1 test
+test verified_cursor_is_persisted_before_later_transient_failure_p2 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.05s
+
+        PASS [   0.051s] (150/158) maos-registry::yank_auth_20_1b verified_cursor_is_persisted_before_later_transient_failure_p2
+       START [         ] (151/158) maos-registry::yank_auth_20_1b yank_authorization_allows_bounded_clock_skew_p10
+
+running 1 test
+test yank_authorization_allows_bounded_clock_skew_p10 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+        PASS [   0.006s] (151/158) maos-registry::yank_auth_20_1b yank_authorization_allows_bounded_clock_skew_p10
+       START [         ] (152/158) maos-registry::yank_auth_20_1b zero_interval_cannot_silently_disable_local_vetting_p11
+
+running 1 test
+test zero_interval_cannot_silently_disable_local_vetting_p11 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+        PASS [   0.004s] (152/158) maos-registry::yank_auth_20_1b zero_interval_cannot_silently_disable_local_vetting_p11
+       START [         ] (153/158) maos-registry::yank_cadence_20_1b signed_yank_crosses_real_server_at_30_second_floor_ac7
+
+running 1 test
+        SLOW [> 30.000s] (───────) maos-registry::yank_cadence_20_1b signed_yank_crosses_real_server_at_30_second_floor_ac7
+test signed_yank_crosses_real_server_at_30_second_floor_ac7 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.08s
+
+        PASS [  30.080s] (153/158) maos-registry::yank_cadence_20_1b signed_yank_crosses_real_server_at_30_second_floor_ac7
+       START [         ] (154/158) maos-registry::yank_query_20_1b filtered_snapshot_keeps_its_authenticated_complete_head_f6
+
+running 1 test
+test filtered_snapshot_keeps_its_authenticated_complete_head_f6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s
+
+        PASS [   0.045s] (154/158) maos-registry::yank_query_20_1b filtered_snapshot_keeps_its_authenticated_complete_head_f6
+       START [         ] (155/158) maos-registry::yank_query_20_1b large_delta_is_refused_instead_of_returning_an_incomplete_signed_head_f6
+
+running 1 test
+test large_delta_is_refused_instead_of_returning_an_incomplete_signed_head_f6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s
+
+        PASS [   0.044s] (155/158) maos-registry::yank_query_20_1b large_delta_is_refused_instead_of_returning_an_incomplete_signed_head_f6
+       START [         ] (156/158) maos-registry::yank_query_20_1b large_history_small_delta_uses_storage_lower_bound_f6
+
+running 1 test
+test large_history_small_delta_uses_storage_lower_bound_f6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s
+
+        PASS [   0.044s] (156/158) maos-registry::yank_query_20_1b large_history_small_delta_uses_storage_lower_bound_f6
+       START [         ] (157/158) maos-spirit-cli::vet_lifecycle_20_1b publisher_and_vetter_yank_verbs_authenticate_ac7
+
+running 1 test
+maos-registry: listening on 127.0.0.1:34375
+test publisher_and_vetter_yank_verbs_authenticate_ac7 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.30s
+
+        PASS [   0.308s] (157/158) maos-spirit-cli::vet_lifecycle_20_1b publisher_and_vetter_yank_verbs_authenticate_ac7
+       START [         ] (158/158) maos-spirit-cli::vet_lifecycle_20_1b vet_issue_install_promote_revoke_refuses_next_admission_ac6
+
+running 1 test
+maos-registry: listening on 127.0.0.1:39333
+test vet_issue_install_promote_revoke_refuses_next_admission_ac6 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.40s
+
+        PASS [   0.408s] (158/158) maos-spirit-cli::vet_lifecycle_20_1b vet_issue_install_promote_revoke_refuses_next_admission_ac6
+────────────
+     Summary [  90.984s] 158 tests run: 158 passed (1 slow), 1241 skipped

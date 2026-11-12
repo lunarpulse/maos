@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/tests/worker_quarantine_20_1b.rs
++++ b/crates/maos-bin/tests/worker_quarantine_20_1b.rs
+@@ -501,7 +501,7 @@
+             report.matched_count, 0,
+             "a CRL that matched the Worker must have fenced it"
+         );
+-        root.capability.set_quarantined(pid, true);
++        // PLANT ac11-5-no-fence: the fence is never set
+         "set_quarantined: the kernel primitive the CRL arm and the yank policy call; the CRL did not reach the Worker"
+     };
+     let fenced_at = now_ns();
