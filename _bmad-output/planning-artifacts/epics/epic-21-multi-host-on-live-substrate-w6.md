@@ -1,6 +1,6 @@
 # Epic 21 — Multi-Host on Live Substrate (W6)
 
-**Status:** `backlog` — Round 2 correct-course 2026-09-04 (`sprint-change-proposal-2026-09-04-round2.md`, Lunarpulse-ratified; Fork C). Replaces the morning's Epic 20 file. `sprint-status.yaml` is authoritative for status.
+**Status:** `in-progress` (2026-11-12: 21-5 created and pulled forward by ruling `s21`; the other seven stories remain `backlog`) — Round 2 correct-course 2026-09-04 (`sprint-change-proposal-2026-09-04-round2.md`, Lunarpulse-ratified; Fork C). Replaces the morning's Epic 20 file. `sprint-status.yaml` is authoritative for status.
 
 **Round 3 applied (2026-09-05):** the R2 preflight's §K edits (22 of 22 applied) and the decisions D-D (one replay selector, ADR-064), D-I (the env registry stays a kloc-free data file) and D-J (a named leaf crate for the orchestrator move, ordered after 21-4 (superseded for ordering by ruling `s21`, 2026-11-12; the leaf-crate destination stands)) are folded in; residuals listed in `sprint-change-proposal-2026-09-05-round3.md`.
 
