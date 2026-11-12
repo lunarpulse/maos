@@ -21,7 +21,7 @@ not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21
 Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
 
 
-Status: in-progress
+Status: done
 
 <!-- Created 2026-11-03 at 8c809f9c (main; `git log -1 -- crates xtask` = 8c809f9c) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30). D-20-14-01…12 were ruled as recommended by the operator on 2026-11-03 (ask `d_batch4`); D-20-14-12 C carries the joint targeted exception (ask `d2014_12`). Grants bind at dev start after re-base onto then-landed pins and cumulative room. No cargo ran (parent rule): cites re-read at HEAD (`creation/cites-8c809f9c.md`); kernel and kloc by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`); the epic's AC1 scene run on the prebuilt binaries in an isolated home (`creation/runtime/`). Stale E20 §20-14 cites are corrected in place and recorded in `creation/records-owed.md` §A. -->
 
@@ -290,22 +290,22 @@ hardfail measured + 1; (7) D-20-14-01…12 (12: the cumulative kernel STOP).
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight.** Operator rulings on D-20-14-01…11 recorded; tracker → `in-progress`. Run
+- [x] **T0 — Preflight.** (evidence `creation/measurements.md`, `landing-2/evidence.md:24`, `landing-2/step0/`) Operator rulings on D-20-14-01…11 recorded; tracker → `in-progress`. Run
   `creation/measurements.md` "Not measured here" 1–7. Re-measure every cite this story touches (rule 9). A figure above
   the ruled envelope, or a T0 result contradicting a ruled option, is STOP + D-row.
-- [ ] **T1 — Payload and domain (AC4.1).** `task_ref`, `CostScope`, R3 test replaced, literals updated.
-- [ ] **T2 — Report (AC4.2–4.5).** Key, rows, `spirit_names`, Worker note, vectors, plant.
-- [ ] **T3 — Docs and ADR-046 (AC5).** Three `run-maos.md` files, ADR amendments.
-- [ ] **T4 — L1 landing (D-20-14-08 A).** Exact pins inside the ruled envelope; `check-kernel-baseline` unchanged;
+- [x] **T1 — Payload and domain (AC4.1).** `task_ref`, `CostScope`, R3 test replaced, literals updated. (f68c7de6 + corrections; `landing-1/evidence.md`)
+- [x] **T2 — Report (AC4.2–4.5).** Key, rows, `spirit_names`, Worker note, vectors, plant. (f68c7de6 + 2ae11192/553336f6/fc7373f0; `landing-1/review/correction-round{2,3}.md`)
+- [x] **T3 — Docs and ADR-046 (AC5).** Three `run-maos.md` files, ADR amendments. (L1, re-touched in L2; `crates/maos-cli/tests/cost_docs_20_14.rs`)
+- [x] **T4 — L1 landing (D-20-14-08 A).** Exact pins inside the ruled envelope; `check-kernel-baseline` unchanged;
   `kloc-check`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; one hosted discipline run on
   the final tree + plants. No commit or push without the operator.
-- [ ] **T5 — Kernel KT (AC2.1, AC3.2–3.3)** under the ruled row: red-before kernel vectors, KT, plants.
-- [ ] **T6 — Root binding and session principal (AC2.2–2.3, AC3.1, AC3.4–3.7).** Env row, boot parse (`maos shell`,
+- [x] **T5 — Kernel KT (AC2.1, AC3.2–3.3)** under the ruled row: red-before kernel vectors, KT, plants. (edeedd25, 456793ca; `landing-2/{red,plants,review/red,review/plants}`)
+- [x] **T6 — Root binding and session principal (AC2.2–2.3, AC3.1, AC3.4–3.7).** Env row, boot parse (`maos shell`,
   `maos run`), shell turn, seam per-pass mint, one-shot hello, mint-site classification record, forget vector.
-- [ ] **T7 — The command (AC1).** `cost_attribution_20_14.rs`, two plants.
-- [ ] **T8 — L2 landing + records (AC6).** Both kernel pins + content hashes (re-base onto the then-landed pins of
+- [x] **T7 — The command (AC1).** `cost_attribution_20_14.rs`, two plants. (`crates/maos-bin/tests/cost_attribution_20_14.rs`; hosted run 43140995903 on 9996fe09 green)
+- [x] **T8 — L2 landing + records (AC6).** Both kernel pins + content hashes (re-base onto the then-landed pins of
   20-1b/20-4/20-11; cumulative STOP 21209); `cargo test -p maos-kernel-core --lib`; hosted run; ledger closures;
-  coverage; FLAG-Winston record.
+  coverage; FLAG-Winston record. (Closed 2026-11-12: kernel pins at 456793ca/9996fe09, hosted run 43140995903 success on 9996fe09 incl. `abi-diff`, ledger closures, `closure/closure-note.md`.)
 
 ## Dev Notes
 
@@ -450,11 +450,16 @@ measured on the `git archive` copies only (the working tree carries a sibling's 
 
 ### Agent Model Used
 
-anthropic/claude-opus-5-5 (creation).
+anthropic/claude-opus-5-5 (creation); dev/finisher: `coder` agents (anthropic/claude-sonnet-5-5:high, per the session `task.agentModelOverrides`; the per-round agent ids are in the session history, not repeated here); reviews: GPT `openai-codex/gpt-6.1-sol` (L1 rounds and L2 rounds 1-3), security `zai glm-5.3` (L1 and L2 round 1), and a GPT reviewer agent for the L2 round-2/3 security pass (GLM weekly quota exhausted).
 
 ### Debug Log References
 
+- Hosted: `discipline` run 43140995903, push, headSha 9996fe09256dc6dc, `success`, 199/199 jobs incl. `abi-diff` (read with `gh run view` at closure).
+- `20-14-complete-cost-attribution-evidence/landing-2/{evidence.md,review/evidence.md,review-r2/evidence.md}`, raw logs under `red/ green/ plants/ gates/ forget-flake/`.
+
 ### Completion Notes List
+
+**Closure 2026-11-12 (record-only).** L1 f68c7de6 (+2ae11192, 553336f6, fc7373f0); L2 landing edeedd25; review corrections 456793ca; round 2 9996fe09. GPT gpt-6.1-sol reviewed rounds 1, 2 and 3 (persisted `landing-2/review/gpt-review{,-r2}.md`, `landing-2/review-r3/gpt-review.md`); security: GLM glm-5.3 in L1 and L2 round 1 (`landing-2/review/security.md`), a GPT reviewer agent for the round-2/3 pass (GLM weekly quota exhausted; `landing-2/review-r3/security-gpt-reviewer.md`, 0 findings). Round 3 GPT: 0 P0/P1/P3 and one P2 (the final KLOC approvals cited a review that says measurement is not approval); resolved by the dated adjudication record `20-14-complete-cost-attribution-evidence/closure/kloc-adjudication-2026-11-12.md` (Main adjudicated, disclosed to the operator, under the recovery-lane rule; no operator numeric ruling exists; kernel at its own ledger). Hosted proof: run 43140995903 on 9996fe09 green 199/199. NOT run: prepush, Apple and Windows legs, a local clean-tree `abi-diff`; later commits not separately proven. Full AC table and caveats: `closure/closure-note.md`.
 
 L1 implementation evidence: `20-14-complete-cost-attribution-evidence/landing-1/evidence.md`.
 The reader, wrapper, name lookup and guides are implemented; current writers
@@ -520,7 +525,7 @@ case- and normalization-sensitive for every frame kind (GLM F-1), Spirit-name co
 Pins: CLI 6603 -> 6609 (ceiling 6610), iac 8726 -> 8770 under an **orchestrator-adjudicated D02 A overdraft, disclosed to the operator: iac ceiling 8728 -> 8770** (before: pin 8726 /
 ceiling 8728; after: measured 8770, zero headroom), audit 8227, aggregate 199198, hardfail 199199 (<= 199378). The existing kernel hash fixtures changed from `deadbeef`/`cafe` to 64-hex digests.
 
-**L2 kernel landing (2026-11-12, implemented locally, uncommitted; awaiting the hosted run and review; story stays `in-progress`; evidence
+**L2 kernel landing (2026-11-12, implemented locally, uncommitted; SUPERSEDED at closure 2026-11-12: the hosted run (43140995903 on 9996fe09) and the reviews completed, story `done`; evidence
 `20-14-complete-cost-attribution-evidence/landing-2/evidence.md`, raw red/plant/green logs beside it).** STEP 0 re-cut KT on a `git archive HEAD` copy at the live base 27014/21181
 including the `CostFrameBody` wrapper: the prototyped field on `CapabilityRegistryAdapter` measured +38/+28 and turned `check-service-boundary` RED (a second surface-hash
 refresh, not granted), so shape B was landed instead (hash-neutral). Round 1 of the review redesigned it: the root-bound `CostScope` is part of its token's own state in maos-capability (`TokenState.cost_scope`, a `OnceLock` set once at mint; no second map, no scan, no prune, it dies with the state), and the kernel exposes only two narrow inherent delegates `CapabilityRegistryAdapter::{bind_cost_scope, cost_scope}`; the wide `tokens()` accessor is gone. The emission reads the scope by the verified token id, a bound session principal is
@@ -578,6 +583,9 @@ Pins (exact formatted): maos-iac 8771 -> 8773 (+2, over the pin; ceiling draw di
   `crates/maos-bin/src/{shell_host.rs,main.rs,env_contract.rs}`, `crates/maos-bin/tests/cost_attribution_20_14.rs`, `xtask/{kernel-core-baseline.toml,kloc.toml}`,
   `xtask/tests/{kernel_pin_content_hash_16_0.rs,recovery_lane_ceiling_rule.rs}`, the three guides, ADR-046, `tests/coverage-matrix.yaml`, `crates/maos-cli/tests/cost_docs_20_14.rs`, records and
   `20-14-complete-cost-attribution-evidence/landing-2/`.
+- Round 2 and closure: `crates/maos-iac/src/adapter/transparency_log.rs`, `crates/maos-bin/src/operator_door.rs`, `crates/maos-iac/tests/cost_identity_cover_20_14.rs`,
+  `20-14-complete-cost-attribution-evidence/{landing-2/review-r2,landing-2/review-r3,closure}/`, `_bmad-output/implementation-artifacts/deferred-work.md`, `tests/coverage-matrix.yaml`, `20-14-flag-winston-decision.md`.
+
 ## Change Log
 
 - 2026-11-03: Story created at `8c809f9c` (ready-for-dev; D-20-14-01…11 PROPOSED). Measured: two shell sessions under
@@ -599,3 +607,4 @@ Pins (exact formatted): maos-iac 8771 -> 8773 (+2, over the pin; ceiling draw di
 - 2026-11-12: L2 kernel landing implemented locally (KT shape B, root binding, env row, witnesses, docs); kernel 21201 / 27040; maos-capability 1444 pending adjudication; status stays `in-progress` until the hosted run and review.
 - 2026-11-12: L2 review round 1 (GPT P2 x3, GLM S1-S3): narrow adapter delegates, scope in the token state, colon-hex cover for redactor-shaped identity text, principal length/hidden-character hardening, decision wording ADJUDICATED; kernel 27043/21203, capability 1454 (re-adjudication pending); status stays `in-progress`.
 - 2026-11-12: L2 correction round 2 (GPT P1 replay invalidation for codec-encoded cost identities, P2 decode only `principal_id` / `task_ref`): iac 8773, bin 38564, hardfail 202921, kernel unchanged (21202, STOP 22000: 798 left); status stays `in-progress`.
+- 2026-11-12: CLOSED `done` (record-only closure; no code change). L2 landing edeedd25, round 1 456793ca, round 2 9996fe09; hosted `discipline` run 43140995903 success 199/199 on 9996fe09; round-3 reviews persisted (GPT gpt-6.1-sol 0 P0/P1/P3 + one P2; security by a GPT reviewer agent, 0 findings, GLM quota exhausted). The P2 (`landing-2/review-r2/evidence.md:31`-style "Main-adjudicated" claims for capability 1454, domain 10274, iac 8773, cli 6612) is answered by `closure/kloc-adjudication-2026-11-12.md` (Main adjudicated, disclosed to the operator; recovery-lane rule 2026-09-12; no operator numeric ruling; kernel at its own ledger). Ledger: FR64 CLOSED, NFR-Cost-1 re-scoped, round-2 Low/Info rows dispositioned rule 10. Not run: prepush, Apple/Windows legs. See `closure/closure-note.md`.

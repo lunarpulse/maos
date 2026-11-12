@@ -9,8 +9,8 @@ Older arithmetic/rulings below remain historical; later kernel landers must re-m
 
 
 **Date:** 2026-11-03  
-**Status:** `RULING RECORDED` 2026-11-03: D-20-14-02 B, D-20-14-03 B and D-20-14-09 A (ask `d_batch4`); D-20-14-12 C (ask `d2014_12`). KT remains a measured request, binding at dev start; no implementation or landing claimed.  
-**Scope:** the kernel row of `20-14-complete-cost-attribution`: the cost-attribution emission site reads a root-bound task / session-principal scope; no implementation or landing claimed.  
+**Status:** `RULING RECORDED` 2026-11-03: D-20-14-02 B, D-20-14-03 B and D-20-14-09 A (ask `d_batch4`); D-20-14-12 C (ask `d2014_12`). KT was landed at edeedd25 (redesigned 456793ca; round 2 9996fe09 touches no kernel) inside the ruled row; story `done` 2026-11-12 (`closure/closure-note.md`).  
+**Scope:** the kernel row of `20-14-complete-cost-attribution`: the cost-attribution emission site reads a root-bound task / session-principal scope; landed at edeedd25 / 456793ca (see the L2 landing record below).  
 **Story:** `_bmad-output/implementation-artifacts/20-14-complete-cost-attribution.md`, frontmatter, §Decisions, §Kernel and kloc pricing.  
 **Evidence:** `20-14-complete-cost-attribution-evidence/creation/measurements.md`, `kloc-kernel-8c809f9c-and-prototypes.json`, `kt-token-bound-scope.diff`, `km-scb-marker.diff`, `km-naive-scb-marker.diff`, `kp-root-cost-scope-port.diff`, `k0-token-on-cost-row.diff`, `kr-request-correlation-id-on-km-naive.diff`, `rec-kt-domain-cli-audit-bin-shell-slice.diff`.  
 
@@ -66,7 +66,7 @@ implements KT plus the root binding sites last, re-measures formatted code, and 
 `maos-kernel-core` exactly, each HISTORY row's first segment citing this key with `->` (D11 A). Unused room is not
 reserved. Any `crates/maos-kernel-core/src` change outside KT's two files is STOP.
 
-## L2 landing record — 2026-11-12 (implemented locally; uncommitted; awaiting the hosted run and review)
+## L2 landing record — 2026-11-12 (landed edeedd25; hosted run 43140995903 green on 9996fe09)
 
 **Ruled row used:** D-20-14-02 B (KT, token-bound scope), D-20-14-03 B (no request field), grant +35 physical / +25 tokei priced at `8c809f9c` (x2 ceilings; shared STOP 21250).
 **T0 re-cut at the live base 27014 / 21181** on a `git archive HEAD` copy, including the `CostFrameBody` wrapper hunk the creation prototype did not price

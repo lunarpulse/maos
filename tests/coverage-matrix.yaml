@@ -1024,8 +1024,10 @@ coverage:
       emission and command witnesses: crates/maos-kernel-core/tests/cost_attribution_20_14.rs
       (token-bound task and session principal, proxy fallback, SR-4 count-not-members),
       crates/maos-bin/tests/cost_attribution_20_14.rs (real maos shell, seam pass, one-shot
-      hello and maosctl cost-reconcile), forget_cascade_18_6.rs (SR-3). Worker CLI spend and
-      the >=98% invoice check stay out of scope; no new gate claimed.
+      hello and maosctl cost-reconcile), forget_cascade_18_6.rs (SR-3). Closed 2026-11-12
+      by 20-14 @9996fe09 (hosted discipline run 43140995903 green on 9996fe09; reviews
+      persisted under the 20-14 evidence directory). Worker CLI spend and the >=98% invoice
+      check stay out of scope; no new gate claimed.
   FR65:
     gates: []
     enforcement: advisory-until-engagement
@@ -1301,9 +1303,10 @@ coverage:
     valid_until: '2027-05-12'
     notes: >
       20-14 L2 implements the per-Spirit, per-task and per-principal token clause; local
-      witnesses: kernel cost_attribution_20_14.rs and bin cost_attribution_20_14.rs (closure
-      waits for the hosted run and review). The
-      >=98% provider-invoice reconciliation is an operational, ownerless open item, not a CI gate.
+      witnesses: kernel cost_attribution_20_14.rs and bin cost_attribution_20_14.rs; that
+      clause closed 2026-11-12 by 20-14 @9996fe09 (hosted discipline run 43140995903). The
+      >=98% provider-invoice reconciliation is an operational, ownerless open item (dispositioned
+      by D-20-14-11 A), not a CI gate.
   NFR-Doc-1:
     gates: []
     corpora: []
