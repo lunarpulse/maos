@@ -352,8 +352,9 @@ coverage:
       init, purge, removal), executes RPM/Fedora, PKGBUILD/Arch and Homebrew/Linux
       recipes, and witnesses temporary-root cargo install/uninstall maos-bin.
       Rendered recipes carry the release version, signed hashes and built key;
-      tap/AUR and image publication remain operator-owned. Hosted results are
-      unverified until the ci/20-2-verify recipe runs.
+      tap/AUR and image publication remain operator-owned and unexercised.
+      Hosted recipe, deb and cargo witnesses are green on the development-signed
+      dist (ci-20-2-verify run 42308080980); tag-time attach is not executed.
   FR10:
     gates: []
     corpora: []
@@ -1539,7 +1540,8 @@ coverage:
       unshare -n; AF_INET/AF_INET6 outbound attempts are forbidden and a TCP
       canary must detect. air-gap-netns-witness is blocking; check-air-gap is
       advisory only under D-20-2-02 C (TcpListener/getaddrinfo measured at cbed4dad).
-      Hosted behavior and plants remain unverified pending ci/20-2-verify.
+      Hosted netns witness and outbound plant are green on the development-key
+      build (ci-20-2-verify run 42308080980); not witnessed on a signed tag.
   NFR-Ops-2:
     gates: []
     enforcement: advisory-until-engagement
