@@ -1,0 +1,4 @@
+180c180
+<     let adapter = SecurityManagerAdapter::new(t3_policy(), Arc::clone(&selected.provider));
+---
+>     let adapter = SecurityManagerAdapter::new(t3_policy(), Arc::clone(&decoy.provider));

@@ -1,0 +1,33 @@
+08:55:40 queued - |       5 queued/- 
+08:57:42 queued - |       5 queued/- 
+08:59:44 queued - |       5 queued/- 
+09:01:46 queued - |       5 queued/- 
+09:03:47 queued - |       5 queued/- 
+09:05:49 queued - |       5 queued/- 
+09:07:51 queued - |       5 queued/- 
+09:09:53 queued - |       4 in_progress/-       1 queued/- 
+09:11:55 in_progress - |       1 completed/success       4 in_progress/- 
+09:13:56 in_progress - |       1 completed/success       4 in_progress/- 
+09:15:59 in_progress - |       1 completed/success       4 in_progress/- 
+09:18:00 in_progress - |       1 completed/success       4 in_progress/- 
+09:20:02 in_progress - |       1 completed/success       4 in_progress/- 
+09:22:04 in_progress - |       1 completed/failure       1 completed/success       3 in_progress/- 
+UNEXPECTED FAILURES:
+hermetic (ubuntu-24.04-arm)
+09:24:06 in_progress - |       1 completed/failure       1 completed/success       3 in_progress/- 
+UNEXPECTED FAILURES:
+hermetic (ubuntu-24.04-arm)
+09:26:08 in_progress - |       1 completed/failure       1 completed/success       3 in_progress/- 
+UNEXPECTED FAILURES:
+hermetic (ubuntu-24.04-arm)
+09:28:09 in_progress - |       3 completed/failure       1 completed/success       1 in_progress/- 
+UNEXPECTED FAILURES:
+hermetic (ubuntu-24.04-arm)
+hermetic (ubuntu-24.04)
+hermetic (ubuntu-26.04-arm)
+09:30:11 completed failure |       4 completed/failure       1 completed/success 
+UNEXPECTED FAILURES:
+hermetic (ubuntu-24.04-arm)
+hermetic (ubuntu-24.04)
+hermetic (ubuntu-26.04-arm)
+hermetic (ubuntu-26.04)

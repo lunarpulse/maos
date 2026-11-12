@@ -1,0 +1,30 @@
+name: ci-20-13-verify
+# Branch-only PLANT recipe (replaces ci-20-13-verify.yml on the plant commit only). The commit also
+# restores the inline ring verifier in the kernel T3 admission arm (security/mod.rs, both branches).
+# The job is GREEN only if crypto_t3_admission_20_13 turns RED on the planted tree.
+on:
+  push:
+    branches: ['ci/20-13-verify']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  plant:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - name: Planted kernel arm must turn the bin witness red
+        run: |
+          set +e -uo pipefail
+          grep -n "RingCryptoProvider" crates/maos-kernel-core/src/security/mod.rs
+          cargo nextest run --locked -p maos-bin --features crypto-recording --profile ci --test crypto_t3_admission_20_13 2>&1 | tee plant.log
+          if [ "${PIPESTATUS[0]}" -eq 0 ]; then echo "PLANT NOT DETECTED" >&2; exit 1; fi
+          grep -F "kernel T3 admission must verify exactly once" plant.log

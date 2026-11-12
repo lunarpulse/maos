@@ -1,0 +1,2208 @@
+﻿2026-11-12T10:00:34.9028257Z Current runner version: '2.338.2'
+2026-11-12T10:00:34.9064861Z ##[group]Runner Image Provisioner
+2026-11-12T10:00:34.9066113Z Hosted Compute Agent
+2026-11-12T10:00:34.9067244Z Version: 20261028.624
+2026-11-12T10:00:34.9068305Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-12T10:00:34.9069652Z Build Date: 2026-10-28T21:51:42Z
+2026-11-12T10:00:34.9070889Z Worker ID: {7ac0c29a-1e14-424b-b8a4-0fbea96da263}
+2026-11-12T10:00:34.9072134Z Region: eastus2
+2026-11-12T10:00:34.9073056Z Cloud: Azure
+2026-11-12T10:00:34.9074253Z ##[endgroup]
+2026-11-12T10:00:34.9076666Z ##[group]Operating System
+2026-11-12T10:00:34.9077781Z Ubuntu
+2026-11-12T10:00:34.9078607Z 24.04.5
+2026-11-12T10:00:34.9079518Z LTS
+2026-11-12T10:00:34.9080402Z ##[endgroup]
+2026-11-12T10:00:34.9081537Z ##[group]Runner Image
+2026-11-12T10:00:34.9082510Z Image: ubuntu-24.04
+2026-11-12T10:00:34.9083878Z Version: 20261101.360.1
+2026-11-12T10:00:34.9086010Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-12T10:00:34.9088837Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-12T10:00:34.9090567Z ##[endgroup]
+2026-11-12T10:00:34.9092939Z ##[group]GITHUB_TOKEN Permissions
+2026-11-12T10:00:34.9096056Z Contents: read
+2026-11-12T10:00:34.9097325Z Metadata: read
+2026-11-12T10:00:34.9098273Z ##[endgroup]
+2026-11-12T10:00:34.9101364Z Secret source: Actions
+2026-11-12T10:00:34.9102841Z Cache mode: write
+2026-11-12T10:00:34.9104508Z Prepare workflow directory
+2026-11-12T10:00:34.9577016Z Prepare all required actions
+2026-11-12T10:00:34.9639194Z Getting action download info
+2026-11-12T10:00:35.2043732Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-12T10:00:35.3170682Z Download action repository 'dtolnay/rust-toolchain@v1' (SHA:683b588c487a69d01f6c6ddf40f036ff682cc2c8)
+2026-11-12T10:00:35.4145432Z Download action repository 'Swatinem/rust-cache@v2' (SHA:d1527c8f67ef9af357290475d4af4b0fab8f12e0)
+2026-11-12T10:00:35.5984287Z Download action repository 'taiki-e/install-action@v2' (SHA:cfdb7ed4ccc7c7dce37759eae89dc5674b469b39)
+2026-11-12T10:00:35.9558823Z Complete job name: plant
+2026-11-12T10:00:36.0477939Z ##[group]Run actions/checkout@v5
+2026-11-12T10:00:36.0479145Z with:
+2026-11-12T10:00:36.0479762Z   repository: lunarpulse/maos
+2026-11-12T10:00:36.0484076Z   token: ***
+2026-11-12T10:00:36.0484747Z   ssh-strict: true
+2026-11-12T10:00:36.0485340Z   ssh-user: git
+2026-11-12T10:00:36.0485987Z   persist-credentials: true
+2026-11-12T10:00:36.0486650Z   clean: true
+2026-11-12T10:00:36.0487234Z   sparse-checkout-cone-mode: true
+2026-11-12T10:00:36.0487973Z   fetch-depth: 1
+2026-11-12T10:00:36.0488589Z   fetch-tags: false
+2026-11-12T10:00:36.0489218Z   show-progress: true
+2026-11-12T10:00:36.0489886Z   lfs: false
+2026-11-12T10:00:36.0490438Z   submodules: false
+2026-11-12T10:00:36.0491158Z   set-safe-directory: true
+2026-11-12T10:00:36.0491829Z   allow-unsafe-pr-checkout: false
+2026-11-12T10:00:36.0492920Z ##[endgroup]
+2026-11-12T10:00:36.3484934Z Syncing repository: lunarpulse/maos
+2026-11-12T10:00:36.3488030Z ##[group]Getting Git version info
+2026-11-12T10:00:36.3489302Z Working directory is '/home/runner/work/maos/maos'
+2026-11-12T10:00:36.3491790Z [command]/usr/bin/git version
+2026-11-12T10:00:36.3550426Z git version 2.56.0
+2026-11-12T10:00:36.3574395Z ##[endgroup]
+2026-11-12T10:00:36.3590698Z Temporarily overriding HOME='/home/runner/work/_temp/196bb35d-6c4c-4824-afcd-b9df237cfa2c' before making global git config changes
+2026-11-12T10:00:36.3595295Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-12T10:00:36.3598704Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/maos/maos
+2026-11-12T10:00:36.3648748Z Deleting the contents of '/home/runner/work/maos/maos'
+2026-11-12T10:00:36.3658106Z ##[group]Initializing the repository
+2026-11-12T10:00:36.3661931Z [command]/usr/bin/git init /home/runner/work/maos/maos
+2026-11-12T10:00:36.3777143Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-12T10:00:36.3781059Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-12T10:00:36.3785066Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-12T10:00:36.3788071Z hint: call:
+2026-11-12T10:00:36.3789757Z hint:
+2026-11-12T10:00:36.3791911Z hint: 	git config --global init.defaultBranch <name>
+2026-11-12T10:00:36.3794595Z hint:
+2026-11-12T10:00:36.3797052Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-12T10:00:36.3800799Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-12T10:00:36.3804309Z hint:
+2026-11-12T10:00:36.3806327Z hint: 	git branch -m <name>
+2026-11-12T10:00:36.3808412Z hint:
+2026-11-12T10:00:36.3810687Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-12T10:00:36.3813963Z Initialized empty Git repository in /home/runner/work/maos/maos/.git/
+2026-11-12T10:00:36.3819837Z [command]/usr/bin/git remote add origin https://github.com/lunarpulse/maos
+2026-11-12T10:00:36.3856464Z ##[endgroup]
+2026-11-12T10:00:36.3859914Z ##[group]Disabling automatic garbage collection
+2026-11-12T10:00:36.3862120Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-12T10:00:36.3901316Z ##[endgroup]
+2026-11-12T10:00:36.3904604Z ##[group]Setting up auth
+2026-11-12T10:00:36.3908281Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-12T10:00:36.3948866Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-12T10:00:36.4358557Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-12T10:00:36.4410149Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-12T10:00:36.4662979Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-12T10:00:36.4708488Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-12T10:00:36.4949019Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-12T10:00:36.4998030Z ##[endgroup]
+2026-11-12T10:00:36.5000225Z ##[group]Fetching the repository
+2026-11-12T10:00:36.5011096Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +ce1e0adaee562c782cfe2970090ed4669bb1a898:refs/remotes/origin/ci/20-13-verify
+2026-11-12T10:00:42.1544838Z From https://github.com/lunarpulse/maos
+2026-11-12T10:00:42.1546001Z  * [new ref]         ce1e0adaee562c782cfe2970090ed4669bb1a898 -> origin/ci/20-13-verify
+2026-11-12T10:00:42.1551552Z ##[endgroup]
+2026-11-12T10:00:42.1552234Z ##[group]Determining the checkout info
+2026-11-12T10:00:42.1553784Z ##[endgroup]
+2026-11-12T10:00:42.1560438Z [command]/usr/bin/git sparse-checkout disable
+2026-11-12T10:00:42.1625298Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-12T10:00:42.1665720Z ##[group]Checking out the ref
+2026-11-12T10:00:42.1678054Z [command]/usr/bin/git checkout --progress --force -B ci/20-13-verify refs/remotes/origin/ci/20-13-verify
+2026-11-12T10:00:43.1899007Z Updating files:  46% (6124/13090)
+2026-11-12T10:00:43.2252407Z Updating files:  47% (6153/13090)
+2026-11-12T10:00:43.2593963Z Updating files:  48% (6284/13090)
+2026-11-12T10:00:43.2814847Z Updating files:  49% (6415/13090)
+2026-11-12T10:00:43.3085721Z Updating files:  50% (6545/13090)
+2026-11-12T10:00:43.3545585Z Updating files:  51% (6676/13090)
+2026-11-12T10:00:43.3843473Z Updating files:  52% (6807/13090)
+2026-11-12T10:00:43.4135529Z Updating files:  53% (6938/13090)
+2026-11-12T10:00:43.4211788Z Updating files:  54% (7069/13090)
+2026-11-12T10:00:43.4310213Z Updating files:  55% (7200/13090)
+2026-11-12T10:00:43.4415864Z Updating files:  56% (7331/13090)
+2026-11-12T10:00:43.4495586Z Updating files:  57% (7462/13090)
+2026-11-12T10:00:43.4843499Z Updating files:  58% (7593/13090)
+2026-11-12T10:00:43.5123032Z Updating files:  59% (7724/13090)
+2026-11-12T10:00:43.5276146Z Updating files:  60% (7854/13090)
+2026-11-12T10:00:43.5449788Z Updating files:  61% (7985/13090)
+2026-11-12T10:00:43.5598596Z Updating files:  62% (8116/13090)
+2026-11-12T10:00:43.5715612Z Updating files:  63% (8247/13090)
+2026-11-12T10:00:43.5794880Z Updating files:  64% (8378/13090)
+2026-11-12T10:00:43.5845948Z Updating files:  65% (8509/13090)
+2026-11-12T10:00:43.5899110Z Updating files:  66% (8640/13090)
+2026-11-12T10:00:43.5954450Z Updating files:  67% (8771/13090)
+2026-11-12T10:00:43.6007890Z Updating files:  68% (8902/13090)
+2026-11-12T10:00:43.6057148Z Updating files:  69% (9033/13090)
+2026-11-12T10:00:43.6099275Z Updating files:  70% (9163/13090)
+2026-11-12T10:00:43.6140883Z Updating files:  71% (9294/13090)
+2026-11-12T10:00:43.6187425Z Updating files:  72% (9425/13090)
+2026-11-12T10:00:43.6235142Z Updating files:  73% (9556/13090)
+2026-11-12T10:00:43.6283038Z Updating files:  74% (9687/13090)
+2026-11-12T10:00:43.6330933Z Updating files:  75% (9818/13090)
+2026-11-12T10:00:43.6379463Z Updating files:  76% (9949/13090)
+2026-11-12T10:00:43.6432624Z Updating files:  77% (10080/13090)
+2026-11-12T10:00:43.6484961Z Updating files:  78% (10211/13090)
+2026-11-12T10:00:43.6536369Z Updating files:  79% (10342/13090)
+2026-11-12T10:00:43.6588889Z Updating files:  80% (10472/13090)
+2026-11-12T10:00:43.6637503Z Updating files:  81% (10603/13090)
+2026-11-12T10:00:43.6687528Z Updating files:  82% (10734/13090)
+2026-11-12T10:00:43.6738137Z Updating files:  83% (10865/13090)
+2026-11-12T10:00:43.6830116Z Updating files:  84% (10996/13090)
+2026-11-12T10:00:43.6931330Z Updating files:  85% (11127/13090)
+2026-11-12T10:00:43.7000116Z Updating files:  86% (11258/13090)
+2026-11-12T10:00:43.7080692Z Updating files:  87% (11389/13090)
+2026-11-12T10:00:43.7173916Z Updating files:  88% (11520/13090)
+2026-11-12T10:00:43.7265922Z Updating files:  89% (11651/13090)
+2026-11-12T10:00:43.7355482Z Updating files:  90% (11781/13090)
+2026-11-12T10:00:43.7419057Z Updating files:  91% (11912/13090)
+2026-11-12T10:00:43.7528419Z Updating files:  92% (12043/13090)
+2026-11-12T10:00:43.7628983Z Updating files:  93% (12174/13090)
+2026-11-12T10:00:43.7737828Z Updating files:  94% (12305/13090)
+2026-11-12T10:00:43.7839066Z Updating files:  95% (12436/13090)
+2026-11-12T10:00:43.8031715Z Updating files:  96% (12567/13090)
+2026-11-12T10:00:43.8158525Z Updating files:  97% (12698/13090)
+2026-11-12T10:00:43.8258758Z Updating files:  98% (12829/13090)
+2026-11-12T10:00:43.8347560Z Updating files:  99% (12960/13090)
+2026-11-12T10:00:43.8347964Z Updating files: 100% (13090/13090)
+2026-11-12T10:00:43.8348308Z Updating files: 100% (13090/13090), done.
+2026-11-12T10:00:43.8499750Z Switched to a new branch 'ci/20-13-verify'
+2026-11-12T10:00:43.8507812Z branch 'ci/20-13-verify' set up to track 'origin/ci/20-13-verify'.
+2026-11-12T10:00:43.8610083Z ##[endgroup]
+2026-11-12T10:00:43.8667946Z [command]/usr/bin/git log -1 --format=%H
+2026-11-12T10:00:43.8702264Z ce1e0adaee562c782cfe2970090ed4669bb1a898
+2026-11-12T10:00:43.9075719Z ##[group]Run dtolnay/rust-toolchain@v1
+2026-11-12T10:00:43.9076036Z with:
+2026-11-12T10:00:43.9076230Z   toolchain: stable
+2026-11-12T10:00:43.9076440Z ##[endgroup]
+2026-11-12T10:00:43.9145128Z ##[start-action display=Parse toolchain version;id=__dtolnay_rust-toolchain.parse]
+2026-11-12T10:00:43.9201016Z ##[group]Run if [[ -z $toolchain ]]; then
+2026-11-12T10:00:43.9201403Z if [[ -z $toolchain ]]; then
+2026-11-12T10:00:43.9201946Z   # GitHub does not enforce `required: true` inputs itself. https://github.com/actions/runner/issues/1070
+2026-11-12T10:00:43.9202507Z   echo "'toolchain' is a required input" >&2
+2026-11-12T10:00:43.9203025Z   exit 1
+2026-11-12T10:00:43.9203780Z elif [[ $toolchain =~ ^stable' '[0-9]+' '(year|month|week|day)s?' 'ago$ ]]; then
+2026-11-12T10:00:43.9204206Z   if [[ Linux == macOS ]]; then
+2026-11-12T10:00:43.9204800Z     echo "toolchain=1.$((($(date -v-$(sed 's/stable \([0-9]*\) \(.\).*/\1\2/' <<< $toolchain) +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT
+2026-11-12T10:00:43.9205329Z   else
+2026-11-12T10:00:43.9205727Z     echo "toolchain=1.$((($(date --date "${toolchain#stable }" +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT
+2026-11-12T10:00:43.9206178Z   fi
+2026-11-12T10:00:43.9206467Z elif [[ $toolchain =~ ^stable' 'minus' '[0-9]+' 'releases?$ ]]; then
+2026-11-12T10:00:43.9206997Z   echo "toolchain=1.$((($(date +%s)/60/60/24-16569)/7/6-${toolchain//[^0-9]/}))" >> $GITHUB_OUTPUT
+2026-11-12T10:00:43.9207459Z elif [[ $toolchain =~ ^1\.[0-9]+$ ]]; then
+2026-11-12T10:00:43.9207974Z   echo "toolchain=1.$((i=${toolchain#1.}, c=($(date +%s)/60/60/24-16569)/7/6, i+9*i*(10*i<=c)+90*i*(100*i<=c)))" >> $GITHUB_OUTPUT
+2026-11-12T10:00:43.9208471Z else
+2026-11-12T10:00:43.9208662Z   delimiter=EOF
+2026-11-12T10:00:43.9208961Z   while [[ $toolchain == *$delimiter* ]]; do delimiter+=_; done
+2026-11-12T10:00:43.9209466Z   printf 'toolchain<<%s\n%s\n%s\n' "$delimiter" "$toolchain" "$delimiter" >> $GITHUB_OUTPUT
+2026-11-12T10:00:43.9209884Z fi
+2026-11-12T10:00:43.9234873Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-12T10:00:43.9235228Z env:
+2026-11-12T10:00:43.9235438Z   toolchain: stable
+2026-11-12T10:00:43.9235645Z ##[endgroup]
+2026-11-12T10:00:43.9331493Z ##[end-action id=__dtolnay_rust-toolchain.parse;outcome=success;conclusion=success;duration_ms=18]
+2026-11-12T10:00:43.9336037Z ##[start-action display=Set $CARGO_HOME;id=__dtolnay_rust-toolchain.__run]
+2026-11-12T10:00:43.9368223Z ##[group]Run echo CARGO_HOME=${CARGO_HOME:-"$HOME/.cargo"} >> $GITHUB_ENV
+2026-11-12T10:00:43.9368731Z echo CARGO_HOME=${CARGO_HOME:-"$HOME/.cargo"} >> $GITHUB_ENV
+2026-11-12T10:00:43.9388459Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-12T10:00:43.9388809Z ##[endgroup]
+2026-11-12T10:00:43.9436245Z ##[end-action id=__dtolnay_rust-toolchain.__run;outcome=success;conclusion=success;duration_ms=9]
+2026-11-12T10:00:43.9438353Z ##[start-action display=Install rustup if needed;id=__dtolnay_rust-toolchain.__run_2]
+2026-11-12T10:00:43.9463160Z ##[group]Run if ! command -v rustup &>/dev/null; then
+2026-11-12T10:00:43.9463837Z if ! command -v rustup &>/dev/null; then
+2026-11-12T10:00:43.9464621Z   curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused --location --silent --show-error --fail https://sh.rustup.rs | sh -s -- --default-toolchain none -y
+2026-11-12T10:00:43.9465380Z   echo "$CARGO_HOME/bin" >> $GITHUB_PATH
+2026-11-12T10:00:43.9465661Z fi
+2026-11-12T10:00:43.9484753Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-12T10:00:43.9485116Z env:
+2026-11-12T10:00:43.9485316Z   CARGO_HOME: /home/runner/.cargo
+2026-11-12T10:00:43.9485561Z ##[endgroup]
+2026-11-12T10:00:43.9529433Z ##[end-action id=__dtolnay_rust-toolchain.__run_2;outcome=success;conclusion=success;duration_ms=9]
+2026-11-12T10:00:43.9531770Z ##[start-action display=Install rustup if needed on windows;id=__dtolnay_rust-toolchain.__run_3]
+2026-11-12T10:00:43.9538108Z ##[end-action id=__dtolnay_rust-toolchain.__run_3;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-12T10:00:43.9551667Z ##[start-action display=rustup toolchain install stable;id=__dtolnay_rust-toolchain.__run_4]
+2026-11-12T10:00:43.9569962Z ##[group]Run set -f  # split targets and components on commas and whitespace, without glob expansion
+2026-11-12T10:00:43.9570658Z set -f  # split targets and components on commas and whitespace, without glob expansion
+2026-11-12T10:00:43.9571165Z flags=()
+2026-11-12T10:00:43.9571672Z for t in ${targets//,/ }; do flags+=(--target "$t"); done
+2026-11-12T10:00:43.9572100Z for c in ${components//,/ }; do flags+=(--component "$c"); done
+2026-11-12T10:00:43.9572609Z if [[ $toolchain == nightly && -n $components ]]; then flags+=(--allow-downgrade); fi
+2026-11-12T10:00:43.9573048Z log=$(mktemp)
+2026-11-12T10:00:43.9573580Z trap 'rm -f "$log"' EXIT
+2026-11-12T10:00:43.9573857Z for attempt in 1 2 3 4 5; do
+2026-11-12T10:00:43.9574448Z   if rustup toolchain install "$toolchain" "${flags[@]}" --profile minimal --no-self-update --force-non-host 2>&1 | tee "$log"; then
+2026-11-12T10:00:43.9575053Z     break
+2026-11-12T10:00:43.9575257Z   else
+2026-11-12T10:00:43.9575461Z     status=$?
+2026-11-12T10:00:43.9575677Z   fi
+2026-11-12T10:00:43.9575972Z   if [[ $attempt == 5 ]] || ! grep -Fq 'checksum failed for ' "$log" \
+2026-11-12T10:00:43.9576558Z       || ! grep -Fq 'this is likely due to an ongoing update of the official release server' "$log"; then
+2026-11-12T10:00:43.9577055Z     exit "$status"
+2026-11-12T10:00:43.9577283Z   fi
+2026-11-12T10:00:43.9577649Z   echo "Retrying rustup toolchain install in 30 seconds (retry $attempt of 4)" >&2
+2026-11-12T10:00:43.9578074Z   sleep 30
+2026-11-12T10:00:43.9578281Z done
+2026-11-12T10:00:43.9597368Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-12T10:00:43.9597727Z env:
+2026-11-12T10:00:43.9597932Z   CARGO_HOME: /home/runner/.cargo
+2026-11-12T10:00:43.9598188Z   toolchain: stable
+2026-11-12T10:00:43.9598391Z   targets: 
+2026-11-12T10:00:43.9598576Z   components: 
+2026-11-12T10:00:43.9598783Z   RUSTUP_PERMIT_COPY_RENAME: 1
+2026-11-12T10:00:43.9599025Z ##[endgroup]
+2026-11-12T10:00:44.2813622Z info: syncing channel updates for stable-x86_64-unknown-linux-gnu
+2026-11-12T10:00:44.3771124Z 
+2026-11-12T10:00:44.3853645Z   stable-x86_64-unknown-linux-gnu unchanged - rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-11-12T10:00:44.3854473Z 
+2026-11-12T10:00:44.3926211Z ##[end-action id=__dtolnay_rust-toolchain.__run_4;outcome=success;conclusion=success;duration_ms=437]
+2026-11-12T10:00:44.3931804Z ##[start-action display=rustup default stable;id=__dtolnay_rust-toolchain.__run_5]
+2026-11-12T10:00:44.3951147Z ##[group]Run rustup default "$toolchain" --force-non-host
+2026-11-12T10:00:44.3951552Z rustup default "$toolchain" --force-non-host
+2026-11-12T10:00:44.3972376Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-12T10:00:44.3972723Z env:
+2026-11-12T10:00:44.3972927Z   CARGO_HOME: /home/runner/.cargo
+2026-11-12T10:00:44.3973411Z   toolchain: stable
+2026-11-12T10:00:44.3973639Z ##[endgroup]
+2026-11-12T10:00:44.4058986Z info: using existing install for stable-x86_64-unknown-linux-gnu
+2026-11-12T10:00:44.4068146Z info: default toolchain set to stable-x86_64-unknown-linux-gnu
+2026-11-12T10:00:44.4069147Z 
+2026-11-12T10:00:44.4146468Z   stable-x86_64-unknown-linux-gnu unchanged - rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-11-12T10:00:44.4147979Z info: note that the toolchain 'stable-x86_64-unknown-linux-gnu' is currently in use (overridden by '/home/runner/work/maos/maos/rust-toolchain.toml')
+2026-11-12T10:00:44.4149341Z 
+2026-11-12T10:00:44.4170473Z ##[end-action id=__dtolnay_rust-toolchain.__run_5;outcome=success;conclusion=success;duration_ms=23]
+2026-11-12T10:00:44.4175949Z ##[start-action display=Create cachekey;id=__dtolnay_rust-toolchain.rustc-version]
+2026-11-12T10:00:44.4228250Z ##[group]Run DATE=$(rustc +"$toolchain" --version --verbose | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')
+2026-11-12T10:00:44.4229360Z DATE=$(rustc +"$toolchain" --version --verbose | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')
+2026-11-12T10:00:44.4230058Z HASH=$(rustc +"$toolchain" --version --verbose | sed -ne 's/^commit-hash: //p')
+2026-11-12T10:00:44.4230583Z echo "cachekey=$(echo $DATE$HASH | head -c12)" >> $GITHUB_OUTPUT
+2026-11-12T10:00:44.4252441Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-12T10:00:44.4252775Z env:
+2026-11-12T10:00:44.4252971Z   CARGO_HOME: /home/runner/.cargo
+2026-11-12T10:00:44.4253380Z   toolchain: stable
+2026-11-12T10:00:44.4253600Z ##[endgroup]
+2026-11-12T10:00:44.4601824Z ##[end-action id=__dtolnay_rust-toolchain.rustc-version;outcome=success;conclusion=success;duration_ms=42]
+2026-11-12T10:00:44.4604851Z ##[start-action display=Disable incremental compilation;id=__dtolnay_rust-toolchain.__run_6]
+2026-11-12T10:00:44.4625203Z ##[group]Run if [ -z "${CARGO_INCREMENTAL+set}" ]; then
+2026-11-12T10:00:44.4625626Z if [ -z "${CARGO_INCREMENTAL+set}" ]; then
+2026-11-12T10:00:44.4625997Z   echo CARGO_INCREMENTAL=0 >> $GITHUB_ENV
+2026-11-12T10:00:44.4626305Z fi
+2026-11-12T10:00:44.4647869Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-12T10:00:44.4648225Z env:
+2026-11-12T10:00:44.4648434Z   CARGO_HOME: /home/runner/.cargo
+2026-11-12T10:00:44.4648685Z ##[endgroup]
+2026-11-12T10:00:44.4695215Z ##[end-action id=__dtolnay_rust-toolchain.__run_6;outcome=success;conclusion=success;duration_ms=8]
+2026-11-12T10:00:44.4697363Z ##[start-action display=Enable colors in Cargo output;id=__dtolnay_rust-toolchain.__run_7]
+2026-11-12T10:00:44.4714446Z ##[group]Run if [ -z "${CARGO_TERM_COLOR+set}" ]; then
+2026-11-12T10:00:44.4714820Z if [ -z "${CARGO_TERM_COLOR+set}" ]; then
+2026-11-12T10:00:44.4715174Z   echo CARGO_TERM_COLOR=always >> $GITHUB_ENV
+2026-11-12T10:00:44.4715483Z fi
+2026-11-12T10:00:44.4735339Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-12T10:00:44.4735695Z env:
+2026-11-12T10:00:44.4735902Z   CARGO_HOME: /home/runner/.cargo
+2026-11-12T10:00:44.4736162Z   CARGO_INCREMENTAL: 0
+2026-11-12T10:00:44.4736381Z ##[endgroup]
+2026-11-12T10:00:44.4781244Z ##[end-action id=__dtolnay_rust-toolchain.__run_7;outcome=success;conclusion=success;duration_ms=8]
+2026-11-12T10:00:44.4784829Z ##[start-action display=Enable Cargo sparse registry;id=__dtolnay_rust-toolchain.__run_8]
+2026-11-12T10:00:44.4803953Z ##[group]Run # implemented in 1.66, stabilized in 1.68, made default in 1.70
+2026-11-12T10:00:44.4804481Z # implemented in 1.66, stabilized in 1.68, made default in 1.70
+2026-11-12T10:00:44.4805214Z if [ -z "${CARGO_REGISTRIES_CRATES_IO_PROTOCOL+set}" -o -f "/home/runner/work/_temp"/.implicit_cargo_registries_crates_io_protocol ]; then
+2026-11-12T10:00:44.4805993Z   if rustc +"$toolchain" --version --verbose | grep -q '^release: 1\.6[89]\.'; then
+2026-11-12T10:00:44.4806624Z     touch "/home/runner/work/_temp"/.implicit_cargo_registries_crates_io_protocol || true
+2026-11-12T10:00:44.4807180Z     echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse >> $GITHUB_ENV
+2026-11-12T10:00:44.4807713Z   elif rustc +"$toolchain" --version --verbose | grep -q '^release: 1\.6[67]\.'; then
+2026-11-12T10:00:44.4808323Z     touch "/home/runner/work/_temp"/.implicit_cargo_registries_crates_io_protocol || true
+2026-11-12T10:00:44.4808855Z     echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git >> $GITHUB_ENV
+2026-11-12T10:00:44.4809206Z   fi
+2026-11-12T10:00:44.4809553Z fi
+2026-11-12T10:00:44.4831396Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-12T10:00:44.4831742Z env:
+2026-11-12T10:00:44.4831941Z   CARGO_HOME: /home/runner/.cargo
+2026-11-12T10:00:44.4832329Z   CARGO_INCREMENTAL: 0
+2026-11-12T10:00:44.4832585Z   CARGO_TERM_COLOR: always
+2026-11-12T10:00:44.4832809Z   toolchain: stable
+2026-11-12T10:00:44.4833005Z ##[endgroup]
+2026-11-12T10:00:44.5140075Z ##[end-action id=__dtolnay_rust-toolchain.__run_8;outcome=success;conclusion=success;duration_ms=35]
+2026-11-12T10:00:44.5144183Z ##[start-action display=Work around spurious network errors in curl 8.0;id=__dtolnay_rust-toolchain.__run_9]
+2026-11-12T10:00:44.5162750Z ##[group]Run # https://rust-lang.zulipchat.com/#narrow/stream/246057-t-cargo/topic/timeout.20investigation
+2026-11-12T10:00:44.5164010Z # https://rust-lang.zulipchat.com/#narrow/stream/246057-t-cargo/topic/timeout.20investigation
+2026-11-12T10:00:44.5164676Z if rustc +"$toolchain" --version --verbose | grep -q '^release: 1\.7[01]\.'; then
+2026-11-12T10:00:44.5165164Z   echo CARGO_HTTP_MULTIPLEXING=false >> $GITHUB_ENV
+2026-11-12T10:00:44.5165480Z fi
+2026-11-12T10:00:44.5186906Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-12T10:00:44.5187253Z env:
+2026-11-12T10:00:44.5187457Z   CARGO_HOME: /home/runner/.cargo
+2026-11-12T10:00:44.5187711Z   CARGO_INCREMENTAL: 0
+2026-11-12T10:00:44.5187950Z   CARGO_TERM_COLOR: always
+2026-11-12T10:00:44.5188176Z   toolchain: stable
+2026-11-12T10:00:44.5188377Z ##[endgroup]
+2026-11-12T10:00:44.5361179Z ##[end-action id=__dtolnay_rust-toolchain.__run_9;outcome=success;conclusion=success;duration_ms=21]
+2026-11-12T10:00:44.5365973Z ##[start-action display=rustc +stable --version --verbose;id=__dtolnay_rust-toolchain.__run_10]
+2026-11-12T10:00:44.5384102Z ##[group]Run rustc +"$toolchain" --version --verbose
+2026-11-12T10:00:44.5384471Z rustc +"$toolchain" --version --verbose
+2026-11-12T10:00:44.5405002Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-12T10:00:44.5405393Z env:
+2026-11-12T10:00:44.5405592Z   CARGO_HOME: /home/runner/.cargo
+2026-11-12T10:00:44.5405846Z   CARGO_INCREMENTAL: 0
+2026-11-12T10:00:44.5406069Z   CARGO_TERM_COLOR: always
+2026-11-12T10:00:44.5406290Z   toolchain: stable
+2026-11-12T10:00:44.5406491Z ##[endgroup]
+2026-11-12T10:00:44.5552095Z rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-11-12T10:00:44.5552601Z binary: rustc
+2026-11-12T10:00:44.5553044Z commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-11-12T10:00:44.5553943Z commit-date: 2026-10-13
+2026-11-12T10:00:44.5554353Z host: x86_64-unknown-linux-gnu
+2026-11-12T10:00:44.5554724Z release: 1.99.1
+2026-11-12T10:00:44.5554964Z LLVM version: 23.1.1
+2026-11-12T10:00:44.5574872Z ##[end-action id=__dtolnay_rust-toolchain.__run_10;outcome=success;conclusion=success;duration_ms=20]
+2026-11-12T10:00:44.5688063Z ##[group]Run Swatinem/rust-cache@v2
+2026-11-12T10:00:44.5688342Z with:
+2026-11-12T10:00:44.5688536Z   prefix-key: v0-rust
+2026-11-12T10:00:44.5688755Z   add-job-id-key: true
+2026-11-12T10:00:44.5688990Z   add-rust-environment-hash-key: true
+2026-11-12T10:00:44.5689264Z   cache-targets: true
+2026-11-12T10:00:44.5689481Z   cache-all-crates: false
+2026-11-12T10:00:44.5689725Z   cache-workspace-crates: false
+2026-11-12T10:00:44.5689964Z   save-if: true
+2026-11-12T10:00:44.5690166Z   cache-provider: github
+2026-11-12T10:00:44.5690397Z   cache-bin: true
+2026-11-12T10:00:44.5690600Z   lookup-only: false
+2026-11-12T10:00:44.5690805Z   cmd-format: {0}
+2026-11-12T10:00:44.5690991Z env:
+2026-11-12T10:00:44.5691183Z   CARGO_HOME: /home/runner/.cargo
+2026-11-12T10:00:44.5691437Z   CARGO_INCREMENTAL: 0
+2026-11-12T10:00:44.5691654Z   CARGO_TERM_COLOR: always
+2026-11-12T10:00:44.5691888Z ##[endgroup]
+2026-11-12T10:00:46.9133515Z ##[group]Cache Configuration
+2026-11-12T10:00:46.9134113Z Cache Provider:
+2026-11-12T10:00:46.9134468Z     github
+2026-11-12T10:00:46.9134781Z Workspaces:
+2026-11-12T10:00:46.9135130Z     /home/runner/work/maos/maos
+2026-11-12T10:00:46.9135551Z Cache Paths:
+2026-11-12T10:00:46.9135897Z     /home/runner/.cargo/bin
+2026-11-12T10:00:46.9136329Z     /home/runner/.cargo/.crates.toml
+2026-11-12T10:00:46.9136822Z     /home/runner/.cargo/.crates2.json
+2026-11-12T10:00:46.9137339Z     /home/runner/.cargo/registry
+2026-11-12T10:00:46.9137802Z     /home/runner/.cargo/git
+2026-11-12T10:00:46.9138230Z     /home/runner/work/maos/maos/target
+2026-11-12T10:00:46.9138692Z Restore Key:
+2026-11-12T10:00:46.9139062Z     v0-rust-plant-Linux-x64-01b81e85
+2026-11-12T10:00:46.9139526Z Cache Key:
+2026-11-12T10:00:46.9139925Z     v0-rust-plant-Linux-x64-01b81e85-c611388f
+2026-11-12T10:00:46.9140453Z .. Prefix:
+2026-11-12T10:00:46.9140812Z   - v0-rust-plant-Linux-x64
+2026-11-12T10:00:46.9141623Z .. Environment considered:
+2026-11-12T10:00:46.9142039Z   - Rust Versions:
+2026-11-12T10:00:46.9142639Z     - 1.99.1 x86_64-unknown-linux-gnu 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-11-12T10:00:46.9143594Z   - CARGO_HOME
+2026-11-12T10:00:46.9143938Z   - CARGO_INCREMENTAL
+2026-11-12T10:00:46.9144303Z   - CARGO_TERM_COLOR
+2026-11-12T10:00:46.9144695Z .. Lockfiles considered:
+2026-11-12T10:00:46.9145137Z   - /home/runner/work/maos/maos/Cargo.lock
+2026-11-12T10:00:46.9145778Z   - /home/runner/work/maos/maos/crates/maos-a2a-core/Cargo.toml
+2026-11-12T10:00:46.9146538Z   - /home/runner/work/maos/maos/crates/maos-a2a-tcp/Cargo.toml
+2026-11-12T10:00:46.9147246Z   - /home/runner/work/maos/maos/crates/maos-a2a/Cargo.toml
+2026-11-12T10:00:46.9147899Z   - /home/runner/work/maos/maos/crates/maos-acp/Cargo.toml
+2026-11-12T10:00:46.9148544Z   - /home/runner/work/maos/maos/crates/maos-attrs/Cargo.toml
+2026-11-12T10:00:46.9149193Z   - /home/runner/work/maos/maos/crates/maos-audit/Cargo.toml
+2026-11-12T10:00:46.9149875Z   - /home/runner/work/maos/maos/crates/maos-bench/Cargo.toml
+2026-11-12T10:00:46.9150576Z   - /home/runner/work/maos/maos/crates/maos-bin/Cargo.toml
+2026-11-12T10:00:46.9151315Z   - /home/runner/work/maos/maos/crates/maos-capability/Cargo.toml
+2026-11-12T10:00:46.9152063Z   - /home/runner/work/maos/maos/crates/maos-cli/Cargo.toml
+2026-11-12T10:00:46.9152794Z   - /home/runner/work/maos/maos/crates/maos-cohort/Cargo.toml
+2026-11-12T10:00:46.9153806Z   - /home/runner/work/maos/maos/crates/maos-compliance/Cargo.toml
+2026-11-12T10:00:46.9154593Z   - /home/runner/work/maos/maos/crates/maos-control/Cargo.toml
+2026-11-12T10:00:46.9155351Z   - /home/runner/work/maos/maos/crates/maos-corpus-gen/Cargo.toml
+2026-11-12T10:00:46.9156201Z   - /home/runner/work/maos/maos/crates/maos-director-surface/Cargo.toml
+2026-11-12T10:00:46.9157043Z   - /home/runner/work/maos/maos/crates/maos-domain/Cargo.toml
+2026-11-12T10:00:46.9157800Z   - /home/runner/work/maos/maos/crates/maos-egress/Cargo.toml
+2026-11-12T10:00:46.9158625Z   - /home/runner/work/maos/maos/crates/maos-escape-detector/Cargo.toml
+2026-11-12T10:00:46.9159818Z   - /home/runner/work/maos/maos/crates/maos-eval/Cargo.toml
+2026-11-12T10:00:46.9160682Z   - /home/runner/work/maos/maos/crates/maos-exec-deps/Cargo.toml
+2026-11-12T10:00:46.9161455Z   - /home/runner/work/maos/maos/crates/maos-fkcs/Cargo.toml
+2026-11-12T10:00:46.9162262Z   - /home/runner/work/maos/maos/crates/maos-frame-codec/Cargo.toml
+2026-11-12T10:00:46.9163112Z   - /home/runner/work/maos/maos/crates/maos-host/Cargo.toml
+2026-11-12T10:00:46.9164097Z   - /home/runner/work/maos/maos/crates/maos-iac/Cargo.toml
+2026-11-12T10:00:46.9164873Z   - /home/runner/work/maos/maos/crates/maos-journey-test/Cargo.toml
+2026-11-12T10:00:46.9165671Z   - /home/runner/work/maos/maos/crates/maos-kernel-core/Cargo.toml
+2026-11-12T10:00:46.9166425Z   - /home/runner/work/maos/maos/crates/maos-loom-lite/Cargo.toml
+2026-11-12T10:00:46.9167227Z   - /home/runner/work/maos/maos/crates/maos-manifest/Cargo.toml
+2026-11-12T10:00:46.9167927Z   - /home/runner/work/maos/maos/crates/maos-mcp/Cargo.toml
+2026-11-12T10:00:46.9168642Z   - /home/runner/work/maos/maos/crates/maos-notify-push/Cargo.toml
+2026-11-12T10:00:46.9169445Z   - /home/runner/work/maos/maos/crates/maos-orchestrator-buffer/Cargo.toml
+2026-11-12T10:00:46.9170261Z   - /home/runner/work/maos/maos/crates/maos-pdp/Cargo.toml
+2026-11-12T10:00:46.9170971Z   - /home/runner/work/maos/maos/crates/maos-persistence/Cargo.toml
+2026-11-12T10:00:46.9171674Z   - /home/runner/work/maos/maos/crates/maos-providers/Cargo.toml
+2026-11-12T10:00:46.9172346Z   - /home/runner/work/maos/maos/crates/maos-registry/Cargo.toml
+2026-11-12T10:00:46.9173012Z   - /home/runner/work/maos/maos/crates/maos-secrets/Cargo.toml
+2026-11-12T10:00:46.9173958Z   - /home/runner/work/maos/maos/crates/maos-shell/Cargo.toml
+2026-11-12T10:00:46.9174609Z   - /home/runner/work/maos/maos/crates/maos-siem/Cargo.toml
+2026-11-12T10:00:46.9175233Z   - /home/runner/work/maos/maos/crates/maos-skill/Cargo.toml
+2026-11-12T10:00:46.9176153Z   - /home/runner/work/maos/maos/crates/maos-spirit-abi/Cargo.toml
+2026-11-12T10:00:46.9176974Z   - /home/runner/work/maos/maos/crates/maos-spirit-cli/Cargo.toml
+2026-11-12T10:00:46.9177822Z   - /home/runner/work/maos/maos/crates/maos-spirit-derive/Cargo.toml
+2026-11-12T10:00:46.9178731Z   - /home/runner/work/maos/maos/crates/maos-spirit-hello/Cargo.toml
+2026-11-12T10:00:46.9179720Z   - /home/runner/work/maos/maos/crates/maos-spirit-sdk/Cargo.toml
+2026-11-12T10:00:46.9180502Z   - /home/runner/work/maos/maos/crates/maos-sso/Cargo.toml
+2026-11-12T10:00:46.9181377Z   - /home/runner/work/maos/maos/crates/maos-telemetry/Cargo.toml
+2026-11-12T10:00:46.9182204Z   - /home/runner/work/maos/maos/crates/maos-wasm-host/Cargo.toml
+2026-11-12T10:00:46.9183093Z   - /home/runner/work/maos/maos/examples/example-spirit/Cargo.toml
+2026-11-12T10:00:46.9184116Z   - /home/runner/work/maos/maos/rust-toolchain.toml
+2026-11-12T10:00:46.9184914Z   - /home/runner/work/maos/maos/spirits/architect/Cargo.toml
+2026-11-12T10:00:46.9185746Z   - /home/runner/work/maos/maos/spirits/butler/Cargo.toml
+2026-11-12T10:00:46.9186521Z   - /home/runner/work/maos/maos/spirits/digest/Cargo.toml
+2026-11-12T10:00:46.9187282Z   - /home/runner/work/maos/maos/spirits/mira/Cargo.toml
+2026-11-12T10:00:46.9251599Z   - /home/runner/work/maos/maos/spirits/nash/Cargo.toml
+2026-11-12T10:00:46.9252364Z   - /home/runner/work/maos/maos/spirits/observer/Cargo.toml
+2026-11-12T10:00:46.9253182Z   - /home/runner/work/maos/maos/spirits/orchestrator/Cargo.toml
+2026-11-12T10:00:46.9254210Z   - /home/runner/work/maos/maos/spirits/researcher/Cargo.toml
+2026-11-12T10:00:46.9254935Z   - /home/runner/work/maos/maos/spirits/reviewer/Cargo.toml
+2026-11-12T10:00:46.9255636Z   - /home/runner/work/maos/maos/spirits/worker/Cargo.toml
+2026-11-12T10:00:46.9256275Z   - /home/runner/work/maos/maos/xtask/Cargo.toml
+2026-11-12T10:00:46.9257155Z ##[endgroup]
+2026-11-12T10:00:46.9257362Z 
+2026-11-12T10:00:46.9257508Z ... Restoring cache ...
+2026-11-12T10:00:46.9899214Z No cache found.
+2026-11-12T10:00:47.0087732Z ##[group]Run taiki-e/install-action@v2
+2026-11-12T10:00:47.0088031Z with:
+2026-11-12T10:00:47.0088230Z   tool: cargo-nextest@0.9.149
+2026-11-12T10:00:47.0088467Z   checksum: true
+2026-11-12T10:00:47.0088670Z   fallback: cargo-binstall
+2026-11-12T10:00:47.0088887Z env:
+2026-11-12T10:00:47.0089070Z   CARGO_HOME: /home/runner/.cargo
+2026-11-12T10:00:47.0089317Z   CARGO_INCREMENTAL: 0
+2026-11-12T10:00:47.0089528Z   CARGO_TERM_COLOR: always
+2026-11-12T10:00:47.0089747Z   CACHE_ON_FAILURE: false
+2026-11-12T10:00:47.0089958Z ##[endgroup]
+2026-11-12T10:00:47.0097356Z ##[start-action display=Run bail() {;id=__taiki-e_install-action.__run]
+2026-11-12T10:00:47.0114921Z ##[group]Run bail() {
+2026-11-12T10:00:47.0115186Z bail() {
+2026-11-12T10:00:47.0115442Z   printf '::error::install-action: %s\n' "$*"
+2026-11-12T10:00:47.0115749Z   exit 1
+2026-11-12T10:00:47.0115942Z }
+2026-11-12T10:00:47.0116331Z # If /bin/sh is dash, environment variable containing % is not imported, but is fine
+2026-11-12T10:00:47.0116874Z # because it also means that it will not be exposed to subprocess.
+2026-11-12T10:00:47.0117298Z if /usr/bin/env | grep -Eq '^BASH_FUNC_'; then
+2026-11-12T10:00:47.0117840Z   bail 'bash function injection via BASH_FUNC_ environment variable is not allowed for security reasons'
+2026-11-12T10:00:47.0118330Z fi
+2026-11-12T10:00:47.0118549Z if ! command -v bash >/dev/null; then
+2026-11-12T10:00:47.0118892Z   if grep -Eq '^ID=alpine' /etc/os-release; then
+2026-11-12T10:00:47.0119337Z     printf '::group::Install packages required for install-action (bash)\n'
+2026-11-12T10:00:47.0119762Z     # NB: sync with apk_install in main.sh
+2026-11-12T10:00:47.0120075Z     if command -v sudo >/dev/null; then
+2026-11-12T10:00:47.0120381Z       sudo apk --no-cache add bash
+2026-11-12T10:00:47.0120699Z     elif command -v doas >/dev/null; then
+2026-11-12T10:00:47.0121166Z       doas apk --no-cache add bash
+2026-11-12T10:00:47.0121429Z     else
+2026-11-12T10:00:47.0121639Z       apk --no-cache add bash
+2026-11-12T10:00:47.0121898Z     fi
+2026-11-12T10:00:47.0122103Z     printf '::endgroup::\n'
+2026-11-12T10:00:47.0122348Z   else
+2026-11-12T10:00:47.0122571Z     bail 'this action requires bash'
+2026-11-12T10:00:47.0122844Z   fi
+2026-11-12T10:00:47.0123027Z fi
+2026-11-12T10:00:47.0123484Z bash --noprofile --norc "${GITHUB_ACTION_PATH:?}/main.sh"
+2026-11-12T10:00:47.0124695Z shell: /usr/bin/env -u ENV -u BASH_ENV -u CDPATH -u SHELLOPTS -u BASHOPTS /bin/sh -eu {0}
+2026-11-12T10:00:47.0125202Z env:
+2026-11-12T10:00:47.0125404Z   CARGO_HOME: /home/runner/.cargo
+2026-11-12T10:00:47.0125656Z   CARGO_INCREMENTAL: 0
+2026-11-12T10:00:47.0126049Z   CARGO_TERM_COLOR: always
+2026-11-12T10:00:47.0126285Z   CACHE_ON_FAILURE: false
+2026-11-12T10:00:47.0126538Z   INPUT_TOOL: cargo-nextest@0.9.149
+2026-11-12T10:00:47.0126791Z   INPUT_CHECKSUM: true
+2026-11-12T10:00:47.0127018Z   INPUT_FALLBACK: cargo-binstall
+2026-11-12T10:00:47.0129557Z   DEFAULT_GITHUB_TOKEN: ***
+2026-11-12T10:00:47.0129845Z   ACTION_USER_AGENT: taiki-e/install-action (v2)
+2026-11-12T10:00:47.0130141Z   RUNNER_OS: Linux
+2026-11-12T10:00:47.0130348Z   RUNNER_ARCH: X64
+2026-11-12T10:00:47.0130543Z ##[endgroup]
+2026-11-12T10:00:47.0268625Z info: host platform: x86_64_linux
+2026-11-12T10:00:47.0528650Z info: installing cargo-nextest@0.9.149
+2026-11-12T10:00:47.0751006Z info: downloading https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.149/cargo-nextest-0.9.149-x86_64-unknown-linux-gnu.tar.gz
+2026-11-12T10:00:47.3239222Z info: verifying sha256 checksum for cargo-nextest-0.9.149-x86_64-unknown-linux-gnu.tar.gz
+2026-11-12T10:00:47.5737265Z info: cargo-nextest installed at /home/runner/.cargo/bin/cargo-nextest
+2026-11-12T10:00:47.5740979Z + cargo-nextest nextest --version
+2026-11-12T10:00:47.5770395Z cargo-nextest 0.9.149 (3fe4ef319 2026-10-20)
+2026-11-12T10:00:47.5770801Z release: 0.9.149
+2026-11-12T10:00:47.5771119Z commit-hash: 3fe4ef31972f24e0c94cfe291718eab0fe678260
+2026-11-12T10:00:47.5771495Z commit-date: 2026-10-20
+2026-11-12T10:00:47.5771782Z host: x86_64-unknown-linux-gnu
+2026-11-12T10:00:47.5775260Z 
+2026-11-12T10:00:47.5787728Z ##[end-action id=__taiki-e_install-action.__run;outcome=success;conclusion=success;duration_ms=568]
+2026-11-12T10:00:47.5792845Z ##[start-action display=Run Set-StrictMode -Version Latest;id=__taiki-e_install-action.__run_2]
+2026-11-12T10:00:47.5797256Z ##[end-action id=__taiki-e_install-action.__run_2;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-12T10:00:47.5826892Z ##[group]Run set +e -uo pipefail
+2026-11-12T10:00:47.5827227Z set +e -uo pipefail
+2026-11-12T10:00:47.5827628Z grep -n "RingCryptoProvider" crates/maos-kernel-core/src/security/mod.rs
+2026-11-12T10:00:47.5828391Z cargo nextest run --locked -p maos-bin --features crypto-recording --profile ci --test crypto_t3_admission_20_13 2>&1 | tee plant.log
+2026-11-12T10:00:47.5829146Z if [ "${PIPESTATUS[0]}" -eq 0 ]; then echo "PLANT NOT DETECTED" >&2; exit 1; fi
+2026-11-12T10:00:47.5829648Z grep -F "kernel T3 admission must verify exactly once" plant.log
+2026-11-12T10:00:47.5850284Z shell: /usr/bin/bash -e {0}
+2026-11-12T10:00:47.5850536Z env:
+2026-11-12T10:00:47.5850733Z   CARGO_HOME: /home/runner/.cargo
+2026-11-12T10:00:47.5850990Z   CARGO_INCREMENTAL: 0
+2026-11-12T10:00:47.5851212Z   CARGO_TERM_COLOR: always
+2026-11-12T10:00:47.5851444Z   CACHE_ON_FAILURE: false
+2026-11-12T10:00:47.5851676Z ##[endgroup]
+2026-11-12T10:00:47.5904468Z 21:pub use crypto::RingCryptoProvider;
+2026-11-12T10:00:47.5905820Z 35:// Story 2.3 — appended for P2 port-pair completeness (RingCryptoProvider adapter → CryptoProvider Port).
+2026-11-12T10:00:47.5906886Z 367:                    &crate::security::crypto::RingCryptoProvider,
+2026-11-12T10:00:47.5907868Z 375:                        &crate::security::crypto::RingCryptoProvider,
+2026-11-12T10:00:48.1657298Z     Updating crates.io index
+2026-11-12T10:00:49.1717462Z  Downloading crates ...
+2026-11-12T10:00:49.2368954Z   Downloaded ambient-authority v0.0.2
+2026-11-12T10:00:49.2408696Z   Downloaded adler2 v2.0.1
+2026-11-12T10:00:49.2424951Z   Downloaded cranelift-bitset v0.135.8
+2026-11-12T10:00:49.2437237Z   Downloaded crypto-common v0.1.7
+2026-11-12T10:00:49.2446621Z   Downloaded anes v0.1.6
+2026-11-12T10:00:49.2478691Z   Downloaded ahash v0.8.12
+2026-11-12T10:00:49.2503766Z   Downloaded atomic-waker v1.1.2
+2026-11-12T10:00:49.2529589Z   Downloaded anstyle-query v1.1.5
+2026-11-12T10:00:49.2534485Z   Downloaded async-lock v3.4.2
+2026-11-12T10:00:49.2557677Z   Downloaded allocator-api2 v0.2.21
+2026-11-12T10:00:49.2614763Z   Downloaded async-recursion v1.1.1
+2026-11-12T10:00:49.2640146Z   Downloaded cranelift-assembler-x64 v0.135.8
+2026-11-12T10:00:49.2666509Z   Downloaded async-signal v0.2.14
+2026-11-12T10:00:49.2685563Z   Downloaded anstream v1.0.0
+2026-11-12T10:00:49.2713857Z   Downloaded anstyle-parse v1.0.0
+2026-11-12T10:00:49.2735369Z   Downloaded async-process v2.5.0
+2026-11-12T10:00:49.2758287Z   Downloaded async-trait v0.1.89
+2026-11-12T10:00:49.2804136Z   Downloaded autocfg v1.5.0
+2026-11-12T10:00:49.2822346Z   Downloaded axum-core v0.5.6
+2026-11-12T10:00:49.2845663Z   Downloaded addr2line v0.26.1
+2026-11-12T10:00:49.2863764Z   Downloaded arbitrary v1.4.2
+2026-11-12T10:00:49.2910504Z   Downloaded async-channel v2.5.0
+2026-11-12T10:00:49.2922341Z   Downloaded async-executor v1.14.0
+2026-11-12T10:00:49.2940452Z   Downloaded async-task v4.7.1
+2026-11-12T10:00:49.2966702Z   Downloaded ciborium v0.2.2
+2026-11-12T10:00:49.2990556Z   Downloaded cranelift-entity v0.135.8
+2026-11-12T10:00:49.3006714Z   Downloaded aes v0.9.3
+2026-11-12T10:00:49.3048211Z   Downloaded base64 v0.22.1
+2026-11-12T10:00:49.3090520Z   Downloaded clap_lex v1.1.0
+2026-11-12T10:00:49.3101964Z   Downloaded anyhow v1.0.103
+2026-11-12T10:00:49.3148278Z   Downloaded chacha20 v0.10.2
+2026-11-12T10:00:49.3172762Z   Downloaded clap_derive v4.6.1
+2026-11-12T10:00:49.3197184Z   Downloaded concurrent-queue v2.5.0
+2026-11-12T10:00:49.3214933Z   Downloaded const-oid v0.9.6
+2026-11-12T10:00:49.3235811Z   Downloaded aho-corasick v1.1.4
+2026-11-12T10:00:49.3288377Z   Downloaded ar_archive_writer v0.5.2
+2026-11-12T10:00:49.3322902Z   Downloaded async-io v2.6.0
+2026-11-12T10:00:49.3357759Z   Downloaded axum v0.8.9
+2026-11-12T10:00:49.3444612Z   Downloaded base64ct v1.8.3
+2026-11-12T10:00:49.3472485Z   Downloaded bitflags v2.11.1
+2026-11-12T10:00:49.3514993Z   Downloaded block-buffer v0.10.4
+2026-11-12T10:00:49.3527196Z   Downloaded bs58 v0.5.1
+2026-11-12T10:00:49.3550867Z   Downloaded cap-primitives v4.0.3
+2026-11-12T10:00:49.3682682Z   Downloaded cfg-if v1.0.4
+2026-11-12T10:00:49.3692947Z   Downloaded chrono v0.4.44
+2026-11-12T10:00:49.3827711Z   Downloaded ciborium-ll v0.2.2
+2026-11-12T10:00:49.3854147Z   Downloaded cipher v0.5.2
+2026-11-12T10:00:49.3899315Z   Downloaded clap_builder v4.6.0
+2026-11-12T10:00:49.4006911Z   Downloaded cmov v0.5.4
+2026-11-12T10:00:49.4030384Z   Downloaded cranelift-bforest v0.135.8
+2026-11-12T10:00:49.4049574Z   Downloaded cranelift-codegen-meta v0.135.8
+2026-11-12T10:00:49.4092535Z   Downloaded cranelift-codegen-shared v0.135.8
+2026-11-12T10:00:49.4105667Z   Downloaded cranelift-frontend v0.135.8
+2026-11-12T10:00:49.4134462Z   Downloaded cranelift-native v0.135.8
+2026-11-12T10:00:49.4143920Z   Downloaded criterion-plot v0.5.0
+2026-11-12T10:00:49.4163426Z   Downloaded crossbeam-epoch v0.9.20
+2026-11-12T10:00:49.4187930Z   Downloaded is-terminal v0.4.17
+2026-11-12T10:00:49.4197598Z   Downloaded is_terminal_polyfill v1.70.2
+2026-11-12T10:00:49.4206574Z   Downloaded anstyle v1.0.14
+2026-11-12T10:00:49.4220216Z   Downloaded bit-set v0.8.0
+2026-11-12T10:00:49.4232442Z   Downloaded block-buffer v0.12.1
+2026-11-12T10:00:49.4243753Z   Downloaded block-padding v0.4.2
+2026-11-12T10:00:49.4251793Z   Downloaded cast v0.3.0
+2026-11-12T10:00:49.4262511Z   Downloaded colorchoice v1.0.5
+2026-11-12T10:00:49.4271187Z   Downloaded crypto-common v0.2.2
+2026-11-12T10:00:49.4282012Z   Downloaded io-lifetimes v2.0.4
+2026-11-12T10:00:49.4297680Z   Downloaded cbc v0.2.1
+2026-11-12T10:00:49.4313023Z   Downloaded cfg_aliases v0.1.1
+2026-11-12T10:00:49.4320696Z   Downloaded cfg_aliases v0.2.1
+2026-11-12T10:00:49.4329724Z   Downloaded cranelift-control v0.135.8
+2026-11-12T10:00:49.4338182Z   Downloaded io-lifetimes v3.0.1
+2026-11-12T10:00:49.4353687Z   Downloaded ipnet v2.12.0
+2026-11-12T10:00:49.4369560Z   Downloaded linked_hash_set v0.1.6
+2026-11-12T10:00:49.4380604Z   Downloaded lock_api v0.4.14
+2026-11-12T10:00:49.4392509Z   Downloaded logos v0.16.1
+2026-11-12T10:00:49.4409271Z   Downloaded logos-derive v0.16.1
+2026-11-12T10:00:49.4417270Z   Downloaded ordered-stream v0.2.0
+2026-11-12T10:00:49.4427868Z   Downloaded io-extras v0.19.0
+2026-11-12T10:00:49.4448604Z   Downloaded matchit v0.8.4
+2026-11-12T10:00:49.4468630Z   Downloaded arc-swap v1.9.1
+2026-11-12T10:00:49.4505645Z   Downloaded ascii-canvas v4.0.0
+2026-11-12T10:00:49.4517066Z   Downloaded byteorder v1.5.0
+2026-11-12T10:00:49.4531663Z   Downloaded ciborium-io v0.2.2
+2026-11-12T10:00:49.4538859Z   Downloaded cpubits v0.1.1
+2026-11-12T10:00:49.4547421Z   Downloaded cpufeatures v0.2.17
+2026-11-12T10:00:49.4560118Z   Downloaded litemap v0.8.2
+2026-11-12T10:00:49.4581399Z   Downloaded logos-codegen v0.16.1
+2026-11-12T10:00:49.4628906Z   Downloaded toml_datetime v0.6.11
+2026-11-12T10:00:49.4639305Z   Downloaded arrayvec v0.7.6
+2026-11-12T10:00:49.4658407Z   Downloaded bit-vec v0.8.0
+2026-11-12T10:00:49.4673160Z   Downloaded cobs v0.3.0
+2026-11-12T10:00:49.4686258Z   Downloaded cpufeatures v0.3.0
+2026-11-12T10:00:49.4700143Z   Downloaded cranelift-srcgen v0.135.8
+2026-11-12T10:00:49.4707501Z   Downloaded crossbeam-deque v0.8.6
+2026-11-12T10:00:49.4720261Z   Downloaded itertools v0.10.5
+2026-11-12T10:00:49.4779641Z   Downloaded miette v7.6.0
+2026-11-12T10:00:49.4821785Z   Downloaded oorandom v11.1.5
+2026-11-12T10:00:49.4831134Z   Downloaded tinyvec_macros v0.1.1
+2026-11-12T10:00:49.4838871Z   Downloaded try-lock v0.2.5
+2026-11-12T10:00:49.4847428Z   Downloaded untrusted v0.9.0
+2026-11-12T10:00:49.4862841Z   Downloaded blocking v1.7.0
+2026-11-12T10:00:49.4874153Z   Downloaded pin-project-internal v1.1.13
+2026-11-12T10:00:49.4888608Z   Downloaded arrayvec v0.5.2
+2026-11-12T10:00:49.4906931Z   Downloaded async-broadcast v0.7.2
+2026-11-12T10:00:49.4922735Z   Downloaded clap v4.6.1
+2026-11-12T10:00:49.5010568Z   Downloaded crc32fast v1.5.0
+2026-11-12T10:00:49.5028051Z   Downloaded crossbeam-utils v0.8.22
+2026-11-12T10:00:49.5053534Z   Downloaded vt100 v0.16.2
+2026-11-12T10:00:49.5068623Z   Downloaded zbus_names v4.3.4
+2026-11-12T10:00:49.5083000Z   Downloaded cedar-policy-formatter v4.11.2
+2026-11-12T10:00:49.5146928Z   Downloaded cranelift-assembler-x64-meta v0.135.8
+2026-11-12T10:00:49.5182648Z   Downloaded ctutils v0.4.5
+2026-11-12T10:00:49.5202262Z   Downloaded toml v1.1.2+spec-1.1.0
+2026-11-12T10:00:49.5241171Z   Downloaded version_check v0.9.5
+2026-11-12T10:00:49.5253238Z   Downloaded walkdir v2.5.0
+2026-11-12T10:00:49.5270588Z   Downloaded want v0.3.1
+2026-11-12T10:00:49.5279508Z   Downloaded wasmtime-internal-jit-icache-coherence v48.0.8
+2026-11-12T10:00:49.5288096Z   Downloaded bytes v1.11.1
+2026-11-12T10:00:49.5329314Z   Downloaded wasmtime-wasi-io v48.0.8
+2026-11-12T10:00:49.5341787Z   Downloaded const-oid v0.10.2
+2026-11-12T10:00:49.5364524Z   Downloaded tokio-rustls v0.26.4
+2026-11-12T10:00:49.5383701Z   Downloaded cc v1.2.62
+2026-11-12T10:00:49.5412182Z   Downloaded cpp_demangle v0.5.1
+2026-11-12T10:00:49.5439835Z   Downloaded crossbeam-channel v0.5.15
+2026-11-12T10:00:49.5478560Z   Downloaded unicode-bidi v0.3.18
+2026-11-12T10:00:49.5501787Z   Downloaded vte v0.15.0
+2026-11-12T10:00:49.5522084Z   Downloaded wasmtime-internal-versioned-export-macros v48.0.8
+2026-11-12T10:00:49.5528383Z   Downloaded zcheapstr v1.1.0
+2026-11-12T10:00:49.5544617Z   Downloaded borsh v1.7.0
+2026-11-12T10:00:49.5612272Z   Downloaded bumpalo v3.20.2
+2026-11-12T10:00:49.5637172Z   Downloaded cranelift-isle v0.135.8
+2026-11-12T10:00:49.5686764Z   Downloaded deadpool-runtime v0.1.4
+2026-11-12T10:00:49.5695103Z   Downloaded num-conv v0.2.2
+2026-11-12T10:00:49.5702659Z   Downloaded num_cpus v1.17.0
+2026-11-12T10:00:49.5738093Z   Downloaded plotters-backend v0.3.7
+2026-11-12T10:00:49.5750165Z   Downloaded tower v0.5.3
+2026-11-12T10:00:49.5847695Z   Downloaded unicode-ident v1.0.24
+2026-11-12T10:00:49.5874389Z   Downloaded criterion v0.5.1
+2026-11-12T10:00:49.5942034Z   Downloaded equivalent v1.0.2
+2026-11-12T10:00:49.5951959Z   Downloaded filedescriptor v0.8.3
+2026-11-12T10:00:49.5961310Z   Downloaded matchers v0.2.0
+2026-11-12T10:00:49.5971445Z   Downloaded mime v0.3.17
+2026-11-12T10:00:49.5983933Z   Downloaded potential_utf v0.1.5
+2026-11-12T10:00:49.5995138Z   Downloaded wasmtime-internal-unwinder v48.0.8
+2026-11-12T10:00:49.6009770Z   Downloaded wast v35.0.2
+2026-11-12T10:00:49.6067273Z   Downloaded embedded-io v0.4.0
+2026-11-12T10:00:49.6083530Z   Downloaded enumflags2_derive v0.7.12
+2026-11-12T10:00:49.6091236Z   Downloaded event-listener-strategy v0.5.4
+2026-11-12T10:00:49.6102109Z   Downloaded fallible-streaming-iterator v0.1.9
+2026-11-12T10:00:49.6111590Z   Downloaded fixedbitset v0.4.2
+2026-11-12T10:00:49.6123495Z   Downloaded tonic v0.13.1
+2026-11-12T10:00:49.6180696Z   Downloaded curve25519-dalek-derive v0.1.1
+2026-11-12T10:00:49.6190703Z   Downloaded deadpool-postgres v0.14.1
+2026-11-12T10:00:49.6203234Z   Downloaded fixedbitset v0.5.7
+2026-11-12T10:00:49.6221469Z   Downloaded new_debug_unreachable v1.0.6
+2026-11-12T10:00:49.6231729Z   Downloaded deadpool v0.12.3
+2026-11-12T10:00:49.6260204Z   Downloaded leb128fmt v0.1.0
+2026-11-12T10:00:49.6269807Z   Downloaded memfd v0.6.5
+2026-11-12T10:00:49.6284181Z   Downloaded parking v2.2.1
+2026-11-12T10:00:49.6294671Z   Downloaded precomputed-hash v0.1.1
+2026-11-12T10:00:49.6300369Z   Downloaded linked-hash-map v0.5.6
+2026-11-12T10:00:49.6310734Z   Downloaded maybe-owned v0.3.4
+2026-11-12T10:00:49.6323150Z   Downloaded nonempty v0.12.0
+2026-11-12T10:00:49.6335040Z   Downloaded powerfmt v0.2.0
+2026-11-12T10:00:49.6347239Z   Downloaded proc-macro-crate v3.5.0
+2026-11-12T10:00:49.6361931Z   Downloaded enum-ordinalize v4.4.1
+2026-11-12T10:00:49.6371305Z   Downloaded enum-ordinalize-derive v4.4.1
+2026-11-12T10:00:49.6383411Z   Downloaded itoa v1.0.18
+2026-11-12T10:00:49.6398635Z   Downloaded ittapi v0.4.0
+2026-11-12T10:00:49.6410157Z   Downloaded leb128 v0.2.7
+2026-11-12T10:00:49.6425125Z   Downloaded phf_shared v0.13.1
+2026-11-12T10:00:49.6434271Z   Downloaded unicode-normalization v0.1.25
+2026-11-12T10:00:49.6467420Z   Downloaded embedded-io v0.6.1
+2026-11-12T10:00:49.6479145Z   Downloaded fastrand v2.4.1
+2026-11-12T10:00:49.6492260Z   Downloaded lalrpop-util v0.22.2
+2026-11-12T10:00:49.6502690Z   Downloaded md-5 v0.11.0
+2026-11-12T10:00:49.6518474Z   Downloaded miette-derive v7.6.0
+2026-11-12T10:00:49.6532826Z   Downloaded num-iter v0.1.46
+2026-11-12T10:00:49.6542033Z   Downloaded utf8_iter v1.0.4
+2026-11-12T10:00:49.6552052Z   Downloaded debugid v0.8.0
+2026-11-12T10:00:49.6563825Z   Downloaded endi v1.1.1
+2026-11-12T10:00:49.6574438Z   Downloaded errno v0.3.14
+2026-11-12T10:00:49.6588682Z   Downloaded id-arena v2.3.0
+2026-11-12T10:00:49.6601150Z   Downloaded ident_case v1.0.1
+2026-11-12T10:00:49.6609274Z   Downloaded keccak v0.1.6
+2026-11-12T10:00:49.6620265Z   Downloaded percent-encoding v2.3.2
+2026-11-12T10:00:49.6628786Z   Downloaded pico-args v0.5.0
+2026-11-12T10:00:49.6641900Z   Downloaded plotters-svg v0.3.7
+2026-11-12T10:00:49.6649654Z   Downloaded serde_spanned v1.1.1
+2026-11-12T10:00:49.6660802Z   Downloaded zerofrom-derive v0.1.7
+2026-11-12T10:00:49.6670967Z   Downloaded idna_adapter v1.2.2
+2026-11-12T10:00:49.6680090Z   Downloaded num v0.4.3
+2026-11-12T10:00:49.6689531Z   Downloaded pem v3.0.6
+2026-11-12T10:00:49.6702970Z   Downloaded pgvector v0.4.2
+2026-11-12T10:00:49.6727676Z   Downloaded phf_shared v0.11.3
+2026-11-12T10:00:49.6736911Z   Downloaded pin-project-lite v0.2.17
+2026-11-12T10:00:49.6791490Z   Downloaded portable-pty v0.9.0
+2026-11-12T10:00:49.6807965Z   Downloaded serde_repr v0.1.21
+2026-11-12T10:00:49.6827309Z   Downloaded siphasher v1.0.3
+2026-11-12T10:00:49.6840581Z   Downloaded downcast-rs v1.2.1
+2026-11-12T10:00:49.6852842Z   Downloaded ena v0.14.4
+2026-11-12T10:00:49.6868566Z   Downloaded enumflags2 v0.7.12
+2026-11-12T10:00:49.6881303Z   Downloaded event-listener v5.4.2
+2026-11-12T10:00:49.6898178Z   Downloaded fallible-iterator v0.2.0
+2026-11-12T10:00:49.6909768Z   Downloaded filetime v0.2.29
+2026-11-12T10:00:49.6925568Z   Downloaded find-msvc-tools v0.1.9
+2026-11-12T10:00:49.6941128Z   Downloaded lazy_static v1.5.0
+2026-11-12T10:00:49.6958014Z   Downloaded nu-ansi-term v0.50.3
+2026-11-12T10:00:49.6980375Z   Downloaded num-complex v0.4.6
+2026-11-12T10:00:49.6994058Z   Downloaded num-integer v0.1.46
+2026-11-12T10:00:49.7009618Z   Downloaded num-rational v0.4.2
+2026-11-12T10:00:49.7021613Z   Downloaded once_cell v1.21.4
+2026-11-12T10:00:49.7045515Z   Downloaded opentelemetry-http v0.32.0
+2026-11-12T10:00:49.7055355Z   Downloaded parking_lot_core v0.9.12
+2026-11-12T10:00:49.7075191Z   Downloaded phf v0.13.1
+2026-11-12T10:00:49.7087093Z   Downloaded piper v0.2.5
+2026-11-12T10:00:49.7102572Z   Downloaded pkcs8 v0.10.2
+2026-11-12T10:00:49.7129279Z   Downloaded postcard v1.1.3
+2026-11-12T10:00:49.7151470Z   Downloaded postgres-protocol v0.6.12
+2026-11-12T10:00:49.7171248Z   Downloaded ppv-lite86 v0.2.21
+2026-11-12T10:00:49.7183703Z   Downloaded pretty v0.12.5
+2026-11-12T10:00:49.7200762Z   Downloaded serde_spanned v0.6.9
+2026-11-12T10:00:49.7211401Z   Downloaded shlex v1.3.0
+2026-11-12T10:00:49.7223736Z   Downloaded signature v2.2.0
+2026-11-12T10:00:49.7237105Z   Downloaded simd-adler32 v0.3.9
+2026-11-12T10:00:49.7255138Z   Downloaded simple_asn1 v0.6.4
+2026-11-12T10:00:49.7268102Z   Downloaded tokio-macros v2.7.0
+2026-11-12T10:00:49.7278294Z   Downloaded tower-service v0.3.3
+2026-11-12T10:00:49.7286218Z   Downloaded wasmtime-internal-component-util v48.0.8
+2026-11-12T10:00:49.7291852Z   Downloaded curve25519-dalek v4.1.3
+2026-11-12T10:00:49.7369999Z   Downloaded futures-task v0.3.32
+2026-11-12T10:00:49.7381785Z   Downloaded jsonwebtoken v9.3.1
+2026-11-12T10:00:49.7421901Z   Downloaded keyring-core v1.0.0
+2026-11-12T10:00:49.7439863Z   Downloaded landlock v0.4.4
+2026-11-12T10:00:49.7462974Z   Downloaded num-traits v0.2.19
+2026-11-12T10:00:49.7487656Z   Downloaded parking_lot v0.12.5
+2026-11-12T10:00:49.7511118Z   Downloaded pin-project v1.1.13
+2026-11-12T10:00:49.7635411Z   Downloaded pkg-config v0.3.33
+2026-11-12T10:00:49.7650674Z   Downloaded polling v3.11.0
+2026-11-12T10:00:49.7679420Z   Downloaded same-file v1.0.6
+2026-11-12T10:00:49.7692528Z   Downloaded signal-hook-registry v1.4.8
+2026-11-12T10:00:49.7703641Z   Downloaded slab v0.4.12
+2026-11-12T10:00:49.7716271Z   Downloaded tempfile v3.27.0
+2026-11-12T10:00:49.7740232Z   Downloaded term v1.2.1
+2026-11-12T10:00:49.7774297Z   Downloaded toml v0.8.23
+2026-11-12T10:00:49.7797189Z   Downloaded utf8parse v0.2.2
+2026-11-12T10:00:49.7806930Z   Downloaded wasmtime-internal-wit-bindgen v48.0.8
+2026-11-12T10:00:49.7820120Z   Downloaded futures-macro v0.3.32
+2026-11-12T10:00:49.7830269Z   Downloaded keyring v4.2.0
+2026-11-12T10:00:49.7852607Z   Downloaded digest v0.10.7
+2026-11-12T10:00:49.7870023Z   Downloaded dyn-clone v1.0.20
+2026-11-12T10:00:49.7886032Z   Downloaded fallible-iterator v0.3.0
+2026-11-12T10:00:49.7898080Z   Downloaded http-body v1.0.1
+2026-11-12T10:00:49.7907205Z   Downloaded log v0.4.29
+2026-11-12T10:00:49.7931366Z   Downloaded postgres-types v0.2.14
+2026-11-12T10:00:49.7956269Z   Downloaded tower-http v0.6.11
+2026-11-12T10:00:49.8044813Z   Downloaded indexmap v1.9.3
+2026-11-12T10:00:49.8075094Z   Downloaded icu_normalizer_data v2.2.0
+2026-11-12T10:00:49.8095629Z   Downloaded opentelemetry-otlp v0.32.0
+2026-11-12T10:00:49.8123425Z   Downloaded wasm-compose v0.254.2
+2026-11-12T10:00:49.8212200Z   Downloaded der v0.7.10
+2026-11-12T10:00:49.8262134Z   Downloaded displaydoc v0.2.5
+2026-11-12T10:00:49.8290886Z   Downloaded futures-sink v0.3.32
+2026-11-12T10:00:49.8299210Z   Downloaded http-body-util v0.1.3
+2026-11-12T10:00:49.8316197Z   Downloaded miniz_oxide v0.8.9
+2026-11-12T10:00:49.8339612Z   Downloaded tokio-stream v0.1.18
+2026-11-12T10:00:49.8387833Z   Downloaded unicode-xid v0.2.6
+2026-11-12T10:00:49.8400466Z   Downloaded wasm-metadata v0.254.2
+2026-11-12T10:00:49.8424260Z   Downloaded digest v0.11.3
+2026-11-12T10:00:49.8446770Z   Downloaded icu_properties v2.2.0
+2026-11-12T10:00:49.8469737Z   Downloaded icu_provider v2.2.0
+2026-11-12T10:00:49.8495744Z   Downloaded opentelemetry v0.32.0
+2026-11-12T10:00:49.8538627Z   Downloaded proc-macro2 v1.0.106
+2026-11-12T10:00:49.8566884Z   Downloaded pulley-macros v48.0.8
+2026-11-12T10:00:49.8573484Z   Downloaded rustix-linux-procfs v0.1.1
+2026-11-12T10:00:49.8584143Z   Downloaded rustls-pemfile v2.2.0
+2026-11-12T10:00:49.8607144Z   Downloaded rustversion v1.0.22
+2026-11-12T10:00:49.8634424Z   Downloaded thiserror v1.0.69
+2026-11-12T10:00:49.8686620Z   Downloaded thiserror v2.0.18
+2026-11-12T10:00:49.8746927Z   Downloaded thiserror-impl v1.0.69
+2026-11-12T10:00:49.8759939Z   Downloaded thiserror-impl v2.0.18
+2026-11-12T10:00:49.8773623Z   Downloaded thread_local v1.1.9
+2026-11-12T10:00:49.8788029Z   Downloaded time-macros v0.2.27
+2026-11-12T10:00:49.8809998Z   Downloaded tinyvec v1.11.0
+2026-11-12T10:00:49.8835856Z   Downloaded tracing-attributes v0.1.31
+2026-11-12T10:00:49.8865959Z   Downloaded uuid v1.23.4
+2026-11-12T10:00:49.8895395Z   Downloaded wasm-encoder v0.254.2
+2026-11-12T10:00:49.8934717Z   Downloaded wasmprinter v0.254.2
+2026-11-12T10:00:49.8951948Z   Downloaded wiggle-macro v48.0.8
+2026-11-12T10:00:49.8960886Z   Downloaded yasna v0.5.2
+2026-11-12T10:00:49.8980794Z   Downloaded zeroize v1.8.2
+2026-11-12T10:00:49.8993015Z   Downloaded ed25519 v2.2.3
+2026-11-12T10:00:49.9009869Z   Downloaded fs-set-times v0.20.3
+2026-11-12T10:00:49.9023217Z   Downloaded futures v0.3.32
+2026-11-12T10:00:49.9070227Z   Downloaded futures-core v0.3.32
+2026-11-12T10:00:49.9082966Z   Downloaded fxprof-processed-profile v0.8.1
+2026-11-12T10:00:49.9108364Z   Downloaded hashlink v0.9.1
+2026-11-12T10:00:49.9125275Z   Downloaded heck v0.5.0
+2026-11-12T10:00:49.9137341Z   Downloaded hex v0.4.3
+2026-11-12T10:00:49.9152161Z   Downloaded hmac v0.12.1
+2026-11-12T10:00:49.9170661Z   Downloaded hmac v0.13.0
+2026-11-12T10:00:49.9190744Z   Downloaded http v1.4.2
+2026-11-12T10:00:49.9225669Z   Downloaded memchr v2.8.0
+2026-11-12T10:00:49.9276444Z   Downloaded mio v1.2.0
+2026-11-12T10:00:49.9332117Z   Downloaded num-bigint v0.4.8
+2026-11-12T10:00:49.9377864Z   Downloaded quote v1.0.45
+2026-11-12T10:00:49.9403460Z   Downloaded rand_chacha v0.9.0
+2026-11-12T10:00:49.9414717Z   Downloaded rand_core v0.6.4
+2026-11-12T10:00:49.9427899Z   Downloaded rcgen v0.13.2
+2026-11-12T10:00:49.9455246Z   Downloaded rustls-pki-types v1.14.1
+2026-11-12T10:00:49.9478466Z   Downloaded ryu v1.0.23
+2026-11-12T10:00:49.9509461Z   Downloaded schemars v0.9.0
+2026-11-12T10:00:49.9642155Z   Downloaded schemars v1.2.1
+2026-11-12T10:00:49.9802014Z   Downloaded scopeguard v1.2.0
+2026-11-12T10:00:49.9813691Z   Downloaded serde_cbor v0.11.2
+2026-11-12T10:00:49.9840869Z   Downloaded synstructure v0.13.2
+2026-11-12T10:00:49.9851109Z   Downloaded target-lexicon v0.13.5
+2026-11-12T10:00:49.9865984Z   Downloaded target-triple v1.0.0
+2026-11-12T10:00:49.9876773Z   Downloaded termcolor v1.4.1
+2026-11-12T10:00:49.9888801Z   Downloaded time-core v0.1.8
+2026-11-12T10:00:49.9899523Z   Downloaded tokio-postgres v0.7.18
+2026-11-12T10:00:49.9949438Z   Downloaded tracing-subscriber v0.3.23
+2026-11-12T10:00:50.0029604Z   Downloaded unicode-properties v0.1.4
+2026-11-12T10:00:50.0047611Z   Downloaded unicode-script v0.5.8
+2026-11-12T10:00:50.0064076Z   Downloaded unicode-security v0.1.2
+2026-11-12T10:00:50.0087407Z   Downloaded unsafe-libyaml v0.2.11
+2026-11-12T10:00:50.0117991Z   Downloaded wat v1.254.2
+2026-11-12T10:00:50.0127757Z   Downloaded cedar-policy v4.11.2
+2026-11-12T10:00:50.0222490Z   Downloaded flate2 v1.1.9
+2026-11-12T10:00:50.0269537Z   Downloaded form_urlencoded v1.2.2
+2026-11-12T10:00:50.0277725Z   Downloaded futures-channel v0.3.32
+2026-11-12T10:00:50.0295574Z   Downloaded futures-io v0.3.32
+2026-11-12T10:00:50.0304131Z   Downloaded rustls-webpki v0.103.16
+2026-11-12T10:00:50.0338088Z   Downloaded secret-service v5.2.0
+2026-11-12T10:00:50.0361548Z   Downloaded serde_core v1.0.228
+2026-11-12T10:00:50.0387562Z   Downloaded sync_wrapper v1.0.2
+2026-11-12T10:00:50.0395527Z   Downloaded fnv v1.0.7
+2026-11-12T10:00:50.0403936Z   Downloaded generic-array v0.14.7
+2026-11-12T10:00:50.0417112Z   Downloaded hyper-timeout v0.5.2
+2026-11-12T10:00:50.0431164Z   Downloaded semver v1.0.28
+2026-11-12T10:00:50.0453386Z   Downloaded serde v1.0.228
+2026-11-12T10:00:50.0486584Z   Downloaded rand v0.10.1
+2026-11-12T10:00:50.0522082Z   Downloaded stable_deref_trait v1.2.1
+2026-11-12T10:00:50.0530664Z   Downloaded zerotrie v0.2.4
+2026-11-12T10:00:50.0568243Z   Downloaded rustc_version v0.4.1
+2026-11-12T10:00:50.0580637Z   Downloaded webpki-roots v0.26.11
+2026-11-12T10:00:50.0592447Z   Downloaded ref-cast v1.0.25
+2026-11-12T10:00:50.0620259Z   Downloaded itertools v0.14.0
+2026-11-12T10:00:50.0686027Z   Downloaded ittapi-sys v0.4.0
+2026-11-12T10:00:50.0737275Z   Downloaded unicode-segmentation v1.13.3
+2026-11-12T10:00:50.0765339Z   Downloaded futures-executor v0.3.32
+2026-11-12T10:00:50.0778653Z   Downloaded hashbrown v0.12.3
+2026-11-12T10:00:50.0814209Z   Downloaded httpdate v1.0.3
+2026-11-12T10:00:50.0825946Z   Downloaded idna v1.1.0
+2026-11-12T10:00:50.0860561Z   Downloaded inout v0.2.2
+2026-11-12T10:00:50.0872862Z   Downloaded rand_core v0.9.5
+2026-11-12T10:00:50.0885697Z   Downloaded ref-cast-impl v1.0.25
+2026-11-12T10:00:50.0893487Z   Downloaded rustc-demangle v0.1.27
+2026-11-12T10:00:50.0909614Z   Downloaded rustc-hash v2.1.2
+2026-11-12T10:00:50.0922212Z   Downloaded rustc-literal-escaper v0.0.7
+2026-11-12T10:00:50.0936086Z   Downloaded serde_with_macros v3.21.0
+2026-11-12T10:00:50.0953944Z   Downloaded spki v0.7.3
+2026-11-12T10:00:50.0970939Z   Downloaded tinystr v0.8.3
+2026-11-12T10:00:50.0990720Z   Downloaded tinytemplate v1.2.1
+2026-11-12T10:00:50.1007658Z   Downloaded tokio-util v0.7.18
+2026-11-12T10:00:50.1079957Z   Downloaded toml_datetime v1.1.1+spec-1.1.0
+2026-11-12T10:00:50.1092408Z   Downloaded ureq v2.12.1
+2026-11-12T10:00:50.1139633Z   Downloaded whoami v2.1.2
+2026-11-12T10:00:50.1159895Z   Downloaded wiggle v48.0.8
+2026-11-12T10:00:50.1172718Z   Downloaded wiggle-generate v48.0.8
+2026-11-12T10:00:50.1189775Z   Downloaded writeable v0.6.3
+2026-11-12T10:00:50.1208634Z   Downloaded zerovec-derive v0.11.3
+2026-11-12T10:00:50.1223258Z   Downloaded darling v0.23.0
+2026-11-12T10:00:50.1275541Z   Downloaded foldhash v0.2.0
+2026-11-12T10:00:50.1287652Z   Downloaded futures-lite v2.6.1
+2026-11-12T10:00:50.1307114Z   Downloaded futures-util v0.3.32
+2026-11-12T10:00:50.1440214Z   Downloaded getrandom v0.2.17
+2026-11-12T10:00:50.1468270Z   Downloaded hashbrown v0.14.5
+2026-11-12T10:00:50.1514743Z   Downloaded hybrid-array v0.4.12
+2026-11-12T10:00:50.1535747Z   Downloaded icu_properties_data v2.2.0
+2026-11-12T10:00:50.1638913Z   Downloaded libm v0.2.16
+2026-11-12T10:00:50.1741842Z   Downloaded prost v0.13.5
+2026-11-12T10:00:50.1757905Z   Downloaded prost-derive v0.14.4
+2026-11-12T10:00:50.1770891Z   Downloaded psm v0.1.31
+2026-11-12T10:00:50.1799903Z   Downloaded rand v0.9.4
+2026-11-12T10:00:50.1835964Z   Downloaded rand_core v0.10.1
+2026-11-12T10:00:50.1851535Z   Downloaded serde_yaml v0.9.34+deprecated
+2026-11-12T10:00:50.1884050Z   Downloaded serial2 v0.2.37
+2026-11-12T10:00:50.1999420Z   Downloaded sha2 v0.10.9
+2026-11-12T10:00:50.2025210Z   Downloaded smallvec v1.15.1
+2026-11-12T10:00:50.2045686Z   Downloaded smol_str v0.3.6
+2026-11-12T10:00:50.2061666Z   Downloaded stacker v0.1.24
+2026-11-12T10:00:50.2080947Z   Downloaded string_cache v0.8.9
+2026-11-12T10:00:50.2096382Z   Downloaded strsim v0.11.1
+2026-11-12T10:00:50.2108730Z   Downloaded subtle v2.6.1
+2026-11-12T10:00:50.2120188Z   Downloaded tar v0.4.46
+2026-11-12T10:00:50.2147887Z   Downloaded trybuild v1.0.116
+2026-11-12T10:00:50.2193499Z   Downloaded ulid v1.2.1
+2026-11-12T10:00:50.2211401Z   Downloaded wasmtime-internal-core v48.0.8
+2026-11-12T10:00:50.2240126Z   Downloaded wasmtime-wasi v48.0.8
+2026-11-12T10:00:50.2406721Z   Downloaded witx v0.9.1
+2026-11-12T10:00:50.2433848Z   Downloaded yoke v0.8.2
+2026-11-12T10:00:50.2451267Z   Downloaded zerocopy v0.8.48
+2026-11-12T10:00:50.2657101Z   Downloaded zerovec v0.11.6
+2026-11-12T10:00:50.2713494Z   Downloaded zmij v1.0.21
+2026-11-12T10:00:50.2730820Z   Downloaded ed25519-dalek v2.2.0
+2026-11-12T10:00:50.2761147Z   Downloaded getrandom v0.4.2
+2026-11-12T10:00:50.2797287Z   Downloaded hkdf v0.13.0
+2026-11-12T10:00:50.2822098Z   Downloaded opentelemetry-proto v0.32.0
+2026-11-12T10:00:50.2904174Z   Downloaded plotters v0.3.7
+2026-11-12T10:00:50.2992136Z   Downloaded prost v0.14.4
+2026-11-12T10:00:50.3008281Z   Downloaded prost-types v0.14.4
+2026-11-12T10:00:50.3024899Z   Downloaded pulley-interpreter v48.0.8
+2026-11-12T10:00:50.3051552Z   Downloaded reqwest v0.13.4
+2026-11-12T10:00:50.3103905Z   Downloaded seccompiler v0.4.0
+2026-11-12T10:00:50.3138241Z   Downloaded serde_with v3.21.0
+2026-11-12T10:00:50.3260763Z   Downloaded sha2 v0.11.0
+2026-11-12T10:00:50.3297348Z   Downloaded shell-words v1.1.1
+2026-11-12T10:00:50.3306765Z   Downloaded socket2 v0.6.3
+2026-11-12T10:00:50.3323973Z   Downloaded toml_edit v0.22.27
+2026-11-12T10:00:50.3365866Z   Downloaded toml_parser v1.1.2+spec-1.1.0
+2026-11-12T10:00:50.3387471Z   Downloaded tower-layer v0.3.3
+2026-11-12T10:00:50.3397131Z   Downloaded tracing-core v0.1.36
+2026-11-12T10:00:50.3422309Z   Downloaded glob v0.3.3
+2026-11-12T10:00:50.3437006Z   Downloaded rayon-core v1.13.0
+2026-11-12T10:00:50.3472928Z   Downloaded serde_derive v1.0.228
+2026-11-12T10:00:50.3502114Z   Downloaded tonic-types v0.14.6
+2026-11-12T10:00:50.3525174Z   Downloaded tracing-log v0.2.0
+2026-11-12T10:00:50.3539296Z   Downloaded educe v0.6.0
+2026-11-12T10:00:50.3615433Z   Downloaded hashbrown v0.16.1
+2026-11-12T10:00:50.3664614Z   Downloaded hashbrown v0.17.1
+2026-11-12T10:00:50.3714934Z   Downloaded lalrpop v0.22.2
+2026-11-12T10:00:50.3835779Z   Downloaded object v0.37.3
+2026-11-12T10:00:50.3941199Z   Downloaded socket2 v0.5.10
+2026-11-12T10:00:50.3959254Z   Downloaded tonic-prost v0.14.6
+2026-11-12T10:00:50.3968168Z   Downloaded wasmtime-internal-jit-debug v48.0.8
+2026-11-12T10:00:50.3978696Z   Downloaded zvariant_derive v5.15.0
+2026-11-12T10:00:50.3990265Z   Downloaded half v1.8.3
+2026-11-12T10:00:50.4011920Z   Downloaded hyper-util v0.1.20
+2026-11-12T10:00:50.4070501Z   Downloaded icu_normalizer v2.2.0
+2026-11-12T10:00:50.4105932Z   Downloaded opentelemetry_sdk v0.32.1
+2026-11-12T10:00:50.4193317Z   Downloaded regalloc2 v0.15.2
+2026-11-12T10:00:50.4237336Z   Downloaded toml_write v0.1.2
+2026-11-12T10:00:50.4249980Z   Downloaded toml_writer v1.1.1+spec-1.1.0
+2026-11-12T10:00:50.4263391Z   Downloaded typed-arena v2.0.2
+2026-11-12T10:00:50.4275689Z   Downloaded vcpkg v0.2.15
+2026-11-12T10:00:50.4772009Z   Downloaded yoke-derive v0.8.2
+2026-11-12T10:00:50.4783756Z   Downloaded zerofrom v0.1.8
+2026-11-12T10:00:50.4793408Z   Downloaded zvariant v5.15.0
+2026-11-12T10:00:50.4861158Z   Downloaded darling_macro v0.23.0
+2026-11-12T10:00:50.4868342Z   Downloaded indexmap v2.14.0
+2026-11-12T10:00:50.4908690Z   Downloaded sharded-slab v0.1.7
+2026-11-12T10:00:50.4940569Z   Downloaded stringprep v0.1.5
+2026-11-12T10:00:50.4955071Z   Downloaded unicode-width v0.1.14
+2026-11-12T10:00:50.5008750Z   Downloaded unicode-width v0.2.2
+2026-11-12T10:00:50.5064918Z   Downloaded wasmtime-internal-component-macro v48.0.8
+2026-11-12T10:00:50.5218581Z   Downloaded wast v254.0.2
+2026-11-12T10:00:50.5331647Z   Downloaded winnow v0.7.15
+2026-11-12T10:00:50.5423807Z   Downloaded zbus-secret-service-keyring-store v1.0.1
+2026-11-12T10:00:50.5438317Z   Downloaded zvariant_utils v4.2.0
+2026-11-12T10:00:50.5456595Z   Downloaded dashmap v6.2.1
+2026-11-12T10:00:50.5480560Z   Downloaded deranged v0.5.8
+2026-11-12T10:00:50.5494935Z   Downloaded iana-time-zone v0.1.65
+2026-11-12T10:00:50.5521971Z   Downloaded icu_locale_core v2.2.0
+2026-11-12T10:00:50.5589546Z   Downloaded rusqlite v0.31.0
+2026-11-12T10:00:50.5647007Z   Downloaded serde_json v1.0.149
+2026-11-12T10:00:50.5715335Z   Downloaded wasmparser v0.254.2
+2026-11-12T10:00:50.5796451Z   Downloaded wasmtime-internal-fiber v48.0.8
+2026-11-12T10:00:50.5815574Z   Downloaded winnow v1.0.3
+2026-11-12T10:00:50.5908338Z   Downloaded zbus_macros v5.19.0
+2026-11-12T10:00:50.5923786Z   Downloaded either v1.15.0
+2026-11-12T10:00:50.5938046Z   Downloaded half v2.7.1
+2026-11-12T10:00:50.5963874Z   Downloaded httparse v1.10.1
+2026-11-12T10:00:50.5988259Z   Downloaded hyper v1.10.1
+2026-11-12T10:00:50.6054084Z   Downloaded rayon v1.12.0
+2026-11-12T10:00:50.6143509Z   Downloaded regex v1.12.3
+2026-11-12T10:00:50.6193483Z   Downloaded time v0.3.47
+2026-11-12T10:00:50.6316063Z   Downloaded toml_edit v0.25.13+spec-1.1.0
+2026-11-12T10:00:50.6354526Z   Downloaded tonic v0.14.6
+2026-11-12T10:00:50.6413293Z   Downloaded wasmtime-environ v48.0.8
+2026-11-12T10:00:50.6494118Z   Downloaded darling_core v0.23.0
+2026-11-12T10:00:50.6546801Z   Downloaded getrandom v0.3.4
+2026-11-12T10:00:50.6579296Z   Downloaded h2 v0.4.15
+2026-11-12T10:00:50.6640875Z   Downloaded icu_collections v2.2.0
+2026-11-12T10:00:50.6699849Z   Downloaded nix v0.28.0
+2026-11-12T10:00:50.6802074Z   Downloaded object v0.39.1
+2026-11-12T10:00:50.6908728Z   Downloaded url v2.5.8
+2026-11-12T10:00:50.6933515Z   Downloaded webpki-roots v1.0.11
+2026-11-12T10:00:50.6963185Z   Downloaded zerocopy-derive v0.8.48
+2026-11-12T10:00:50.7050079Z   Downloaded typenum v1.20.0
+2026-11-12T10:00:50.7084214Z   Downloaded hkdf v0.12.4
+2026-11-12T10:00:50.7106787Z   Downloaded zbus v5.19.0
+2026-11-12T10:00:50.7198409Z   Downloaded regex-syntax v0.8.10
+2026-11-12T10:00:50.7263175Z   Downloaded wasmtime-internal-cranelift v48.0.8
+2026-11-12T10:00:50.7326041Z   Downloaded syn v2.0.117
+2026-11-12T10:00:50.7426422Z   Downloaded rustls v0.23.46
+2026-11-12T10:00:50.7539369Z   Downloaded wit-parser v0.254.2
+2026-11-12T10:00:50.7915332Z   Downloaded syn v3.0.6
+2026-11-12T10:00:50.8017392Z   Downloaded wit-component v0.254.2
+2026-11-12T10:00:50.8583759Z   Downloaded rustix v1.1.6
+2026-11-12T10:00:50.8842391Z   Downloaded tracing v0.1.44
+2026-11-12T10:00:50.8996273Z   Downloaded cedar-policy-core v4.11.2
+2026-11-12T10:00:50.9178356Z   Downloaded gimli v0.33.0
+2026-11-12T10:00:50.9252147Z   Downloaded regex-automata v0.4.14
+2026-11-12T10:00:50.9384582Z   Downloaded petgraph v0.6.5
+2026-11-12T10:00:50.9550227Z   Downloaded petgraph v0.7.1
+2026-11-12T10:00:50.9728864Z   Downloaded libc v0.2.186
+2026-11-12T10:00:51.0129886Z   Downloaded tokio v1.53.3
+2026-11-12T10:00:51.0559764Z   Downloaded sha3 v0.10.9
+2026-11-12T10:00:51.0601179Z   Downloaded cranelift-codegen v0.135.8
+2026-11-12T10:00:51.0887231Z   Downloaded wasmtime v48.0.8
+2026-11-12T10:00:51.1160597Z   Downloaded encoding_rs v0.8.35
+2026-11-12T10:00:51.1354064Z   Downloaded ring v0.17.14
+2026-11-12T10:00:51.1759119Z   Downloaded linux-raw-sys v0.12.1
+2026-11-12T10:00:51.2391427Z   Downloaded libsqlite3-sys v0.28.0
+2026-11-12T10:00:51.9800425Z    Compiling proc-macro2 v1.0.106
+2026-11-12T10:00:51.9801197Z    Compiling unicode-ident v1.0.24
+2026-11-12T10:00:51.9801962Z    Compiling quote v1.0.45
+2026-11-12T10:00:51.9834297Z    Compiling cfg-if v1.0.4
+2026-11-12T10:00:54.4494633Z    Compiling libc v0.2.186
+2026-11-12T10:00:55.7411881Z    Compiling serde_core v1.0.228
+2026-11-12T10:00:58.4032989Z    Compiling serde v1.0.228
+2026-11-12T10:00:58.5492402Z    Compiling version_check v0.9.5
+2026-11-12T10:00:58.9666917Z    Compiling typenum v1.20.0
+2026-11-12T10:01:00.0652273Z    Compiling equivalent v1.0.2
+2026-11-12T10:01:00.0960002Z    Compiling syn v2.0.117
+2026-11-12T10:01:00.1497646Z    Compiling generic-array v0.14.7
+2026-11-12T10:01:00.2624327Z    Compiling memchr v2.8.0
+2026-11-12T10:01:00.4812526Z    Compiling pin-project-lite v0.2.17
+2026-11-12T10:01:00.5286844Z    Compiling bitflags v2.11.1
+2026-11-12T10:01:00.7131111Z    Compiling shlex v1.3.0
+2026-11-12T10:01:00.8362225Z    Compiling itoa v1.0.18
+2026-11-12T10:01:00.9356956Z    Compiling find-msvc-tools v0.1.9
+2026-11-12T10:01:00.9774213Z    Compiling foldhash v0.2.0
+2026-11-12T10:01:01.1185406Z    Compiling cc v1.2.62
+2026-11-12T10:01:01.1714749Z    Compiling hashbrown v0.17.1
+2026-11-12T10:01:01.2184739Z    Compiling zeroize v1.8.2
+2026-11-12T10:01:01.3224817Z    Compiling rustix v1.1.6
+2026-11-12T10:01:01.7548314Z    Compiling indexmap v2.14.0
+2026-11-12T10:01:01.8059337Z    Compiling linux-raw-sys v0.12.1
+2026-11-12T10:01:02.4273159Z    Compiling thiserror v2.0.18
+2026-11-12T10:01:02.6281790Z    Compiling zmij v1.0.21
+2026-11-12T10:01:02.7884549Z    Compiling subtle v2.6.1
+2026-11-12T10:01:02.9490567Z    Compiling serde_json v1.0.149
+2026-11-12T10:01:03.0611165Z    Compiling semver v1.0.28
+2026-11-12T10:01:03.3455573Z    Compiling once_cell v1.21.4
+2026-11-12T10:01:03.5064755Z    Compiling crypto-common v0.1.7
+2026-11-12T10:01:03.5547670Z    Compiling block-buffer v0.10.4
+2026-11-12T10:01:03.6238572Z    Compiling getrandom v0.3.4
+2026-11-12T10:01:03.7615575Z    Compiling cpufeatures v0.2.17
+2026-11-12T10:01:03.8085176Z    Compiling digest v0.10.7
+2026-11-12T10:01:04.3221852Z    Compiling rustc_version v0.4.1
+2026-11-12T10:01:04.5474423Z    Compiling hex v0.4.3
+2026-11-12T10:01:04.7944606Z    Compiling curve25519-dalek v4.1.3
+2026-11-12T10:01:05.2685834Z    Compiling serde_derive v1.0.228
+2026-11-12T10:01:05.4555037Z    Compiling thiserror-impl v2.0.18
+2026-11-12T10:01:05.5914754Z    Compiling async-trait v0.1.89
+2026-11-12T10:01:06.5837285Z    Compiling curve25519-dalek-derive v0.1.1
+2026-11-12T10:01:06.6099008Z    Compiling signature v2.2.0
+2026-11-12T10:01:06.6864769Z    Compiling ed25519 v2.2.3
+2026-11-12T10:01:06.7979083Z    Compiling sha2 v0.10.9
+2026-11-12T10:01:07.6989682Z    Compiling errno v0.3.14
+2026-11-12T10:01:07.7924664Z    Compiling signal-hook-registry v1.4.8
+2026-11-12T10:01:08.0745338Z    Compiling bytes v1.11.1
+2026-11-12T10:01:08.6564866Z    Compiling ed25519-dalek v2.2.0
+2026-11-12T10:01:08.8153591Z    Compiling smallvec v1.15.1
+2026-11-12T10:01:08.9688714Z    Compiling maos-spirit-abi v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-spirit-abi)
+2026-11-12T10:01:09.0492738Z    Compiling zerocopy v0.8.48
+2026-11-12T10:01:09.1035073Z    Compiling futures-core v0.3.32
+2026-11-12T10:01:09.2055503Z    Compiling parking_lot_core v0.9.12
+2026-11-12T10:01:09.3074773Z    Compiling tokio-macros v2.7.0
+2026-11-12T10:01:09.3494003Z    Compiling zerocopy-derive v0.8.48
+2026-11-12T10:01:09.4884071Z    Compiling maos-domain v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-domain)
+2026-11-12T10:01:09.7896738Z    Compiling socket2 v0.6.3
+2026-11-12T10:01:10.2664660Z    Compiling mio v1.2.0
+2026-11-12T10:01:10.7694829Z    Compiling tokio v1.53.3
+2026-11-12T10:01:11.5071209Z    Compiling scopeguard v1.2.0
+2026-11-12T10:01:11.5575820Z    Compiling lock_api v0.4.14
+2026-11-12T10:01:11.7576363Z    Compiling ring v0.17.14
+2026-11-12T10:01:14.9025597Z warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+2026-11-12T10:01:14.9044505Z   --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+2026-11-12T10:01:14.9065057Z    |
+2026-11-12T10:01:14.9066448Z 44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T10:01:14.9094379Z    |     ^^^^^
+2026-11-12T10:01:14.9103896Z    |
+2026-11-12T10:01:14.9105130Z    = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+2026-11-12T10:01:14.9106541Z    = note: `#[warn(async_fn_in_trait)]` on by default
+2026-11-12T10:01:14.9108370Z help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+2026-11-12T10:01:14.9109720Z    |
+2026-11-12T10:01:14.9110634Z 44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T10:01:14.9112911Z 44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+2026-11-12T10:01:14.9114333Z    |
+2026-11-12T10:01:14.9114550Z 
+2026-11-12T10:01:14.9115249Z warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+2026-11-12T10:01:14.9116350Z   --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+2026-11-12T10:01:14.9117303Z    |
+2026-11-12T10:01:14.9117759Z 58 |     async fn retract(
+2026-11-12T10:01:14.9118329Z    |     ^^^^^
+2026-11-12T10:01:14.9118833Z    |
+2026-11-12T10:01:14.9120051Z    = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+2026-11-12T10:01:14.9122274Z help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+2026-11-12T10:01:14.9123864Z    |
+2026-11-12T10:01:14.9124290Z 58 ~     fn retract(
+2026-11-12T10:01:14.9124829Z 59 |         &self,
+2026-11-12T10:01:14.9125362Z ...
+2026-11-12T10:01:14.9125910Z 62 |         retracting_spirit: &SpiritId,
+2026-11-12T10:01:14.9127251Z 63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+2026-11-12T10:01:14.9128180Z    |
+2026-11-12T10:01:14.9128373Z 
+2026-11-12T10:01:15.1408915Z    Compiling crossbeam-utils v0.8.22
+2026-11-12T10:01:15.7589120Z    Compiling getrandom v0.2.17
+2026-11-12T10:01:15.8784678Z    Compiling slab v0.4.12
+2026-11-12T10:01:15.9884567Z    Compiling untrusted v0.9.0
+2026-11-12T10:01:16.0524871Z    Compiling tracing-core v0.1.36
+2026-11-12T10:01:16.3188304Z warning: `maos-domain` (lib) generated 2 warnings
+2026-11-12T10:01:16.3190657Z    Compiling ahash v0.8.12
+2026-11-12T10:01:16.4375287Z    Compiling autocfg v1.5.0
+2026-11-12T10:01:16.5643782Z    Compiling tracing-attributes v0.1.31
+2026-11-12T10:01:16.7332192Z    Compiling log v0.4.29
+2026-11-12T10:01:17.0082149Z    Compiling futures-sink v0.3.32
+2026-11-12T10:01:17.0624889Z    Compiling hashbrown v0.14.5
+2026-11-12T10:01:17.3464586Z    Compiling futures-macro v0.3.32
+2026-11-12T10:01:17.6534606Z    Compiling tracing v0.1.44
+2026-11-12T10:01:17.6594371Z    Compiling futures-task v0.3.32
+2026-11-12T10:01:17.8245682Z    Compiling synstructure v0.13.2
+2026-11-12T10:01:17.9794753Z    Compiling fastrand v2.4.1
+2026-11-12T10:01:17.9954586Z    Compiling futures-util v0.3.32
+2026-11-12T10:01:18.1734577Z    Compiling getrandom v0.4.2
+2026-11-12T10:01:18.3170862Z    Compiling rand_core v0.10.1
+2026-11-12T10:01:18.3535576Z    Compiling hybrid-array v0.4.12
+2026-11-12T10:01:18.5634816Z    Compiling zerofrom-derive v0.1.7
+2026-11-12T10:01:18.8054586Z    Compiling rustls-pki-types v1.14.1
+2026-11-12T10:01:18.9272118Z    Compiling yoke-derive v0.8.2
+2026-11-12T10:01:19.3304363Z    Compiling parking_lot v0.12.5
+2026-11-12T10:01:19.6938669Z    Compiling num-traits v0.2.19
+2026-11-12T10:01:19.7024888Z    Compiling zerofrom v0.1.8
+2026-11-12T10:01:19.7751507Z    Compiling stable_deref_trait v1.2.1
+2026-11-12T10:01:19.8979391Z    Compiling rustversion v1.0.22
+2026-11-12T10:01:19.9216031Z    Compiling yoke v0.8.2
+2026-11-12T10:01:20.1414593Z    Compiling crypto-common v0.2.2
+2026-11-12T10:01:20.4264629Z    Compiling tokio-util v0.7.18
+2026-11-12T10:01:20.8491608Z    Compiling zerovec-derive v0.11.3
+2026-11-12T10:01:21.3632554Z    Compiling maos-attrs v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-attrs)
+2026-11-12T10:01:21.5391443Z    Compiling displaydoc v0.2.5
+2026-11-12T10:01:21.6155379Z    Compiling rustls v0.23.46
+2026-11-12T10:01:21.6784669Z    Compiling pkg-config v0.3.33
+2026-11-12T10:01:21.7194257Z    Compiling regex-syntax v0.8.10
+2026-11-12T10:01:21.8264015Z    Compiling zerovec v0.11.6
+2026-11-12T10:01:22.0594540Z    Compiling vcpkg v0.2.15
+2026-11-12T10:01:22.1574823Z    Compiling rustls-webpki v0.103.16
+2026-11-12T10:01:22.3794595Z    Compiling base64 v0.22.1
+2026-11-12T10:01:22.6646780Z    Compiling libsqlite3-sys v0.28.0
+2026-11-12T10:01:22.6755158Z    Compiling cmov v0.5.4
+2026-11-12T10:01:22.8754640Z    Compiling ctutils v0.4.5
+2026-11-12T10:01:23.1429653Z    Compiling block-buffer v0.12.1
+2026-11-12T10:01:23.2584700Z    Compiling dashmap v6.2.1
+2026-11-12T10:01:23.6334819Z    Compiling toml_datetime v0.6.11
+2026-11-12T10:01:23.8417358Z    Compiling serde_spanned v0.6.9
+2026-11-12T10:01:23.9225416Z    Compiling enumflags2_derive v0.7.12
+2026-11-12T10:01:24.3424697Z    Compiling const-oid v0.10.2
+2026-11-12T10:01:24.4985892Z    Compiling toml_write v0.1.2
+2026-11-12T10:01:24.6579811Z    Compiling winnow v0.7.15
+2026-11-12T10:01:24.7584646Z    Compiling digest v0.11.3
+2026-11-12T10:01:24.9944458Z    Compiling tinystr v0.8.3
+2026-11-12T10:01:25.2594501Z    Compiling hashlink v0.9.1
+2026-11-12T10:01:25.5754430Z    Compiling winnow v1.0.3
+2026-11-12T10:01:26.3354783Z    Compiling toml_edit v0.22.27
+2026-11-12T10:01:26.9224793Z    Compiling tinyvec_macros v0.1.1
+2026-11-12T10:01:26.9565226Z    Compiling fallible-streaming-iterator v0.1.9
+2026-11-12T10:01:27.0510661Z    Compiling siphasher v1.0.3
+2026-11-12T10:01:27.9334842Z    Compiling cpufeatures v0.3.0
+2026-11-12T10:01:27.9694658Z    Compiling parking v2.2.1
+2026-11-12T10:01:28.0674694Z    Compiling fallible-iterator v0.3.0
+2026-11-12T10:01:28.3744091Z    Compiling writeable v0.6.3
+2026-11-12T10:01:28.5357294Z    Compiling litemap v0.8.2
+2026-11-12T10:01:28.8794573Z    Compiling icu_locale_core v2.2.0
+2026-11-12T10:01:29.6204477Z    Compiling toml v0.8.23
+2026-11-12T10:01:30.0704673Z    Compiling tinyvec v1.11.0
+2026-11-12T10:01:30.3085205Z    Compiling maos-capability v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-capability)
+2026-11-12T10:01:30.4305411Z    Compiling potential_utf v0.1.5
+2026-11-12T10:01:30.4912857Z warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+2026-11-12T10:01:30.4934753Z   --> crates/maos-capability/src/working_memory/mod.rs:19:5
+2026-11-12T10:01:30.4965406Z    |
+2026-11-12T10:01:30.4966602Z 19 | use maos_domain::invariants::i7::ScalarTapEvent;
+2026-11-12T10:01:30.4967713Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:01:30.4968491Z    |
+2026-11-12T10:01:30.4969408Z    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:01:30.4970191Z 
+2026-11-12T10:01:30.5332684Z    Compiling zerotrie v0.2.4
+2026-11-12T10:01:30.8073628Z    Compiling ppv-lite86 v0.2.21
+2026-11-12T10:01:31.0615458Z warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+2026-11-12T10:01:31.0634094Z    Compiling rand_core v0.9.5
+2026-11-12T10:01:31.1452501Z    Compiling same-file v1.0.6
+2026-11-12T10:01:31.2165164Z    Compiling strsim v0.11.1
+2026-11-12T10:01:31.2294742Z    Compiling icu_normalizer_data v2.2.0
+2026-11-12T10:01:31.3314676Z    Compiling utf8_iter v1.0.4
+2026-11-12T10:01:31.4166943Z    Compiling icu_properties_data v2.2.0
+2026-11-12T10:01:31.5148494Z    Compiling icu_collections v2.2.0
+2026-11-12T10:01:31.5465230Z    Compiling walkdir v2.5.0
+2026-11-12T10:01:31.8052772Z    Compiling rand_chacha v0.9.0
+2026-11-12T10:01:31.9824728Z    Compiling icu_provider v2.2.0
+2026-11-12T10:01:32.1494895Z    Compiling unicode-normalization v0.1.25
+2026-11-12T10:01:32.2560964Z    Compiling percent-encoding v2.3.2
+2026-11-12T10:01:32.3854441Z    Compiling rand v0.9.4
+2026-11-12T10:01:32.8774705Z    Compiling toml_parser v1.1.2+spec-1.1.0
+2026-11-12T10:01:32.9135004Z    Compiling rusqlite v0.31.0
+2026-11-12T10:01:32.9734708Z    Compiling hmac v0.13.0
+2026-11-12T10:01:33.0832623Z    Compiling aho-corasick v1.1.4
+2026-11-12T10:01:33.1014814Z    Compiling tempfile v3.27.0
+2026-11-12T10:01:33.4475358Z    Compiling maos-spirit-derive v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-spirit-derive)
+2026-11-12T10:01:33.4694397Z    Compiling syn v3.0.6
+2026-11-12T10:01:33.8469911Z    Compiling toml_datetime v1.1.1+spec-1.1.0
+2026-11-12T10:01:34.0283646Z    Compiling toml_edit v0.25.13+spec-1.1.0
+2026-11-12T10:01:34.1156459Z    Compiling regex-automata v0.4.14
+2026-11-12T10:01:35.0595523Z    Compiling maos-spirit-sdk v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-spirit-sdk)
+2026-11-12T10:01:35.0834660Z    Compiling ulid v1.2.1
+2026-11-12T10:01:35.2505603Z    Compiling icu_properties v2.2.0
+2026-11-12T10:01:35.3834819Z    Compiling icu_normalizer v2.2.0
+2026-11-12T10:01:35.9194530Z    Compiling sha2 v0.11.0
+2026-11-12T10:01:36.6756029Z    Compiling enumflags2 v0.7.12
+2026-11-12T10:01:36.8059518Z    Compiling webpki-roots v1.0.11
+2026-11-12T10:01:36.8755109Z    Compiling futures-io v0.3.32
+2026-11-12T10:01:36.9747125Z    Compiling webpki-roots v0.26.11
+2026-11-12T10:01:37.0166004Z    Compiling zvariant_utils v4.2.0
+2026-11-12T10:01:38.1065435Z    Compiling idna_adapter v1.2.2
+2026-11-12T10:01:38.1866044Z    Compiling proc-macro-crate v3.5.0
+2026-11-12T10:01:38.3224721Z    Compiling event-listener v5.4.2
+2026-11-12T10:01:38.4982674Z    Compiling num-integer v0.1.46
+2026-11-12T10:01:38.5634731Z    Compiling concurrent-queue v2.5.0
+2026-11-12T10:01:38.5815152Z    Compiling hmac v0.12.1
+2026-11-12T10:01:38.5956749Z    Compiling object v0.37.3
+2026-11-12T10:01:38.6630129Z    Compiling hkdf v0.12.4
+2026-11-12T10:01:38.7153499Z    Compiling zvariant_derive v5.15.0
+2026-11-12T10:01:38.7494452Z    Compiling event-listener-strategy v0.5.4
+2026-11-12T10:01:38.7764674Z    Compiling idna v1.1.0
+2026-11-12T10:01:38.8035465Z    Compiling futures-lite v2.6.1
+2026-11-12T10:01:38.8244743Z    Compiling form_urlencoded v1.2.2
+2026-11-12T10:01:38.9584376Z    Compiling endi v1.1.1
+2026-11-12T10:01:39.4525218Z    Compiling url v2.5.8
+2026-11-12T10:01:39.5616671Z    Compiling maos-audit v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-audit)
+2026-11-12T10:01:40.9045240Z    Compiling num-bigint v0.4.8
+2026-11-12T10:01:42.6289008Z    Compiling chacha20 v0.10.2
+2026-11-12T10:01:42.8514616Z    Compiling arc-swap v1.9.1
+2026-11-12T10:01:43.0454444Z    Compiling async-io v2.6.0
+2026-11-12T10:01:43.1098853Z    Compiling crc32fast v1.5.0
+2026-11-12T10:01:43.1654783Z    Compiling unicode-bidi v0.3.18
+2026-11-12T10:01:43.2734793Z    Compiling unicode-properties v0.1.4
+2026-11-12T10:01:43.4253167Z    Compiling ident_case v1.0.1
+2026-11-12T10:01:43.4844789Z    Compiling darling_core v0.23.0
+2026-11-12T10:01:43.7034692Z    Compiling stringprep v0.1.5
+2026-11-12T10:01:44.2050059Z    Compiling maos-iac v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-iac)
+2026-11-12T10:01:44.3934759Z    Compiling ar_archive_writer v0.5.2
+2026-11-12T10:01:44.4104591Z warning: unused import: `Instant`
+2026-11-12T10:01:44.4134696Z   --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+2026-11-12T10:01:44.4175583Z    |
+2026-11-12T10:01:44.4176685Z 18 | use tokio::time::{interval, Instant};
+2026-11-12T10:01:44.4177763Z    |                             ^^^^^^^
+2026-11-12T10:01:44.4178437Z    |
+2026-11-12T10:01:44.4179333Z    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:01:44.4180085Z 
+2026-11-12T10:01:45.1770652Z    Compiling rand v0.10.1
+2026-11-12T10:01:45.2579124Z warning: unused variable: `referenced`
+2026-11-12T10:01:45.2580796Z    --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+2026-11-12T10:01:45.2581814Z     |
+2026-11-12T10:01:45.2582664Z 122 |     let referenced = match referenced {
+2026-11-12T10:01:45.2584347Z     |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+2026-11-12T10:01:45.2585261Z     |
+2026-11-12T10:01:45.2586004Z     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:01:45.2586632Z 
+2026-11-12T10:01:45.5417997Z warning: hiding a lifetime that's elided elsewhere is confusing
+2026-11-12T10:01:45.5444306Z    --> crates/maos-iac/src/adapter/metrics.rs:230:21
+2026-11-12T10:01:45.5474008Z     |
+2026-11-12T10:01:45.5494337Z 230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+2026-11-12T10:01:45.5504389Z     |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+2026-11-12T10:01:45.5533960Z     |                     |
+2026-11-12T10:01:45.5544313Z     |                     the lifetime is elided here
+2026-11-12T10:01:45.5545218Z     |
+2026-11-12T10:01:45.5584477Z     = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+2026-11-12T10:01:45.5594309Z     = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+2026-11-12T10:01:45.5611079Z help: use `'_` for type paths
+2026-11-12T10:01:45.5653869Z     |
+2026-11-12T10:01:45.5664640Z 230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+2026-11-12T10:01:45.5694087Z     |                                                              ++++
+2026-11-12T10:01:45.5713733Z 
+2026-11-12T10:01:45.7004535Z    Compiling zcheapstr v1.1.0
+2026-11-12T10:01:45.8190394Z    Compiling maos-manifest v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-manifest)
+2026-11-12T10:01:45.8244844Z    Compiling phf_shared v0.11.3
+2026-11-12T10:01:45.9547358Z    Compiling md-5 v0.11.0
+2026-11-12T10:01:46.0925817Z    Compiling block-padding v0.4.2
+2026-11-12T10:01:46.1336499Z    Compiling polling v3.11.0
+2026-11-12T10:01:46.3894551Z    Compiling adler2 v2.0.1
+2026-11-12T10:01:46.4668662Z    Compiling byteorder v1.5.0
+2026-11-12T10:01:46.6654682Z    Compiling async-task v4.7.1
+2026-11-12T10:01:46.7374842Z warning: unused variable: `on_confidence_below`
+2026-11-12T10:01:46.7404201Z     --> crates/maos-manifest/src/manifest.rs:1434:21
+2026-11-12T10:01:46.7433897Z      |
+2026-11-12T10:01:46.7464334Z 1434 |                 let on_confidence_below = r.on_confidence_below;
+2026-11-12T10:01:46.7494567Z      |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+2026-11-12T10:01:46.7523844Z      |
+2026-11-12T10:01:46.7554375Z      = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:01:46.7583560Z 
+2026-11-12T10:01:46.8274555Z    Compiling keccak v0.1.6
+2026-11-12T10:01:47.0234693Z    Compiling fallible-iterator v0.2.0
+2026-11-12T10:01:47.3484681Z    Compiling new_debug_unreachable v1.0.6
+2026-11-12T10:01:47.3842381Z    Compiling utf8parse v0.2.2
+2026-11-12T10:01:47.5644475Z    Compiling bit-vec v0.8.0
+2026-11-12T10:01:47.7524755Z    Compiling lazy_static v1.5.0
+2026-11-12T10:01:47.7974689Z    Compiling either v1.15.0
+2026-11-12T10:01:47.9664723Z    Compiling simd-adler32 v0.3.9
+2026-11-12T10:01:48.1447898Z    Compiling precomputed-hash v0.1.1
+2026-11-12T10:01:48.1844046Z    Compiling term v1.2.1
+2026-11-12T10:01:48.6145186Z warning: `maos-iac` (lib) generated 3 warnings (run `cargo fix --lib -p maos-iac` to apply 3 suggestions)
+2026-11-12T10:01:48.6174165Z    Compiling fixedbitset v0.5.7
+2026-11-12T10:01:48.6584648Z    Compiling ascii-canvas v4.0.0
+2026-11-12T10:01:48.8184564Z    Compiling petgraph v0.7.1
+2026-11-12T10:01:48.8418714Z    Compiling string_cache v0.8.9
+2026-11-12T10:01:48.9854988Z    Compiling miniz_oxide v0.8.9
+2026-11-12T10:01:50.1535431Z warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+2026-11-12T10:01:50.1594031Z    Compiling itertools v0.14.0
+2026-11-12T10:01:50.1934403Z    Compiling bit-set v0.8.0
+2026-11-12T10:01:50.3034664Z    Compiling ena v0.14.4
+2026-11-12T10:01:50.5444904Z    Compiling anstyle-parse v1.0.0
+2026-11-12T10:01:50.6644534Z    Compiling postgres-protocol v0.6.12
+2026-11-12T10:01:50.7014670Z    Compiling sha3 v0.10.9
+2026-11-12T10:01:51.1864646Z    Compiling inout v0.2.2
+2026-11-12T10:01:51.2814630Z    Compiling darling_macro v0.23.0
+2026-11-12T10:01:51.4900547Z    Compiling zvariant v5.15.0
+2026-11-12T10:01:51.5074603Z    Compiling psm v0.1.31
+2026-11-12T10:01:51.6199355Z    Compiling async-channel v2.5.0
+2026-11-12T10:01:51.7364731Z    Compiling lalrpop-util v0.22.2
+2026-11-12T10:01:51.7724571Z    Compiling regex v1.12.3
+2026-11-12T10:01:51.7920827Z    Compiling crossbeam-channel v0.5.15
+2026-11-12T10:01:51.9090338Z    Compiling maos-mcp v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-mcp)
+2026-11-12T10:01:51.9564545Z warning: unused import: `McpResponse`
+2026-11-12T10:01:51.9594007Z   --> crates/maos-mcp/src/client.rs:15:70
+2026-11-12T10:01:51.9603874Z    |
+2026-11-12T10:01:51.9605194Z 15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+2026-11-12T10:01:51.9606555Z    |                                                                      ^^^^^^^^^^^
+2026-11-12T10:01:51.9607259Z    |
+2026-11-12T10:01:51.9608041Z    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:01:51.9608663Z 
+2026-11-12T10:01:52.2348588Z    Compiling anstyle v1.0.14
+2026-11-12T10:01:52.2654425Z    Compiling half v1.8.3
+2026-11-12T10:01:52.3970760Z    Compiling num-conv v0.2.2
+2026-11-12T10:01:52.5105342Z    Compiling pico-args v0.5.0
+2026-11-12T10:01:52.5243561Z    Compiling time-core v0.1.8
+2026-11-12T10:01:52.6326232Z    Compiling powerfmt v0.2.0
+2026-11-12T10:01:52.6404329Z    Compiling iana-time-zone v0.1.65
+2026-11-12T10:01:52.6589357Z warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+2026-11-12T10:01:52.6592160Z    Compiling unicode-xid v0.2.6
+2026-11-12T10:01:52.7304847Z    Compiling colorchoice v1.0.5
+2026-11-12T10:01:52.7725700Z    Compiling atomic-waker v1.1.2
+2026-11-12T10:01:52.7800974Z    Compiling anstyle-query v1.1.5
+2026-11-12T10:01:52.8196471Z    Compiling is_terminal_polyfill v1.70.2
+2026-11-12T10:01:52.8355302Z    Compiling piper v0.2.5
+2026-11-12T10:01:52.8384140Z    Compiling deranged v0.5.8
+2026-11-12T10:01:52.8624796Z    Compiling anstream v1.0.0
+2026-11-12T10:01:52.9771926Z    Compiling chrono v0.4.44
+2026-11-12T10:01:53.1214452Z    Compiling lalrpop v0.22.2
+2026-11-12T10:01:54.0305268Z    Compiling zbus_names v4.3.4
+2026-11-12T10:01:54.1346162Z    Compiling time-macros v0.2.27
+2026-11-12T10:01:54.5124834Z    Compiling serde_cbor v0.11.2
+2026-11-12T10:01:55.1065539Z    Compiling maos-acp v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-acp)
+2026-11-12T10:01:55.1884672Z warning: unused import: `DecisionId`
+2026-11-12T10:01:55.1904228Z   --> crates/maos-acp/src/server.rs:13:45
+2026-11-12T10:01:55.1905025Z    |
+2026-11-12T10:01:55.1934583Z 13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+2026-11-12T10:01:55.1964202Z    |                                             ^^^^^^^^^^
+2026-11-12T10:01:55.1993927Z    |
+2026-11-12T10:01:55.1995029Z    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:01:55.2023656Z 
+2026-11-12T10:01:55.3164466Z    Compiling flate2 v1.1.9
+2026-11-12T10:01:55.4444752Z warning: unused variable: `other`
+2026-11-12T10:01:55.4474019Z    --> crates/maos-acp/src/server.rs:223:25
+2026-11-12T10:01:55.4494024Z     |
+2026-11-12T10:01:55.4524057Z 223 |                         other => {
+2026-11-12T10:01:55.4525177Z     |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+2026-11-12T10:01:55.4526074Z     |
+2026-11-12T10:01:55.4526823Z     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:01:55.4527406Z 
+2026-11-12T10:01:55.6657213Z warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+2026-11-12T10:01:55.6684749Z    Compiling darling v0.23.0
+2026-11-12T10:01:55.7055487Z    Compiling async-signal v0.2.14
+2026-11-12T10:01:55.7107070Z    Compiling cipher v0.5.2
+2026-11-12T10:01:55.8388652Z    Compiling postgres-types v0.2.14
+2026-11-12T10:01:55.9355183Z    Compiling async-lock v3.4.2
+2026-11-12T10:01:56.3594892Z    Compiling maos-a2a-core v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-a2a-core)
+2026-11-12T10:01:56.4664879Z    Compiling phf_shared v0.13.1
+2026-11-12T10:01:56.6821886Z    Compiling half v2.7.1
+2026-11-12T10:01:57.2235125Z    Compiling enum-ordinalize-derive v4.4.1
+2026-11-12T10:01:57.2565331Z    Compiling stacker v0.1.24
+2026-11-12T10:01:57.3904690Z    Compiling ref-cast v1.0.25
+2026-11-12T10:01:57.5834591Z    Compiling ryu v1.0.23
+2026-11-12T10:01:57.6644889Z    Compiling unsafe-libyaml v0.2.11
+2026-11-12T10:01:57.7105096Z    Compiling fnv v1.0.7
+2026-11-12T10:01:57.7604121Z    Compiling clap_lex v1.1.0
+2026-11-12T10:01:57.9250527Z    Compiling ciborium-io v0.2.2
+2026-11-12T10:01:57.9736124Z    Compiling heck v0.5.0
+2026-11-12T10:01:58.1234582Z    Compiling clap_derive v4.6.1
+2026-11-12T10:01:58.5187361Z    Compiling serde_yaml v0.9.34+deprecated
+2026-11-12T10:01:59.3437590Z    Compiling ciborium-ll v0.2.2
+2026-11-12T10:01:59.4894740Z    Compiling clap_builder v4.6.0
+2026-11-12T10:01:59.8029763Z    Compiling logos-codegen v0.16.1
+2026-11-12T10:02:00.2324841Z    Compiling enum-ordinalize v4.4.1
+2026-11-12T10:02:00.9080864Z    Compiling phf v0.13.1
+2026-11-12T10:02:01.0281437Z    Compiling async-process v2.5.0
+2026-11-12T10:02:01.3564839Z    Compiling serde_with_macros v3.21.0
+2026-11-12T10:02:01.6135427Z    Compiling ureq v2.12.1
+2026-11-12T10:02:02.2411819Z    Compiling maos-director-surface v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-director-surface)
+2026-11-12T10:02:02.3155152Z warning: unused variable: `halt_id`
+2026-11-12T10:02:02.3174237Z   --> crates/maos-director-surface/src/halt_ui.rs:59:9
+2026-11-12T10:02:02.3194041Z    |
+2026-11-12T10:02:02.3224158Z 59 |         halt_id: HaltId,
+2026-11-12T10:02:02.3225332Z    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+2026-11-12T10:02:02.3226293Z    |
+2026-11-12T10:02:02.3227162Z    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:02.3283584Z 
+2026-11-12T10:02:02.4565446Z warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+2026-11-12T10:02:02.5545753Z    Compiling time v0.3.47
+2026-11-12T10:02:02.8698744Z    Compiling maos-compliance v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-compliance)
+2026-11-12T10:02:03.1452577Z    Compiling cedar-policy-core v4.11.2
+2026-11-12T10:02:03.1687234Z    Compiling zbus_macros v5.19.0
+2026-11-12T10:02:03.4509272Z    Compiling blocking v1.7.0
+2026-11-12T10:02:03.6775054Z    Compiling async-executor v1.14.0
+2026-11-12T10:02:03.9804834Z    Compiling num-rational v0.4.2
+2026-11-12T10:02:04.4759105Z    Compiling maos-eval v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-eval)
+2026-11-12T10:02:04.5087658Z    Compiling async-broadcast v0.7.2
+2026-11-12T10:02:04.6434499Z    Compiling num-iter v0.1.46
+2026-11-12T10:02:04.6835878Z    Compiling serde_repr v0.1.21
+2026-11-12T10:02:04.7079127Z    Compiling num-complex v0.4.6
+2026-11-12T10:02:04.9894764Z    Compiling rustls-pemfile v2.2.0
+2026-11-12T10:02:05.1211095Z    Compiling futures-channel v0.3.32
+2026-11-12T10:02:05.1515630Z    Compiling deadpool-runtime v0.1.4
+2026-11-12T10:02:05.2324587Z    Compiling ordered-stream v0.2.0
+2026-11-12T10:02:05.3084856Z    Compiling linked-hash-map v0.5.6
+2026-11-12T10:02:05.4644592Z    Compiling miette-derive v7.6.0
+2026-11-12T10:02:05.5165164Z    Compiling ref-cast-impl v1.0.25
+2026-11-12T10:02:05.7454579Z    Compiling async-recursion v1.1.1
+2026-11-12T10:02:05.8464927Z warning: unused variable: `file_name`
+2026-11-12T10:02:05.8474142Z    --> crates/maos-eval/src/distillate_corpus.rs:106:17
+2026-11-12T10:02:05.8503854Z     |
+2026-11-12T10:02:05.8524473Z 106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+2026-11-12T10:02:05.8530234Z     |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+2026-11-12T10:02:05.8531536Z     |
+2026-11-12T10:02:05.8532366Z     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:05.8532998Z 
+2026-11-12T10:02:05.8684470Z    Compiling uuid v1.23.4
+2026-11-12T10:02:06.1604704Z    Compiling whoami v2.1.2
+2026-11-12T10:02:06.2314691Z    Compiling filetime v0.2.29
+2026-11-12T10:02:06.3808431Z    Compiling num_cpus v1.17.0
+2026-11-12T10:02:06.4975993Z    Compiling unicode-script v0.5.8
+2026-11-12T10:02:06.6625521Z    Compiling cpubits v0.1.1
+2026-11-12T10:02:06.6657368Z    Compiling unicode-width v0.1.14
+2026-11-12T10:02:06.6995002Z    Compiling maos-frame-codec v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-frame-codec)
+2026-11-12T10:02:06.7944740Z    Compiling unicode-security v0.1.2
+2026-11-12T10:02:06.8014632Z    Compiling aes v0.9.3
+2026-11-12T10:02:06.8607991Z    Compiling miette v7.6.0
+2026-11-12T10:02:07.3924620Z    Compiling deadpool v0.12.3
+2026-11-12T10:02:07.6400340Z    Compiling tokio-postgres v0.7.18
+2026-11-12T10:02:07.6401604Z    Compiling tar v0.4.46
+2026-11-12T10:02:08.3955207Z warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+2026-11-12T10:02:08.3956196Z    Compiling zbus v5.19.0
+2026-11-12T10:02:08.6811696Z    Compiling linked_hash_set v0.1.6
+2026-11-12T10:02:08.7827062Z    Compiling num v0.4.3
+2026-11-12T10:02:08.9452710Z    Compiling serde_with v3.21.0
+2026-11-12T10:02:10.6181200Z    Compiling clap v4.6.1
+2026-11-12T10:02:10.6614394Z    Compiling logos-derive v0.16.1
+2026-11-12T10:02:10.8639035Z    Compiling educe v0.6.0
+2026-11-12T10:02:10.9032524Z    Compiling maos-skill v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-skill)
+2026-11-12T10:02:12.6265369Z    Compiling ciborium v0.2.2
+2026-11-12T10:02:13.2034591Z    Compiling cbc v0.2.1
+2026-11-12T10:02:13.4404545Z    Compiling landlock v0.4.4
+2026-11-12T10:02:13.6165815Z    Compiling hkdf v0.13.0
+2026-11-12T10:02:13.6865118Z    Compiling maos-providers v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-providers)
+2026-11-12T10:02:13.7384631Z warning: unused import: `InferenceOptions`
+2026-11-12T10:02:13.7414069Z   --> crates/maos-providers/src/anthropic.rs:10:5
+2026-11-12T10:02:13.7464409Z    |
+2026-11-12T10:02:13.7505631Z 10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+2026-11-12T10:02:13.7507073Z    |     ^^^^^^^^^^^^^^^^
+2026-11-12T10:02:13.7507959Z    |
+2026-11-12T10:02:13.7509059Z    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:13.7509924Z 
+2026-11-12T10:02:13.7510589Z warning: unused import: `InferenceOptions`
+2026-11-12T10:02:13.7511690Z   --> crates/maos-providers/src/ollama.rs:11:5
+2026-11-12T10:02:13.7512555Z    |
+2026-11-12T10:02:13.7514072Z 11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+2026-11-12T10:02:13.7515445Z    |     ^^^^^^^^^^^^^^^^
+2026-11-12T10:02:13.7516035Z 
+2026-11-12T10:02:13.7516630Z warning: unused import: `InferenceOptions`
+2026-11-12T10:02:13.7517716Z   --> crates/maos-providers/src/openai.rs:11:5
+2026-11-12T10:02:13.7518596Z    |
+2026-11-12T10:02:13.7519855Z 11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+2026-11-12T10:02:13.7521219Z    |     ^^^^^^^^^^^^^^^^
+2026-11-12T10:02:13.7522217Z 
+2026-11-12T10:02:13.7912544Z    Compiling nonempty v0.12.0
+2026-11-12T10:02:13.9164675Z    Compiling smol_str v0.3.6
+2026-11-12T10:02:14.1231278Z warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+2026-11-12T10:02:14.1264435Z    Compiling seccompiler v0.4.0
+2026-11-12T10:02:14.1805086Z    Compiling maos-exec-deps v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-exec-deps)
+2026-11-12T10:02:14.3470163Z    Compiling rustc-literal-escaper v0.0.7
+2026-11-12T10:02:14.3835347Z    Compiling anyhow v1.0.103
+2026-11-12T10:02:14.4385391Z    Compiling unicode-width v0.2.2
+2026-11-12T10:02:14.5664790Z    Compiling typed-arena v2.0.2
+2026-11-12T10:02:14.6415331Z    Compiling arrayvec v0.5.2
+2026-11-12T10:02:14.7024219Z    Compiling maos-kernel-core v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-kernel-core)
+2026-11-12T10:02:14.8508725Z    Compiling pretty v0.12.5
+2026-11-12T10:02:14.9934981Z warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+2026-11-12T10:02:14.9956119Z   --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+2026-11-12T10:02:14.9963966Z    |
+2026-11-12T10:02:15.0006178Z 13 | use maos_domain::frame::EpistemicHaltPayload;
+2026-11-12T10:02:15.0024003Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:15.0053819Z    |
+2026-11-12T10:02:15.0071261Z    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:15.0093640Z 
+2026-11-12T10:02:15.0114179Z warning: unexpected `cfg` condition value: `test-introspection`
+2026-11-12T10:02:15.0144138Z    --> crates/maos-kernel-core/src/capability/mod.rs:521:21
+2026-11-12T10:02:15.0153992Z     |
+2026-11-12T10:02:15.0154858Z 521 |     #[cfg(any(test, feature = "test-introspection"))]
+2026-11-12T10:02:15.0199944Z     |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:15.0211119Z     |
+2026-11-12T10:02:15.0254685Z     = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+2026-11-12T10:02:15.0264341Z     = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+2026-11-12T10:02:15.0285286Z     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+2026-11-12T10:02:15.0307375Z     = note: `#[warn(unexpected_cfgs)]` on by default
+2026-11-12T10:02:15.0343565Z 
+2026-11-12T10:02:15.0354261Z warning: unused import: `HaltJournal`
+2026-11-12T10:02:15.0374020Z   --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+2026-11-12T10:02:15.0403811Z    |
+2026-11-12T10:02:15.0414521Z 29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+2026-11-12T10:02:15.0415949Z    |                                  ^^^^^^^^^^^
+2026-11-12T10:02:15.0463555Z 
+2026-11-12T10:02:15.0494178Z warning: private item shadows public glob re-export
+2026-11-12T10:02:15.0495115Z   --> crates/maos-kernel-core/src/iac.rs:19:5
+2026-11-12T10:02:15.0524041Z    |
+2026-11-12T10:02:15.0565333Z 19 | use maos_iac::mailbox::SpiritActivityTracker;
+2026-11-12T10:02:15.0566267Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:15.0583927Z    |
+2026-11-12T10:02:15.0584831Z note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+2026-11-12T10:02:15.0586332Z   --> crates/maos-kernel-core/src/iac.rs:13:9
+2026-11-12T10:02:15.0586913Z    |
+2026-11-12T10:02:15.0587558Z 13 | pub use maos_iac::*;
+2026-11-12T10:02:15.0588201Z    |         ^^^^^^^^^^^
+2026-11-12T10:02:15.0588890Z note: but the private item here shadows it
+2026-11-12T10:02:15.0589628Z   --> crates/maos-kernel-core/src/iac.rs:19:5
+2026-11-12T10:02:15.0590249Z    |
+2026-11-12T10:02:15.0591016Z 19 | use maos_iac::mailbox::SpiritActivityTracker;
+2026-11-12T10:02:15.0591866Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:15.0592700Z    = note: `#[warn(hidden_glob_reexports)]` on by default
+2026-11-12T10:02:15.0593464Z 
+2026-11-12T10:02:15.0594082Z warning: unused import: `crate::capability::WorkingMemoryStore`
+2026-11-12T10:02:15.0595072Z   --> crates/maos-kernel-core/src/inference/mod.rs:23:5
+2026-11-12T10:02:15.0595718Z    |
+2026-11-12T10:02:15.0596443Z 23 | use crate::capability::WorkingMemoryStore;
+2026-11-12T10:02:15.0597308Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:15.0597747Z 
+2026-11-12T10:02:15.0598224Z warning: unused import: `std::sync::Arc`
+2026-11-12T10:02:15.0599114Z   --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+2026-11-12T10:02:15.0599773Z    |
+2026-11-12T10:02:15.0600350Z 10 | use std::sync::Arc;
+2026-11-12T10:02:15.0600966Z    |     ^^^^^^^^^^^^^^
+2026-11-12T10:02:15.0601411Z 
+2026-11-12T10:02:15.0602012Z warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+2026-11-12T10:02:15.0614272Z   --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+2026-11-12T10:02:15.0633862Z    |
+2026-11-12T10:02:15.0664354Z 13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+2026-11-12T10:02:15.0674230Z    |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+2026-11-12T10:02:15.0674932Z 
+2026-11-12T10:02:15.0711066Z warning: unused import: `maos_domain::invariants::i1::TokenId`
+2026-11-12T10:02:15.0754123Z   --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+2026-11-12T10:02:15.0763990Z    |
+2026-11-12T10:02:15.0784189Z 60 | use maos_domain::invariants::i1::TokenId;
+2026-11-12T10:02:15.0814417Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:15.0823693Z 
+2026-11-12T10:02:15.0843999Z warning: unused import: `LifecycleEntry`
+2026-11-12T10:02:15.0864054Z   --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+2026-11-12T10:02:15.0903824Z    |
+2026-11-12T10:02:15.0914963Z 61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+2026-11-12T10:02:15.0930364Z    |                                                                 ^^^^^^^^^^^^^^
+2026-11-12T10:02:15.0963501Z 
+2026-11-12T10:02:15.0974189Z warning: unused import: `TokenId`
+2026-11-12T10:02:15.0975183Z   --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+2026-11-12T10:02:15.0993811Z    |
+2026-11-12T10:02:15.0994671Z 12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+2026-11-12T10:02:15.0995625Z    |                                                           ^^^^^^^
+2026-11-12T10:02:15.1023506Z 
+2026-11-12T10:02:15.1053992Z warning: unused import: `McpRequest`
+2026-11-12T10:02:15.1083967Z   --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+2026-11-12T10:02:15.1113793Z    |
+2026-11-12T10:02:15.1144514Z 13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+2026-11-12T10:02:15.1174106Z    |                                                                         ^^^^^^^^^^
+2026-11-12T10:02:15.1203535Z 
+2026-11-12T10:02:15.1233970Z warning: unused import: `Path`
+2026-11-12T10:02:15.1264067Z   --> crates/maos-kernel-core/src/memory/private.rs:13:17
+2026-11-12T10:02:15.1293774Z    |
+2026-11-12T10:02:15.1318024Z 13 | use std::path::{Path, PathBuf};
+2026-11-12T10:02:15.1334363Z    |                 ^^^^
+2026-11-12T10:02:15.1334832Z 
+2026-11-12T10:02:15.1348524Z warning: unused import: `AtomicU64`
+2026-11-12T10:02:15.1364881Z  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+2026-11-12T10:02:15.1379842Z   |
+2026-11-12T10:02:15.1381008Z 9 | use std::sync::atomic::{AtomicU64, Ordering};
+2026-11-12T10:02:15.1382073Z   |                         ^^^^^^^^^
+2026-11-12T10:02:15.1382710Z 
+2026-11-12T10:02:15.1383935Z warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+2026-11-12T10:02:15.1385392Z   --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+2026-11-12T10:02:15.1386389Z    |
+2026-11-12T10:02:15.1387306Z 18 | use crate::scheduler::kernel_ctx::KernelCtx;
+2026-11-12T10:02:15.1388337Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:15.1388919Z 
+2026-11-12T10:02:15.1389468Z warning: unused import: `DispositionOutcome`
+2026-11-12T10:02:15.1390561Z   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+2026-11-12T10:02:15.1391512Z    |
+2026-11-12T10:02:15.1392732Z 16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+2026-11-12T10:02:15.1394339Z    |                 ^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:15.1394915Z 
+2026-11-12T10:02:15.1602425Z    Compiling secret-service v5.2.0
+2026-11-12T10:02:16.0045318Z warning: use of deprecated method `std::sync::atomic::Atomic::<u32>::fetch_update`: renamed to `try_update` for consistency
+2026-11-12T10:02:16.0074431Z   --> crates/maos-kernel-core/src/scheduler/scheduler_loop.rs:69:10
+2026-11-12T10:02:16.0104126Z    |
+2026-11-12T10:02:16.0134955Z 69 |         .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |deficit| {
+2026-11-12T10:02:16.0135874Z    |          ^^^^^^^^^^^^
+2026-11-12T10:02:16.0136395Z    |
+2026-11-12T10:02:16.0136944Z    = note: `#[warn(deprecated)]` on by default
+2026-11-12T10:02:16.0137731Z help: replace the use of the deprecated method
+2026-11-12T10:02:16.0138307Z    |
+2026-11-12T10:02:16.0139173Z 69 -         .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |deficit| {
+2026-11-12T10:02:16.0140345Z 69 +         .try_update(Ordering::SeqCst, Ordering::SeqCst, |deficit| {
+2026-11-12T10:02:16.0141098Z    |
+2026-11-12T10:02:16.0141380Z 
+2026-11-12T10:02:16.1865478Z warning: unused import: `maos_providers::Provider`
+2026-11-12T10:02:16.1914210Z   --> crates/maos-kernel-core/src/inference/mod.rs:29:5
+2026-11-12T10:02:16.1944038Z    |
+2026-11-12T10:02:16.1954257Z 29 | use maos_providers::Provider;
+2026-11-12T10:02:16.1955014Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:16.1955449Z 
+2026-11-12T10:02:16.1955837Z warning: unused variable: `event`
+2026-11-12T10:02:16.2004308Z   --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+2026-11-12T10:02:16.2033870Z    |
+2026-11-12T10:02:16.2064008Z 66 |         let event = self
+2026-11-12T10:02:16.2094404Z    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+2026-11-12T10:02:16.2123843Z    |
+2026-11-12T10:02:16.2154273Z    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:16.2183551Z 
+2026-11-12T10:02:16.2194262Z warning: unused variable: `spirit_id`
+2026-11-12T10:02:16.2224381Z   --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+2026-11-12T10:02:16.2225291Z    |
+2026-11-12T10:02:16.2225822Z 69 |     spirit_id: &str,
+2026-11-12T10:02:16.2226944Z    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+2026-11-12T10:02:16.2227699Z 
+2026-11-12T10:02:16.2228078Z warning: unused variable: `spirit_pid`
+2026-11-12T10:02:16.2229106Z   --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+2026-11-12T10:02:16.2229935Z    |
+2026-11-12T10:02:16.2230426Z 70 |     spirit_pid: u32,
+2026-11-12T10:02:16.2231469Z    |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+2026-11-12T10:02:16.2232192Z 
+2026-11-12T10:02:16.5254824Z warning: variable does not need to be mutable
+2026-11-12T10:02:16.5286217Z    --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:622:9
+2026-11-12T10:02:16.5344000Z     |
+2026-11-12T10:02:16.5404417Z 622 |     let mut child = spawn_child(&mut spec, &argv)?;
+2026-11-12T10:02:16.5434035Z     |         ----^^^^^
+2026-11-12T10:02:16.5434704Z     |         |
+2026-11-12T10:02:16.5435340Z     |         help: remove this `mut`
+2026-11-12T10:02:16.5435912Z     |
+2026-11-12T10:02:16.5436616Z     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:16.5437188Z 
+2026-11-12T10:02:16.8737593Z warning: unused variable: `now_ns`
+2026-11-12T10:02:16.8754593Z    --> crates/maos-kernel-core/src/supervision/crash_detector.rs:196:13
+2026-11-12T10:02:16.8784238Z     |
+2026-11-12T10:02:16.8814638Z 196 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+2026-11-12T10:02:16.8816009Z     |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+2026-11-12T10:02:16.8816757Z 
+2026-11-12T10:02:17.0334708Z warning: value assigned to `owned_guard` is never read
+2026-11-12T10:02:17.0364354Z    --> crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:401:27
+2026-11-12T10:02:17.0365195Z     |
+2026-11-12T10:02:17.0394023Z 401 |     let mut owned_guard = None;
+2026-11-12T10:02:17.0424251Z     |                           ^^^^ this value is reassigned later and never used
+2026-11-12T10:02:17.0453850Z ...
+2026-11-12T10:02:17.0484321Z 455 |     owned_guard = Some(SandboxedContainerChild::own(
+2026-11-12T10:02:17.0514410Z     |     ----------- `owned_guard` is overwritten here before the previous value is read
+2026-11-12T10:02:17.0543816Z     |
+2026-11-12T10:02:17.0574157Z     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:17.0603496Z 
+2026-11-12T10:02:17.1054532Z warning: unused variable: `total`
+2026-11-12T10:02:17.1084198Z   --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+2026-11-12T10:02:17.1114057Z    |
+2026-11-12T10:02:17.1144074Z 22 |     let total = drained_tasks.len();
+2026-11-12T10:02:17.1174368Z    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+2026-11-12T10:02:17.1203562Z 
+2026-11-12T10:02:17.1394682Z warning: field `boot_nonce` is never read
+2026-11-12T10:02:17.1395809Z    --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+2026-11-12T10:02:17.1443919Z     |
+2026-11-12T10:02:17.1454133Z  95 | pub struct KernelHaltResolver {
+2026-11-12T10:02:17.1455039Z     |            ------------------ field in this struct
+2026-11-12T10:02:17.1455762Z ...
+2026-11-12T10:02:17.1456249Z 101 |     boot_nonce: u64,
+2026-11-12T10:02:17.1456845Z     |     ^^^^^^^^^^
+2026-11-12T10:02:17.1457353Z     |
+2026-11-12T10:02:17.1458121Z     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:17.1458667Z 
+2026-11-12T10:02:17.1459081Z warning: field `next_frame_counter` is never read
+2026-11-12T10:02:17.1459907Z   --> crates/maos-kernel-core/src/memory/mod.rs:82:5
+2026-11-12T10:02:17.1460535Z    |
+2026-11-12T10:02:17.1461107Z 77 | pub struct MemoryManagerAdapter {
+2026-11-12T10:02:17.1461977Z    |            -------------------- field in this struct
+2026-11-12T10:02:17.1462659Z ...
+2026-11-12T10:02:17.1463414Z 82 |     next_frame_counter: AtomicU64,
+2026-11-12T10:02:17.1464139Z    |     ^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:17.1464478Z 
+2026-11-12T10:02:17.1464851Z warning: method `mint_frame_id` is never used
+2026-11-12T10:02:17.1465630Z    --> crates/maos-kernel-core/src/memory/mod.rs:665:8
+2026-11-12T10:02:17.1466233Z     |
+2026-11-12T10:02:17.1466747Z 115 | impl MemoryManagerAdapter {
+2026-11-12T10:02:17.1467610Z     | ------------------------- method in this implementation
+2026-11-12T10:02:17.1468356Z ...
+2026-11-12T10:02:17.1468936Z 665 |     fn mint_frame_id(&self) -> [u8; 16] {
+2026-11-12T10:02:17.1469952Z     |        ^^^^^^^^^^^^^
+2026-11-12T10:02:17.1470321Z 
+2026-11-12T10:02:17.1470743Z warning: field `kind` is never read
+2026-11-12T10:02:17.1494085Z   --> crates/maos-kernel-core/src/memory/private.rs:46:5
+2026-11-12T10:02:17.1523822Z    |
+2026-11-12T10:02:17.1553984Z 44 | struct DiskCandidate {
+2026-11-12T10:02:17.1583745Z    |        ------------- field in this struct
+2026-11-12T10:02:17.1604307Z 45 |     name: String,
+2026-11-12T10:02:17.1634591Z 46 |     kind: ValueKind,
+2026-11-12T10:02:17.1673967Z    |     ^^^^
+2026-11-12T10:02:17.1693673Z 
+2026-11-12T10:02:17.1744064Z warning: field `iac_rt_metrics` is never read
+2026-11-12T10:02:17.1754120Z   --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+2026-11-12T10:02:17.1754895Z    |
+2026-11-12T10:02:17.1755501Z 32 | pub struct SelfTelemetryAggregator {
+2026-11-12T10:02:17.1756433Z    |            ----------------------- field in this struct
+2026-11-12T10:02:17.1757330Z 33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+2026-11-12T10:02:17.1758377Z    |     ^^^^^^^^^^^^^^
+2026-11-12T10:02:17.1758733Z 
+2026-11-12T10:02:17.1759215Z warning: associated function `resolution_label` is never used
+2026-11-12T10:02:17.1760204Z   --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+2026-11-12T10:02:17.1760880Z    |
+2026-11-12T10:02:17.1761405Z 38 | impl SelfTelemetryAggregator {
+2026-11-12T10:02:17.1762403Z    | ---------------------------- associated function in this implementation
+2026-11-12T10:02:17.1763425Z ...
+2026-11-12T10:02:17.1764235Z 60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+2026-11-12T10:02:17.1765108Z    |        ^^^^^^^^^^^^^^^^
+2026-11-12T10:02:17.1765460Z 
+2026-11-12T10:02:17.1765895Z warning: associated function `kind_to_str` is never used
+2026-11-12T10:02:17.1766789Z   --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+2026-11-12T10:02:17.1767398Z    |
+2026-11-12T10:02:17.1767876Z 38 | impl SharedMemoryStore {
+2026-11-12T10:02:17.1768857Z    | ---------------------- associated function in this implementation
+2026-11-12T10:02:17.1769699Z ...
+2026-11-12T10:02:17.1770302Z 52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+2026-11-12T10:02:17.1771022Z    |        ^^^^^^^^^^^
+2026-11-12T10:02:17.1771466Z 
+2026-11-12T10:02:17.1771858Z warning: method `build_kernel_ctx` is never used
+2026-11-12T10:02:17.1804115Z    --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:141:8
+2026-11-12T10:02:17.1833792Z     |
+2026-11-12T10:02:17.1863941Z  70 | impl HookDispatcher {
+2026-11-12T10:02:17.1894102Z     | ------------------- method in this implementation
+2026-11-12T10:02:17.1923810Z ...
+2026-11-12T10:02:17.1953990Z 141 |     fn build_kernel_ctx<'a>(
+2026-11-12T10:02:17.1983913Z     |        ^^^^^^^^^^^^^^^^
+2026-11-12T10:02:17.2013516Z 
+2026-11-12T10:02:17.2044168Z warning: field `crypto` is never read
+2026-11-12T10:02:17.2074054Z    --> crates/maos-kernel-core/src/security/mod.rs:136:5
+2026-11-12T10:02:17.2103838Z     |
+2026-11-12T10:02:17.2134057Z 131 | pub struct SecurityManagerAdapter {
+2026-11-12T10:02:17.2164463Z     |            ---------------------- field in this struct
+2026-11-12T10:02:17.2193824Z ...
+2026-11-12T10:02:17.2224045Z 136 |     crypto: Arc<dyn CryptoProvider>,
+2026-11-12T10:02:17.2253873Z     |     ^^^^^^
+2026-11-12T10:02:17.2272089Z     |
+2026-11-12T10:02:17.2314692Z     = note: `SecurityManagerAdapter` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+2026-11-12T10:02:17.2343507Z 
+2026-11-12T10:02:17.2344009Z warning: field `attestation` is never read
+2026-11-12T10:02:17.2384211Z   --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+2026-11-12T10:02:17.2403756Z    |
+2026-11-12T10:02:17.2434008Z 34 | pub struct VerifiedImageAttestation {
+2026-11-12T10:02:17.2464139Z    |            ------------------------ field in this struct
+2026-11-12T10:02:17.2494005Z 35 |     attestation: T3ImageAttestation,
+2026-11-12T10:02:17.2523855Z    |     ^^^^^^^^^^^
+2026-11-12T10:02:17.2553769Z    |
+2026-11-12T10:02:17.2584623Z    = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+2026-11-12T10:02:17.2613499Z 
+2026-11-12T10:02:17.2644106Z warning: field `notification_dispatcher` is never read
+2026-11-12T10:02:17.2674091Z   --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+2026-11-12T10:02:17.2703743Z    |
+2026-11-12T10:02:17.2704339Z 23 | pub struct ProgressWatchdog {
+2026-11-12T10:02:17.2734019Z    |            ---------------- field in this struct
+2026-11-12T10:02:17.2763779Z ...
+2026-11-12T10:02:17.2774714Z 27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+2026-11-12T10:02:17.2775863Z    |     ^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:17.2803578Z 
+2026-11-12T10:02:17.2834198Z warning: field `notification_dispatcher` is never read
+2026-11-12T10:02:17.2864281Z   --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+2026-11-12T10:02:17.2913839Z    |
+2026-11-12T10:02:17.2934054Z 23 | pub struct SilentFailureDetector {
+2026-11-12T10:02:17.2935214Z    |            --------------------- field in this struct
+2026-11-12T10:02:17.2936017Z ...
+2026-11-12T10:02:17.2936977Z 27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+2026-11-12T10:02:17.2937658Z    |     ^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:17.2937879Z 
+2026-11-12T10:02:17.9804614Z    Compiling logos v0.16.1
+2026-11-12T10:02:18.0832784Z    Compiling deadpool-postgres v0.14.1
+2026-11-12T10:02:19.5935135Z    Compiling maos-registry v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-registry)
+2026-11-12T10:02:19.7684835Z warning: unused import: `std::sync::Mutex`
+2026-11-12T10:02:19.7724397Z  --> crates/maos-registry/src/fixture_replay.rs:6:5
+2026-11-12T10:02:19.7773874Z   |
+2026-11-12T10:02:19.7804278Z 6 | use std::sync::Mutex;
+2026-11-12T10:02:19.7833903Z   |     ^^^^^^^^^^^^^^^^
+2026-11-12T10:02:19.7863812Z   |
+2026-11-12T10:02:19.7894237Z   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:19.7923542Z 
+2026-11-12T10:02:19.7955828Z warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+2026-11-12T10:02:19.7984070Z   --> crates/maos-registry/src/fixture_replay.rs:9:5
+2026-11-12T10:02:19.8013842Z    |
+2026-11-12T10:02:19.8044493Z  9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+2026-11-12T10:02:19.8074524Z    |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+2026-11-12T10:02:19.8104399Z 10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+2026-11-12T10:02:19.8134441Z    |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+2026-11-12T10:02:19.8163544Z 
+2026-11-12T10:02:19.8194015Z warning: unused import: `SignedManifest`
+2026-11-12T10:02:19.8224054Z  --> crates/maos-registry/src/handlers/manifest.rs:9:36
+2026-11-12T10:02:19.8224729Z   |
+2026-11-12T10:02:19.8226086Z 9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+2026-11-12T10:02:19.8227026Z   |                                    ^^^^^^^^^^^^^^
+2026-11-12T10:02:19.8227434Z 
+2026-11-12T10:02:20.0236245Z warning: use of deprecated method `std::sync::atomic::Atomic::<usize>::fetch_update`: renamed to `try_update` for consistency
+2026-11-12T10:02:20.0244235Z    --> crates/maos-registry/src/http.rs:319:10
+2026-11-12T10:02:20.0273856Z     |
+2026-11-12T10:02:20.0294537Z 319 |         .fetch_update(Ordering::AcqRel, Ordering::Acquire, |active| {
+2026-11-12T10:02:20.0324061Z     |          ^^^^^^^^^^^^
+2026-11-12T10:02:20.0333855Z     |
+2026-11-12T10:02:20.0364073Z     = note: `#[warn(deprecated)]` on by default
+2026-11-12T10:02:20.0384171Z help: replace the use of the deprecated method
+2026-11-12T10:02:20.0394002Z     |
+2026-11-12T10:02:20.0424628Z 319 -         .fetch_update(Ordering::AcqRel, Ordering::Acquire, |active| {
+2026-11-12T10:02:20.0454538Z 319 +         .try_update(Ordering::AcqRel, Ordering::Acquire, |active| {
+2026-11-12T10:02:20.0473852Z     |
+2026-11-12T10:02:20.0474113Z 
+2026-11-12T10:02:20.3674786Z warning: unused variable: `server_sig`
+2026-11-12T10:02:20.3704166Z    --> crates/maos-registry/src/client.rs:198:27
+2026-11-12T10:02:20.3734542Z     |
+2026-11-12T10:02:20.3764149Z 198 |             (server_tier, server_sig) => {
+2026-11-12T10:02:20.3794573Z     |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+2026-11-12T10:02:20.3823870Z     |
+2026-11-12T10:02:20.3854315Z     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:20.3883611Z 
+2026-11-12T10:02:20.6905116Z    Compiling maos-cohort v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-cohort)
+2026-11-12T10:02:21.6804866Z warning: methods `accept_consent` and `outbound_consent_context` are never used
+2026-11-12T10:02:21.6834206Z    --> crates/maos-cohort/src/state.rs:388:19
+2026-11-12T10:02:21.6863784Z     |
+2026-11-12T10:02:21.6893988Z 206 | impl CohortManifestState {
+2026-11-12T10:02:21.6924187Z     | ------------------------ methods in this implementation
+2026-11-12T10:02:21.6934890Z ...
+2026-11-12T10:02:21.6935917Z 388 |     pub(crate) fn accept_consent(
+2026-11-12T10:02:21.6936952Z     |                   ^^^^^^^^^^^^^^
+2026-11-12T10:02:21.6937800Z ...
+2026-11-12T10:02:21.6938716Z 408 |     pub(crate) fn outbound_consent_context(
+2026-11-12T10:02:21.6939805Z     |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:21.6940682Z     |
+2026-11-12T10:02:21.6941708Z     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:21.6942555Z 
+2026-11-12T10:02:23.9916863Z warning: `maos-cohort` (lib) generated 1 warning
+2026-11-12T10:02:23.9934253Z    Compiling pgvector v0.4.2
+2026-11-12T10:02:24.6967256Z warning: `maos-kernel-core` (lib) generated 36 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 20 suggestions)
+2026-11-12T10:02:24.6996411Z    Compiling pem v3.0.6
+2026-11-12T10:02:24.9664849Z    Compiling keyring-core v1.0.0
+2026-11-12T10:02:25.0855371Z warning: `maos-registry` (lib) generated 5 warnings (run `cargo fix --lib -p maos-registry` to apply 5 suggestions)
+2026-11-12T10:02:25.0864387Z    Compiling cedar-policy v4.11.2
+2026-11-12T10:02:25.1944714Z    Compiling zbus-secret-service-keyring-store v1.0.1
+2026-11-12T10:02:25.3478655Z    Compiling maos-loom-lite v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-loom-lite)
+2026-11-12T10:02:25.8406416Z    Compiling simple_asn1 v0.6.4
+2026-11-12T10:02:26.2035120Z    Compiling maos-corpus-gen v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-corpus-gen)
+2026-11-12T10:02:26.3895161Z    Compiling sharded-slab v0.1.7
+2026-11-12T10:02:26.4072806Z    Compiling matchers v0.2.0
+2026-11-12T10:02:26.4934600Z    Compiling tracing-log v0.2.0
+2026-11-12T10:02:26.6620574Z    Compiling thread_local v1.1.9
+2026-11-12T10:02:26.8214825Z    Compiling nu-ansi-term v0.50.3
+2026-11-12T10:02:26.9041058Z    Compiling unicode-segmentation v1.13.3
+2026-11-12T10:02:27.0814856Z    Compiling tracing-subscriber v0.3.23
+2026-11-12T10:02:27.3394701Z    Compiling researcher v0.1.0 (/home/runner/work/maos/maos/spirits/researcher)
+2026-11-12T10:02:27.7324994Z    Compiling maos-cli v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-cli)
+2026-11-12T10:02:28.6755340Z    Compiling jsonwebtoken v9.3.1
+2026-11-12T10:02:29.2911028Z    Compiling keyring v4.2.0
+2026-11-12T10:02:29.4182724Z    Compiling maos-spirit-hello v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-spirit-hello)
+2026-11-12T10:02:29.5504943Z    Compiling yasna v0.5.2
+2026-11-12T10:02:29.8535179Z    Compiling butler v0.1.0 (/home/runner/work/maos/maos/spirits/butler)
+2026-11-12T10:02:30.2485144Z    Compiling maos-egress v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-egress)
+2026-11-12T10:02:31.2815289Z    Compiling orchestrator v0.1.0 (/home/runner/work/maos/maos/spirits/orchestrator)
+2026-11-12T10:02:31.5965485Z    Compiling tokio-rustls v0.26.4
+2026-11-12T10:02:31.6789848Z    Compiling maos-bench v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-bench)
+2026-11-12T10:02:31.8016652Z    Compiling cedar-policy-formatter v4.11.2
+2026-11-12T10:02:33.5125180Z    Compiling maos-a2a-tcp v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-a2a-tcp)
+2026-11-12T10:02:33.6914821Z    Compiling worker v0.1.0 (/home/runner/work/maos/maos/spirits/worker)
+2026-11-12T10:02:33.7785133Z    Compiling maos-shell v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-shell)
+2026-11-12T10:02:34.1805024Z    Compiling rcgen v0.13.2
+2026-11-12T10:02:34.9655478Z    Compiling maos-sso v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-sso)
+2026-11-12T10:02:35.2185673Z    Compiling maos-secrets v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-secrets)
+2026-11-12T10:02:36.0055206Z    Compiling maos-spirit-cli v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-spirit-cli)
+2026-11-12T10:02:36.3321335Z warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+2026-11-12T10:02:36.3324282Z   --> crates/maos-spirit-cli/src/signing.rs:27:7
+2026-11-12T10:02:36.3324955Z    |
+2026-11-12T10:02:36.3325581Z 27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+2026-11-12T10:02:36.3326372Z    |       ^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:36.3326928Z    |
+2026-11-12T10:02:36.3327647Z    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:36.3328214Z 
+2026-11-12T10:02:36.9184898Z warning: `maos-spirit-cli` (lib) generated 1 warning
+2026-11-12T10:02:36.9220800Z    Compiling maos-pdp v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-pdp)
+2026-11-12T10:02:37.2480166Z    Compiling maos-digest v0.1.0 (/home/runner/work/maos/maos/spirits/digest)
+2026-11-12T10:02:37.8254146Z    Compiling maos-control v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-control)
+2026-11-12T10:02:37.9339088Z warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+2026-11-12T10:02:37.9354099Z   --> crates/maos-control/src/lib.rs:17:11
+2026-11-12T10:02:37.9383877Z    |
+2026-11-12T10:02:37.9384552Z 17 | use ring::constant_time;
+2026-11-12T10:02:37.9385259Z    |           ^^^^^^^^^^^^^
+2026-11-12T10:02:37.9385872Z    |
+2026-11-12T10:02:37.9386481Z    = note: `#[warn(deprecated)]` on by default
+2026-11-12T10:02:37.9386953Z 
+2026-11-12T10:02:37.9388833Z warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+2026-11-12T10:02:37.9390711Z     --> crates/maos-control/src/lib.rs:1064:28
+2026-11-12T10:02:37.9391349Z      |
+2026-11-12T10:02:37.9392463Z 1064 |             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
+2026-11-12T10:02:37.9393917Z      |                            ^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:37.9394406Z 
+2026-11-12T10:02:38.1035097Z    Compiling maos-notify-push v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-notify-push)
+2026-11-12T10:02:38.2336520Z    Compiling maos-a2a v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-a2a)
+2026-11-12T10:02:38.3715516Z warning: `maos-control` (lib) generated 2 warnings
+2026-11-12T10:02:38.3730531Z    Compiling maos-orchestrator-buffer v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-orchestrator-buffer)
+2026-11-12T10:02:38.5375498Z warning: unreachable pattern
+2026-11-12T10:02:38.5404479Z    --> crates/maos-orchestrator-buffer/src/gateway_dispatcher.rs:332:21
+2026-11-12T10:02:38.5433859Z     |
+2026-11-12T10:02:38.5435284Z 332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+2026-11-12T10:02:38.5464342Z     |                     ^^^^^^^^^^^ no value can reach this
+2026-11-12T10:02:38.5493947Z     |
+2026-11-12T10:02:38.5524129Z note: multiple earlier patterns match some of the same values
+2026-11-12T10:02:38.5525689Z    --> crates/maos-orchestrator-buffer/src/gateway_dispatcher.rs:332:21
+2026-11-12T10:02:38.5553880Z     |
+2026-11-12T10:02:38.5584657Z 329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+2026-11-12T10:02:38.5594437Z     |                     ----------------------------- matches some of the same values
+2026-11-12T10:02:38.5614570Z 330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+2026-11-12T10:02:38.5644302Z     |                     --------------- matches some of the same values
+2026-11-12T10:02:38.5674387Z 331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+2026-11-12T10:02:38.5684353Z     |                     ----------- matches some of the same values
+2026-11-12T10:02:38.5704539Z 332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+2026-11-12T10:02:38.5734188Z     |                     ^^^^^^^^^^^ collectively making this unreachable
+2026-11-12T10:02:38.5764367Z     = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:38.5765128Z 
+2026-11-12T10:02:38.5827205Z warning: unused variable: `e`
+2026-11-12T10:02:38.5854370Z    --> crates/maos-orchestrator-buffer/src/gateway_dispatcher.rs:161:29
+2026-11-12T10:02:38.5863871Z     |
+2026-11-12T10:02:38.5894019Z 161 |                         Err(e) => {
+2026-11-12T10:02:38.5914535Z     |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+2026-11-12T10:02:38.5943991Z     |
+2026-11-12T10:02:38.5954319Z     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:38.5973718Z 
+2026-11-12T10:02:38.6004172Z warning: unused variable: `ctx`
+2026-11-12T10:02:38.6014226Z    --> crates/maos-orchestrator-buffer/src/gateway_dispatcher.rs:132:17
+2026-11-12T10:02:38.6043843Z     |
+2026-11-12T10:02:38.6064119Z 132 |             let ctx = GatewayCtx {
+2026-11-12T10:02:38.6094460Z     |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+2026-11-12T10:02:38.6103567Z 
+2026-11-12T10:02:38.6371421Z    Compiling maos-siem v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-siem)
+2026-11-12T10:02:38.8970155Z    Compiling observer v0.1.0 (/home/runner/work/maos/maos/spirits/observer)
+2026-11-12T10:02:38.9065412Z warning: `maos-orchestrator-buffer` (lib) generated 3 warnings (run `cargo fix --lib -p maos-orchestrator-buffer` to apply 2 suggestions)
+2026-11-12T10:02:38.9076227Z    Compiling architect v0.1.0 (/home/runner/work/maos/maos/spirits/architect)
+2026-11-12T10:02:39.1314869Z    Compiling reviewer v0.1.0 (/home/runner/work/maos/maos/spirits/reviewer)
+2026-11-12T10:02:39.3412389Z    Compiling mira v1.5.0 (/home/runner/work/maos/maos/spirits/mira)
+2026-11-12T10:02:39.5804866Z    Compiling nash v1.5.0 (/home/runner/work/maos/maos/spirits/nash)
+2026-11-12T10:02:39.6025680Z    Compiling maos-escape-detector v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-escape-detector)
+2026-11-12T10:02:39.8184829Z    Compiling maos-host v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-host)
+2026-11-12T10:02:39.8875806Z    Compiling maos-bin v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-bin)
+2026-11-12T10:02:39.9924791Z    Compiling wasmparser v0.254.2
+2026-11-12T10:02:40.2695144Z warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+2026-11-12T10:02:40.2714047Z     --> crates/maos-bin/src/cross_team_crossing.rs:1014:5
+2026-11-12T10:02:40.2747530Z      |
+2026-11-12T10:02:40.2775131Z 1014 | use maos_kernel_core::memory::MemoryManagerAdapter;
+2026-11-12T10:02:40.2804036Z      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:40.2841646Z      |
+2026-11-12T10:02:40.2864312Z      = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:40.2894951Z 
+2026-11-12T10:02:40.2934083Z warning: unused import: `AtomicUsize`
+2026-11-12T10:02:40.2963938Z    --> crates/maos-bin/src/supervision.rs:249:63
+2026-11-12T10:02:40.2975378Z     |
+2026-11-12T10:02:40.2994885Z 249 |     use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+2026-11-12T10:02:40.2996272Z     |                                                               ^^^^^^^^^^^
+2026-11-12T10:02:40.2996966Z 
+2026-11-12T10:02:40.3056714Z    Compiling id-arena v2.3.0
+2026-11-12T10:02:47.0736821Z    Compiling wit-parser v0.254.2
+2026-11-12T10:02:51.1321268Z warning: `maos-bin` (lib) generated 2 warnings (run `cargo fix --lib -p maos-bin` to apply 2 suggestions)
+2026-11-12T10:02:52.8374587Z warning: unused import: `maos_mcp::McpClient`
+2026-11-12T10:02:52.8375472Z     --> crates/maos-bin/src/main.rs:1381:9
+2026-11-12T10:02:52.8376059Z      |
+2026-11-12T10:02:52.8376759Z 1381 |     use maos_mcp::McpClient as _;
+2026-11-12T10:02:52.8377484Z      |         ^^^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:52.8378043Z      |
+2026-11-12T10:02:52.8378837Z      = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:52.8379442Z 
+2026-11-12T10:02:57.2911395Z warning: struct `EnvVar` is never constructed
+2026-11-12T10:02:57.2912036Z  --> crates/maos-bin/src/env_contract.rs:1:12
+2026-11-12T10:02:57.2912480Z   |
+2026-11-12T10:02:57.2912822Z 1 | pub struct EnvVar {
+2026-11-12T10:02:57.2913656Z   |            ^^^^^^
+2026-11-12T10:02:57.2914032Z   |
+2026-11-12T10:02:57.2914508Z   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+2026-11-12T10:02:57.2914899Z 
+2026-11-12T10:02:57.2915142Z warning: enum `EnvStability` is never used
+2026-11-12T10:02:57.2915649Z  --> crates/maos-bin/src/env_contract.rs:8:10
+2026-11-12T10:02:57.2916032Z   |
+2026-11-12T10:02:57.2916360Z 8 | pub enum EnvStability {
+2026-11-12T10:02:57.2916788Z   |          ^^^^^^^^^^^^
+2026-11-12T10:02:57.2917027Z 
+2026-11-12T10:02:57.2917296Z warning: constant `MAOS_ENV_REGISTRY` is never used
+2026-11-12T10:02:57.2917841Z   --> crates/maos-bin/src/env_contract.rs:13:11
+2026-11-12T10:02:57.2918235Z    |
+2026-11-12T10:02:57.2918630Z 13 | pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
+2026-11-12T10:02:57.2919131Z    |           ^^^^^^^^^^^^^^^^^
+2026-11-12T10:02:57.2919375Z 
+2026-11-12T10:02:57.2919604Z warning: function `lookup` is never used
+2026-11-12T10:02:57.2920101Z    --> crates/maos-bin/src/env_contract.rs:673:8
+2026-11-12T10:02:57.2920487Z     |
+2026-11-12T10:02:57.2920929Z 673 | pub fn lookup(name: &str) -> Option<&'static EnvVar> {
+2026-11-12T10:02:57.2921444Z     |        ^^^^^^
+2026-11-12T10:02:57.2921668Z 
+2026-11-12T10:03:01.4969770Z warning: `maos-bin` (bin "maos") generated 5 warnings
+2026-11-12T10:03:01.4970431Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 09s
+2026-11-12T10:03:01.5424538Z ────────────
+2026-11-12T10:03:01.5425674Z  Nextest run ID e1ceba6c-1c51-4e24-8a25-7fe23c78125d with nextest profile: ci
+2026-11-12T10:03:01.5426357Z     Starting 1 test across 1 binary
+2026-11-12T10:03:01.5524261Z         FAIL [   0.009s] (1/1) maos-bin::crypto_t3_admission_20_13 selected_recording_instance_verifies_the_kernel_t3_lock
+2026-11-12T10:03:01.5526386Z   stdout ───
+2026-11-12T10:03:01.5526746Z 
+2026-11-12T10:03:01.5526879Z     running 1 test
+2026-11-12T10:03:01.5527350Z     test selected_recording_instance_verifies_the_kernel_t3_lock ... FAILED
+2026-11-12T10:03:01.5527801Z 
+2026-11-12T10:03:01.5527917Z     failures:
+2026-11-12T10:03:01.5528084Z 
+2026-11-12T10:03:01.5528207Z     failures:
+2026-11-12T10:03:01.5528628Z         selected_recording_instance_verifies_the_kernel_t3_lock
+2026-11-12T10:03:01.5529006Z 
+2026-11-12T10:03:01.5529397Z     test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-12T10:03:01.5530081Z     
+2026-11-12T10:03:01.5531013Z   stderr ───
+2026-11-12T10:03:01.5531348Z 
+2026-11-12T10:03:01.5532450Z     thread 'selected_recording_instance_verifies_the_kernel_t3_lock' (7880) panicked at crates/maos-bin/tests/crypto_t3_admission_20_13.rs:183:5:
+2026-11-12T10:03:01.5534326Z     assertion `left == right` failed: kernel T3 admission must verify exactly once: ["7879:1", "7879:2"]
+2026-11-12T10:03:01.5535067Z       left: 2
+2026-11-12T10:03:01.5535332Z      right: 3
+2026-11-12T10:03:01.5535928Z     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-11-12T10:03:01.5536424Z 
+2026-11-12T10:03:01.5554167Z ────────────
+2026-11-12T10:03:01.5555181Z      Summary [   0.010s] 1 test run: 0 passed, 1 failed, 0 skipped
+2026-11-12T10:03:01.5556304Z         FAIL [   0.009s] (1/1) maos-bin::crypto_t3_admission_20_13 selected_recording_instance_verifies_the_kernel_t3_lock
+2026-11-12T10:03:01.5571159Z error: test run failed
+2026-11-12T10:03:01.5603720Z     assertion `left == right` failed: kernel T3 admission must verify exactly once: ["7879:1", "7879:2"]
+2026-11-12T10:03:01.5694743Z Post job cleanup.
+2026-11-12T10:03:01.7032852Z ##[group]Cache Configuration
+2026-11-12T10:03:01.7034287Z Cache Provider:
+2026-11-12T10:03:01.7034643Z     github
+2026-11-12T10:03:01.7034976Z Workspaces:
+2026-11-12T10:03:01.7035306Z     /home/runner/work/maos/maos
+2026-11-12T10:03:01.7035716Z Cache Paths:
+2026-11-12T10:03:01.7036053Z     /home/runner/.cargo/bin
+2026-11-12T10:03:01.7036474Z     /home/runner/.cargo/.crates.toml
+2026-11-12T10:03:01.7036966Z     /home/runner/.cargo/.crates2.json
+2026-11-12T10:03:01.7038226Z     /home/runner/.cargo/registry
+2026-11-12T10:03:01.7038699Z     /home/runner/.cargo/git
+2026-11-12T10:03:01.7039141Z     /home/runner/work/maos/maos/target
+2026-11-12T10:03:01.7039621Z Restore Key:
+2026-11-12T10:03:01.7040042Z     v0-rust-plant-Linux-x64-01b81e85
+2026-11-12T10:03:01.7040503Z Cache Key:
+2026-11-12T10:03:01.7040894Z     v0-rust-plant-Linux-x64-01b81e85-c611388f
+2026-11-12T10:03:01.7041402Z .. Prefix:
+2026-11-12T10:03:01.7041833Z   - v0-rust-plant-Linux-x64
+2026-11-12T10:03:01.7042270Z .. Environment considered:
+2026-11-12T10:03:01.7042683Z   - Rust Versions:
+2026-11-12T10:03:01.7043470Z     - 1.99.1 x86_64-unknown-linux-gnu 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-11-12T10:03:01.7044154Z   - CARGO_HOME
+2026-11-12T10:03:01.7044511Z   - CARGO_INCREMENTAL
+2026-11-12T10:03:01.7044895Z   - CARGO_TERM_COLOR
+2026-11-12T10:03:01.7045278Z .. Lockfiles considered:
+2026-11-12T10:03:01.7045722Z   - /home/runner/work/maos/maos/Cargo.lock
+2026-11-12T10:03:01.7046372Z   - /home/runner/work/maos/maos/crates/maos-a2a-core/Cargo.toml
+2026-11-12T10:03:01.7047034Z   - /home/runner/work/maos/maos/crates/maos-a2a-tcp/Cargo.toml
+2026-11-12T10:03:01.7047504Z   - /home/runner/work/maos/maos/crates/maos-a2a/Cargo.toml
+2026-11-12T10:03:01.7047899Z   - /home/runner/work/maos/maos/crates/maos-acp/Cargo.toml
+2026-11-12T10:03:01.7048281Z   - /home/runner/work/maos/maos/crates/maos-attrs/Cargo.toml
+2026-11-12T10:03:01.7048657Z   - /home/runner/work/maos/maos/crates/maos-audit/Cargo.toml
+2026-11-12T10:03:01.7049024Z   - /home/runner/work/maos/maos/crates/maos-bench/Cargo.toml
+2026-11-12T10:03:01.7049399Z   - /home/runner/work/maos/maos/crates/maos-bin/Cargo.toml
+2026-11-12T10:03:01.7049810Z   - /home/runner/work/maos/maos/crates/maos-capability/Cargo.toml
+2026-11-12T10:03:01.7050208Z   - /home/runner/work/maos/maos/crates/maos-cli/Cargo.toml
+2026-11-12T10:03:01.7050579Z   - /home/runner/work/maos/maos/crates/maos-cohort/Cargo.toml
+2026-11-12T10:03:01.7050984Z   - /home/runner/work/maos/maos/crates/maos-compliance/Cargo.toml
+2026-11-12T10:03:01.7051665Z   - /home/runner/work/maos/maos/crates/maos-control/Cargo.toml
+2026-11-12T10:03:01.7052061Z   - /home/runner/work/maos/maos/crates/maos-corpus-gen/Cargo.toml
+2026-11-12T10:03:01.7052805Z   - /home/runner/work/maos/maos/crates/maos-director-surface/Cargo.toml
+2026-11-12T10:03:01.7053503Z   - /home/runner/work/maos/maos/crates/maos-domain/Cargo.toml
+2026-11-12T10:03:01.7053910Z   - /home/runner/work/maos/maos/crates/maos-egress/Cargo.toml
+2026-11-12T10:03:01.7054330Z   - /home/runner/work/maos/maos/crates/maos-escape-detector/Cargo.toml
+2026-11-12T10:03:01.7054755Z   - /home/runner/work/maos/maos/crates/maos-eval/Cargo.toml
+2026-11-12T10:03:01.7055138Z   - /home/runner/work/maos/maos/crates/maos-exec-deps/Cargo.toml
+2026-11-12T10:03:01.7055523Z   - /home/runner/work/maos/maos/crates/maos-fkcs/Cargo.toml
+2026-11-12T10:03:01.7055915Z   - /home/runner/work/maos/maos/crates/maos-frame-codec/Cargo.toml
+2026-11-12T10:03:01.7056301Z   - /home/runner/work/maos/maos/crates/maos-host/Cargo.toml
+2026-11-12T10:03:01.7056670Z   - /home/runner/work/maos/maos/crates/maos-iac/Cargo.toml
+2026-11-12T10:03:01.7057063Z   - /home/runner/work/maos/maos/crates/maos-journey-test/Cargo.toml
+2026-11-12T10:03:01.7057485Z   - /home/runner/work/maos/maos/crates/maos-kernel-core/Cargo.toml
+2026-11-12T10:03:01.7057889Z   - /home/runner/work/maos/maos/crates/maos-loom-lite/Cargo.toml
+2026-11-12T10:03:01.7058521Z   - /home/runner/work/maos/maos/crates/maos-manifest/Cargo.toml
+2026-11-12T10:03:01.7058913Z   - /home/runner/work/maos/maos/crates/maos-mcp/Cargo.toml
+2026-11-12T10:03:01.7059297Z   - /home/runner/work/maos/maos/crates/maos-notify-push/Cargo.toml
+2026-11-12T10:03:01.7059740Z   - /home/runner/work/maos/maos/crates/maos-orchestrator-buffer/Cargo.toml
+2026-11-12T10:03:01.7060167Z   - /home/runner/work/maos/maos/crates/maos-pdp/Cargo.toml
+2026-11-12T10:03:01.7060553Z   - /home/runner/work/maos/maos/crates/maos-persistence/Cargo.toml
+2026-11-12T10:03:01.7060966Z   - /home/runner/work/maos/maos/crates/maos-providers/Cargo.toml
+2026-11-12T10:03:01.7061363Z   - /home/runner/work/maos/maos/crates/maos-registry/Cargo.toml
+2026-11-12T10:03:01.7061762Z   - /home/runner/work/maos/maos/crates/maos-secrets/Cargo.toml
+2026-11-12T10:03:01.7062151Z   - /home/runner/work/maos/maos/crates/maos-shell/Cargo.toml
+2026-11-12T10:03:01.7062515Z   - /home/runner/work/maos/maos/crates/maos-siem/Cargo.toml
+2026-11-12T10:03:01.7062945Z   - /home/runner/work/maos/maos/crates/maos-skill/Cargo.toml
+2026-11-12T10:03:01.7063899Z   - /home/runner/work/maos/maos/crates/maos-spirit-abi/Cargo.toml
+2026-11-12T10:03:01.7064588Z   - /home/runner/work/maos/maos/crates/maos-spirit-cli/Cargo.toml
+2026-11-12T10:03:01.7065275Z   - /home/runner/work/maos/maos/crates/maos-spirit-derive/Cargo.toml
+2026-11-12T10:03:01.7066035Z   - /home/runner/work/maos/maos/crates/maos-spirit-hello/Cargo.toml
+2026-11-12T10:03:01.7066766Z   - /home/runner/work/maos/maos/crates/maos-spirit-sdk/Cargo.toml
+2026-11-12T10:03:01.7067446Z   - /home/runner/work/maos/maos/crates/maos-sso/Cargo.toml
+2026-11-12T10:03:01.7068108Z   - /home/runner/work/maos/maos/crates/maos-telemetry/Cargo.toml
+2026-11-12T10:03:01.7068790Z   - /home/runner/work/maos/maos/crates/maos-wasm-host/Cargo.toml
+2026-11-12T10:03:01.7069530Z   - /home/runner/work/maos/maos/examples/example-spirit/Cargo.toml
+2026-11-12T10:03:01.7070200Z   - /home/runner/work/maos/maos/rust-toolchain.toml
+2026-11-12T10:03:01.7070823Z   - /home/runner/work/maos/maos/spirits/architect/Cargo.toml
+2026-11-12T10:03:01.7071478Z   - /home/runner/work/maos/maos/spirits/butler/Cargo.toml
+2026-11-12T10:03:01.7072127Z   - /home/runner/work/maos/maos/spirits/digest/Cargo.toml
+2026-11-12T10:03:01.7072767Z   - /home/runner/work/maos/maos/spirits/mira/Cargo.toml
+2026-11-12T10:03:01.7073591Z   - /home/runner/work/maos/maos/spirits/nash/Cargo.toml
+2026-11-12T10:03:01.7074222Z   - /home/runner/work/maos/maos/spirits/observer/Cargo.toml
+2026-11-12T10:03:01.7074910Z   - /home/runner/work/maos/maos/spirits/orchestrator/Cargo.toml
+2026-11-12T10:03:01.7075610Z   - /home/runner/work/maos/maos/spirits/researcher/Cargo.toml
+2026-11-12T10:03:01.7076273Z   - /home/runner/work/maos/maos/spirits/reviewer/Cargo.toml
+2026-11-12T10:03:01.7076910Z   - /home/runner/work/maos/maos/spirits/worker/Cargo.toml
+2026-11-12T10:03:01.7077756Z   - /home/runner/work/maos/maos/xtask/Cargo.toml
+2026-11-12T10:03:01.7078551Z ##[endgroup]
+2026-11-12T10:03:01.7078746Z 
+2026-11-12T10:03:03.6782161Z ... Cleaning /home/runner/work/maos/maos/target ...
+2026-11-12T10:03:04.0170362Z ... Cleaning cargo registry (cache-all-crates: false) ...
+2026-11-12T10:03:05.7613974Z ... Cleaning cargo/bin ...
+2026-11-12T10:03:05.7634752Z ... Cleaning cargo git cache ...
+2026-11-12T10:03:05.7638834Z ... Saving cache ...
+2026-11-12T10:03:05.7833928Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/maos/maos --files-from manifest.txt --use-compress-program zstdmt
+2026-11-12T10:03:11.5560042Z Sent 11183356 of 480945404 (2.3%), 10.7 MBs/sec
+2026-11-12T10:03:11.7515727Z Sent 480945404 of 480945404 (100.0%), 383.5 MBs/sec
+2026-11-12T10:03:11.9228390Z Post job cleanup.
+2026-11-12T10:03:12.0133848Z [command]/usr/bin/git version
+2026-11-12T10:03:12.0180831Z git version 2.56.0
+2026-11-12T10:03:12.0254095Z Temporarily overriding HOME='/home/runner/work/_temp/2f7f5238-d497-45d5-b517-7bb8a645d688' before making global git config changes
+2026-11-12T10:03:12.0255373Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-12T10:03:12.0264117Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/maos/maos
+2026-11-12T10:03:12.0302783Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-12T10:03:12.0343143Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-12T10:03:12.0637666Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-12T10:03:12.0675621Z http.https://github.com/.extraheader
+2026-11-12T10:03:12.0688170Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-12T10:03:12.0733715Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-12T10:03:12.1033846Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-12T10:03:12.1079666Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-12T10:03:12.1521247Z Cleaning up orphan processes

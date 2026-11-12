@@ -20,10 +20,15 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
+          targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest@0.9.149
+      # kloc-check shells out to tokei (run 43186933794: "failed to read tokei version"); v14.0.0 ships no
+      # release assets, so build from source exactly as discipline.yml does.
+      - name: Install tokei
+        run: cargo install --locked --version 14.0.0 tokei
       - uses: ./.github/actions/provision-t3-test-substrate
         if: ${{ !endsWith(matrix.image, '-arm') }}
       - name: Fixtures and witnesses
@@ -31,6 +36,7 @@ jobs:
           set -euo pipefail
           cargo test --locked -p maos-bin --bin maos --features crypto-recording story_13_5a_enterprise_governance_reaches_the_booted_cohort_daemon
           cargo nextest run --locked -p maos-bin --bin maos --features crypto-recording --profile ci crypto_provider_one_boot_reaches_all_four_surfaces
+          cargo nextest run --locked -p maos-bin --features crypto-recording --profile ci --test crypto_t3_admission_20_13
           if cargo check --locked --release -p maos-bin --lib --features crypto-recording > "$RUNNER_TEMP/crypto-release.log" 2>&1; then
             echo "recording provider unexpectedly compiled in release" >&2
             exit 1
@@ -49,7 +55,9 @@ jobs:
             cargo run --locked -p xtask -- "$gate" --json
           done
   apple-check:
-    runs-on: macos-14
+    # macos-14 is refused for this repository (run 43183933114 job 131066361556: "The configuration
+    # 'macos-14-arm64-us-default' is not supported"); discipline's macos-check uses macos-latest.
+    runs-on: macos-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5

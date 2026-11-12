@@ -1,0 +1,4020 @@
+warning: this function has too many arguments (8/7)
+   --> crates/maos-spirit-abi/src/gateway.rs:273:5
+    |
+273 | /     fn write_inbound(
+274 | |         &self,
+275 | |         receiving_spirit_id: &str,
+276 | |         gateway_id: &str,
+...   |
+281 | |         timestamp_ns: u64,
+282 | |     ) -> Pin<Box<dyn Future<Output = Result<(), GatewayError>> + Send>>;
+    | |_______________________________________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: this function has too many arguments (9/7)
+   --> crates/maos-spirit-abi/src/gateway.rs:285:5
+    |
+285 | /     fn write_outbound(
+286 | |         &self,
+287 | |         sending_spirit_id: &str,
+288 | |         gateway_id: &str,
+...   |
+294 | |         send_outcome: &str,
+295 | |     ) -> Pin<Box<dyn Future<Output = Result<(), GatewayError>> + Send>>;
+    | |_______________________________________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> crates/maos-spirit-abi/src/lifecycle.rs:415:18
+    |
+415 |     pub migrate: fn(&T, &mut Ctx, &[u8]) -> Result<alloc::vec::Vec<u8>, MigratorError>,
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: using `contains()` instead of `iter().any()` is more efficient
+   --> crates/maos-spirit-abi/src/lifecycle.rs:518:5
+    |
+518 |     enabled_hooks.iter().any(|&h| h == hook_name)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `enabled_hooks.contains(&hook_name)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_contains
+    = note: `#[warn(clippy::manual_contains)]` on by default
+
+warning: `maos-spirit-abi` (lib) generated 4 warnings (run `cargo clippy --fix --lib -p maos-spirit-abi -- ` to apply 1 suggestion)
+warning: empty line after doc comment
+   --> crates/maos-domain/src/ports/collective_memory.rs:109:1
+    |
+109 | / /// the kernel mediation layer and the external Loom-lite backing store.
+110 | |
+    | |_^
+111 |   pub trait CollectiveMemoryPort: Send + Sync {
+    |   ------------------------------ the comment documents this trait
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#empty_line_after_doc_comments
+    = note: `#[warn(clippy::empty_line_after_doc_comments)]` on by default
+    = help: if the empty line is unintentional, remove it
+
+warning: manual implementation of `.is_multiple_of()`
+   --> crates/maos-domain/src/audit_key.rs:349:8
+    |
+349 |     if filtered.len() % 4 != 0 {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `!filtered.len().is_multiple_of(4)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+    = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: using `chunks_exact` with a constant chunk size
+   --> crates/maos-domain/src/audit_key.rs:356:27
+    |
+356 |     let chunks = filtered.chunks_exact(4);
+    |                           ^^^^^^^^^^^^^^^
+    |
+help: consider using `as_chunks::<4>()` instead
+   --> crates/maos-domain/src/audit_key.rs:356:27
+    |
+356 |     let chunks = filtered.chunks_exact(4);
+    |                           ^^^^^^^^^^^^^^^
+    = note: you can access the chunks using `chunks.0.iter()`, and the remainder using `chunks.1`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+    = note: `#[warn(clippy::chunks_exact_to_as_chunks)]` on by default
+
+warning: useless conversion to the same type: `u8`
+   --> crates/maos-domain/src/audit_key.rs:367:19
+    |
+367 |               match b
+    |  ___________________^
+368 | |                 .try_into()
+    | |___________________________^
+    |
+    = help: consider removing `.try_into()`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_conversion
+    = note: `#[warn(clippy::useless_conversion)]` on by default
+
+warning: this `impl` can be derived
+  --> crates/maos-domain/src/invariants/i12.rs:46:1
+   |
+46 | / impl Default for WorkingMemoryDigestRefs {
+47 | |     fn default() -> Self {
+48 | |         Self(Vec::new())
+49 | |     }
+50 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#derivable_impls
+   = note: `#[warn(clippy::derivable_impls)]` on by default
+help: replace the manual implementation with a derive attribute
+   |
+32 + #[derive(Default)]
+33 | pub struct WorkingMemoryDigestRefs(Vec<String>);
+   |
+
+warning: this `impl` can be derived
+  --> crates/maos-domain/src/invariants/i13.rs:53:1
+   |
+53 | / impl Default for IntentLineage {
+54 | |     fn default() -> Self {
+55 | |         Self(Vec::new())
+56 | |     }
+57 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#derivable_impls
+help: replace the manual implementation with a derive attribute
+   |
+34 + #[derive(Default)]
+35 | pub struct IntentLineage(Vec<crate::invariants::i8::A2AIntent>);
+   |
+
+warning: this `impl` can be derived
+   --> crates/maos-domain/src/frame.rs:159:1
+    |
+159 | / impl Default for PosturePreferences {
+160 | |     fn default() -> Self {
+161 | |         Self {
+162 | |             preferred_posture: None,
+...   |
+166 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#derivable_impls
+help: replace the manual implementation with a derive attribute
+    |
+145 + #[derive(Default)]
+146 | pub struct PosturePreferences {
+    |
+
+warning: current MSRV (Minimum Supported Rust Version) is `1.88.0` but this item is stable since `1.91.0`
+   --> crates/maos-domain/src/frame.rs:357:46
+    |
+357 |         let _ = reason.get(..4096.min(reason.ceil_char_boundary(4096)));
+    |                                              ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#incompatible_msrv
+    = note: `#[warn(clippy::incompatible_msrv)]` on by default
+
+warning: using `chunks_exact` with a constant chunk size
+   --> crates/maos-domain/src/governance.rs:173:33
+    |
+173 |     for (index, chunk) in bytes.chunks_exact(2).enumerate() {
+    |                                 ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+warning: using `chunks_exact_mut` with a constant chunk size
+   --> crates/maos-domain/src/governance.rs:189:22
+    |
+189 |     for chunk in out.chunks_exact_mut(2) {
+    |                      ^^^^^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks_mut::<2>().0`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+warning: doc list item without indentation
+   --> crates/maos-domain/src/hot_swap.rs:235:5
+    |
+235 | /// The kernel impl reads and parses the manifest; domain trait stays free
+    |     ^
+    |
+    = help: if this is supposed to be its own paragraph, add a blank line
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+    = note: `#[warn(clippy::doc_lazy_continuation)]` on by default
+help: indent this line
+    |
+235 | ///   The kernel impl reads and parses the manifest; domain trait stays free
+    |     ++
+
+warning: doc list item without indentation
+   --> crates/maos-domain/src/hot_swap.rs:236:5
+    |
+236 | /// of kernel types, mirroring the `LifecycleResolver` and `HaltResolver` precedent.
+    |     ^
+    |
+    = help: if this is supposed to be its own paragraph, add a blank line
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+    |
+236 | ///   of kernel types, mirroring the `LifecycleResolver` and `HaltResolver` precedent.
+    |     ++
+
+warning: the `Err`-variant returned from this function is very large
+   --> crates/maos-domain/src/ports/iac_bus.rs:51:56
+    |
+ 51 |       fn register_spirit(&self, spirit_id: &SpiritId) -> Result<Self::MailboxHandle, IacBusError>;
+    |                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: crates/maos-domain/src/iac_bus_types.rs:116:5
+    |
+116 | /     CrossHostCrossTeamCrossingRefused {
+117 | |         peer: String,
+118 | |         reason: String,
+119 | |         detail: String,
+...   |
+122 | |         intent: String,
+123 | |     },
+    | |_____- the largest variant contains at least 144 bytes
+    |
+    = help: try reducing the size of `iac_bus_types::IacBusError`, for example by boxing large elements or replacing it with `Box<iac_bus_types::IacBusError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+    = note: `#[warn(clippy::result_large_err)]` on by default
+
+warning: clamp-like pattern without using clamp function
+  --> crates/maos-domain/src/ports/registry.rs:99:20
+   |
+99 |             limit: limit.min(200).max(1),
+   |                    ^^^^^^^^^^^^^^^^^^^^^ help: replace with clamp: `limit.clamp(1, 200)`
+   |
+   = note: clamp will panic if max < min
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_clamp
+   = note: `#[warn(clippy::manual_clamp)]` on by default
+
+warning: manual `!RangeInclusive::contains` implementation
+  --> crates/maos-domain/src/region.rs:61:12
+   |
+61 |         if len < Self::MIN_LEN || len > Self::MAX_LEN {
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `!(Self::MIN_LEN..=Self::MAX_LEN).contains(&len)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_range_contains
+   = note: `#[warn(clippy::manual_range_contains)]` on by default
+
+warning: this function has too many arguments (11/7)
+  --> crates/maos-domain/src/self_telemetry.rs:30:5
+   |
+30 | /     pub fn new(
+31 | |         spirit_pid: u32,
+32 | |         window_start_ns: u64,
+33 | |         window_end_ns: u64,
+...  |
+41 | |         generated_ns: u64,
+42 | |     ) -> Result<Self, &'static str> {
+   | |___________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+   = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 18 warnings (run `cargo clippy --fix --lib -p maos-domain -- ` to apply 7 suggestions)
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: you should consider adding a `Default` implementation for `CapShard`
+  --> crates/maos-capability/src/cap_tokens/shard.rs:22:5
+   |
+22 | /     pub fn new() -> Self {
+23 | |         Self {
+24 | |             inner: RwLock::new(HashMap::new()),
+25 | |         }
+26 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#new_without_default
+   = note: `#[warn(clippy::new_without_default)]` on by default
+help: try adding this
+   |
+21 + impl Default for CapShard {
+22 +     fn default() -> Self {
+23 +         Self::new()
+24 +     }
+25 + }
+   |
+
+warning: using `clone` on type `IntentClass` which implements the `Copy` trait
+  --> crates/maos-capability/src/cap_tokens/shard.rs:39:27
+   |
+39 |             intent_class: s.intent_class.clone(),
+   |                           ^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `s.intent_class`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#clone_on_copy
+   = note: `#[warn(clippy::clone_on_copy)]` on by default
+
+warning: `maos-capability` (lib) generated 3 warnings (run `cargo clippy --fix --lib -p maos-capability -- ` to apply 3 suggestions)
+warning: empty line after doc comment
+   --> crates/maos-audit/src/lib.rs:189:1
+    |
+189 | / /// Open the per-Host SQLite file read-only and return matching entries.
+190 | |
+    | |_^
+191 |   pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, AuditError> {
+    |   ------------ the comment documents this function
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#empty_line_after_doc_comments
+    = note: `#[warn(clippy::empty_line_after_doc_comments)]` on by default
+    = help: if the empty line is unintentional, remove it
+
+warning: manually reimplementing `div_ceil`
+  --> crates/maos-audit/src/erasure/merkle.rs:88:43
+   |
+88 |         let mut next = Vec::with_capacity((current.len() + 1) / 2);
+   |                                           ^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `current.len().div_ceil(2)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_div_ceil
+   = note: `#[warn(clippy::manual_div_ceil)]` on by default
+
+warning: this function has too many arguments (11/7)
+   --> crates/maos-audit/src/erasure/proof.rs:360:1
+    |
+360 | / pub fn build_erasure_proof(
+361 | |     spirit_id: String,
+362 | |     spirit_pid: u32,
+363 | |     uninstalled_at_ns: u64,
+...   |
+371 | |     signing_seed: &[u8; 32],
+372 | | ) -> Result<ErasureProof, ErasureProofError> {
+    | |____________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: redundant closure
+   --> crates/maos-audit/src/log_composition.rs:216:57
+    |
+216 |         let file = fs::File::open(journal_path).map_err(|e| AuditError::Io(e))?;
+    |                                                         ^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `AuditError::Io`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+    = note: `#[warn(clippy::redundant_closure)]` on by default
+
+warning: redundant closure
+   --> crates/maos-audit/src/log_composition.rs:219:37
+    |
+219 |             let line = line.map_err(|e| AuditError::Io(e))?;
+    |                                     ^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `AuditError::Io`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+
+warning: this function has too many arguments (8/7)
+   --> crates/maos-audit/src/sealed_export.rs:520:1
+    |
+520 | / fn two_host_receipt_payload(
+521 | |     schema_version: &str,
+522 | |     host_a: &str,
+523 | |     host_b: &str,
+...   |
+528 | |     claim_scope: &str,
+529 | | ) -> Vec<u8> {
+    | |____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: use of a fallible conversion when an infallible one could be used
+   --> crates/maos-audit/src/lib.rs:210:23
+    |
+210 |         let pid_i64 = i64::try_from(pid).map_err(|_| AuditError::ValueOverflow {
+    |                       ^^^^^^^^^^^^^
+    |
+    = note: converting `u32` to `i64` cannot fail
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_fallible_conversions
+    = note: `#[warn(clippy::unnecessary_fallible_conversions)]` on by default
+help: use
+    |
+210 -         let pid_i64 = i64::try_from(pid).map_err(|_| AuditError::ValueOverflow {
+210 +         let pid_i64 = From::from(pid).map_err(|_| AuditError::ValueOverflow {
+    |
+
+warning: use of a fallible conversion when an infallible one could be used
+   --> crates/maos-audit/src/lib.rs:391:23
+    |
+391 |         let pid_i64 = i64::try_from(pid).map_err(|_| AuditError::ValueOverflow {
+    |                       ^^^^^^^^^^^^^
+    |
+    = note: converting `u32` to `i64` cannot fail
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_fallible_conversions
+help: use
+    |
+391 -         let pid_i64 = i64::try_from(pid).map_err(|_| AuditError::ValueOverflow {
+391 +         let pid_i64 = From::from(pid).map_err(|_| AuditError::ValueOverflow {
+    |
+
+warning: the variable `line_no` is used as a loop counter
+   --> crates/maos-audit/src/lib.rs:705:5
+    |
+705 |     for mut entry in entries.into_iter() {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `for (line_no, mut entry) in entries.into_iter().enumerate()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#explicit_counter_loop
+    = note: `#[warn(clippy::explicit_counter_loop)]` on by default
+
+warning: this OR pattern can be rewritten using a range
+   --> crates/maos-audit/src/lib.rs:887:9
+    |
+887 | /         0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19
+888 | |         | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 => Some(AuditCategory::Operational),
+    | |_______________________________________________^ help: try: `0..=27`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_range_patterns
+    = note: `#[warn(clippy::manual_range_patterns)]` on by default
+
+warning: literal with an empty format string
+   --> crates/maos-audit/src/lib.rs:915:9
+    |
+915 | /         "capability_token",
+916 | |         "intent",
+    | |________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#write_literal
+    = note: `#[warn(clippy::write_literal)]` on by default
+help: try
+    |
+909 ~         "{:<32}  {:<16}  {:<10}  {:<22}  {:<20}  capability_token  intent",
+910 |         "call_id",
+...
+913 |         "call_type",
+914 ~         "timestamp_ns",
+    |
+
+warning: literal with an empty format string
+   --> crates/maos-audit/src/lib.rs:952:77
+    |
+952 |         "call_id", "boot_nonce", "spirit_pid", "call_type", "timestamp_ns", "intent",
+    |                                                                             ^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#write_literal
+help: try
+    |
+951 ~         "{:<32}  {:<16}  {:<10}  {:<22}  {:<20}  intent",
+952 ~         "call_id", "boot_nonce", "spirit_pid", "call_type", "timestamp_ns",
+    |
+
+warning: the variable `line_no` is used as a loop counter
+   --> crates/maos-audit/src/lib.rs:955:5
+    |
+955 |     for entry in entries.into_iter() {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `for (line_no, entry) in entries.into_iter().enumerate()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#explicit_counter_loop
+
+warning: unneeded late initialization
+    --> crates/maos-audit/src/lib.rs:1250:5
+     |
+1250 | /     match read_binding_row(conn)? {
+1251 | |         Some((team, datname)) => {
+1252 | |             binding_team = Some(team);
+1253 | |             binding_datname = datname;
+...    |
+1259 | |     }
+     | |_____^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_late_init
+     = note: `#[warn(clippy::needless_late_init)]` on by default
+help: move the declarations here and remove the assignments from the `match` arms
+     |
+1248 ~     
+1249 ~     
+1250 ~     let (binding_team, binding_datname) = match read_binding_row(conn)? {
+1251 |         Some((team, datname)) => {
+1252 ~             (Some(team), datname)
+1253 |         }
+1254 |         None => {
+1255 ~             (None, None)
+1256 |         }
+1257 ~     };
+     |
+
+warning: `maos-audit` (lib) generated 14 warnings (run `cargo clippy --fix --lib -p maos-audit -- ` to apply 7 suggestions)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: redundant closure
+   --> crates/maos-iac/src/adapter/distillate.rs:183:23
+    |
+183 |             .and_then(|s| parse_hex_frame_id(s))
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the function itself: `parse_hex_frame_id`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+    = note: `#[warn(clippy::redundant_closure)]` on by default
+
+warning: redundant closure
+   --> crates/maos-iac/src/adapter/distillate.rs:202:25
+    |
+202 |             .filter_map(|s| parse_hex_frame_id(s))
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the function itself: `parse_hex_frame_id`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+
+warning: redundant closure
+   --> crates/maos-iac/src/adapter/distillate.rs:211:18
+    |
+211 |             .map(|s| A2AIntent::new(s))
+    |                  ^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the associated function itself: `A2AIntent::new`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+
+warning: the loop variable `i` is used to index `bytes`
+   --> crates/maos-iac/src/adapter/distillate.rs:508:14
+    |
+508 |     for i in 0..16 {
+    |              ^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_range_loop
+    = note: `#[warn(clippy::needless_range_loop)]` on by default
+help: consider using an iterator and enumerate()
+    |
+508 -     for i in 0..16 {
+508 +     for (i, <item>) in bytes.iter_mut().enumerate() {
+    |
+
+warning: the `Err`-variant returned from this function is very large
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:91:10
+   |
+91 |     ) -> Result<LogBeforeDeliver<FrameRowWrite>, IacBusError> {
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 144 bytes
+   |
+   = help: try reducing the size of `maos_domain::iac_bus_types::IacBusError`, for example by boxing large elements or replacing it with `Box<maos_domain::iac_bus_types::IacBusError>`
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+   = note: `#[warn(clippy::result_large_err)]` on by default
+
+warning: this returns a `Result<_, ()>`
+   --> crates/maos-iac/src/adapter/mailbox.rs:242:5
+    |
+242 |     pub fn install_consent_gate(&self, gate: Arc<dyn ConsentGate>) -> Result<(), ()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: use a custom `Error` type instead
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_unit_err
+    = note: `#[warn(clippy::result_unit_err)]` on by default
+
+warning: this returns a `Result<_, ()>`
+   --> crates/maos-iac/src/adapter/mailbox.rs:248:5
+    |
+248 |     pub fn install_transparency_log(&self, tl: Arc<TransparencyLogAdapter>) -> Result<(), ()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: use a custom `Error` type instead
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_unit_err
+
+warning: this returns a `Result<_, ()>`
+   --> crates/maos-iac/src/adapter/mailbox.rs:262:5
+    |
+262 |     pub fn install_a2a_router(&self, router: Arc<dyn A2ARouter>) -> Result<(), ()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: use a custom `Error` type instead
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_unit_err
+
+warning: the `Err`-variant returned from this function is very large
+   --> crates/maos-iac/src/adapter/mailbox.rs:266:55
+    |
+266 |     pub fn register_spirit(&self, spirit_id: &str) -> Result<SpiritMailboxHandle, IacBusError> {
+    |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 144 bytes
+    |
+    = help: try reducing the size of `maos_domain::iac_bus_types::IacBusError`, for example by boxing large elements or replacing it with `Box<maos_domain::iac_bus_types::IacBusError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: the `Err`-variant returned from this function is very large
+   --> crates/maos-iac/src/adapter/mailbox.rs:400:53
+    |
+400 |     pub async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError> {
+    |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 144 bytes
+    |
+    = help: try reducing the size of `maos_domain::iac_bus_types::IacBusError`, for example by boxing large elements or replacing it with `Box<maos_domain::iac_bus_types::IacBusError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: the `Err`-variant returned from this function is very large
+   --> crates/maos-iac/src/adapter/mailbox.rs:410:10
+    |
+410 |     ) -> Result<LogBeforeDeliver<()>, IacBusError> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 144 bytes
+    |
+    = help: try reducing the size of `maos_domain::iac_bus_types::IacBusError`, for example by boxing large elements or replacing it with `Box<maos_domain::iac_bus_types::IacBusError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-iac/src/adapter/mailbox.rs:481:65
+    |
+481 | ...                   .map(|r| match serde_json::to_value(&r.reason) {
+    |                                                           ^^^^^^^^^ help: change this to: `r.reason`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+    = note: `#[warn(clippy::needless_borrows_for_generic_args)]` on by default
+
+warning: the `Err`-variant returned from this function is very large
+   --> crates/maos-iac/src/adapter/mailbox.rs:684:10
+    |
+684 |     ) -> Result<LogBeforeDeliver<()>, IacBusError> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 144 bytes
+    |
+    = help: try reducing the size of `maos_domain::iac_bus_types::IacBusError`, for example by boxing large elements or replacing it with `Box<maos_domain::iac_bus_types::IacBusError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: the `Err`-variant returned from this function is very large
+  --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:67:6
+   |
+67 | ) -> Result<(), IacBusError> {
+   |      ^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 144 bytes
+   |
+   = help: try reducing the size of `maos_domain::iac_bus_types::IacBusError`, for example by boxing large elements or replacing it with `Box<maos_domain::iac_bus_types::IacBusError>`
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: this `.fold` can be written more succinctly using another method
+   --> crates/maos-iac/src/adapter/redaction.rs:268:63
+    |
+268 |           serde_json::Value::Array(values) => values.iter_mut().fold(false, |seen, value| {
+    |  _______________________________________________________________^
+269 | |             redact_json_value(value, under_clause_sources) || seen
+270 | |         }),
+    | |__________^ help: try: `any(|value| redact_json_value(value, under_clause_sources))`
+    |
+    = note: the `any` method is short circuiting and may change the program semantics if the iterator has side effects
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_fold
+    = note: `#[warn(clippy::unnecessary_fold)]` on by default
+
+warning: this returns a `Result<_, ()>`
+   --> crates/maos-iac/src/adapter/transparency_log.rs:729:5
+    |
+729 | /     pub fn install_recipient_resolver(
+730 | |         &self,
+731 | |         resolver: std::sync::Arc<dyn RecipientResolver>,
+732 | |     ) -> Result<(), ()> {
+    | |_______________________^
+    |
+    = help: use a custom `Error` type instead
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_unit_err
+
+warning: this function has too many arguments (9/7)
+    --> crates/maos-iac/src/adapter/transparency_log.rs:1140:5
+     |
+1140 | /     pub fn insert_frame_event_with_sender(
+1141 | |         &self,
+1142 | |         kind: FrameKind,
+1143 | |         spirit_pid: u32,
+...    |
+1149 | |         origin: FrameOrigin,
+1150 | |     ) -> LogBeforeDeliver<()> {
+     | |_____________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+     = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: this function has too many arguments (10/7)
+    --> crates/maos-iac/src/adapter/transparency_log.rs:1186:5
+     |
+1186 | /     pub fn insert_frame_event_with_id(
+1187 | |         &self,
+1188 | |         frame_id: Option<[u8; 16]>,
+1189 | |         kind: FrameKind,
+...    |
+1196 | |         origin: FrameOrigin,
+1197 | |     ) -> LogBeforeDeliver<FrameRowWrite> {
+     | |________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: this function has too many arguments (10/7)
+    --> crates/maos-iac/src/adapter/transparency_log.rs:1230:5
+     |
+1230 | /     pub fn insert_distillate_frame(
+1231 | |         &self,
+1232 | |         _token: DistillateWriteToken,
+1233 | |         frame_id: Option<[u8; 16]>,
+...    |
+1240 | |         origin: FrameOrigin,
+1241 | |     ) -> LogBeforeDeliver<()> {
+     | |_____________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/maos-iac/src/adapter/transparency_log.rs:2050:10
+     |
+2050 |       ) -> Result<
+     |  __________^
+2051 | |         (
+2052 | |             Vec<String>,
+2053 | |             Vec<String>,
+...    |
+2058 | |         AuditError,
+2059 | |     > {
+     | |_____^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+     = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: the `Err`-variant returned from this function is very large
+   --> crates/maos-iac/src/adapter.rs:227:10
+    |
+227 |     ) -> Result<(), maos_domain::iac_bus_types::IacBusError> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 144 bytes
+    |
+    = help: try reducing the size of `maos_domain::iac_bus_types::IacBusError`, for example by boxing large elements or replacing it with `Box<maos_domain::iac_bus_types::IacBusError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: the `Err`-variant returned from this function is very large
+   --> crates/maos-iac/src/adapter.rs:433:10
+    |
+433 |       ) -> Result<
+    |  __________^
+434 | |         maos_domain::invariants::i2::LogBeforeDeliver<
+435 | |             crate::adapter::transparency_log::FrameRowWrite,
+436 | |         >,
+437 | |         maos_domain::iac_bus_types::IacBusError,
+438 | |     > {
+    | |_____^ the `Err`-variant is at least 144 bytes
+    |
+    = help: try reducing the size of `maos_domain::iac_bus_types::IacBusError`, for example by boxing large elements or replacing it with `Box<maos_domain::iac_bus_types::IacBusError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: this `if` statement can be collapsed
+   --> crates/maos-iac/src/adapter.rs:521:13
+    |
+521 | /             if is_cross_spirit {
+522 | |                 if frame.intent_lineage.is_empty() {
+523 | |                     match frame.auto_marker {
+...   |
+595 | |             }
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#collapsible_if
+    = note: `#[warn(clippy::collapsible_if)]` on by default
+help: collapse nested if block
+    |
+521 ~             if is_cross_spirit
+522 ~                 && frame.intent_lineage.is_empty() {
+523 |                     match frame.auto_marker {
+...
+593 |                     }
+594 ~                 }
+    |
+
+warning: the `Err`-variant returned from this function is very large
+   --> crates/maos-iac/src/adapter.rs:736:10
+    |
+736 |     ) -> Result<SpiritMailboxHandle, maos_domain::iac_bus_types::IacBusError> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 144 bytes
+    |
+    = help: try reducing the size of `maos_domain::iac_bus_types::IacBusError`, for example by boxing large elements or replacing it with `Box<maos_domain::iac_bus_types::IacBusError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: doc list item without indentation
+   --> crates/maos-iac/src/adapter.rs:748:9
+    |
+748 |     /// `capability_token` (Story 17-3c) mediates the retract; journaled on the
+    |         ^
+    |
+    = help: if this is supposed to be its own paragraph, add a blank line
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+    = note: `#[warn(clippy::doc_lazy_continuation)]` on by default
+help: indent this line
+    |
+748 |     ///    `capability_token` (Story 17-3c) mediates the retract; journaled on the
+    |         +++
+
+warning: doc list item without indentation
+   --> crates/maos-iac/src/adapter.rs:749:9
+    |
+749 |     /// Retract row exactly as in [`Self::deliver_typed`].
+    |         ^
+    |
+    = help: if this is supposed to be its own paragraph, add a blank line
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+    |
+749 |     ///    Retract row exactly as in [`Self::deliver_typed`].
+    |         +++
+
+warning: the `Err`-variant returned from this function is very large
+   --> crates/maos-iac/src/adapter.rs:756:10
+    |
+756 |     ) -> Result<maos_domain::iac_bus_types::RetractOutcome, maos_domain::iac_bus_types::IacBusError>
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 144 bytes
+    |
+    = help: try reducing the size of `maos_domain::iac_bus_types::IacBusError`, for example by boxing large elements or replacing it with `Box<maos_domain::iac_bus_types::IacBusError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: calls to `push` immediately after creation
+   --> crates/maos-iac/src/adapter.rs:863:21
+    |
+863 | /                     let mut v = Vec::new();
+864 | |                     v.push(maos_domain::frame::FrameAddress {
+865 | |                         spirit_id: retracting_spirit.clone(),
+866 | |                         host_id: None,
+867 | |                         role: None,
+868 | |                     });
+    | |_______________________^ help: consider using the `vec![]` macro: `let v = vec![..];`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#vec_init_then_push
+    = note: `#[warn(clippy::vec_init_then_push)]` on by default
+
+warning: calls to `push` immediately after creation
+   --> crates/maos-iac/src/adapter.rs:871:21
+    |
+871 | /                     let mut v = Vec::new();
+872 | |                     v.push(maos_domain::frame::FrameAddress {
+873 | |                         spirit_id: maos_spirit_abi::identity::SpiritId::from(recipient_id.as_str()),
+874 | |                         host_id: None,
+875 | |                         role: None,
+876 | |                     });
+    | |_______________________^ help: consider using the `vec![]` macro: `let v = vec![..];`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#vec_init_then_push
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: `maos-iac` (lib) generated 32 warnings (run `cargo clippy --fix --lib -p maos-iac -- ` to apply 8 suggestions)
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1434:21
+     |
+1434 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: this `map_or` can be simplified
+   --> crates/maos-manifest/src/manifest.rs:464:39
+    |
+464 |             if segment.is_empty() || !segment.bytes().next().map_or(false, |b| b.is_ascii_digit()) {
+    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+    = note: `#[warn(clippy::unnecessary_map_or)]` on by default
+help: use `is_some_and` instead
+    |
+464 -             if segment.is_empty() || !segment.bytes().next().map_or(false, |b| b.is_ascii_digit()) {
+464 +             if segment.is_empty() || !segment.bytes().next().is_some_and(|b| b.is_ascii_digit()) {
+    |
+
+warning: manual implementation of `Option::map`
+    --> crates/maos-manifest/src/manifest.rs:1449:24
+     |
+1449 |                   } else if let Some(t) = r.on_confidence_below {
+     |  ________________________^
+1450 | |                     Some(ScalarPredicate::Below { threshold: t })
+1451 | |                 } else {
+1452 | |                     None
+1453 | |                 };
+     | |_________________^ help: try: `{ r.on_confidence_below.map(|t| ScalarPredicate::Below { threshold: t }) }`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_map
+     = note: `#[warn(clippy::manual_map)]` on by default
+
+warning: this `impl` can be derived
+    --> crates/maos-manifest/src/manifest.rs:1680:1
+     |
+1680 | / impl Default for LifecycleSection {
+1681 | |     fn default() -> Self {
+1682 | |         Self {
+1683 | |             enabled_hooks: vec![],
+...    |
+1686 | | }
+     | |_^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#derivable_impls
+     = note: `#[warn(clippy::derivable_impls)]` on by default
+help: replace the manual implementation with a derive attribute
+     |
+1676 + #[derive(Default)]
+1677 | pub struct LifecycleSection {
+     |
+
+warning: manual implementation of `.is_multiple_of()`
+    --> crates/maos-manifest/src/manifest.rs:1992:8
+     |
+1992 |     if bytes.len() % 4 != 0 {
+     |        ^^^^^^^^^^^^^^^^^^^^ help: replace with: `!bytes.len().is_multiple_of(4)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+     = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: using `chunks_exact` with a constant chunk size
+    --> crates/maos-manifest/src/manifest.rs:2006:24
+     |
+2006 |     for chunk in bytes.chunks_exact(4) {
+     |                        ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<4>().0`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+     = note: `#[warn(clippy::chunks_exact_to_as_chunks)]` on by default
+
+warning: this `impl` can be derived
+    --> crates/maos-manifest/src/manifest.rs:5073:1
+     |
+5073 | / impl Default for GatewayType {
+5074 | |     fn default() -> Self {
+5075 | |         GatewayType::Echo
+5076 | |     }
+5077 | | }
+     | |_^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#derivable_impls
+help: replace the manual implementation with a derive attribute and mark the default variant
+     |
+5062 + #[derive(Default)]
+5063 | pub enum GatewayType {
+5064 |     Telegram,
+ ...
+5070 |     /// end-to-end without external network deps. NOT for production use.
+5071 ~     #[default]
+5072 ~     Echo,
+     |
+
+warning: this `impl` can be derived
+    --> crates/maos-manifest/src/manifest.rs:5090:1
+     |
+5090 | / impl Default for OnInboundHook {
+5091 | |     fn default() -> Self {
+5092 | |         OnInboundHook::OnFrame
+5093 | |     }
+5094 | | }
+     | |_^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#derivable_impls
+help: replace the manual implementation with a derive attribute and mark the default variant
+     |
+5086 + #[derive(Default)]
+5087 | pub enum OnInboundHook {
+5088 ~     #[default]
+5089 ~     OnFrame,
+     |
+
+warning: `maos-manifest` (lib) generated 8 warnings (run `cargo clippy --fix --lib -p maos-manifest -- ` to apply 8 suggestions)
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo clippy --fix --lib -p maos-mcp -- ` to apply 1 suggestion)
+warning: unused import: `DecisionId`
+  --> crates/maos-acp/src/server.rs:13:45
+   |
+13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+   |                                             ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `other`
+   --> crates/maos-acp/src/server.rs:223:25
+    |
+223 |                         other => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo clippy --fix --lib -p maos-acp -- ` to apply 2 suggestions)
+warning: doc list item without indentation
+   --> crates/maos-a2a-core/src/corpus.rs:145:5
+    |
+145 | /// (content-addressed reproducibility per §8.1).
+    |     ^
+    |
+    = help: if this is supposed to be its own paragraph, add a blank line
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+    = note: `#[warn(clippy::doc_lazy_continuation)]` on by default
+help: indent this line
+    |
+145 | ///   (content-addressed reproducibility per §8.1).
+    |     ++
+
+warning: doc list item without indentation
+   --> crates/maos-a2a-core/src/router.rs:129:5
+    |
+129 | /// Holds the transport-agnostic state (`peers`, `tofu`, `clock`) and the
+    |     ^
+    |
+    = help: if this is supposed to be its own paragraph, add a blank line
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+    |
+129 | ///   Holds the transport-agnostic state (`peers`, `tofu`, `clock`) and the
+    |     ++
+
+warning: doc list item without indentation
+   --> crates/maos-a2a-core/src/router.rs:130:5
+    |
+130 | /// validation logic both transports reuse.
+    |     ^
+    |
+    = help: if this is supposed to be its own paragraph, add a blank line
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+    |
+130 | ///   validation logic both transports reuse.
+    |     ++
+
+warning: useless use of `format!`
+    --> crates/maos-a2a-core/src/router.rs:2006:21
+     |
+2006 |             detail: format!("pin invalidated — re-pin consent required"),
+     |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.to_string()`: `"pin invalidated — re-pin consent required".to_string()`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_format
+     = note: `#[warn(clippy::useless_format)]` on by default
+
+warning: the `Err`-variant returned from this function is very large
+   --> crates/maos-a2a-core/src/transport/json_rpc.rs:212:44
+    |
+212 |     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, NackResponse> {
+    |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 136 bytes
+    |
+    = help: try reducing the size of `transport::json_rpc::NackResponse`, for example by boxing large elements or replacing it with `Box<transport::json_rpc::NackResponse>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+    = note: `#[warn(clippy::result_large_err)]` on by default
+
+warning: `maos-a2a-core` (lib) generated 5 warnings (run `cargo clippy --fix --lib -p maos-a2a-core -- ` to apply 1 suggestion)
+warning: unused variable: `halt_id`
+  --> crates/maos-director-surface/src/halt_ui.rs:59:9
+   |
+59 |         halt_id: HaltId,
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: redundant closure
+   --> crates/maos-director-surface/src/notification.rs:265:22
+    |
+265 |             .map_err(|e| NotificationError::WriteFailed(e))?;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `NotificationError::WriteFailed`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+    = note: `#[warn(clippy::redundant_closure)]` on by default
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> crates/maos-compliance/src/evaluator.rs:115:13
+    |
+115 |     verify: &dyn Fn(&[u8; 32], &[u8], &[u8; 64]) -> bool,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: this function has too many arguments (8/7)
+   --> crates/maos-compliance/src/vetting/mod.rs:321:1
+    |
+321 | / pub fn evaluate_upgrade_precondition(
+322 | |     target_is_public_vetted: bool,
+323 | |     subject: VettingSubject<'_>,
+324 | |     target_attestation: Option<&VettingAttestation>,
+...   |
+329 | |     now_unix_ms: u64,
+330 | | ) -> Result<(), VettingRejection> {
+    | |_________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: `maos-director-surface` (lib) generated 2 warnings (run `cargo clippy --fix --lib -p maos-director-surface -- ` to apply 2 suggestions)
+warning: `maos-compliance` (lib) generated 2 warnings
+warning: unused variable: `file_name`
+   --> crates/maos-eval/src/distillate_corpus.rs:106:17
+    |
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: redundant closure
+  --> crates/maos-eval/src/distillate_corpus.rs:91:22
+   |
+91 |             .map_err(|e| CorpusError::Io(e))?
+   |                      ^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `CorpusError::Io`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+   = note: `#[warn(clippy::redundant_closure)]` on by default
+
+warning: this `map_or` can be simplified
+  --> crates/maos-eval/src/halt_continuity_corpus.rs:66:16
+   |
+66 |             if path.extension().map_or(false, |ext| ext == "json") {
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+   = note: `#[warn(clippy::unnecessary_map_or)]` on by default
+help: use `is_some_and` instead
+   |
+66 -             if path.extension().map_or(false, |ext| ext == "json") {
+66 +             if path.extension().is_some_and(|ext| ext == "json") {
+   |
+
+warning: this can be `std::io::Error::other(_)`
+  --> crates/maos-eval/src/halt_corpus.rs:78:44
+   |
+78 |                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+   = note: `#[warn(clippy::io_other_error)]` on by default
+help: use `std::io::Error::other`
+   |
+78 -                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+78 +                         .unwrap_or_else(|| std::io::Error::other(msg)),
+   |
+
+warning: this `map_or` can be simplified
+  --> crates/maos-eval/src/halt_corpus.rs:82:16
+   |
+82 |             if path.extension().map_or(true, |ext| ext != "json") {
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+   |
+82 -             if path.extension().map_or(true, |ext| ext != "json") {
+82 +             if path.extension().is_none_or(|ext| ext != "json") {
+   |
+
+warning: struct `HaltCorpus` has a public `len` method, but no `is_empty` method
+  --> crates/maos-eval/src/halt_corpus.rs:97:5
+   |
+97 |     pub fn len(&self) -> usize {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#len_without_is_empty
+   = note: `#[warn(clippy::len_without_is_empty)]` on by default
+
+warning: manual implementation of `.is_multiple_of()`
+   --> crates/maos-eval/src/halt_replay.rs:223:12
+    |
+223 |         if hex.len() % 2 != 0 || !hex.is_ascii() {
+    |            ^^^^^^^^^^^^^^^^^^ help: replace with: `!hex.len().is_multiple_of(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+    = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: this `map_or` can be simplified
+   --> crates/maos-eval/src/hsis_corpus.rs:131:20
+    |
+131 |                 if path.extension().map_or(false, |ext| ext == "json") {
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+    |
+131 -                 if path.extension().map_or(false, |ext| ext == "json") {
+131 +                 if path.extension().is_some_and(|ext| ext == "json") {
+    |
+
+warning: this can be `std::io::Error::other(_)`
+  --> crates/maos-eval/src/intent_lineage_corpus.rs:77:44
+   |
+77 |                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+help: use `std::io::Error::other`
+   |
+77 -                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+77 +                         .unwrap_or_else(|| std::io::Error::other(msg)),
+   |
+
+warning: this `map_or` can be simplified
+  --> crates/maos-eval/src/intent_lineage_corpus.rs:81:16
+   |
+81 |             if path.extension().map_or(true, |ext| ext != "json") {
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+   |
+81 -             if path.extension().map_or(true, |ext| ext != "json") {
+81 +             if path.extension().is_none_or(|ext| ext != "json") {
+   |
+
+warning: this `map_or` can be simplified
+  --> crates/maos-eval/src/intent_lineage_corpus.rs:84:17
+   |
+84 |               if !path.file_stem().map_or(false, |s| {
+   |  _________________^
+85 | |                 s.to_str().map_or(false, |s| s.starts_with("scenario-"))
+86 | |             }) {
+   | |______________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+   |
+84 -             if !path.file_stem().map_or(false, |s| {
+84 +             if !path.file_stem().is_some_and(|s| {
+   |
+
+warning: this `map_or` can be simplified
+  --> crates/maos-eval/src/intent_lineage_corpus.rs:85:17
+   |
+85 |                 s.to_str().map_or(false, |s| s.starts_with("scenario-"))
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+   |
+85 -                 s.to_str().map_or(false, |s| s.starts_with("scenario-"))
+85 +                 s.to_str().is_some_and(|s| s.starts_with("scenario-"))
+   |
+
+warning: doc list item without indentation
+ --> crates/maos-eval/src/isolation_corpus.rs:6:5
+  |
+6 | //! category aggregated.
+  |     ^
+  |
+  = help: if this is supposed to be its own paragraph, add a blank line
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+  = note: `#[warn(clippy::doc_lazy_continuation)]` on by default
+help: indent this line
+  |
+6 | //!   category aggregated.
+  |     ++
+
+warning: redundant closure
+   --> crates/maos-eval/src/isolation_corpus.rs:235:26
+    |
+235 |                 .map_err(|e| CorpusError::Io(e))?
+    |                          ^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `CorpusError::Io`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+
+warning: redundant closure
+   --> crates/maos-eval/src/isolation_corpus.rs:268:30
+    |
+268 |                     .map_err(|e| CorpusError::Io(e))?
+    |                              ^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `CorpusError::Io`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+
+warning: this can be `std::io::Error::other(_)`
+  --> crates/maos-eval/src/retract_corpus.rs:55:44
+   |
+55 |                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+help: use `std::io::Error::other`
+   |
+55 -                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+55 +                         .unwrap_or_else(|| std::io::Error::other(msg)),
+   |
+
+warning: this `map_or` can be simplified
+  --> crates/maos-eval/src/retract_corpus.rs:59:16
+   |
+59 |             if path.extension().map_or(true, |ext| ext != "json") {
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+   |
+59 -             if path.extension().map_or(true, |ext| ext != "json") {
+59 +             if path.extension().is_none_or(|ext| ext != "json") {
+   |
+
+warning: this `map_or` can be simplified
+  --> crates/maos-eval/src/retract_corpus.rs:62:17
+   |
+62 |               if !path.file_stem().map_or(false, |s| {
+   |  _________________^
+63 | |                 s.to_str().map_or(false, |s| s.starts_with("scenario-"))
+64 | |             }) {
+   | |______________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+   |
+62 -             if !path.file_stem().map_or(false, |s| {
+62 +             if !path.file_stem().is_some_and(|s| {
+   |
+
+warning: this `map_or` can be simplified
+  --> crates/maos-eval/src/retract_corpus.rs:63:17
+   |
+63 |                 s.to_str().map_or(false, |s| s.starts_with("scenario-"))
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+   |
+63 -                 s.to_str().map_or(false, |s| s.starts_with("scenario-"))
+63 +                 s.to_str().is_some_and(|s| s.starts_with("scenario-"))
+   |
+
+warning: this can be `std::io::Error::other(_)`
+  --> crates/maos-eval/src/revocation_corpus.rs:41:44
+   |
+41 |                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+help: use `std::io::Error::other`
+   |
+41 -                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+41 +                         .unwrap_or_else(|| std::io::Error::other(msg)),
+   |
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+  --> crates/maos-eval/src/revocation_corpus.rs:83:10
+   |
+83 |     ) -> Result<Vec<(RevocationScenario, Vec<u8>, Vec<u8>)>, crate::CorpusError> {
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+   = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: this can be `std::io::Error::other(_)`
+  --> crates/maos-eval/src/t3_escape_corpus.rs:54:44
+   |
+54 |                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+help: use `std::io::Error::other`
+   |
+54 -                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+54 +                         .unwrap_or_else(|| std::io::Error::other(msg)),
+   |
+
+warning: this `map_or` can be simplified
+  --> crates/maos-eval/src/t3_escape_corpus.rs:58:16
+   |
+58 |             if path.extension().map_or(true, |ext| ext != "json") {
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+   |
+58 -             if path.extension().map_or(true, |ext| ext != "json") {
+58 +             if path.extension().is_none_or(|ext| ext != "json") {
+   |
+
+warning: this `map_or` can be simplified
+  --> crates/maos-eval/src/t3_escape_corpus.rs:61:16
+   |
+61 |               if path
+   |  ________________^
+62 | |                 .file_name()
+63 | |                 .map_or(false, |n| n == "methodology-attestation.json")
+   | |_______________________________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+   |
+63 -                 .map_or(false, |n| n == "methodology-attestation.json")
+63 +                 .is_some_and(|n| n == "methodology-attestation.json")
+   |
+
+warning: this can be `std::io::Error::other(_)`
+  --> crates/maos-eval/src/termination_corpus.rs:54:44
+   |
+54 |                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+help: use `std::io::Error::other`
+   |
+54 -                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+54 +                         .unwrap_or_else(|| std::io::Error::other(msg)),
+   |
+
+warning: this `map_or` can be simplified
+  --> crates/maos-eval/src/termination_corpus.rs:58:16
+   |
+58 |             if path.extension().map_or(true, |ext| ext != "json") {
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+   |
+58 -             if path.extension().map_or(true, |ext| ext != "json") {
+58 +             if path.extension().is_none_or(|ext| ext != "json") {
+   |
+
+warning: struct `TerminationCorpus` has a public `len` method, but no `is_empty` method
+  --> crates/maos-eval/src/termination_corpus.rs:73:5
+   |
+73 |     pub fn len(&self) -> usize {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#len_without_is_empty
+
+warning: this can be `std::io::Error::other(_)`
+  --> crates/maos-eval/src/upgrade_policy_corpus.rs:41:44
+   |
+41 |                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+help: use `std::io::Error::other`
+   |
+41 -                         .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)),
+41 +                         .unwrap_or_else(|| std::io::Error::other(msg)),
+   |
+
+warning: this `map_or` can be simplified
+  --> crates/maos-eval/src/upgrade_policy_corpus.rs:45:16
+   |
+45 |             if path.extension().map_or(true, |ext| ext != "json") {
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+   |
+45 -             if path.extension().map_or(true, |ext| ext != "json") {
+45 +             if path.extension().is_none_or(|ext| ext != "json") {
+   |
+
+warning: this `map_or` can be simplified
+  --> crates/maos-eval/src/upgrade_policy_corpus.rs:48:16
+   |
+48 |               if path
+   |  ________________^
+49 | |                 .file_name()
+50 | |                 .map_or(false, |n| n == "methodology-attestation.json")
+   | |_______________________________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+   |
+50 -                 .map_or(false, |n| n == "methodology-attestation.json")
+50 +                 .is_some_and(|n| n == "methodology-attestation.json")
+   |
+
+warning: `maos-eval` (lib) generated 30 warnings (run `cargo clippy --fix --lib -p maos-eval -- ` to apply 26 suggestions)
+warning: doc list item without indentation
+  --> crates/maos-skill/src/lib.rs:15:5
+   |
+15 | //! The markdown `body` and the FR57 `proposed_diff` are OPAQUE — the kernel
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+   = note: `#[warn(clippy::doc_lazy_continuation)]` on by default
+help: indent this line
+   |
+15 | //!   The markdown `body` and the FR57 `proposed_diff` are OPAQUE — the kernel
+   |     ++
+
+warning: doc list item without indentation
+  --> crates/maos-skill/src/lib.rs:16:5
+   |
+16 | //! does NOT parse them for meaning. Skill EXECUTION (a Spirit consuming a skill
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+16 | //!   does NOT parse them for meaning. Skill EXECUTION (a Spirit consuming a skill
+   |     ++
+
+warning: doc list item without indentation
+  --> crates/maos-skill/src/lib.rs:17:5
+   |
+17 | //! at `on_load`) is Spirit-side and out of scope.
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+17 | //!   at `on_load`) is Spirit-side and out of scope.
+   |     ++
+
+warning: current MSRV (Minimum Supported Rust Version) is `1.88.0` but this item is stable since `1.89.0`
+   --> crates/maos-skill/src/store.rs:166:14
+    |
+166 |         lock.lock()?;
+    |              ^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#incompatible_msrv
+    = note: `#[warn(clippy::incompatible_msrv)]` on by default
+
+warning: `maos-skill` (lib) generated 4 warnings
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo clippy --fix --lib -p maos-providers -- ` to apply 3 suggestions)
+warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+   |
+13 | use maos_domain::frame::EpistemicHaltPayload;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `test-introspection`
+   --> crates/maos-kernel-core/src/capability/mod.rs:521:21
+    |
+521 |     #[cfg(any(test, feature = "test-introspection"))]
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `HaltJournal`
+  --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+   |
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+   |                                  ^^^^^^^^^^^
+
+warning: private item shadows public glob re-export
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+  --> crates/maos-kernel-core/src/iac.rs:13:9
+   |
+13 | pub use maos_iac::*;
+   |         ^^^^^^^^^^^
+note: but the private item here shadows it
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `crate::capability::WorkingMemoryStore`
+  --> crates/maos-kernel-core/src/inference/mod.rs:23:5
+   |
+23 | use crate::capability::WorkingMemoryStore;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+   |
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i1::TokenId`
+  --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+   |
+60 | use maos_domain::invariants::i1::TokenId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LifecycleEntry`
+  --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+   |
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+   |                                                                 ^^^^^^^^^^^^^^
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+   |
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+   |                                                           ^^^^^^^
+
+warning: unused import: `McpRequest`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+   |
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+   |                                                                         ^^^^^^^^^^
+
+warning: unused import: `Path`
+  --> crates/maos-kernel-core/src/memory/private.rs:13:17
+   |
+13 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `AtomicU64`
+ --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                         ^^^^^^^^^
+
+warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+   |
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `DispositionOutcome`
+  --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+   |
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+   |                 ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_providers::Provider`
+  --> crates/maos-kernel-core/src/inference/mod.rs:29:5
+   |
+29 | use maos_providers::Provider;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `event`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+   |
+66 |         let event = self
+   |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spirit_id`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+   |
+69 |     spirit_id: &str,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+
+warning: unused variable: `spirit_pid`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+   |
+70 |     spirit_pid: u32,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+
+warning: variable does not need to be mutable
+   --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:622:9
+    |
+622 |     let mut child = spawn_child(&mut spec, &argv)?;
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `now_ns`
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:196:13
+    |
+196 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+
+warning: value assigned to `owned_guard` is never read
+   --> crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:401:27
+    |
+401 |     let mut owned_guard = None;
+    |                           ^^^^ this value is reassigned later and never used
+...
+455 |     owned_guard = Some(SandboxedContainerChild::own(
+    |     ----------- `owned_guard` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `total`
+  --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+   |
+22 |     let total = drained_tasks.len();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+warning: field `boot_nonce` is never read
+   --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+    |
+ 95 | pub struct KernelHaltResolver {
+    |            ------------------ field in this struct
+...
+101 |     boot_nonce: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `next_frame_counter` is never read
+  --> crates/maos-kernel-core/src/memory/mod.rs:82:5
+   |
+77 | pub struct MemoryManagerAdapter {
+   |            -------------------- field in this struct
+...
+82 |     next_frame_counter: AtomicU64,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: method `mint_frame_id` is never used
+   --> crates/maos-kernel-core/src/memory/mod.rs:665:8
+    |
+115 | impl MemoryManagerAdapter {
+    | ------------------------- method in this implementation
+...
+665 |     fn mint_frame_id(&self) -> [u8; 16] {
+    |        ^^^^^^^^^^^^^
+
+warning: field `kind` is never read
+  --> crates/maos-kernel-core/src/memory/private.rs:46:5
+   |
+44 | struct DiskCandidate {
+   |        ------------- field in this struct
+45 |     name: String,
+46 |     kind: ValueKind,
+   |     ^^^^
+
+warning: field `iac_rt_metrics` is never read
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+   |
+32 | pub struct SelfTelemetryAggregator {
+   |            ----------------------- field in this struct
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+   |     ^^^^^^^^^^^^^^
+
+warning: associated function `resolution_label` is never used
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+   |
+38 | impl SelfTelemetryAggregator {
+   | ---------------------------- associated function in this implementation
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: associated function `kind_to_str` is never used
+  --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+   |
+38 | impl SharedMemoryStore {
+   | ---------------------- associated function in this implementation
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+   |        ^^^^^^^^^^^
+
+warning: method `build_kernel_ctx` is never used
+   --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:141:8
+    |
+ 70 | impl HookDispatcher {
+    | ------------------- method in this implementation
+...
+141 |     fn build_kernel_ctx<'a>(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `attestation` is never read
+  --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+   |
+34 | pub struct VerifiedImageAttestation {
+   |            ------------------------ field in this struct
+35 |     attestation: T3ImageAttestation,
+   |     ^^^^^^^^^^^
+   |
+   = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+   |
+23 | pub struct ProgressWatchdog {
+   |            ---------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+   |
+23 | pub struct SilentFailureDetector {
+   |            --------------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: this function has too many arguments (10/7)
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:53:5
+   |
+53 | /     pub fn process_scalar_write(
+54 | |         &self,
+55 | |         tl: &TransparencyLogAdapter,
+56 | |         journal: &JournalAdapter,
+...  |
+63 | |         policy: &EpistemicPolicySection,
+64 | |     ) -> Result<Option<HaltReceipt>, Box<dyn std::error::Error>> {
+   | |________________________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+   = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: this function has too many arguments (8/7)
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:68:1
+   |
+68 | / pub fn evaluate_after_set_scalar(
+69 | |     spirit_id: &str,
+70 | |     spirit_pid: u32,
+71 | |     _boot_nonce: u64,
+...  |
+76 | |     registry: &dyn CapabilityRegistryPort,
+77 | | ) -> Result<Option<PolicyEvaluationOutcome>, PolicyRuntimeError> {
+   | |________________________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: you should consider adding a `Default` implementation for `PolicyTable`
+   --> crates/maos-kernel-core/src/capability/cap_policy/mod.rs:103:5
+    |
+103 | /     pub fn new() -> Self {
+104 | |         Self {
+105 | |             inner: Arc::new(ArcSwap::from_pointee(PolicyTableInner::default())),
+106 | |         }
+107 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#new_without_default
+    = note: `#[warn(clippy::new_without_default)]` on by default
+help: try adding this
+    |
+102 + impl Default for PolicyTable {
+103 +     fn default() -> Self {
+104 +         Self::new()
+105 +     }
+106 + }
+    |
+
+warning: this function has too many arguments (8/7)
+   --> crates/maos-kernel-core/src/capability/mod.rs:158:5
+    |
+158 | /     pub fn new(
+159 | |         crypto: Arc<dyn CryptoProvider>,
+160 | |         signing_key: cap_tokens::Ed25519SigningKey,
+161 | |         boot_nonce: u64,
+...   |
+166 | |         telemetry: Arc<TelemetryStreamAdapter>,
+167 | |     ) -> Self {
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-kernel-core/src/capability/mod.rs:306:62
+    |
+306 |             maos_domain::invariants::i7::TelemetryTopic::new(&format!("scalar.tap.{}", tag));
+    |                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `format!("scalar.tap.{}", tag)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+    = note: `#[warn(clippy::needless_borrows_for_generic_args)]` on by default
+
+warning: using `clone` on type `HaltState` which implements the `Copy` trait
+   --> crates/maos-kernel-core/src/halt/mod.rs:407:43
+    |
+407 |                 preview.push((id.clone(), state.clone()));
+    |                                           ^^^^^^^^^^^^^ help: try dereferencing it: `*state`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#clone_on_copy
+    = note: `#[warn(clippy::clone_on_copy)]` on by default
+
+warning: this function has too many arguments (9/7)
+  --> crates/maos-kernel-core/src/hot_swap/coordinator.rs:71:5
+   |
+71 | /     pub fn new(
+72 | |         spirits: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
+73 | |         journal: Arc<JournalAdapter>,
+74 | |         tl: Arc<TransparencyLogAdapter>,
+...  |
+80 | |         archive_dir: PathBuf,
+81 | |     ) -> Self {
+   | |_____________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: using `clone` on type `OnCrashAction` which implements the `Copy` trait
+   --> crates/maos-kernel-core/src/hot_swap/coordinator.rs:344:32
+    |
+344 |                 .map(|section| section.action.clone())
+    |                                ^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `section.action`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#clone_on_copy
+
+warning: this item has comments with 4 forward slashes (`////`). These look like doc comments, but they aren't
+  --> crates/maos-kernel-core/src/hot_swap/post_swap_monitor.rs:24:1
+   |
+24 | / //// Re-export the domain violation type for the saga layer.
+25 | | pub use maos_domain::hot_swap::PostSwapInvariantViolation;
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#four_forward_slashes
+   = note: `#[warn(clippy::four_forward_slashes)]` on by default
+help: make this a doc comment by removing one `/`
+   |
+24 - //// Re-export the domain violation type for the saga layer.
+25 - pub use maos_domain::hot_swap::PostSwapInvariantViolation;
+24 + /// Re-export the domain violation type for the saga layer.
+   |
+
+warning: useless conversion to the same type: `std::string::String`
+   --> crates/maos-kernel-core/src/hot_swap/state_codec.rs:110:13
+    |
+110 |             format!("schema_version {schema_version_raw} exceeds u32::MAX").into(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider removing `.into()`: `format!("schema_version {schema_version_raw} exceeds u32::MAX")`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_conversion
+    = note: `#[warn(clippy::useless_conversion)]` on by default
+
+warning: you seem to want to iterate on a map's values
+  --> crates/maos-kernel-core/src/iac.rs:46:29
+   |
+46 |             for (_, scb) in scbs.iter() {
+   |                             ^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#for_kv_map
+   = note: `#[warn(clippy::for_kv_map)]` on by default
+help: use the corresponding method
+   |
+46 -             for (_, scb) in scbs.iter() {
+46 +             for scb in scbs.values() {
+   |
+
+warning: you seem to want to iterate on a map's values
+  --> crates/maos-kernel-core/src/iac.rs:58:29
+   |
+58 |             for (_, scb) in scbs.iter() {
+   |                             ^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#for_kv_map
+help: use the corresponding method
+   |
+58 -             for (_, scb) in scbs.iter() {
+58 +             for scb in scbs.values() {
+   |
+
+warning: this function has too many arguments (9/7)
+   --> crates/maos-kernel-core/src/inference/mod.rs:131:5
+    |
+131 | /     fn emit_rate_limited_frame(
+132 | |         &self,
+133 | |         invoking_spirit_id: &str,
+134 | |         provider_id: &str,
+...   |
+140 | |         intent_lineage: maos_domain::invariants::i13::IntentLineage,
+141 | |     ) {
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: calls to `push` immediately after creation
+   --> crates/maos-kernel-core/src/inference/mod.rs:179:17
+    |
+179 | /                 let mut v: Vec<maos_domain::frame::FrameAddress> = Vec::new();
+180 | |                 v.push(maos_domain::frame::FrameAddress {
+181 | |                     spirit_id: maos_spirit_abi::identity::SpiritId::from(invoking_spirit_id),
+182 | |                     host_id: None,
+183 | |                     role: None,
+184 | |                 });
+    | |___________________^ help: consider using the `vec![]` macro: `let v: Vec<maos_domain::frame::FrameAddress> = vec![..];`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#vec_init_then_push
+    = note: `#[warn(clippy::vec_init_then_push)]` on by default
+
+warning: useless use of `format!`
+   --> crates/maos-kernel-core/src/isolation/runner.rs:107:29
+    |
+107 |                     signal: format!("isolation not maintained"),
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.to_string()`: `"isolation not maintained".to_string()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_format
+    = note: `#[warn(clippy::useless_format)]` on by default
+
+warning: doc list item overindented
+  --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs:14:5
+   |
+14 | //!                   then subprocess wait + cap-token revocation.
+   |     ^^^^^^^^^^^^^^^^^^ help: try using `  ` (2 spaces)
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_overindented_list_items
+   = note: `#[warn(clippy::doc_overindented_list_items)]` on by default
+
+warning: doc list item overindented
+  --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs:16:5
+   |
+16 | //!                   `posture.control_channel`.
+   |     ^^^^^^^^^^^^^^^^^^ help: try using `  ` (2 spaces)
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_overindented_list_items
+
+warning: large size difference between variants
+   --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:468:1
+    |
+468 | / enum BridgeChild {
+469 | |     Plain(Child),
+470 | |     #[cfg(target_os = "linux")]
+471 | |     Sandboxed(SandboxedChild),
+    | |     ------------------------- the second-largest variant contains at least 80 bytes
+472 | |     Container(SandboxedContainerChild, VerifiedImageAttestation),
+    | |     ------------------------------------------------------------ the largest variant contains at least 304 bytes
+473 | | }
+    | |_^ the entire enum is at least 304 bytes
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#large_enum_variant
+    = note: `#[warn(clippy::large_enum_variant)]` on by default
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+    |
+472 -     Container(SandboxedContainerChild, VerifiedImageAttestation),
+472 +     Container(SandboxedContainerChild, Box<VerifiedImageAttestation>),
+    |
+
+warning: this function has too many arguments (8/7)
+   --> crates/maos-kernel-core/src/memory/principal.rs:105:5
+    |
+105 | /     pub(in crate::memory) fn record_write(
+106 | |         &self,
+107 | |         principal_id: &str,
+108 | |         writer_spirit_pid: u32,
+...   |
+113 | |         spill: impl FnOnce() -> Result<(), MemoryError>,
+114 | |     ) -> Result<(), MemoryError> {
+    | |________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: this function has too many arguments (8/7)
+   --> crates/maos-kernel-core/src/memory/mod.rs:253:5
+    |
+253 | /     pub fn collective_write(
+254 | |         &self,
+255 | |         spirit_pid: u32,
+256 | |         namespace: &MemoryNamespace,
+...   |
+261 | |         sandbox: maos_domain::invariants::i9::SandboxTier,
+262 | |     ) -> Result<(), MemoryError> {
+    | |________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: unnecessary closure used to substitute value for `Option::None`
+   --> crates/maos-kernel-core/src/memory/mod.rs:265:13
+    |
+265 | /             self.capabilities
+266 | |                 .as_ref()
+267 | |                 .ok_or_else(|| MemoryError::CollectiveNotYetAvailable {
+268 | |                     ship_target: "v1.5",
+269 | |                     landing_story: "E10 Story 10.4",
+270 | |                 })?;
+    | |__________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+    = note: `#[warn(clippy::unnecessary_lazy_evaluations)]` on by default
+help: use `ok_or` instead
+    |
+267 ~                 .ok_or(MemoryError::CollectiveNotYetAvailable {
+268 +                     ship_target: "v1.5",
+269 +                     landing_story: "E10 Story 10.4",
+270 ~                 })?;
+    |
+
+warning: unnecessary closure used to substitute value for `Option::None`
+   --> crates/maos-kernel-core/src/memory/mod.rs:271:20
+    |
+271 |           let port = self.collective_port.as_ref().ok_or_else(|| {
+    |  ____________________^
+272 | |             MemoryError::CollectiveNotYetAvailable {
+273 | |                 ship_target: "v1.5",
+274 | |                 landing_story: "E10 Story 10.4",
+275 | |             }
+276 | |         })?;
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+help: use `ok_or` instead
+    |
+271 ~         let port = self.collective_port.as_ref().ok_or({
+272 +             MemoryError::CollectiveNotYetAvailable {
+273 +                 ship_target: "v1.5",
+274 +                 landing_story: "E10 Story 10.4",
+275 +             }
+276 ~         })?;
+    |
+
+warning: unnecessary closure used to substitute value for `Option::None`
+   --> crates/maos-kernel-core/src/memory/mod.rs:329:13
+    |
+329 | /             self.capabilities
+330 | |                 .as_ref()
+331 | |                 .ok_or_else(|| MemoryError::CollectiveNotYetAvailable {
+332 | |                     ship_target: "v1.5",
+333 | |                     landing_story: "E10 Story 10.4",
+334 | |                 })?;
+    | |__________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+help: use `ok_or` instead
+    |
+331 ~                 .ok_or(MemoryError::CollectiveNotYetAvailable {
+332 +                     ship_target: "v1.5",
+333 +                     landing_story: "E10 Story 10.4",
+334 ~                 })?;
+    |
+
+warning: unnecessary closure used to substitute value for `Option::None`
+   --> crates/maos-kernel-core/src/memory/mod.rs:335:20
+    |
+335 |           let port = self.collective_port.as_ref().ok_or_else(|| {
+    |  ____________________^
+336 | |             MemoryError::CollectiveNotYetAvailable {
+337 | |                 ship_target: "v1.5",
+338 | |                 landing_story: "E10 Story 10.4",
+339 | |             }
+340 | |         })?;
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+help: use `ok_or` instead
+    |
+335 ~         let port = self.collective_port.as_ref().ok_or({
+336 +             MemoryError::CollectiveNotYetAvailable {
+337 +                 ship_target: "v1.5",
+338 +                 landing_story: "E10 Story 10.4",
+339 +             }
+340 ~         })?;
+    |
+
+warning: this function has too many arguments (8/7)
+   --> crates/maos-kernel-core/src/memory/mod.rs:362:5
+    |
+362 | /     pub fn collective_scan(
+363 | |         &self,
+364 | |         spirit_pid: u32,
+365 | |         namespace: &MemoryNamespace,
+...   |
+370 | |         sandbox: maos_domain::invariants::i9::SandboxTier,
+371 | |     ) -> Result<Vec<MemoryEntry>, MemoryError> {
+    | |______________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: unnecessary closure used to substitute value for `Option::None`
+   --> crates/maos-kernel-core/src/memory/mod.rs:374:13
+    |
+374 | /             self.capabilities
+375 | |                 .as_ref()
+376 | |                 .ok_or_else(|| MemoryError::CollectiveNotYetAvailable {
+377 | |                     ship_target: "v1.5",
+378 | |                     landing_story: "E10 Story 10.4",
+379 | |                 })?;
+    | |__________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+help: use `ok_or` instead
+    |
+376 ~                 .ok_or(MemoryError::CollectiveNotYetAvailable {
+377 +                     ship_target: "v1.5",
+378 +                     landing_story: "E10 Story 10.4",
+379 ~                 })?;
+    |
+
+warning: unnecessary closure used to substitute value for `Option::None`
+   --> crates/maos-kernel-core/src/memory/mod.rs:380:20
+    |
+380 |           let port = self.collective_port.as_ref().ok_or_else(|| {
+    |  ____________________^
+381 | |             MemoryError::CollectiveNotYetAvailable {
+382 | |                 ship_target: "v1.5",
+383 | |                 landing_story: "E10 Story 10.4",
+384 | |             }
+385 | |         })?;
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+help: use `ok_or` instead
+    |
+380 ~         let port = self.collective_port.as_ref().ok_or({
+381 +             MemoryError::CollectiveNotYetAvailable {
+382 +                 ship_target: "v1.5",
+383 +                 landing_story: "E10 Story 10.4",
+384 +             }
+385 ~         })?;
+    |
+
+warning: this function has too many arguments (8/7)
+  --> crates/maos-kernel-core/src/revocation/applier.rs:45:5
+   |
+45 | /     pub fn new(
+46 | |         spirits: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
+47 | |         capability: Arc<crate::capability::CapabilityRegistryAdapter>,
+48 | |         scheduler: Arc<SpiritSchedulerAdapter>,
+...  |
+53 | |         telemetry: Arc<IacRtMetrics>,
+54 | |     ) -> Self {
+   | |_____________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: this `if` has identical blocks
+  --> crates/maos-kernel-core/src/revocation/poller.rs:93:24
+   |
+93 |       if revocation_fast {
+   |  ________________________^
+94 | |         std::time::Duration::from_millis(100)
+95 | |     } else if supervision_fast {
+   | |_____^
+   |
+note: same as this
+  --> crates/maos-kernel-core/src/revocation/poller.rs:95:32
+   |
+95 |       } else if supervision_fast {
+   |  ________________________________^
+96 | |         std::time::Duration::from_millis(100)
+97 | |     } else {
+   | |_____^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#if_same_then_else
+   = note: `#[warn(clippy::if_same_then_else)]` on by default
+
+warning: this `impl` can be derived
+   --> crates/maos-kernel-core/src/scheduler/control_block.rs:223:1
+    |
+223 | / impl Default for SpiritManifestBundle {
+224 | |     fn default() -> Self {
+225 | |         Self {
+226 | |             scheduling: SchedulingSection::default(),
+...   |
+241 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#derivable_impls
+    = note: `#[warn(clippy::derivable_impls)]` on by default
+help: replace the manual implementation with a derive attribute
+    |
+197 + #[derive(Default)]
+198 | pub struct SpiritManifestBundle {
+    |
+
+warning: using `clone` on type `OnCrashAction` which implements the `Copy` trait
+   --> crates/maos-kernel-core/src/scheduler/control_block.rs:330:22
+    |
+330 |             .map(|s| s.action.clone())
+    |                      ^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `s.action`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#clone_on_copy
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+  --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:65:14
+   |
+65 |     spirits: Option<Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>>,
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+   = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: clamp-like pattern without using clamp function
+   --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:133:18
+    |
+133 |     let raw_ms = (idle_window_ms / 10).max(100).min(5000);
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with clamp: `(idle_window_ms / 10).clamp(100, 5000)`
+    |
+    = note: clamp will panic if max < min
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_clamp
+    = note: `#[warn(clippy::manual_clamp)]` on by default
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+  --> crates/maos-kernel-core/src/scheduler/kernel_ctx.rs:33:18
+   |
+33 |       pub spirits: Option<
+   |  __________________^
+34 | |         Arc<RwLock<BTreeMap<u32, Arc<crate::scheduler::control_block::SpiritControlBlock>>>>,
+35 | |     >,
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+
+warning: you seem to want to iterate on a map's values
+   --> crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs:185:29
+    |
+185 |             for (_, scb) in scbs.iter() {
+    |                             ^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#for_kv_map
+help: use the corresponding method
+    |
+185 -             for (_, scb) in scbs.iter() {
+185 +             for scb in scbs.values() {
+    |
+
+warning: clamp-like pattern without using clamp function
+   --> crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs:366:24
+    |
+366 |         let ttl_secs = ((entry.cadence_secs.saturating_mul(2)).min(300)).max(1);
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with clamp: `(entry.cadence_secs.saturating_mul(2)).clamp(1, 300)`
+    |
+    = note: clamp will panic if max < min
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_clamp
+
+warning: this function has too many arguments (12/7)
+   --> crates/maos-kernel-core/src/scheduler/scheduler_loop.rs:100:5
+    |
+100 | /     pub fn new(
+101 | |         tl: Arc<TransparencyLogAdapter>,
+102 | |         capability: Arc<crate::capability::CapabilityRegistryAdapter>,
+103 | |         memory: Arc<crate::memory::MemoryManagerAdapter>,
+...   |
+114 | |         crash_detector: Option<Arc<crate::supervision::CrashDetector>>,
+115 | |     ) -> Self {
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: non-binding `let` on a future
+   --> crates/maos-kernel-core/src/scheduler/scheduler_loop.rs:652:25
+    |
+652 | /                         let _ = tokio::spawn(async move {
+653 | |                             let _ = cd_clone
+654 | |                                 .handle_crash(
+655 | |                                     spirit_pid,
+...   |
+663 | |                                 .await;
+664 | |                         });
+    | |___________________________^
+    |
+    = help: consider awaiting the future or dropping explicitly with `std::mem::drop`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#let_underscore_future
+    = note: `#[warn(clippy::let_underscore_future)]` on by default
+
+warning: using `clone` on type `OnCrashAction` which implements the `Copy` trait
+   --> crates/maos-kernel-core/src/scheduler/scheduler_loop.rs:720:13
+    |
+720 |             runtime.on_crash_action.clone(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `runtime.on_crash_action`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#clone_on_copy
+
+warning: you should consider adding a `Default` implementation for `MockLifecycleResolver`
+   --> crates/maos-kernel-core/src/scheduler/verb_resolver.rs:169:9
+    |
+169 | /         pub fn new() -> Self {
+170 | |             Self {
+171 | |                 calls: Mutex::new(vec![]),
+172 | |             }
+173 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#new_without_default
+help: try adding this
+    |
+168 ~     impl Default for MockLifecycleResolver {
+169 +         fn default() -> Self {
+170 +             Self::new()
+171 +         }
+172 +     }
+173 + 
+174 ~     impl MockLifecycleResolver {
+    |
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-kernel-core/src/security/posture.rs:111:23
+    |
+111 |         hasher.update(&[posture_u8(self.current)]);
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `[posture_u8(self.current)]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-kernel-core/src/security/posture.rs:112:23
+    |
+112 |         hasher.update(&[posture_u8(self.allowed_max)]);
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `[posture_u8(self.allowed_max)]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-kernel-core/src/security/posture.rs:129:27
+    |
+129 |             hasher.update(&[epistemic_action_u8(&rule.action)]);
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `[epistemic_action_u8(&rule.action)]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-kernel-core/src/security/posture.rs:137:27
+    |
+137 |             hasher.update(&threshold_bits.to_le_bytes());
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `threshold_bits.to_le_bytes()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-kernel-core/src/security/posture.rs:145:27
+    |
+145 |             hasher.update(&[conflict_flag]);
+    |                           ^^^^^^^^^^^^^^^^ help: change this to: `[conflict_flag]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-kernel-core/src/security/posture.rs:149:23
+    |
+149 |         hasher.update(&[epistemic_action_u8(&self.epistemic_policy.default_action)]);
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `[epistemic_action_u8(&self.epistemic_policy.default_action)]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-kernel-core/src/security/posture.rs:248:23
+    |
+248 |         hasher.update(&[byte]);
+    |                       ^^^^^^^ help: change this to: `[byte]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: this function has too many arguments (12/7)
+  --> crates/maos-kernel-core/src/security/sandbox/t3/argv.rs:25:1
+   |
+25 | / pub fn build_runtime_argv(
+26 | |     runtime: &ContainerRuntime,
+27 | |     image: &VerifiedImageAttestation,
+28 | |     spec: &SandboxSpec,
+...  |
+37 | |     env: &[(String, String)],
+38 | | ) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
+   | |_______________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: redundant closure
+  --> crates/maos-kernel-core/src/security/sandbox/t3/runtime_detect.rs:32:22
+   |
+32 |         .get_or_init(|| detect_container_runtime_uncached())
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the function itself: `detect_container_runtime_uncached`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+   = note: `#[warn(clippy::redundant_closure)]` on by default
+
+warning: wildcard pattern covers any other pattern as it will match anyway
+  --> crates/maos-kernel-core/src/security/sandbox/t3/runtime_detect.rs:44:9
+   |
+44 |         "auto" | _ => select_auto_runtime(
+   |         ^^^^^^^^^^
+   |
+   = help: consider handling `_` separately
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#wildcard_in_or_patterns
+   = note: `#[warn(clippy::wildcard_in_or_patterns)]` on by default
+
+warning: redundant pattern matching
+   --> crates/maos-kernel-core/src/security/sandbox/linux.rs:133:28
+    |
+133 |                     if let Err(_) = apply_seccomp(prog) {
+    |                            ^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_pattern_matching
+    = note: `#[warn(clippy::redundant_pattern_matching)]` on by default
+help: consider using `is_err()`
+    |
+133 -                     if let Err(_) = apply_seccomp(prog) {
+133 +                     if apply_seccomp(prog).is_err() {
+    |
+
+warning: casting to the same type is unnecessary (`i64` -> `i64`)
+   --> crates/maos-kernel-core/src/security/sandbox/linux.rs:335:22
+    |
+335 |         rules.insert(syscall as i64, vec![]);
+    |                      ^^^^^^^^^^^^^^ help: try: `syscall`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_cast
+    = note: `#[warn(clippy::unnecessary_cast)]` on by default
+
+warning: casting to the same type is unnecessary (`i64` -> `i64`)
+   --> crates/maos-kernel-core/src/security/sandbox/linux.rs:394:27
+    |
+394 |         kill_rules.insert(syscall as i64, vec![]);
+    |                           ^^^^^^^^^^^^^^ help: try: `syscall`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_cast
+
+warning: this function has too many arguments (16/7)
+   --> crates/maos-kernel-core/src/security/mod.rs:259:5
+    |
+259 | /     pub fn admit_spirit(
+260 | |         &self,
+261 | |         spirit_pid: u32,
+262 | |         spirit_id: &str,
+...   |
+280 | |         class: Option<&ClassSection>,
+281 | |     ) -> Result<SandboxSpec, SecurityError> {
+    | |___________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: using `clone` on type `OnCrashAction` which implements the `Copy` trait
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:175:13
+    |
+175 |             runtime.on_crash_action.clone(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `runtime.on_crash_action`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#clone_on_copy
+
+warning: this let-binding has unit value
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:182:9
+    |
+182 | /         let _ = self
+183 | |             .journal
+184 | |             .append_transition(JournalEntry::Lifecycle(LifecycleEntry {
+185 | |                 timestamp: crate::capability::cap_tokens::monotonic_now_ns(),
+...   |
+189 | |                 effective_sandbox_tier: Some(runtime.sandbox_tier),
+190 | |             }));
+    | |________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#let_unit_value
+    = note: `#[warn(clippy::let_unit_value)]` on by default
+help: omit the `let` binding
+    |
+182 -         let _ = self
+182 +         self
+    |
+
+warning: you should consider adding a `Default` implementation for `SimulatedChildSupervisor`
+  --> crates/maos-kernel-core/src/supervision/test_double.rs:28:5
+   |
+28 | /     pub fn new() -> Self {
+29 | |         Self {
+30 | |             next_handle: Mutex::new(1),
+31 | |             exit_status: Mutex::new(None),
+32 | |         }
+33 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#new_without_default
+help: try adding this
+   |
+27 + impl Default for SimulatedChildSupervisor {
+28 +     fn default() -> Self {
+29 +         Self::new()
+30 +     }
+31 + }
+   |
+
+warning: `maos-kernel-core` (lib) generated 91 warnings (run `cargo clippy --fix --lib -p maos-kernel-core -- ` to apply 53 suggestions)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:198:27
+    |
+198 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: this `impl` can be derived
+   --> crates/maos-registry/src/admission.rs:437:1
+    |
+437 | / impl Default for ModelProvenancePolicy {
+438 | |     fn default() -> Self {
+439 | |         // AC-11 safe default: provenance optional, no staleness window.
+440 | |         Self {
+...   |
+446 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#derivable_impls
+    = note: `#[warn(clippy::derivable_impls)]` on by default
+help: replace the manual implementation with a derive attribute
+    |
+425 + #[derive(Default)]
+426 | pub struct ModelProvenancePolicy {
+    |
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-registry/src/admission.rs:574:19
+    |
+574 |     hasher.update(&(pkg.manifest_toml.len() as u64).to_le_bytes());
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `(pkg.manifest_toml.len() as u64).to_le_bytes()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+    = note: `#[warn(clippy::needless_borrows_for_generic_args)]` on by default
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-registry/src/admission.rs:576:19
+    |
+576 |     hasher.update(&(pkg.artifact_bytes.len() as u64).to_le_bytes());
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `(pkg.artifact_bytes.len() as u64).to_le_bytes()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-registry/src/client.rs:280:19
+    |
+280 |     hasher.update(&(spirit_id.len() as u64).to_le_bytes());
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `(spirit_id.len() as u64).to_le_bytes()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-registry/src/client.rs:282:19
+    |
+282 |     hasher.update(&(version.len() as u64).to_le_bytes());
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `(version.len() as u64).to_le_bytes()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-registry/src/client.rs:284:19
+    |
+284 |     hasher.update(&[server_tier as u8]);
+    |                   ^^^^^^^^^^^^^^^^^^^^ help: change this to: `[server_tier as u8]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+  --> crates/maos-registry/src/handlers/manifest.rs:16:19
+   |
+16 |     hasher.update(&(spirit_id.len() as u64).to_le_bytes());
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `(spirit_id.len() as u64).to_le_bytes()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+  --> crates/maos-registry/src/handlers/manifest.rs:18:19
+   |
+18 |     hasher.update(&(version.len() as u64).to_le_bytes());
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `(version.len() as u64).to_le_bytes()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+  --> crates/maos-registry/src/handlers/manifest.rs:20:19
+   |
+20 |     hasher.update(&[server_tier as u8]);
+   |                   ^^^^^^^^^^^^^^^^^^^^ help: change this to: `[server_tier as u8]`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: clamp-like pattern without using clamp function
+  --> crates/maos-registry/src/operations.rs:44:20
+   |
+44 |             limit: limit.min(200).max(1),
+   |                    ^^^^^^^^^^^^^^^^^^^^^ help: replace with clamp: `limit.clamp(1, 200)`
+   |
+   = note: clamp will panic if max < min
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_clamp
+   = note: `#[warn(clippy::manual_clamp)]` on by default
+
+warning: this `impl` can be derived
+  --> crates/maos-registry/src/origin.rs:21:1
+   |
+21 | / impl Default for RegistryOrigin {
+22 | |     fn default() -> Self {
+23 | |         Self::Published
+24 | |     }
+25 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#derivable_impls
+help: replace the manual implementation with a derive attribute and mark the default variant
+   |
+ 9 + #[derive(Default)]
+10 | pub enum RegistryOrigin {
+11 |     /// Normal publish path — author pushed to a registry server.
+12 ~     #[default]
+13 ~     Published,
+   |
+
+warning: clamp-like pattern without using clamp function
+   --> crates/maos-registry/src/storage.rs:921:21
+    |
+921 |         let limit = q.limit.min(200).max(1) as usize;
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^ help: replace with clamp: `q.limit.clamp(1, 200)`
+    |
+    = note: clamp will panic if max < min
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_clamp
+
+warning: redundant closure
+    --> crates/maos-registry/src/storage.rs:1164:35
+     |
+1164 |     let start = START.get_or_init(|| std::time::Instant::now());
+     |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the associated function itself: `std::time::Instant::now`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+     = note: `#[warn(clippy::redundant_closure)]` on by default
+
+warning: `maos-registry` (lib) generated 17 warnings (run `cargo clippy --fix --lib -p maos-registry -- ` to apply 15 suggestions)
+warning: duplicated attribute
+  --> crates/maos-cohort/src/error.rs:24:11
+   |
+24 | #![forbid(unsafe_code)]
+   |           ^^^^^^^^^^^
+   |
+note: first defined here
+  --> crates/maos-cohort/src/error.rs:1:11
+   |
+ 1 | #![forbid(unsafe_code)]
+   |           ^^^^^^^^^^^
+help: remove this attribute
+  --> crates/maos-cohort/src/error.rs:24:11
+   |
+24 | #![forbid(unsafe_code)]
+   |           ^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#duplicated_attributes
+   = note: `#[warn(clippy::duplicated_attributes)]` on by default
+
+warning: duplicated attribute
+  --> crates/maos-cohort/src/manifest.rs:36:11
+   |
+36 | #![forbid(unsafe_code)]
+   |           ^^^^^^^^^^^
+   |
+note: first defined here
+  --> crates/maos-cohort/src/manifest.rs:1:11
+   |
+ 1 | #![forbid(unsafe_code)]
+   |           ^^^^^^^^^^^
+help: remove this attribute
+  --> crates/maos-cohort/src/manifest.rs:36:11
+   |
+36 | #![forbid(unsafe_code)]
+   |           ^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#duplicated_attributes
+
+warning: duplicated attribute
+  --> crates/maos-cohort/src/pin.rs:35:11
+   |
+35 | #![forbid(unsafe_code)]
+   |           ^^^^^^^^^^^
+   |
+note: first defined here
+  --> crates/maos-cohort/src/pin.rs:1:11
+   |
+ 1 | #![forbid(unsafe_code)]
+   |           ^^^^^^^^^^^
+help: remove this attribute
+  --> crates/maos-cohort/src/pin.rs:35:11
+   |
+35 | #![forbid(unsafe_code)]
+   |           ^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#duplicated_attributes
+
+warning: methods `accept_consent` and `outbound_consent_context` are never used
+   --> crates/maos-cohort/src/state.rs:388:19
+    |
+206 | impl CohortManifestState {
+    | ------------------------ methods in this implementation
+...
+388 |     pub(crate) fn accept_consent(
+    |                   ^^^^^^^^^^^^^^
+...
+408 |     pub(crate) fn outbound_consent_context(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: manually reimplementing `div_ceil`
+   --> crates/maos-cohort/src/state.rs:851:32
+    |
+851 |         Ok(Duration::from_secs((cached.manifest.t_stale_secs + 1) / 2))
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `cached.manifest.t_stale_secs.div_ceil(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_div_ceil
+    = note: `#[warn(clippy::manual_div_ceil)]` on by default
+
+warning: `maos-cohort` (lib) generated 5 warnings (run `cargo clippy --fix --lib -p maos-cohort -- ` to apply 1 suggestion)
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> crates/maos-loom-lite/src/replication/leaf.rs:130:51
+    |
+130 |           let (domain, team_bytes, depth, lineage): (
+    |  ___________________________________________________^
+131 | |             &[u8],
+132 | |             Option<&[u8]>,
+133 | |             Option<u32>,
+134 | |             Option<&IntentLineage>,
+135 | |         ) = match (
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: this function has too many arguments (8/7)
+   --> crates/maos-loom-lite/src/store.rs:605:5
+    |
+605 | /     async fn write_with_source_attested_at(
+606 | |         &self,
+607 | |         spirit_pid: u32,
+608 | |         namespace: &MemoryNamespace,
+...   |
+613 | |         crossed: bool,
+614 | |     ) -> Result<(), StoreError> {
+    | |_______________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: `maos-loom-lite` (lib) generated 2 warnings
+warning: using `chunks_exact` with a constant chunk size
+    --> spirits/researcher/src/lib.rs:1802:29
+     |
+1802 |     for (index, pair) in id.chunks_exact(2).enumerate() {
+     |                             ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+     = note: `#[warn(clippy::chunks_exact_to_as_chunks)]` on by default
+
+warning: `researcher` (lib) generated 1 warning (run `cargo clippy --fix --lib -p researcher -- ` to apply 1 suggestion)
+warning: this creates an owned instance just for comparison
+  --> crates/maos-cli/src/accessibility.rs:59:24
+   |
+59 |             if term == OsString::from("dumb") {
+   |                        ^^^^^^^^^^^^^^^^^^^^^^ help: try: `"dumb"`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#cmp_owned
+   = note: `#[warn(clippy::cmp_owned)]` on by default
+
+warning: useless conversion to the same type: `maos_skill::ESkillStore`
+    --> crates/maos-cli/src/subcommands.rs:1111:53
+     |
+1111 |         value.map_err(|e| SkillDecisionError::Store(e.into()))
+     |                                                     ^^^^^^^^ help: consider removing `.into()`: `e`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_conversion
+     = note: `#[warn(clippy::useless_conversion)]` on by default
+
+warning: stripping a suffix manually
+    --> crates/maos-cli/src/subcommands.rs:2953:25
+     |
+2953 |         let days: u64 = range[..range.len() - 1]
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: the suffix was tested here
+    --> crates/maos-cli/src/subcommands.rs:2952:5
+     |
+2952 |     if range.ends_with('d') {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_strip
+     = note: `#[warn(clippy::manual_strip)]` on by default
+help: try using the `strip_suffix` method
+     |
+2952 ~     if let Some(<stripped>) = range.strip_suffix('d') {
+2953 ~         let days: u64 = <stripped>
+     |
+
+warning: stripping a suffix manually
+    --> crates/maos-cli/src/subcommands.rs:2963:26
+     |
+2963 |         let hours: u64 = range[..range.len() - 1]
+     |                          ^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: the suffix was tested here
+    --> crates/maos-cli/src/subcommands.rs:2962:12
+     |
+2962 |     } else if range.ends_with('h') {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_strip
+help: try using the `strip_suffix` method
+     |
+2962 ~     } else if let Some(<stripped>) = range.strip_suffix('h') {
+2963 ~         let hours: u64 = <stripped>
+     |
+
+warning: called `unwrap` on `filter.boot_nonce` after checking its variant with `is_some`
+    --> crates/maos-cli/src/subcommands.rs:3061:17
+     |
+3057 |         if filter.boot_nonce.is_some() && filter.boot_nonce != Some(b) {
+     |            --------------------------- the check is happening here
+...
+3061 |                 filter.boot_nonce.unwrap()
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: try using `match`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_unwrap
+     = note: `#[warn(clippy::unnecessary_unwrap)]` on by default
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/maos-cli/src/subcommands.rs:3975:6
+     |
+3975 |   ) -> Result<
+     |  ______^
+3976 | |     (
+3977 | |         maos_audit::sealed_export::AuditBundle,
+3978 | |         [u8; 32],
+...    |
+3981 | |     String,
+3982 | | > {
+     | |_^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+     = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: match can be simplified with `.unwrap_or_default()`
+    --> crates/maos-cli/src/subcommands.rs:4545:16
+     |
+4545 |       let last = match std::fs::read_to_string(&state_path)
+     |  ________________^
+4546 | |         .ok()
+4547 | |         .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+4548 | |         .and_then(|v| v.get("last_export_seq").and_then(|v| v.as_u64()))
+...    |
+4551 | |         None => 0,
+4552 | |     };
+     | |_____^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_unwrap_or_default
+     = note: `#[warn(clippy::manual_unwrap_or_default)]` on by default
+help: ascribe the type u64 and replace your expression with
+     |
+4545 ~     let last = std::fs::read_to_string(&state_path)
+4546 +         .ok()
+4547 +         .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+4548 ~         .and_then(|v| v.get("last_export_seq").and_then(|v| v.as_u64())).unwrap_or_default();
+     |
+
+warning: `maos-cli` (lib) generated 7 warnings (run `cargo clippy --fix --lib -p maos-cli -- ` to apply 2 suggestions)
+warning: the `Err`-variant returned from this function is very large
+   --> spirits/butler/src/lib.rs:159:38
+    |
+159 |   pub fn parse_proposal(text: &str) -> Result<ButlerProposal, ButlerError> {
+    |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+874 | /     McpUnavailable {
+875 | |         calendar: ButlerMcpError,
+876 | |         comms: ButlerMcpError,
+877 | |     },
+    | |_____- the largest variant contains at least 208 bytes
+    |
+    = help: try reducing the size of `ButlerError`, for example by boxing large elements or replacing it with `Box<ButlerError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+    = note: `#[warn(clippy::result_large_err)]` on by default
+
+warning: the `Err`-variant returned from this function is very large
+   --> spirits/butler/src/lib.rs:200:6
+    |
+200 |   ) -> Result<String, ButlerError> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+874 | /     McpUnavailable {
+875 | |         calendar: ButlerMcpError,
+876 | |         comms: ButlerMcpError,
+877 | |     },
+    | |_____- the largest variant contains at least 208 bytes
+    |
+    = help: try reducing the size of `ButlerError`, for example by boxing large elements or replacing it with `Box<ButlerError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> spirits/butler/src/lib.rs:424:17
+    |
+424 |     frame_sink: Arc<dyn Fn(u32, &[u8]) + Send + Sync>,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> spirits/butler/src/lib.rs:436:21
+    |
+436 |         frame_sink: Arc<dyn Fn(u32, &[u8]) + Send + Sync>,
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+
+warning: the `Err`-variant returned from this function is very large
+   --> spirits/butler/src/lib.rs:818:6
+    |
+818 |   ) -> Result<PredicateFireRate, ButlerError> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+874 | /     McpUnavailable {
+875 | |         calendar: ButlerMcpError,
+876 | |         comms: ButlerMcpError,
+877 | |     },
+    | |_____- the largest variant contains at least 208 bytes
+    |
+    = help: try reducing the size of `ButlerError`, for example by boxing large elements or replacing it with `Box<ButlerError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: unnecessary closure used with `bool::then`
+    --> spirits/butler/src/lib.rs:1093:25
+     |
+1093 | /                         (!assessment.conflicts.is_empty()).then(|| NotificationPayload {
+1094 | |                             pattern: proposal.pattern,
+1095 | |                             confidence: proposal.confidence,
+1096 | |                             evidence: proposal.evidence,
+1097 | |                             options: proposal.options,
+1098 | |                             conflict_summary,
+1099 | |                         })
+     | |__________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+     = note: `#[warn(clippy::unnecessary_lazy_evaluations)]` on by default
+help: use `then_some` instead
+     |
+1093 ~                         (!assessment.conflicts.is_empty()).then_some(NotificationPayload {
+1094 +                             pattern: proposal.pattern,
+1095 +                             confidence: proposal.confidence,
+1096 +                             evidence: proposal.evidence,
+1097 +                             options: proposal.options,
+1098 +                             conflict_summary,
+1099 +                         })
+     |
+
+warning: the `Err`-variant returned from this function is very large
+    --> spirits/butler/src/lib.rs:1168:10
+     |
+ 874 | /     McpUnavailable {
+ 875 | |         calendar: ButlerMcpError,
+ 876 | |         comms: ButlerMcpError,
+ 877 | |     },
+     | |_____- the largest variant contains at least 208 bytes
+...
+1168 |       ) -> Result<ButlerProposal, ButlerError> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: try reducing the size of `ButlerError`, for example by boxing large elements or replacing it with `Box<ButlerError>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: the `Err`-variant returned from this function is very large
+    --> spirits/butler/src/lib.rs:1265:33
+     |
+ 874 | /     McpUnavailable {
+ 875 | |         calendar: ButlerMcpError,
+ 876 | |         comms: ButlerMcpError,
+ 877 | |     },
+     | |_____- the largest variant contains at least 208 bytes
+...
+1265 |       fn refresh_record(&self) -> Result<(), ButlerError> {
+     |                                   ^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: try reducing the size of `ButlerError`, for example by boxing large elements or replacing it with `Box<ButlerError>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: the `Err`-variant returned from this function is very large
+    --> spirits/butler/src/lib.rs:1325:75
+     |
+ 874 | /     McpUnavailable {
+ 875 | |         calendar: ButlerMcpError,
+ 876 | |         comms: ButlerMcpError,
+ 877 | |     },
+     | |_____- the largest variant contains at least 208 bytes
+...
+1325 |       pub fn seed_acceptance_history(&self, fixture: &AcceptanceFixture) -> Result<(), ButlerError> {
+     |                                                                             ^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: try reducing the size of `ButlerError`, for example by boxing large elements or replacing it with `Box<ButlerError>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: the `Err`-variant returned from this function is very large
+    --> spirits/butler/src/lib.rs:1738:10
+     |
+ 874 | /     McpUnavailable {
+ 875 | |         calendar: ButlerMcpError,
+ 876 | |         comms: ButlerMcpError,
+ 877 | |     },
+     | |_____- the largest variant contains at least 208 bytes
+...
+1738 |       ) -> Result<MorningDigest, ButlerError> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: try reducing the size of `ButlerError`, for example by boxing large elements or replacing it with `Box<ButlerError>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: the `Err`-variant returned from this function is very large
+    --> spirits/butler/src/lib.rs:1769:10
+     |
+ 874 | /     McpUnavailable {
+ 875 | |         calendar: ButlerMcpError,
+ 876 | |         comms: ButlerMcpError,
+ 877 | |     },
+     | |_____- the largest variant contains at least 208 bytes
+...
+1769 |       ) -> Result<MorningDigest, ButlerError> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: try reducing the size of `ButlerError`, for example by boxing large elements or replacing it with `Box<ButlerError>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: the `Err`-variant returned from this function is very large
+    --> spirits/butler/src/lib.rs:1882:10
+     |
+ 874 | /     McpUnavailable {
+ 875 | |         calendar: ButlerMcpError,
+ 876 | |         comms: ButlerMcpError,
+ 877 | |     },
+     | |_____- the largest variant contains at least 208 bytes
+...
+1882 |       ) -> Result<serde_json::Value, ButlerError> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: try reducing the size of `ButlerError`, for example by boxing large elements or replacing it with `Box<ButlerError>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: the `Err`-variant returned from this function is very large
+    --> spirits/butler/src/lib.rs:1899:10
+     |
+ 874 | /     McpUnavailable {
+ 875 | |         calendar: ButlerMcpError,
+ 876 | |         comms: ButlerMcpError,
+ 877 | |     },
+     | |_____- the largest variant contains at least 208 bytes
+...
+1899 |       ) -> Result<(serde_json::Value, Option<u64>), ButlerError> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: try reducing the size of `ButlerError`, for example by boxing large elements or replacing it with `Box<ButlerError>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: the `Err`-variant returned from this function is very large
+    --> spirits/butler/src/lib.rs:1971:10
+     |
+ 874 | /     McpUnavailable {
+ 875 | |         calendar: ButlerMcpError,
+ 876 | |         comms: ButlerMcpError,
+ 877 | |     },
+     | |_____- the largest variant contains at least 208 bytes
+...
+1971 |       ) -> Result<DistillationRequest, ButlerError> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: try reducing the size of `ButlerError`, for example by boxing large elements or replacing it with `Box<ButlerError>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: this expression creates a reference which is immediately dereferenced by the compiler
+    --> spirits/butler/src/lib.rs:2026:38
+     |
+2026 |     let mut cx = Context::from_waker(&waker);
+     |                                      ^^^^^^ help: change this to: `waker`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+     = note: `#[warn(clippy::needless_borrow)]` on by default
+
+warning: the `Err`-variant returned from this function is very large
+    --> spirits/butler/src/lib.rs:2084:57
+     |
+ 874 | /     McpUnavailable {
+ 875 | |         calendar: ButlerMcpError,
+ 876 | |         comms: ButlerMcpError,
+ 877 | |     },
+     | |_____- the largest variant contains at least 208 bytes
+...
+2084 |   fn anomaly_items(entries: &[maos_audit::AuditEntry]) -> Result<Vec<AnomalyItem>, ButlerError> {
+     |                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: try reducing the size of `ButlerError`, for example by boxing large elements or replacing it with `Box<ButlerError>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: the `Err`-variant returned from this function is very large
+    --> spirits/butler/src/lib.rs:2164:38
+     |
+ 874 | /     McpUnavailable {
+ 875 | |         calendar: ButlerMcpError,
+ 876 | |         comms: ButlerMcpError,
+ 877 | |     },
+     | |_____- the largest variant contains at least 208 bytes
+...
+2164 |   fn decode_frame_id_hex(hex: &str) -> Result<[u8; 16], ButlerError> {
+     |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: try reducing the size of `ButlerError`, for example by boxing large elements or replacing it with `Box<ButlerError>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+warning: this `if` statement can be collapsed
+   --> crates/maos-egress/src/upstream.rs:199:24
+    |
+199 |                   } else if name == "connection" {
+    |  ________________________^
+200 | |                     if value
+201 | |                         .split(',')
+202 | |                         .map(str::trim)
+...   |
+207 | |                 }
+    | |_________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#collapsible_if
+    = note: `#[warn(clippy::collapsible_if)]` on by default
+help: collapse nested if block
+    |
+199 ~                 } else if name == "connection"
+200 ~                     && value
+201 |                         .split(',')
+...
+205 |                         return Err(invalid("invalid upstream connection option"));
+206 ~                     }
+    |
+
+warning: this function has too many arguments (8/7)
+   --> spirits/orchestrator/src/lib.rs:721:5
+    |
+721 | /     pub fn followup_dispatch(
+722 | |         &self,
+723 | |         seq: u64,
+724 | |         to_id: &str,
+...   |
+729 | |         lineage: IntentLineage,
+730 | |     ) -> IacFrame {
+    | |_________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: `butler` (lib) generated 17 warnings (run `cargo clippy --fix --lib -p butler -- ` to apply 2 suggestions)
+warning: `maos-egress` (lib) generated 1 warning (run `cargo clippy --fix --lib -p maos-egress -- ` to apply 1 suggestion)
+warning: `orchestrator` (lib) generated 1 warning
+warning: digits of hex, binary or octal literal not in groups of equal size
+  --> crates/maos-bench/src/harness/j0.rs:28:56
+   |
+28 |     let tl = Arc::new(TransparencyLogAdapter::open(db, 0xB17_0).expect("open TL"));
+   |                                                        ^^^^^^^ help: consider: `0xB170`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unusual_byte_groupings
+   = note: `#[warn(clippy::unusual_byte_groupings)]` on by default
+
+warning: digits of hex, binary or octal literal not in groups of equal size
+  --> crates/maos-bench/src/harness/j_researcher.rs:63:56
+   |
+63 |     let tl = Arc::new(TransparencyLogAdapter::open(db, 0x_8E_5EA5).expect("open TL"));
+   |                                                        ^^^^^^^^^^ help: consider: `0x008E_5EA5`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unusual_byte_groupings
+
+warning: this `map_or` can be simplified
+  --> crates/maos-bench/src/decision.rs:30:18
+   |
+30 |     let j6_met = j6.map_or(true, |j| j.not_measured || j.budget_met);
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+   = note: `#[warn(clippy::unnecessary_map_or)]` on by default
+help: use `is_none_or` instead
+   |
+30 -     let j6_met = j6.map_or(true, |j| j.not_measured || j.budget_met);
+30 +     let j6_met = j6.is_none_or(|j| j.not_measured || j.budget_met);
+   |
+
+warning: this method chain can be written more clearly with `if .. else ..`
+   --> crates/maos-bench/src/distill_eval.rs:260:23
+    |
+260 |               verdicts: frozen
+    |  _______________________^
+261 | |                 .then(|| row.judge.verdicts.clone())
+262 | |                 .unwrap_or_default(),
+    | |____________________________________^ help: try: `if frozen { row.judge.verdicts.clone() } else { Default::default() }`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#obfuscated_if_else
+    = note: `#[warn(clippy::obfuscated_if_else)]` on by default
+
+warning: this `map_or` can be simplified
+   --> crates/maos-bench/src/halt_eval.rs:220:24
+    |
+220 |         self.record || self.cassette.as_ref().map_or(true, committed)
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_map_or
+help: use `is_none_or` instead
+    |
+220 -         self.record || self.cassette.as_ref().map_or(true, committed)
+220 +         self.record || self.cassette.as_ref().is_none_or(committed)
+    |
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> crates/maos-bench/src/halt_eval.rs:455:6
+    |
+455 |   ) -> Result<
+    |  ______^
+456 | |     (
+457 | |         Vec<OnbScenario>,
+458 | |         BTreeMap<String, bool>,
+...   |
+461 | |     String,
+462 | | > {
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: called `unwrap_err` on `measurement_result` after checking its variant with `is_err`
+   --> crates/maos-bench/src/harness/j1.rs:135:20
+    |
+133 |     if measurement_result.is_err() {
+    |     ------------------------------ help: try: `if let Err(<item>) = measurement_result`
+134 |         guard.kill_and_reap();
+135 |         return Err(measurement_result.unwrap_err());
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_unwrap
+    = note: `#[warn(clippy::unnecessary_unwrap)]` on by default
+
+warning: redundant closure
+   --> crates/maos-bench/src/harness/j1.rs:235:22
+    |
+235 |             .map_err(|e| BenchError::Io(e))?;
+    |                      ^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `BenchError::Io`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_closure
+    = note: `#[warn(clippy::redundant_closure)]` on by default
+
+warning: manual implementation of `.is_multiple_of()`
+  --> crates/maos-bench/src/harness/j_researcher.rs:54:19
+   |
+54 |         polarity: i % 2 == 0,
+   |                   ^^^^^^^^^^ help: replace with: `i.is_multiple_of(2)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+   = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: you should consider adding a `Default` implementation for `BenchHarness`
+   --> crates/maos-bench/src/harness/mod.rs:110:5
+    |
+110 | /     pub fn new() -> Self {
+111 | |         Self {
+112 | |             run_id: run_id(),
+113 | |             started_at_ns: monotonic_now_ns(),
+...   |
+117 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#new_without_default
+    = note: `#[warn(clippy::new_without_default)]` on by default
+help: try adding this
+    |
+109 + impl Default for BenchHarness {
+110 +     fn default() -> Self {
+111 +         Self::new()
+112 +     }
+113 + }
+    |
+
+warning: this function has too many arguments (8/7)
+   --> crates/maos-a2a-tcp/src/transport.rs:976:1
+    |
+976 | / async fn serve_connection(
+977 | |     tcp: TcpStream,
+978 | |     acceptor: TlsAcceptor,
+979 | |     core: Arc<A2ARouterCore>,
+...   |
+984 | |     last_intake: Arc<Mutex<Option<(u64, u64)>>>,
+985 | | ) {
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: `maos-bench` (lib) generated 10 warnings (run `cargo clippy --fix --lib -p maos-bench -- ` to apply 6 suggestions)
+warning: `maos-a2a-tcp` (lib) generated 1 warning
+warning: very complex type used. Consider factoring parts into `type` definitions
+  --> crates/maos-corpus-gen/src/ccac/expansion.rs:91:6
+   |
+91 |   ) -> Result<
+   |  ______^
+92 | |     (
+93 | |         ComplianceClaimEnvelope,
+94 | |         &'static str,
+...  |
+98 | |     String,
+99 | | > {
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+   = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> crates/maos-corpus-gen/src/ccac/expansion.rs:207:6
+    |
+207 |   ) -> Result<
+    |  ______^
+208 | |     (
+209 | |         ComplianceClaimEnvelope,
+210 | |         &'static str,
+...   |
+214 | |     String,
+215 | | > {
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+
+warning: manually reimplementing `div_ceil`
+  --> crates/maos-corpus-gen/src/red_team/expansion.rs:27:18
+   |
+27 |     let cycles = (n + seeds.len() * variants_per_seed - 1) / (seeds.len() * variants_per_seed);
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `n.div_ceil(seeds.len() * variants_per_seed)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_div_ceil
+   = note: `#[warn(clippy::manual_div_ceil)]` on by default
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-corpus-gen/src/red_team/expansion.rs:146:14
+    |
+146 |     h.update(&axis_idx.to_le_bytes());
+    |              ^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `axis_idx.to_le_bytes()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+    = note: `#[warn(clippy::needless_borrows_for_generic_args)]` on by default
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-corpus-gen/src/red_team/expansion.rs:147:14
+    |
+147 |     h.update(&variant_idx.to_le_bytes());
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `variant_idx.to_le_bytes()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: manual implementation of `.is_multiple_of()`
+   --> crates/maos-corpus-gen/src/red_team/expansion.rs:209:16
+    |
+209 |             if variant_idx % 3 == 0 {
+    |                ^^^^^^^^^^^^^^^^^^^^ help: replace with: `variant_idx.is_multiple_of(3)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+    = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: method `default` can be confused for the standard trait method `std::default::Default::default`
+  --> crates/maos-corpus-gen/src/red_team/mod.rs:70:5
+   |
+70 | /     pub fn default() -> Self {
+71 | |         let seeds: Vec<RedTeamSeed> =
+72 | |             seeds::load_seeds(&include_bytes!("../../seeds/red-team-seeds-v0.1.toml")[..])
+73 | |                 .expect("failed to parse bundled red-team seeds");
+74 | |         Self { seeds }
+75 | |     }
+   | |_____^
+   |
+   = help: consider implementing the trait `std::default::Default` or choosing a less ambiguous method name
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#should_implement_trait
+   = note: `#[warn(clippy::should_implement_trait)]` on by default
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-corpus-gen/src/secret_redaction/expansion.rs:172:19
+    |
+172 |     hasher.update(&idx.to_le_bytes());
+    |                   ^^^^^^^^^^^^^^^^^^ help: change this to: `idx.to_le_bytes()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-corpus-gen/src/secret_redaction/expansion.rs:192:31
+    |
+192 |                     h2.update(&[j as u8]);
+    |                               ^^^^^^^^^^ help: change this to: `[j as u8]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: useless use of `format!`
+   --> crates/maos-corpus-gen/src/secret_redaction/expansion.rs:200:43
+    |
+200 |             let header = base64url_synth(&format!("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInRlc3QiOnRydWV9"));
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.to_string()`: `"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInRlc3QiOnRydWV9".to_string()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_format
+    = note: `#[warn(clippy::useless_format)]` on by default
+
+warning: redundant reference in `format!` argument
+   --> crates/maos-corpus-gen/src/secret_redaction/expansion.rs:209:50
+    |
+209 |             let access = format!("AKIA-TEST-{}", &hex[..16].to_uppercase());
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove the redundant `&`: `hex[..16].to_uppercase()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_borrows_in_formatting
+    = note: `#[warn(clippy::useless_borrows_in_formatting)]` on by default
+
+warning: redundant reference in `format!` argument
+   --> crates/maos-corpus-gen/src/secret_redaction/expansion.rs:210:76
+    |
+210 |             let secret = format!("wJalrXUtnFEMI/K7MDENG/bPxRfiCY-TEST-{}", &hex);
+    |                                                                            ^^^^ help: remove the redundant `&`: `hex`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_borrows_in_formatting
+
+warning: the borrowed expression implements the required traits
+  --> crates/maos-corpus-gen/src/secret_redaction/mod.rs:76:18
+   |
+76 |     inner.update(&ipad);
+   |                  ^^^^^ help: change this to: `ipad`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+  --> crates/maos-corpus-gen/src/secret_redaction/mod.rs:80:18
+   |
+80 |     outer.update(&opad);
+   |                  ^^^^^ help: change this to: `opad`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+  --> crates/maos-corpus-gen/src/secret_redaction/mod.rs:81:18
+   |
+81 |     outer.update(&inner_hash);
+   |                  ^^^^^^^^^^^ help: change this to: `inner_hash`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: method `default` can be confused for the standard trait method `std::default::Default::default`
+   --> crates/maos-corpus-gen/src/secret_redaction/mod.rs:100:5
+    |
+100 | /     pub fn default() -> Self {
+101 | |         let seeds: Vec<SecretRedactionSeed> =
+102 | |             seeds::load_seeds(&include_bytes!("../../seeds/secret-redaction-seeds-v0.1.toml")[..])
+103 | |                 .expect("failed to parse bundled secret-redaction seeds");
+104 | |         Self { seeds }
+105 | |     }
+    | |_____^
+    |
+    = help: consider implementing the trait `std::default::Default` or choosing a less ambiguous method name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#should_implement_trait
+
+warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+  --> crates/maos-spirit-cli/src/signing.rs:27:7
+   |
+27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-spirit-cli/src/publish.rs:125:19
+    |
+125 |     hasher.update(&(manifest_toml.len() as u64).to_le_bytes());
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `(manifest_toml.len() as u64).to_le_bytes()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+    = note: `#[warn(clippy::needless_borrows_for_generic_args)]` on by default
+
+warning: the borrowed expression implements the required traits
+   --> crates/maos-spirit-cli/src/publish.rs:127:19
+    |
+127 |     hasher.update(&(artifact_bytes.len() as u64).to_le_bytes());
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `(artifact_bytes.len() as u64).to_le_bytes()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+warning: `maos-corpus-gen` (lib) generated 16 warnings (run `cargo clippy --fix --lib -p maos-corpus-gen -- ` to apply 12 suggestions)
+warning: `maos-spirit-cli` (lib) generated 3 warnings (run `cargo clippy --fix --lib -p maos-spirit-cli -- ` to apply 2 suggestions)
+warning: explicit call to `.into_iter()` in function argument accepting `IntoIterator`
+   --> crates/maos-pdp/src/reconcile.rs:190:60
+    |
+190 |     for ((pid, key), verdict) in positions.into_iter().zip(verdicts.into_iter()) {
+    |                                                            ^^^^^^^^^^^^^^^^^^^^
+    |
+note: this parameter accepts any `IntoIterator`, so you don't need to call `.into_iter()`
+   --> /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:632:12
+    |
+632 |         U: IntoIterator,
+    |            ^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_conversion
+    = note: `#[warn(clippy::useless_conversion)]` on by default
+help: consider removing the `.into_iter()`
+    |
+190 -     for ((pid, key), verdict) in positions.into_iter().zip(verdicts.into_iter()) {
+190 +     for ((pid, key), verdict) in positions.into_iter().zip(verdicts) {
+    |
+
+warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+  --> crates/maos-control/src/lib.rs:17:11
+   |
+17 | use ring::constant_time;
+   |           ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+    --> crates/maos-control/src/lib.rs:1064:28
+     |
+1064 |             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
+     |                            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: the following explicit lifetimes could be elided: 'a
+    --> crates/maos-control/src/lib.rs:1734:16
+     |
+1734 | fn validate_id<'a>(id: &'a str) -> Result<&'a str, Response> {
+     |                ^^       ^^                 ^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_lifetimes
+     = note: `#[warn(clippy::needless_lifetimes)]` on by default
+help: elide the lifetimes
+     |
+1734 - fn validate_id<'a>(id: &'a str) -> Result<&'a str, Response> {
+1734 + fn validate_id(id: &str) -> Result<&str, Response> {
+     |
+
+warning: `maos-pdp` (lib) generated 1 warning (run `cargo clippy --fix --lib -p maos-pdp -- ` to apply 1 suggestion)
+warning: `maos-control` (lib) generated 3 warnings (run `cargo clippy --fix --lib -p maos-control -- ` to apply 1 suggestion)
+warning: doc list item without indentation
+  --> crates/maos-a2a/src/adapter.rs:30:5
+   |
+30 | /// the same `handle_intake` path used by cross-Host (the wire is just a
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+   = note: `#[warn(clippy::doc_lazy_continuation)]` on by default
+help: indent this line
+   |
+30 | ///   the same `handle_intake` path used by cross-Host (the wire is just a
+   |     ++
+
+warning: doc list item without indentation
+  --> crates/maos-a2a/src/adapter.rs:31:5
+   |
+31 | /// `handle_intake` shortcut). The mTLS + TOFU substrate is exercised at
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+31 | ///   `handle_intake` shortcut). The mTLS + TOFU substrate is exercised at
+   |     ++
+
+warning: doc list item without indentation
+  --> crates/maos-a2a/src/adapter.rs:32:5
+   |
+32 | /// connection time, not per-frame.
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+   |
+32 | ///   connection time, not per-frame.
+   |     ++
+
+warning: unreachable pattern
+   --> crates/maos-orchestrator-buffer/src/gateway_dispatcher.rs:332:21
+    |
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/maos-orchestrator-buffer/src/gateway_dispatcher.rs:332:21
+    |
+329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+    |                     ----------------------------- matches some of the same values
+330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+    |                     --------------- matches some of the same values
+331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+    |                     ----------- matches some of the same values
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+    = note: the full name for the type has been written to '/mnt/build/cargo-maos/debug/deps/maos_orchestrator_buffer-c40c8a7f2d0006c7.long-type-9305827611065669124.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+warning: unused variable: `e`
+   --> crates/maos-orchestrator-buffer/src/gateway_dispatcher.rs:161:29
+    |
+161 |                         Err(e) => {
+    |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `ctx`
+   --> crates/maos-orchestrator-buffer/src/gateway_dispatcher.rs:132:17
+    |
+132 |             let ctx = GatewayCtx {
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+
+warning: using `clone` on type `GatewayType` which implements the `Copy` trait
+   --> crates/maos-orchestrator-buffer/src/gateway_dispatcher.rs:270:35
+    |
+270 |                     gateway_type: entry.gateway_type.clone(),
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `entry.gateway_type`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#clone_on_copy
+    = note: `#[warn(clippy::clone_on_copy)]` on by default
+
+warning: `maos-a2a` (lib) generated 3 warnings
+warning: `maos-orchestrator-buffer` (lib) generated 4 warnings (run `cargo clippy --fix --lib -p maos-orchestrator-buffer -- ` to apply 3 suggestions)
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/maos-siem/src/lib.rs:137:5
+    |
+137 |     probe.limit = Some(1);
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `maos_audit::AuditFilter { limit: Some(1), ..Default::default() }` and removing relevant reassignments
+   --> crates/maos-siem/src/lib.rs:136:5
+    |
+136 |     let mut probe = AuditFilter::default();
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#field_reassign_with_default
+    = note: `#[warn(clippy::field_reassign_with_default)]` on by default
+
+warning: doc list item without indentation
+  --> spirits/architect/src/lib.rs:20:5
+   |
+20 | //! dev-dependencies in `tests/` only.
+   |     ^
+   |
+   = help: if this is supposed to be its own paragraph, add a blank line
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+   = note: `#[warn(clippy::doc_lazy_continuation)]` on by default
+help: indent this line
+   |
+20 | //!   dev-dependencies in `tests/` only.
+   |     ++
+
+warning: `maos-siem` (lib) generated 1 warning
+warning: `architect` (lib) generated 1 warning
+warning: doc list item without indentation
+   --> spirits/nash/src/lib.rs:157:9
+    |
+157 |     /// falls as severity rises (a more severe anomaly is a harder architecture
+    |         ^
+    |
+    = help: if this is supposed to be its own paragraph, add a blank line
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+    = note: `#[warn(clippy::doc_lazy_continuation)]` on by default
+help: indent this line
+    |
+157 |     ///   falls as severity rises (a more severe anomaly is a harder architecture
+    |         ++
+
+warning: doc list item without indentation
+   --> spirits/nash/src/lib.rs:158:9
+    |
+158 |     /// problem). Threads Mira's `source_log_ref` so the morning digest can cite
+    |         ^
+    |
+    = help: if this is supposed to be its own paragraph, add a blank line
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+    |
+158 |     ///   problem). Threads Mira's `source_log_ref` so the morning digest can cite
+    |         ++
+
+warning: doc list item without indentation
+   --> spirits/nash/src/lib.rs:159:9
+    |
+159 |     /// it (FR17).
+    |         ^
+    |
+    = help: if this is supposed to be its own paragraph, add a blank line
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_lazy_continuation
+help: indent this line
+    |
+159 |     ///   it (FR17).
+    |         ++
+
+warning: `nash` (lib) generated 3 warnings
+    Checking maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+    --> crates/maos-bin/src/cross_team_crossing.rs:1014:5
+     |
+1014 | use maos_kernel_core::memory::MemoryManagerAdapter;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `AtomicUsize`
+   --> crates/maos-bin/src/supervision.rs:249:63
+    |
+249 |     use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+    |                                                               ^^^^^^^^^^^
+
+warning: this function has too many arguments (9/7)
+   --> crates/maos-bin/src/cross_team_crossing.rs:800:1
+    |
+800 | / pub fn erase_frame_with_binding(
+801 | |     from: &maos_domain::frame::FrameAddress,
+802 | |     peer: &maos_spirit_abi::identity::HostId,
+803 | |     frame_seq: u64,
+...   |
+809 | |     locator_digest: String,
+810 | | ) -> Result<IacFrame, String> {
+    | |_____________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+  --> crates/maos-bin/src/crypto_provider.rs:10:12
+   |
+10 |     build: fn(Option<&Path>) -> Result<Arc<dyn CryptoProvider>, String>,
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+   = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: doc list item overindented
+   --> crates/maos-bin/src/enterprise_identity.rs:553:5
+    |
+553 | ///                        collision (vanishing at 128 bits) surfaces as
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ help: try using `  ` (2 spaces)
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_overindented_list_items
+    = note: `#[warn(clippy::doc_overindented_list_items)]` on by default
+
+warning: doc list item overindented
+   --> crates/maos-bin/src/enterprise_identity.rs:554:5
+    |
+554 | ///                        `AuditError::Query`, NEVER swallowed.
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ help: try using `  ` (2 spaces)
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_overindented_list_items
+
+warning: doc list item overindented
+   --> crates/maos-bin/src/enterprise_identity.rs:564:5
+    |
+564 | ///                        Reuses the domain enum so the discriminator cannot
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ help: try using `  ` (2 spaces)
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_overindented_list_items
+
+warning: doc list item overindented
+   --> crates/maos-bin/src/enterprise_identity.rs:565:5
+    |
+565 | ///                        drift from `i3`.
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ help: try using `  ` (2 spaces)
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#doc_overindented_list_items
+
+warning: this can be `std::io::Error::other(_)`
+   --> crates/maos-bin/src/enterprise_identity.rs:582:37
+    |
+582 |         .map_err(|e| AuditError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+    |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+    = note: `#[warn(clippy::io_other_error)]` on by default
+help: use `std::io::Error::other`
+    |
+582 -         .map_err(|e| AuditError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+582 +         .map_err(|e| AuditError::Io(std::io::Error::other(e)))?;
+    |
+
+warning: use of a fallible conversion when an infallible one could be used
+   --> crates/maos-bin/src/enterprise_identity.rs:592:24
+    |
+592 |     let spirit_pid_i = i64::try_from(spirit_pid).map_err(|_| AuditError::ValueOverflow {
+    |                        ^^^^^^^^^^^^^
+    |
+    = note: converting `u32` to `i64` cannot fail
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_fallible_conversions
+    = note: `#[warn(clippy::unnecessary_fallible_conversions)]` on by default
+help: use
+    |
+592 -     let spirit_pid_i = i64::try_from(spirit_pid).map_err(|_| AuditError::ValueOverflow {
+592 +     let spirit_pid_i = From::from(spirit_pid).map_err(|_| AuditError::ValueOverflow {
+    |
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> crates/maos-bin/src/operator_door.rs:546:23
+    |
+546 |     post_unload_stop: Mutex<Option<Arc<dyn Fn(u32) + Send + Sync>>>,
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#type_complexity
+
+warning: useless conversion to the same type: `maos_skill::ESkillStore`
+    --> crates/maos-bin/src/operator_door.rs:3012:53
+     |
+3012 |         value.map_err(|e| SkillDecisionError::Store(e.into()))
+     |                                                     ^^^^^^^^ help: consider removing `.into()`: `e`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_conversion
+     = note: `#[warn(clippy::useless_conversion)]` on by default
+
+warning: this function has too many arguments (9/7)
+  --> crates/maos-bin/src/shell_host.rs:62:5
+   |
+62 | /     pub fn new(
+63 | |         spirit_pid: u32,
+64 | |         boot_nonce: u64,
+65 | |         default_provider: String,
+...  |
+71 | |         door: Arc<dyn OperatorCommandPort>,
+72 | |     ) -> Self {
+   | |_____________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: unnecessary closure used to substitute value for `Option::None`
+    --> crates/maos-bin/src/supervision.rs:2191:30
+     |
+2191 |                   let budget = bundle.budget.get_or_insert_with(|| {
+     |  ______________________________^
+2192 | |                     maos_kernel_core::security::manifest::Budget {
+2193 | |                         context_window_size: 0,
+2194 | |                         time_cap_seconds: cap,
+...    |
+2198 | |                 });
+     | |__________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+     = note: `#[warn(clippy::unnecessary_lazy_evaluations)]` on by default
+help: use `get_or_insert` instead
+     |
+2191 ~                 let budget = bundle.budget.get_or_insert({
+2192 +                     maos_kernel_core::security::manifest::Budget {
+2193 +                         context_window_size: 0,
+2194 +                         time_cap_seconds: cap,
+2195 +                         context_pressure_permille: 800,
+2196 +                         context_limit_permille: 950,
+2197 +                     }
+2198 ~                 });
+     |
+
+warning: casting to the same type is unnecessary (`i32` -> `i32`)
+    --> crates/maos-bin/src/supervision.rs:3450:73
+     |
+3450 | ...                   signal: status.terminating_signal().map(|s| s as i32),
+     |                                                                   ^^^^^^^^ help: try: `s`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_cast
+     = note: `#[warn(clippy::unnecessary_cast)]` on by default
+
+warning: casting to the same type is unnecessary (`i32` -> `i32`)
+    --> crates/maos-bin/src/supervision.rs:3451:64
+     |
+3451 | ...                   code: status.exit_status().map(|c| c as i32),
+     |                                                          ^^^^^^^^ help: try: `c`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_cast
+
+warning: this function has too many arguments (8/7)
+   --> crates/maos-bin/src/worker_spawn.rs:407:1
+    |
+407 | / pub fn issue_enterprise_governed_capability(
+408 | |     capability: &CapabilityRegistryAdapter,
+409 | |     enterprise_runtime: Option<&enterprise_identity::EnterpriseRuntime>,
+410 | |     enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
+...   |
+415 | |     intent_class: IntentClass,
+416 | | ) -> Result<CapabilityToken, GovernedMintError> {
+    | |_______________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#too_many_arguments
+
+warning: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/maos-bin/src/worker_spawn.rs:836:17
+    |
+836 |                 &permitted_egress,
+    |                 ^^^^^^^^^^^^^^^^^ help: change this to: `permitted_egress`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+    = note: `#[warn(clippy::needless_borrow)]` on by default
+
+warning: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/maos-bin/src/worker_spawn.rs:844:17
+    |
+844 |                 &permitted_egress,
+    |                 ^^^^^^^^^^^^^^^^^ help: change this to: `permitted_egress`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+
+warning: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/maos-bin/src/worker_spawn.rs:951:21
+    |
+951 |                     &permitted_egress,
+    |                     ^^^^^^^^^^^^^^^^^ help: change this to: `permitted_egress`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+
+warning: `maos-bin` (lib) generated 20 warnings (run `cargo clippy --fix --lib -p maos-bin -- ` to apply 10 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.51s

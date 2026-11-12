@@ -1,0 +1,24 @@
+08:33:57 in_progress - |       1 completed/cancelled       4 in_progress/- 
+08:35:59 in_progress - |       1 completed/cancelled       4 in_progress/- 
+08:38:01 in_progress - |       1 completed/cancelled       4 in_progress/- 
+08:40:03 in_progress - |       1 completed/cancelled       4 in_progress/- 
+08:42:06 in_progress - |       1 completed/cancelled       4 in_progress/- 
+08:44:07 in_progress - |       1 completed/cancelled       4 in_progress/- 
+08:46:10 in_progress - |       1 completed/cancelled       4 in_progress/- 
+08:48:12 in_progress - |       1 completed/cancelled       1 completed/failure       3 in_progress/- 
+UNEXPECTED FAILURES:
+hermetic (ubuntu-24.04-arm)
+08:50:14 in_progress - |       1 completed/cancelled       2 completed/failure       2 in_progress/- 
+UNEXPECTED FAILURES:
+hermetic (ubuntu-24.04-arm)
+hermetic (ubuntu-26.04-arm)
+08:52:16 in_progress - |       1 completed/cancelled       2 completed/failure       2 in_progress/- 
+UNEXPECTED FAILURES:
+hermetic (ubuntu-24.04-arm)
+hermetic (ubuntu-26.04-arm)
+08:54:18 completed cancelled |       1 completed/cancelled       4 completed/failure 
+UNEXPECTED FAILURES:
+hermetic (ubuntu-24.04-arm)
+hermetic (ubuntu-24.04)
+hermetic (ubuntu-26.04)
+hermetic (ubuntu-26.04-arm)

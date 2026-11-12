@@ -1,0 +1,5 @@
+131076312277	apple-check	success	2026-11-12T09:08:24Z	2026-11-12T09:11:15Z	
+131076312503	hermetic (ubuntu-24.04-arm)	failure	2026-11-12T09:08:30Z	2026-11-12T09:20:44Z	Fixtures and witnesses
+131076312568	hermetic (ubuntu-24.04)	failure	2026-11-12T09:08:26Z	2026-11-12T09:27:18Z	Fixtures and witnesses
+131076312686	hermetic (ubuntu-26.04-arm)	failure	2026-11-12T09:09:02Z	2026-11-12T09:27:35Z	Fixtures and witnesses
+131076312754	hermetic (ubuntu-26.04)	failure	2026-11-12T09:10:49Z	2026-11-12T09:30:01Z	Fixtures and witnesses
