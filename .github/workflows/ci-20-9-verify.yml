@@ -77,10 +77,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        swap_in: [declared, removed-plant]
+        include:
+          # AC6.1: the swap, with the example's CPU cap raised so each TypeScript start fits the
+          # swap attempt wall (see the cap note on the sed below).
+          - {swap_in: declared, cpu: '100'}
+          # AC6.2: the plant, at the same cap. EXPECTED RED, judged by its own last step.
+          - {swap_in: removed-plant, cpu: '100'}
+          # The shipped manifest (cpu_max_pct = 10) unchanged: recorded to show what the cap does.
+          - {swap_in: declared, cpu: shipped}
     timeout-minutes: 90
     env:
       SWAP_IN_CASE: ${{ matrix.swap_in }}
+      CPU_CASE: ${{ matrix.cpu }}
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -135,6 +143,16 @@ jobs:
           cp "$ex/manifest.toml" v1.toml
           sed 's/^version = "0.1.0"/version = "0.2.0"/' "$ex/manifest.toml" > v2.toml
           grep -q '^version = "0.2.0"' v2.toml
+          # Cap note: the shipped manifest declares cpu_max_pct = 10. Under that cap the TypeScript
+          # guest needs ~250 s of wall time to finish starting (run 43182348879: ~34 CPU-s consumed
+          # in 278 s), longer than the door's 90 s swap attempt wall (ATTEMPT_WALL), so a hot swap
+          # cannot finish at the shipped cap. The `shipped` case records that; the other cases run
+          # the same example with the cap raised so the swap itself is what is measured.
+          if [ "$CPU_CASE" != shipped ]; then
+            sed -i "s/^cpu_max_pct = 10\$/cpu_max_pct = $CPU_CASE/" v1.toml v2.toml
+            grep -q "^cpu_max_pct = $CPU_CASE\$" v1.toml
+            grep -q "^cpu_max_pct = $CPU_CASE\$" v2.toml
+          fi
           "$rel/maos-registry-server" --dev-http --bind 127.0.0.1:6789 --root "$scratch/registry" > registry.log 2>&1 &
           server_pid=$!
           ready=0
@@ -179,6 +197,25 @@ jobs:
             grep -q 'spawned_swap_not_ready' swap.out || break
           done
           echo "ready_after_s=$((SECONDS - start))" | tee -a swap.out
+          if [ "$status" -eq 75 ]; then
+            # The door outlived maosctl's 30 s route budget; the operation runs to completion and its
+            # TL row `operator.upgrade.<op>:<outcome>` carries the verdict.
+            op="$(grep -o 'op-[0-9a-f]*' swap.out | head -1)"
+            outcome=""
+            for i in $(seq 1 180); do
+              outcome="$(OP="$op" python3 - <<'PY'
+          import os, sqlite3
+          db = sqlite3.connect("file:" + os.environ["MAOS_HOME"] + "/audit/transparency.sqlite?mode=ro", uri=True)
+          r = db.execute("SELECT intent FROM transparency_log WHERE intent LIKE ?", ("operator.upgrade." + os.environ["OP"] + ":%",)).fetchone()
+          print(r[0].split(":", 1)[1] if r else "")
+          PY
+          )"
+              [ -n "$outcome" ] && break
+              sleep 2
+            done
+            echo "async upgrade $op outcome=${outcome:-none}" | tee -a swap.out
+            [ "$outcome" = completed ] && status=0
+          fi
           echo "upgrade exit=$status"
           cat swap.out
           echo "$status" > swap.status
@@ -235,7 +272,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: 20-9-hosted-swap-${{ matrix.swap_in }}
+          name: 20-9-hosted-swap-${{ matrix.swap_in }}-${{ matrix.cpu }}
           path: |
             daemon.out
             daemon.err
