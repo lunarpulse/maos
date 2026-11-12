@@ -167,9 +167,15 @@ fn door_scan_with_continuous_writer(count: u64) {
         SubmitOutcome::HandlerStillRunning { ref operation_id } => {
             // The shipped route deadline is unchanged. This response is only
             // pending, never an erased report; its durable completion must be
-            // observable within one further unchanged route-budget interval.
+            // observable within the second wait below.
+            // Operator ruling 2026-11-12 (ask `ac5` = widen): the handler takes
+            // ~15-22 s against the 10 s route budget, so the old 10 s second
+            // wait sat on the edge (hosted pass 40.957/43.176/43.2 s, fail at
+            // 44.1 s, run 43143326211). The second wait is 30 s: the total
+            // allowance is 10 s route + 30 s = 40 s. The route budget and every
+            // product deadline are unchanged and every assertion is kept.
             eprintln!("EC-13 pending rows={count} operation_id={operation_id}");
-            let deadline = Instant::now() + forget().route_budget();
+            let deadline = Instant::now() + Duration::from_secs(30);
             let intent = format!("operator.forget.{operation_id}:completed");
             loop {
                 let completed: Option<Vec<u8>> = db

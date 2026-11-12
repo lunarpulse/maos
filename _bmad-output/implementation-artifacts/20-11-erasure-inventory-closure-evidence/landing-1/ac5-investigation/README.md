@@ -95,3 +95,14 @@ amended to say the one skip does not change parallelism. Cost: a few xtask lines
    (ii) seed the late sweep from the first sweep's high-water/held/malformed state instead of re-scanning from rowid 0 (removes 4-5 of 9 scans; needs a carrier from `scrub_forget_frames`
    — kernel-core `ForgetOutcome` is kernel-frozen, an adapter-side hand-off costs maos-iac lines at ceiling 8770 / zero headroom: STOP, priced need required [INFERENCE ~+25..+40]).
 4. Independent of 3, apply the loom-leg `--skip` above if the hosted loom leg is red on this test.
+
+## Addendum 2026-11-12 — hosted occurrences and operator ruling: widen (DevFlakes)
+
+Hosted evidence for this oracle after the analysis above: PASS 40.957 s (run 42533166219), PASS 43.176 s, PASS 43.2 s, and FAIL 44.126 s at the edge (run 43143326211 @ `e1a44cd5`, job
+130935295525: `EC-13 route rows=1000000 wall=10.000145984s response=HandlerStillRunning`, then `pending operation did not finish`). The handler needs ~15-22 s against the unchanged 10 s route
+budget plus the old 10 s second wait, so the hosted case sat on the edge in both directions.
+
+**Ruling (operator, ask `ac5` = widen):** the second wait is 30 s (total allowance 40 s). The route budget and every product deadline are unchanged; every assertion is kept (completion receipt,
+tombstone, idempotent repeat, body integrity, disk envelope). This supersedes recommendation 3's "robust oracle" lever as the applied remedy; the page-size and seed levers remain
+unapplied and open under 20-7. Applied at `crates/maos-bin/tests/erasure_million_20_11.rs:167-178`; local run `landing-2/flakes/million-widened-local.log`: PASS 38.106 s (door wall 21.834 s).
+Records: `landing-2/flakes/README.md`.

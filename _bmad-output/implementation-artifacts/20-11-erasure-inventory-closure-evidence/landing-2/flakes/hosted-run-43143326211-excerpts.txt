@@ -1,0 +1,27 @@
+# Hosted run 43143326211 @ e1a44cd532c6b180e5a0f2d8b8e4cac5f7638773 (fetched 2026-11-12 with gh api, ANSI stripped)
+
+## Job 130935295525 workspace-test-suite (log lines 9872, 9887, 9891)
+2026-11-12T03:29:59.4061352Z         FAIL [  44.126s] (1179/6047) maos-bin::erasure_million_20_11 ac5_million_row_pending_forget_finishes_and_repeats_without_corruption
+2026-11-12T03:29:59.4072967Z     EC-13 route rows=1000000 wall=10.000145984s response=HandlerStillRunning { operation_id: "op-532307cec56925a306c496a4" }
+2026-11-12T03:29:59.4077271Z     pending operation did not finish: op-532307cec56925a306c496a4
+
+## Job 130952590282 cgroup-ceiling-delegated (ubuntu-24.04-arm) (log lines 371-387, 405-406)
+2026-11-12T03:32:23.3077366Z        START [         ] (2/4) maos-kernel-core::cgroup_ceiling_smoke killed_leader_cleanup_kills_its_surviving_descendant
+2026-11-12T03:32:23.3082608Z 
+2026-11-12T03:32:23.3083813Z running 1 test
+2026-11-12T03:32:23.3176608Z 
+2026-11-12T03:32:23.3177365Z thread 'killed_leader_cleanup_kills_its_surviving_descendant' (2332) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:786:23:
+2026-11-12T03:32:23.3178322Z read descendant terminal state: No such process (os error 3)
+2026-11-12T03:32:23.3178841Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-11-12T03:32:23.3181876Z test killed_leader_cleanup_kills_its_surviving_descendant ... FAILED
+2026-11-12T03:32:23.3182209Z 
+2026-11-12T03:32:23.3182301Z failures:
+2026-11-12T03:32:23.3182445Z 
+2026-11-12T03:32:23.3182596Z failures:
+2026-11-12T03:32:23.3182890Z     killed_leader_cleanup_kills_its_surviving_descendant
+2026-11-12T03:32:23.3183151Z 
+2026-11-12T03:32:23.3183461Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.01s
+2026-11-12T03:32:23.3183867Z 
+2026-11-12T03:32:23.3184310Z         FAIL [   0.013s] (2/4) maos-kernel-core::cgroup_ceiling_smoke killed_leader_cleanup_kills_its_surviving_descendant
+2026-11-12T03:32:34.4411240Z      Summary [  11.166s] 4 tests run: 3 passed, 1 failed, 4 skipped
+2026-11-12T03:32:34.4411895Z         FAIL [   0.013s] (2/4) maos-kernel-core::cgroup_ceiling_smoke killed_leader_cleanup_kills_its_surviving_descendant

@@ -685,6 +685,34 @@ fn descendant_is_dead(state: Option<&str>) -> bool {
     matches!(state, None | Some("Z" | "X" | "x"))
 }
 
+/// Classifies one read of `/proc/<pid>/stat` taken after the leader was killed:
+/// `Ok(true)` = terminal or gone, `Ok(false)` = observably still alive, `Err` =
+/// an unexplained read failure (never swallowed). A vanished descendant is the
+/// success condition: `cgroup.kill` made it exit and its new parent reaped it. A
+/// read racing that reap fails ENOENT (path gone, `NotFound`) or, once the open
+/// succeeded, ESRCH ("No such process", `Uncategorized`, not `NotFound`).
+fn descendant_stat_read_is_terminal(
+    read: &std::io::Result<String>,
+) -> Result<bool, &std::io::Error> {
+    match read {
+        Ok(stat) => Ok(descendant_is_dead(Some(
+            stat.rsplit_once(") ")
+                .expect("descendant stat must close its comm field")
+                .1
+                .split_whitespace()
+                .next()
+                .expect("descendant stat must contain a state"),
+        ))),
+        Err(error)
+            if error.kind() == std::io::ErrorKind::NotFound
+                || error.raw_os_error() == Some(libc::ESRCH) =>
+        {
+            Ok(true)
+        }
+        Err(error) => Err(error),
+    }
+}
+
 #[test]
 fn descendant_terminal_state_accepts_reaped_or_dead_but_not_live() {
     for state in [None, Some("Z"), Some("X"), Some("x")] {
@@ -693,6 +721,57 @@ fn descendant_terminal_state_accepts_reaped_or_dead_but_not_live() {
     for state in [Some("R"), Some("S"), Some("D")] {
         assert!(!descendant_is_dead(state), "live state accepted: {state:?}");
     }
+}
+
+#[test]
+fn descendant_stat_read_classifies_gone_dead_live_and_unexplained() {
+    let stat = |state: &str| Ok(format!("4242 (maos) fixture) {state} 1 4242 4242 0 -1"));
+    assert!(descendant_stat_read_is_terminal(&stat("Z")).unwrap());
+    assert!(descendant_stat_read_is_terminal(&stat("X")).unwrap());
+    for live in ["R", "S", "D"] {
+        assert!(
+            !descendant_stat_read_is_terminal(&stat(live)).unwrap(),
+            "live state {live} accepted as terminal"
+        );
+    }
+    // The path vanished (reaped before open): the descendant is gone.
+    let enoent = Err(std::io::Error::from_raw_os_error(libc::ENOENT));
+    assert!(descendant_stat_read_is_terminal(&enoent).unwrap());
+    // Reaped between open and read: `/proc/<pid>/stat` fails ESRCH, which std
+    // does not map to `NotFound`. The descendant is gone, so the kill worked.
+    let esrch = Err(std::io::Error::from_raw_os_error(libc::ESRCH));
+    assert!(descendant_stat_read_is_terminal(&esrch).unwrap());
+    // Anything else is unexplained and must stay a failure.
+    for errno in [libc::EACCES, libc::EIO] {
+        let other = Err(std::io::Error::from_raw_os_error(errno));
+        assert_eq!(
+            descendant_stat_read_is_terminal(&other)
+                .unwrap_err()
+                .raw_os_error(),
+            Some(errno)
+        );
+    }
+}
+
+#[test]
+fn a_real_stat_read_racing_the_reap_fails_esrch_and_counts_as_gone() {
+    let mut child = std::process::Command::new("sleep")
+        .arg("30")
+        .spawn()
+        .expect("spawn a real child to reap");
+    let pid = child.id();
+    // Open while the task is live: the later read is what races the reap.
+    let mut stat = std::fs::File::open(format!("/proc/{pid}/stat")).expect("open live stat");
+    child.kill().expect("kill the child");
+    child.wait().expect("reap the child");
+    let mut text = String::new();
+    let read = std::io::Read::read_to_string(&mut stat, &mut text).map(|_| text);
+    assert_eq!(
+        read.as_ref().err().and_then(std::io::Error::raw_os_error),
+        Some(libc::ESRCH),
+        "the kernel reports a reaped task's open stat as ESRCH: {read:?}"
+    );
+    assert!(descendant_stat_read_is_terminal(&read).unwrap());
 }
 
 #[test]
@@ -770,21 +849,11 @@ fn assert_killed_leader_cleanup(resolved: ResolvedCaps) {
         collect_until_exit(&mut bridge),
         ExitCause::Signaled { .. }
     ));
-    match std::fs::read_to_string(format!("/proc/{descendant}/stat")) {
-        Ok(stat) => assert!(
-            descendant_is_dead(Some(
-                stat.rsplit_once(") ")
-                    .unwrap()
-                    .1
-                    .split_whitespace()
-                    .next()
-                    .expect("descendant stat must contain a state")
-            )),
-            "a descendant awaiting its new parent's reap must already be dead: {stat}"
-        ),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => panic!("read descendant terminal state: {error}"),
-    }
+    let observed = std::fs::read_to_string(format!("/proc/{descendant}/stat"));
+    assert!(
+        descendant_stat_read_is_terminal(&observed).expect("read descendant terminal state"),
+        "a descendant awaiting its new parent's reap must already be dead: {observed:?}"
+    );
     assert!(
         !leaf.exists(),
         "cgroup.kill must remove the surviving descendant and leaf"
