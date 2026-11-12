@@ -19,6 +19,12 @@ and keep it in `$tag`:
 tag=v1.0.0-rc.1   # example; must equal "v" + [workspace.package].version in Cargo.toml
 ```
 
+> **Dated note 2026-11-12 (operator ruling; the paragraph above is kept as written):**
+> agents may dispatch the T3 fuzz chain (`fuzz-prerelease.yml`) when their token allows it —
+> the exact command and preconditions are in
+> [`decisions-2026-11-12.md`](decisions-2026-11-12.md) — but never tag, sign or publish: the
+> signed tag needs the key holder.
+
 ## Pre-tag checklist
 
 Run these checks against the exact commit that will be tagged:
@@ -67,8 +73,11 @@ Run these checks against the exact commit that will be tagged:
    runs never count). Against the real ledger the leg **refuses** until your
    dispatch exists (0 T3 records when measured 2026-11-04).
 
-   The perf-ledger leg (`check-perf-verdict`, Story 20-7 AC11.2) joins this step
-   when 20-7 lands it. The aggregate server-side `check_name=aggregate&filter=latest` filter is mandatory
+   The perf-ledger leg (Operator ruling 2026-11-12, rc = b): `release.yml` runs
+   `check-perf-verdict --json` on the `perf-ledger` branch (absent = empty ledger) and
+   passes the report as `--perf-verdicts`; a release candidate adds `--perf-absent-ok`
+   (ABSENT accepted, labelled in the notes), GA does not (every row PASS), and FAIL or
+   INDETERMINATE are always refused. The aggregate server-side `check_name=aggregate&filter=latest` filter is mandatory
    (no `status=completed` filter: a newer run still in progress is the run judged and
    refused, never hidden behind an older green one) and matches
    the query the `Require successful main discipline aggregate` step runs in
@@ -91,14 +100,19 @@ Run these checks against the exact commit that will be tagged:
 
    `check-rc-readiness` is green only when: the workspace version is `X.Y.Z-rc.N`
    and equals `$tag` sans the `v`; STABILITY.md is in sync; every `20-*` story in
-   `sprint-status.yaml` is `done` (with `--tag`, Story 20-5's own key included);
-   the `MAOS_RELEASE_PUBKEY`, `RELEASE_SIGNING_KEY`, `fuzz-ledger branch
-   permission` and `release environment protection evidence` rows of the
-   provisioning checklist are `present` (the last is `absent` until the operator
-   configures required reviewers, no self-review/bypass and tag restrictions on the
-   `release` environment, so this gate stays red until then); and every
-   `deny.toml` ignored RUSTSEC id has a `deferred-work.md` row. `release.yml`
-   runs the same command with `--tag` before signing when the ref is an rc tag.
+   `sprint-status.yaml` is `done` (with `--tag`, Story 20-5's own key included) — except
+   `20-7-stable-runner-perf-gates`, accepted at `in-progress` and reported `WAIVED` for an
+   `-rc.N` version whose notes carry the perf label (operator ruling 2026-11-12, rc = b);
+   the `MAOS_RELEASE_PUBKEY`, `RELEASE_SIGNING_KEY` and `fuzz-ledger branch
+   permission` rows of the provisioning checklist are `present`, and the `release
+   environment protection evidence` row is `present` **or** `absent` with a labelled
+   `WARN: environment protection not provisioned: claim boundary` (then the notes
+   must carry the exact line `Release environment protection: NOT PROVISIONED`);
+   `docs/release/v<version>.md` exists and carries the exact line `Perf verdicts: ABSENT`
+   (leg `perf-verdict-label`); and every `deny.toml` ignored RUSTSEC id has a
+   `deferred-work.md` row. `release.yml` runs the same command with `--tag` before
+   signing when the ref is an rc tag. See
+   [`decisions-2026-11-12.md`](decisions-2026-11-12.md).
 
 4. Confirm `MAOS_RELEASE_PUBKEY` and `RELEASE_SIGNING_KEY` are both `present`
    in [`docs/runbooks/provisioning-checklist.md`](../runbooks/provisioning-checklist.md).

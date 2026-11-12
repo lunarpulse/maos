@@ -1,5 +1,14 @@
 # MAOS Pen-Test Finding Triage Protocol
 
+> **Operator ruling 2026-11-12 (dated note; the protocol text below is kept as written).**
+> No external pen-test engagement is being run, so no findings will be produced and this
+> protocol is dormant. The v1.0 ship-gate wording in the header and §1 (the "before MAOS
+> may ship v1.0" sentences) no longer describes a GA precondition: NFR-Sec-7 is an explicit
+> claim boundary and `v1.0.0` may be tagged without a pen-test report, with the release
+> notes stating that no external penetration test was performed. If an engagement is ever
+> run, this protocol governs it unchanged. See [`RELEASE-HOLDS.md`](../../RELEASE-HOLDS.md)
+> Hold 1 and [`docs/release/decisions-2026-11-12.md`](../release/decisions-2026-11-12.md).
+
 | | |
 |---|---|
 | **Engagement** | MAOS v1.0 Ship-Gate Pen-Test (Story 10.1b) |

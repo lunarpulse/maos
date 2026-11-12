@@ -10,7 +10,10 @@
 //!   3. Every required cryptographic primitive in the MAOS surface is
 //!      enumerated in the ECCN doc (enumeration completeness — task 1.1).
 //!
-//! Absence is a v1.0 ship-block (disposition `v1_0 = "blocking"`).
+//! Absence is a ship-block of the artifact (disposition `v1_0 = "blocking"`). The gate
+//! checks the document and its enumeration only: it never claims an ECCN determination
+//! was made (operator ruling 2026-11-12: NFR-Comp-1 is an explicit claim boundary, not
+//! a GA precondition; see `RELEASE-HOLDS.md`).
 
 use std::path::Path;
 use std::process::Command;

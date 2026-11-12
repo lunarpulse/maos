@@ -163,6 +163,11 @@ fn every_later_control_reads_the_one_classification() {
 // ---- GLM F6 / F4: the aggregate + ledger step ------------------------------------------
 
 fn aggregate_step(kind: &str) -> (Output, String) {
+    aggregate_step_with(kind, "")
+}
+
+/// `perf_mode`: "" = the perf-ledger branch exists; "404" = absent; "500" = any other failure.
+fn aggregate_step_with(kind: &str, perf_mode: &str) -> (Output, String) {
     let release = release();
     let steps = steps(&release, "sign-and-publish");
     let script = script(&steps, "Require successful main discipline aggregate")
@@ -178,6 +183,12 @@ fn aggregate_step(kind: &str) -> (Output, String) {
              case \"$*\" in\n\
                *commits/fuzz-ledger*) echo ledgertip0123456789abcdef0123456789abcdef0123 ;;\n\
                *contents/fuzz-ledger.json*) echo '{{\"schema_version\":1,\"records\":[]}}' ;;\n\
+               *branches/perf-ledger*) case \"$PERF_MODE\" in\n\
+                 404) echo 'gh: Branch not found (HTTP 404)' >&2; exit 1 ;;\n\
+                 500) echo 'gh: boom (HTTP 500)' >&2; exit 1 ;;\n\
+                 *) echo perftip0123456789abcdef0123456789abcdef01234 ;;\n\
+               esac ;;\n\
+               *contents/ledger.jsonl*) ;;\n\
                *check-runs*) echo '{{\"check_runs\":[]}}' ;;\n\
              esac",
             log = log.display()
@@ -191,7 +202,7 @@ fn aggregate_step(kind: &str) -> (Output, String) {
         &script,
         dir.path(),
         Some(&bin),
-        &[("KIND", kind), ("GH_TOKEN", "x")],
+        &[("KIND", kind), ("GH_TOKEN", "x"), ("PERF_MODE", perf_mode)],
     );
     let calls = std::fs::read_to_string(&log).unwrap_or_default();
     (output, calls)
@@ -221,6 +232,52 @@ fn rc_and_ga_pass_the_ledger_pinned_to_its_logged_tip_and_alpha_does_not() {
         !calls.contains("--fuzz-ledger") && !calls.contains("fuzz-ledger.json"),
         "{calls}"
     );
+}
+
+#[test]
+fn perf_verdicts_are_judged_for_rc_and_ga_and_only_a_candidate_accepts_absent() {
+    let (output, calls) = aggregate_step("rc");
+    assert!(output.status.success(), "{}", text(&output));
+    assert!(
+        calls.contains(&format!("check-perf-verdict --sha {SHA} --ledger")),
+        "{calls}"
+    );
+    assert!(
+        calls.contains("contents/ledger.jsonl?ref=perftip0123456789abcdef0123456789abcdef01234"),
+        "{calls}"
+    );
+    assert!(text(&output)
+        .contains("perf-ledger tip consumed: perftip0123456789abcdef0123456789abcdef01234"));
+    assert!(
+        calls.contains("--perf-verdicts") && calls.contains("--perf-absent-ok"),
+        "{calls}"
+    );
+    let (output, calls) = aggregate_step("ga");
+    assert!(output.status.success(), "{}", text(&output));
+    assert!(calls.contains("--perf-verdicts"), "{calls}");
+    assert!(
+        !calls.contains("--perf-absent-ok"),
+        "GA needs PASS, never ABSENT: {calls}"
+    );
+    let (output, calls) = aggregate_step("alpha");
+    assert!(output.status.success(), "{}", text(&output));
+    assert!(
+        !calls.contains("perf"),
+        "the alpha line has no perf leg: {calls}"
+    );
+}
+
+#[test]
+fn an_absent_perf_ledger_branch_is_an_empty_ledger_and_any_other_failure_refuses() {
+    for kind in ["rc", "ga"] {
+        let (output, calls) = aggregate_step_with(kind, "404");
+        assert!(output.status.success(), "{kind}: {}", text(&output));
+        assert!(text(&output).contains("empty ledger"), "{}", text(&output));
+        assert!(calls.contains("--perf-verdicts"), "{calls}");
+        let (output, calls) = aggregate_step_with(kind, "500");
+        assert!(!output.status.success(), "{kind}: {}", text(&output));
+        assert!(!calls.contains("check-release-precondition"), "{calls}");
+    }
 }
 
 #[test]
@@ -320,7 +377,7 @@ const REFUSAL_JOB: &str = "precondition-refuses-without-a-t3-chain";
 const READINESS_JOB: &str = "rc-readiness-reports-its-legs";
 const REFUSAL_STEP: &str = "The leg refuses (the gate's own refusal is the PASS of this step)";
 const READINESS_STEP: &str =
-    "Report the five legs (a red tree is the expected state until the L2 landing)";
+    "Report the six legs (a red tree is the expected state until the L2 landing)";
 
 fn run_recipe_step(job: &str, name: &str, fake_xtask: Option<&str>) -> Output {
     let recipe = recipe();
@@ -389,16 +446,17 @@ fn report(legs: &[(&str, bool)], gate: &str, passed: bool) -> String {
     )
 }
 
-const FIVE: [&str; 5] = [
+const SIX: [&str; 6] = [
     "version",
     "stability-matrix",
     "epic-20-stories",
     "provisioning",
     "deny-ignores",
+    "perf-verdict-label",
 ];
 
 fn legs_with(red: &[&str]) -> Vec<(&'static str, bool)> {
-    FIVE.iter().map(|leg| (*leg, !red.contains(leg))).collect()
+    SIX.iter().map(|leg| (*leg, !red.contains(leg))).collect()
 }
 
 #[test]
@@ -414,7 +472,7 @@ fn the_readiness_step_passes_only_a_genuine_red_report() {
 
     let all_green = report(&legs_with(&[]), "check-rc-readiness", true);
     let wrong_gate = report(&legs_with(&["version"]), "other-gate", false);
-    let four_legs = report(&legs_with(&["version"])[..4], "check-rc-readiness", false);
+    let five_legs = report(&legs_with(&["version"])[..5], "check-rc-readiness", false);
     let lying = report(&legs_with(&[]), "check-rc-readiness", false);
     for (label, body) in [
         ("an all-green report (exit 0)", fake(&all_green, 0)),
@@ -430,7 +488,7 @@ fn the_readiness_step_passes_only_a_genuine_red_report() {
         ),
         ("a crash", fake(&good, 101)),
         ("a report for another gate", fake(&wrong_gate, 1)),
-        ("a report with four legs", fake(&four_legs, 1)),
+        ("a report with five legs", fake(&five_legs, 1)),
         (
             "a `passed:false` report whose legs are all green",
             fake(&lying, 1),

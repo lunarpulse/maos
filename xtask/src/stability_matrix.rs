@@ -366,7 +366,7 @@ pub(crate) fn parse_workspace_version(cargo_path: &Path) -> Result<String, Strin
 /// An absent record is the deterministic placeholder; a present but malformed record
 /// is an error, never the placeholder.
 fn lts_clock_start(workspace_root: &Path) -> Result<String, String> {
-    const PLACEHOLDER: &str = "pending — `v1.0.0` is cut by `ops-ga-tag-after-holds` after RELEASE-HOLDS Holds 1–2 clear, which writes `xtask/release-channel.toml`; no clock runs before then.";
+    const PLACEHOLDER: &str = "pending — `v1.0.0` is cut by `ops-ga-tag-after-holds` (RELEASE-HOLDS Holds 1–2 are explicit claim boundaries, not preconditions), which writes `xtask/release-channel.toml`; no clock runs before then.";
     let path = workspace_root.join(RELEASE_CHANNEL_RECORD);
     let src = match std::fs::read_to_string(&path) {
         Ok(src) => src,
@@ -553,8 +553,10 @@ mod tests {
         let (_guard, tmp) = isolated_workspace();
         let placeholder = render(&tmp).expect("render");
         assert!(
-            placeholder.contains("ops-ga-tag-after-holds"),
-            "no record → placeholder"
+            placeholder.contains("ops-ga-tag-after-holds")
+                && placeholder.contains("claim boundaries, not preconditions")
+                && !placeholder.contains("Holds 1–2 clear"),
+            "no record → placeholder naming the Holds as claim boundaries (ruling 2026-11-12)"
         );
         let sha = "0123456789abcdef0123456789abcdef01234567";
         std::fs::create_dir_all(tmp.join("xtask")).unwrap();

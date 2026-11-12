@@ -144,8 +144,9 @@ pub fn is_governed_story_file(keys: &BTreeSet<String>, file_name: &str) -> bool 
 // Option C — leg-level gate binding (Epic 12 retro B1, 2026-07-13).
 //
 // Two independent axes were previously conflated in one string (`CURRENT_PHASE`):
-//   (1) the GA / ship-phase ladder — how far the product has SHIPPED, correctly
-//       held at v1.5 by the two external holds (pen-test, export counsel); and
+//   (1) the GA / ship-phase ladder — how far the product has SHIPPED (it was held at
+//       v1.5 by the two external holds, pen-test and export counsel, which the
+//       2026-11-12 operator ruling made explicit claim boundaries, not preconditions); and
 //   (2) DEV-TIME enforcement — whether a RED oracle hard-fails CI at HEAD.
 //
 // Keying (2) off (1) made ~7 hermetic v2.0 gates advisory at HEAD (a real red
@@ -160,9 +161,10 @@ pub fn is_governed_story_file(keys: &BTreeSet<String>, file_name: &str) -> bool 
 /// one-line edit, not a hunt across ~10 duplicated per-gate copies.
 pub const PHASE_ORDER: &[&str] = &["v1_0", "v1_5", "v2_0", "v2_2"];
 
-/// The GA / ship phase. Held at v1_5 by v1.5's two external holds (pen-test,
-/// export counsel). This governs ONLY the GA ship-gate ladder (`is_blocking_at`)
-/// — NEVER dev-time enforcement, which is governed by [`BindingClass`].
+/// The GA / ship phase. It was held at v1_5 by v1.5's two external holds (pen-test,
+/// export counsel), now explicit claim boundaries per the 2026-11-12 operator ruling;
+/// the value is unchanged here. This governs ONLY the GA ship-gate ladder
+/// (`is_blocking_at`) — NEVER dev-time enforcement, which is governed by [`BindingClass`].
 pub const CURRENT_PHASE: &str = "v1_5";
 
 /// The GA disposition in effect at `phase`: the nearest explicitly-set

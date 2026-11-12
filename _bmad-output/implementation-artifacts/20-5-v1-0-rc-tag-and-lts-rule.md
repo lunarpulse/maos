@@ -53,8 +53,14 @@ blocker on starting L1. Preflight places this story last (PF:144): "20-5 last is
 **Does NOT close, and says so:**
 - The tag, signing and publication — `ops-rc-signed-tag` (`sprint-status.yaml:349`); the T3 chain itself — an
   operator dispatch; GA and the LTS clock — `ops-ga-tag-after-holds` after RELEASE-HOLDS Holds 1–2.
+  **Dated note 2026-11-12:** GA is no longer gated on Holds 1–2 (explicit claim boundaries); the key
+  `ops-ga-tag-after-holds` now means "cut `v1.0.0` once the engineering exits are green", an operator action (the
+  signed tag needs the key holder).
 - The perf-ledger `PASS` read in `check_release_precondition.rs` — 20-7 AC11.2 (`20-7-…md:232`), L2. This story shares
   the file and serializes with it (Overlap).
+  **Dated note 2026-11-12:** L2 landing 2 (Dev205L2) adds that read here as `--perf-verdicts` (FAIL/INDETERMINATE
+  always refused, ABSENT only under `--perf-absent-ok`, passed by `release.yml` for kind `rc` only; GA still needs
+  every row PASS). The 20-7 L2 binding phase itself stays an unclaimed row needing a bare-metal runner.
 - NFR-Maint-6's v1.5 two-year term (a v1.5 decision); the architecture's 72 CPU-hour per-target pre-GA fuzz floor
   (`5-spirit-abi.md:193`, `check_fuzz_floor.rs`) — a GA gate, not an rc gate.
 - `.deb`, air-gap, Docker split — 20-2; this story verifies their presence at L2, never builds them.
@@ -198,6 +204,10 @@ The operator ruled every D-20-5-01…16 row as recommended. The envelope binds a
 | **D-20-5-14** | Version bump timing | **A** L2's final commit bumps `Cargo.toml:67` to `1.0.0-rc.1`, `Cargo.lock`, STABILITY.md; the fuzz chain and perf verdicts are for that SHA (or a later rc-versioned SHA) · **B** the operator bumps in a release commit under `ops-rc-signed-tag` · **C** bump in L1 now | **A.** The SHA that is fuzzed must be the SHA that is tagged, with the version it ships; B puts a code edit in the operator lane; C ships every later landing as "rc" and changes `ESubstrateTooOld` comparisons mid-epic (safe by C30, but noisy). | RULED 2026-11-04 (operator, ask d205): as recommended **A** |
 | **D-20-5-15** | Where the rc procedure and the LTS rule live | **A** new `docs/release/lts-policy.md`; `docs/release/tag-procedure.md` generalized to `vX.Y.Z-rc.N` (alpha history kept); RELEASE-HOLDS pre-release sentence extended; no docs-site route · **B** A + a docs-site page (en + ko, route manifest, ko glossary gates) · **C** a separate `docs/release/rc-procedure.md` | **A.** The epic names `docs/release/` (E20:220); one procedure for every pre-release keeps the macOS rehearsal and aggregate steps in one place; B adds a route and two gates for one page. | RULED 2026-11-04 (operator, ask d205): as recommended **A** |
 | **D-20-5-16** | Per-crate envelope (D02 A applied) | **A** the envelope above (×2 measured / ×3 unmeasured) · **B** exact measured grants, every correction re-asks · **C** ×1.3 (rule 6) | **A.** 20-3b/20-3c landed at 2–3× creation forecasts; 20-4 L1 re-based the same way. | RULED 2026-11-04 (operator, ask d205): as recommended **A** |
+| **D-20-5-17** | Perf leg in `check-release-precondition` (rc = b) | **A** `--perf-verdicts <json> [--perf-absent-ok]` over `check-perf-verdict --json`: FAIL/INDETERMINATE always refused, ABSENT refused unless `--perf-absent-ok`, JSON must parse, carry rows and the released SHA (a tool crash is never ABSENT); `release.yml` passes `--perf-absent-ok` for kind `rc` only, fetches `perf-ledger` at its logged tip, an HTTP 404 branch = empty ledger · **B** no perf leg for the rc (notes label only) | **A.** Honest: ABSENT is accepted only because the operator ruled rc = b, GA still needs PASS; B would let a FAIL through. | APPROVED 2026-11-12 (Main, under the operator ruling `rc` = b); landing 2 (Dev205L2) |
+| **D-20-5-18** | `perf-verdict-label` leg and the `release` environment | **A** `check-rc-readiness` leg 6 `perf-verdict-label`: `docs/release/v<version>.md` exists and carries the exact line `Perf verdicts: ABSENT`; the `release environment protection evidence` row `absent` passes as `WARN: environment protection not provisioned: claim boundary` only with the exact notes line `Release environment protection: NOT PROVISIONED`, `present` needs none · **B** keep the row mandatory | **A.** The environment is absent (gh read 2026-11-12) and agents cannot provision money/accounts; the boundary is stated, not hidden. | APPROVED 2026-11-12 (Main); landing 2 |
+| **D-20-5-19** | The 20-7 key in leg (c) | **A** named waiver `WAIVED_KEY = 20-7-stable-runner-perf-gates` accepted at `in-progress` only, only when the workspace version is `-rc.N` and the perf label leg passes, both modes (with/without `--tag`), detail prints `WAIVED`; the key is never flipped to done · **B** flip 20-7 to done | **A.** B would be a false done (20-7 L2 needs a bare-metal runner). | APPROVED 2026-11-12 (Main); landing 2 |
+| **D-20-5-20** | Ruling wording and the fuzz dispatch | **A** generator wording (`stability_matrix.rs` placeholder) says the Holds are claim boundaries, STABILITY.md regenerated; comment-only fixes in `check_export_control.rs`, `gate_common.rs`; dated ruling notes in the pen-test docs, provisioning checklist, PRD scoping/NFR; `docs/release/decisions-2026-11-12.md` records the exact `fuzz-prerelease` dispatch command, to run at the rc SHA, NOT now · **B** dispatch now | **A.** The rc SHA does not exist yet; the chain is a 24 h+ hosted job at that exact commit. | APPROVED 2026-11-12 (Main); landing 2 |
 
 ## Operator ruling 2026-11-12 (asks `ga`, `rc`, `kb`) — amends D-20-5-09 and D-20-5-12
 
@@ -206,6 +216,31 @@ Operator words: "we are not doing NFR-Sec-7 and NFR-Comp-1 as we do not have res
 - `ga` = **boundary.** RELEASE-HOLDS Holds 1–2 (external pen-test NFR-Sec-7; ECCN NFR-Comp-1) are explicit claim boundaries, not GA preconditions. `v1.0.0` may be tagged without them; the release notes and RELEASE-HOLDS state plainly: no external penetration test was performed; no ECCN determination was made; assurance is AI-agent review plus the hermetic CI proof only. The release may NOT claim NFR-Sec-7 or NFR-Comp-1 is met. WASM-engine-off-by-default stays in force. The signed-tag step needs the key holder: an operator action AI agents cannot perform.
 - `rc` = **b** (D-20-5-09 B): the rc ships with perf verdicts ABSENT, labelled in the release notes; agents dispatch the T3 fuzz chain and provision what the `gh` token allows; money/accounts/hardware rows stay named and UNCLAIMED (never claimed done). The 20-7 L2 binding phase remains an unclaimed row needing a bare-metal runner.
 - `kb` = keep: kernel shared STOP stays 21,250 tokei; ask again before any quarantine-closure work.
+
+**Reading of the amended rows (dated 2026-11-12; the rows above are kept as ruled).** D-20-5-09's recommendation A text
+"the rc waits for 20-7 L2" and D-20-5-12 A's "GA: Holds 1–2, `ops-external-cohort-and-pen-test`, `ops-ga-tag-after-holds`"
+are superseded by this ruling: the rc does not wait for 20-7 L2 (perf verdicts ABSENT, labelled); Holds 1–2 are not GA
+preconditions. D-20-5-13 A stands with the two note labels recorded at AC8. Decision rows D-20-5-17…20 (above) record how.
+
+### Landing 2 — kernel-free ruling alignment (Dev205L2, 2026-11-12; uncommitted, awaiting review)
+
+Implemented: `check-release-precondition --perf-verdicts <json> [--perf-absent-ok]` (+ `release.yml`: rc passes
+`--perf-absent-ok`, GA does not, `perf-ledger` fetched via `branches/` with 404 = empty ledger); `check-rc-readiness`
+leg 6 `perf-verdict-label`, the labelled `release environment` WARN, the `-rc.N`-only 20-7 waiver (key not flipped);
+`stability_matrix.rs` placeholder wording + regenerated `STABILITY.md`; comment-only fixes in `check_export_control.rs`
+and `gate_common.rs`; dated ruling notes (pen-test scope + triage, provisioning checklist, PRD scoping + NFR, tag
+procedure); `docs/release/decisions-2026-11-12.md` (includes the exact `fuzz-prerelease` dispatch command and
+preconditions, **not dispatched**). Version bump and the real `docs/release/v1.0.0-rc.1.md` are NOT in this landing
+(the final 20-5 commit, after 21-5).
+
+**kloc (exact, formatted).** xtask **45355 → 45461 (+106)** against the 20-5 ceiling 45527 (66 left): an
+**orchestrator-adjudicated draw** (Main, 2026-11-12: +101 accepted, final ≤ 45527 required; the last +5 is a clippy
+`if/else` fix inside that envelope), disclosed to the operator, recorded in the xtask HISTORY by
+`scripts/repin.py --apply --adjudicated xtask`. aggregate 203240 (hardfail 203241); kernel 27103 / 21256 unchanged
+(this landing is kernel-free). **Live pins: xtask 45461, `_aggregate_hardfail` 203241.**
+Evidence: `20-5-v1-0-rc-tag-and-lts-rule-evidence/landing-2/` (failing-before at HEAD code: 16 of 45 red; ten plants, each
+reds at least one test; `evidence.md`). Unverified: the hosted release run, `ci-20-5-verify.yml` (re-cut to six legs, never run),
+the real `perf-ledger` fetch inside `release.yml` (probed read-only: `branches/perf-ledger` → HTTP 404, `commits/` → 422).
 
 ## Acceptance Criteria
 
@@ -339,6 +374,12 @@ run. No AC needs a secret, a tag or a dispatch.)*
 1. `docs/release/v1.0.0-rc.1.md`: what ships (Epic 20 closures), BREAKING.md entries since the alpha, claim
    boundaries (RELEASE-HOLDS), operator-lane residue (`creation/rc-contract.md` §3), LTS status ("no LTS; clock at
    `v1.0.0`"), perf/fuzz evidence state; wired as `body_path` in `release.yml` (`fail_on_unmatched_files` kept).
+   **Dated note 2026-11-12 (operator ruling; the AC text above is kept as written; D-20-5-13 A stands).** The
+   notes now carry two required labels: the exact line `Perf verdicts: ABSENT` (the rc = b ruling; `check-rc-readiness`
+   leg `perf-verdict-label` is red without the notes file or the line) and, while the `release` environment is
+   unprovisioned, the exact line `Release environment protection: NOT PROVISIONED`; the claim-boundary text states no
+   external penetration test and no ECCN determination (RELEASE-HOLDS Holds 1–2 are boundaries, not GA preconditions).
+   The real notes file is the final rc commit's job (after 21-5); L2 landing 2 only pins the legs against fixtures.
 
 #### AC9 — records
 

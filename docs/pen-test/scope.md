@@ -1,5 +1,16 @@
 # MAOS v1.0 Pen-Test Scope Document
 
+> **Operator ruling 2026-11-12 (dated note; the requirement text below is kept as written).**
+> No external penetration test is being performed: the project has no budget or vendor
+> for one ("we do not have resources and companies to do that"). NFR-Sec-7 is an explicit
+> **claim boundary**, not a precondition of the GA tag: `v1.0.0` may be tagged without this
+> engagement, and the release notes state plainly that no external penetration test was
+> performed and that NFR-Sec-7 is **not claimed**. The "gates the v1.0 release" and
+> "ship gate" wording in §1–§2 and the 6–8 week critical-path dependency describe the
+> engagement as originally specified; this document is retained as the scope of any future
+> engagement. Authority: [`RELEASE-HOLDS.md`](../../RELEASE-HOLDS.md) Hold 1 and
+> [`docs/release/decisions-2026-11-12.md`](../release/decisions-2026-11-12.md).
+
 | Field | Value |
 |---|---|
 | Document | Pen-Test Scope Document |

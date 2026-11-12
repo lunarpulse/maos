@@ -824,6 +824,14 @@ enum Commands {
         /// for the released SHA.
         #[arg(long)]
         fuzz_ledger: Option<String>,
+        /// Operator ruling 2026-11-12 — `check-perf-verdict --json` output for the
+        /// released SHA: FAIL / INDETERMINATE are always refused, ABSENT unless
+        /// `--perf-absent-ok`.
+        #[arg(long)]
+        perf_verdicts: Option<String>,
+        /// Accept ABSENT perf verdicts (release candidates only; GA needs PASS).
+        #[arg(long, requires = "perf_verdicts")]
+        perf_absent_ok: bool,
         #[arg(long)]
         json: bool,
     },
@@ -1501,8 +1509,16 @@ fn main() {
         Commands::CheckReleasePrecondition {
             check_runs,
             fuzz_ledger,
+            perf_verdicts,
+            perf_absent_ok,
             json,
-        } => check_release_precondition::run(check_runs.as_deref(), fuzz_ledger.as_deref(), json),
+        } => check_release_precondition::run(
+            check_runs.as_deref(),
+            fuzz_ledger.as_deref(),
+            perf_verdicts.as_deref(),
+            perf_absent_ok,
+            json,
+        ),
         Commands::CheckPerfVerdict {
             sha,
             ledger,

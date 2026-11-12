@@ -63,7 +63,7 @@ is a v1.5 decision, taken once support load is known. A release candidate
 ([`docs/release/lts-policy.md`](docs/release/lts-policy.md)).
 
 <!-- lts-clock-start: read from the committed `xtask/release-channel.toml`, which `ops-ga-tag-after-holds` writes when it cuts `v1.0.0`; placeholder until then — do NOT fabricate a SHA/tag. -->
-- **LTS clock-start:** pending — `v1.0.0` is cut by `ops-ga-tag-after-holds` after RELEASE-HOLDS Holds 1–2 clear, which writes `xtask/release-channel.toml`; no clock runs before then.
+- **LTS clock-start:** pending — `v1.0.0` is cut by `ops-ga-tag-after-holds` (RELEASE-HOLDS Holds 1–2 are explicit claim boundaries, not preconditions), which writes `xtask/release-channel.toml`; no clock runs before then.
 
 ## Substrate-Self Compliance Scope
 

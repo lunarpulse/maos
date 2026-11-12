@@ -45,6 +45,19 @@ than inherited from planning prose.
 | `stable performance runner` | `docs/adr/ADR-068-stable-performance-runner.md` §2–§4 | skip-by-design until it exists: the wall-clock performance verdicts read `ABSENT`, never `PASS` | `ops-stable-perf-runner` | `absent` |
 | `agent CI-log read token` | `_bmad-output/implementation-artifacts/17-3a-wasm-recall-and-componentize-spike.md` T6 | degraded: agents read only public workflow annotations and step conclusions (which remain the citable evidence either way); raw job logs need an operator download (unauthenticated log requests return 403). Provisioned 2026-10-07 **on the operator's dev host only** (host-local, not in the repository, not in CI): fine-grained PAT, `lunarpulse/maos` only, Actions read-only (+ Metadata), expires 2027-01-05; file `~/.config/maos-agent/gh-ci-read.token` (0600, dir 0700), injected per command as `GH_TOKEN` — never a `gh` login, never a git credential; verified: job log readable, secrets / Actions admin / contents / pulls / dispatch / refs writes refused (403). Any other host is `absent` unless provisioned the same way; that state is expected, not a failure | `ops-provisioning-secrets-and-accounts` | `present` |
 
+> **Operator ruling 2026-11-12 (dated note; no row above is changed).** The project has no
+> money, accounts, vendors or hardware — only AI agents. Consequences for this checklist:
+> (1) rows needing money, an account or hardware (Docker Hub, Homebrew tap / AUR, live vendor
+> credentials, the `maos-perf` bare-metal runner, an external pen-test) stay named and
+> `absent` — **UNCLAIMED, never marked done**; (2) the `release environment protection
+> evidence` row may stay `absent` for a release candidate: `check-rc-readiness` then reports a
+> labelled `WARN: environment protection not provisioned: claim boundary` and requires the
+> release notes to carry the exact line `Release environment protection: NOT PROVISIONED`
+> (a `present` row needs no such line); (3) agents provision what the `gh` token allows
+> (read facts 2026-11-12: secrets `CI_EVIDENCE_AUDIT_KEY`, `MAOS_RELEASE_PUBKEY`,
+> `RELEASE_SIGNING_KEY` exist; branches `fuzz-ledger` and `rto-ledger` exist; the `release`
+> environment is absent). See [`docs/release/decisions-2026-11-12.md`](../release/decisions-2026-11-12.md).
+
 ## Evidence and blockers
 
 - Historical Story 15-5 inventory: secrets, variables and runners were empty;
@@ -89,6 +102,9 @@ than inherited from planning prose.
   `release-verify --sign` and hard-fails when this key is unavailable.
 - The penetration-test schedule, owner, findings threshold, and GA effect are
   not duplicated here. `RELEASE-HOLDS.md` Hold 1 is authoritative.
+  **Dated note 2026-11-12:** under the operator ruling Hold 1 (pen-test) and Hold 2 (ECCN)
+  are explicit claim boundaries with no GA effect; `RELEASE-HOLDS.md` remains the
+  authority for what the release notes must state.
 - **Re-measured 2026-09-24 (work started):** the inventory rule still yields
   exactly seven names (`DOCKERHUB_TOKEN`, `DOCKERHUB_USERNAME`,
   `FUZZ_LEDGER_WRITE_TOKEN`, `MAOS_ANTHROPIC_API_KEY`, `MAOS_RELEASE_PUBKEY`,

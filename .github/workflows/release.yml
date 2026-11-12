@@ -157,9 +157,16 @@ jobs:
           # `fuzz-ledger` branch; the operator dispatches `fuzz-prerelease` before
           # tagging. The alpha line keeps the aggregate-only rule; an unclassified kind
           # is refused (it cannot reach here through the classify step).
+          # Operator ruling 2026-11-12 (rc = b): perf verdicts are judged for rc and GA
+          # from the `perf-ledger` branch (an absent branch, HTTP 404, is an empty
+          # ledger: every metric ABSENT). A release candidate accepts ABSENT
+          # (`--perf-absent-ok`; the notes label it, `check-rc-readiness`); FAIL and
+          # INDETERMINATE are always refused, and GA needs every metric PASS.
           fuzz_args=()
+          perf_args=()
           case "$KIND" in
-            rc|ga) fuzz_args=(--fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json") ;;
+            rc) fuzz_args=(--fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json"); perf_args=(--perf-verdicts "$RUNNER_TEMP/perf-verdicts.json" --perf-absent-ok) ;;
+            ga) fuzz_args=(--fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json"); perf_args=(--perf-verdicts "$RUNNER_TEMP/perf-verdicts.json") ;;
             alpha) ;;
             *) echo "release refused: unclassified tag kind '$KIND'"; exit 1 ;;
           esac
@@ -171,10 +178,28 @@ jobs:
             echo "fuzz-ledger tip consumed: $tip"
             gh api -H "Accept: application/vnd.github.raw+json" "repos/${{ github.repository }}/contents/fuzz-ledger.json?ref=$tip" > "$RUNNER_TEMP/fuzz-ledger.json"
           fi
+          if [ "${#perf_args[@]}" -gt 0 ]; then
+            perf_err="$RUNNER_TEMP/perf-ledger.err"
+            if {
+              tip="$(gh api "repos/${{ github.repository }}/branches/perf-ledger" --jq .commit.sha)" &&
+              echo "perf-ledger tip consumed: $tip" &&
+              gh api -H "Accept: application/vnd.github.raw+json" "repos/${{ github.repository }}/contents/ledger.jsonl?ref=$tip" > "$RUNNER_TEMP/perf-ledger.jsonl"
+            } 2> "$perf_err"; then :
+            elif grep -q 'HTTP 404' "$perf_err"; then
+              echo "perf-ledger branch absent (HTTP 404): empty ledger, every metric ABSENT"
+              : > "$RUNNER_TEMP/perf-ledger.jsonl"
+            else
+              cat "$perf_err"; echo "release refused: cannot read the perf-ledger"; exit 1
+            fi
+            # The verdict JSON (stdout) is what is judged; `check-perf-verdict` exits 1 on a
+            # blocking metric. A crash prints no JSON, which the precondition refuses: it is
+            # never read as ABSENT.
+            cargo run --locked -p xtask -- check-perf-verdict --sha "${{ github.sha }}" --ledger "$RUNNER_TEMP/perf-ledger.jsonl" --json > "$RUNNER_TEMP/perf-verdicts.json" || true
+          fi
           # Review GLM F6: no status filter, so a newer run still in progress is the run
           # judged (and refused) instead of an older green one.
           gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=aggregate&filter=latest" |
-            cargo run --locked -p xtask -- check-release-precondition "${fuzz_args[@]}"
+            cargo run --locked -p xtask -- check-release-precondition "${fuzz_args[@]}" "${perf_args[@]}"
       - uses: actions/download-artifact@v4
         with:
           path: dist

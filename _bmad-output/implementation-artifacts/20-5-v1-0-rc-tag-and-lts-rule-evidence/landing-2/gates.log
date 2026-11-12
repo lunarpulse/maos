@@ -1,0 +1,76 @@
+=== check-kernel-baseline
+  "added": [],
+  "removed": []
+}
+exit=0
+=== check-dev-record-completeness
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1703: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:1704: ownerless and open, with a recorded disposition
+{"passed":true,"violation_count":0,"violations":[],"done_stories_checked":199,"deferred_owner_assertions":378,"owned_but_deferred":[],"not_a_vehicle":[],"ownerless_undispositioned":[],"ownerless_dispositioned":["deferred-work.md:119: ownerless and open, with a recorded disposition","deferred-work.md
+exit=0
+=== check-epic-close-coherence
+  "authoritative-src-lines": 27103,
+  "violations": []
+}
+exit=0
+=== check-exit-commands
+{"gate":"check-exit-commands","passed":true,"epics_in_roster":2,"blocks_read":2,"tokens_resolved":10,"owed":[],"findings":[],"surface_notes":[],"surfaces":{"maos":9,"maosctl":27,"xtask":99,"one_shot_modes":32}}
+exit=0
+=== check-decision-register
+{"gate":"check-decision-register","register":"_bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md","rows":23,"open_rows":6,"resolved_targets":30,"unqueryable_deadlines":[{"row":"D19","deadline":"UNQUERYABLE — \"before the next `j1-*` story leaves `ready-for-dev`\" was SELF-VOIDING
+exit=0
+=== check-env-contract
+{"passed":true,"registered_count":124,"violations":[]}
+check-env-contract: PASS (124 maos-bin/src MAOS_* vars registered, 0 violations; workspace-wide env surface is Story 21-4 / xtask env-contract.toml — D-I)
+exit=0
+=== check-abi-ratification
+{"passed":true,"abi_changes_count":0,"uncovered_count":0,"ratified_count":23,"uncovered":[]}
+exit=0
+=== stability-matrix --check
+{"passed":true,"in_sync":true,"deprecation_issues":[],"export_issue":null}
+exit=0
+=== error-catalog-check
+{"passed":true,"discovered_count":70,"registry_count":70,"violation_count":0,"violations":[]}
+exit=0
+=== check-manifest-schema-version
+{"passed":true,"current":7,"min_supported":1,"max_supported":7,"violation_count":0,"violations":[]}
+exit=0
+=== gen-abi-docs --check
+Usage: xtask gen-abi-docs --check
+
+For more information, try '--help'.
+exit=2
+=== check-breaking-md
+{"passed":true,"entries":3,"reasons":[]}
+exit=0
+=== check-workspace-count
+  "declared-count": 58,
+  "declared-info": "**Workspace member count (post Story 17-1):**<!-- workspace-count-authoritative --> Story 17-1 adds ONE leaf crate `crates/maos-egress/`, moving the count from 57 to **58 workspace members**. The daemon feature owns the reverse proxy and scoped credential; the default-features-of
+}
+exit=0
+=== check-fkcs
+{"gate":"check-fkcs","passed":true,"oracle_green":true,"advisory":false,"blocking_now":false,"ship_phase":"v1_5","disposition":{"v2_0":"blocking","v1_5":"advisory","v1_0":"advisory"},"legs":[{"label":"frozen-tag-consistency","passed":1,"failed":0,"ran":true,"attempted":true,"green":true},{"label":"d
+exit=0
+=== kloc-check
+  },
+  "over_budget": []
+}
+exit=0
+=== check-export-control
+{"passed":true,"failures":[],"wasm_host_leak":{"passed":true,"violations":[]}}
+exit=0
+=== check-gate-registry
+Usage: xtask <COMMAND>
+
+For more information, try '--help'.
+exit=2
+=== check-doc-links
+Usage: xtask <COMMAND>
+
+For more information, try '--help'.
+exit=2
+=== check-release-precondition --help
+      --perf-absent-ok                 Accept ABSENT perf verdicts (release candidates only; GA needs PASS)
+      --json                           
+  -h, --help                           Print help
+exit=0

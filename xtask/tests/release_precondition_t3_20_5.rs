@@ -338,7 +338,7 @@ fn the_release_job_passes_the_fuzz_ledger_to_the_precondition_for_rc_and_ga_tags
         "the aggregate leg keeps its server-side latest filter: {run}"
     );
     assert!(
-        run.contains("rc|ga)") && run.contains("alpha)"),
+        run.contains("rc) fuzz_args") && run.contains("ga) fuzz_args") && run.contains("alpha)"),
         "rc and GA kinds require the chain, the alpha kind keeps the aggregate-only precondition: {run}"
     );
 }

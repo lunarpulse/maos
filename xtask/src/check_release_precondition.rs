@@ -1,6 +1,9 @@
 //! Story 15-4 AC3 — publication requires a successful discipline aggregate.
 //! Story 20-5 AC4 — and, when `--fuzz-ledger` is given, a complete T3 fuzz chain for the
 //! released SHA (the `fuzz-prerelease.yml` collector's rule, one source for both).
+//! Operator ruling 2026-11-12 (rc = b) — and, when `--perf-verdicts` is given, the
+//! `check-perf-verdict --json` rows for the released SHA: FAIL / INDETERMINATE are always
+//! refused, ABSENT only under `--perf-absent-ok` (release candidates), else all PASS.
 
 use std::collections::BTreeMap;
 use std::io::Read;
@@ -33,6 +36,51 @@ struct Report<'a> {
     head_sha: &'a str,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     t3_fuzz_chain: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    perf_verdicts: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct PerfReport {
+    sha: String,
+    verdicts: Vec<PerfRow>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PerfRow {
+    metric: String,
+    verdict: String,
+}
+
+/// Refuse `sha` unless the `check-perf-verdict --json` report is for exactly that commit,
+/// has rows, and every row is PASS (or ABSENT when `absent_ok`). A tool crash prints no
+/// JSON and an unknown verdict is not PASS, so neither can be read as ABSENT.
+fn check_perf_verdicts(path: &str, sha: &str, absent_ok: bool) -> Result<(), String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|error| format!("failed to read perf verdicts {path}: {error}"))?;
+    let report: PerfReport = serde_json::from_str(&text)
+        .map_err(|error| format!("invalid perf verdicts {path}: {error}"))?;
+    if report.sha != sha || report.verdicts.is_empty() {
+        return Err(format!(
+            "release precondition failed: perf verdicts {path} are for {:?} with {} rows, not rows for {sha}",
+            report.sha,
+            report.verdicts.len()
+        ));
+    }
+    let refused: Vec<String> = report
+        .verdicts
+        .iter()
+        .filter(|row| row.verdict != "PASS" && !(absent_ok && row.verdict == "ABSENT"))
+        .map(|row| format!("{}={}", row.metric, row.verdict))
+        .collect();
+    if refused.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "release precondition failed: perf verdicts at {sha} not PASS: {}",
+            refused.join(", ")
+        ))
+    }
 }
 
 /// The T3 targets `fuzz-prerelease.yml` chains (PRD NFR-Sec-5/6).
@@ -110,6 +158,8 @@ fn check_t3_fuzz_chain(ledger_path: &str, sha: &str) -> Result<(), String> {
 pub fn run(
     check_runs_path: Option<&str>,
     fuzz_ledger: Option<&str>,
+    perf_verdicts: Option<&str>,
+    perf_absent_ok: bool,
     json: bool,
 ) -> Result<(), String> {
     let input = match check_runs_path {
@@ -161,6 +211,9 @@ pub fn run(
     if let Some(ledger) = fuzz_ledger {
         check_t3_fuzz_chain(ledger, &run.head_sha)?;
     }
+    if let Some(verdicts) = perf_verdicts {
+        check_perf_verdicts(verdicts, &run.head_sha, perf_absent_ok)?;
+    }
     if json {
         println!(
             "{}",
@@ -171,6 +224,7 @@ pub fn run(
                 conclusion: "success",
                 head_sha: &run.head_sha,
                 t3_fuzz_chain: fuzz_ledger.is_some(),
+                perf_verdicts: perf_verdicts.is_some(),
             })
             .map_err(|error| format!("failed to serialize release precondition: {error}"))?
         );
@@ -180,6 +234,17 @@ pub fn run(
             eprintln!(
                 "check-release-precondition: PASS — complete T3 fuzz chain for every target at {}",
                 run.head_sha
+            );
+        }
+        if perf_verdicts.is_some() {
+            eprintln!(
+                "check-release-precondition: PASS — perf verdicts at {} ({})",
+                run.head_sha,
+                if perf_absent_ok {
+                    "ABSENT accepted"
+                } else {
+                    "all PASS"
+                }
             );
         }
     }

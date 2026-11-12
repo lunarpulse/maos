@@ -4,7 +4,7 @@
 #   1. the exact `gh api` fetch release.yml uses for fuzz-ledger.json works against the live
 #      `fuzz-ledger` branch, and `check-release-precondition --fuzz-ledger` REFUSES while the branch
 #      holds no complete T3 chain for the SHA (0 T3 records when measured 2026-11-04/11-11);
-#   2. `check-rc-readiness` runs hosted and reports its five legs (it exits 1 until L2; the step
+#   2. `check-rc-readiness` runs hosted and reports its six legs (it exits 1 until L2; the step
 #      asserts the refusal status and validates the report, it never turns red legs green).
 # Each judgment step is preceded by a build step that must succeed, requires the gate's own exit
 # status (1) and a diagnostic or report that proves the gate ran: a compile failure, an old binary
@@ -66,7 +66,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build xtask (this step must succeed)
         run: cargo build --locked -p xtask
-      - name: Report the five legs (a red tree is the expected state until the L2 landing)
+      - name: Report the six legs (a red tree is the expected state until the L2 landing)
         run: |
           set -uo pipefail
           status=0
@@ -79,7 +79,7 @@ jobs:
           report = json.load(open(sys.argv[1]))
           assert report.get("gate") == "check-rc-readiness", report
           legs = report["legs"]
-          expected = ["version", "stability-matrix", "epic-20-stories", "provisioning", "deny-ignores"]
+          expected = ["version", "stability-matrix", "epic-20-stories", "provisioning", "deny-ignores", "perf-verdict-label"]
           assert [leg["leg"] for leg in legs] == expected, legs
           assert report["passed"] is False and not all(leg["passed"] for leg in legs), report
           print({leg["leg"]: leg["passed"] for leg in legs})

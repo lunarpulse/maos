@@ -39,9 +39,14 @@ const SPRINT: &str = "development_status:
   20-3a-gate-honesty: done
   20-4-gemini-driver-and-endpoint-pin: done  # backlog earlier
   20-5-v1-0-rc-tag-and-lts-rule: done
+  20-7-stable-runner-perf-gates: in-progress
   ops-rc-signed-tag: backlog
   epic-20-retrospective: backlog
 ";
+
+const NOTES: &str = "# v1.0.0-rc.1\n\nPerf verdicts: ABSENT\n";
+const ENV_LINE: &str = "Release environment protection: NOT PROVISIONED";
+const WAIVED_KEY: &str = "20-7-stable-runner-perf-gates";
 
 const CHECKLIST: &str = "| Item | Consumer | Behavior | Row | State |
 |---|---|---|---|---|
@@ -89,6 +94,7 @@ fn fixture() -> tempfile::TempDir {
         SPRINT,
     );
     write(root, "docs/runbooks/provisioning-checklist.md", CHECKLIST);
+    write(root, "docs/release/v1.0.0-rc.1.md", NOTES);
     write(root, "deny.toml", DENY);
     write(
         root,
@@ -134,23 +140,38 @@ fn check(root: &Path, tag: Option<&str>) -> Output {
     xtask(root, &args)
 }
 
-/// The fixture is ready except for `red_leg`: that leg is red, every other leg is green,
-/// the command exits non-zero.
-fn assert_only_red(output: &Output, red_leg: &str) {
+/// The fixture is ready except for `red_legs`: those legs are red, every other leg is
+/// green, the command exits non-zero.
+fn assert_red(output: &Output, red_legs: &[&str]) {
     assert!(
         !output.status.success(),
-        "{red_leg} red must fail the gate; stdout: {}",
+        "{red_legs:?} red must fail the gate; stdout: {}",
         String::from_utf8_lossy(&output.stdout)
     );
     let legs = legs(output);
-    assert_eq!(legs.len(), 5, "five legs: {legs:?}");
+    assert_eq!(legs.len(), 6, "six legs: {legs:?}");
     for (leg, passed) in &legs {
         assert_eq!(
             passed,
-            &Value::Bool(leg != red_leg),
-            "leg {leg} (only {red_leg} may be red): {legs:?}"
+            &Value::Bool(!red_legs.contains(&leg.as_str())),
+            "leg {leg} (only {red_legs:?} may be red): {legs:?}"
         );
     }
+}
+
+fn assert_only_red(output: &Output, red_leg: &str) {
+    assert_red(output, &[red_leg]);
+}
+
+fn detail(output: &Output, leg: &str) -> String {
+    let report: Value = serde_json::from_slice(&output.stdout).expect("one JSON report");
+    let leg = report["legs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|l| l["leg"] == leg)
+        .expect("leg");
+    leg["detail"].as_str().unwrap().to_string()
 }
 
 #[test]
@@ -165,7 +186,7 @@ fn an_all_green_tree_passes_with_and_without_a_tag() {
             String::from_utf8_lossy(&output.stderr)
         );
         let legs = legs(&output);
-        assert_eq!(legs.len(), 5);
+        assert_eq!(legs.len(), 6);
         assert!(
             legs.values().all(|passed| passed == &Value::Bool(true)),
             "{legs:?}"
@@ -179,7 +200,17 @@ fn the_version_leg_demands_an_rc_that_equals_the_tag() {
     // Tag mismatch against rc.1.
     assert_only_red(&check(dir.path(), Some("v1.0.0-rc.2")), "version");
     assert_only_red(&check(dir.path(), Some("1.0.0-rc.1")), "version");
-    // Non-rc versions, with the tag that would match them.
+    // Non-rc versions, with the tag that would match them (20-7 done, so only the version
+    // leg can be red; the notes carry the label under every version's own file name).
+    let base = read(dir.path(), "Cargo.toml");
+    write(
+        dir.path(),
+        "_bmad-output/implementation-artifacts/sprint-status.yaml",
+        &SPRINT.replace(
+            &format!("{WAIVED_KEY}: in-progress"),
+            &format!("{WAIVED_KEY}: done"),
+        ),
+    );
     for version in [
         "0.1.0-alpha.1",
         "1.0.0",
@@ -187,9 +218,9 @@ fn the_version_leg_demands_an_rc_that_equals_the_tag() {
         "1.0.0-rc.1x",
         "1.0.0-rcx",
     ] {
-        let text =
-            read(dir.path(), "Cargo.toml").replace("\"1.0.0-rc.1\"", &format!("\"{version}\""));
+        let text = base.replace("\"1.0.0-rc.1\"", &format!("\"{version}\""));
         write(dir.path(), "Cargo.toml", &text);
+        write(dir.path(), &format!("docs/release/v{version}.md"), NOTES);
         regenerate_stability(dir.path());
         let tag = format!("v{version}");
         assert_only_red(&check(dir.path(), None), "version");
@@ -350,6 +381,121 @@ fn the_command_never_writes_into_the_tree() {
         snapshot(dir.path()),
         "check-rc-readiness must not write"
     );
+}
+
+const RC_NOTES: &str = "docs/release/v1.0.0-rc.1.md";
+
+fn with_sprint_status(root: &Path, status: &str) {
+    write(
+        root,
+        "_bmad-output/implementation-artifacts/sprint-status.yaml",
+        &SPRINT.replace(
+            &format!("{WAIVED_KEY}: in-progress"),
+            &format!("{WAIVED_KEY}: {status}"),
+        ),
+    );
+}
+
+#[test]
+fn the_perf_label_leg_needs_the_notes_and_the_exact_line() {
+    let dir = fixture();
+    // No label also switches the 20-7 waiver off, so that key is open as well.
+    let red = ["perf-verdict-label", "epic-20-stories"];
+    for body in [
+        "",
+        "# v1.0.0-rc.1\n",
+        "Perf verdicts: PASS\n",
+        "Perf verdicts: ABSENT.\n",
+        "perf verdicts: absent\n",
+        " Perf verdicts: ABSENT\n",
+    ] {
+        write(dir.path(), RC_NOTES, body);
+        assert_red(&check(dir.path(), None), &red);
+        assert_red(&check(dir.path(), Some("v1.0.0-rc.1")), &red);
+    }
+    std::fs::remove_file(dir.path().join(RC_NOTES)).unwrap();
+    assert_red(&check(dir.path(), None), &red);
+    write(dir.path(), RC_NOTES, "x\nPerf verdicts: ABSENT\r\ny\n");
+    assert!(check(dir.path(), None).status.success());
+}
+
+#[test]
+fn the_20_7_waiver_is_in_progress_only_rc_only_and_prints_waived() {
+    let dir = fixture();
+    for tag in [None, Some("v1.0.0-rc.1")] {
+        let output = check(dir.path(), tag);
+        assert!(output.status.success(), "{tag:?}");
+        assert!(detail(&output, "epic-20-stories").contains("WAIVED"));
+        for status in ["backlog", "ready-for-dev", "review"] {
+            with_sprint_status(dir.path(), status);
+            assert_only_red(&check(dir.path(), tag), "epic-20-stories");
+        }
+        with_sprint_status(dir.path(), "done");
+        let output = check(dir.path(), tag);
+        assert!(output.status.success());
+        assert!(!detail(&output, "epic-20-stories").contains("WAIVED"));
+        with_sprint_status(dir.path(), "in-progress");
+    }
+    // A GA (or any non-rc) version never gets the waiver, label or not.
+    let base = read(dir.path(), "Cargo.toml");
+    for version in ["1.0.0", "1.0.0-beta.1"] {
+        write(
+            dir.path(),
+            "Cargo.toml",
+            &base.replace("\"1.0.0-rc.1\"", &format!("\"{version}\"")),
+        );
+        write(dir.path(), &format!("docs/release/v{version}.md"), NOTES);
+        regenerate_stability(dir.path());
+        let red = ["version", "epic-20-stories"];
+        assert_red(&check(dir.path(), None), &red);
+        assert_red(&check(dir.path(), Some(&format!("v{version}"))), &red);
+    }
+}
+
+#[test]
+fn an_unprovisioned_release_environment_is_a_labelled_warn() {
+    let dir = fixture();
+    let absent: String = CHECKLIST
+        .lines()
+        .map(
+            |line| match line.starts_with("| `release environment protection evidence` |") {
+                true => line.replace("`present`", "`absent`"),
+                false => line.to_string(),
+            },
+        )
+        .collect::<Vec<_>>()
+        .join("\n");
+    write(
+        dir.path(),
+        "docs/runbooks/provisioning-checklist.md",
+        &absent,
+    );
+    assert_only_red(&check(dir.path(), None), "provisioning");
+    write(dir.path(), RC_NOTES, &format!("{NOTES}{ENV_LINE}\n"));
+    for tag in [None, Some("v1.0.0-rc.1")] {
+        let output = check(dir.path(), tag);
+        assert!(output.status.success(), "{tag:?}");
+        assert_eq!(
+            detail(&output, "provisioning"),
+            "WARN: environment protection not provisioned: claim boundary"
+        );
+    }
+    // The label never excuses another absent row; a `present` row needs no label.
+    write(
+        dir.path(),
+        "docs/runbooks/provisioning-checklist.md",
+        &absent.replace("| `present` |", "| `absent` |"),
+    );
+    assert_only_red(&check(dir.path(), None), "provisioning");
+    write(
+        dir.path(),
+        "docs/runbooks/provisioning-checklist.md",
+        CHECKLIST,
+    );
+    write(dir.path(), RC_NOTES, NOTES);
+    let output = check(dir.path(), None);
+    assert!(output.status.success());
+    assert!(!detail(&output, "provisioning").contains("WARN"));
 }
 
 fn snapshot(root: &Path) -> Vec<(String, String)> {
