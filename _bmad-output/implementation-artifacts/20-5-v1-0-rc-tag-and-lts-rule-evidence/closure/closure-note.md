@@ -75,3 +75,12 @@ owned elsewhere; unchanged. Line 1346 is a historical FIXED sub-bullet (18-0 clo
 - ABI ratification record: `proposed`.
 - Candidate `check-rc-readiness --tag v1.0.0-rc.1 --json`: saved by the orchestrator at `closure/rc-readiness-final.json`.
 - Final hosted run ids, chain run id and tag result: a post-tag record commit.
+
+## Correction 2026-11-12: `done` was recorded over a red hosted run
+
+20-5 was recorded `done` while the hosted discipline run on its L2 tree (`23b2200b`, run 43215484029) was red. The non-green jobs, checked with `gh run view 43215484029 --repo lunarpulse/maos --json jobs`, are `check-fmt`, `nfr-rel-11-halt-receipt-999pct` and the fan-in `aggregate`.
+
+- `check-fmt` failed on rustfmt hunks in 20-5's own `xtask/tests/release_gates_20_5r1.rs`; commit `582f9509` fixes them and was not yet pushed when this correction was written.
+- `nfr-rel-11-halt-receipt-999pct` failed on the same `ac4_v3b` failure (`root_shutdown_unload_16_3::ac4_v3b_...`) that is recorded in the 20-9 closure note; its fix is owned by agent FixAc4v3b, not by 20-5.
+- Root cause of the `check-fmt` miss: the local commit routine lacked `cargo fmt --all -- --check`. It is now added (Epic 20 retrospective action E20-A1, `epic-20-retro-2026-11-12.md:206`).
+- No acceptance criterion of 20-5 is changed and the `done` status is unchanged. The hosted run for the final candidate SHA remains listed under UNVERIFIED above.

@@ -91,7 +91,9 @@ MAOS separates the **kernel** (invariant, small, ~20 KLOC core) from **Spirits**
 A **MAOS Host** is a single OS process running the kernel. The kernel exposes
 five services plus two internal modules and one stable contract. Spirits run as
 in-process Rust actors (v0.1) or subprocess binaries (the first
-third-party-shippable form); a WASM-component form is planned for v2.0.
+third-party-shippable form); the WASM-component form (ADR-031, ADR-060) ships
+as an opt-in build (`--features wasm-host`, off by default; making it default-on
+is owned by `21-9-wasm-host-default-on`).
 
 ```mermaid
 flowchart TB
@@ -167,12 +169,17 @@ gate and forces a major-version bump (ADR-037). Full text in
    cognition.
 8. **Constitutional governance is structural, not procedural.** Invariant changes
    require the `invariant-lock` gate; per-crate KLOC ceilings enforced by `tokei`
-   (≤20 KLOC kernel core, alarm at 16).
+   (kernel core ≤ 23,000 tokei lines, alarm at 22,000 — ADR-069; currently 20,429).
 
 ## Constitutional invariants (I1–I14)
 
-Non-negotiable runtime guarantees, each mechanically gated. One file per
-invariant lives under [`docs/invariants/`](docs/invariants/).
+Non-negotiable runtime guarantees. Changes to the register are mechanically gated
+(`invariant-lock`), but the guarantees themselves are not yet all proven: every
+I1–I14 register entry currently reads `claim: asserted` rather than `guaranteed`
+(I5's FR13 stays `asserted` by operator ruling `q20`), and the per-invariant
+property-test and adversarial-vector proofs are owed by
+`21-10-invariant-ledger-proofs`. One file per invariant lives under
+[`docs/invariants/`](docs/invariants/).
 
 | # | Guarantee |
 |---|---|
@@ -331,7 +338,7 @@ maos/
 ├── examples/      # worked example Spirits (Rust + TypeScript)
 ├── templates/     # cargo-generate Spirit templates (Rust + TS)
 ├── schemas/       # JSON schemas (manifest, ComplianceClaim, gateway, halt registry)
-├── wit/           # WebAssembly Interface Types (v2.0 WASM Spirit form)
+├── wit/           # WebAssembly Interface Types (WASM Spirit form, opt-in `wasm-host`)
 ├── docs/          # invariants, ADRs, dev-discipline, the three-door docs site
 ├── xtask/         # build-discipline gates run on every PR
 ├── fuzz/          # fuzz targets
@@ -340,7 +347,7 @@ maos/
 
 ## The workspace: crates and Spirits
 
-A Cargo workspace of **44 members** on Rust **1.88 (stable)**.
+A Cargo workspace of **59 members** on Rust **1.88 (stable)**.
 
 ### Kernel & substrate crates
 
@@ -420,8 +427,8 @@ run on **every PR** — these shipped *before* kernel code, by design:
 - **`invariant-lock`** — any change to invariant files, the `lock.toml` mapping,
   or `maos-domain` invariant types requires a machine-checkable diff, a corpus
   delta, a phase-commitment update, and ≥2 maintainer sign-offs (ADR-037).
-- **KLOC ceilings** — `tokei`-enforced per-crate budgets; ≤20 KLOC kernel core,
-  alarm at 16.
+- **KLOC ceilings** — `tokei`-enforced per-crate budgets; kernel core ≤ 23,000 tokei lines,
+  alarm at 22,000 (ADR-069).
 - **ABI diff** — `cargo public-api` gates the frozen Spirit ABI; only additive
   changes pass without a version bump.
 - **Service-boundary lint** — `check-service-boundary` enforces the
@@ -442,12 +449,12 @@ cargo fmt --all && cargo clippy --workspace --all-targets
 
 ## Project status & roadmap
 
-**Status: v0.1-alpha, actively developed.** The kernel substrate, the Spirit
+**Status: `v1.0.0-rc.1` release candidate (workspace version `1.0.0-rc.1`), actively developed.** The kernel substrate, the Spirit
 ABI, the adapter ring, and all nine reference Spirits are implemented; the live
 runtime spine (`maos run`) fires real Spirit behavior through production wiring.
-Work is organized as **12 epics**; the substrate and reference-Spirit epics
-(0 through 8) have landed, with operator productionization and the v1.0 ship gate
-ahead.
+Work is organized as **23 epics** (0, 1a, 1b, 2–21); epics 0 through 19 are done,
+and Epic 20 (the `v1.0.0-rc.1` release candidate and LTS rule) and Epic 21 are in
+progress.
 
 | Phase | Milestone | Target |
 |---|---|---|
