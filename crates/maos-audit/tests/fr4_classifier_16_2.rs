@@ -277,6 +277,14 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
         (
             "capability.invocation",
             None,
+            "schedule.suppressed:daily-9",
+            r#"{"spirit_id":"butler","schedule_id":"daily-9","refused_scope":"FsRead { subtree: \"/srv\" }","reason":"quota exhausted"}"#,
+            1,
+            "schedule suppressed",
+        ),
+        (
+            "capability.invocation",
+            None,
             "hook.budget.on_idle",
             r#"{"spirit_pid":1,"hook_name":"on_idle","wall_ns":5,"cap_seconds":10,"ratio_breached":0.5}"#,
             1,

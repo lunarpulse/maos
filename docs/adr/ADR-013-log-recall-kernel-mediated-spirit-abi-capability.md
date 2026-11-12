@@ -97,7 +97,10 @@ kernel error on the operator REPL. There is no operator- or manifest-configurabl
 issuance budget and **no Spirit-facing issuance pre-warning**: each path's typed
 denial is how a Spirit learns exhaustion. `ScheduleWatchdog` consumes its rate
 bucket before minting; its narrowed tokens attest authority at fire time in
-the audit record, not in the hook ABI, which carries no token.
+the audit record, not in the hook ABI, which carries no token. A refused
+declared scope suppresses the fire (Story 20-9, D07 A): the scopes already
+minted for it are revoked and a `schedule.suppressed:<id>` row records the
+refusal; the fire is never delivered with a zero token.
 
 These issuance signals are not ADR-016's Spirit-facing
 `ContextPressure`/`ContextLimit`/`EContextExhausted` context-token accounting.

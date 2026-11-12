@@ -613,6 +613,15 @@ pub async fn run_admitted_session(
                         if !ready || active || pending.is_some() {
                             return Err(SessionError::UnexpectedEof);
                         }
+                        // A predecessor that exits right after its `snapshot` must not take its
+                        // pid down while the swap still replaces its runtime (20-9 F2): the
+                        // session outlives its child until the swap resolves. A committed
+                        // successor is adopted at the top of the loop; a refused swap releases
+                        // the fence, and the next pass ends the session as before.
+                        if link.swap_in_flight() {
+                            std::thread::sleep(Duration::from_millis(20));
+                            continue;
+                        }
                         if launch.once && report.turns == 0 {
                             return Err(SessionError::Protocol("once session ended before its turn"));
                         }
@@ -734,6 +743,8 @@ pub async fn run_admitted_session(
             let _ = answer.send(Answer::SessionEnded);
         }
         link.close();
+        // A committed successor nobody adopted dies with its handover, not with the dropped core.
+        drop(link.take_handover());
         // Whatever ended the loop, the child gets a bounded grace to leave by
         // itself (its stdin closed with the loop), then a planned stop, then a
         // kill: `wait_and_finalize` below can never block forever.

@@ -1194,9 +1194,10 @@ pub async fn load_admit_start(
 }
 
 /// [`load_admit_start`] without the FR11 archive record (Story 20-9): a spawned component's start
-/// completes asynchronously, so the caller commits the record with [`archive_admitted`] only once
-/// it started. A component that never starts then leaves the predecessor's record the newest, and
-/// the restore of the predecessor is judged against it, not against a version that never ran.
+/// completes asynchronously, so the caller writes the record itself, with [`archive_provisional`]
+/// before the start (a death inside the window then cannot leave a started version unrecorded) and
+/// [`withdraw_provisional`] when it never starts: the restore of the predecessor is then judged
+/// against the predecessor's record, not against a version that never ran.
 pub async fn load_admit_start_unarchived(
     deps: &AdmissionDeps<'_>,
     gated: &GatedManifest,
@@ -1586,6 +1587,40 @@ fn refuse_without_migrator(root: &Path, gated: &GatedManifest) -> Result<(), Adm
 /// rewrites it; a failed write warns and never un-admits the Spirit.
 pub fn archive_admitted(root: &Path, gated: &GatedManifest) {
     archive_manifest(root, &gated.class_section, &gated.manifest_toml);
+}
+
+/// The FR11 record of a spawned component, written BEFORE it starts (20-9, GLM r3 F3): a daemon
+/// death inside the start window then leaves a started cross-major version recorded, never
+/// unrecorded (fail-closed, not a fail-open downgrade). Returns whether this call created the
+/// record, so only a record it created is withdrawn when the component never starts.
+#[cfg(all(feature = "network", feature = "wasm-host"))]
+pub fn archive_provisional(root: &Path, gated: &GatedManifest) -> bool {
+    let class = &gated.class_section;
+    let record = maos_kernel_core::hot_swap::SpiritArchive::new(root.to_path_buf())
+        .archive_dir(&class.name, &class.version)
+        .join("manifest.toml");
+    if !is_path_component(&class.version) || record.exists() {
+        return false;
+    }
+    archive_admitted(root, gated);
+    record.exists()
+}
+
+/// Withdraw the record [`archive_provisional`] created for a component that never started, so a
+/// restore of the predecessor is judged against the predecessor's own record.
+#[cfg(all(feature = "network", feature = "wasm-host"))]
+pub fn withdraw_provisional(root: &Path, gated: &GatedManifest) {
+    let class = &gated.class_section;
+    let dir = maos_kernel_core::hot_swap::SpiritArchive::new(root.to_path_buf())
+        .archive_dir(&class.name, &class.version);
+    if let Err(error) = std::fs::remove_dir_all(&dir) {
+        if error.kind() != std::io::ErrorKind::NotFound {
+            eprintln!(
+                "maos: WARNING — FR11 provisional record {} was not withdrawn: {error}",
+                dir.display()
+            );
+        }
+    }
 }
 
 /// Write an accepted identity/text without the stricter full admission gate.

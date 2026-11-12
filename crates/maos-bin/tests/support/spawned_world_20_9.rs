@@ -397,6 +397,7 @@ impl World {
             ("hostile-stderr-flood.wasm", Vec::new()),
             ("hostile-probe-flood.wasm", Vec::new()),
             ("hostile-slow-ready.wasm", Vec::new()),
+            ("hostile-snapshot-then-exit.wasm", Vec::new()),
         ] {
             std::fs::write(path.join(name), bytes).unwrap();
         }

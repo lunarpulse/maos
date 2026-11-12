@@ -465,3 +465,82 @@ async fn declared_default_migrator_returns_migrator_not_implemented() {
 
     assert!(matches!(error, HotSwapError::MigratorNotImplemented { .. }));
 }
+
+/// A successor whose `migrate` (step 7) unloads the pid, standing in for a
+/// predecessor session that tears down while the swap is mid-flight.
+struct UnloadingSuccessor {
+    spirits: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
+    swap_in_calls: Arc<AtomicU32>,
+}
+
+impl Spirit for UnloadingSuccessor {
+    fn migrate(&self, _ctx: &mut Ctx, _predecessor_state: &[u8]) -> Result<Vec<u8>, MigratorError> {
+        self.spirits.write().expect("spirits lock").remove(&7);
+        Ok(b"major-two-state".to_vec())
+    }
+
+    fn on_swap_in<'a>(&self, _ctx: &mut Ctx, _payload: &SwapInPayload<'a>) {
+        self.swap_in_calls.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+/// 20-9 F2 — a pid unloaded between the runtime swap and the swap-in lookup is
+/// a typed `NotLoaded` refusal with compensation, never a panic of the upgrade
+/// task, and the successor's `on_swap_in` is never delivered.
+#[tokio::test]
+async fn a_pid_unloaded_mid_swap_is_a_typed_not_loaded_refusal() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let tmp = tempfile::TempDir::new().expect("tempdir");
+    let predecessor_manifest = SpiritManifestBundle {
+        lifecycle: LifecycleSection {
+            enabled_hooks: vec!["snapshot".into()],
+        },
+        class: Some(class_section("1.0.0")),
+        hot_swap: Some(HotSwapManifestSection {
+            state_schema_uri: "urn:maos:test:state:v1".into(),
+            state_schema_version: 0x0001_0001,
+        }),
+        ..Default::default()
+    };
+    let (coordinator, spirits, _) =
+        make_coordinator(&tmp, predecessor_manifest, MajorOnePredecessor);
+    let swap_in_calls = Arc::new(AtomicU32::new(0));
+    let successor = UnloadingSuccessor {
+        spirits: Arc::clone(&spirits),
+        swap_in_calls: Arc::clone(&swap_in_calls),
+    };
+    let successor_manifest = SpiritManifestBundle {
+        lifecycle: LifecycleSection {
+            enabled_hooks: vec!["migrate".into(), "on_swap_in".into()],
+        },
+        class: Some(class_section("2.0.0")),
+        hot_swap: Some(HotSwapManifestSection {
+            state_schema_uri: "urn:maos:test:state:v2".into(),
+            state_schema_version: 0x0002_0001,
+        }),
+        migrates_from: Some(MigratesFromSection {
+            versions: vec!["1.0.0".into()],
+        }),
+        ..Default::default()
+    };
+
+    let error = coordinator
+        .initiate_swap(
+            "migration-spirit",
+            &successor_manifest,
+            make_spirit_obj(successor),
+        )
+        .await
+        .expect_err("an unloaded pid refuses the swap");
+    assert_eq!(
+        error,
+        maos_domain::hot_swap::HotSwapError::NotLoaded {
+            spirit_id: "migration-spirit".into()
+        }
+    );
+    assert_eq!(
+        swap_in_calls.load(Ordering::SeqCst),
+        0,
+        "no swap-in on an unloaded pid"
+    );
+}

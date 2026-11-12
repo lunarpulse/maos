@@ -276,7 +276,13 @@ fn kernel_core_ceiling_has_not_moved_under_the_easing() {
     // verification and wire use; inference/mod.rs spawns RateLimited delivery
     // instead of dropping its unpolled future. The +23 allowance is not headroom:
     // the ceiling is the measured +22.
-    const RATIFIED_AT_EASING: i64 = 21_202;
+    const RATIFIED_AT_EASING: i64 = 21_256;
+    // 20-9 landing 2 (20-9 L2, AC7/AC8), FLAG-Winston row R (D-20-9-13 A + D-20-9-14 A, ruled
+    // 2026-11-03 ask d_batch4) plus the operator-granted options (a1) typed NotLoaded refusal, (b)
+    // atomic archive record, (c) idle-watchdog parallel fire (asks of 2026-11-12): exact formatted
+    // 21202 -> 21256 (+54), physical 27044 -> 27103 (+59), inside the shared STOP 22000;
+    // schedule_watchdog.rs `poll_once` + D07 A suppression, coordinator.rs, archive.rs,
+    // idle_watchdog.rs; the surface gate flags nothing.
     // 20-13 landing 2 (20-13 L2, AC7), FLAG-Winston KT3 (D-20-13-04 A, literal shape ruled
     // 2026-11-12 ask `kt3`): exact formatted 21203 -> 21202 (-1), physical 27043 -> 27044 (+1),
     // the priced KT3 figure; SecurityManagerAdapter takes the selected provider, T3 admission

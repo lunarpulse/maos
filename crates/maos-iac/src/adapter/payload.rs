@@ -30,6 +30,59 @@ pub struct ScheduleFireRecord {
     pub principal_revocability: bool,
 }
 
+/// D07 A (20-9) — a fire suppressed because a declared side-effect scope's
+/// mint was refused; journaled instead of the fire.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ScheduleSuppressedRecord {
+    pub spirit_id: String,
+    pub schedule_id: String,
+    /// `None` when no capability registry is wired.
+    pub refused_scope: Option<String>,
+    pub reason: String,
+}
+
+/// Journal one suppressed fire as `schedule.suppressed:<schedule_id>`.
+pub fn journal_schedule_suppressed(
+    tl: &crate::transparency_log::TransparencyLogAdapter,
+    spirit_pid: u32,
+    spirit_id: &str,
+    schedule_id: &str,
+    refused_scope: Option<String>,
+    reason: String,
+) {
+    let record = ScheduleSuppressedRecord {
+        spirit_id: spirit_id.to_owned(),
+        schedule_id: schedule_id.to_owned(),
+        refused_scope,
+        reason,
+    };
+    match serde_json::to_vec(&record) {
+        Ok(payload) => {
+            let _ = tl.insert_frame_event(
+                crate::transparency_log::FrameKind::CapabilityInvocation,
+                spirit_pid,
+                None,
+                &format!("schedule.suppressed:{schedule_id}"),
+                &payload,
+                maos_domain::invariants::i3::FrameOrigin::Kernel,
+            );
+        }
+        Err(error) => eprintln!(
+            "maos: WARN schedule.suppressed row serialize failed for {spirit_id}/{schedule_id}: {error}"
+        ),
+    }
+}
+
+/// 20-9 PF-04 — the schedule watchdog's decision for one due
+/// `(spirit_pid, schedule_id)` in one poll.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PollOutcome {
+    Fired(u32, String),
+    PrincipalRevoked(u32, String),
+    RateRefused(u32, String),
+    Suppressed(u32, String),
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

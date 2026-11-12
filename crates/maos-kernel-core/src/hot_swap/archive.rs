@@ -7,8 +7,8 @@
 //! (triggering `EMigratorMissing` if no migrator is declared).
 
 use std::fs;
-use std::io;
-use std::path::PathBuf;
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 
 /// Errors from archive operations.
 #[derive(Debug)]
@@ -39,6 +39,20 @@ impl From<io::Error> for ArchiveError {
 /// A Spirit archive — immutable record of a predecessor Spirit at a given version.
 pub struct SpiritArchive {
     base_dir: PathBuf,
+}
+
+/// Crash-atomic write: a temp file in the same directory, fsynced, renamed over
+/// `path`, then the directory fsynced, so a death never leaves a partial record.
+fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let tmp = path.with_extension("tmp");
+    let mut file = fs::File::create(&tmp)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    fs::rename(&tmp, path)?;
+    match path.parent() {
+        Some(dir) => fs::File::open(dir)?.sync_all(),
+        None => Ok(()),
+    }
 }
 
 impl SpiritArchive {
@@ -78,8 +92,8 @@ impl SpiritArchive {
             }
         }
 
-        fs::write(dir.join("manifest.toml"), manifest)?;
-        fs::write(dir.join("snapshot.cbor"), snapshot_bytes)?;
+        write_atomic(&dir.join("manifest.toml"), manifest.as_bytes())?;
+        write_atomic(&dir.join("snapshot.cbor"), snapshot_bytes)?;
 
         Ok(())
     }

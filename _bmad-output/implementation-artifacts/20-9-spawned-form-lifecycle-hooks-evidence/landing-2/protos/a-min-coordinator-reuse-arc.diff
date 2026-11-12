@@ -1,0 +1,25 @@
+--- head/crates/maos-kernel-core/src/hot_swap/coordinator.rs	2026-11-12 02:06:46.099722374 +0000
++++ R/coordinator-amin.rs	2026-11-12 02:08:33.714884953 +0000
+@@ -351,18 +351,13 @@
+             sandbox_tier: pre_swap_runtime.sandbox_tier,
+         });
+ 
+-        // Step 9: Fire on_swap_in(payload) hook on the SUCCESSOR SCB.
+-        let successor_scb = {
+-            let map = self.spirits.read().expect("spirits lock poisoned");
+-            Arc::clone(
+-                map.get(&predecessor_pid)
+-                    .expect("successor SCB just inserted"),
+-            )
+-        };
++        // Step 9: Fire on_swap_in(payload) hook on the SUCCESSOR runtime. The
++        // map still points at `predecessor_scb`'s allocation (step 8 replaced
++        // only its interior), so no lookup, and no `expect`, is needed.
+         saga.advance_to(SagaPhase::SwapInFired);
+         let swap_in_result = self
+             .dispatcher
+-            .fire_on_swap_in(&successor_scb, &payload)
++            .fire_on_swap_in(&predecessor_scb, &payload)
+             .await;
+         match swap_in_result {
+             HookOutcome::Fired { .. }

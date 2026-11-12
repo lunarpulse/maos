@@ -371,7 +371,15 @@ coverage:
       a_cold_swap_admits_at_a_new_pid_resets_state_and_restores_a_refused_successor) and the
       real door in crates/maos-bin/tests/spawned_door_20_9.rs. Hosted legs (AC6) are
       unverified until the ci/20-9-verify recipe runs. The Worker keeps
-      cli_wrapper_is_not_a_spirit_form.
+      cli_wrapper_is_not_a_spirit_form. Story 20-9 L2: a predecessor that exits after its
+      snapshot still completes its swap at the same pid
+      (a_predecessor_that_exits_after_its_snapshot_still_completes_its_swap), a pid unloaded
+      mid-swap is a typed NotLoaded refusal, not a panic
+      (crates/maos-kernel-core/tests/hot_swap_cross_major_migration.rs
+      a_pid_unloaded_mid_swap_is_a_typed_not_loaded_refusal), and the cold-swap successor's
+      FR11 record precedes its start and is withdrawn when it never starts
+      (a_cold_swap_successors_fr11_record_precedes_its_start_and_a_failed_start_withdraws_it;
+      the record write is crash-atomic, crates/maos-kernel-core/tests/spirit_archive_atomic_20_9.rs).
   FR11:
     gates: []
     corpora: []
@@ -580,8 +588,16 @@ coverage:
       Story 20-9 L1 (AC3): [[schedule]] is carried at admission for every form, not only for
       a hot-swap successor (admission_carries_schedule_for_every_form_and_refuses_a_malformed_entry_typed
       and each_kernel_trigger_reaches_its_lifecycle_export_through_its_caller in
-      crates/maos-bin/tests/spawned_lifecycle_20_9.rs). The refused-poll observer and the
-      suppression of an unauthorized fire (AC7, AC8) are 20-9 L2 (kernel) and not yet landed.
+      crates/maos-bin/tests/spawned_lifecycle_20_9.rs). Story 20-9 L2 (AC7, AC8; kernel): the
+      refused-poll observer is ScheduleWatchdog::poll_once, driven without a clock in
+      crates/maos-kernel-core/tests/schedule_watchdog_fr26.rs
+      (schedule_17_9_refused_fire_mints_nothing, schedule_poll_once_reports_a_revoked_principal,
+      schedule_poll_once_reports_a_suppressed_fire), and a refused declared scope suppresses the
+      fire and revokes what was minted (schedule_17_9_exhausted_quota_suppresses_the_fire,
+      schedule_d07a_partial_mint_is_revoked_and_the_fire_suppressed,
+      schedule_d07a_declared_scopes_without_a_registry_suppress_the_fire,
+      schedule_d07a_scope_free_entries_still_fire_with_the_zero_token); the row's FR4
+      disposition is crates/maos-audit/tests/fr4_classifier_16_2.rs.
   FR27:
     gates: []
     corpora: []
@@ -902,6 +918,9 @@ coverage:
       when its manifest lists on_telemetry_event explicitly
       (crates/maos-bin/tests/hook_pump_17_4.rs
       a_spawned_form_registers_but_telemetry_needs_an_explicit_listing).
+      Story 20-9 L2: the kernel IdleWatchdog fires due Spirits side by side, so one Spirit's
+      long on_idle no longer holds back another's trigger
+      (crates/maos-kernel-core/tests/on_idle_substrate.rs idle_watchdog_fires_due_spirits_side_by_side).
   FR56:
     gates: []
     corpora: []

@@ -183,3 +183,101 @@ async fn idle_watchdog_skips_manifest_disabled_hook() {
         "Spirit without on_idle in enabled_hooks must not advance last_idle_fire_ns"
     );
 }
+
+/// A Spirit whose `on_idle` rendezvous with a peer's `on_idle`: the waiter
+/// blocks until the peer has fired (bounded), the signaller fires at once.
+struct RendezvousSpirit {
+    wait_for: Option<std::sync::Mutex<std::sync::mpsc::Receiver<()>>>,
+    signal: Option<std::sync::Mutex<std::sync::mpsc::Sender<()>>>,
+    met: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl maos_spirit_abi::lifecycle::Spirit for RendezvousSpirit {
+    fn on_idle(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx) {
+        if let Some(rx) = &self.wait_for {
+            let seen = rx
+                .lock()
+                .expect("rendezvous lock")
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .is_ok();
+            self.met.store(seen, Ordering::SeqCst);
+        }
+        if let Some(tx) = &self.signal {
+            let _ = tx.lock().expect("rendezvous lock").send(());
+        }
+    }
+}
+
+fn rendezvous_scb(pid: u32, spirit: RendezvousSpirit) -> Arc<SpiritControlBlock> {
+    let manifest = SpiritManifestBundle {
+        scheduling: SchedulingSection {
+            priority_weight: 100,
+            yield_every_polls: 64,
+            idle_window_ms: 100,
+        },
+        lifecycle: LifecycleSection {
+            enabled_hooks: vec!["on_idle".into()],
+        },
+        ..Default::default()
+    };
+    let scb = SpiritControlBlock::new(
+        pid,
+        format!("idle-{pid}"),
+        manifest,
+        make_spirit_obj(spirit),
+        0,
+    );
+    scb.state
+        .store(ScbLifecycleState::Running as u8, Ordering::Release);
+    scb.last_inbound_frame_ns.store(1, Ordering::Relaxed);
+    Arc::new(scb)
+}
+
+/// 20-9 — one Spirit's long `on_idle` does not hold back another Spirit's
+/// trigger in the same poll: the lower pid's hook waits for the higher pid's
+/// hook to have fired, which only happens when the fires run side by side.
+#[tokio::test]
+async fn idle_watchdog_fires_due_spirits_side_by_side() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let met = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let waiter = rendezvous_scb(
+        1,
+        RendezvousSpirit {
+            wait_for: Some(std::sync::Mutex::new(rx)),
+            signal: None,
+            met: Arc::clone(&met),
+        },
+    );
+    let signaller = rendezvous_scb(
+        2,
+        RendezvousSpirit {
+            wait_for: None,
+            signal: Some(std::sync::Mutex::new(tx)),
+            met: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        },
+    );
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().unwrap().insert(1, Arc::clone(&waiter));
+    scbs.write().unwrap().insert(2, Arc::clone(&signaller));
+
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let watchdog = Arc::new(IdleWatchdog::new(Arc::clone(&scbs), make_dispatcher()));
+    let handle = watchdog.spawn(cancel.child_token());
+    let both_fired = tokio::time::timeout(tokio::time::Duration::from_secs(10), async {
+        while waiter.last_idle_fire_ns.load(Ordering::Acquire) == 0
+            || signaller.last_idle_fire_ns.load(Ordering::Acquire) == 0
+        {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await;
+    cancel.cancel();
+    let _ = tokio::time::timeout(tokio::time::Duration::from_secs(5), handle).await;
+
+    assert!(both_fired.is_ok(), "both Spirits fired on_idle");
+    assert!(
+        met.load(Ordering::SeqCst),
+        "the waiter saw the peer's on_idle fire while it was still held"
+    );
+}

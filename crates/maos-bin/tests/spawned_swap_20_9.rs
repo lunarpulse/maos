@@ -785,6 +785,71 @@ async fn a_cross_major_component_that_never_starts_leaves_the_predecessors_archi
     world.finish().await;
 }
 
+// GLM r3 F2 — a predecessor that answers its `snapshot` and then exits cleanly while its own
+// swap is still running must not take its pid down: the swap completes, the successor is adopted
+// at the same pid, and its counter continues from the snapshot (7).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_predecessor_that_exits_after_its_snapshot_still_completes_its_swap() {
+    let mut world = World::new().await;
+    let v1 = v(
+        &world,
+        "v1.toml",
+        "1.0.0",
+        "hostile-snapshot-then-exit.wasm",
+        "",
+    );
+    let v2 = v(&world, "v2.toml", "1.1.0", "lifecycle_probe.wasm", "");
+    let running = world.start(&v1).await;
+    world
+        .upgrade(&v2, UpgradePolicy::HotSwap)
+        .await
+        .expect("the swap completes though the predecessor child already left");
+    assert_eq!(
+        world.scheduler.resolve_pid(ID),
+        Some(running.pid),
+        "the pid survived its predecessor's exit"
+    );
+    let report = world.turn(ID, "").await;
+    assert_eq!(World::count(&report, "swap-in"), 7, "{report}");
+    assert_eq!(World::count(&report, "counter"), 8, "{report}");
+    settle(world, running).await;
+}
+
+// GLM r3 F3 — the FR11 record of a cold-swap successor exists BEFORE its component starts (a
+// death inside the start window can no longer leave a started cross-major version unrecorded),
+// and a component that never starts has the record withdrawn again.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_cold_swap_successors_fr11_record_precedes_its_start_and_a_failed_start_withdraws_it() {
+    let world = World::bare().await;
+    let slow = capped(&world, "3.0.0", "hostile-slow-ready.wasm", 3);
+    let record = maos_audit::default_archive_dir()
+        .join(ID)
+        .join("3.0.0")
+        .join("manifest.toml");
+    assert!(!record.exists(), "a fresh archive");
+    let (result, seen) = tokio::join!(admit(&world, slow), async {
+        let until = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < until {
+            if record.exists() {
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        false
+    });
+    assert!(seen, "the record was written before the component answered");
+    let refusal = result.expect_err("a component that never becomes ready is refused");
+    assert!(
+        refusal.to_string().contains("spawned_start_failed"),
+        "{refusal}"
+    );
+    assert!(
+        !record.exists(),
+        "a version that never started leaves no record"
+    );
+    world.finish().await;
+}
+
 // GPT r2 #5 — the failed pid's hook-pump registration (and its grant) is withdrawn at once, not
 // at the next scalar write.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

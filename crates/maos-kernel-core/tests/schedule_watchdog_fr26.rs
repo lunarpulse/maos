@@ -10,9 +10,10 @@
 //!   5. narrowed cap-token issue
 //!
 //! Plus cadence cross-entry independence + pause / resume continuity +
-//! lifecycle gate skip, and three registry-backed vectors (Story 17-9 PF-04):
-//! a refused fire mints nothing (FW-10), one narrowed token per scope per
-//! admitted fire (AC2.6), and a revoked principal never fires (AC2.4).
+//! lifecycle gate skip, and the registry-backed vectors (Story 17-9 PF-04, 20-9 D07 A):
+//! `poll_once` reports every refused poll without a clock, a refused or partial
+//! mint suppresses the fire and revokes what was minted, one narrowed token per
+//! scope per admitted fire (AC2.6), and a revoked principal never fires (AC2.4).
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -24,6 +25,7 @@ use maos_domain::ports::crypto::{CryptoError, CryptoProvider};
 use maos_kernel_core::capability::{
     cap_audit, cap_policy, cap_quota, cap_tokens, CapabilityRegistryAdapter, WorkingMemoryStore,
 };
+use maos_kernel_core::iac::payload::PollOutcome;
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use maos_kernel_core::scheduler::{
     control_block::{make_spirit_obj, ScbLifecycleState, SpiritControlBlock, SpiritManifestBundle},
@@ -138,26 +140,6 @@ async fn run_watchdog(watchdog: ScheduleWatchdog, millis: u64) {
         timeout_res.is_ok() && timeout_res.unwrap().is_ok(),
         "watchdog must shut down cleanly within timeout"
     );
-}
-
-/// Wait on an admitted-fire journal row, not an assumed number of polls.
-async fn run_watchdog_until_fire(
-    watchdog: ScheduleWatchdog,
-    tl: &TransparencyLogAdapter,
-    pid: u32,
-) {
-    std::env::set_var("MAOS_SCHEDULE_FAST", "1");
-    let cancel = tokio_util::sync::CancellationToken::new();
-    let handle = Arc::new(watchdog).spawn(cancel.child_token());
-    let observed = tokio::time::timeout(std::time::Duration::from_secs(1), async {
-        while schedule_fire_rows(tl, pid) == 0 {
-            tokio::task::yield_now().await;
-        }
-    })
-    .await;
-    cancel.cancel();
-    handle.await.expect("watchdog shuts down cleanly");
-    observed.expect("an admitted-fire journal row within the deadline");
 }
 
 /// AC2.1 — Single `[[schedule]]` entry fires within fast-mode poll window.
@@ -534,9 +516,23 @@ fn schedule_fire_rows(tl: &TransparencyLogAdapter, pid: u32) -> usize {
     .count()
 }
 
-/// Story 17-9 FW-10 A (PF-04 a) — an admitted fire mints exactly one token
-/// per scope under a bounded journal-row wait. A refused poll is not observable
-/// without a source hook, so this vector does not prove one occurred.
+/// Poll until some entry is due (the fast-mode cadence window is at least
+/// 1 ms) and return that poll's outcomes. Bounded by iterations, never by a
+/// sleep or a clock: the assertions use only the outcome sequence.
+async fn poll_until_due(watchdog: &ScheduleWatchdog) -> Vec<PollOutcome> {
+    for _ in 0..2_000_000 {
+        let outcomes = watchdog.poll_once(true).await;
+        if !outcomes.is_empty() {
+            return outcomes;
+        }
+        tokio::task::yield_now().await;
+    }
+    panic!("no entry became due");
+}
+
+/// Story 17-9 FW-10 A / 20-9 PF-04 — a rate-refused poll is observable
+/// without a clock: `rate_limit_per_hour = 1` admits one fire, the next due
+/// poll is `RateRefused`, and only the admitted fire minted tokens.
 #[tokio::test]
 async fn schedule_17_9_refused_fire_mints_nothing() {
     maos_kernel_core::capability::cap_tokens::init_monotonic_base();
@@ -559,8 +555,15 @@ async fn schedule_17_9_refused_fire_mints_nothing() {
     let (dispatcher, tl) = make_dispatcher();
     let watchdog = ScheduleWatchdog::new(scbs, dispatcher, Arc::clone(&tl))
         .with_capability(Arc::clone(&registry.adapter));
-    run_watchdog_until_fire(watchdog, &tl, pid).await;
 
+    assert_eq!(
+        poll_until_due(&watchdog).await,
+        vec![PollOutcome::Fired(pid, "bounded".into())]
+    );
+    assert_eq!(
+        poll_until_due(&watchdog).await,
+        vec![PollOutcome::RateRefused(pid, "bounded".into())]
+    );
     let fires = counter.load(Ordering::SeqCst) as usize;
     assert_eq!(fires, 1, "rate_limit_per_hour = 1 admits one fire");
     assert_eq!(schedule_fire_rows(&tl, pid), fires);
@@ -652,10 +655,25 @@ async fn schedule_2_4_revoked_principal_never_fires_or_mints() {
     assert_eq!(registry.remaining_capacity(pid), BUDGET - 1);
 }
 
-/// An exhausted issuance quota refuses minting, but FW-10 still records and
-/// delivers the admitted fire with a zero side-effect token.
+/// Every row of `intent` prefix journaled for `pid`, payloads decoded as JSON.
+fn rows_of(tl: &TransparencyLogAdapter, pid: u32, prefix: &str) -> Vec<serde_json::Value> {
+    tl.query_frames(FrameFilter {
+        spirit_pid: Some(pid),
+        kind: Some(FrameKind::CapabilityInvocation),
+        ..Default::default()
+    })
+    .expect("query_frames")
+    .iter()
+    .filter(|row| row.intent.starts_with(prefix))
+    .map(|row| serde_json::from_slice(&row.payload_redacted).expect("row payload is JSON"))
+    .collect()
+}
+
+/// D07 A — an exhausted issuance quota refuses the mint, and the fire is
+/// suppressed: no hook, no `schedule.fire:` row, one `schedule.suppressed:` row
+/// naming the refused scope, the quota evidence row kept.
 #[tokio::test]
-async fn schedule_17_9_exhausted_quota_records_fire_without_minting() {
+async fn schedule_17_9_exhausted_quota_suppresses_the_fire() {
     cap_tokens::init_monotonic_base();
     let pid = 67;
     let scopes = side_effect_scopes();
@@ -677,25 +695,24 @@ async fn schedule_17_9_exhausted_quota_records_fire_without_minting() {
     let (dispatcher, tl) = make_dispatcher();
     let watchdog = ScheduleWatchdog::new(scbs, dispatcher, Arc::clone(&tl))
         .with_capability(Arc::clone(&registry.adapter));
-    run_watchdog_until_fire(watchdog, &tl, pid).await;
-    assert_eq!(counter.load(Ordering::SeqCst), 1, "FW-10 delivers the fire");
-    let rows = tl
-        .query_frames(FrameFilter {
-            spirit_pid: Some(pid),
-            kind: Some(FrameKind::CapabilityInvocation),
-            ..Default::default()
-        })
-        .expect("fire rows");
-    let row = rows
-        .iter()
-        .find(|row| row.intent == "schedule.fire:quota-exhausted")
-        .expect("the admitted fire is journaled");
-    let record: maos_kernel_core::iac::payload::ScheduleFireRecord =
-        serde_json::from_slice(&row.payload_redacted).expect("fire record");
+    run_watchdog(watchdog, 250).await;
     assert_eq!(
-        record.side_effect_token_id,
-        maos_domain::invariants::i1::TokenId::ZERO
+        counter.load(Ordering::SeqCst),
+        0,
+        "a refused mint never fires the hook"
     );
+    assert_eq!(schedule_fire_rows(&tl, pid), 0, "no schedule.fire: row");
+    let suppressed = rows_of(&tl, pid, "schedule.suppressed:quota-exhausted");
+    assert_eq!(
+        suppressed.len(),
+        1,
+        "one suppressed row: the cadence is consumed"
+    );
+    assert_eq!(suppressed[0]["spirit_id"], "quota-exhausted");
+    assert_eq!(suppressed[0]["schedule_id"], "quota-exhausted");
+    let refused = suppressed[0]["refused_scope"].as_str().expect("scope text");
+    assert!(refused.contains("FsRead") && refused.contains("/srv/digest"));
+    assert!(!suppressed[0]["reason"].as_str().expect("reason").is_empty());
     let mut minted = 0;
     let mut exhausted = 0;
     while let Ok(event) = registry.audit.try_recv() {
@@ -713,4 +730,196 @@ async fn schedule_17_9_exhausted_quota_records_fire_without_minting() {
     }
     assert_eq!(minted, 0, "quota refusal precedes minting");
     assert_eq!(exhausted, 1, "one exhaustion evidence row");
+}
+
+/// D07 A — a partial mint is revoked: two declared scopes, the second refused
+/// by policy. The first token is revoked at once, no token stays live for the
+/// pid, and no fire row or hook delivery exists.
+#[tokio::test]
+async fn schedule_d07a_partial_mint_is_revoked_and_the_fire_suppressed() {
+    cap_tokens::init_monotonic_base();
+    let pid = 68;
+    let scopes = side_effect_scopes();
+    // The policy grants only the first declared scope.
+    let mut registry = Registry::new(pid, vec![scopes[0].clone()]);
+    let counter = Arc::new(AtomicU32::new(0));
+    let mut due = entry("partial", 1, 3600, scopes.clone());
+    due.principal_revocability = false;
+    let scb = make_scb(
+        pid,
+        "partial",
+        vec!["on_schedule".into()],
+        vec![due],
+        Arc::clone(&counter),
+    );
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().unwrap().insert(pid, scb);
+    let (dispatcher, tl) = make_dispatcher();
+    let watchdog = ScheduleWatchdog::new(scbs, dispatcher, Arc::clone(&tl))
+        .with_capability(Arc::clone(&registry.adapter));
+    run_watchdog(watchdog, 250).await;
+    assert_eq!(counter.load(Ordering::SeqCst), 0, "no hook delivery");
+    assert_eq!(schedule_fire_rows(&tl, pid), 0, "no schedule.fire: row");
+    let suppressed = rows_of(&tl, pid, "schedule.suppressed:partial");
+    assert!(!suppressed.is_empty(), "the suppression is journaled");
+    let refused = suppressed[0]["refused_scope"].as_str().expect("scope text");
+    assert!(refused.contains("NetHttps") && refused.contains("calendar.example"));
+    let mut issued = Vec::new();
+    let mut revoked = Vec::new();
+    while let Ok(event) = registry.audit.try_recv() {
+        match event {
+            cap_audit::CapAuditEvent::Issue {
+                token_id,
+                spirit_pid,
+                ..
+            } if spirit_pid == pid => issued.push(token_id),
+            cap_audit::CapAuditEvent::Revoke { token_id, .. } => revoked.push(token_id),
+            _ => {}
+        }
+    }
+    assert_eq!(
+        issued.len(),
+        suppressed.len(),
+        "one first-scope token minted per suppressed attempt"
+    );
+    assert_eq!(
+        revoked, issued,
+        "every minted token of a suppressed fire is revoked"
+    );
+    assert!(
+        !registry.adapter.has_active_tokens_for_pid(pid),
+        "no live token remains for the pid"
+    );
+}
+
+/// D07 A — declared scopes with no capability registry wired refuse the fire.
+#[tokio::test]
+async fn schedule_d07a_declared_scopes_without_a_registry_suppress_the_fire() {
+    cap_tokens::init_monotonic_base();
+    let pid = 69;
+    let counter = Arc::new(AtomicU32::new(0));
+    let mut due = entry("unwired", 1, 3600, side_effect_scopes());
+    due.principal_revocability = false;
+    let scb = make_scb(
+        pid,
+        "unwired",
+        vec!["on_schedule".into()],
+        vec![due],
+        Arc::clone(&counter),
+    );
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().unwrap().insert(pid, scb);
+    let (dispatcher, tl) = make_dispatcher();
+    run_watchdog(
+        ScheduleWatchdog::new(scbs, dispatcher, Arc::clone(&tl)),
+        250,
+    )
+    .await;
+    assert_eq!(counter.load(Ordering::SeqCst), 0);
+    assert_eq!(schedule_fire_rows(&tl, pid), 0);
+    let suppressed = rows_of(&tl, pid, "schedule.suppressed:unwired");
+    assert!(!suppressed.is_empty());
+    assert!(
+        suppressed[0]["refused_scope"].is_null(),
+        "no scope was tried"
+    );
+}
+
+/// Scope-free entries fire as before, with the zero token.
+#[tokio::test]
+async fn schedule_d07a_scope_free_entries_still_fire_with_the_zero_token() {
+    cap_tokens::init_monotonic_base();
+    let pid = 70;
+    let counter = Arc::new(AtomicU32::new(0));
+    let mut free = entry("free", 1, 3600, Vec::new());
+    free.principal_revocability = false;
+    let scb = make_scb(
+        pid,
+        "free",
+        vec!["on_schedule".into()],
+        vec![free],
+        Arc::clone(&counter),
+    );
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().unwrap().insert(pid, scb);
+    let (dispatcher, tl) = make_dispatcher();
+    run_watchdog(
+        ScheduleWatchdog::new(scbs, dispatcher, Arc::clone(&tl)),
+        250,
+    )
+    .await;
+    assert!(counter.load(Ordering::SeqCst) >= 1);
+    assert!(schedule_fire_rows(&tl, pid) >= 1);
+    assert!(rows_of(&tl, pid, "schedule.suppressed:").is_empty());
+}
+
+/// PF-04 — a revoked principal is observable: `PrincipalRevoked`, zero fires.
+#[tokio::test]
+async fn schedule_poll_once_reports_a_revoked_principal() {
+    cap_tokens::init_monotonic_base();
+    let pid = 71;
+    let scopes = side_effect_scopes();
+    let mut registry = Registry::new(pid, scopes.clone());
+    registry
+        .adapter
+        .issue_with_mediation(pid, scopes[0].clone(), 60, [0u8; 32], IntentClass::Standard)
+        .expect("seed token");
+    assert_eq!(registry.adapter.revoke_all_for_pid(pid), 1);
+    let counter = Arc::new(AtomicU32::new(0));
+    let scb = make_scb(
+        pid,
+        "revoked",
+        vec!["on_schedule".into()],
+        vec![entry("revocable", 1, 3600, scopes.clone())],
+        Arc::clone(&counter),
+    );
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().unwrap().insert(pid, scb);
+    let (dispatcher, tl) = make_dispatcher();
+    let watchdog = ScheduleWatchdog::new(scbs, dispatcher, Arc::clone(&tl))
+        .with_capability(Arc::clone(&registry.adapter));
+    assert_eq!(
+        poll_until_due(&watchdog).await,
+        vec![PollOutcome::PrincipalRevoked(pid, "revocable".into())]
+    );
+    assert_eq!(counter.load(Ordering::SeqCst), 0, "0 fires");
+    assert_eq!(schedule_fire_rows(&tl, pid), 0);
+    assert_eq!(registry.issued_scopes(pid), vec![scopes[0].clone()]);
+}
+
+/// D07 A — the suppression is observable, and it consumes the cadence and the
+/// bucket: the next due poll of a `rate = 1` entry is `RateRefused`.
+#[tokio::test]
+async fn schedule_poll_once_reports_a_suppressed_fire() {
+    cap_tokens::init_monotonic_base();
+    let pid = 72;
+    let scopes = side_effect_scopes();
+    let registry = Registry::with_budget(pid, scopes.clone(), 1);
+    let spent = registry.quota.charge(pid).expect("spend the only slot");
+    registry.quota.commit(spent);
+    let counter = Arc::new(AtomicU32::new(0));
+    let mut due = entry("suppressed", 1, 1, scopes);
+    due.principal_revocability = false;
+    let scb = make_scb(
+        pid,
+        "suppressed",
+        vec!["on_schedule".into()],
+        vec![due],
+        Arc::clone(&counter),
+    );
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().unwrap().insert(pid, scb);
+    let (dispatcher, tl) = make_dispatcher();
+    let watchdog = ScheduleWatchdog::new(scbs, dispatcher, Arc::clone(&tl))
+        .with_capability(Arc::clone(&registry.adapter));
+    assert_eq!(
+        poll_until_due(&watchdog).await,
+        vec![PollOutcome::Suppressed(pid, "suppressed".into())]
+    );
+    assert_eq!(
+        poll_until_due(&watchdog).await,
+        vec![PollOutcome::RateRefused(pid, "suppressed".into())]
+    );
+    assert_eq!(counter.load(Ordering::SeqCst), 0);
+    assert_eq!(rows_of(&tl, pid, "schedule.suppressed:suppressed").len(), 1);
 }

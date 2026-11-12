@@ -354,10 +354,22 @@ impl HotSwapCoordinator {
         // Step 9: Fire on_swap_in(payload) hook on the SUCCESSOR SCB.
         let successor_scb = {
             let map = self.spirits.read().expect("spirits lock poisoned");
-            Arc::clone(
-                map.get(&predecessor_pid)
-                    .expect("successor SCB just inserted"),
+            map.get(&predecessor_pid).map(Arc::clone)
+        };
+        // 20-9 F2: a session teardown can unload the pid between the runtime
+        // swap and this lookup; refuse typed with compensation, never panic.
+        let Some(successor_scb) = successor_scb else {
+            saga.compensate(
+                SagaCompensation::DiscardSuccessor {
+                    reason: "pid unloaded before swap-in".into(),
+                },
+                &self.tl,
+                &self.journal,
             )
+            .await;
+            return Err(HotSwapError::NotLoaded {
+                spirit_id: spirit_id.to_string(),
+            });
         };
         saga.advance_to(SagaPhase::SwapInFired);
         let swap_in_result = self

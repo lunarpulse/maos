@@ -80,10 +80,17 @@ fn main() -> ExitCode {
             Err(_) => return ExitCode::from(1),
         };
         // A session probes the runner's lifecycle export at start (Story 20-9): this twin has
-        // none, as the runner answers for a guest without the export.
+        // none, as the runner answers for a guest without the export. `snapshot-then-exit` has
+        // one: it hands over a counter of 7, then leaves cleanly (a predecessor that exits
+        // while its own hot swap is still running).
         if lifecycle_wire::is_request(&body) {
-            let reply = match lifecycle_wire::decode_request(&body) {
-                Ok(LifecycleRequest::Probe) => LifecycleReply::Supported(false),
+            let exits = mode == "snapshot-then-exit";
+            let request = lifecycle_wire::decode_request(&body);
+            let reply = match request {
+                Ok(LifecycleRequest::Probe) => LifecycleReply::Supported(exits),
+                Ok(LifecycleRequest::Snapshot) if exits => {
+                    LifecycleReply::State(maos_wasm_host::recall_wire::WireBytes(7u64.to_le_bytes().to_vec()))
+                }
                 _ => LifecycleReply::Unsupported,
             };
             let Ok(reply) = lifecycle_wire::encode_reply(&reply) else {
@@ -91,6 +98,9 @@ fn main() -> ExitCode {
             };
             if write_frame(&mut writer, &reply).is_err() {
                 return ExitCode::from(1);
+            }
+            if exits && matches!(request, Ok(LifecycleRequest::Snapshot)) {
+                return ExitCode::SUCCESS;
             }
             continue;
         }

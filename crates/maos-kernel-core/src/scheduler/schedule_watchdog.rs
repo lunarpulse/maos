@@ -13,7 +13,8 @@
 //!   2. principal-revocability check (when `entry.principal_revocability`)
 //!   3. rate-limit check against the per-`(spirit_id, schedule_id)` bucket
 //!   4. ComplianceClaim stamp recorded in the firing's TL row
-//!   5. `side_effect_allowlist` narrows the cap-token issued for the firing
+//!   5. `side_effect_allowlist` narrows the cap-token issued for the firing; a
+//!      refused declared scope (or none wired) suppresses the firing (D07 A)
 //!
 //! Each firing is journaled to the Transparency Log (Story 1b.1) with
 //! `FrameKind::CapabilityInvocation` carrying the schedule_id, the
@@ -29,12 +30,14 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::capability::CapabilityRegistryAdapter;
+use crate::iac::payload::PollOutcome;
 use crate::iac::transparency_log::{FrameKind as TlFrameKind, TransparencyLogAdapter};
 use crate::scheduler::control_block::{ScbLifecycleState, SpiritControlBlock};
 use crate::scheduler::hook_dispatch::HookDispatcher;
 use crate::security::manifest::ScheduleEntry;
 use maos_domain::invariants::i1::{IntentClass, TokenId};
 use maos_domain::invariants::i3::FrameOrigin;
+use maos_domain::ports::capability::CapabilityRegistryPort;
 
 /// Per-schedule rate-limit bucket. Fractional refill is encoded as
 /// f64 token-balance; on consume we top up by elapsed_ns × refill_per_sec.
@@ -162,15 +165,17 @@ impl ScheduleWatchdog {
                         break;
                     }
                     _ = interval.tick() => {
-                        self.check_and_fire(fast_mode).await;
+                        self.poll_once(fast_mode).await;
                     }
                 }
             }
         })
     }
 
-    /// One poll cycle.
-    async fn check_and_fire(&self, fast_mode: bool) {
+    /// One poll cycle. 20-9 PF-04: returns every due entry's outcome, so a
+    /// test drives polls as a barrier instead of waiting on wall-clock.
+    pub async fn poll_once(&self, fast_mode: bool) -> Vec<PollOutcome> {
+        let mut outcomes = Vec::new();
         // Collect candidates outside the lock to avoid holding RwLock across
         // await points (Story 5.1 review-backfill lesson).
         let candidates: Vec<(Arc<SpiritControlBlock>, ScheduleEntry)> = {
@@ -216,6 +221,7 @@ impl ScheduleWatchdog {
             // (Story 9.2 wires the cascade). If the Spirit's tokens are
             // wholesale revoked, skip the firing.
             if entry.principal_revocability && self.is_principal_revoked(&scb) {
+                outcomes.push(PollOutcome::PrincipalRevoked(scb.pid, entry.id));
                 continue;
             }
 
@@ -229,15 +235,31 @@ impl ScheduleWatchdog {
                 .value()
                 .clone();
             if !bucket.try_consume() {
+                outcomes.push(PollOutcome::RateRefused(scb.pid, entry.id));
                 continue;
             }
 
             // Step 4 — mint only after admission (one token per Scope at v0.5).
-            // The tokens attest authority at fire time and the TL row records
-            // the first issued token_id; the hook ABI carries no token. `None`
-            // when side_effect_scopes is empty, the registry is not wired, or
-            // every mint was refused — the fire proceeds either way (FW-10).
-            let token_id = self.issue_narrowed_token(&scb, &entry);
+            // D07 A: a refused declared scope suppresses the fire; the scopes
+            // already minted for it are revoked and the suppression is journaled.
+            let token_id = match self.issue_narrowed_token(&scb, &entry) {
+                Ok(token_id) => token_id,
+                Err((refused_scope, reason)) => {
+                    crate::iac::payload::journal_schedule_suppressed(
+                        &self.transparency_log,
+                        scb.pid,
+                        &scb.spirit_id,
+                        &entry.id,
+                        refused_scope,
+                        reason,
+                    );
+                    let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+                    self.last_fire_ns
+                        .insert((scb.pid, entry.id.clone()), now_ns);
+                    outcomes.push(PollOutcome::Suppressed(scb.pid, entry.id));
+                    continue;
+                }
+            };
             let fired_at_ns = crate::capability::cap_tokens::monotonic_now_ns();
 
             // Write TL row BEFORE firing the hook (I2 log-before-deliver).
@@ -288,7 +310,9 @@ impl ScheduleWatchdog {
                 self.last_fire_ns
                     .insert((scb.pid, entry.id.clone()), fired_at_ns);
             }
+            outcomes.push(PollOutcome::Fired(scb.pid, entry.id));
         }
+        outcomes
     }
 
     fn on_schedule_allowed(runtime: &crate::scheduler::control_block::ScbRuntimeSnapshot) -> bool {
@@ -324,21 +348,24 @@ impl ScheduleWatchdog {
         !cap.has_active_tokens_for_pid(scb.pid)
     }
 
+    /// `Ok(None)` for a scope-free entry; `Err` names the refused scope
+    /// (`None` when no registry is wired) after revoking every scope minted.
     fn issue_narrowed_token(
         &self,
         scb: &SpiritControlBlock,
         entry: &ScheduleEntry,
-    ) -> Option<TokenId> {
+    ) -> Result<Option<TokenId>, (Option<String>, String)> {
         if entry.side_effect_scopes.is_empty() {
-            return None;
+            return Ok(None);
         }
-        let cap = self.capability.as_ref()?;
-        // Issue one token per scope at v0.5; record the first token_id.
-        let mut first_id: Option<TokenId> = None;
+        let Some(cap) = self.capability.as_ref() else {
+            return Err((None, "capability registry not wired".into()));
+        };
         // TTL = 2 × cadence_secs capped at 300s per ADR-023 Standard
         // intent_class (Story 6.4 AC2).
         let ttl_secs = ((entry.cadence_secs.saturating_mul(2)).min(300)).max(1);
         let posture_hash = [0u8; 32];
+        let mut minted = Vec::with_capacity(entry.side_effect_scopes.len());
         for scope in &entry.side_effect_scopes {
             match cap.issue_with_mediation(
                 scb.pid,
@@ -347,26 +374,23 @@ impl ScheduleWatchdog {
                 posture_hash,
                 IntentClass::Standard,
             ) {
-                Ok(token) => {
-                    if first_id.is_none() {
-                        first_id = Some(token.token_id);
-                    }
-                }
+                Ok(token) => minted.push(token.token_id),
                 Err(e) => {
-                    // Token issue failure (policy denial or quota exhaustion):
-                    // the fire proceeds and its TL row attests the missing
-                    // authority (TokenId::ZERO when no scope minted). The hook
-                    // never receives a token, so nothing downstream enforces
-                    // it. Story 11.4a CATCH-B forbids silent org-policy denies.
-                    eprintln!(
-                        "schedule-watchdog: capability token issue denied for spirit {}: {e}",
-                        scb.pid
-                    );
-                    continue;
+                    for token_id in minted {
+                        if let Err(revoke_error) =
+                            CapabilityRegistryPort::revoke(cap.as_ref(), token_id)
+                        {
+                            eprintln!(
+                                "schedule-watchdog: revoke of a suppressed fire's token failed for spirit {}: {revoke_error}",
+                                scb.pid
+                            );
+                        }
+                    }
+                    return Err((Some(format!("{scope:?}")), e.to_string()));
                 }
             }
         }
-        first_id
+        Ok(minted.first().copied())
     }
 }
 

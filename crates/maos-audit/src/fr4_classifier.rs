@@ -377,7 +377,7 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         // fired_at_ns, compliance_claim_ref (Option<[u8;32]> → array|null),
         // side_effect_token_id (TokenId([u8;16]) → array),
         // principal_revocability (bool).
-        site: ("schedule_watchdog.rs", "check_and_fire", 0),
+        site: ("schedule_watchdog.rs", "poll_once", 0),
         kind: 7,
         token: TokenColumn::Absent,
         intent: WriterIntent::Prefix("schedule.fire:"),
@@ -388,6 +388,20 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
             ("compliance_claim_ref", PayloadType::NumArrayOrNull),
             ("side_effect_token_id", PayloadType::NumArrayOrNull),
             ("principal_revocability", PayloadType::Bool),
+        ]),
+    },
+    WriterShapeEntry {
+        // `iac::payload::ScheduleSuppressedRecord` (20-9 D07 A): spirit_id,
+        // schedule_id, refused_scope (Option<String>), reason.
+        site: ("payload.rs", "journal_schedule_suppressed", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Prefix("schedule.suppressed:"),
+        shape: Some(&[
+            ("spirit_id", PayloadType::Str),
+            ("schedule_id", PayloadType::Str),
+            ("refused_scope", PayloadType::StrOrNull),
+            ("reason", PayloadType::Str),
         ]),
     },
     WriterShapeEntry {

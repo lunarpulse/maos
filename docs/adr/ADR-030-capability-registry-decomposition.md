@@ -49,7 +49,8 @@ manifest-configurable budget is provided. No Spirit-facing issuance pre-warning
 is provided: a Spirit learns exhaustion through each path's typed denial.
 `ScheduleWatchdog` consumes its rate bucket before minting; its narrowed tokens
 are audit attestations of authority at fire time, not hook authority — the hook
-ABI carries no token.
+ABI carries no token. A refused declared scope suppresses the fire (Story 20-9,
+D07 A): minted scopes are revoked and a `schedule.suppressed:<id>` row records it.
 
 The issuance quota's `cap.quota:*` signals are distinct from ADR-016's
 `ContextPressure`/`ContextLimit`/`EContextExhausted` for Spirit-self-reported

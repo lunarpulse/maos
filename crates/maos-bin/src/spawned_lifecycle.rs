@@ -476,6 +476,12 @@ impl LifecycleLink {
         self.fenced.load(Ordering::Acquire)
     }
 
+    /// A swap holds this predecessor link: its `snapshot` fenced it, or a committed successor
+    /// awaits adoption. The predecessor's session does not end cleanly while that is so.
+    pub fn swap_in_flight(&self) -> bool {
+        self.fenced() || locked(&self.handover).is_some()
+    }
+
     pub fn take_handover(&self) -> Option<Handover> {
         locked(&self.handover).take()
     }
@@ -674,6 +680,10 @@ impl SwapHandles {
             &mut |pid| bound.bind_scheduler_pid(pid),
         )
         .await?;
+        // The FR11 record precedes the start: a death inside the start window must not leave a
+        // started version unrecorded. A component that never starts has it withdrawn again.
+        let archive_root = maos_audit::default_archive_dir();
+        let provisional = crate::admission::archive_provisional(&archive_root, gated);
         let session = (self.session)(Arc::clone(&supervisor));
         let (id, hold) = (gated.spirit_id.clone(), self.hosted.hold());
         let (started, link, budget) = (
@@ -693,8 +703,6 @@ impl SwapHandles {
         let until = Instant::now() + budget.min(ATTEMPT_WALL) + READY_GRACE;
         let failure = loop {
             if link.wait_supported(Duration::ZERO).is_some() {
-                // Only a component that started is the version the FR11 archive names.
-                crate::admission::archive_admitted(&maos_audit::default_archive_dir(), gated);
                 return Ok(admitted);
             }
             if task.as_ref().is_some_and(|task| task.is_finished()) {
@@ -715,6 +723,9 @@ impl SwapHandles {
         if let Some(task) = task {
             supervisor.stop_binding(admitted.pid);
             let _ = tokio::time::timeout(Duration::from_secs(10), task).await;
+        }
+        if provisional {
+            crate::admission::withdraw_provisional(&archive_root, gated);
         }
         crate::admission::unwind_admitted(deps, admitted.pid, &gated.spirit_id).await;
         Err(class_build(format!("spawned_start_failed: {failure}")))
