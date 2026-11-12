@@ -1,0 +1,15 @@
+{
+  "attempt_id": "01M77GM9FQ31CA27WKPNT9VQGM",
+  "declared": [
+    "explanation_shape",
+    "intent_promotion_set",
+    "swap_invariants"
+  ],
+  "governance_type": "ManifestDeclaration",
+  "manifest_sha256": "5484:a1fb:f9da:b0b3:2e07:941a:beaa:060a:0bb6:6c05:121f:0f52:2a3d:bc7b:d400:63ee",
+  "outcome": "declared",
+  "publisher": "e377:4c16:0d7c:dcc0:c279:7711:1b8c:b949:5042:d14b:c72a:584c:4a4c:abbd:53c0:deab",
+  "skill_ids": [],
+  "spirit_id": "example-spirit-ts",
+  "version": "0.1.0"
+}

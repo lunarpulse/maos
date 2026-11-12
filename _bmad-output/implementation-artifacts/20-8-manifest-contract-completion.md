@@ -22,7 +22,7 @@ not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21
 Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
 
 
-Status: in-progress
+Status: done
 
 <!-- Created 2026-11-03 at 8c809f9c (main; `git log -1 -- crates xtask` = 8c809f9c) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30); D-18-7-11 A (2026-10-26, the received item). D-20-8-01…12 are PROPOSED, not ruled. The operator rules them; a different ruling rewrites only the clauses marked with that row. No cargo ran (parent rule). Cites were re-read in a `git archive 8c809f9c` copy (`creation/cites-8c809f9c.md`), because the working tree carries Dev204L1's uncommitted 20-4 L1 edits. Kernel and kloc were measured by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`); prototypes are saved as diffs and were never applied. Stale E20 §20-8 cites were corrected in place (`creation/records-owed.md` §A). -->
 
@@ -335,9 +335,10 @@ Every AC names a failing-before witness and a plant. **local** = hermetic on the
 
 #### AC7 — hosted T2 proof of host/guest admission and author/propose (epic AC3)
 
-1. The branch-only evidence recipe builds, publishes, installs and boots the example, checks its declaration and authoring, and runs the wasm-host and equivalence legs. This hosted run remains unverified and is not installed on main.
+1. The branch-only evidence recipe builds, publishes, installs and boots the example, checks its declaration and authoring, and runs the wasm-host and equivalence legs. **Verified 2026-11-12:** branch-only run 43188003155 (`ci/20-8-verify` @fa8a7862, push), 5/5 jobs green; see Closure. Still branch-only, not installed on main.
 2. **Plant (hosted, one image):** the example manifest drops `author_self` ⇒ the exit job's queue assertion fails (`proof-contract.md:14-17`).
-3. External-author cohort evidence is not claimed (operator lane).
+3. External-author cohort evidence is not claimed (operator lane, `ops-external-cohort-and-pen-test`).
+4. **Dated note 2026-11-12:** the tree is WIT 2.4.0 (20-9); `skills@2.3.0` resolves against 2.4.0 and the example imports `maos:spirit/skills@2.4.0`. The AC8 pins 27014/21181 are historical; the authoritative kernel is now 26,062/20,429 after 21-5.
 
 ### L2 — kernel last
 
@@ -376,16 +377,16 @@ Every AC names a failing-before witness and a plant. **local** = hermetic on the
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight.** Operator rulings on D-20-8-01…12 recorded; tracker → `in-progress`. Confirm `20-1a` is `done` (D-02). Run `creation/measurements.md` "Not measured here" 1–2. Re-measure every cite this story touches (rule 9; `admission.rs`/`main.rs` will have moved with 20-4 L1). A measured figure above the ruled envelope, or a T0 result contradicting a ruled option, is STOP + D-row.
+- [x] **T0 — Preflight.** Operator rulings on D-20-8-01…12 recorded; tracker → `in-progress`. Confirm `20-1a` is `done` (D-02). Run `creation/measurements.md` "Not measured here" 1–2. Re-measure every cite this story touches (rule 9; `admission.rs`/`main.rs` will have moved with 20-4 L1). A measured figure above the ruled envelope, or a T0 result contradicting a ruled option, is STOP + D-row. Done: rulings recorded (ask `d_batch4`), `20-1a` done, kernel landed under KS.
 - [x] **T1 — Sections + schema (AC1.1, AC2).** `man` shape; v7 docs; ratification; STABILITY.md; degrade vector; plant.
 - [x] **T2 — Gate + record + signer (AC1.2–1.7).** `gate` shape; `manifest_declarations_20_8.rs`; local signed install witness; plant. The TS hosted command remains AC7.
 - [x] **T3 — Skills `uses` (AC3).** Admission check, refusal codes, vectors, plant.
 - [x] **T4 — I13 consumer (AC4).** Bus registration, delivery check, `IntentPromotionDenied`, `intent_promotion_20_8.rs`, plant. Invariant registry documentation remains unchanged.
 - [x] **T5 — Explanation label (AC5).** Docs text; deferred row stays open.
-- [ ] **T6 — WIT 2.3 + bridge + TS (AC6).** Implementation and local skill witness exist; genuine 2.1/2.2 guest execution and hosted TS proof remain unverified.
-- [ ] **T7 — L1 landing (D-20-8-01 A).** Exact pins inside the ruled envelope. Gates: `check-manifest-schema-version`, `check-stability-matrix`, `gen-abi-docs --check`, `check-equiv-fixture-provenance`, `abi-diff`, `kloc-check`, `check-kernel-baseline` (unchanged), `check-service-boundary`, `check-corpus`, `check-env-contract` (no new variable expected), `check-dev-record-completeness`, `check-epic-close-coherence`, `check-exit-commands`, `check-decision-register`, `prepush`. One hosted discipline run on the final tree + AC7 plant. Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
+- [x] **T6 — WIT 2.3 + bridge + TS (AC6).** Implementation and local skill witness landed (5610f9d6, 37baeedf). Hosted proof: run 43188003155 (`componentize-js` vitest 14/14; `wasm-host-tests` ubuntu-24.04 `wasm_skill_authoring_20_8` 3 passed) and four-image `wasm-host-tests` in discipline run 43104682092. Claim boundary: WIT 2.3 skills import is additive; genuine 2.0 and frames-only 2.2/2.3 guests run hosted; a recall-calling 2.1 guest was not built.
+- [x] **T7 — L1 landing (D-20-8-01 A).** Exact pins inside the ruled envelope. Gates: `check-manifest-schema-version`, `check-stability-matrix`, `gen-abi-docs --check`, `check-equiv-fixture-provenance`, `abi-diff`, `kloc-check`, `check-kernel-baseline` (unchanged), `check-service-boundary`, `check-corpus`, `check-env-contract` (no new variable expected), `check-dev-record-completeness`, `check-epic-close-coherence`, `check-exit-commands`, `check-decision-register`, `prepush`. One hosted discipline run on the final tree + AC7 plant. Revert `intent-lineage-coverage-report.md` if a run modifies it. Done at closure: gates green per landing evidence, discipline run 43104682092 on 1fd26dcc, hosted AC7 run 43188003155 incl. plant; the operator-commit restriction was lifted by the orchestrator landing commits.
 - [x] **T8 — Kernel (AC8)** under the ruled row: red-before test, the shape, door mapping, plant. Done 2026-11-11 (landing 2).
-- [ ] **T9 — L2 landing + records (AC9).** Kernel pins + hashes, FLAG-Winston record, `cargo test -p maos-kernel-core --lib`, coverage and docs are done (landing 2). Open: the hosted run (AC7 legs + plant), review, the ledger closure `CLOSED <date> by 20-8 @<commit>` (Main-owned), and the 20-8-owned deferred rows (D-18-7-11 charter, `[explanation_shape]`, I13 opt-in default, `precheck` verdict).
+- [x] **T9 — L2 landing + records (AC9).** Kernel pins + hashes, FLAG-Winston record, coverage and docs (landing 2); hosted run 43188003155 (AC7 legs + plant); reviews persisted (landing-1, landing-2, landing-3); `CLOSED 2026-11-12 by 20-8 @5610f9d6/37baeedf/692b1e59/1fd26dcc/44cf4f99` stamped on the D-18-7-11 charter and the precheck row; I13 opt-in default, F-3 and new residual rows are rule-10 rows in `deferred-work.md`.
 
 ## Dev Notes
 
@@ -512,6 +513,8 @@ E20@HEAD:7,55-61,81,256-262; PF `epic-20-preflight-2026-10-30.md:82,126,141,242-
 
 `anthropic/claude-sonnet-5-5` (L2 final kernel landing, AC8, Dev208K). Reviewers are OpenAI/GLM family.
 
+Reviews: code review `openai-codex/gpt-6.1-sol` (L1, L2, landing-3 precheck round 1 and round 2); security review landing-2 `zai glm-5.3` (GLM); security review of 1fd26dcc and the precheck door ran on a GPT reviewer agent because the GLM weekly quota was exhausted. Closure record: `anthropic/claude-sonnet-5-5` (`coder`, record-only).
+
 ### Completion Notes List
 
 - Implemented the L1 schema-7 declarations and degradation, pre-pid single declaration writer, verified publisher carriage, skill admission checks, I13 recipient promotion enforcement and WIT 2.3 skill bridge. The declaration row means only “declared”; I2 failure remains fail-stop and a later refusal has a separate record. This one-directional clarification of ruling A is disclosed to the operator.
@@ -525,6 +528,8 @@ E20@HEAD:7,55-61,81,256-262; PF `epic-20-preflight-2026-10-30.md:82,126,141,242-
 - **L2 review corrections (2026-11-11, Dev208K, base `a2bbd687`).** See the AC8 "REVIEW CORRECTIONS" paragraph: kernel 27014 / 21181, door cold-swap refusal, bin 38475, aggregate hardfail 202751; failing-before at HEAD (kernel: scalar vector, label/receipt vectors red; door: cold swap of the dropping successor exits 0) and plants (scalar error swallowed, raw name in the receipt, raw name under the hex label, cold-swap check dropped) red and restored by copy-back + `cmp` + `touch`. Unverified: the spawned (WASM) hop and `precheck` as before, hosted legs, `abi-diff` on a dirty tree.
 - L2 verification (observed, `…-evidence/landing-2/commands.md`): kernel `--lib` 253/253; the new kernel vectors 3/3 and the door vector 1/1; workspace clippy + ratchet clean; no-default verb table 7/7; every named gate passes except `check-serde-error-handling` (the pre-existing 20-11 violation at `main.rs:11091`, owned by 20-11) and `abi-diff` (refuses a dirty tree; clean post-commit run owed); the ONE final-tree workspace nextest ran 6011 tests, 6010 passed, 1 failed (`erasure_million_20_11` AC5 1M oracle, the documented 20-7-owned timing/I/O row, not retried). `prepush` and every hosted leg were not run.
 - L2 review-corrections verification (observed, `…-evidence/landing-2/review-corrections/commands.md`): kernel `--lib` 253/253; kernel vectors 5/5, door vectors 2/2; workspace clippy + ratchet clean (no diagnostic on an added line); no-default verb table 7/7; every named gate passes (`check-serde-error-handling` is green at this base) except `abi-diff` (dirty-tree refusal, clean post-commit run owed); the ONE final-tree workspace nextest ran 6018 tests, 6017 passed, 1 failed (`erasure_million_20_11` AC5 1M oracle, the documented 20-7-owned row, not retried). `prepush` and every hosted leg were not run.
+
+- **Closure 2026-11-12 (record-only).** Landings: 5610f9d6 (L1), 37baeedf (L1 review corrections), 692b1e59 (AC8 kernel), 1fd26dcc (kernel landing corrections), 44cf4f99 (kernel-free door precheck: live-SCB declaration + coordinator parse first; two GPT P2 fixed in a correction round, re-review 0 findings; security 0 findings, two residual P3 observations filed as rule-10 rows; bin 38602 -> 38628, +26 adjudicated). Hosted AC7 proof: run 43188003155. The precheck deferred row is closed; I13 opt-in default and F-3 are rule-10 rows; new rows: unbounded precheck reads, audit completion row without verdict, runner panic after a denied TS `author()`, opaque tamper text, thin timing margin. Details: `20-8-manifest-contract-completion-evidence/closure/closure-note.md`. Unclaimed: AC7.3 external author; a recall-calling genuine 2.1 guest.
 
 ### File List
 
@@ -541,12 +546,33 @@ E20@HEAD:7,55-61,81,256-262; PF `epic-20-preflight-2026-10-30.md:82,126,141,242-
 - L2: `crates/maos-kernel-core/src/{hot_swap/coordinator.rs,lifecycle/upgrade.rs,scheduler/control_block.rs}`; `crates/maos-kernel-core/tests/swap_invariants_20_8.rs`; `crates/maos-domain/src/hot_swap.rs`; `crates/maos-bin/src/{admission.rs,main.rs,migration_plan.rs,operator_door.rs}`; `crates/maos-bin/tests/one_daemon_one_door_16_1.rs`.
 - L2 review corrections: `crates/maos-kernel-core/src/{hot_swap/coordinator.rs,lifecycle/upgrade.rs}`; `crates/maos-kernel-core/tests/swap_invariants_20_8.rs`; `crates/maos-bin/src/{admission.rs,operator_door.rs}`; `crates/maos-bin/tests/one_daemon_one_door_16_1.rs`; `xtask/{kernel-core-baseline.toml,kloc.toml}`; `xtask/tests/{kernel_pin_content_hash_16_0.rs,recovery_lane_ceiling_rule.rs}`; docs v7 and cookbook (EN/KO); `tests/coverage-matrix.yaml`; this story, the FLAG-Winston record, `deferred-work.md`, `20-8-manifest-contract-completion-evidence/landing-2/{review,review-corrections}/`.
 - L2 pins and records: `xtask/{kernel-core-baseline.toml,kloc.toml}`; `xtask/tests/{kernel_pin_content_hash_16_0.rs,recovery_lane_ceiling_rule.rs}`; `docs/ci-baselines/kernel-surface-v0.1-beta.json`; `docs-site/docs/{manifest/v7.md,cookbook/wasm-component-spirit.md}` and the Korean counterparts; `tests/coverage-matrix.yaml`; `_bmad-output/implementation-artifacts/{20-8-manifest-contract-completion.md,20-8-flag-winston-decision.md,deferred-work.md,sprint-status.yaml,20-8-manifest-contract-completion-evidence/landing-2/}`; `_bmad-output/planning-artifacts/{epics/epic-20-ship-it-w5.md,epic-20-preflight-2026-10-30.md}`.
+- Closure files: `_bmad-output/implementation-artifacts/20-8-manifest-contract-completion-evidence/{closure/closure-note.md,ci/run-43188003155.md,ci/run-43188003155/,landing-3/}`; `crates/maos-bin/src/operator_door.rs`, `crates/maos-bin/tests/one_daemon_one_door_16_1.rs` (precheck door, 44cf4f99); `tests/coverage-matrix.yaml`; `_bmad-output/implementation-artifacts/{deferred-work.md,sprint-status.yaml}`.
 
 ### Change Log
 
+- 2026-11-12: Closure (record-only): 44cf4f99 precheck door fix and reviews; hosted AC7 run 43188003155 (5/5 green incl. plant); deferred rows stamped/dispositioned/filed; coverage-matrix notes updated; Status `in-progress` → `done`.
 - 2026-11-03: Story created at `8c809f9c` (ready-for-dev; D-20-8-01…12 PROPOSED). Inventory measured: the four FR8 sections absent; invalid sections silently unread; signature verified only on the install path; no declaration journaled; I13 check without production caller; no explanation carrier; WIT 2.2 without skills. Kernel priced by reverted prototypes (KS +38 / +33 recommended; KB +10 / +8, KB4 +34 / +32, K0). Out-of-kernel measured: manifest +104, bin +156, wasm-host +51, domain +11, xtask +4. E20 §20-8 cites corrected in place.
 - 2026-11-03: Operator ruled D-20-8-01…12 all as recommended (ask `d_batch4`): each row selects A. Kernel KS and the per-crate envelope are ruled; ceilings bind at the applicable dev start after re-baselining, with L2 kernel last. Creation-time history above is retained.
 - 2026-11-09: L1 kernel-free implementation, `ac13i2` and `enc208` rulings, one-directional admission clarification, exact pins and disclosed orchestrator-adjudicated domain overdraft. Hosted proof is authored, not run; L2 remains open.
 - 2026-11-09: Review corrections, independently reviewed FKCS skill-limit re-pin, explicit workspace and prepush limitations, and catalog documentation.
 - 2026-11-11: L2 final kernel landing (AC8): KS re-cut and landed at +42/+37, door `409 swap_invariant_dropped`, exact kernel pins and one surface-hash refresh, failing-before and plants, records. Status `ready-for-dev` → `in-progress`; hosted AC7, review and the ledger closure remain.
 - 2026-11-11: L2 review corrections: ManifestParse on a malformed schema-7 `[swap_invariants]`, reversible-hex receipt reason, cold-swap door refusal (`409 swap_invariant_dropped`), kernel 27014 / 21181, bin 38475, three deferred rows (F-2 detail, F-3, N-1).
+
+## Closure
+
+Closed 2026-11-12 (record-only). Hosted proof: https://github.com/lunarpulse/maos/actions/runs/43188003155 (workflow `ci-20-8-verify`, `event=push`, branch `ci/20-8-verify`, headSha fa8a7862 = main 163ab9bd + the workflow file).
+
+| Job | Id | Result |
+|---|---|---|
+| `epic-20-exit (declared)` | 131079942019 | green: publish, install, boot of the TS example; one `governance:manifest-declaration` row (sha256 = installed manifest.toml, publisher = `signed_package.json` publisher_pubkey, 3 declared sections); queued skill `Pending`; tamper refusal `admission_refused` + `governance:vetter-key-rejection ... installed_package_invalid`, no new declaration row |
+| `epic-20-exit (removed-plant)` | 131079942065 | green only because the queue assertion failed: `QUEUE-ASSERTION-FAILED: no skill queued for example-spirit-ts.example` (AC7.2 plant) |
+| `componentize-js` | 131079941969 | vitest 14/14 |
+| `wasm-host-tests` | 131079941613 | ubuntu-24.04 only: `wasm_skill_authoring_20_8` 3 passed, `recall_17_3d` 1+1, `wit_corpus` 25 |
+| `check-wasm-form-equiv` | 131079942342 | green |
+
+Claim boundaries:
+- AC7.3 external author is an operator lane (`ops-external-cohort-and-pen-test`) and is NOT claimed.
+- Genuine 2.1/2.2 guests: WIT 2.3 skills import is additive; genuine 2.0 and frames-only 2.2/2.3 guests run hosted; a recall-calling 2.1 guest was not built.
+- The ci branch was never dispatched via `workflow_dispatch`: only the `push` trigger ran (a workflow absent from the default branch cannot be dispatched).
+- In the branch run `wasm-host-tests` ran on ubuntu-24.04 only; the four-image proof stays with discipline run 43104682092 (1fd26dcc).
+- Run 43188003155 tested main 163ab9bd plus the workflow, not 44cf4f99; the precheck door fix is witnessed locally (`landing-3/`) and reviewed, not by this hosted run.

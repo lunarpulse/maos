@@ -739,8 +739,10 @@ coverage:
       and live_submission_18_7 cover typed refusal and ownership controls.
       No auto-admit; admitted discovery is not skill execution.
       Story 20-8 L1 `wasm_skill_authoring_20_8` additionally exercises the
-      WIT 2.3 path through the root-bound skill port; hosted TS/four-image proof
-      remains unverified. Operator admission is still required.
+      WIT 2.3 path through the root-bound skill port; hosted run 43188003155
+      (ci/20-8-verify, ubuntu-24.04 wasm-host-tests, componentize-js vitest 14/14,
+      epic-20-exit queued skill Pending) proves the TS example; four-image
+      wasm-host-tests proof is run 43104682092. Operator admission is still required.
   FR4:
     gates:
       - audit_spine_integration
@@ -941,7 +943,7 @@ coverage:
       skill_port_18_7 and live_submission_18_7 cover evidence provenance and
       owned-current-target controls. Revisions are decision-only, not auto-applied.
       Story 20-8 L1 `wasm_skill_authoring_20_8` exercises a foreign-target
-      proposal refusal through the WASM import; hosted proof remains unverified.
+      proposal refusal through the WASM import; the hosted TS example proof is run 43188003155.
   FR58:
     gates:
     - check-service-boundary
@@ -1088,15 +1090,15 @@ coverage:
       `recipient_promotion_set_checks_stored_lineage_before_enqueue` is the I13 witness.
       The signed install publisher/digest/tamper witness is
       `wasm_skill_authoring_20_8::signed::installed_signed_manifest_journals_verified_publisher_and_rejects_tamper`.
-      A declaration is not proof of admission. Hosted T2 proof remains unverified.
+      A declaration is not proof of admission. Hosted T2 proof: run 43188003155 (`epic-20-exit` declared leg: one declaration row, sha256 = installed manifest, publisher = signed package, three sections, tamper refusal; removed-plant leg fails the queue assertion). External-author cohort is not claimed.
       Story 20-8 L2 (AC8): `swap_invariants_20_8` (maos-kernel-core; a hot swap
       refuses a successor that drops a predecessor-declared swap invariant before
       any hook fires; a malformed section is a parse refusal; the receipt carries
       the dropped name as reversible hex) and `one_daemon_one_door_16_1::ac8_20_8_a_dropped_swap_invariant_is_a_typed_409_and_the_predecessor_keeps_serving`
       / `ac8_20_8_a_cold_swap_that_drops_a_swap_invariant_is_a_typed_409_before_unload`
       (door `409 swap_invariant_dropped`, hot swap and cold swap). The check is
-      structural, not a proof that state survived; `HotSwapCoordinator::precheck`
-      does not report it.
+      structural, not a proof that state survived. The dry-run door precheck reports
+      it since 44cf4f99 (`operator_door.rs` `precheck_command`; non-safe verdict).
   FR9:
     gates:
       - journal_survives_cold_restart

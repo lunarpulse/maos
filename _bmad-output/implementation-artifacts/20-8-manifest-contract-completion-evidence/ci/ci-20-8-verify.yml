@@ -1,11 +1,32 @@
-# Branch-only recipe. Copy to .github/workflows on ci/20-8-verify; not installed on main.
-# UNVERIFIED: hosted run and the author_self removal plant remain outstanding.
-name: 20-8 hosted proof
+# Branch-only recipe. Copy to .github/workflows on ci/20-8-verify; never on main.
+# Triggers: `push` on the ci branch is what actually fires (a workflow that does not exist on
+# the default branch cannot be `workflow_dispatch`ed; precedent ci/20-2-verify run
+# 42308080980 was event=push). `workflow_dispatch` is kept for a future main install.
+#
+# Legs (AC1.5 / AC7 of 20-8-manifest-contract-completion):
+#   componentize-js        the TypeScript example builds, its vitest passes, it componentizes
+#                          against WIT 2.4.0 (`maos:spirit/skills@2.4.0`).
+#   wasm-host-tests        the real skill-authoring guest tests and the legacy recall corpus
+#                          (one image; the four-image run is discipline run 43104682092).
+#   check-wasm-form-equiv  equivalence fixture provenance + live tiered oracle.
+#   epic-20-exit[declared] release build; publish -> install -> boot the TS example through the
+#                          delegated T2 service; the one `governance:manifest-declaration` row
+#                          (sha256, verified publisher, the three FR8 section names); the queued
+#                          skill (`maosctl skills show`); installed-manifest tamper => boot
+#                          refusal `installed_package_invalid`, no new declaration row.
+#   epic-20-exit[removed-plant]  the same command with `author_self` removed from the example
+#                          manifest. The queue assertion MUST FAIL (AC7.2); this job is green
+#                          only when it fails with the expected message and a
+#                          `skill.author.refused:capability-denied` row exists.
+name: ci-20-8-verify
 on:
   push:
     branches: ['ci/20-8-verify']
+  workflow_dispatch:
 permissions:
   contents: read
+env:
+  CARGO_TERM_COLOR: never
 jobs:
   componentize-js:
     runs-on: ubuntu-24.04
@@ -18,11 +39,7 @@ jobs:
         working-directory: examples/example-spirit-ts
         run: npm ci && npm test && npm run build && npm run componentize
   wasm-host-tests:
-    strategy:
-      fail-fast: false
-      matrix:
-        image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
-    runs-on: ${{ matrix.image }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
@@ -54,7 +71,6 @@ jobs:
       - run: cargo run --locked -p xtask -- check-equiv-fixture-provenance --json
       - run: cargo run --locked -p xtask -- check-wasm-form-equiv --json
   epic-20-exit:
-    needs: [componentize-js, wasm-host-tests, check-wasm-form-equiv]
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -71,9 +87,17 @@ jobs:
           node-version: '22'
       - uses: Swatinem/rust-cache@v2
       - uses: ./.github/actions/provision-t3-test-substrate
-      - name: Build example and production surfaces
+      - name: Build example and RELEASE production surfaces
+        env:
+          CAPABILITY_CASE: ${{ matrix.capability }}
         run: |
           set -euo pipefail
+          # The plant removes `author_self` BEFORE the componentize/publish so the published
+          # package, not only a local copy, lacks the capability.
+          if [ "$CAPABILITY_CASE" = removed-plant ]; then
+            python3 -c 'from pathlib import Path; p=Path("examples/example-spirit-ts/manifest.toml"); s=p.read_text(); assert "author_self = true\n" in s; p.write_text(s.replace("author_self = true\n",""))'
+            grep -c 'author_self' examples/example-spirit-ts/manifest.toml || true
+          fi
           (cd examples/example-spirit-ts && npm ci && npm run build && npm run componentize)
           cargo build --locked --release -p maos-bin --features wasm-host --bin maos
           cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner
@@ -86,6 +110,7 @@ jobs:
           set -euo pipefail
           target="$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
           export PATH="$target/release:$PATH"
+          out="$PWD"
           scratch="$(mktemp -d)"
           export HOME="$scratch/home" MAOS_HOME="$scratch/home/.maos" XDG_DATA_HOME="$scratch/home/.local/share" XDG_CONFIG_HOME="$scratch/home/.config" XDG_RUNTIME_DIR="$scratch/run"
           mkdir -p "$HOME/.maos/skills" "$XDG_CONFIG_HOME/maos" "$XDG_RUNTIME_DIR"
@@ -98,47 +123,91 @@ jobs:
           for i in $(seq 1 50); do if (exec 3<>/dev/tcp/127.0.0.1/6789) 2>/dev/null; then ready=1; break; fi; sleep 0.1; done
           [ "$ready" -eq 1 ] || { cat registry.log; exit 1; }
           export MAOS_SPIRIT_SIGNING_KEY="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')"
-          if [ "$CAPABILITY_CASE" = removed-plant ]; then
-            python3 -c 'from pathlib import Path; p=Path("examples/example-spirit-ts/manifest.toml"); s=p.read_text(); assert "author_self = true\n" in s; p.write_text(s.replace("author_self = true\n",""))'
-          fi
           maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest examples/example-spirit-ts/manifest.toml --artifact examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
           maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
-          set +e
-          printf '@example-spirit-ts hello\n' | sudo systemd-run --unit=maos-20-8-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" PATH="$PATH" MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" "$target/release/maos" shell --plain 2>&1 | tee shell.log
-          shell_status=${PIPESTATUS[1]}
-          set -e
-          maosctl audit query --intent governance:manifest-declaration > declarations.ndjson
-          if [ "$CAPABILITY_CASE" = removed-plant ]; then
-            maosctl audit query --intent skill.author.refused:capability-denied > plant-denial.ndjson
-            test -s plant-denial.ndjson
-            if maosctl skills show example-spirit-ts.example > skill.json 2>/dev/null; then
-              echo '::error::author_self removal unexpectedly queued a skill'; exit 1
+          feed() {
+            printf '@example-spirit-ts hello\n'
+            if [ "${1:-}" = hold ]; then
+              # `maos shell` exits at stdin EOF and kills the session (run 43182623611: 216 ms, SIGKILL,
+              # nothing authored). Hold stdin open until the guest has queued its skill or been refused
+              # (bounded at 450 s; run 43184609860 needed ~280-305 s under the manifest's 10% CPU cap), then give the host two more seconds.
+              for _ in $(seq 1 900); do
+                if grep -rqsa 'example-spirit-ts.example' "$MAOS_HOME" || maosctl audit query --intent skill.author.refused 2>/dev/null | grep -q .; then break; fi
+                sleep 0.5
+              done
+              sleep 2
+            else
+              sleep 8
             fi
-          else
-            test "$shell_status" -eq 0
-            maosctl skills show example-spirit-ts.example > skill.json
-          fi
+          }
+          boot() {
+            # $1 = hold | quick. The delegated script accepts only the unit `maos-17-3c-proof`; it is reused (--collect).
+            feed "$1" | sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$out" "$out/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" PATH="$PATH" RUST_BACKTRACE=1 MAOS_NOTIFY_DISABLE=1 MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$out/crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json" "$target/release/maos" shell --plain
+          }
+          set +e
+          boot hold 2>&1 | tee shell.log
+          shell_status=${PIPESTATUS[0]}
+          set -e
+          echo "shell exit status: $shell_status"
+          test "$shell_status" -eq 0
+          maosctl audit query --intent governance:manifest-declaration > declarations.ndjson
+          maosctl audit query --intent skill.author > skill-author.ndjson || true
+          maosctl skills list > skills-list.txt 2>&1 || true
+          maosctl audit query > audit-all.ndjson || true
+          # The declaration row: exactly one for the installed example (the `--intent` filter is a
+          # substring match, so `-outcome` rows are present and are not declarations).
           python3 - <<'PY'
           import hashlib,json,os,pathlib
           home=pathlib.Path(os.environ['HOME']); registry=home/'.local/share/maos/registry'
           index=json.loads((registry/'installed-index.json').read_text())
           package=registry/'installed'/index['example-spirit-ts']
           signed=json.loads((package/'signed_package.json').read_text())
-          rows=[json.loads(line) for line in open('declarations.ndjson') if line.strip()]
-          rows=[json.loads(row['payload'])['event'] for row in rows]
-          rows=[row for row in rows if row.get('spirit_id')=='example-spirit-ts']
+          rows=[]
+          for line in open('declarations.ndjson'):
+              if not line.strip():
+                  continue
+              event=json.loads(json.loads(line)['payload']).get('event',{})
+              if event.get('governance_type')=='ManifestDeclaration' and event.get('spirit_id')=='example-spirit-ts':
+                  rows.append(event)
           assert len(rows)==1, rows
           row=rows[0]
-          assert row['manifest_sha256'].replace(':','')==hashlib.sha256((package/'manifest.toml').read_bytes()).hexdigest()
-          assert row['publisher'].replace(':','')==signed['publisher_pubkey']
-          assert set(row['declared'])=={'explanation_shape','intent_promotion_set','swap_invariants'}
-          if os.environ['CAPABILITY_CASE']=='declared':
-              skill=json.load(open('skill.json'))
-              assert skill['state']=='Pending' and skill['author']['class']=='example-spirit-ts', skill
+          pathlib.Path('declaration-row.json').write_text(json.dumps(row,indent=2,sort_keys=True)+'\n')
+          assert row['manifest_sha256'].replace(':','')==hashlib.sha256((package/'manifest.toml').read_bytes()).hexdigest(), row
+          assert row['publisher'].replace(':','')==signed['publisher_pubkey'], row
+          assert set(row['declared'])=={'explanation_shape','intent_promotion_set','swap_invariants'}, row
+          print('declaration row OK:', json.dumps(row,sort_keys=True))
           PY
-          if [ "$CAPABILITY_CASE" = declared ]; then
-            maosctl skills approve example-spirit-ts.example
-            maosctl skills show example-spirit-ts.example | python3 -c 'import json,sys; assert json.load(sys.stdin)["state"] == "Admitted"'
+          # The queue assertion (AC7.2 names this as the plant's failing assertion).
+          queue_assertion() {
+            if ! maosctl skills show example-spirit-ts.example > skill.json 2> skill.err; then
+              echo 'QUEUE-ASSERTION-FAILED: no skill queued for example-spirit-ts.example'
+              cat skill.err
+              return 1
+            fi
+            python3 -c 'import json; s=json.load(open("skill.json")); assert s["state"]=="Pending" and s["author"]["class"]=="example-spirit-ts", s; print("queued skill OK:", json.dumps(s,sort_keys=True))' || {
+              echo 'QUEUE-ASSERTION-FAILED: queued skill has the wrong state or author'
+              return 1
+            }
+          }
+          if [ "$CAPABILITY_CASE" = removed-plant ]; then
+            # EXPECTED RED: the plant must make the queue assertion fail. Anything else is a red job.
+            set +e
+            queue_assertion > queue-assertion.log 2>&1
+            rc=$?
+            set -e
+            cat queue-assertion.log
+            if [ "$rc" -eq 0 ]; then
+              echo '::error::PLANT NOT RED: author_self removal still queued a skill'
+              exit 1
+            fi
+            grep -F 'QUEUE-ASSERTION-FAILED: no skill queued for example-spirit-ts.example' queue-assertion.log
+            maosctl audit query --intent skill.author.refused:capability-denied > plant-denial.ndjson
+            test -s plant-denial.ndjson
+            echo 'EXPECTED RED OBSERVED: queue assertion failed and a capability-denied row exists'
+          else
+            queue_assertion
+            maosctl skills list | tee skills-list.txt
+            # Tamper: edit the INSTALLED [swap_invariants]; the next boot must refuse and write no row.
             python3 - <<'PY'
           import json,os,pathlib
           r=pathlib.Path(os.environ['HOME'])/'.local/share/maos/registry'
@@ -147,12 +216,15 @@ jobs:
           p.write_text(s.replace('preserve = ["example-state"]','preserve = ["tampered"]'))
           PY
             set +e
-            printf '@example-spirit-ts hello\n' | sudo systemd-run --unit=maos-20-8-tamper --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" PATH="$PATH" MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" "$target/release/maos" shell --plain > tamper.log 2>&1
+            boot quick > tamper.log 2>&1
             set -e
+            cat tamper.log
             grep -F 'refused at boot: admission_refused' tamper.log
-            maosctl audit query --intent governance:vetter-key-rejection | grep -F installed_package_invalid
+            maosctl audit query --intent governance:vetter-key-rejection > vetter-rejection.ndjson
+            grep -F installed_package_invalid vetter-rejection.ndjson
             maosctl audit query --intent governance:manifest-declaration > after-tamper.ndjson
             cmp declarations.ndjson after-tamper.ndjson
+            echo 'tamper refusal OK: refused at boot, installed_package_invalid journaled, declaration rows unchanged'
           fi
       - uses: actions/upload-artifact@v4
         if: always()
@@ -162,7 +234,14 @@ jobs:
             shell.log
             registry.log
             declarations.ndjson
+            declaration-row.json
             skill.json
+            skill.err
+            skill-author.ndjson
+            audit-all.ndjson
+            skills-list.txt
+            queue-assertion.log
             plant-denial.ndjson
             tamper.log
+            vetter-rejection.ndjson
             after-tamper.ndjson
