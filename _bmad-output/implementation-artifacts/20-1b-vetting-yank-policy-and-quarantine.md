@@ -21,7 +21,7 @@ not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21
 Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
 
 
-Status: backlog
+Status: done
 
 <!-- Split from story 20-1 on 2026-11-01/02 under operator ruling D-20-1-01 B (ask split201). Part B (AC6–AC13) and Tasks T6–T10 moved here unchanged; the story file for the exit path is `20-1a-registry-publish-install-exit-path.md`. Shared evidence: `20-1-registry-client-install-verb-vetter-and-yank-evidence/`. Decisions, rulings, pricing and Dev Notes live in 20-1a and are not repeated here. -->
 
@@ -66,6 +66,8 @@ readback, F-4 changing poller errors, F-5 token-only fence) are rule-10 deferred
 story the operator must price: "quarantine closure: memory/scalar fences + durable/load-time yank quarantine + operator
 release verb + distinct `quarantined` readback: kernel +30..+80 tokei, unmeasured"**. **20-1b stays not `done`; AC11 is
 satisfied only in its narrowed meaning and the epic-close gate must not close it.**
+
+**SUPERSEDED 2026-11-12 by operator ruling `q20` (`decisions-2026-11-12-acceleration.md` item 11):** the clause "20-1b stays not `done`" no longer holds for the rc. 20-1b closes after its hosted legs; the quarantine gaps are carried by the NEW non-`20-*` backlog key `later-registry-quarantine-closure`. AC11 remains satisfied only in its narrowed meaning (see `### Closure`).
 
 ### L1 independent-review correction rulings — 2026-11-07
 
@@ -195,9 +197,10 @@ below belong to `landing-1/ac15/review/triage.md`, not the older L1 review.
 
 1. Kernel: `kq1-sticky-quarantine.diff` shape — the CRL `Quarantine` arm (`applier.rs:160-197`) sets the quarantine fence, journals `spirit.quarantined`, and spawns no drain/terminate; `is_paused` honours quarantine at every fence site (`capability/mod.rs:203,319,345`); a director `resume` cannot lift it; `unload` ends it (`scheduler_loop.rs:572`).
 2. **Hostile-effect witness (local, kernel):** `crates/maos-kernel-core/tests/quarantine_fr13_20_1.rs` — a fixture Spirit declaring `[on_revocation] action = "quarantine"` receives a CRL; it then attempts an MCP tool call, an inference call, a `MemWrite` token issuance (memory-by-token) and a token verification ⇒ each refused (`CapError::Revoked`), nothing reaches the MCP/inference effect; private/shared memory writes and scalar mutation are **not** fenced and are not claimed; the Spirit is still loaded and Running past the old drain deadline; pause→resume leaves it fenced; unload clears it. Red at HEAD (terminated after the deadline; mediated calls succeed until then).
-3. `docs/invariants/I5.md:11` FR13 stays `asserted` (ADR-037; operator ruling `q` narrows the claim, so there is nothing to flip); `tests/coverage-matrix.yaml` FR13/FR37/FR59 notes, ADR-056, `crates/maos-registry/SECURITY.md` and architecture `4-kernel-design.md:661` state the narrowed, non-isolation scope.
+3. `docs/invariants/I5.md:11` FR13 stays `asserted` (ADR-037; operator ruling `q` narrows the claim, so there is nothing to flip; **AC11.3 stays PARTIAL, closed by claim boundary under `q20`**); `tests/coverage-matrix.yaml` FR13/FR37/FR59 notes, ADR-056, `crates/maos-registry/SECURITY.md` and architecture `4-kernel-design.md:661` state the narrowed, non-isolation scope.
 4. **Plant (one, local):** restore drain-then-terminate in the arm ⇒ AC11.2 red.
 5. **Hosted T3 leg:** a T3 Worker Spirit quarantined by CRL — its next mediated action refused; whether its container keeps running activity is recorded (measurement owed 4); if it does, the record names it.
+   **LANDED 2026-11-12 (hosted run 43184858544, jobs 131069396042 and 131069396078; `crates/maos-bin/tests/worker_quarantine_20_1b.rs`):** a live T3 Worker fenced; its next MCP issue, inference issue and held-token verify each `Err(Revoked)`; `container_activity_continues: true` (4 heartbeats in 4 s after the fence, container still running; a later `stop_workers` removed it), so the fence is capability-mediated only and **no isolation is claimed**. **CLAIM BOUNDARY / product finding:** a CRL cannot quarantine a Worker (`worker_spawn.rs:919-922` binds `..Default::default()`, no `[class]` in its SCB; the CRL arm in `revocation/applier.rs` skips class-less SCBs; yank policy needs an installed package plus a class-bearing SCB, `yank_policy.rs` `reevaluate_at`). The test fences via `set_quarantined(pid, true)`, the primitive the CRL arm calls, and names that route in its record; the AC text 'quarantined by CRL' is NOT proven for a Worker. Deferred row owned by `later-registry-quarantine-closure`.
 6. Pins: both kernel pins, content hashes; HISTORY rows cite this key; FLAG-Winston decision record (precedent `20-3c-flag-winston-decision.md`).
 
 #### AC12 — the revocation poller says a failure once (D:1264; D-20-1-03 A) ◆ FLAG-Winston
@@ -210,6 +213,7 @@ below belong to `landing-1/ac15/review/triage.md`, not the older L1 review.
 
 1. `check-dev-record-completeness` passes at the final landing with no open `deferred-work.md` row owned by `20-1` (D:37, :56, :1093, :1147, :1264 → `CLOSED <date> by 20-1 @<commit>` with witness, or rule-10 re-owned); FR35/FR36/FR59 coverage rows (`coverage-matrix.yaml:617,622,841`) name their witnesses; FR37 stays `v2.0+` with the machinery witnessed; I5 owner re-pointed or closed.
 2. **Negative control:** with one live row left naming `20-1` and S:296 flipped to `done` in a scratch copy, the gate reds.
+3. **Closed 2026-11-12:** the five named rows are stamped or re-owned: D:37 (now ~:156), D:56 (FR59 row, ~:175), D:1093 (~:1213) and D:1264 (~:1389) carry `CLOSED 2026-11-12 by 20-1b-vetting-yank-policy-and-quarantine @<sha>`; D:1147 (FR13, ~:1267) is re-owned to `later-registry-quarantine-closure` (rule-10 re-own; not closed, by `q20`). The remaining 20-1b-owned rows are closed, re-owned to that key, or `ownerless and open` with a `Dispositioned by operator ruling q20` citation; `check-dev-record-completeness` passes with 0 violations after the `done` flip.
 
 #### AC14 — installed name@version is immutable (F4; RULED `f1b`, 2026-11-06)
 
@@ -272,11 +276,16 @@ below belong to `landing-1/ac15/review/triage.md`, not the older L1 review.
 
 ## Tasks / Subtasks
 
-- [ ] **T6 — Binding + vet CLI (AC6)**; ADR-056 §1; golden pin.
-- [ ] **T7 — Signed, labelled, restart-safe yanks (AC7)**; policy (AC8); vetter lapse/revocation (AC9); squatting (AC10). L2 landing.
-- [ ] **T8 — L3 kernel (AC11, AC12)** under the ruled FLAG-Winston row: apply the ruled bundle (re-cut, never applied blindly), the hostile-effect witness, I5/coverage/architecture text, both kernel pins + hashes, decision record.
-- [ ] **T9 — Plants** (one per AC, `proof-contract.md:24-31`), local except AC5 (hosted) and AC11.5 (hosted T3); wall-clock per plant in the Dev Agent Record.
-- [ ] **T10 — Close (AC13).** `check-kernel-baseline`, `check-service-boundary`, `check-pub-field-constructors`, `check-dependency-closure`, `check-env-contract`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; one hosted discipline run on the final tree (known 20-7 flakes by name and run id, D13). Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
+- [x] **T6 — Binding + vet CLI (AC6)**; ADR-056 §1; golden pin.
+  - Evidence 2026-11-12: Landed `62faff63`, `c656a6e7`; hosted 158/158 run 43184858544 (jobs 131069395919, 131069395836).
+- [x] **T7 — Signed, labelled, restart-safe yanks (AC7)**; policy (AC8); vetter lapse/revocation (AC9); squatting (AC10). L2 landing.
+  - Evidence 2026-11-12: Landed `62faff63`, `c656a6e7`, `608735d2`, `a2bbd687`; hosted T3 group 16/16 incl. 12 `yank_policy_20_1b` tests (jobs 131069396042, 131069396078).
+- [x] **T8 — L3 kernel (AC11, AC12)** under the ruled FLAG-Winston row: apply the ruled bundle (re-cut, never applied blindly), the hostile-effect witness, I5/coverage/architecture text, both kernel pins + hashes, decision record.
+  - Evidence 2026-11-12: Landed `608735d2`, `a2bbd687`, narrowed by ruling `q`: kernel quarantine vectors 5/5 hosted; I5 FR13 stays `asserted`, so AC11.3 is PARTIAL by design; decision record `20-1b-flag-winston-decision.md`.
+- [x] **T9 — Plants** (one per AC, `proof-contract.md:24-31`), local except AC5 (hosted) and AC11.5 (hosted T3); wall-clock per plant in the Dev Agent Record.
+  - Evidence 2026-11-12: One local plant per AC (`landing-1/plants.md`, `landing-2/plants/`); AC11.5 hosted plant red on both images (run 43184858544 jobs 131069396042, 131069396078), local container-less plant `ci/ac11-5-plant-local.out`; wall times in `ci/`/`landing-2/`.
+- [x] **T10 — Close (AC13).** `check-kernel-baseline`, `check-service-boundary`, `check-pub-field-constructors`, `check-dependency-closure`, `check-env-contract`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; one hosted discipline run on the final tree (known 20-7 flakes by name and run id, D13). Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
+  - Evidence 2026-11-12: Hosted run 43184858544 7/7 success (`ci/README.md`, `closure/closure-note.md`). **`prepush` on the final tree was NOT run**: hosted discipline run 43175946640 (21-5 L2, descendant of `608735d2`/`a2bbd687`) is green 199/199 except the advisory reproducible-build job (cited honestly, not a prepush). Closes under operator ruling `q20` (item 11 of `decisions-2026-11-12-acceleration.md`) superseding the `q` clause 'stays not `done`'; the gates `check-dev-record-completeness`, `check-dev-model-tier`, `check-epic-close-coherence`, `check-review-findings-resolved`, `check-decision-register`, `check-exit-commands`, `check-env-contract`, `coverage-matrix` run after the flip.
 
 ## Dev Notes
 
@@ -289,6 +298,10 @@ Shared Dev Notes (what changes by file, guardrails, proven-red controls, tests a
 `openai-codex/gpt-6.1-sol` — kernel-free landing-1 implementation.
 
 `anthropic/claude-sonnet-5-5` (Dev201bK) — landing 2, the final kernel landing (row R = KQ1 + P) and the AC8 quarantine effect, 2026-11-11.
+
+`anthropic/claude-sonnet-5-5` (Hosted201b, Close201b) — hosted legs recipe, the AC11.5 test and this record-only closure, 2026-11-12 (Hosted201b's own model id is not recorded in this file).
+
+Reviewers (read-only, persisted verbatim): the L1 and AC15 independent reviews (`landing-1/review/`, `landing-1/ac15/review-corrections/`), the landing-2 GPT review (`landing-2/review/gpt-review.md`) and the landing-2 security review (`landing-2/review/security.md`; its findings are cited as GLM F-1..F-5 in this story). The exact model ids of the reviewers are not recorded in those files.
 
 ### Debug Log References
 
@@ -1063,6 +1076,18 @@ independent review; restart persistence of quarantine (the fence is an in-memory
 unfenced, see the deferred row and the decision record); KQ2 egress fence not selected; the ADR-037 I5 flip. AC13's
 deferred-row closure is staged as locally witnessed with the `CLOSED @commit` stamp Main-owned. Status is not flipped.
 
+### Closure — operator ruling `q20`, hosted legs (2026-11-12)
+
+Closed record-only: no code, kernel file or `docs/invariants/*.md` changed. Status flipped to `done` under `q20`, which supersedes the `q` clause "stays not `done`"; the quarantine gaps are carried by the non-`20-*` backlog key `later-registry-quarantine-closure`. Full table: `20-1b-vetting-yank-policy-and-quarantine-evidence/closure/closure-note.md`.
+
+**Hosted proof:** branch-only run [43184858544](https://github.com/lunarpulse/maos/actions/runs/43184858544) (`ci/20-1b-verify` @ `6c59aa46`), 7/7 success: kernel-free-trust (jobs 131069395919 on 24.04, 131069395836 on 26.04: TLS/dev flows/cohort teardown 158/158, 54 required markers), final-tree-vectors (131069396042, 131069396078: kernel quarantine vectors 5/5; T3 group 16/16 = yank policy x12, AC12 one-door, 20-11 Worker variant, both AC11.5 tests), public-WebPKI (131069395551), macOS aarch64-apple-darwin check + `registry_limits_20_1b` 4 tests + 3 TLS runtime cases (131069395957), epic-20-exit (131069396074). Run 1 (43180252358) was recipe bugs only, fixed in `6c59aa46`. AC11.5 and AC15 are LANDED hosted; AC11.3 stays PARTIAL.
+
+**Claim boundary (verbatim):** FR13 quarantine = capability-mediated fence only (issue/verify/recheck: MCP, inference, memory-by-token, IAC-by-token); private/shared memory writes, scalar mutation, DRR/native IAC/IO, hooks and telemetry are NOT fenced; per-pid in memory, shed by restart/unload/swap/reload; a consumed yank row is never re-applied (CRL path is durable); no operator release verb; `fenced` readback conflates pause and quarantine; not isolation (ruling `q`). I5 FR13 remains `asserted`.
+
+**Product finding:** a CRL cannot quarantine a Worker (`worker_spawn.rs:919-922` binds `..Default::default()`, so its SCB has no `[class]`; the CRL arm in `revocation/applier.rs` skips class-less SCBs; yank policy needs an installed package and a class-bearing SCB, `yank_policy.rs` `reevaluate_at`). The AC11.5 test fences through `set_quarantined(pid, true)` and names that route. Container activity continues after the fence (`container_activity_continues: true`).
+
+**Honest limits:** `prepush` on the final tree not run (hosted discipline run 43175946640, green 199/199 except the advisory reproducible-build job, is the cited discipline evidence); macOS beyond the TLS/limits runtime cases not run; the live-container plant is hosted-only (local T3 skips).
+
 ### File List
 
 Historical original-L1 inventories: initial42 paths in `landing-tracked-file-list.stdout`; final43 in `landing-tracked-file-list-final.stdout`. These are not the correction-pass inventory. Original grouped implementation inventory:
@@ -1096,6 +1121,11 @@ exact paths/hashes in `landing-1/ac15/review-corrections/source-inventory.json`)
 
 Landing 2 (final kernel landing; uncommitted) owned paths: kernel `crates/maos-kernel-core/src/{capability/mod.rs,revocation/applier.rs,revocation/poller.rs,scheduler/scheduler_loop.rs}`; kernel tests `tests/quarantine_fr13_20_1.rs` (new), `tests/on_revocation_three_actions.rs`; audit `src/fr4_classifier.rs`, `tests/fr4_classifier_16_2.rs`; bin `src/{yank_policy.rs,main.rs,env_contract.rs}`, `tests/{yank_policy_20_1b.rs,one_daemon_one_door_16_1.rs}`; registry doc comment `crates/maos-registry/src/yank.rs`; pins `xtask/{kernel-core-baseline.toml,kloc.toml}`, `xtask/tests/{kernel_pin_content_hash_16_0.rs,recovery_lane_ceiling_rule.rs}`, `docs/ci-baselines/kernel-surface-v0.1-beta.json`; records `20-1b-flag-winston-decision.md`, this story, `deferred-work.md`, `sprint-status.yaml`, epic-20 + preflight mirrors, coverage matrix, ADR-056, `4-kernel-design.md`; evidence `20-1b-vetting-yank-policy-and-quarantine-evidence/landing-2/`.
 
+Closure 2026-11-12 (record-only) and hosted legs:
+- `crates/maos-bin/tests/worker_quarantine_20_1b.rs`; `.github/workflows/ci-20-1b-verify.yml` (branch-only recipe, final at `6c59aa46`).
+- `_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine.md`; `_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/ci/` (run 43180252358, run 43184858544, README, local AC11.5 outputs); `_bmad-output/implementation-artifacts/20-1b-vetting-yank-policy-and-quarantine-evidence/closure/closure-note.md`.
+- `_bmad-output/implementation-artifacts/{sprint-status.yaml,deferred-work.md}` (new key `later-registry-quarantine-closure`, 20-1b-owned rows stamped/re-owned/dispositioned, new CRL-cannot-reach-a-Worker row).
+
 ### Change Log
 
 - At the original L1 handoff, operator `f1b` scope and Main's kernel-last AC8 split were recorded while F5 choices remained priced PROPOSED D-rows; superseded by the dated `f5rows` entry below.
@@ -1109,3 +1139,4 @@ Landing 2 (final kernel landing; uncommitted) owned paths: kernel `crates/maos-k
 - 2026-11-08 (Dev201b, openai-codex/gpt-6.1-sol; Main AC15 handoff atc656a6e7): implemented ruled A/A/A URI-bound root/rustls/explicit dev mode and authenticated complete response heads; fixed hosted42418118608 cohort audit-owner regression with real no-T3 before/plant and AST/declared-capability controls. Exact aggregate196964/hardfail196965, kernel unchanged. One standalone workspace100 and one prepush1 are honestly recorded, not retried; independent/hosted review remains Main-owned. Cleanup and full acceptance/source/command evidence are under `landing-1/ac15/`.
 - 2026-11-11 (Dev201bK, anthropic/claude-sonnet-5-5; base c2beedb4): landing 2 = final kernel row R (KQ1 sticky quarantine fence + P poller edge-trigger, kernel 26967/21141, +78/+68 = grant, one `CapabilityRegistryAdapter` surface-hash refresh) and the AC8 quarantine effect (bin +30, audit +11); failing-before + six plants; pins re-set together; records, deferred rows and mirrors updated. Uncommitted; status not flipped (hosted T3/TLS legs, hosted run, prepush/review, quarantine restart persistence, I5 flip open).
 - 2026-11-08 (Dev201b; independent AC15 review baseline9e8c7737): implemented P1–P12 and scoped security corrections/D1–D5, recorded W dispositions and correction witnesses, forfeited legacy CLI reserve, and re-pinned registry6151/bin35586/domain10144/aggregate197451 (hardfail197452). Exact kernel hash unchanged; no KQ1 effect claimed. Current detailed verification/limitations are in the correction Dev Agent Record and review-corrections evidence; no status flip or commit.
+- 2026-11-12 (Close201b, anthropic/claude-sonnet-5-5; operator ruling `q20`): record-only closure. Hosted run 43184858544 7/7 green (AC11.5, AC15 hosted legs; 158/158 kernel-free, kernel vectors 5/5, T3 group 16/16, WebPKI, macOS, epic-20-exit); product finding recorded (a CRL cannot quarantine a Worker; fenced via `set_quarantined`); T6-T10 ticked (prepush not run; hosted discipline run 43175946640 cited); deferred rows stamped, re-owned to `later-registry-quarantine-closure` or dispositioned under `q20`; status `done`; I5 FR13 stays `asserted`.
