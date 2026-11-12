@@ -1,4 +1,4 @@
-# Branch-only recipe (never installed on main). Copy to .github/workflows/ on ci/20-9-verify;
+# Branch-only recipe (never installed on main). Copy to .github/workflows/ on ci/20-9-verify-2;
 # the `push` trigger on that branch is what dispatches it (a workflow_dispatch on a non-default
 # branch needs the file on the default branch, so none is declared).
 # Story 20-9 AC6 hosted proof:
@@ -22,7 +22,7 @@
 name: 20-9 hosted proof
 on:
   push:
-    branches: ['ci/20-9-verify']
+    branches: ['ci/20-9-verify-2']
 permissions:
   contents: read
 jobs:
