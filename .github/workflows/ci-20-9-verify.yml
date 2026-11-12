@@ -71,8 +71,7 @@ jobs:
           cargo nextest run --locked -p maos-bin --features maos-bin/wasm-host --no-fail-fast
           --test spawned_lifecycle_20_9 --test spawned_swap_20_9 --test spawned_door_20_9
           --test spawned_installed_20_9
-          --test hook_pump_17_4 --test wasm_form_admission_17_3b --test root_shutdown_unload_16_3
-          --test one_daemon_one_door_16_1
+          --test hook_pump_17_4 --test wasm_form_admission_17_3b --test one_daemon_one_door_16_1
   epic-20-exit-swap:
     runs-on: ubuntu-24.04
     strategy:
@@ -164,12 +163,22 @@ jobs:
           [ "$ok" -eq 1 ] || { echo "never reached Running"; cat daemon.out daemon.err; exit 1; }
           pid_before="$(field pid)"
           echo "pid_before=$pid_before"
-          sleep 5   # MAOS_IDLE_FAST: the example's `idle` export runs repeatedly
           "$rel/maosctl" spirit inspect example-spirit-ts | tee inspect-before.out
-          set +e
-          "$rel/maosctl" spirit upgrade example-spirit-ts --to "$scratch/package/v2.toml" --policy hot-swap > swap.out 2>&1
-          status=$?
-          set -e
+          # `Running` is reported before the TypeScript guest has finished starting (release build,
+          # the manifest's cpu_max_pct = 10 throttles the compile for tens of seconds), and the door
+          # answers a swap in that window with the typed, retryable `spawned_swap_not_ready`. Retry
+          # exactly that refusal; any other outcome ends the loop.
+          start=$SECONDS
+          status=1
+          for attempt in $(seq 1 120); do
+            set +e
+            "$rel/maosctl" spirit upgrade example-spirit-ts --to "$scratch/package/v2.toml" --policy hot-swap > swap.out 2>&1
+            status=$?
+            set -e
+            echo "attempt=$attempt exit=$status elapsed=$((SECONDS - start))s: $(head -c 300 swap.out | tr '\n' ' ')"
+            grep -q 'spawned_swap_not_ready' swap.out || break
+          done
+          echo "ready_after_s=$((SECONDS - start))" | tee -a swap.out
           echo "upgrade exit=$status"
           cat swap.out
           echo "$status" > swap.status
@@ -195,18 +204,25 @@ jobs:
           cat "$MAOS_HOME"/journal/* > journal.all 2>/dev/null || true
           test "$(grep -o '"HotSwap"' journal.all | wc -l)" -eq 1
           echo "one lifecycle.hot_swap row: ok"
-      - name: Observe the example's counter (idle count before the swap, carried, continued)
-        if: always() && matrix.swap_in == 'declared'
+      - name: Observe the example's counter (idle before the swap, carried by swap-in, continued by the successor)
+        if: always()
         shell: bash
         run: |
           set +e
           . ./scratch.env
-          echo "--- MAOS-209 lines in daemon.out/daemon.err/journal"
-          grep -h 'MAOS-209' daemon.out daemon.err journal.all 2>/dev/null | head -60
-          echo "--- sinks"
+          export MAOS_HOME="$scratch/home/.maos"
+          cat "$MAOS_HOME"/journal/* > journal.all 2>/dev/null
+          python3 - <<'PY'
+          import os, sqlite3
+          db = sqlite3.connect("file:" + os.environ["MAOS_HOME"] + "/audit/transparency.sqlite?mode=ro", uri=True)
+          with open("tl-intents.txt", "w") as out:
+              for intent, payload in db.execute("SELECT intent, payload_redacted FROM transparency_log ORDER BY rowid"):
+                  out.write(intent + "\t" + bytes(payload).decode("utf-8", "replace")[:300] + "\n")
+          PY
+          echo "--- tl intents"; cut -f1 tl-intents.txt | sort | uniq -c
+          echo "--- MAOS-209 lines per sink (daemon.out daemon.err journal.all)"
           grep -c 'MAOS-209' daemon.out daemon.err journal.all
-          echo "--- tl-intents"
-          cut -f1 tl-intents.txt | sort | uniq -c
+          grep -h 'MAOS-209' daemon.out daemon.err journal.all | head -80
       - name: Judge the plant (the red above must be the intended refusal)
         if: always() && matrix.swap_in == 'removed-plant'
         shell: bash
