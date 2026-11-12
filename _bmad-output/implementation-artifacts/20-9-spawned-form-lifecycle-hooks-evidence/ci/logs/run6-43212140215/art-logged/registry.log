@@ -1,0 +1,2 @@
+maos-registry: listening on 127.0.0.1:6789
+maos-registry: connection error: Broken pipe (os error 32)

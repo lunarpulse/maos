@@ -1,0 +1,1 @@
+{"frame_id":"01a1cfabc68bb700b3295581346c8a55","timestamp_ns":1794485503627160462,"spirit_pid":1,"boot_nonce":8238722291206745717,"kind":"capability.invocation","intent":"skill.author.refused:capability-denied","payload":"{\"spirit_pid\":1,\"reason\":\"capability-denied\"}"}

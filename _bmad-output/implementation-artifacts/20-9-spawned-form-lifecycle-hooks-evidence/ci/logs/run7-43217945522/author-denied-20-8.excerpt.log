@@ -1,0 +1,15 @@
+2026-11-12T12:54:55.8052923Z ##[notice]immutable image pulled; rootless network-none shell exercised; image=docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794; lock=/home/runner/work/_temp/maos-t3-tests/t3-image.lock; Ed25519 verified
+2026-11-12T13:10:05.9012658Z maosctl audit query --intent skill.author.refused:capability-denied > plant-denial.ndjson
+2026-11-12T13:10:05.9015749Z ! grep -F 'session child terminated' shell.log
+2026-11-12T13:10:37.8201952Z maos: installed spirit 'example-spirit-ts' session refused: session child terminated: Exited { code: 4 }
+2026-11-12T13:10:44.2872635Z maos: shell exiting
+2026-11-12T13:10:44.3146401Z shell exit status: 0
+2026-11-12T13:10:44.3488384Z maos: installed spirit 'example-spirit-ts' session refused: session child terminated: Exited { code: 4 }
+2026-11-12T13:10:44.3488857Z maos: shell exiting
+2026-11-12T13:10:44.3490918Z capability-denied row: ok
+2026-11-12T13:10:44.3505735Z maos: installed spirit 'example-spirit-ts' session refused: session child terminated: Exited { code: 4 }
+2026-11-12T13:10:44.3551403Z no exit 101, no panic, no unplanned crash: ok
+2026-11-12T13:10:44.3558028Z {"frame_id":"01a1cfe1a5173e30fd83e8414eb777f8","timestamp_ns":1794489034007345559,"spirit_pid":1,"boot_nonce":8694702196547349056,"kind":"cli.subprocess.output","intent":"spirit.diagnostic","payload":"{\"event\":\"spirit_diagnostic\",\"child_pid\":15814,\"line\":\"Skill authoring declined: capability-denied \"}"}
+2026-11-12T13:10:44.3560150Z guest console.log after the denied author() reached spirit.diagnostic: ok
+2026-11-12T13:10:44.3567520Z maos: installed spirit 'example-spirit-ts' session refused: session child terminated: Exited { code: 4 }
+2026-11-12T13:10:44.3579809Z maos-wasm-runner: OutOfFuel

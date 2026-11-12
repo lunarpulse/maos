@@ -1,0 +1,22 @@
+2026-11-12T13:09:58.5139760Z pid_before="$(field pid)"
+2026-11-12T13:09:58.5155526Z pid_after="$(field pid)"
+2026-11-12T13:10:06.7678339Z pid_before=1
+2026-11-12T13:10:11.8941043Z attempt=1 exit=1 elapsed=5s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+2026-11-12T13:10:16.9603172Z attempt=2 exit=1 elapsed=10s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+2026-11-12T13:10:22.0263265Z attempt=3 exit=1 elapsed=16s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+2026-11-12T13:10:27.0892127Z attempt=4 exit=1 elapsed=21s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+2026-11-12T13:10:57.1511579Z attempt=5 exit=75 elapsed=51s: maosctl: spirit upgrade — the command outlived its route budget but is running to completion; operation_id op-3af1abcdecf42135198f01bf; inspect its row later with: maosctl audit query --intent-contains op-3af1abcdecf42135198f01bf 
+2026-11-12T13:10:57.1542174Z ready_after_s=51
+2026-11-12T13:10:57.1881294Z async upgrade op-3af1abcdecf42135198f01bf outcome=completed
+2026-11-12T13:10:57.1885935Z upgrade exit=0
+2026-11-12T13:10:57.1898139Z ready_after_s=51
+2026-11-12T13:10:57.1899408Z async upgrade op-3af1abcdecf42135198f01bf outcome=completed
+2026-11-12T13:10:57.2527500Z pid_after=1
+2026-11-12T13:11:02.3391053Z successor tick lines after the swap row: 16
+2026-11-12T13:11:02.4140401Z one successor declaration row: ok
+2026-11-12T13:11:02.4227404Z one lifecycle.hot_swap row: ok
+2026-11-12T13:11:07.5843426Z swap row (spirit.upgrade completed) at tl rowid: 94
+2026-11-12T13:11:07.5844542Z MAOS-209 tick lines (tl rowid, hook, counter, child pid):
+2026-11-12T13:11:07.5906168Z MAOS-209 swap-in lines (the successor's pre-warm stderr is drained and dropped by the product): []
+2026-11-12T13:11:07.5906702Z spirit_diagnostic_dropped rows: 0
+2026-11-12T13:11:07.5907350Z counter before the swap row: last N = 80; first tick after it = 81 (N+1); 16 ticks after, consecutive; whole sequence 1..96

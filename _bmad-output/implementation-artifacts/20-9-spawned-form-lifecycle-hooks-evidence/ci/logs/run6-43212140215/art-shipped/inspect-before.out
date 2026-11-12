@@ -1,0 +1,6 @@
+spirit_id: example-spirit-ts
+pid: 1
+boot_nonce: 3998682878064453584
+lifecycle_state: Running
+posture: Assistive
+posture_ceiling: Assistive

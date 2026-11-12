@@ -1,0 +1,18 @@
+1	crypto.provider.selected	{"provider":"ring","version":"0.17.14","source":"config"}
+2	governance:manifest-declaration	{"recorded_at_ns":1794485727803877304,"effective_at_ns":1794485727803877304,"event":{"governance_type":"ManifestDeclaration","spirit_id":"example-spirit-ts","attempt_id":"01M77TYCHV7XC55NC4YC49317G","outcome":"declared","version":"0.1.0","manifest_sha256":"072d:4a18:d7d7:4543:094b:cc18:cb83:42bc:cca6:cd9c:2c9b:0b59:e282:4c16:6984:8a34","publisher":"ffb1:37e9:fd12:a46e:7495:1f1b:dedb:bf10:467b:cf52:fadb:e94a:acce:f2a7:6a2b:4ca0","declared":["explanation_shape","intent_promotion_set","swap_invariants"],"skill_ids":[]}}
+3	lifecycle.admit	{"spirit_id":"example-spirit-ts"}
+4	lifecycle.load	{"lifecycle_event":"Load","spirit_id":"example-spirit-ts","spirit_pid":1}
+5	governance:vetter-key-admission	{"recorded_at_ns":1794485727805534980,"effective_at_ns":1794485727805534980,"event":{"governance_type":"VetterKey","spirit_id":"example-spirit-ts","version":"0.1.0","admitted":true,"effective_tier":"SandboxTier(2)","journal_note":"admission granted"}}
+6	governance:manifest-declaration-outcome	{"attempt_id":"01M77TYCHV7XC55NC4YC49317G","outcome":"admitted"}
+7	lifecycle.start	{"lifecycle_event":"Start","spirit_pid":1}
+8	operator.upgrade.op-6183d2b169855c587cb466cd:upgrade_failed	{"operation_id":"op-6183d2b169855c587cb466cd","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"upgrade_failed"}
+9	operator.upgrade.op-43c0cd9e989c82f939de4c98:upgrade_failed	{"operation_id":"op-43c0cd9e989c82f939de4c98","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"upgrade_failed"}
+10	operator.upgrade.op-ddb54cdd8f1e1fc176b46237:upgrade_failed	{"operation_id":"op-ddb54cdd8f1e1fc176b46237","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"upgrade_failed"}
+11	operator.upgrade.op-741416ada3b7b3ab67a1840c:upgrade_failed	{"operation_id":"op-741416ada3b7b3ab67a1840c","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"upgrade_failed"}
+12	operator.upgrade.op-36cdf2e0e6bb818e17a94c24:upgrade_failed	{"operation_id":"op-36cdf2e0e6bb818e17a94c24","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"upgrade_failed"}
+13	cli.subprocess.exit	{"event":"cli_subprocess_exit","cli_child_pid":16309,"exit_cause":"signaled(sig=15)","is_crash":true}
+14	cap.revoke	
+15	lifecycle.unload	{"lifecycle_event":"Unload","spirit_pid":1}
+16	planned_unload	
+17	planned_unload	{"halt_id":"term-example-spirit-ts-1-1794485752649748576","timestamp_ns":1794485752649748576,"spirit_pid":1,"boot_nonce":948543338410172264,"frame_id":[1,161,207,175,147,73,104,124,222,218,70,118,166,151,31,241],"terminal_state":"Terminated","resolution_kind":"planned_unload","resolution_timestamp_ns":1794485752649748576}
+18	cap.revoke	

@@ -1,0 +1,14 @@
+2026-11-12T13:10:53.2254916Z pid_before="$(field pid)"
+2026-11-12T13:10:53.2270680Z pid_after="$(field pid)"
+2026-11-12T13:11:01.4439575Z pid_before=1
+2026-11-12T13:11:06.5713055Z attempt=1 exit=1 elapsed=5s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+2026-11-12T13:11:11.6341508Z attempt=2 exit=1 elapsed=10s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+2026-11-12T13:11:16.7051234Z attempt=3 exit=1 elapsed=15s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+2026-11-12T13:11:21.7712523Z attempt=4 exit=1 elapsed=20s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+2026-11-12T13:11:26.8331755Z attempt=5 exit=1 elapsed=25s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+2026-11-12T13:11:27.2627653Z attempt=6 exit=1 elapsed=26s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_unsupported: the running Spirit exports no lifecycle (HTTP 500) 
+2026-11-12T13:11:27.2653578Z ready_after_s=26
+2026-11-12T13:11:27.2656445Z upgrade exit=1
+2026-11-12T13:11:27.2669780Z ready_after_s=26
+2026-11-12T13:11:27.4089297Z ready_after_s=26
+2026-11-12T13:11:27.4129878Z ##[notice]the swap-in-less guest was refused spawned_swap_unsupported; the red above is the intended one

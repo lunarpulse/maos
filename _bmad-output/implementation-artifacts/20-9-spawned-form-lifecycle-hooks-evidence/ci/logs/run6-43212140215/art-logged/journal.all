@@ -1,0 +1,3 @@
+{"kind":"lifecycle","timestamp":1794485535047365174,"lifecycle_event":"Load","spirit_id":"example-spirit-ts","effective_sandbox_tier":"T2"}
+{"kind":"lifecycle","timestamp":1794485584820050008,"lifecycle_event":"HotSwap","spirit_id":"example-spirit-ts"}
+{"kind":"lifecycle","timestamp":1794485584,"lifecycle_event":"Upgrade","spirit_id":"example-spirit-ts"}

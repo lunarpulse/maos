@@ -1,0 +1,22 @@
+1	crypto.provider.selected	{"provider":"ring","version":"0.17.14","source":"config"}
+2	governance:manifest-declaration	{"recorded_at_ns":1794485707910902941,"effective_at_ns":1794485707910902941,"event":{"governance_type":"ManifestDeclaration","spirit_id":"example-spirit-ts","attempt_id":"01M77TXS46R54ZT1KCXB2N8JE6","outcome":"declared","version":"0.1.0","manifest_sha256":"072d:4a18:d7d7:4543:094b:cc18:cb83:42bc:cca6:cd9c:2c9b:0b59:e282:4c16:6984:8a34","publisher":"0208:79d7:ce92:0eaa:24e8:cb4b:6171:6769:6e74:315e:bc86:3c27:86c2:8c5b:e746:66d9","declared":["explanation_shape","intent_promotion_set","swap_invariants"],"skill_ids":[]}}
+3	lifecycle.admit	{"spirit_id":"example-spirit-ts"}
+4	lifecycle.load	{"lifecycle_event":"Load","spirit_id":"example-spirit-ts","spirit_pid":1}
+5	governance:vetter-key-admission	{"recorded_at_ns":1794485707912477323,"effective_at_ns":1794485707912477323,"event":{"governance_type":"VetterKey","spirit_id":"example-spirit-ts","version":"0.1.0","admitted":true,"effective_tier":"SandboxTier(2)","journal_note":"admission granted"}}
+6	governance:manifest-declaration-outcome	{"attempt_id":"01M77TXS46R54ZT1KCXB2N8JE6","outcome":"admitted"}
+7	lifecycle.start	{"lifecycle_event":"Start","spirit_pid":1}
+8	operator.upgrade.op-ab64baa993da3e05d7ba81f0:upgrade_failed	{"operation_id":"op-ab64baa993da3e05d7ba81f0","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"upgrade_failed"}
+9	operator.upgrade.op-0cc294f8a7be3e9b973335b4:upgrade_failed	{"operation_id":"op-0cc294f8a7be3e9b973335b4","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"upgrade_failed"}
+10	operator.upgrade.op-1535b18051af4a211d99b411:upgrade_failed	{"operation_id":"op-1535b18051af4a211d99b411","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"upgrade_failed"}
+11	operator.upgrade.op-042ce4c6e05bb372df4c5aa2:upgrade_failed	{"operation_id":"op-042ce4c6e05bb372df4c5aa2","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"upgrade_failed"}
+12	governance:manifest-declaration	{"recorded_at_ns":1794485748509512240,"effective_at_ns":1794485748509512240,"event":{"governance_type":"ManifestDeclaration","spirit_id":"example-spirit-ts","attempt_id":"01M77TZ0RXX93630GXVGT87K4S","outcome":"declared","version":"0.2.0","manifest_sha256":"ca1e:be5e:634b:f5b3:fbec:c12c:0a66:fbb5:2f1d:50e2:9025:8563:7ca6:480c:44d8:e823","publisher":null,"declared":["explanation_shape","intent_promotion_set","swap_invariants"],"skill_ids":[]}}
+13	governance:manifest-declaration-outcome	{"attempt_id":"01M77TZ0RXX93630GXVGT87K4S","outcome":"admitted"}
+14	spirit.upgrade	{"spirit_id":"example-spirit-ts","predecessor_version":"0.1.0","successor_version":"0.2.0","policy":"hot-swap","outcome":"completed","latency_ns":20147128796,"halt_receipts_produced":0}
+15	cli.subprocess.exit	{"event":"cli_subprocess_exit","cli_child_pid":16023,"exit_cause":"exited(code=0)","is_crash":false}
+16	operator.upgrade.op-f60f1c43987f4155150cd834:completed	{"operation_id":"op-f60f1c43987f4155150cd834","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"completed"}
+17	cli.subprocess.exit	{"event":"cli_subprocess_exit","cli_child_pid":16073,"exit_cause":"signaled(sig=15)","is_crash":true}
+18	cap.revoke	
+19	lifecycle.unload	{"lifecycle_event":"Unload","spirit_pid":1}
+20	planned_unload	
+21	planned_unload	{"halt_id":"term-example-spirit-ts-1-1794485753991824146","timestamp_ns":1794485753991824146,"spirit_pid":1,"boot_nonce":3998682878064453584,"frame_id":[1,161,207,175,152,135,1,100,182,88,26,227,149,98,2,105],"terminal_state":"Terminated","resolution_kind":"planned_unload","resolution_timestamp_ns":1794485753991824146}
+22	cap.revoke	

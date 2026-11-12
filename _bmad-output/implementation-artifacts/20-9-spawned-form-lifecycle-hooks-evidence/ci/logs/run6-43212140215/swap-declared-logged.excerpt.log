@@ -1,0 +1,58 @@
+2026-11-12T11:56:32.9417874Z 44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T11:56:32.9429205Z 44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T11:56:32.9432379Z 44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+2026-11-12T11:56:32.9451450Z 63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+2026-11-12T11:59:34.4228704Z 15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+2026-11-12T12:01:30.7519135Z 29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+2026-11-12T12:01:30.7833618Z 13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+2026-11-12T12:01:30.7854024Z 16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+2026-11-12T12:02:20.5269719Z warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+2026-11-12T12:02:20.5274658Z  9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+2026-11-12T12:08:26.8988461Z 44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T12:08:26.9055774Z 44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T12:08:26.9058237Z 44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+2026-11-12T12:08:26.9266496Z 63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+2026-11-12T12:09:48.7258571Z 44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T12:09:48.7288663Z 44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T12:09:48.7300333Z 44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+2026-11-12T12:09:48.7350657Z 63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+2026-11-12T12:10:24.7968851Z 15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+2026-11-12T12:10:33.8419725Z warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+2026-11-12T12:10:33.8478777Z  9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+2026-11-12T12:11:18.7048400Z 44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T12:11:18.7087294Z 44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T12:11:18.7089681Z 44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+2026-11-12T12:11:18.7106359Z 63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+2026-11-12T12:11:22.7308509Z 15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+2026-11-12T12:11:30.2039608Z warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+2026-11-12T12:11:30.2098476Z  9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+2026-11-12T12:11:50.4001334Z 44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T12:11:50.4009868Z 44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T12:11:50.4011403Z 44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+2026-11-12T12:11:50.4021785Z 63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+2026-11-12T12:11:50.4027050Z 15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+2026-11-12T12:11:52.1290038Z warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+2026-11-12T12:11:52.1294115Z  9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+2026-11-12T12:12:06.8434806Z   "$rel/maos-spirit" publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest "v$v.toml" --artifact "$ex/dist/spirit.wasm" --signing-key-env MAOS_SPIRIT_SIGNING_KEY
+2026-11-12T12:12:06.8447511Z pid_before="$(field pid)"
+2026-11-12T12:12:06.8447793Z echo "pid_before=$pid_before"
+2026-11-12T12:12:06.8453236Z   echo "attempt=$attempt exit=$status elapsed=$((SECONDS - start))s: $(head -c 300 swap.out | tr '\n' ' ')"
+2026-11-12T12:12:06.8462198Z echo "upgrade exit=$status"
+2026-11-12T12:12:06.8463200Z pid_after="$(field pid)"
+2026-11-12T12:12:06.8463462Z echo "pid_after=$pid_after"
+2026-11-12T12:12:06.8463738Z test "$pid_before" = "$pid_after"
+2026-11-12T12:12:09.6281613Z   "publish_id": "pub-110",
+2026-11-12T12:12:12.4630569Z   "publish_id": "pub-2846501567",
+2026-11-12T12:12:15.2508434Z pid_before=1
+2026-11-12T12:12:20.3784115Z attempt=1 exit=1 elapsed=5s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+2026-11-12T12:12:25.4488793Z attempt=2 exit=1 elapsed=10s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+2026-11-12T12:12:30.5174222Z attempt=3 exit=1 elapsed=15s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+2026-11-12T12:12:35.5786083Z attempt=4 exit=1 elapsed=20s: maosctl: spirit upgrade — upgrade_failed: successor factory failed: spawned_swap_not_ready: the running Spirit has not finished starting; retry (HTTP 500) 
+2026-11-12T12:13:04.8778840Z attempt=5 exit=0 elapsed=49s: {"spirit_id":"example-spirit-ts","policy":"hot-swap","reports":[{"spirit_id":"example-spirit-ts","predecessor_version":"0.1.0","successor_version":"0.2.0","policy":"hot_swap","outcome":"completed","latency_ns":29235380443,"halt_receipts_produced":0}]} 
+2026-11-12T12:13:04.8812816Z upgrade exit=0
+2026-11-12T12:13:04.9432229Z pid_after=1
+2026-11-12T12:15:11.7354695Z one successor declaration row: ok
+2026-11-12T12:15:11.7567378Z one lifecycle.hot_swap row: ok
+2026-11-12T12:15:11.9007586Z     except ValueError:
+2026-11-12T12:15:12.0104358Z Traceback (most recent call last):
+2026-11-12T12:15:12.0105923Z AssertionError: ('expected exactly one swap-in line', [])

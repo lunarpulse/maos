@@ -1,0 +1,37 @@
+2026-11-12T11:56:29.3315736Z 44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T11:56:29.3326922Z 44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T11:56:29.3329866Z 44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+2026-11-12T11:56:29.3445155Z 63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+2026-11-12T11:59:29.5246144Z 15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+2026-11-12T12:01:24.4796289Z 29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+2026-11-12T12:01:24.6117110Z 13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+2026-11-12T12:01:24.6137820Z 16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+2026-11-12T12:02:14.2398603Z warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+2026-11-12T12:02:14.2426915Z  9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+2026-11-12T12:08:22.5405627Z 44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T12:08:22.5605399Z 44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T12:08:22.5607477Z 44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+2026-11-12T12:08:22.5621157Z 63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+2026-11-12T12:09:42.9225745Z 44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T12:09:42.9376075Z 44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+2026-11-12T12:09:42.9396961Z 44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+2026-11-12T12:09:42.9413031Z 63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+2026-11-12T12:09:57.9006095Z 15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+2026-11-12T12:10:04.4046749Z warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+2026-11-12T12:10:04.4109426Z  9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+2026-11-12T12:11:13.6458974Z maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest examples/example-spirit-ts/manifest.toml --artifact examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
+2026-11-12T12:11:13.6469180Z echo "shell exit status: $shell_status"
+2026-11-12T12:11:13.6470026Z maosctl audit query --intent skill.author.refused:capability-denied > plant-denial.ndjson
+2026-11-12T12:11:13.6472326Z echo "capability-denied row: ok"
+2026-11-12T12:11:13.6473368Z ! grep -F 'session child terminated' shell.log
+2026-11-12T12:11:16.3489879Z   "publish_id": "pub-110",
+2026-11-12T12:11:47.1169883Z maos: installed spirit 'example-spirit-ts' session refused: session child terminated: Exited { code: 4 }
+2026-11-12T12:11:53.7988256Z maos: shell exiting
+2026-11-12T12:11:53.8198220Z shell exit status: 0
+2026-11-12T12:11:53.8637932Z maos: installed spirit 'example-spirit-ts' session refused: session child terminated: Exited { code: 4 }
+2026-11-12T12:11:53.8639484Z maos: shell exiting
+2026-11-12T12:11:53.8644285Z capability-denied row: ok
+2026-11-12T12:11:53.8665598Z maos: installed spirit 'example-spirit-ts' session refused: session child terminated: Exited { code: 4 }
+2026-11-12T12:11:53.8715720Z no exit 101, no panic, no unplanned crash: ok
+2026-11-12T12:11:53.8724359Z {"frame_id":"01a1cfabc68c99c7433aad3c8a851992","timestamp_ns":1794485503628167905,"spirit_pid":1,"boot_nonce":8238722291206745717,"kind":"cli.subprocess.output","intent":"spirit.diagnostic","payload":"{\"event\":\"spirit_diagnostic\",\"child_pid\":15832,\"line\":\"Skill authoring declined: capability-denied \"}"}
+2026-11-12T12:11:53.8726281Z guest console.log after the denied author() reached spirit.diagnostic: ok

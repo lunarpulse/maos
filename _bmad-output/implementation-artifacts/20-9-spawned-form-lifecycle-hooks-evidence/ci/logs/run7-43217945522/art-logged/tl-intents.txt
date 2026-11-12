@@ -1,0 +1,118 @@
+1	crypto.provider.selected	{"provider":"ring","version":"0.17.14","source":"config"}
+2	governance:manifest-declaration	{"recorded_at_ns":1794489006536520690,"effective_at_ns":1794489006536520690,"event":{"governance_type":"ManifestDeclaration","spirit_id":"example-spirit-ts","attempt_id":"01M77Y2EE871HS9YGY6Q73TC7Q","outcome":"declared","version":"0.1.0","manifest_sha256":"072d:4a18:d7d7:4543:094b:cc18:cb83:42bc:cca6:cd9c:2c9b:0b59:e282:4c16:6984:8a34","publisher":"131e:4a0c:217b:9ab3:5d67:d586:de6e:7f85:e162:e9ed:587b:59d7:6e60:5424:3377:4a22","declared":["explanation_shape","intent_promotion_set","swap_invariants"],"skill_ids":[]}}
+3	lifecycle.admit	{"spirit_id":"example-spirit-ts"}
+4	lifecycle.load	{"lifecycle_event":"Load","spirit_id":"example-spirit-ts","spirit_pid":1}
+5	governance:vetter-key-admission	{"recorded_at_ns":1794489006538494862,"effective_at_ns":1794489006538494862,"event":{"governance_type":"VetterKey","spirit_id":"example-spirit-ts","version":"0.1.0","admitted":true,"effective_tier":"SandboxTier(2)","journal_note":"admission granted"}}
+6	governance:manifest-declaration-outcome	{"attempt_id":"01M77Y2EE871HS9YGY6Q73TC7Q","outcome":"admitted"}
+7	lifecycle.start	{"lifecycle_event":"Start","spirit_pid":1}
+8	operator.upgrade.op-d68379f14eabd8072d4cd2fe:upgrade_failed	{"operation_id":"op-d68379f14eabd8072d4cd2fe","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"upgrade_failed"}
+9	operator.upgrade.op-75b6ceb72ab292cdcbc5736d:upgrade_failed	{"operation_id":"op-75b6ceb72ab292cdcbc5736d","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"upgrade_failed"}
+10	operator.upgrade.op-e3ef424a1cd74070ad53665e:upgrade_failed	{"operation_id":"op-e3ef424a1cd74070ad53665e","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"upgrade_failed"}
+11	operator.upgrade.op-70dd16087c41bf2ee1636b71:upgrade_failed	{"operation_id":"op-70dd16087c41bf2ee1636b71","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"upgrade_failed"}
+12	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 1"}
+13	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 idle 2"}
+14	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 3"}
+15	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 4"}
+16	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 5"}
+17	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 6"}
+18	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 7"}
+19	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 8"}
+20	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 9"}
+21	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 10"}
+22	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 11"}
+23	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 12"}
+24	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 13"}
+25	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 14"}
+26	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 15"}
+27	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 16"}
+28	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 17"}
+29	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 18"}
+30	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 19"}
+31	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 20"}
+32	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 21"}
+33	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 22"}
+34	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 23"}
+35	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 24"}
+36	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 25"}
+37	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 26"}
+38	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 27"}
+39	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 28"}
+40	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 29"}
+41	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 30"}
+42	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 31"}
+43	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 32"}
+44	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 33"}
+45	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 34"}
+46	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 35"}
+47	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 36"}
+48	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 37"}
+49	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 38"}
+50	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 39"}
+51	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 40"}
+52	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 41"}
+53	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 42"}
+54	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 43"}
+55	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 44"}
+56	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 45"}
+57	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 46"}
+58	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 47"}
+59	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 48"}
+60	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 49"}
+61	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 50"}
+62	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 51"}
+63	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 52"}
+64	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 53"}
+65	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 54"}
+66	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 55"}
+67	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 56"}
+68	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 57"}
+69	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 58"}
+70	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 59"}
+71	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 60"}
+72	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 61"}
+73	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 62"}
+74	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 63"}
+75	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 64"}
+76	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 65"}
+77	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 66"}
+78	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 67"}
+79	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 68"}
+80	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 69"}
+81	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 70"}
+82	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 71"}
+83	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 72"}
+84	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 73"}
+85	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 74"}
+86	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 75"}
+87	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 76"}
+88	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 77"}
+89	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 78"}
+90	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 79"}
+91	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16274,"line":"MAOS-209 consolidate 80"}
+92	governance:manifest-declaration	{"recorded_at_ns":1794489057153143019,"effective_at_ns":1794489057153143019,"event":{"governance_type":"ManifestDeclaration","spirit_id":"example-spirit-ts","attempt_id":"01M77Y3ZW1Z5G8Y7BV7ADG06PJ","outcome":"declared","version":"0.2.0","manifest_sha256":"ca1e:be5e:634b:f5b3:fbec:c12c:0a66:fbb5:2f1d:50e2:9025:8563:7ca6:480c:44d8:e823","publisher":null,"declared":["explanation_shape","intent_promotion_set","swap_invariants"],"skill_ids":[]}}
+93	governance:manifest-declaration-outcome	{"attempt_id":"01M77Y3ZW1Z5G8Y7BV7ADG06PJ","outcome":"admitted"}
+94	spirit.upgrade	{"spirit_id":"example-spirit-ts","predecessor_version":"0.1.0","successor_version":"0.2.0","policy":"hot-swap","outcome":"completed","latency_ns":30060406892,"halt_receipts_produced":0}
+95	operator.upgrade.op-3af1abcdecf42135198f01bf:completed	{"operation_id":"op-3af1abcdecf42135198f01bf","verb":"upgrade","spirit_id":"example-spirit-ts","outcome":"completed"}
+96	cli.subprocess.exit	{"event":"cli_subprocess_exit","cli_child_pid":16274,"exit_cause":"exited(code=0)","is_crash":false}
+97	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 81"}
+98	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 82"}
+99	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 83"}
+100	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 84"}
+101	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 85"}
+102	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 86"}
+103	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 87"}
+104	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 88"}
+105	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 89"}
+106	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 90"}
+107	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 91"}
+108	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 92"}
+109	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 93"}
+110	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 94"}
+111	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 95"}
+112	spirit.diagnostic	{"event":"spirit_diagnostic","child_pid":16326,"line":"MAOS-209 consolidate 96"}
+113	cli.subprocess.exit	{"event":"cli_subprocess_exit","cli_child_pid":16326,"exit_cause":"signaled(sig=9)","is_crash":true}
+114	cap.revoke	
+115	lifecycle.unload	{"lifecycle_event":"Unload","spirit_pid":1}
+116	planned_unload	
+117	planned_unload	{"halt_id":"term-example-spirit-ts-1-1794489062487710102","timestamp_ns":1794489062487710102,"spirit_pid":1,"boot_nonce":4599136467845516710,"frame_id":[1,161,207,226,20,87,109,54,63,217,47,106,44,92,84,162],"terminal_state":"Terminated","resolution_kind":"planned_unload","resolution_timestamp_ns":1794489062487710102}
+118	cap.revoke	
