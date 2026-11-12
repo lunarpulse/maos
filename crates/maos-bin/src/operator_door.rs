@@ -2385,7 +2385,8 @@ impl DoorInner {
                         ));
                 !retained
                     && (frame.kind == FrameKind::Distillate
-                        || maos_domain::memory::principal_id_occurs(
+                        || maos_kernel_core::iac::TransparencyLogAdapter::subject_in_frame(
+                            frame.kind as i64,
                             &frame.payload_redacted,
                             principal,
                         ))

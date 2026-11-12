@@ -5,6 +5,10 @@
 mod shell_world;
 
 use maos_control::{submit_and_wait, OperatorCommand, OperatorOutcome, SubmitOutcome};
+use maos_domain::cost::{
+    AttributionConfidence, AttributionSource, CostAttributionPayload, CostDimension, CostFrameBody,
+    PrincipalRef,
+};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_kernel_core::iac::FrameKind;
 use shell_world::{kernel_world, regression_door, scheduler_with_hello, KernelWorld};
@@ -389,6 +393,64 @@ fn ac5_replay_invalidates_for_new_matching_frames_and_changed_reason() {
     assert_eq!(changed["replayed"], false);
     let repeat = completed_report(door.as_ref(), principal, Some("new collection"));
     assert_eq!(repeat["operation_id"], changed["operation_id"]);
+    assert_eq!(repeat["replayed"], true);
+
+    // Round 2 (GPT P1): a principal the cost codec journals as `x:` colon-hex is found by the
+    // replay's tail check through the same decoded-value predicate as erasure.
+    let coded = "sk-alice";
+    let first = completed_report(door.as_ref(), coded, None);
+    let cost = CostFrameBody {
+        payload: CostAttributionPayload {
+            schema_version: 2,
+            timestamp_ns: 1,
+            spirit_pid: 7,
+            provider: "provider".into(),
+            model: "model".into(),
+            principal: PrincipalRef::Resolved {
+                principal_id: coded.into(),
+            },
+            attribution_source: AttributionSource::SessionPrincipal,
+            attribution_confidence: AttributionConfidence::Exact,
+            dimensions: [
+                (CostDimension::TokensIn, 50),
+                (CostDimension::TokensOut, 30),
+            ]
+            .into_iter()
+            .collect(),
+        },
+        task_ref: None,
+    };
+    let wire = serde_json::to_vec(&cost).expect("schema-2 cost frame");
+    assert!(
+        !String::from_utf8_lossy(&wire).contains(coded),
+        "the principal travels as colon-hex"
+    );
+    let id = world.transparency_log.insert_kernel_event_returning_id(
+        7,
+        FrameKind::CostAttribution,
+        None,
+        "cost:inference-attribution",
+        &wire,
+    );
+    let fresh = completed_report(door.as_ref(), coded, None);
+    assert_ne!(fresh["operation_id"], first["operation_id"]);
+    assert_eq!(fresh["replayed"], false);
+    let stored = world
+        .transparency_log
+        .query_frame_by_id(id)
+        .expect("cost frame lookup")
+        .expect("the cost frame remains as a redacted row");
+    let stored: CostFrameBody =
+        serde_json::from_slice(&stored.payload_redacted).expect("redacted cost frame");
+    assert_eq!(
+        stored.payload.principal,
+        PrincipalRef::Resolved {
+            principal_id: "[REDACTED]".into()
+        }
+    );
+    assert_eq!(stored.payload.dimensions, cost.payload.dimensions);
+    let repeat = completed_report(door.as_ref(), coded, None);
+    assert_eq!(repeat["operation_id"], fresh["operation_id"]);
     assert_eq!(repeat["replayed"], true);
     rt.block_on(door.drain_started_tasks());
 }

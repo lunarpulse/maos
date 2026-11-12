@@ -2259,7 +2259,7 @@ impl TransparencyLogAdapter {
         Ok(())
     }
 
-    fn subject_in_frame(kind: i64, body: &[u8], subject: &str) -> bool {
+    pub fn subject_in_frame(kind: i64, body: &[u8], subject: &str) -> bool {
         match matches!(kind, 28 | 29).then(|| serde_json::from_slice(body)) {
             Some(Ok(mut value)) => Self::scrub(kind, &mut value, &[subject]),
             _ => principal_id_occurs(body, subject),
@@ -2295,7 +2295,7 @@ impl TransparencyLogAdapter {
             .filter(|(_, ok)| *ok && kind == 28)
             .filter_map(|(p, _)| v.pointer_mut(p).map(|slot| (p, std::mem::take(slot))))
             .collect();
-        let hit = Self::walk(kind, v, who);
+        let hit = Self::walk(kind, v, who, "");
         held.into_iter().for_each(|(p, held)| {
             v.pointer_mut(p)
                 .map(|slot| *slot = held)
@@ -2305,8 +2305,10 @@ impl TransparencyLogAdapter {
     }
 
     /// Value-only erasure: object keys never change; kind 29 reaches only identity and label
-    /// values, kind 28 every value except fixed receipt fields and canonical digests.
-    fn walk(kind: i64, v: &mut serde_json::Value, who: &[impl AsRef<str>]) -> bool {
+    /// values, kind 28 every value except fixed receipt fields and canonical digests. Only the
+    /// cost frame's `principal_id` and `task_ref` (`key`) are codec-encoded and compared decoded;
+    /// every other string, including provider/model labels, is compared as written.
+    fn walk(kind: i64, v: &mut serde_json::Value, w: &[impl AsRef<str>], key: &str) -> bool {
         use maos_domain::cost::decode_identity as plain;
         use maos_domain::memory::principal_id_occurs as seen;
         use serde_json::Value::{Array, Object, String as Text};
@@ -2314,13 +2316,15 @@ impl TransparencyLogAdapter {
         const FIXED: &str = "event kernel_verdict trusted_intent trusted_origin";
         const DIGESTS: &str = "sha256 supersedes schema_content_hash";
         let listed = |names: &str, key: &str| names.split(' ').any(|name| name == key);
+        let coded = kind == 29 && listed("principal_id task_ref", key);
+        let text = |s| if coded { plain(s) } else { s.into() };
         let mut hit = false;
         match v {
-            Text(s) if who.iter().any(|p| seen(plain(s).as_bytes(), p.as_ref())) => {
+            Text(s) if w.iter().any(|p| seen(text(s).as_bytes(), p.as_ref())) => {
                 *s = "[REDACTED]".into();
                 hit = true;
             }
-            Array(a) => a.iter_mut().for_each(|i| hit |= Self::walk(kind, i, who)),
+            Array(a) => a.iter_mut().for_each(|i| hit |= Self::walk(kind, i, w, "")),
             Object(m) => m
                 .iter_mut()
                 .filter(|(k, i)| match kind {
@@ -2329,7 +2333,7 @@ impl TransparencyLogAdapter {
                         listed(FIXED, k) || listed(DIGESTS, k) && Self::is_digest(t)
                     }),
                 })
-                .for_each(|(_, i)| hit |= Self::walk(kind, i, who)),
+                .for_each(|(k, i)| hit |= Self::walk(kind, i, w, k)),
             _ => {}
         }
         hit

@@ -1,0 +1,3 @@
+{"plant":"p1-replay-predicate-raw-bytes","exit":100,"restored_identical":true}
+{"plant":"p2-walker-decodes-every-string","exit":100,"restored_identical":true}
+{"plant":"p3-walker-never-decodes","exit":100,"restored_identical":true}

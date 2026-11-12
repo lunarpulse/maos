@@ -1,0 +1,5 @@
+fmt rc=0
+iac-full rc=0
+bin-focused rc=0
+audit rc=0
+clippy rc=0

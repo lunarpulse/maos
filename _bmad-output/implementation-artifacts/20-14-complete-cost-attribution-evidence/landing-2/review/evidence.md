@@ -35,7 +35,7 @@ Withdrawn wording: "stale scopes are pruned" (production never reaches that case
 
 | Crate | Before | After | Note |
 |---|---:|---:|---|
-| maos-kernel-core tokei / physical | 21201 / 27040 | **21203 / 27043** (+2 / +3) | x2 ceiling 21221, shared STOP 21250 (47 left); net kernel growth +2 (<= +4 STOP); no surface refresh |
+| maos-kernel-core tokei / physical | 21201 / 27040 | **21203 / 27043** (+2 / +3) | x2 ceiling 21221, shared STOP 22000 (797 left; ruling `lim=stop22` 2026-11-12, corrects the stale "21250 / 47 left"); net kernel growth +2 (<= +4 STOP); no surface refresh |
 | maos-capability | 1444 | **1454** | +21 over 1433; the adjudicated figure was 1444: re-adjudication of +10 pending |
 | maos-domain | 10217 | **10274** (+57) | pending adjudication |
 | maos-iac | 8770 | **8771** (+1) | pending adjudication |

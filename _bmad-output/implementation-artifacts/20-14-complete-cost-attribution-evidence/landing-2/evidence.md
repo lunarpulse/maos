@@ -9,7 +9,7 @@
 ## STEP 0 — KT re-cut and re-price (before any repo edit)
 
 `git archive HEAD` copies in `/tmp`, every file touched, `rustfmt`, gates from the copy root (`step0/variant-*.txt`, `step0/prototype-patch.py`).
-Live base **27014 physical / 21181 tokei**, shared STOP 21250 (69 left), ADR-069 alarm 22000.
+Live base **27014 physical / 21181 tokei**, shared STOP 21250 (69 left) at writing; the shared STOP is now 22000 (ruling `lim=stop22`, 2026-11-12), 819 left at 21181; ADR-069 alarm 22000.
 
 | Shape | Kernel | maos-capability | Surface (`check-service-boundary`) |
 |---|---|---|---|
@@ -53,7 +53,7 @@ Logs: `red/`, `plants/` (raw output, command, rc, restore + `cmp` result), `gree
 
 | Pin | Before | After | Ceiling |
 |---|---:|---:|---|
-| kernel tokei / physical | 21181 / 27014 | 21201 / 27040 | x2 21221, STOP 21250 (49 left) |
+| kernel tokei / physical | 21181 / 27014 | 21201 / 27040 | x2 21221, STOP 21250 (49 left at writing; now 22000, ruling `lim=stop22` 2026-11-12) |
 | maos-capability | 1433 | 1444 | pending adjudication (see STEP 0) |
 | maos-bin | 38475 | 38549 (+74) | L2 allowance +250 (D-20-14-09 A) |
 | aggregate / hardfail | 202750 / 202751 | 202855 / 202856 | |

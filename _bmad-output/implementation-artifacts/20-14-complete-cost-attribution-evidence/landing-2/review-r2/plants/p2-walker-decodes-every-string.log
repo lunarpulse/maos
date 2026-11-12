@@ -1,0 +1,127 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `key`
+    --> crates/maos-iac/src/adapter/transparency_log.rs:2311:74
+     |
+2311 |     fn walk(kind: i64, v: &mut serde_json::Value, w: &[impl AsRef<str>], key: &str) -> bool {
+     |                                                                          ^^^ help: if this is intentional, prefix it with an underscore: `_key`
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: `maos-iac` (lib) generated 4 warnings (run `cargo fix --lib -p maos-iac` to apply 4 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.61s
+────────────
+ Nextest run ID 57a58c46-4590-4775-b7c0-da7250aa95d4 with nextest profile: default
+    Starting 2 tests across 1 binary
+        PASS [   0.003s] (1/2) maos-iac::cost_identity_cover_20_14 the_identity_cover_names_every_redaction_prefix_and_what_it_covers_survives_the_filter
+        FAIL [   0.190s] (2/2) maos-iac::cost_identity_cover_20_14 erasure_decodes_only_the_codec_bearing_cost_fields
+  stdout ───
+
+    running 1 test
+    test erasure_decodes_only_the_codec_bearing_cost_fields ... FAILED
+
+    failures:
+
+    failures:
+        erasure_decodes_only_the_codec_bearing_cost_fields
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.19s
+
+  stderr ───
+
+    thread 'erasure_decodes_only_the_codec_bearing_cost_fields' (4168592) panicked at crates/maos-iac/tests/cost_identity_cover_20_14.rs:77:9:
+    assertion `left == right` failed: 61: cost model
+      left: false
+     right: true
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: core::panicking::assert_failed_inner
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+       3: core::panicking::assert_failed::<bool, bool>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+       4: cost_identity_cover_20_14::erasure_decodes_only_the_codec_bearing_cost_fields
+                 at ./tests/cost_identity_cover_20_14.rs:77:9
+       5: cost_identity_cover_20_14::erasure_decodes_only_the_codec_bearing_cost_fields::{closure#0}
+                 at ./tests/cost_identity_cover_20_14.rs:47:56
+       6: <cost_identity_cover_20_14::erasure_decodes_only_the_codec_bearing_cost_fields::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+────────────
+     Summary [   0.190s] 2 tests run: 1 passed, 1 failed, 0 skipped
+        FAIL [   0.190s] (2/2) maos-iac::cost_identity_cover_20_14 erasure_decodes_only_the_codec_bearing_cost_fields
+error: test run failed
+restored identical
