@@ -1,0 +1,70 @@
+{
+  "journal": {
+    "actor": "director",
+    "spirit": "orch-1",
+    "instruction": { "id": 7, "goal": "ship the fix", "enqueued_at_ns": 99 },
+    "token_id_hex": "ab12cd",
+    "token_reason": "compromised",
+    "rows": [
+      {
+        "actor": "director",
+        "target": "orch-1",
+        "capability": "orchestrator.queue",
+        "intent": "queue",
+        "decision": true,
+        "reasoning": "id=7: queued instruction (len=12): ship the fix"
+      },
+      {
+        "actor": "director",
+        "target": "orch-1",
+        "capability": "lifecycle.pause",
+        "intent": "pause",
+        "decision": true,
+        "reasoning": null
+      },
+      {
+        "actor": "director",
+        "target": "orch-1",
+        "capability": "lifecycle.resume",
+        "intent": "resume",
+        "decision": true,
+        "reasoning": null
+      },
+      {
+        "actor": "director",
+        "target": "token:ab12cd",
+        "capability": "token.revoke",
+        "intent": "revoke",
+        "decision": true,
+        "reasoning": "token=ab12cd: compromised"
+      },
+      {
+        "actor": "director",
+        "target": "token:ab12cd",
+        "capability": "token.revoke",
+        "intent": "revoke",
+        "decision": true,
+        "reasoning": null
+      }
+    ]
+  },
+  "buffer": {
+    "capacity": 32,
+    "goal_prefix": "goal-",
+    "overflow_error": "orchestrator buffer at capacity (32); director must wait for Orchestrator to drain",
+    "small_capacity": 2
+  },
+  "registry": {
+    "spirit": "queued-spirit",
+    "other_spirit": "quiet-spirit"
+  },
+  "replay": {
+    "spirit": "replay-spirit",
+    "unqueued_spirit": "unqueued-spirit",
+    "instructions": [
+      { "id": 11, "goal": "alpha", "enqueued_at_ns": 1 },
+      { "id": 12, "goal": "beta", "enqueued_at_ns": 2 },
+      { "id": 13, "goal": "gamma", "enqueued_at_ns": 3 }
+    ]
+  }
+}

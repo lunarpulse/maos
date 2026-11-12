@@ -128,3 +128,7 @@ first segment cites this key with `->` (D11 A). The xtask test constants move wi
 `kernel_pin_content_hash_16_0.rs:34` (95 → 90) and `:820,838,847,858` (27040 → new), `recovery_lane_ceiling_rule.rs:279`
 (`RATIFIED_AT_EASING` lowered to the new ceiling — the freed lines are not growth capacity, §15.5 Decision 2(a),
 `15-full-spectrum-v2-2.md:100`). Unused room is not reserved.
+
+## L1 note — 2026-11-12 (Dev215L1; kernel-free; no grant is used or changed)
+
+L1 (D-21-5-05 A) landed uncommitted until Main commits: `maos_domain::orchestrator::OrchestratorResumePort` (+3 tokei; `maos-domain` 10274 → 10277, aggregate hardfail 203241 → 203244), the equivalence goldens recorded against the unmoved `maos_kernel_core::orchestrator`, and the D-21-5-07 replay-race witness (red on the unmoved code, `#[ignore]`d until L2). **No kernel source line changed**: kernel 27103 physical / 21256 tokei / 95 files, as on the L1 base `d00802aa`. The KP prototype diff still applies to the live tree with only its (now landed) domain hunk excluded (`git apply --check` rc 0); the kernel row figures above are unchanged and still owed at L2 (re-measure at T0). Evidence: `21-5-orchestrator-port-and-move-evidence/landing-1/evidence.md`.

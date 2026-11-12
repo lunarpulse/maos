@@ -12,7 +12,7 @@ review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (
 
 # Story 21.5: Orchestrator port and move — the FR20 buffer leaves the kernel
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Created 2026-11-12 at 0baa76fb (`git log -1 -- crates xtask` = edeedd25; docs-only commits since) by bmad-create-story under the lighter measured creation contract (Create215). Pulled forward by operator ruling `s21` (2026-11-12, `planning-artifacts/decisions-2026-11-12-acceleration.md:34`): 21-5 follows 20-9 as a kernel story. Shared kernel STOP 22000 = ADR-069 alarm (`lim` = stop22, `:36`); envelope 23000. D-21-5-01…14 were PROPOSED at creation and are RULED (ask `d21`, 2026-11-12, accepted as recommended; see Decisions). A dev agent was editing the tree and tracker during creation, so only new files were written; every edit to an existing file is listed in `creation/records-owed.md`. Cites re-read at HEAD on a `git archive` copy (`creation/cites-0baa76fb.md`); kernel, kloc and surface figures by the prebuilt gate binary on reverted prototypes (`creation/measurements.md`). -->
 
@@ -187,6 +187,13 @@ Every AC names a failing-before witness or an equivalence golden, and a plant. *
 2. L1 imports `maos_kernel_core::orchestrator::*`; L2 changes only the import (diff of the test = the `use` lines).
 3. Green at HEAD (this is the baseline, not a red); **plant (local):** change `journal_orchestrator_queue`'s reasoning
    format ⇒ (a) reds; append instead of push-back in `enqueue` ⇒ (b) reds.
+4. **L1 outcome (2026-11-12, Dev215L1; `landing-1/evidence.md`):** the same file also holds the D-21-5-07 replay-race witness
+   `a_producer_racing_resume_neither_overtakes_nor_displaces_the_queue` (a producer racing 200 pause/resume cycles; full queue).
+   It is RED on the unmoved two-lock replay (10 of 10 runs; each accepted producer enqueue is one refused re-enqueue = one lost
+   queued instruction) and committed `#[ignore]`d at L1; L2 removes the attribute and the test must go green (that is AC2.2's
+   failing-before/green-after). The diff of the file at L2 = the `use` lines + that one attribute. Plants run: reasoning format,
+   push-front, replay drop-last, `get` creating a buffer (`landing-1/plants.md`; push-front does not red (c): the replay round trip
+   of a reversed queue coincides, so (c) is planted by the replay drop).
 
 ### L2 — kernel last ◆ FLAG-Winston
 
@@ -260,8 +267,8 @@ Every AC names a failing-before witness or an equivalence golden, and a plant. *
   → `in-progress`. Re-base onto the then-landed pins (20-9 L2, 20-13 KT3, 20-14 corrections); re-measure every cite
   this story touches (rule 9); run `creation/measurements.md` "Not measured here" 1–6. A figure above the ruled
   envelope, or a result contradicting a ruled option, is STOP + D-row.
-- [ ] **T1 — Port and notes (AC4).**
-- [ ] **T2 — Goldens (AC5)** against `maos_kernel_core::orchestrator`, plants.
+- [x] **T1 — Port and notes (AC4).** (L1, 2026-11-12; `crates/maos-domain/src/orchestrator.rs`; PRD `:54,:68`, `4-kernel-design.md:186` dated notes.)
+- [x] **T2 — Goldens (AC5)** against `maos_kernel_core::orchestrator`, plants. (L1: `crates/maos-bin/tests/orchestrator_equivalence_21_5.rs` + fixture; plants `landing-1/plants.md`; plus the D-21-5-07 replay-race witness, red on the unmoved kernel.)
 - [ ] **T3 — L1 landing (D-05 A).** Exact domain pin; `check-kernel-baseline` unchanged; `kloc-check`,
   `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; hosted run on the final tree + plants.
 - [ ] **T4 — Kernel-free red witnesses first (AC2.4 leaf vector, AC3.2)**, then the move (AC2.1–2.3), the control
@@ -389,6 +396,10 @@ ADR-066, ADR-069; 19-6 `r19_6_d04` (`19-6-…md:181`); `epic-15-foundations-w0.m
 
 ## Dev Agent Record
 
+### Agent Model Used
+
+anthropic/claude-opus-5-5 (creation); anthropic/claude-sonnet-5-5 (L1 implementation, Dev215L1, 2026-11-12).
+
 ### Story context creation
 
 Created 2026-11-12 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter measured contract; `Create215`) at
@@ -416,11 +427,23 @@ in-flight pin 27043); `check-decision-register` rc 0 (23 rows, 6 open); `check-e
 
 ### Debug Log References
 
+`21-5-orchestrator-port-and-move-evidence/landing-1/` (`evidence.md`, `plants.md`, `red/`, `plants/`, `gates/`).
+
 ### Completion Notes List
 
+- **2026-11-12 — L1 landed UNCOMMITTED until Main commits (Dev215L1, kernel-free, base `d00802aa`).** Contents: `OrchestratorResumePort` in `maos-domain` (+3 tokei, no dependency added); the AC5 equivalence goldens recorded against the unmoved `maos_kernel_core::orchestrator` (5 green) with a fixture; the D-21-5-07 replay-race witness, **RED on the unmoved replay in 10 of 10 runs (and the first), committed `#[ignore]`d** so hosted CI stays green, L2 removes the attribute when the one-lock replay lands; dated FR20 / FR54 / §4.0.7 notes (no FR text deleted). No kernel source line changed (kernel 27103 / 21256 / 95 files unchanged, `repin.py --check` in sync). Pins: `maos-domain` 10274 → 10277 (+3, inside the D-21-5-12 A ceiling of +6; the script's overdraft flag was adjudicated against that ruling), aggregate hardfail 203241 → 203244. Evidence: `landing-1/evidence.md`.
+- **What L1 taught L2:** see `landing-1/evidence.md` §L2 plan (the lost-instruction race is real; the one-lock replay degenerates to an identity; the `Some(registry)` coercion keeps every `new` call site).
+
 ### File List
+
+- `crates/maos-domain/src/orchestrator.rs` (port)
+- NEW `crates/maos-bin/tests/orchestrator_equivalence_21_5.rs`, `crates/maos-bin/tests/fixtures/orchestrator_equivalence_21_5.json`
+- `xtask/kloc.toml` (domain row, aggregate hardfail; `repin.py`)
+- `_bmad-output/planning-artifacts/prd/functional-requirements.md` (`:54`, `:68`), `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md` (`:186`)
+- NEW `_bmad-output/implementation-artifacts/21-5-orchestrator-port-and-move-evidence/landing-1/`
 
 ## Change Log
 
 - 2026-11-12: Created (`ready-for-dev`, D-21-5-01…14 PROPOSED) at `0baa76fb`; pulled forward by ruling `s21`.
 - 2026-11-12: all fourteen D-rows RULED (ask `d21`, 2026-11-12, accepted as recommended: D01 A, D02 A, D03 A crate `maos-orchestrator-buffer`, D04 A, D05 A, D06 B, D07 B, D08 A ADR-070, D09 A, D10 A, D11 A, D12 A, D13 A key kept in Epic 21 after 20-9, D14 B). Story Status stays `ready-for-dev`. D13 A: `s21` waives the epic-20-retrospective precondition for this key only; `epic-21` → `in-progress`. D14 B: AC6 void; the maos-iac FR21 exemption row re-pointed to ownerless-and-open (operator named no key). Records applied: epic-21 corrections A1–A6, tracker B1–B3, acceleration note C1, deferred-work C2.
+- 2026-11-12: L1 (kernel-free) landed uncommitted (Dev215L1): port, goldens, replay-race witness (red, `#[ignore]`d until L2), PRD/architecture notes; Status `ready-for-dev` → `in-progress`; domain +3 (10277), aggregate hardfail 203244, kernel pins unchanged.

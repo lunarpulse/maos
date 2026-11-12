@@ -31,6 +31,14 @@ pub struct OrchestratorInstruction {
     pub enqueued_at_ns: u64,
 }
 
+/// The one call the kernel's `resume` makes into the Orchestrator buffer
+/// (FR20, FR51 c): replay the instructions buffered for `spirit_id` while the
+/// Spirit was paused. The kernel holds this port, never the buffer
+/// (story 21-5, D-21-5-02 A).
+pub trait OrchestratorResumePort: Send + Sync {
+    fn replay_pending(&self, spirit_id: &str);
+}
+
 impl OrchestratorInstruction {
     /// Construct an instruction. Returns `Err` if `goal` is empty or
     /// whitespace-only — mirrors `Resolution::provided_context`

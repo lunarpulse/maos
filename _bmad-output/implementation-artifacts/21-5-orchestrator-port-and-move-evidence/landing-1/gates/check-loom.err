@@ -1,0 +1,9 @@
+NFR-Test-9 warning: glob import '' at crates/maos-kernel-core/src/capability/cap_audit/mod.rs:9 — cannot verify blocklisted symbols; review manually
+NFR-Test-9 warning: glob import '' at crates/maos-kernel-core/src/capability/working_memory/mod.rs:10 — cannot verify blocklisted symbols; review manually
+NFR-Test-9 warning: glob import '' at crates/maos-kernel-core/src/capability/mod.rs:25 — cannot verify blocklisted symbols; review manually
+NFR-Test-9 warning: glob import '' at crates/maos-kernel-core/src/capability/mod.rs:31 — cannot verify blocklisted symbols; review manually
+NFR-Test-9 warning: glob import '' at crates/maos-kernel-core/src/lifecycle/upgrade.rs:311 — cannot verify blocklisted symbols; review manually
+NFR-Test-9 warning: glob import '' at crates/maos-kernel-core/src/scheduler/verb_resolver.rs:158 — cannot verify blocklisted symbols; review manually
+NFR-Test-9 warning: glob import '' at crates/maos-kernel-core/src/scheduler/control_block.rs:457 — cannot verify blocklisted symbols; review manually
+NFR-Test-9 warning: glob import '' at crates/maos-kernel-core/src/security/manifest.rs:9 — cannot verify blocklisted symbols; review manually
+NFR-Test-9 warning: glob import '' at crates/maos-kernel-core/src/iac.rs:13 — cannot verify blocklisted symbols; review manually

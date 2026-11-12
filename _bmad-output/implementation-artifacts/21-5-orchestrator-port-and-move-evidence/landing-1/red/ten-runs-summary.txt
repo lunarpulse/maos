@@ -1,0 +1,10 @@
+run-1: FAIL [   0.118s] (1/1) maos-bin::orchestrator_equivalence_21_5 a_producer_racing_resume_neither_overtakes_nor_displaces_the_queue | accepted=1703 | refused-reenqueue-lines=1703
+run-2: FAIL [   0.118s] (1/1) maos-bin::orchestrator_equivalence_21_5 a_producer_racing_resume_neither_overtakes_nor_displaces_the_queue | accepted=1659 | refused-reenqueue-lines=1659
+run-3: FAIL [   0.114s] (1/1) maos-bin::orchestrator_equivalence_21_5 a_producer_racing_resume_neither_overtakes_nor_displaces_the_queue | accepted=1685 | refused-reenqueue-lines=1685
+run-4: FAIL [   0.113s] (1/1) maos-bin::orchestrator_equivalence_21_5 a_producer_racing_resume_neither_overtakes_nor_displaces_the_queue | accepted=1788 | refused-reenqueue-lines=1788
+run-5: FAIL [   0.112s] (1/1) maos-bin::orchestrator_equivalence_21_5 a_producer_racing_resume_neither_overtakes_nor_displaces_the_queue | accepted=827 | refused-reenqueue-lines=827
+run-6: FAIL [   0.115s] (1/1) maos-bin::orchestrator_equivalence_21_5 a_producer_racing_resume_neither_overtakes_nor_displaces_the_queue | accepted=1787 | refused-reenqueue-lines=1787
+run-7: FAIL [   0.124s] (1/1) maos-bin::orchestrator_equivalence_21_5 a_producer_racing_resume_neither_overtakes_nor_displaces_the_queue | accepted=1785 | refused-reenqueue-lines=1785
+run-8: FAIL [   0.121s] (1/1) maos-bin::orchestrator_equivalence_21_5 a_producer_racing_resume_neither_overtakes_nor_displaces_the_queue | accepted=573 | refused-reenqueue-lines=573
+run-9: FAIL [   0.122s] (1/1) maos-bin::orchestrator_equivalence_21_5 a_producer_racing_resume_neither_overtakes_nor_displaces_the_queue | accepted=1647 | refused-reenqueue-lines=1647
+run-10: FAIL [   0.117s] (1/1) maos-bin::orchestrator_equivalence_21_5 a_producer_racing_resume_neither_overtakes_nor_displaces_the_queue | accepted=1779 | refused-reenqueue-lines=1779
