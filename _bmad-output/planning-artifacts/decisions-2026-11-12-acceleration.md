@@ -37,6 +37,8 @@ Earlier same-day pointer: scope ruling commit `9e4be177` (`ga` = boundary, `rc` 
 8. **`r1` = rescope** (ask 2026-11-12, after the Epic 20 closure audit) — Story 20-7 closes at L1 plus the rc waiver. Its L2 (T12 shadow, T13 bind, AC2, AC11) and every stable-runner-only row move to the named UNCLAIMED row `ops-stable-perf-runner` as the claim boundary "perf verdicts ABSENT; no stable-runner timing claim". The 20-7-owned flake rows are dispositioned as hosted-runner timing noise with their same-line citations. Not a widening of any time budget.
 9. **`r2` = yes** — Agents may dispatch the T3 `fuzz-prerelease` chain (24 h+ hosted job) at the rc candidate SHA with the `gh` token. Hosted minutes only.
 10. **`r3` = ask** — The signed rc tag `v1.0.0-rc.1` is NOT pushed by an agent without a per-event ask (a tag push is a release act; signing runs in CI via `release.yml`).
+11. **`q20` = supersede** (ask 2026-11-12) — The `q` clause "20-1b stays not `done`" is superseded for the rc: 20-1b closes after its hosted legs, the quarantine gaps move to a NEW post-rc backlog key `later-registry-quarantine-closure` (not a `20-*` key). Claim text: FR13 = capability-mediated fence only, not isolation; private/shared memory writes, scalar mutation, native IAC/IO, hooks and telemetry are NOT fenced; per-pid in memory; no release verb; I5 FR13 stays `asserted`.
+12. **`p4` = accept** (ask 2026-11-12) — Exception for 20-4: the green hosted discipline run 43150757804 (199/199 on d00802aa, descendant of 251dc692) substitutes for local `prepush` and is the final-tree proof.
 
 ## ADR-069 consequence (STOP now equals the alarm)
 
