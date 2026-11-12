@@ -1,0 +1,62 @@
+name: ci-20-13-verify
+# Branch-only operator recipe; not installed on main and not a hosted-pass claim.
+on:
+  push:
+    branches: ['ci/20-13-verify']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hermetic:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - uses: ./.github/actions/provision-t3-test-substrate
+        if: ${{ !endsWith(matrix.image, '-arm') }}
+      - name: Fixtures and witnesses
+        run: |
+          set -euo pipefail
+          cargo test --locked -p maos-bin --bin maos --features crypto-recording story_13_5a_enterprise_governance_reaches_the_booted_cohort_daemon
+          cargo nextest run --locked -p maos-bin --bin maos --features crypto-recording --profile ci crypto_provider_one_boot_reaches_all_four_surfaces
+          cargo nextest run --locked -p maos-bin --features crypto-recording --profile ci --test crypto_t3_admission_20_13
+          if cargo check --locked --release -p maos-bin --lib --features crypto-recording > "$RUNNER_TEMP/crypto-release.log" 2>&1; then
+            echo "recording provider unexpectedly compiled in release" >&2
+            exit 1
+          fi
+          grep -F "crypto-recording is dev/CI-only" "$RUNNER_TEMP/crypto-release.log"
+          cargo build --locked --release -p maos-bin
+          cargo run --locked -p xtask -- check-mock-not-in-release --binary target/release/maos --json
+          cargo run --locked -p xtask -- build-test-fixtures
+          cargo build --locked -p maos-bin -p maos-cli
+          cargo nextest run --locked -p maos-bin --test crypto_provider_20_13 --profile ci --test-threads 1
+          cargo nextest run --locked -p maos-bin --test crypto_real_shell_20_13 --test crypto_real_boot_20_13 --profile ci --test-threads 1
+          if [[ "${{ matrix.image }}" != *-arm ]]; then
+            cargo nextest run --locked -p maos-bin --test crypto_provider_t3_20_13 --profile ci --test-threads 1
+          fi
+          for gate in check-env-contract check-service-boundary check-composition-root-completeness kloc-check check-kernel-baseline; do
+            cargo run --locked -p xtask -- "$gate" --json
+          done
+  apple-check:
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --locked --workspace --all-targets --target aarch64-apple-darwin
