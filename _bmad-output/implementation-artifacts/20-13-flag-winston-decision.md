@@ -72,3 +72,5 @@ maos-cli 6612 unchanged; **maos-bin 38556 -> 38563 (+7)**, an overdraft over the
 **Landing:** the L1 pending gate entry (`pending_t3` / `security_impl` visitor state) is removed; the structural
 check now refuses every production `RingCryptoProvider` naming outside its allowlist, `security/mod.rs`
 included. Evidence, witnesses and plants: `20-13-pluggable-crypto-provider-selection-evidence/landing-2/evidence.md`.
+
+**Adjudication (2026-11-12, Main):** the maos-bin +7 overdraft (38,556 -> 38,563) recorded at the L2 landing `998b36e6` is adjudicated as the cost of migrating the four `main.rs` `SecurityManagerAdapter` call sites; the kernel stays +1/-1 (27,044 physical / 21,202 tokei, below STOP 22,000).

@@ -662,6 +662,8 @@ anthropic/claude-opus-5-5 (creation).
 
 ### Completion Notes List
 
+- 2026-11-12 (L2 landing `998b36e6`, independent GPT + GLM reviews at `20-13-pluggable-crypto-provider-selection-evidence/landing-2/review/`, 0 P0-P2): the maos-bin +7 overdraft (38,556 -> 38,563) is ADJUDICATED by Main 2026-11-12 as the cost of migrating the four `main.rs` `SecurityManagerAdapter` call sites. Operator severity ruling: the two P3 hardening findings (F1 adapter exempt from the exactly-one-construction gate; F2 naming-ban scan coverage) are recorded as rule-10 rows in `deferred-work.md`. Story NOT complete; owed per the GPT review: AC7.2 bin-side recording proof of kernel admission (the Worker recording test is not a substitute); hosted T3/container admission, final-tree hosted discipline, `abi-diff` and `prepush` unverified; the bin/escape suite is not wholly green (million-row erasure failure persists after the dependency-corrected rerun). Evidence precision: the surface reports contain 401 items, not 400.
+
 ### File List
 
 ## Change Log
@@ -673,3 +675,5 @@ anthropic/claude-opus-5-5 (creation).
   sign/verify/seal files besides the provider; the audit sealed export signs, it does not encrypt; the FR38 crypto drift check
   is vacuous. Kernel KT3 +1/−1 recommended (KT1 +20/+14, KTd +11/+6, KI +19/+18, KO +38/+37 priced by reverted prototype);
   out-of-kernel measured bin +188, shell +46, compliance +22, registry +21, xtask +59.
+
+- 2026-11-12: L2 kernel landing `998b36e6` reviewed (GPT, GLM; 0 P0-P2, two P3 deferred rows); maos-bin +7 overdraft adjudicated by Main as the cost of migrating the four `main.rs` call sites; AC7.2 bin-side recording proof, hosted admission, `abi-diff` and `prepush` still owed; surface reports hold 401 items, not 400.
