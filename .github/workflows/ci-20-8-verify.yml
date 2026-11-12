@@ -126,11 +126,11 @@ jobs:
           maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest examples/example-spirit-ts/manifest.toml --artifact examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
           maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
           boot() {
-            # $1 = systemd unit name. Delegated T2 service, exactly the 17-3c / epic-20-exit launch.
-            printf '@example-spirit-ts hello\n' | sudo systemd-run --unit="$1" --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$out" "$out/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" PATH="$PATH" MAOS_NOTIFY_DISABLE=1 MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$out/crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json" "$target/release/maos" shell --plain
+            # The delegated script accepts only the unit `maos-17-3c-proof`; it is reused (--collect).
+            printf '@example-spirit-ts hello\n' | sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$out" "$out/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" PATH="$PATH" MAOS_NOTIFY_DISABLE=1 MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$out/crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json" "$target/release/maos" shell --plain
           }
           set +e
-          boot maos-20-8-proof 2>&1 | tee shell.log
+          boot 2>&1 | tee shell.log
           shell_status=${PIPESTATUS[0]}
           set -e
           echo "shell exit status: $shell_status"
@@ -200,7 +200,7 @@ jobs:
           p.write_text(s.replace('preserve = ["example-state"]','preserve = ["tampered"]'))
           PY
             set +e
-            boot maos-20-8-tamper > tamper.log 2>&1
+            boot > tamper.log 2>&1
             set -e
             cat tamper.log
             grep -F 'refused at boot: admission_refused' tamper.log
