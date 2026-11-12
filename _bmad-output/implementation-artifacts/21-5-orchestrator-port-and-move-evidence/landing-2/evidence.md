@@ -105,3 +105,9 @@ Story (tasks, Completion Notes, File List, Change Log; Status stays `in-progress
 ## Not verified / open
 
 Hosted run; the review; the full workspace nextest (ACCEPTED PROCESS: hosted CI authoritative); `prepush`; `abi-diff`; a real second-tree failing-before of the kernel vector at HEAD (compile-level argument only).
+
+## Review dispositions (commit `637721bf`, 2026-11-12)
+
+Reviews persisted verbatim: `review/gpt-review.md` (GPT gpt-6.1-sol: 0 P0-P3) and `review/glm-security-review.md` (GLM glm-5.3: 0 P0-P2, 3 P3: F1 FR54 gateway host with allow-all stubs in the unfrozen leaf, F2 journal writers left the kernel freeze gates, F3 `resume` skips replay when the port is `None`).
+
+Under the operator's accepted severity policy (`decisions-2026-11-12-acceleration.md` ruling 3) the three P3 are rule-10 deferred rows, no correction round: `deferred-work.md`, section "Observed during: 21-5 L2 review (2026-11-12, commit 637721bf)" (three rows, each "ownerless and open" with a disposition, fix sketch, trigger). The hosted run for `637721bf` is pending; `done` is NOT claimed.
