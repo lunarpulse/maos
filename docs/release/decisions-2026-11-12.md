@@ -27,6 +27,21 @@ section and decision rows D-20-5-17…20 are the register of record).
   > the private key. The enforcement for "only the key holder" would be protecting the
   > `release` environment (required reviewers); it is **UNCLAIMED**, as is any
   > cryptographically signed Git tag.
+  >
+  > **Dated note 2026-11-12 (operator ruling 13, `r3` answered; the notes above are kept as
+  > written):** the operator's free text "완료되면 태그 push" ("push the tag when it is
+  > complete"; `_bmad-output/planning-artifacts/decisions-2026-11-12-acceleration.md` item 13)
+  > authorizes the orchestrator to cut and push exactly one ordinary tag, `v1.0.0-rc.1`, once
+  > the whole `tag-procedure.md` pre-tag checklist is green at the candidate SHA (conditions
+  > a-e in item 13). That explicit per-tag authorization is how the key-holder **policy** above
+  > is satisfied for this tag; it is not an enforcement change. There is still no Git tag
+  > signature (the tag is an ordinary `git tag`); artifact signing (`SHA256SUMS`,
+  > `SHA256SUMS-packages`) runs in CI with the secret-held `RELEASE_SIGNING_KEY`; `release`
+  > environment protection stays **UNCLAIMED**. Force push, moving, deleting or re-cutting the
+  > tag, any other tag and history rewrite remain per-event asks. At the time of this note the
+  > hosted discipline run for the candidate SHA, the `release.yml` step-6b rehearsal and the T3
+  > `fuzz-prerelease` chain are **not yet run**; the final run ids and the tag result are
+  > recorded in a post-tag record commit.
 
 - **The rc ships with perf verdicts ABSENT (rc = b, D-20-5-09 B).** The 20-7 L2 binding phase
   needs a bare-metal `maos-perf` runner; it stays a named, **UNCLAIMED** row. Money, account

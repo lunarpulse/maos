@@ -34,6 +34,22 @@ tag=v1.0.0-rc.1   # example; must equal "v" + [workspace.package].version in Car
 > and publication without holding the private key. Protecting the `release` environment
 > (required reviewers) is the enforcement and is **UNCLAIMED**; do not describe this tag as
 > a cryptographically signed Git tag.
+>
+> **Dated note 2026-11-12 (operator ruling 13; the notes above are kept as written):** the
+> operator's free text "완료되면 태그 push" ("push the tag when it is complete";
+> `_bmad-output/planning-artifacts/decisions-2026-11-12-acceleration.md` item 13) authorizes
+> the orchestrator to run "Cut the tag" for `v1.0.0-rc.1` and push that one ordinary tag once
+> every pre-tag checklist step is green at the candidate SHA (item 13 conditions a-e: the
+> candidate is the `origin/main` tip and `main` has not moved since the T3 dispatch;
+> discipline `aggregate` green for the SHA; one `fuzz-prerelease.yml` run at the SHA green
+> with `t3-ledger-collect` and `check-release-precondition` green against the real ledger;
+> `cargo metadata --locked --offline`, `stability-matrix --check` and
+> `check-rc-readiness --tag v1.0.0-rc.1` green; the step-6b `release.yml` rehearsal green
+> including `aarch64-apple-darwin`). Any red or skipped condition means no tag. That
+> explicit per-tag authorization satisfies the key-holder policy for this tag only; no Git
+> tag signature is created or verified, artifact signing runs in CI, and `release`
+> environment protection stays **UNCLAIMED**. Force push, moving, deleting or re-cutting the
+> tag, other tags and history rewrite remain per-event asks.
 
 ## Pre-tag checklist
 

@@ -24,7 +24,13 @@ Thus C is below shared STOP 21250; the frontmatter/Kernel table/cumulative parag
 no alternative is newly granted by the STOP change.
 
 
-Status: in-progress
+Status: done
+
+**Closure — 2026-11-12 (records closure; `Close205Records`).** The L2 code landed in `23b2200b`; the closure note
+`20-5-v1-0-rc-tag-and-lts-rule-evidence/closure/closure-note.md` carries the AC-by-AC table and the claim boundaries.
+`done` here means the story's engineering scope and its independent reviews are complete. It does NOT mean the tag
+exists: the hosted discipline runs, the `release.yml` rehearsal, the T3 chain, the tag push and the `release`
+environment protection are recorded there as UNVERIFIED / UNCLAIMED.
 
 <!-- Created 2026-11-04 at 73e7afbc (main; `git log -1 -- crates xtask` = 73e7afbc) by bmad-create-story under the lighter measured creation contract (`Create205`). Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30); 20-3a Q3 (2026-10-15: the rc-tag T3 precondition is routed here); 17-1 Q8 (2026-10-07: the `[cli_wrapper]` schema version is owned here); D-18-0-03 (2026-10-24: the deny ignore re-check is owned here). D-20-5-01…16 were ruled as recommended by the operator on 2026-11-04 (ask d205); grants bind at dev start and re-base onto the then-landed exact pins. No cargo ran: cites re-read at HEAD (`creation/cites-73e7afbc.md`); kernel and kloc by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`); ledger, tag, secret and run facts read-only (`creation/cites-73e7afbc.md` §O). Stale E20 §20-5 cites corrected in place (`creation/records-owed.md` §A). -->
 
@@ -400,12 +406,19 @@ run. No AC needs a secret, a tag or a dispatch.)*
 - [x] **T3 — T3 precondition (AC4).** Leg, `release.yml`, `fuzz-prerelease.yml` trigger, procedure, vectors, plant. *(L1 done; hosted run and the operator's chain unverified.)*
 - [x] **T4 — Readiness (AC5).** Command, release wiring, fixtures, plant. *(L1 done.)*
 - [x] **T5 — Docs truth + deny record (AC6, AC7).** *(L1 done.)*
-- [ ] **T6 — L1 landing.** Exact pins inside the ruled envelope; `check-kernel-baseline` unchanged; `kloc-check`,
+- [x] **T6 — L1 landing.** Exact pins inside the ruled envelope; `check-kernel-baseline` unchanged; `kloc-check`,
   `check-abi-ratification`, `check-dev-record-completeness`, `check-epic-close-coherence`, `check-exit-commands`,
   `check-decision-register`, `prepush`; one hosted discipline run on the final tree + plants. No commit or push without
   the operator.
-- [ ] **T7 — L2 (AC1, AC8, AC9)** when every other `20-*` key is `done`: re-base ceilings, version bump, lock,
+- [x] **T7 — L2 (AC1, AC8, AC9)** when every other `20-*` key is `done`: re-base ceilings, version bump, lock,
   STABILITY, notes, readiness green, precondition refusal recorded, records. Hand the tag to `ops-rc-signed-tag`.
+  *(Ticked 2026-11-12 at the records closure, with these exact limits. T6: L1 landed in `0e455c4e` + `e322c7ad`
+  (exact pins, local gates and plants in `landing-1/` and `landing-1/review-corrections/`); its clause "one hosted
+  discipline run on the final tree" is NOT met by any run this record cites. T7: version bump, five lock files,
+  STABILITY, notes, the precondition refusal (`landing-1/ac4-6-real-ledger.log`, SHA `f56959c2`) and the records are
+  done in `23b2200b` + this closure; "readiness green" is not claimed: the prebuilt `check-rc-readiness --json` read
+  on 2026-11-12 was red only on `epic-20-stories` (20-9 in-progress), and the candidate's own run is saved by the
+  orchestrator at `closure/rc-readiness-final.json`. The tag itself belongs to `ops-rc-signed-tag`.)*
 
 ## Dev Notes
 
@@ -592,9 +605,97 @@ xtask: `src/{check_rc_readiness (new),check_release_precondition,stability_matri
 
 ### Completion Notes List
 
+**Landings (chronological).** L1 kernel-free AC2-AC7 (`0e455c4e`) and its review corrections (`e322c7ad`) are recorded
+above and in `landing-1/`. Landing 2 (`d00802aa`, `Dev205L2`, ruling alignment; `landing-2/evidence.md`): the perf
+leg of `check-release-precondition`, `check-rc-readiness` leg 6 `perf-verdict-label`, the labelled `release`
+environment WARN, the `-rc.N`-only 20-7 waiver, STABILITY generator wording, dated ruling notes. Landing 3 (this
+closure's base `23b2200b`, `FixRel205`): the correction round for the landing-2 review plus the L2 version bump.
+
+**L2 as committed in `23b2200b`** (`git show --stat 23b2200b`, 29 files): workspace version `0.1.0-alpha.1` ->
+`1.0.0-rc.1` (`Cargo.toml:68`, root `Cargo.lock` 48 lines, the four standalone locks `crates/maos-domain/fuzz`,
+`crates/maos-exec-deps/fuzz`, `crates/maos-manifest/fuzz`, `.../equiv-fixture/native-twin`); `STABILITY.md`
+regenerated; `release.yml` publishes the notes file as `body_path` (`docs/release/${{ github.ref_name }}.md`) with an
+rc-only guard that fails loudly when the file is missing or empty, `prerelease: contains(github.ref_name, '-')`
+retained; docs-site `abi-stability.md` version rows (EN + KO); `SECURITY.md:56,60` LTS wording (1 year from `v1.0.0`;
+the 2-year term is a v1.5 decision); PRD DELTA; `docs/release/v1.0.0-rc.1.md` with the exact lines
+`Perf verdicts: ABSENT` and `Release environment protection: NOT PROVISIONED`.
+
+**Review-correction round (landing 3; `landing-3/README.md`).** F1 (P2): the `perf-ledger` BRANCH lookup is judged
+alone, only its `HTTP 404` yields an empty ledger, any later `contents/ledger.jsonl` failure refuses. F2 (P2): a new
+rc-only step reconciles the `Perf verdicts: ABSENT` notes label with the computed verdicts (an ABSENT label plus any
+PASS/FAIL/INDETERMINATE row refuses). F3 (P3): the dated notes state that key-holder-only tagging is policy, not
+enforcement, and that `release` environment protection is UNCLAIMED. A SHA-prefix witness was added to the T3 tests.
+Witnesses are executed-shell tests in `xtask/tests/release_gates_20_5r1.rs` and `release_precondition_t3_20_5.rs`:
+7 failing before the fix (`landing-3/failing-before.log`), 76/76 focused passing (`landing-3/final-focused.log`),
+four mutation records (`landing-3/plants/p1..p4`, each restored copy-back + `cmp` + `touch`), `repin-check.log`
+PINS IN SYNC, no xtask source changed in landing 3.
+
+**Independent reviews (substitution disclosed).** The GLM quota is exhausted until 2026-11-15, so the landing-2 and
+final reviews ran on the GPT `reviewer`, a different model family from the Anthropic implementer.
+`landing-2/review/gpt-review.md`: P0 0, P1 0, P2 2 (F1, F2), P3 1 (F3), all fixed in landing 3.
+`landing-3/review/gpt-review-final.md`: P0 0, P1 0, P2 0, one P3 (stale docs-site version rows), fixed in `23b2200b`.
+That review also records that the aggregate-shell harness stubs `cargo` and is not an end-to-end release test.
+
+**Rulings used.** `decisions-2026-11-12-acceleration.md` items 8-13: item 9 (`r2`) lets agents dispatch the T3 chain;
+item 13 (operator, "완료되면 태그 push") lets the orchestrator push the ordinary tag `v1.0.0-rc.1` once the whole
+pre-tag checklist is green at the candidate SHA (a-e); anything else stays a per-event ask. Dated notes in
+`docs/release/decisions-2026-11-12.md` and `tag-procedure.md` record it.
+
+**NOT done / NOT verified at this record (never claimed):** the hosted discipline run for `23b2200b` and for the final
+candidate SHA; `release.yml` has never run hosted at the rc version (step-6b rehearsal pending); the T3 `fuzz-prerelease`
+chain at the candidate SHA (about 26 h [INFERENCE]; the only prior dispatch, run 38926626626 of 2026-10-16, failed);
+the tag push; `release` environment protection (UNCLAIMED); perf verdicts (ABSENT by ruling rc = b); real `gh` 404/403
+error text (stubbed in the harness); `python3` on the hosted runner (assumed); the ABI ratification row (`proposed`).
+The candidate's `check-rc-readiness --tag v1.0.0-rc.1 --json` is saved by the orchestrator at
+`20-5-v1-0-rc-tag-and-lts-rule-evidence/closure/rc-readiness-final.json` (not authored here). The final hosted run ids,
+the chain run id and the tag result go in a post-tag record commit.
+
+**Deferred rows (rule 10)** re-derived at the closure: `[cli_wrapper]` schema, published examples and variant routes
+rows CLOSED (local evidence); NFR-Maint-6 row re-owned to `ops-ga-tag-after-holds`; zbus ignores, binary-size
+attribution dispositioned; F13 and the ledger follow-up re-owned to `ops-provisioning-secrets-and-accounts`;
+`check-rc-readiness` hosted-run row re-owned to `ops-rc-signed-tag`; a new row tracks the proposed ABI ratification.
+Table in the closure note.
+
 ### File List
 
+- .github/workflows/release.yml (modified, 23b2200b)
+- Cargo.toml (modified, 23b2200b)
+- Cargo.lock (modified, 23b2200b)
+- crates/maos-domain/fuzz/Cargo.lock (modified, 23b2200b)
+- crates/maos-exec-deps/fuzz/Cargo.lock (modified, 23b2200b)
+- crates/maos-manifest/fuzz/Cargo.lock (modified, 23b2200b)
+- crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.lock (modified, 23b2200b)
+- STABILITY.md (modified, 23b2200b)
+- SECURITY.md (modified, 23b2200b)
+- docs-site/docs/migrate/abi-stability.md (modified, 23b2200b)
+- docs-site/i18n/ko/docusaurus-plugin-content-docs/current/migrate/abi-stability.md (modified, 23b2200b)
+- docs/release/decisions-2026-11-12.md (modified, 23b2200b and this closure)
+- docs/release/tag-procedure.md (modified, 23b2200b and this closure)
+- docs/release/v1.0.0-rc.1.md (modified, 23b2200b)
+- xtask/tests/release_gates_20_5r1.rs (modified, 23b2200b)
+- xtask/tests/release_precondition_t3_20_5.rs (modified, 23b2200b)
+- _bmad-output/planning-artifacts/prd/developer-tool-specific-requirements.md (modified, 23b2200b)
+- _bmad-output/implementation-artifacts/20-5-v1-0-rc-tag-and-lts-rule-evidence/landing-2/review/gpt-review.md (new, 23b2200b)
+- _bmad-output/implementation-artifacts/20-5-v1-0-rc-tag-and-lts-rule-evidence/landing-3/ (new: README.md, failing-before.log, final-focused.log, gates.log, green-focused.log, repin-check.log, plants/, review/gpt-review-final.md)
+- _bmad-output/implementation-artifacts/20-5-v1-0-rc-tag-and-lts-rule-evidence/closure/closure-note.md (new, this closure)
+- _bmad-output/implementation-artifacts/20-5-v1-0-rc-tag-and-lts-rule.md (modified, this closure)
+- _bmad-output/implementation-artifacts/sprint-status.yaml (modified, this closure: the 20-5 and `ops-rc-signed-tag` lines only)
+- _bmad-output/implementation-artifacts/deferred-work.md (modified, this closure: rows owned by 20-5)
+
+### Review Findings
+
+| # | Finding | Severity | Status | Resolution |
+|---|---|---|---|---|
+| L2-F1 | perf-ledger fetch treated any failure as an empty ledger | P2 | closed | fixed in landing 3; `.github/workflows/release.yml`; witnesses `xtask/tests/release_gates_20_5r1.rs`, plants p1 and p4 red |
+| L2-F2 | rc notes `Perf verdicts: ABSENT` label not reconciled with computed verdicts | P2 | closed | fixed in landing 3; `.github/workflows/release.yml`; `xtask/tests/release_gates_20_5r1.rs`, plants p2 and p3 red |
+| L2-F3 | "needs the key holder" described as enforcement | P3 | closed | dated notes in `docs/release/decisions-2026-11-12.md` and `docs/release/tag-procedure.md`; `docs/release/v1.0.0-rc.1.md` |
+| L2-final-P3 | stale docs-site version rows | P3 | closed | fixed in 23b2200b; `docs-site/docs/migrate/abi-stability.md` (EN and KO) |
+| L1-GPT | 3 P2 (clock tag, recipe build/exit status, recipe tests) | P2 | closed | fixed in `e322c7ad` with failing-before + plants; `.github/workflows/release.yml`; `landing-1/review-corrections/evidence.md` |
+| L1-GLM | 1 HIGH, 4 MEDIUM, 4 LOW, 1 INFO | HIGH | deferred (part fixed in `e322c7ad`; remainder rows in `deferred-work.md`) | dispositions in `landing-1/review-corrections/evidence.md`; open rows owned by `ops-provisioning-secrets-and-accounts` |
+
 ## Change Log
+
+- 2026-11-12: **Story closed (`done`)** (`Close205Records`): L2 code landed in `23b2200b` (workspace 1.0.0-rc.1, five lock files, STABILITY, release.yml notes `body_path` + rc-only guard, review fixes F1/F2/F3); GPT reviews (landing-2: 2 P2 + 1 P3 fixed; final: 0 P0-P2 + 1 P3 fixed); closure note with the AC table and claim boundaries; deferred rows re-derived; dated notes for ruling 13 (orchestrator pushes the ordinary tag after the pre-tag checklist). Hosted runs, rehearsal, T3 chain, tag and environment protection NOT done (recorded UNVERIFIED/UNCLAIMED).
 
 - 2026-11-11: **L1 review corrections** (Dev205L1): GPT 3 P2 and GLM 1 HIGH / 4 MEDIUM / 4 LOW / 1 INFO dispositioned (fixed with failing-before + plants, or deferred with rows); tag classification and main-ancestry added to `release.yml`; readiness now audits the release-environment row; recipe rewritten and executed in tests; xtask 45333, aggregate 202018.
 
