@@ -70,14 +70,14 @@ jobs:
       - name: Build the test fixtures (probe guests, runner, maosctl; xtask build-test-fixtures)
         run: cargo run --locked -p xtask -- build-test-fixtures
       - name: AC1 runner and WIT corpus (maos-wasm-host)
-        run: cargo nextest run --locked -p maos-wasm-host --no-fail-fast --test wit_corpus --test lifecycle_runner_20_9 --test guest_stdio_t2_20_9
+        run: cargo nextest run --locked --color never -p maos-wasm-host --no-fail-fast --test wit_corpus --test lifecycle_runner_20_9 --test guest_stdio_t2_20_9
       - name: AC2-AC5 triggers, swap, cold swap and the real door (maos-bin, wasm-host)
         shell: bash
         env:
           MAOS_17_2_CGROUP_MODE: undelegated
         run: |
           set -euo pipefail
-          cargo nextest run --locked -p maos-bin --features maos-bin/wasm-host --no-fail-fast \
+          cargo nextest run --locked --color never -p maos-bin --features maos-bin/wasm-host --no-fail-fast \
             --test spawned_lifecycle_20_9 --test spawned_swap_20_9 --test spawned_door_20_9 \
             --test spawned_installed_20_9 \
             --test hook_pump_17_4 --test wasm_form_admission_17_3b --test one_daemon_one_door_16_1 2>&1 | tee nextest-bin.log
@@ -163,6 +163,9 @@ jobs:
           # Positive: the guest's console.log after the denial reached the journal.
           grep -F 'Skill authoring declined' diagnostics.ndjson
           echo "guest console.log after the denied author() reached spirit.diagnostic: ok"
+          # Observed, not asserted (see run record): how the session ended, if it did.
+          echo "--- session end observed"; grep -F 'session child terminated' shell.log || echo "(no session termination line)"
+          grep -F -o 'maos-wasm-runner: OutOfFuel' diagnostics.ndjson | head -1 || true
           test "$shell_status" -eq 0
       - uses: actions/upload-artifact@v4
         if: always()
@@ -210,7 +213,12 @@ jobs:
             # stdout lands on the runner's stderr and the session journals it as `spirit.diagnostic`.
             sed -i 's|^    idles += 1;$|    idles += 1;\n    console.log("MAOS-209 idle", idles);|' src/index.ts
             sed -i 's|^    idles = Number.isFinite(carried) ? carried : 0;$|    idles = Number.isFinite(carried) ? carried : 0;\n    console.log("MAOS-209 swap-in", idles);|' src/index.ts
-            test "$(grep -c 'MAOS-209' src/index.ts)" -eq 2
+            # The idle hook fires once per quiescence (IdleWatchdog `last_idle_fire_ns >= last_inbound`),
+            # and nothing delivers a frame to a `maos run` Spirit, so after the swap no second idle would
+            # ever fire. The variant therefore also counts and logs in `consolidate` (the kernel's
+            # periodic caller): one counter, bumped by both hooks, logged by both.
+            sed -i 's|^  consolidate(_batch: Uint8Array): void {},$|  consolidate(_batch: Uint8Array): void {\n    idles += 1;\n    console.log("MAOS-209 consolidate", idles);\n  },|' src/index.ts
+            test "$(grep -c 'MAOS-209' src/index.ts)" -eq 3
             git diff -- src/index.ts
           else
             # `shipped`: the example is exactly what is in the tree, manifest at cpu_max_pct = 100.
@@ -330,22 +338,22 @@ jobs:
           [ "$(field lifecycle_state)" = Running ]
           sleep 5   # the successor's own idle exports run
           if [ "$INSTR_CASE" = logged ]; then
-            # Wait (bounded) until the successor's guest has logged a few idles after its swap-in line.
+            # Wait (bounded) until the successor's guest has logged a few ticks after the swap's own TL row.
             for i in $(seq 1 60); do
               n="$(python3 - <<'PY'
-          import os, re, sqlite3
+          import os, sqlite3
           db = sqlite3.connect("file:" + os.environ["MAOS_HOME"] + "/audit/transparency.sqlite?mode=ro", uri=True)
-          seen, after = False, 0
-          for (payload,) in db.execute("SELECT payload_redacted FROM transparency_log WHERE intent = 'spirit.diagnostic' ORDER BY rowid"):
+          up, after = None, 0
+          for rowid, intent, payload in db.execute("SELECT rowid, intent, payload_redacted FROM transparency_log ORDER BY rowid"):
               t = bytes(payload).decode("utf-8", "replace")
-              if "MAOS-209 swap-in" in t:
-                  seen, after = True, 0
-              elif seen and "MAOS-209 idle" in t:
+              if intent == "spirit.upgrade" and '"completed"' in t:
+                  up = rowid
+              elif up is not None and intent == "spirit.diagnostic" and ("MAOS-209 idle" in t or "MAOS-209 consolidate" in t):
                   after += 1
-          print(after if seen else -1)
+          print(after if up is not None else -1)
           PY
           )"
-              echo "successor idle lines after swap-in: $n"
+              echo "successor tick lines after the swap row: $n"
               [ "$n" -ge 3 ] && break
               sleep 2
             done
@@ -393,10 +401,12 @@ jobs:
           # `spirit.diagnostic` row (crates/maos-bin/src/spirit_session.rs journal_diagnostic).
           python3 - <<'PY'
           import json, re
-          seq = []
-          dropped = 0
+          ticks, swapins, up, dropped = [], [], None, 0
           for line in open("tl-intents.txt", encoding="utf-8", errors="replace"):
               rowid, intent, payload = line.rstrip("\n").split("\t", 2)
+              rowid = int(rowid)
+              if intent == "spirit.upgrade" and '"completed"' in payload:
+                  up = rowid
               if intent != "spirit.diagnostic":
                   continue
               try:
@@ -405,28 +415,30 @@ jobs:
                   rec = {"line": payload}
               if rec.get("event") == "spirit_diagnostic_dropped":
                   dropped += 1
-              m = re.search(r"MAOS-209 (idle|swap-in) (\d+)", str(rec.get("line", "")))
-              if m:
-                  seq.append((int(rowid), m.group(1), int(m.group(2)), rec.get("child_pid")))
-          print("MAOS-209 diagnostic lines (tl rowid, hook, counter, runner child pid):")
-          for row in seq:
-              print("  ", row)
+              m = re.search(r"MAOS-209 (idle|consolidate|swap-in) (\d+)", str(rec.get("line", "")))
+              if not m:
+                  continue
+              if m.group(1) == "swap-in":
+                  swapins.append((rowid, int(m.group(2))))
+              else:
+                  ticks.append((rowid, m.group(1), int(m.group(2)), rec.get("child_pid")))
+          print("swap row (spirit.upgrade completed) at tl rowid:", up)
+          print("MAOS-209 tick lines (tl rowid, hook, counter, child pid):")
+          for t in ticks:
+              print("  ", t)
+          print("MAOS-209 swap-in lines (the successor's pre-warm stderr is drained and dropped by the product):", swapins)
           print("spirit_diagnostic_dropped rows:", dropped)
-          swapins = [i for i, r in enumerate(seq) if r[1] == "swap-in"]
-          assert len(swapins) == 1, ("expected exactly one swap-in line", swapins)
-          k = swapins[0]
-          before = [r[2] for r in seq[:k]]
-          after = [r[2] for r in seq[k + 1:]]
-          carried = seq[k][2]
-          assert len(before) >= 1, "no idle observed before the swap"
-          assert len(after) >= 1, "no idle observed after the swap"
-          # idle counts strictly 1,2,...,N before the swap (the guest starts at 0).
-          assert before == list(range(1, len(before) + 1)), ("pre-swap counter not 1..N", before)
-          n = before[-1]
-          assert carried == n, ("swap-in carried a different value than the last idle", carried, n)
-          assert after == list(range(n + 1, n + 1 + len(after))), ("post-swap counter does not continue from N", n, after)
-          print(f"counter before swap: 1..{n}; swap-in carried {carried}; first idle after swap = {after[0]} (N+1 = {n + 1}); {len(after)} idle lines after, consecutive")
-          print("child pid before/after swap:", seq[k - 1][3], "->", seq[k + 1][3])
+          assert up is not None, "no completed spirit.upgrade row"
+          assert dropped == 0, "the session's diagnostic budget ran out; the tail of the sequence is missing"
+          before = [t for t in ticks if t[0] < up]
+          after = [t for t in ticks if t[0] > up]
+          assert any(t[1] == "idle" for t in before), "no idle hook observed before the swap"
+          assert before and after, ("need ticks on both sides of the swap", len(before), len(after))
+          values = [t[2] for t in ticks]
+          assert values == list(range(1, len(values) + 1)), ("the counter is not 1,2,3,... across the swap", values)
+          n = before[-1][2]
+          print(f"counter before the swap row: last N = {n}; first tick after it = {after[0][2]} (N+1); {len(after)} ticks after, consecutive; whole sequence 1..{values[-1]}")
+          assert after[0][2] == n + 1
           PY
       - name: Judge the plant (the red above must be the intended refusal)
         if: always() && matrix.swap_in == 'removed-plant'
