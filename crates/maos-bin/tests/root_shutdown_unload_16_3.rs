@@ -272,13 +272,21 @@ struct FixtureContainer {
     payload_start_time: String,
 }
 
+/// The payload's host PID, only once the same inspect reports the container
+/// RUNNING: the product runs `init` (PID published) before it spawns
+/// `start --attach`, so a nonzero `State.Pid` alone can precede a live fixture.
 fn inspect_payload_pid(container_id: &str) -> Result<u32, String> {
     let runtime = std::env::var("MAOS_T3_RUNTIME")
         .map_err(|error| format!("MAOS_T3_RUNTIME unavailable during inspect: {error}"))?;
     let output = Command::new("timeout")
         .arg("8s")
         .arg(runtime)
-        .args(["inspect", "--format", "{{.State.Pid}}", container_id])
+        .args([
+            "inspect",
+            "--format",
+            "{{.State.Pid}} {{.State.Running}}",
+            container_id,
+        ])
         .output()
         .map_err(|error| format!("run OCI inspect for CID {container_id}: {error}"))?;
     if !output.status.success() {
@@ -287,9 +295,17 @@ fn inspect_payload_pid(container_id: &str) -> Result<u32, String> {
             String::from_utf8_lossy(&output.stderr)
         ));
     }
-    String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .parse()
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut fields = stdout.split_whitespace();
+    let (Some(pid), Some(running), None) = (fields.next(), fields.next(), fields.next()) else {
+        return Err(format!(
+            "container {container_id} inspect returned an unexpected state: {stdout:?}"
+        ));
+    };
+    if running != "true" {
+        return Err(format!("container {container_id} is not running yet"));
+    }
+    pid.parse()
         .map_err(|error| format!("container {container_id} reported invalid host PID: {error}"))
 }
 

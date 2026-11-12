@@ -4940,7 +4940,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // the serving tail), the Worker progress stamper and the signal
         // listener. Every input is already in scope, and `set_crash_detector`
         // — which needs the scheduler's Arc strong count at 1 — is long past.
-        root_supervision = Some(maos_bin::supervision::RootSupervision::arm(
+        let armed_supervision = maos_bin::supervision::RootSupervision::arm(
             Arc::clone(&scheduler),
             Arc::clone(&crash_detector),
             Arc::clone(&transparency_log),
@@ -4950,7 +4950,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc::clone(&telemetry),
             Arc::clone(&notification_dispatcher),
             boot_nonce,
-        ));
+        );
+        // The listener's grace exit names the `--once` pass it interrupted.
+        if run.once {
+            armed_supervision.declare_once_pass();
+        }
+        root_supervision = Some(armed_supervision);
         // Story 17-10 (D-17-10-FW-01) — the live escape-anomaly consumer, armed
         // before any admission so no kill row of this boot precedes its cursor.
         // Story 18-4 (D-18-4-07 A; review TIA-2) — each anomaly is journaled

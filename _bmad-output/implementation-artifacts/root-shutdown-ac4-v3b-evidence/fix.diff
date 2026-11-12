@@ -1,0 +1,176 @@
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index 9ae813fe..fad87094 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -4940,7 +4940,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         // the serving tail), the Worker progress stamper and the signal
+         // listener. Every input is already in scope, and `set_crash_detector`
+         // — which needs the scheduler's Arc strong count at 1 — is long past.
+-        root_supervision = Some(maos_bin::supervision::RootSupervision::arm(
++        let armed_supervision = maos_bin::supervision::RootSupervision::arm(
+             Arc::clone(&scheduler),
+             Arc::clone(&crash_detector),
+             Arc::clone(&transparency_log),
+@@ -4950,7 +4950,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+             Arc::clone(&telemetry),
+             Arc::clone(&notification_dispatcher),
+             boot_nonce,
+-        ));
++        );
++        // The listener's grace exit names the `--once` pass it interrupted.
++        if run.once {
++            armed_supervision.declare_once_pass();
++        }
++        root_supervision = Some(armed_supervision);
+         // Story 17-10 (D-17-10-FW-01) — the live escape-anomaly consumer, armed
+         // before any admission so no kill row of this boot precedes its cursor.
+         // Story 18-4 (D-18-4-07 A; review TIA-2) — each anomaly is journaled
+diff --git a/crates/maos-bin/src/supervision.rs b/crates/maos-bin/src/supervision.rs
+index 4714738e..8a5a65f4 100644
+--- a/crates/maos-bin/src/supervision.rs
++++ b/crates/maos-bin/src/supervision.rs
+@@ -2179,11 +2179,32 @@ mod worker {
+             }
+         }
+ 
+-        /// The ids of every binding still short of a terminal phase, for the
+-        /// grace-exit message.
++        /// Disposition (the manifest's FR50 `[on_crash]` action — `task.nacked`
++        /// by default) every Worker whose stop is latched but whose call path
++        /// has not finished, from the kept record.
++        ///
++        /// The signal listener's grace exit is the one root exit that abandons
++        /// the call path: `finish` — the only other place a stopped Worker's
++        /// in-flight task is dispositioned — will never run, and the unload that
++        /// follows removes the SCB, ledger and all. Idempotent with `finish`: the
++        /// `dispositioned` latch makes whichever runs second a no-op.
++        pub fn disposition_stopped_unfinished(&self) {
++            for core in self.registry.active() {
++                if core.phase() == BindingPhase::PlannedStop {
++                    core.disposition();
++                }
++            }
++        }
++
++        /// The ids of every ACTIVE binding still short of a terminal phase, for
++        /// the grace-exit message. A retired binding keeps its `PlannedStop`
++        /// phase and has no child handle, so listing it would claim it "could
++        /// not be signalled".
+         pub fn unstopped_workers(&self) -> Vec<(String, bool)> {
+-            self.bindings()
++            self.registry
++                .active()
+                 .into_iter()
++                .map(|core| core.view())
+                 .filter(|view| {
+                     matches!(
+                         view.phase,
+@@ -2889,6 +2910,8 @@ mod worker {
+         watchdog: tokio::task::JoinHandle<()>,
+         stamper: tokio::task::JoinHandle<()>,
+         listener: tokio::task::JoinHandle<()>,
++        /// Set by `maos run … --once`; read by the listener's grace exit.
++        once_pass: Arc<AtomicBool>,
+     }
+ 
+     impl RootSupervision {
+@@ -2996,12 +3019,14 @@ mod worker {
+                 root_cancel.clone(),
+             );
+ 
++            let once_pass = Arc::new(AtomicBool::new(false));
+             let listener = spawn_signal_listener(
+                 Arc::clone(&supervisor),
+                 Arc::clone(&scheduler),
+                 Arc::clone(&halt_registry),
+                 root_cancel.clone(),
+                 root_shutdown.clone(),
++                Arc::clone(&once_pass),
+             );
+ 
+             Self {
+@@ -3013,6 +3038,7 @@ mod worker {
+                 watchdog,
+                 stamper,
+                 listener,
++                once_pass,
+             }
+         }
+ 
+@@ -3034,6 +3060,13 @@ mod worker {
+             self.root_shutdown.clone()
+         }
+ 
++        /// Declare this root a `--once` pass, so the listener's grace exit says
++        /// "interrupted by signal before the --once pass completed" — the same
++        /// sentence the main flow's own `--once` exit prints.
++        pub fn declare_once_pass(&self) {
++            self.once_pass.store(true, Ordering::SeqCst);
++        }
++
+         /// Stop Workers, cancel and JOIN every task this root spawned, then
+         /// join any parked crash handler.
+         ///
+@@ -3147,14 +3180,19 @@ mod worker {
+     /// here would run before the door shutdown and could unload a Spirit in the
+     /// middle of a topology load. It then waits, check-then-wait on the
+     /// supervisor's active-path count, for [`ROOT_GRACE`]. Only on timeout — a
+-    /// descendant still holding a stopped Worker's pipe — does it unload
+-    /// itself, say exactly what the exit is losing, and exit 1.
++    /// Worker call path that did not finish, e.g. a descendant still holding a
++    /// stopped Worker's pipe — does it leave by itself: nack the stopped
++    /// Workers' in-flight tasks, unload, say that the pass was interrupted and
++    /// exactly what the exit is losing, and exit 1. That exit abandons the call
++    /// paths and the main flow's own teardown, so it must carry every
++    /// disposition and statement that teardown would have made.
+     fn spawn_signal_listener(
+         supervisor: Arc<WorkerSupervisor>,
+         scheduler: Arc<SpiritSchedulerAdapter>,
+         halt_registry: Arc<HaltRegistry>,
+         root_cancel: tokio_util::sync::CancellationToken,
+         root_shutdown: tokio_util::sync::CancellationToken,
++        once_pass: Arc<AtomicBool>,
+     ) -> tokio::task::JoinHandle<()> {
+         // Created SYNCHRONOUSLY, before the task is spawned and before
+         // `ARMED_MARKER` is printed.
+@@ -3176,21 +3214,33 @@ mod worker {
+             if idle {
+                 return;
+             }
+-            // A descendant of a stopped Worker still holds its pipe, so the
+-            // bridge's reader-thread join will never finish and the normal
+-            // teardown can never run. Write the receipts straight to the
+-            // Transparency Log and exit, naming the loss.
++            // A Worker call path did not finish within the grace — a descendant
++            // of a stopped Worker may still hold its pipe, so the bridge's
++            // reader-thread join would never finish and the normal teardown can
++            // never run. `finish` never runs either, so nack the stopped
++            // Workers' in-flight tasks here, then write the receipts straight to
++            // the Transparency Log and exit, naming the interruption and the loss.
++            supervisor.disposition_stopped_unfinished();
+             let stop_after_unload = |pid| supervisor.stop_binding(pid);
+             let report =
+                 super::unload_all_loaded(&scheduler, &halt_registry, Some(&stop_after_unload))
+                     .await;
+             report.render(&mut std::io::stderr());
++            // The same sentence the main flow's own `--once` exit prints; a
++            // root that is not a `--once` pass has no such pass to name.
++            if once_pass.load(Ordering::SeqCst) {
++                eprintln!("maos run: interrupted by signal before the --once pass completed");
++            } else {
++                eprintln!("maos run: interrupted by signal");
++            }
+             for (spirit_id, has_child) in supervisor.unstopped_workers() {
+                 if has_child {
+                     eprintln!(
+-                        "maos: worker {spirit_id} stopped but its output is still held open by a \
+-                         descendant; exiting without the door shutdown and the audit-channel \
+-                         drain (process-tree teardown: 17-1)"
++                        "maos: worker {spirit_id} stopped but its call path did not finish within \
++                         {}s (its output may still be held open by a descendant); exiting \
++                         without the door shutdown and the audit-channel drain (process-tree \
++                         teardown: 17-1)",
++                        ROOT_GRACE.as_secs()
+                     );
+                 } else {
+                     eprintln!(

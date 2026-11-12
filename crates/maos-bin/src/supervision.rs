@@ -767,6 +767,9 @@ mod worker {
         on_crash_action: OnCrashAction,
         /// Disposition has already been written.
         dispositioned: bool,
+        /// Claimed dispositions whose executor call has not returned yet —
+        /// `dispositioned` is set at the CLAIM, this is the COMPLETION.
+        dispositions_in_flight: u32,
         /// A live scheduler ledger entry belongs to this binding.
         record_active: bool,
         /// This binding owns one short-lived task rather than a persistent record.
@@ -787,6 +790,8 @@ mod worker {
         spirit_id: String,
         spirit_pid: AtomicU32,
         state: Mutex<BindingState>,
+        /// Notified when `dispositions_in_flight` returns to zero.
+        disposition_done: std::sync::Condvar,
         exec: Arc<dyn BindingExecutor>,
         strategy: Arc<dyn ExitObservation>,
         counters: Arc<SupervisorCounters>,
@@ -1292,7 +1297,10 @@ mod worker {
         /// `task.nacked` for an `escalate-to-operator` Worker.
         ///
         /// Idempotent: once `dispositioned` is set every `Disposition*`
-        /// executor is a no-op.
+        /// executor is a no-op. The latch is set at the CLAIM, before the
+        /// executor runs and outside the binding lock; the claim is what makes
+        /// the write single-execution, [`Self::await_disposition`] is what
+        /// observes its COMPLETION.
         fn disposition(&self) {
             let (action, record, crashed) = {
                 let mut state = self.lock();
@@ -1300,11 +1308,41 @@ mod worker {
                     return;
                 }
                 state.dispositioned = true;
+                state.dispositions_in_flight += 1;
                 let crashed = state.phase == BindingPhase::CrashHandled;
                 (state.on_crash_action, state.record.clone(), crashed)
             };
+            // Completion is signalled on every exit, a panicking executor included.
+            let _completion = DispositionInFlight(self);
             self.exec
                 .disposition(self.spirit_pid(), action, &record, crashed);
+        }
+
+        /// Wait until no claimed disposition is still executing, or until
+        /// `deadline`. `true` when every claimed disposition completed.
+        fn await_disposition(&self, deadline: Instant) -> bool {
+            let mut state = self.lock();
+            while state.dispositions_in_flight > 0 {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    return false;
+                }
+                state = match self.disposition_done.wait_timeout(state, remaining) {
+                    Ok((guard, _)) => guard,
+                    Err(poisoned) => poisoned.into_inner().0,
+                };
+            }
+            true
+        }
+    }
+
+    /// Marks one claimed disposition complete when dropped.
+    struct DispositionInFlight<'a>(&'a BindingCore);
+
+    impl Drop for DispositionInFlight<'_> {
+        fn drop(&mut self) {
+            self.0.lock().dispositions_in_flight -= 1;
+            self.0.disposition_done.notify_all();
         }
     }
 
@@ -1747,10 +1785,12 @@ mod worker {
                         .map(|section| section.action)
                         .unwrap_or_default(),
                     dispositioned: false,
+                    dispositions_in_flight: 0,
                     record_active,
                     turn_scoped: !record_active,
                     ready: false,
                 }),
+                disposition_done: std::sync::Condvar::new(),
                 exec: Arc::clone(&self.exec) as Arc<dyn BindingExecutor>,
                 strategy: Arc::clone(&self.strategy),
                 counters: Arc::clone(&self.counters),
@@ -2179,11 +2219,47 @@ mod worker {
             }
         }
 
-        /// The ids of every binding still short of a terminal phase, for the
-        /// grace-exit message.
+        /// Disposition (the manifest's FR50 `[on_crash]` action — `task.nacked`
+        /// by default) every Worker whose stop is latched but whose call path
+        /// has not finished, from the kept record, and wait for every such
+        /// disposition to COMPLETE.
+        ///
+        /// The signal listener's grace exit is the one root exit that abandons
+        /// the call path: the unload that follows removes the SCB, ledger and
+        /// all, and `process::exit` ends the process. `finish` — the only other
+        /// place a stopped Worker's in-flight task is dispositioned — may still
+        /// be running, or may resume while the exit proceeds, so this does not
+        /// assume it never runs: the `dispositioned` latch makes whichever
+        /// claims second a no-op, and a disposition `finish` has claimed but
+        /// not yet written is awaited here, not skipped.
+        ///
+        /// The wait is bounded by `deadline`, shared by the whole sweep and
+        /// fixed by the caller from the moment it starts the sweep, so time the
+        /// blocking pool spends before running this counts against it. Returns
+        /// the ids of Workers whose claimed disposition had not completed by
+        /// then; their `task.nacked` may be lost.
+        pub fn disposition_stopped_unfinished(&self, deadline: Instant) -> Vec<String> {
+            let mut unconfirmed = Vec::new();
+            for core in self.registry.active() {
+                if core.phase() == BindingPhase::PlannedStop {
+                    core.disposition();
+                    if !core.await_disposition(deadline) {
+                        unconfirmed.push(core.spirit_id.clone());
+                    }
+                }
+            }
+            unconfirmed
+        }
+
+        /// The ids of every ACTIVE binding still short of a terminal phase, for
+        /// the grace-exit message. A retired binding keeps its `PlannedStop`
+        /// phase and has no child handle, so listing it would claim it "could
+        /// not be signalled".
         pub fn unstopped_workers(&self) -> Vec<(String, bool)> {
-            self.bindings()
+            self.registry
+                .active()
                 .into_iter()
+                .map(|core| core.view())
                 .filter(|view| {
                     matches!(
                         view.phase,
@@ -2889,6 +2965,8 @@ mod worker {
         watchdog: tokio::task::JoinHandle<()>,
         stamper: tokio::task::JoinHandle<()>,
         listener: tokio::task::JoinHandle<()>,
+        /// Set by `maos run … --once`; read by the listener's grace exit.
+        once_pass: Arc<AtomicBool>,
     }
 
     impl RootSupervision {
@@ -2996,12 +3074,14 @@ mod worker {
                 root_cancel.clone(),
             );
 
+            let once_pass = Arc::new(AtomicBool::new(false));
             let listener = spawn_signal_listener(
                 Arc::clone(&supervisor),
                 Arc::clone(&scheduler),
                 Arc::clone(&halt_registry),
                 root_cancel.clone(),
                 root_shutdown.clone(),
+                Arc::clone(&once_pass),
             );
 
             Self {
@@ -3013,6 +3093,7 @@ mod worker {
                 watchdog,
                 stamper,
                 listener,
+                once_pass,
             }
         }
 
@@ -3032,6 +3113,13 @@ mod worker {
         /// listener is joined is swallowed.
         pub fn shutdown_token(&self) -> tokio_util::sync::CancellationToken {
             self.root_shutdown.clone()
+        }
+
+        /// Declare this root a `--once` pass, so the listener's grace exit says
+        /// "interrupted by signal before the --once pass completed" — the same
+        /// sentence the main flow's own `--once` exit prints.
+        pub fn declare_once_pass(&self) {
+            self.once_pass.store(true, Ordering::SeqCst);
         }
 
         /// Stop Workers, cancel and JOIN every task this root spawned, then
@@ -3147,14 +3235,19 @@ mod worker {
     /// here would run before the door shutdown and could unload a Spirit in the
     /// middle of a topology load. It then waits, check-then-wait on the
     /// supervisor's active-path count, for [`ROOT_GRACE`]. Only on timeout — a
-    /// descendant still holding a stopped Worker's pipe — does it unload
-    /// itself, say exactly what the exit is losing, and exit 1.
+    /// Worker call path that did not finish, e.g. a descendant still holding a
+    /// stopped Worker's pipe — does it leave by itself: nack the stopped
+    /// Workers' in-flight tasks, unload, say that the pass was interrupted and
+    /// exactly what the exit is losing, and exit 1. That exit abandons the call
+    /// paths and the main flow's own teardown, so it must carry every
+    /// disposition and statement that teardown would have made.
     fn spawn_signal_listener(
         supervisor: Arc<WorkerSupervisor>,
         scheduler: Arc<SpiritSchedulerAdapter>,
         halt_registry: Arc<HaltRegistry>,
         root_cancel: tokio_util::sync::CancellationToken,
         root_shutdown: tokio_util::sync::CancellationToken,
+        once_pass: Arc<AtomicBool>,
     ) -> tokio::task::JoinHandle<()> {
         // Created SYNCHRONOUSLY, before the task is spawned and before
         // `ARMED_MARKER` is printed.
@@ -3176,21 +3269,75 @@ mod worker {
             if idle {
                 return;
             }
-            // A descendant of a stopped Worker still holds its pipe, so the
-            // bridge's reader-thread join will never finish and the normal
-            // teardown can never run. Write the receipts straight to the
-            // Transparency Log and exit, naming the loss.
+            // A Worker call path did not finish within the grace — a descendant
+            // of a stopped Worker may still hold its pipe, so the bridge's
+            // reader-thread join would never finish and the normal teardown can
+            // never run. `finish` may still be running or may resume while this
+            // exit proceeds, so nack the stopped Workers' in-flight tasks here
+            // and wait for each nack to land — claimed by `finish` or by this
+            // sweep alike — before the unload and `process::exit` can outrun it.
+            // ONE end-to-end budget, `ROOT_GRACE`, measured from the moment this
+            // listener starts the sweep: the nack is one synchronous Transparency
+            // Log insert (milliseconds), so a budget that long means the write is
+            // stuck, and a hung shutdown is the one outcome this exit exists to
+            // prevent. The sweep's own wait deadline is computed from the same
+            // start instant, so time spent queued for the blocking pool counts
+            // against it; the listener's `timeout` bounds the whole await, so a
+            // sweep that never gets scheduled, or blocks inside the synchronous
+            // `disposition()` write, cannot stall the unload and the exit. A
+            // blocking task cannot be aborted: on timeout it is left running and
+            // `process::exit` below is the bound.
+            // The sweep blocks on a `Condvar`, so it runs off the runtime thread.
+            let started = Instant::now();
+            let deadline = started + ROOT_GRACE;
+            let sweeper = Arc::clone(&supervisor);
+            let sweep = tokio::task::spawn_blocking(move || {
+                sweeper.disposition_stopped_unfinished(deadline)
+            });
+            match tokio::time::timeout(ROOT_GRACE, sweep).await {
+                Ok(Ok(spirit_ids)) => {
+                    for spirit_id in spirit_ids {
+                        eprintln!(
+                            "maos: worker {spirit_id}'s task disposition was still being written \
+                             when the {}s disposition budget ended ({}ms after the sweep \
+                             started); exiting anyway, its task.nacked may be lost",
+                            ROOT_GRACE.as_secs(),
+                            started.elapsed().as_millis()
+                        );
+                    }
+                }
+                Ok(Err(error)) => eprintln!(
+                    "maos: the Worker disposition sweep did not complete ({error}); exiting \
+                     anyway, task.nacked rows may be missing"
+                ),
+                Err(_elapsed) => eprintln!(
+                    "maos: the task disposition sweep did not finish within {}s of starting it \
+                     ({}ms elapsed); exiting anyway, task.nacked rows for unknown Workers may \
+                     be lost. The sweep cannot be aborted; exiting is the bound",
+                    ROOT_GRACE.as_secs(),
+                    started.elapsed().as_millis()
+                ),
+            }
             let stop_after_unload = |pid| supervisor.stop_binding(pid);
             let report =
                 super::unload_all_loaded(&scheduler, &halt_registry, Some(&stop_after_unload))
                     .await;
             report.render(&mut std::io::stderr());
+            // The same sentence the main flow's own `--once` exit prints; a
+            // root that is not a `--once` pass has no such pass to name.
+            if once_pass.load(Ordering::SeqCst) {
+                eprintln!("maos run: interrupted by signal before the --once pass completed");
+            } else {
+                eprintln!("maos run: interrupted by signal");
+            }
             for (spirit_id, has_child) in supervisor.unstopped_workers() {
                 if has_child {
                     eprintln!(
-                        "maos: worker {spirit_id} stopped but its output is still held open by a \
-                         descendant; exiting without the door shutdown and the audit-channel \
-                         drain (process-tree teardown: 17-1)"
+                        "maos: worker {spirit_id} stopped but its call path did not finish within \
+                         {}s (its output may still be held open by a descendant); exiting \
+                         without the door shutdown and the audit-channel drain (process-tree \
+                         teardown: 17-1)",
+                        ROOT_GRACE.as_secs()
                     );
                 } else {
                     eprintln!(
