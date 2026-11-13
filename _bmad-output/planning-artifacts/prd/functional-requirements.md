@@ -107,6 +107,24 @@ The 66 functional requirements below are organized into seven capability areas r
 - **FR64:** Operator can attribute cost (token-spend per provider, subprocess CPU-time, storage I/O) per Spirit per task per principal in the Transparency Log. **Enterprise-readiness gate** — no enterprise deployment without per-tenant cost accounting. **[DELTA-2026-10-25, operator ruling — routing audit DECIDE-2, split]** v1.0: token-spend per provider attributed per Spirit, per task and per session principal — the enterprise gate's per-tenant token accounting (story `20-14-complete-cost-attribution`). v1.1: the subprocess CPU-time and storage-I/O dimensions (ADR-046 R6).
 - **FR65:** Operator can uninstall a Spirit; kernel emits a proof-of-erasure record enumerating all removed substrate state (memory namespace per ADR-026, capability tokens, pending halts, intent lineage references, scheduled invocations). **Defends the v1.0 hermes-tenant positioning claim** that substrate-uninstall is a real guarantee, not a hope.
 
+## H. Enterprise Fit — always-on Host, standards interop, operator plane (13 FRs) **[DELTA-2026-11-13 OPERATOR-APPROVED, SCP 2026-11-13]**
+
+Added by `sprint-change-proposal-2026-11-13.md` §5 (approved by the operator 2026-11-13). None of these is a `v1.0.0` requirement: the lane (Epics 22–26) starts after the GA tag. Each FR names its owning epic.
+
+- **FR67:** MCP client authorization per the MCP specification at a pinned revision; tokens bound to one server and never visible to a Spirit. **(Phase: after `v1.0.0`; Epic 23.)**
+- **FR68:** Signed A2A v1.0 Agent Card and JSON-RPC binding; every inbound request passes typed-intent consent. **(Phase: after `v1.0.0`; Epic 23.)**
+- **FR69:** The agent path exported as OpenTelemetry spans under the GenAI conventions at a pinned version. **(Phase: after `v1.0.0`; Epic 23.)**
+- **FR70:** Every mutating door command carries a verified operator principal and an operator-policy decision. **(Phase: after `v1.0.0`; Epic 24.)**
+- **FR71:** List agents with parent, task, age and spend; read one agent's session; one list of pending decisions. **(Phase: after `v1.0.0`; Epics 22, 24.)**
+- **FR72:** An approval-required capability is held, shown to an authorized operator, and minted only after an approval row. **(Phase: after `v1.0.0`; Epic 24.)**
+- **FR73:** Budgets per task, Spirit or principal; a breach stops spend and raises a halt; Worker spend is metered. **(Phase: after `v1.0.0`; Epics 24, 26.)**
+- **FR74:** Operator rules turn a drift or anomaly signal into a journaled door command. **(Phase: after `v1.0.0`; Epic 24.)**
+- **FR75:** An installed Host verifies its own guarantees and writes a signed report. **(Phase: after `v1.0.0`; Epic 25.)**
+- **FR76:** An OCI image and a Helm chart ship; the enterprise posture is available in air-gap builds. **(Phase: after `v1.0.0`; Epics 22, 23.)**
+- **FR77:** One Host configuration file declares the standing cast; the Host restores it at every boot and refuses to boot on an invalid file. **(Phase: after `v1.0.0`; Epic 22.)**
+- **FR78:** An authorized caller hands a named Spirit a task and reads its result, with a task id in the audit trail. **(Phase: after `v1.0.0`; Epic 22.)**
+- **FR79:** The audit store is bounded by policy; rotated segments remain independently verifiable. **(Phase: after `v1.0.0`; Epic 22.)**
+
 ---
 
 ## FR-to-architecture traceability (updated; 65 FRs across 27 ADRs and 14 invariants)
@@ -120,8 +138,11 @@ The 66 functional requirements below are organized into seven capability areas r
 | E. Memory, Cognition Substrate, Distillation | I5, I11, I12, I13; ADR-013/022/026; §4.0.7 principle | v0.3 (FR27, FR32); v0.5 (FR28, FR29); v0.8 (FR30, FR31, FR56) |
 | F. Spirit Ecosystem and Distribution | ADR-008/009/015/021/024/027 | v0.1 (FR58 onboarding-tutorial); v0.3 (FR33, FR34); v0.5 (FR35, FR36, FR38, FR39, FR40); v0.8 (FR57); v1.0 (FR59); v1.5 (FR60); v2.2 (FR37 machinery) / v2.5 (FR37 accredited vetters) **[DELTA-2026-07-06]** |
 | G. Audit, Compliance, Operator Surfaces | I2; ADR-013/015/023/026; Step 5 role-distinct queries | v0.1 (FR61); v0.5 (FR41); v1.0 (FR42–FR46, FR62, FR63, FR64, FR65); v1.1 (FR64 CPU-time + storage-I/O dimensions) **[DELTA-2026-10-25: DECIDE-2]** |
+| H. Enterprise Fit — always-on Host, standards interop, operator plane **[DELTA-2026-11-13]** | ADR-062 amendment (`22-4-directed-task-ingress`, `24-1-operator-principal-and-door-authz`); ADR-051 amendment (`23-2-oidc-discovery-and-key-rotation`, `23-4-siem-network-sink-and-durable-watermark`, `23-6-enterprise-posture-in-air-gap`, `23-8-external-kms-adapter`); ADR-046 amendment (`24-6-budgets-as-policy`, `26-3-worker-egress-usage-metering`); new ADRs for the Host configuration file (`22-1-host-config-and-standing-cast`), audit-store rotation (`22-6-bounded-audit-store`) and the A2A HTTP listener (`23-5-a2a-v1-agent-card-and-jsonrpc-binding`) — each written by the owning story (SCP 2026-11-13 §5) | after `v1.0.0`: Epic 22 (FR71, FR76, FR77, FR78, FR79); Epic 23 (FR67, FR68, FR69, FR76); Epic 24 (FR70–FR74); Epic 25 (FR75); Epic 26 (FR73) |
 
 **65 functional requirements total.** Each is a testable capability stated implementation-agnostically. Each can be implemented in multiple ways within the architectural commitments. Each will need an epic or stories during implementation. The Kernel Non-Goals preface (above) is load-bearing alongside the FRs — without it, the kernel-stays-neutral principle is invisible.
+
+**[DELTA-2026-11-13 OPERATOR-APPROVED, SCP 2026-11-13]** Area H adds FR67–FR79 (13 FRs); none of them is a `v1.0.0` requirement, and each lands in Epics 22–26 after the GA tag.
 
 ## NFR Carry-Forward to Step 10
 

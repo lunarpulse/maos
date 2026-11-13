@@ -304,6 +304,26 @@ A `claude` process spawns inside a T2 sandbox, with `developer` + `maos-bridge` 
 - Audit-from-minute-1 (`maos audit query` works on the local Transparency Log).
 - Clean uninstall (kernel is reversible; user's data persists or is removed per their choice).
 
+## Journey 5 — v1.x anchor: Dana keeps a standing cast on (enterprise server)
+
+> **[DELTA-2026-11-13 OPERATOR-APPROVED, SCP 2026-11-13 §3 item 4 and §5]** New journey; the id J5 was free. It is served after `v1.0.0` by the Phase v1.x lane (Epics 22–26; see `project-scoping-phased-development.md`), not by `v1.0.0`. The journey counts stated at the top of this file and in the summary below are kept as written.
+
+**Premise.** MAOS is the theater: your domain agents are the actors, and the house enforces the rules.
+
+**Persona.** Dana, platform engineer at a 400-person company.
+
+**Scene.** She installs the chart on the company cluster with one values file. The file names the standing cast: a diagnostic Spirit on the production edge and an architect Spirit beside the repositories. The node is drained overnight; in the morning both are back, with their memory and their pending halt. The incident tool hands the diagnostic Spirit a task through one authenticated call and reads the answer with its task id. Security receives the same events in the SIEM. The audit store rotates monthly and each archived segment still verifies.
+
+**What this journey requires (J5):**
+
+- One values file declares the standing cast; the Host restores it at every boot and refuses to boot on an invalid file — FR77.
+- An OCI image and a Helm chart; the enterprise posture in air-gap builds — FR76; image size and idle memory stated — NFR-Ops-14.
+- After the drain, the cast is back with its memory and its pending halt — FR77; the pending decisions are in one list — FR71.
+- The incident tool hands a named Spirit a task through one authenticated call and reads the result with its task id — FR78; the call carries a verified operator principal and a policy decision — FR70, NFR-Ops-13.
+- Security sees the same events: the agent path as OpenTelemetry spans — FR69, NFR-Obs-6. The SIEM export itself is the existing NFR-Aud-11; its network sink is story `23-4-siem-network-sink-and-durable-watermark` (no new FR).
+- The audit store rotates by policy and each archived segment still verifies — FR79.
+- Not shown in the scene, required by the same server posture: MCP authorization with server-bound tokens — FR67, NFR-Sec-20; A2A v1.0 Agent Card and JSON-RPC binding — FR68; approvals held for an authorized operator — FR72; budgets and Worker metering — FR73, NFR-Cost-2; operator rules that turn a drift signal into a door command — FR74; a Host that verifies its own guarantees, with a control map — FR75, NFR-Comp-6.
+
 ## Journey requirements summary
 
 Eight journeys collectively reveal the capability areas the kernel and reference Spirits must deliver, sequenced by ship phase:
@@ -334,6 +354,14 @@ Eight journeys collectively reveal the capability areas the kernel and reference
 | Public Spirit registry with Ed25519 signing + four trust tiers | Diego, all third-party Spirits | v0.5 (basic) → v1.0 (full registry + vetting attestations) |
 | `cargo generate maos-spirit` + `spirit-test` + Spirit dev SDK | Diego, J-Butler/Researcher (Spirit-author paths) | v0.3 (SDK basic) → v0.5 (full) → v1.0 (registry integration) |
 | `maos audit query` CLI + cleanup + clean uninstall | J0, J7-equivalent in NFRs | v0.1 (clean uninstall — J0 requirement) → v0.5 (basic queries) → v1.0 (signed export) |
+| Standing cast declared in one Host file, restored at every boot (FR77) | J5 | after `v1.0.0`: Epic 22 **[DELTA-2026-11-13]** |
+| OCI image + Helm chart; enterprise posture in air-gap builds (FR76) | J5 | after `v1.0.0`: Epics 22, 23 **[DELTA-2026-11-13]** |
+| Task handed to a named Spirit through the door, task id in the audit trail (FR78) | J5 | after `v1.0.0`: Epic 22 **[DELTA-2026-11-13]** |
+| Audit store bounded by policy; rotated segments independently verifiable (FR79) | J5 | after `v1.0.0`: Epic 22 **[DELTA-2026-11-13]** |
+| Agent list, session view, one list of pending decisions (FR71) | J5 | after `v1.0.0`: Epics 22, 24 **[DELTA-2026-11-13]** |
+| Standards interop: MCP authorization, A2A v1.0, OpenTelemetry GenAI spans (FR67, FR68, FR69) | J5 | after `v1.0.0`: Epic 23 **[DELTA-2026-11-13]** |
+| Operator plane: operator principal and policy decision per door command, approval hold, budgets, containment rules (FR70, FR72, FR73, FR74) | J5 | after `v1.0.0`: Epic 24; Worker metering (FR73) Epic 26 **[DELTA-2026-11-13]** |
+| A Host verifies its own guarantees and writes a signed report (FR75) | J5 | after `v1.0.0`: Epic 25 **[DELTA-2026-11-13]** |
 
 These map directly to Functional Requirements (Step 9) and Non-Functional Requirements (Step 10). The wedge pain commitment (W1″ — Orchestrator-led parallel multi-CLI execution with kernel-mediated audit-chain) is now load-bearing across J1 and Reza, *anchored at v0.8*. Step 10 (NFRs) inherits the five-metric distillation ship-gate from §9.5 (digest-recall ≥ 0.90; faithfulness ≥ 0.98; hedge-preservation ≥ 0.95; traceability = 100%; secret-leakage = 0%).
 
@@ -366,6 +394,8 @@ Most FRs trace directly to a named user journey (per the Journey Requirements Su
 | FR50 | I10 (lifecycle journaling) | Crash-survival applies whenever any Spirit dies; serves operational reliability across all journeys |
 | FR62 | Innovation #7 (Constitutional Substrate Evolution) | Audit-queryable governance artifacts (vetter-key admission, ABI-extension proposals, ComplianceClaim schema versions) underpin third-party trust for every Spirit author + every operator |
 | FR65 | Defends v1.0 hermes-tenant positioning + GDPR cascade (FR45) | Spirit uninstall proof-of-erasure; serves J0 clean-uninstall (Tier 1 success criterion) AND enterprise GDPR-style requirements |
+
+*Correct-course 2026-11-13 (SCP 2026-11-13 §5, operator-approved):* FR67–FR79 add no row to Category A or Category B. They trace directly to Journey 5 through its rows in the Journey requirements summary above, so they are not carveouts and not orphans.
 
 **Operational guidance for epic breakdown:**
 

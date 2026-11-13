@@ -229,3 +229,14 @@ The most contested ship gates by phase, after John's rebalancing:
 **v2.5 (ecosystem, non-gating):** FKCS-populated by genuine external authors (NFR-Test-5 second half). External N=12 trial cohort. RTL layout support (NFR-Doc-7 follow-on). Vetter ecosystem maturity (accredited external vetters issuing FR37 attestations). Adoption outcomes (cert bodies, external Spirits, consortium case study) — measured, never scheduled.
 
 These gates are the substrate's quality contract. They are non-negotiable at the named phase or the phase doesn't ship.
+
+## Enterprise-fit additions **[DELTA-2026-11-13 OPERATOR-APPROVED, SCP 2026-11-13 §5]**
+
+Six requirements for the lane that starts after `v1.0.0` (Epics 22–26). None is a `v1.0.0` requirement. They are listed here, not inside their family sections above, so that every existing line cite into this file stays valid.
+
+- **NFR-Sec-20** [NEW, DELTA-2026-11-13, SCP 2026-11-13; after v1.0.0; Epic 23]: A token issued for MCP server A is never sent to server B.
+- **NFR-Obs-6** [NEW, DELTA-2026-11-13, SCP 2026-11-13; after v1.0.0; Epic 23]: 100 % of mediated external calls in a task appear in one trace; the convention version is stated.
+- **NFR-Ops-13** [NEW, DELTA-2026-11-13, SCP 2026-11-13; after v1.0.0; Epic 24]: An unauthorized operator command returns a typed 403 and a journal row, with zero state change.
+- **NFR-Ops-14** [NEW, DELTA-2026-11-13, SCP 2026-11-13; after v1.0.0; Epic 22]: Image size and idle memory are measured, stated and regression-checked; the values are set at story `22-3-image-compose-and-helm`.
+- **NFR-Cost-2** [NEW, DELTA-2026-11-13, SCP 2026-11-13; after v1.0.0; Epic 24]: Budget overshoot is bounded by one stated reconcile interval.
+- **NFR-Comp-6** [NEW, DELTA-2026-11-13, SCP 2026-11-13; after v1.0.0; Epic 25]: Every control-map row cites an invariant or gate and an evidence command.

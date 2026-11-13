@@ -602,8 +602,8 @@ disclosed to the operator; 20-9/20-13/20-14 re-base on the 10,190 landed pin.
 | FR55 lifecycle hooks for spawned forms | 17-4 (compiled-in only) | `20-9-spawned-form-lifecycle-hooks` ◆ FLAG-Winston (after 20-8 L1, D-20-9-02 A PROPOSED) — created 2026-11-03 @8c809f9c, ready-for-dev: WIT 2.4.0 `world spirit-lifecycle` (idle/consolidate/telemetry/schedule/pause/resume/snapshot/swap-in/migrate; old guests unchanged), spawned triggers via `WorkerSpirit` forwarding, `[[schedule]]` carried at admission, received FR10 spawned hot swap/upgrade preserving pid tokens + working memory + snapshot state, spawned cold swap, watchdog D07 A suppression + PF-04 `poll_once` (L2 R +16/+21; cumulative 21203, D-20-9-15 STOP row); envelope PROPOSED (bin 36379, wasm-host 3222, iac 8348, domain 10117, xtask 44451, kernel 26873/21084, aggregate 195700) — **CLOSED for spawned forms 2026-11-12 by `20-9-spawned-form-lifecycle-hooks` (done): budgeted idle, consolidate, telemetry, schedule and pause/resume triggers reach a `wasm-component` Spirit (AC2, AC3, AC7, AC8; landings `9f03064b`..`459a606a`, `6bb4f339`; hosted runs 43149216081 and 43217945522; closure note `20-9-spawned-form-lifecycle-hooks-evidence/closure/closure-note.md`). Limit recorded as open rule-10 row F3: `idle` fires once per quiescence for a spawned Spirit under `maos run`.** Received FR10 spawned clause: **CLOSED for the spawned (`wasm-component`) form 2026-11-12 by `20-9-spawned-form-lifecycle-hooks` (done): spawned hot swap, upgrade and cold swap preserve the pid, capability tokens, working memory and snapshot state (AC4, AC5; landings `9f03064b`, `c8e5d035`; fixes `fe44017a`); hosted proof run 43217945522 (four-image `maos-bin` 132/132, hot swap of the shipped TypeScript example job 131181865598, counter continuity on a recipe-local variant job 131181865721; AC6.1 amended by D1 in the story, `20-9-spawned-form-lifecycle-hooks-evidence/closure/closure-note.md`).** |
 | FR2 purge residue (containers, cgroups) | 16-4 (reported, not removed) | `20-10-purge-residue-removal` (starts when picked, D-20-10-09 B RULED 2026-11-02, ask s2010; binary-removal hint/sentence stay with 20-2) |
 | FR65 erasure inventory (intent lineage, pending halts, schedules) | 16-4 (`main.rs:10845-10860` assumes lineage empty; schedules `CoverageGap`) | `20-11-erasure-inventory-closure` (after 20-3c) |
-| FR29 production consent granter + `ConsentGate`; native pid | 17-8 (rule-11 label: none in production) | `21-7-production-consent-granter-and-gate` (after 21-2) |
-| Success-criteria "three-protocol coherence" (ACP + MCP + A2A, one session) | none | `21-8-three-protocol-session-witness` (after 21-2) |
+| FR29 production consent granter + `ConsentGate`; native pid | 17-8 (rule-11 label: none in production) | `21-7-production-consent-granter-and-gate` — *2026-11-13:* no 21-2 edge (ruling B2, SCP 2026-11-12 §5.B2/3.2); its Postgres leg is parked under `v25-reza-postgres-legs` (SCP 2026-11-13 §2) |
+| Success-criteria "three-protocol coherence" (ACP + MCP + A2A, one session) | none | `23-5-a2a-v1-agent-card-and-jsonrpc-binding` (Epic 23 exit `interop_session_23`; not claimed at `v1.0.0`) — *re-routed 2026-11-13 (SCP 2026-11-13 §2):* was `21-8-three-protocol-session-witness`, which left the GA set and the tracker |
 | FR14 human task envelope, FR19 halt-policy schema/CLI, FR24 re-emission provenance | 19-1 (ACs are machine dispatch only) | 19-1 — ACs widened at the E19 preflight |
 | FR51(a)(d) bounded interruption, revocation; FR51(c) | 16-1 | 19-2 (with FR20) — (c) AC3; (a)(d) AC7/AC8, absorbed 2026-10-28 (D-19-2-01 B) |
 | FR21 fan-out floors, FR25 persona skills, FR40 startup refusal, FR4 1000-call proof | 19-1/19-3, 17-1, "LIVE" | 19-3 — ACs widened |
@@ -618,7 +618,7 @@ disclosed to the operator; 20-9/20-13/20-14 re-base on the 10,190 landed pin.
 | FR3 Kimi + per-Spirit selection | 20-4 | 20-4 — ACs widened |
 | FR16 posture-shift latency; the six PRD hot-path budgets | 16-1; 20-7 (1 of 6) | 20-7 — ACs widened |
 | FR23b skew/partition/CRL; NFR-Sec-13 scale/percentile acceptance | 21-3 | 21-3 — ACs widened |
-| J3/Reza live loop; J4 cross-host deployed fix | 21-2 / 21-1 (fixture + nightly mechanism scenes) | unchanged — mechanism-proven in the hermetic exit, live runs on the operator lane; the v1.0-rc ledger says so (audit DECIDE-5) |
+| J3/Reza live loop; J4 cross-host deployed fix | 21-2 / 21-1 (fixture + nightly mechanism scenes) | unchanged — mechanism-proven in the hermetic exit, live runs on the operator lane; the v1.0-rc ledger says so (audit DECIDE-5) — *2026-11-13 (SCP 2026-11-13 §2):* the J4 pair moves to `22-8-always-on-scene` (from the binary); 21-2 is dropped and its Postgres legs (the Reza scene on Postgres) are parked under `v25-reza-postgres-legs` |
 | NFR-Onb-1/Test-8/J6 N=12 cohort | `ops-external-cohort-and-pen-test` (≥3) | unchanged — honest N recorded; N=12 is the GA clause |
 | FR47 for Workers | 17-1 | narrowed by ADR-061 (proxy is the Worker's sole egress); first-party Spirits stay on the Inference Port |
 | FR6 macOS/Windows caps; FR33 Python template | 17-2 / 17-3b | parked v1.5 (Windows = 10.5's phase; round-3 "Python later") |
@@ -628,6 +628,34 @@ disclosed to the operator; 20-9/20-13/20-14 re-base on the 10,190 landed pin.
 | FR54 gateway contracts | v2.5 | **RULED 2026-10-25 (keep v2.5):** no story; the PRD's v1.0 phase entry is retagged v2.5 in place (DELTA-2026-10-25) — the v1.0 hermes-tenant positioning rests on FR65/NFR-Aud-12 erasure (`20-11`) and principal scoping |
 | I1–I14 ledger (guaranteed/asserted per `success-criteria.md:38`); adversarial corpus per invariant | 20-3b (coverage generator, closed NO-GO; all 14 rows read `asserted`) | **RULED 2026-11-12 (`ga3`):** `21-10-invariant-ledger-proofs`, a `v1.0.0` GA precondition; section owed at the Epic-20 retrospective preflight |
 | Third-party WASM form in the default artifact (v1.0 "Third-Party Spirits Ship"; ADR-060) | none (off by default under RELEASE-HOLDS "Standing mitigations") | **RULED 2026-11-12 (`wasm` = on):** `21-9-wasm-host-default-on`, a `v1.0.0` GA precondition; section owed |
-| NFR-Onb-1/Test-8/J6 N=12 cohort | `ops-external-cohort-and-pen-test` (≥3; N=12 the GA clause) | **RULED 2026-11-12 (`authors` = agents-first):** `21-11-agent-authoring-kit-and-agent-author-trial` (agent authors, honest N, own label); human authors optional, never blocking; not a GA precondition |
-| J4 50-incident cassette | `ops-j4-live-incident-recording` (paid recording blocks 21-1) | **RULED 2026-11-12 (`live` = skip):** 21-1 produces it from a local model or agent-authored (then the closure rate is labelled NOT MEASURED) |
+| NFR-Onb-1/Test-8/J6 N=12 cohort | `ops-external-cohort-and-pen-test` (≥3; N=12 the GA clause) | **RULED 2026-11-12 (`authors` = agents-first):** `22-7-domain-spirit-kit` (agent authors, honest N, own label); human authors optional, never blocking; not a GA precondition — *re-routed 2026-11-13 (SCP 2026-11-13 §2):* was `21-11-agent-authoring-kit-and-agent-author-trial`; 22-7 keeps the kit, a working `maos-spirit validate` and three recorded agent runs, and removes the N=12 trial and the human-denominator legs of the gate (D-21-PF-21 and D-21-PF-22 superseded) |
+| J4 50-incident cassette | `ops-j4-live-incident-recording` (paid recording blocks 21-1) | **RULED 2026-11-12 (`live` = skip):** 21-1 produces it from a local model or agent-authored (then the closure rate is labelled NOT MEASURED) — *2026-11-13 (SCP 2026-11-13 §2):* 21-1 moved to `22-8-always-on-scene`, which cuts the 50-incident cassette; the J4 closure rate stays NOT MEASURED |
 | FR13 quarantine gaps | `later-registry-quarantine-closure` (post-rc) | **RULED 2026-11-12 (`ga3`):** same key, promoted to a `v1.0.0` GA precondition |
+
+## Enterprise-fit lane routing (2026-11-13)
+
+Source: `../sprint-change-proposal-2026-11-13.md` §5 (the new ids) and §6 (each story's "Closes" column), operator-approved 2026-11-13. The ids are added to `../prd/functional-requirements.md` and `../prd/non-functional-requirements.md` by the same correct-course. Every owner below is a tracker `backlog` key of Epics 22–26; the lane starts after `v1.0.0`, so none of these is claimed at `v1.0.0`.
+
+| Requirement | Short text | Owning story key(s) |
+|---|---|---|
+| FR67 | MCP client authorization at a pinned specification revision; tokens bound to one server, never visible to a Spirit | `23-1-mcp-oauth-client` |
+| FR68 | Signed A2A v1.0 Agent Card and JSON-RPC binding; every inbound request passes typed-intent consent | `23-5-a2a-v1-agent-card-and-jsonrpc-binding` |
+| FR69 | The agent path exported as OpenTelemetry spans under the GenAI conventions at a pinned version | `23-3-otel-wiring-and-genai-projection` |
+| FR70 | Every mutating door command carries a verified operator principal and an operator-policy decision | `24-1-operator-principal-and-door-authz` |
+| FR71 | List agents and read one agent's session; one list of pending decisions | `22-5-agents-list-and-session-view` (list, session); `24-2-needs-you-inbox` (inbox) |
+| FR72 | An approval-required capability is held, shown to an authorized operator, and minted only after an approval row | `24-3-interactive-approval-hold` |
+| FR73 | Budgets per task, Spirit or principal; a breach stops spend and raises a halt; Worker spend is metered | `24-6-budgets-as-policy` (budgets); `26-3-worker-egress-usage-metering` (metering) |
+| FR74 | Operator rules turn a drift or anomaly signal into a journaled door command | `24-4-policy-driven-containment` |
+| FR75 | An installed Host verifies its own guarantees and writes a signed report | `25-1-maos-verify` |
+| FR76 | An OCI image and a Helm chart ship; the enterprise posture is available in air-gap builds | `22-2-service-mode-and-probes` (service); `22-3-image-compose-and-helm` (packaging); `23-6-enterprise-posture-in-air-gap` (air-gap) |
+| FR77 | One Host configuration file declares the standing cast; restored at every boot; an invalid file refuses boot | `22-1-host-config-and-standing-cast` |
+| FR78 | An authorized caller hands a named Spirit a task and reads its result, with a task id in the audit trail | `22-4-directed-task-ingress` |
+| FR79 | The audit store is bounded by policy; rotated segments remain independently verifiable | `22-6-bounded-audit-store` |
+| NFR-Sec-20 | A token issued for MCP server A is never sent to server B | `23-1-mcp-oauth-client` |
+| NFR-Obs-6 | 100 % of mediated external calls in a task appear in one trace; the convention version is stated | `23-3-otel-wiring-and-genai-projection` |
+| NFR-Ops-13 | An unauthorized operator command returns a typed 403 and a journal row, with zero state change | `24-1-operator-principal-and-door-authz` |
+| NFR-Ops-14 | Image size and idle memory are measured, stated and regression-checked; values set at 22-3 | `22-3-image-compose-and-helm` |
+| NFR-Cost-2 | Budget overshoot is bounded by one stated reconcile interval | `24-6-budgets-as-policy` |
+| NFR-Comp-6 | Every control-map row cites an invariant or gate and an evidence command | `25-2-control-map` |
+
+Existing requirements that gain a lane owner (same source): `prd/success-criteria.md:9` (first 30 minutes) → `22-8-always-on-scene`; NFR-Perf-8 → `26-1-concurrent-worker-fanout`.
