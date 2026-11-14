@@ -49,7 +49,9 @@ use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use maos_kernel_core::inference::router::MultiProviderRouter;
 use maos_kernel_core::inference::InferencePortAdapter;
 use maos_kernel_core::journal::JournalAdapter;
-use maos_kernel_core::security::manifest::{CapabilitiesRequired, EpistemicPolicySection};
+use maos_kernel_core::security::manifest::{
+    pinned_model, CapabilitiesRequired, EpistemicPolicySection,
+};
 use maos_kernel_core::security::{capabilities_required_to_scopes, RingCryptoProvider};
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 use maos_kernel_core::telemetry::TelemetryStreamAdapter;
@@ -268,34 +270,39 @@ pub fn evaluate(req: &EvalRequest, completions: Option<Completions>) -> Result<E
         .map_err(|e| format!("corpus {}: {e}", class.corpus))?;
     let text = String::from_utf8(bytes).map_err(|e| format!("corpus {}: {e}", class.corpus))?;
     let lines = text.lines().filter(|l| !l.trim().is_empty());
-    let declared = || -> Result<Vec<Scope>, String> {
-        Ok(capabilities_required_to_scopes(
-            &CapabilitiesRequired::from_toml_str(&required(&manifest)?)
-                .map_err(|e| format!("{} [capabilities.required]: {e}", class.name))?,
-        ))
+    let caps = || -> Result<CapabilitiesRequired, String> {
+        CapabilitiesRequired::from_toml_str(&required(&manifest)?)
+            .map_err(|e| format!("{} [capabilities.required]: {e}", class.name))
     };
 
     let (rows, verdicts, cassette) = match class.composition {
         Composition::Butler => model_verdicts(
             class,
             lines,
-            declared()?,
+            caps()?,
             completions,
-            |row: &ButlerInput, world, port, provider_id, mint| {
-                butler_pass(&row.input, world, port, provider_id, mint, &policy)
+            |row: &ButlerInput, world, port, provider_id, model_id, mint| {
+                butler_pass(
+                    &row.input,
+                    world,
+                    port,
+                    (provider_id, model_id),
+                    mint,
+                    &policy,
+                )
             },
         )?,
         Composition::Orchestrator => model_verdicts(
             class,
             lines,
-            declared()?,
+            caps()?,
             completions,
-            |row: &OrchestratorInput, world, port, provider_id, mint| {
+            |row: &OrchestratorInput, world, port, provider_id, model_id, mint| {
                 orchestrator_pass(
                     &row.section,
                     world,
                     port,
-                    provider_id,
+                    (provider_id, model_id),
                     mint,
                     class.name,
                     &policy,
@@ -449,9 +456,16 @@ struct CassetteFacts {
 fn model_verdicts<'a, I: serde::de::DeserializeOwned>(
     class: &HaltClass,
     lines: impl Iterator<Item = &'a str>,
-    declared: Vec<Scope>,
+    caps: CapabilitiesRequired,
     completions: Option<Completions>,
-    pass: impl Fn(&I, Arc<World>, Arc<Counted>, String, InferenceMint) -> Result<bool, String>,
+    pass: impl Fn(
+        &I,
+        Arc<World>,
+        Arc<Counted>,
+        String,
+        Option<String>,
+        InferenceMint,
+    ) -> Result<bool, String>,
 ) -> Result<
     (
         Vec<OnbScenario>,
@@ -465,6 +479,7 @@ fn model_verdicts<'a, I: serde::de::DeserializeOwned>(
         .map(parse_row)
         .collect::<Result<Vec<ModelRow<I>>, _>>()?;
     let completions = completions.ok_or_else(|| format!("the {name} class replays completions"))?;
+    let declared = capabilities_required_to_scopes(&caps);
     let provider = declared
         .iter()
         .find_map(|scope| match scope {
@@ -472,6 +487,8 @@ fn model_verdicts<'a, I: serde::de::DeserializeOwned>(
             _ => None,
         })
         .ok_or_else(|| format!("{name} declares no inference provider"))?;
+    // S1 (Q6): the class's completions are served by the model its manifest pins.
+    let pinned = pinned_model(&caps.provider.complete, &provider);
     let (router, cassette, flush) = match completions {
         Completions::Replay { driver, cassette } => {
             let drivers = BTreeMap::from([(provider.clone(), driver)]);
@@ -515,8 +532,15 @@ fn model_verdicts<'a, I: serde::de::DeserializeOwned>(
                 .map(|token| (token, EVAL_PID))
                 .map_err(|e| format!("token issue failed: {e}"))
         });
-        let halted = pass(&row.input, world, port, provider.clone(), mint)
-            .map_err(|e| format!("row {id}: {e}"))?;
+        let halted = pass(
+            &row.input,
+            world,
+            port,
+            provider.clone(),
+            pinned.clone(),
+            mint,
+        )
+        .map_err(|e| format!("row {id}: {e}"))?;
         verdicts.insert(id.clone(), halted);
     }
     check_consumed(consumed.load(Ordering::SeqCst), rows.len())?;
@@ -545,7 +569,7 @@ fn butler_pass(
     input: &ScenarioInput,
     world: Arc<World>,
     port: Arc<Counted>,
-    provider_id: String,
+    (provider_id, model_id): (String, Option<String>),
     mint: InferenceMint,
     policy: &EpistemicPolicySection,
 ) -> Result<bool, String> {
@@ -554,7 +578,11 @@ fn butler_pass(
         policy: policy.clone(),
         outcome: Mutex::new(None),
     });
-    let binding = ButlerInferenceBinding { provider_id, mint };
+    let binding = ButlerInferenceBinding {
+        provider_id,
+        model_id,
+        mint,
+    };
     let butler = Butler::with_scenario(input.clone())
         .with_scalar_port(Arc::clone(&scalar) as Arc<dyn EpistemicScalarPort>)
         .with_deferred_inference_port(port, Arc::new(Mutex::new(Some(binding))));
@@ -578,7 +606,7 @@ fn orchestrator_pass(
     epic: &str,
     world: Arc<World>,
     port: Arc<Counted>,
-    provider_id: String,
+    (provider_id, model_id): (String, Option<String>),
     mint: InferenceMint,
     spirit_id: &str,
     policy: &EpistemicPolicySection,
@@ -588,7 +616,11 @@ fn orchestrator_pass(
         .into_iter()
         .next()
         .ok_or("section: no `### Story` section")?;
-    let binding = OrchestratorInferenceBinding { provider_id, mint };
+    let binding = OrchestratorInferenceBinding {
+        provider_id,
+        model_id,
+        mint,
+    };
     let (tag, value, derived_from) = Orchestrator::new(spirit_id)
         .with_deferred_inference_port(port, Arc::new(Mutex::new(Some(binding))))
         .judge_ambiguity(&section)

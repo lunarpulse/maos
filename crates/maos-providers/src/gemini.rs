@@ -66,6 +66,9 @@ impl Provider for GeminiProvider {
     }
 
     fn complete(&self, req: &InferenceRequest) -> Result<InferenceResponse, ProviderError> {
+        // 20-4 review F1 (operator-adjudicated, kept by S1/Q6): the id is a URL
+        // path segment, so a request may name only the admitted model — a
+        // Gemini manifest pin must equal the configured model.
         let model_id = req.options.model_id.as_deref().unwrap_or(&self.model_id);
         validate_model_id(model_id)?;
         if model_id != self.model_id {
@@ -74,33 +77,20 @@ impl Provider for GeminiProvider {
             ));
         }
         let body = build_request_body(req);
-        let body_bytes =
-            serde_json::to_vec(&body).map_err(|e| ProviderError::Serde(e.to_string()))?;
         let url = format!(
             "{}/v1beta/models/{}:generateContent",
             self.endpoint_url, model_id
         );
-        let exchange = self
-            .transport
-            .http_post_exchange(
-                &url,
-                &body_bytes,
-                &[
-                    ("x-goog-api-key", &self.api_key),
-                    ("content-type", "application/json"),
-                ],
-                "retry-after",
-            )
-            .map_err(crate::provider::transport_error)?;
-        if !(200..=299).contains(&exchange.status) {
-            return Err(ProviderError::ProviderRejected {
-                status: exchange.status,
-                body: crate::provider::error_text(&String::from_utf8_lossy(
-                    &exchange.body[..exchange.body.len().min(512)],
-                )),
-            });
-        }
-        let json: serde_json::Value = serde_json::from_slice(&exchange.body)
+        let response_bytes = crate::provider::post_json(
+            &*self.transport,
+            &url,
+            &body,
+            &[
+                ("x-goog-api-key", &self.api_key),
+                ("content-type", "application/json"),
+            ],
+        )?;
+        let json: serde_json::Value = serde_json::from_slice(&response_bytes)
             .map_err(|e| ProviderError::Serde(e.to_string()))?;
         parse_response(&json, &self.endpoint_url, model_id)
     }
@@ -160,13 +150,33 @@ fn parse_response(
         stop_reason,
         usage: TokenUsage {
             input_tokens: crate::provider::usage_count(usage, "promptTokenCount")?,
-            output_tokens: crate::provider::usage_count(usage, "candidatesTokenCount")?,
+            output_tokens: billed_output_tokens(usage)?,
         },
         provider_attribution: ProviderAttribution {
             provider_id: "gemini".into(),
             endpoint_url: endpoint_url.into(),
             model_id: Some(model_id.into()),
         },
+    })
+}
+
+/// Billed output tokens: `candidatesTokenCount + thoughtsTokenCount`. Gemini
+/// prices "the sum of output tokens and thinking tokens", and reports thoughts
+/// separately from the candidates (https://ai.google.dev/gemini-api/docs/thinking).
+///
+/// `candidatesTokenCount` is required. `thoughtsTokenCount` is absent when the
+/// model produced no thoughts (non-thinking models, thinking off), so an absent
+/// field counts 0; a field that IS present must be a `u32` integer, never
+/// silently treated as 0. The sum is overflow-checked.
+fn billed_output_tokens(usage: Option<&serde_json::Value>) -> Result<u32, ProviderError> {
+    let candidates = crate::provider::usage_count(usage, "candidatesTokenCount")?;
+    let thoughts = if usage.and_then(|u| u.get("thoughtsTokenCount")).is_none() {
+        0
+    } else {
+        crate::provider::usage_count(usage, "thoughtsTokenCount")?
+    };
+    candidates.checked_add(thoughts).ok_or_else(|| {
+        ProviderError::Serde("usageMetadata candidates + thoughts tokens exceed u32".into())
     })
 }
 

@@ -142,6 +142,7 @@ fn bound_on(port: Arc<ScriptedPort>, scenario: ScenarioInput) -> Bound {
     let counter = Arc::clone(&mints);
     let binding = Arc::new(Mutex::new(Some(ButlerInferenceBinding {
         provider_id: "anthropic".into(),
+        model_id: None,
         mint: Arc::new(move || {
             counter.fetch_add(1, Ordering::SeqCst);
             Ok((CapabilityToken::new(TokenId::ZERO, 41, 0, [0u8; 64]), 41))
@@ -460,6 +461,7 @@ fn a_refused_pass_clears_the_previous_notification() {
 
     let binding = Arc::new(Mutex::new(Some(ButlerInferenceBinding {
         provider_id: "anthropic".into(),
+        model_id: None,
         mint: Arc::new(|| Ok((CapabilityToken::new(TokenId::ZERO, 41, 0, [0u8; 64]), 41))),
     })));
     let refusing = b.butler.clone().with_deferred_inference_port(
@@ -578,7 +580,7 @@ fn the_seam_binds_the_declared_provider_at_the_resolved_pid() {
     )
     .attach(
         Butler::with_scenario(conflict()),
-        || Some("anthropic".into()),
+        || Some(("anthropic".into(), None)),
         Arc::new(|| Some(77)),
     )
     .expect("a registered declared provider binds");
@@ -603,7 +605,7 @@ fn the_seam_refuses_an_unregistered_declared_provider() {
     let err = seam(&["ollama"], Arc::default(), ScriptedPort::answering(GOOD))
         .attach(
             Butler::with_scenario(conflict()),
-            || Some("anthropic".into()),
+            || Some(("anthropic".into(), None)),
             Arc::new(|| Some(77)),
         )
         .expect_err("an unregistered declared provider must refuse");

@@ -140,17 +140,7 @@ fn now_ns() -> i64 {
 }
 
 fn path_with_target_debug() -> std::ffi::OsString {
-    let profile = std::env::current_exe()
-        .expect("test executable path")
-        .parent()
-        .and_then(Path::parent)
-        .expect("test profile directory")
-        .to_path_buf();
-    let mut paths = vec![profile.clone(), profile.join("deps")];
-    if let Some(existing) = std::env::var_os("PATH") {
-        paths.extend(std::env::split_paths(&existing));
-    }
-    std::env::join_paths(paths).expect("test PATH entries are valid")
+    fixtures::path_with_profile()
 }
 
 fn base(binary: &Path, home: &Path) -> Command {

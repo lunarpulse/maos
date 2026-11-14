@@ -229,10 +229,12 @@ pub type InferenceMint = Arc<dyn Fn() -> Result<(CapabilityToken, u32), String> 
 
 /// Story 18-1 (D-18-1-02 A) — the binding the composition root backfills
 /// after admission: the provider Butler's token names (its first declared
-/// `ProviderInfer`) and the per-pass mint. The request names the same id.
+/// `ProviderInfer`), the model its manifest pins for it (S1; `None` is
+/// provider-only) and the per-pass mint. The request names the same ids.
 #[derive(Clone)]
 pub struct ButlerInferenceBinding {
     pub provider_id: String,
+    pub model_id: Option<String>,
     pub mint: InferenceMint,
 }
 
@@ -351,7 +353,8 @@ impl ButlerSeam {
     }
 
     /// Bind `butler` (D-18-1-02/05 A): its token names its first declared
-    /// `ProviderInfer` (`declared`) and the request names the same id; the
+    /// `ProviderInfer` (`declared`: provider and the model its manifest pins
+    /// for it, S1) and the request names the same ids; the
     /// mint runs per pass at the pid `pid_of` resolves. Review ruling
     /// D-18-1-R2: a declared provider the router does not register is
     /// refused here — at boot or load — never pass by pass.
@@ -363,7 +366,7 @@ impl ButlerSeam {
     pub fn attach(
         &self,
         mut butler: Butler,
-        declared: impl FnOnce() -> Option<String>,
+        declared: impl FnOnce() -> Option<(String, Option<String>)>,
         pid_of: PidSource,
     ) -> Result<Butler, String> {
         butler = butler.with_clock(Arc::clone(&self.clock));
@@ -376,7 +379,8 @@ impl ButlerSeam {
             }));
         }
         if let Some((build_port, registered)) = self.inference.clone() {
-            let provider = declared().ok_or("butler inference: the Spirit declares no provider")?;
+            let (provider, model_id) =
+                declared().ok_or("butler inference: the Spirit declares no provider")?;
             if !registered.contains(&provider) {
                 return Err(format!(
                     "butler inference: no inference provider is configured for its declared \
@@ -385,9 +389,13 @@ impl ButlerSeam {
             }
             let port = build_port().ok_or("butler inference: the host is shutting down")?;
             eprintln!("butler inference seam wired (provider `{provider}`)");
+            if let Some(model) = &model_id {
+                eprintln!("butler inference model pinned by its manifest: `{model}`");
+            }
             let (mint, pid) = (Arc::clone(&self.mint), Arc::clone(&pid_of));
             let binding = ButlerInferenceBinding {
                 provider_id: provider.clone(),
+                model_id,
                 mint: Arc::new(move || {
                     let pid = pid().ok_or("the Spirit has no admitted pid yet")?;
                     mint(pid, &provider).map(|token| (token, pid))
@@ -1180,7 +1188,7 @@ impl Butler {
             InferenceOptions {
                 max_tokens: 512,
                 temperature: Some(0.0),
-                model_id: None,
+                model_id: binding.model_id,
             },
             Some(binding.provider_id),
             Vec::new(),

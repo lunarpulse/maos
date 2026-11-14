@@ -3175,3 +3175,137 @@ fn vetted_door_upgrade_uses_installed_package_and_refuses_swaps_d1_p9() {
         }
     }
 }
+
+/// S1 (Q6, review P2) — Butler at `version` pinning `model` for Anthropic.
+fn butler_pinning(version: &str, model: &str) -> String {
+    let unpinned = butler_at(version, "");
+    let pinned = unpinned.replace("anthropic.claude-haiku-5-5", &format!("anthropic.{model}"));
+    assert_ne!(pinned, unpinned, "the fixture must really change the pin");
+    pinned
+}
+
+/// A model the currency file retires: the catalog admits only the configured
+/// default plus the allowlist, so a pin naming it must be refused everywhere.
+const RETIRED_PIN: &str = "claude-3-haiku-20240307";
+
+/// S1 review P2 — a hot-swap successor pinning a retired model is refused
+/// `model_not_admitted` by the successor factory BEFORE the swap commits: same
+/// pid, still `Running`, no `spirit.upgrade` row, no FR11 record. A successor
+/// pinning an allowed model then swaps at that pid, so the refusal is the
+/// pin's and not the swap's.
+///
+/// Proven red: delete the factory's `check_staged_pins` call ⇒ the retired
+/// successor completes the swap (exit 0).
+#[test]
+fn s1_a_hot_swap_successor_with_a_retired_pin_is_refused_and_the_predecessor_keeps_serving() {
+    let root = Root::butler("pin-hot-swap");
+    let pid = pid_of(&root, "butler");
+    let dir = root.scratch.join("manifests");
+    let retired = write_fixture(
+        &dir,
+        "butler-0.3.1-retired.toml",
+        &butler_pinning("0.3.1", RETIRED_PIN),
+    );
+    let rows_before = root.tl_frames().len();
+
+    let out = upgrade(&root, &retired, None);
+    let err = stderr(&out);
+    assert_eq!(code(&out), 1, "a typed refusal: {err}");
+    assert!(
+        err.contains("model_not_admitted") && err.contains(RETIRED_PIN),
+        "the refusal must name the code and the pin: {err}"
+    );
+    assert_eq!(pid_of(&root, "butler"), pid, "the predecessor is untouched");
+    assert_eq!(root.lifecycle_state("butler").as_deref(), Some("Running"));
+    assert!(
+        !root
+            .tl_frames()
+            .iter()
+            .skip(rows_before)
+            .any(|frame| frame.intent == "spirit.upgrade"),
+        "a refused successor commits no swap"
+    );
+    assert!(
+        !root.archives.join("butler").join("0.3.1").exists(),
+        "a refused successor leaves no FR11 record"
+    );
+
+    let allowed = write_fixture(
+        &dir,
+        "butler-0.3.1-sonnet.toml",
+        &butler_pinning("0.3.1", "claude-sonnet-5-5"),
+    );
+    let out = upgrade(&root, &allowed, None);
+    assert_eq!(code(&out), 0, "an admitted pin swaps: {}", stderr(&out));
+    assert!(report_of(&out).to_string().contains("0.3.1"));
+    assert_eq!(pid_of(&root, "butler"), pid, "a hot swap keeps the pid");
+    assert_eq!(root.lifecycle_state("butler").as_deref(), Some("Running"));
+}
+
+/// S1 review P2 — the cold swap re-admits through the one admission triple, so
+/// a retired pin is refused there too: `cold_swap_reverted` names
+/// `model_not_admitted` and the predecessor is restored and running.
+#[test]
+fn s1_a_cold_swap_successor_with_a_retired_pin_is_refused_and_reverted() {
+    let root = Root::butler("pin-cold-swap");
+    let predecessor = pid_of(&root, "butler");
+    let retired = write_fixture(
+        &root.scratch.join("manifests"),
+        "butler-0.3.1-retired.toml",
+        &butler_pinning("0.3.1", RETIRED_PIN),
+    );
+
+    let out = upgrade(&root, &retired, Some("cold-swap"));
+    let err = stderr(&out);
+    assert_eq!(code(&out), 1, "a reverted cold swap is a failure: {err}");
+    for needle in ["cold_swap_reverted", "HTTP 409", "model_not_admitted"] {
+        assert!(
+            err.contains(needle),
+            "the refusal must name {needle}: {err}"
+        );
+    }
+    assert_eq!(root.lifecycle_state("butler").as_deref(), Some("Running"));
+    assert_ne!(pid_of(&root, "butler"), predecessor, "restored afresh");
+    assert!(!root.archives.join("butler").join("0.3.1").exists());
+}
+
+/// S1 review P2 — explicit replay replaces every driver, so the driver-side
+/// model gate never runs there; admission still refuses a retired pin, on both
+/// replay-mode entries: `maos run <manifest>` before any pid exists, and
+/// `maosctl load` over a replay root's door.
+#[test]
+fn s1_explicit_replay_refuses_a_retired_pin_at_run_and_at_load() {
+    let shared = tempfile::TempDir::new().expect("scratch");
+    let archives = shared.path().join("spirit-archives");
+    let retired = write_fixture(
+        &shared.path().join("manifests"),
+        "butler-0.3.1-retired.toml",
+        &butler_pinning("0.3.1", RETIRED_PIN),
+    );
+
+    let run = refused_run("pin-run", &retired, &archives);
+    assert!(
+        matches!(run.code, Some(code) if code != 0),
+        "maos run must exit non-zero: {:?} {}",
+        run.code,
+        run.stderr
+    );
+    assert!(
+        run.stderr.contains("model_not_admitted") && run.stderr.contains(RETIRED_PIN),
+        "maos run's refusal must name the code and the pin: {}",
+        run.stderr
+    );
+    assert!(!run.frames.iter().any(|f| f.intent == "lifecycle.load"));
+
+    let root = Root::butler("pin-load");
+    let unload = root.ctl(&["unload", "butler"]);
+    assert_eq!(code(&unload), 0, "unload must exit 0: {}", stderr(&unload));
+    let load = root.ctl(&["load", utf8(&retired)]);
+    let err = stderr(&load);
+    assert_eq!(code(&load), 1, "the door must refuse the load: {err}");
+    assert!(
+        err.contains("model_not_admitted") && err.contains(RETIRED_PIN),
+        "the door refusal must name the code and the pin: {err}"
+    );
+    assert_eq!(root.lifecycle_state("butler"), None, "nothing was admitted");
+}

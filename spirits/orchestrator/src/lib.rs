@@ -89,11 +89,13 @@ pub type ProviderMint = Arc<dyn Fn(u32, &str) -> Result<CapabilityToken, String>
 pub type PidSource = Arc<dyn Fn() -> Option<u32> + Send + Sync>;
 
 /// Story 19-1 (AC3, D19-4 A; mirrors `researcher::ResearcherInferenceBinding`)
-/// — the provider the token and every request name, and the per-pass mint.
+/// — the provider the token and every request name, the model its manifest
+/// pins for it (S1; `None` is provider-only) and the per-pass mint.
 /// The composition root backfills it after admission.
 #[derive(Clone)]
 pub struct OrchestratorInferenceBinding {
     pub provider_id: String,
+    pub model_id: Option<String>,
     pub mint: InferenceMint,
 }
 
@@ -103,11 +105,18 @@ impl OrchestratorInferenceBinding {
         let provider = provider_id.clone();
         Self {
             provider_id,
+            model_id: None,
             mint: Arc::new(move || {
                 let pid = pid_of().ok_or("the Spirit has no admitted pid yet")?;
                 mint(pid, &provider).map(|token| (token, pid))
             }),
         }
+    }
+
+    /// S1 — every request names the manifest's pinned model.
+    pub fn with_model(mut self, model_id: Option<String>) -> Self {
+        self.model_id = model_id;
+        self
     }
 }
 
@@ -453,7 +462,7 @@ impl Orchestrator {
             InferenceOptions {
                 max_tokens: AMBIGUITY_MAX_TOKENS,
                 temperature: Some(0.0),
-                model_id: None,
+                model_id: binding.model_id.clone(),
             },
             Some(binding.provider_id.clone()),
             Vec::new(),

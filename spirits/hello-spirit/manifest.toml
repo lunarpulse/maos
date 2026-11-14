@@ -10,7 +10,7 @@ description = "MAOS reference Spirit — structured acknowledgement"
 
 [capabilities.required]
 # Every provider the router can default to must be declared at token issuance.
-provider.complete = ["anthropic.claude-haiku-4-5-20251001", "ollama.llama3.1:8b", "openai.gpt-4o-mini", "gemini.gemini-3.5-flash-lite", "kimi.kimi-k3.1-pro"]
+provider.complete = ["anthropic.claude-haiku-5-5", "ollama.llama3.1:8b", "openai.gpt-4o-mini", "gemini.gemini-3.5-flash-lite", "kimi.kimi-k3.1-pro"]
 
 [posture]
 default = "assistive"

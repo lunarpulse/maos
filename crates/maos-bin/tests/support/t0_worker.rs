@@ -21,18 +21,10 @@ fn resolve_fixture(command: &str) -> Result<String, String> {
     let name = path
         .file_name()
         .ok_or_else(|| format!("invalid Worker command {command:?}"))?;
-    if let Some(parent) = std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(Path::to_path_buf))
-    {
-        for candidate in [
-            parent.join(name),
-            parent.parent().unwrap_or(&parent).join(name),
-        ] {
-            if candidate.is_file() {
-                return Ok(candidate.display().to_string());
-            }
-        }
+    // Layout-agnostic profile directory (Cargo `deps/` or `build/<pkg>/<hash>/out/`).
+    let candidate = crate::fixtures::profile_dir().join(name);
+    if candidate.is_file() {
+        return Ok(candidate.display().to_string());
     }
     for dir in std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()) {
         let candidate = dir.join(name);

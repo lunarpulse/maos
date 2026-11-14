@@ -98,22 +98,21 @@ impl Provider for OpenAiProvider {
     }
 
     fn complete(&self, req: &InferenceRequest) -> Result<InferenceResponse, ProviderError> {
-        let body = build_openai_request_body(req, &self.model_id);
-        let body_bytes =
-            serde_json::to_vec(&body).map_err(|e| ProviderError::Serde(e.to_string()))?;
+        // S1: an admitted pin (the request's `model_id`) is served — and
+        // attributed — by that model; else the configured one.
+        let model_id = req.options.model_id.as_deref().unwrap_or(&self.model_id);
+        let body = build_openai_request_body(req, model_id);
 
         let url = format!("{}/v1/chat/completions", self.endpoint_url);
-        let response_bytes = self
-            .transport
-            .http_post(
-                &url,
-                &body_bytes,
-                &[
-                    ("Authorization", &format!("Bearer {}", self.api_key)),
-                    ("content-type", "application/json"),
-                ],
-            )
-            .map_err(crate::provider::transport_error)?;
+        let response_bytes = crate::provider::post_json(
+            &*self.transport,
+            &url,
+            &body,
+            &[
+                ("Authorization", &format!("Bearer {}", self.api_key)),
+                ("content-type", "application/json"),
+            ],
+        )?;
 
         let response_json: serde_json::Value = serde_json::from_slice(&response_bytes)
             .map_err(|e| ProviderError::Serde(e.to_string()))?;
@@ -121,7 +120,7 @@ impl Provider for OpenAiProvider {
         parse_openai_response(
             &response_json,
             &self.endpoint_url,
-            &self.model_id,
+            model_id,
             self.provider_id,
         )
     }

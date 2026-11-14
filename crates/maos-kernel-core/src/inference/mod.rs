@@ -367,15 +367,14 @@ impl InferencePort for InferencePortAdapter {
         });
         let duration_us = start.elapsed().as_micros() as u64;
 
-        let actual_provider = result
-            .as_ref()
-            .map(|r| r.provider_attribution.provider_id.as_str())
-            .unwrap_or("unknown");
+        let served = result.as_ref().ok().map(|r| &r.provider_attribution);
+        let actual_provider = served.map_or("unknown", |a| a.provider_id.as_str());
+        let model = served
+            .and_then(|a| a.model_id.as_deref())
+            .or(req.options.model_id.as_deref());
         let intent = format!(
-            "infer:{}->{}:{}",
-            provider_id,
-            actual_provider,
-            req.options.model_id.as_deref().unwrap_or("default")
+            "infer:{provider_id}->{actual_provider}:{}",
+            model.unwrap_or("default")
         );
         let payload = req.prompt.as_bytes();
         let mut token_bytes = [0u8; 32];

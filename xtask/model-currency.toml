@@ -38,6 +38,12 @@
 # (replacement: the vendor's named successor) and this gate reds every pin of
 # it — hello-spirit, the 17-5 sweep targets, the price book and the `main.rs`
 # default — which is the re-sweep. Not a pin the gate can pre-empt offline.
+# 2026-11-12 SWEEP (operator ruling "set haiku5.5 for the workflow model"):
+# butler, hello-spirit, orchestrator and the `main.rs` ANTHROPIC_DEFAULTS moved to
+# `claude-haiku-5-5` (Claude Haiku 5.5, released 2026-10-07; model ID per
+# platform.claude.com/docs/en/models/haiku-5-5/overview). `claude-haiku-4-5-*`
+# stays `allowed` — spirit-rust, example-spirit and the gate's own vectors still
+# name it — and the retirement WATCH above still applies to those pins.
 
 [providers.anthropic]
 allowed = [
@@ -52,6 +58,7 @@ allowed = [
     "claude-sonnet-5-5",
     "claude-sonnet-5",
     "claude-sonnet-4-6",
+    "claude-haiku-5-5",
     "claude-haiku-4-5-20251001",
     "claude-haiku-4-5",
 ]

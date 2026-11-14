@@ -5,6 +5,8 @@
 
 use std::process::Command;
 
+#[path = "../../../tests/harness/layout.rs"]
+mod layout;
 #[path = "../../../tests/harness/t3_substrate.rs"]
 mod t3_substrate;
 
@@ -41,19 +43,7 @@ fn founder_loop_once_drains_capability_audit_writer() {
         .env("HOME", t3_substrate::isolated_runtime_home(home.path()))
         .env("XDG_DATA_HOME", home.path())
         .env("MAOS_HOME", home.path())
-        .env("PATH", {
-            let profile = std::env::current_exe()
-                .expect("test executable path")
-                .parent()
-                .and_then(std::path::Path::parent)
-                .expect("test profile directory")
-                .to_path_buf();
-            let mut paths = vec![profile.clone(), profile.join("deps")];
-            if let Some(existing) = std::env::var_os("PATH") {
-                paths.extend(std::env::split_paths(&existing));
-            }
-            std::env::join_paths(paths).expect("test PATH")
-        })
+        .env("PATH", layout::path_with_profile())
         .current_dir(workspace_root())
         .output()
         .expect("spawn founder-loop topology");

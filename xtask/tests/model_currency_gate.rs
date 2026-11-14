@@ -115,18 +115,18 @@ fn each_retired_or_unknown_pin_reds_naming_its_file_and_line() {
     const RETIRED: &str = "RETIRED model id";
     // (surface, current text, planted text, expected detail fragment)
     let vectors: &[(&str, &str, &str, &str)] = &[
-        ("spirits/butler/manifest.toml", "anthropic.claude-haiku-4-5-20251001", "anthropic.claude-3-haiku-20240307",
+        ("spirits/butler/manifest.toml", "anthropic.claude-haiku-5-5", "anthropic.claude-3-haiku-20240307",
          "RETIRED model id `anthropic.claude-3-haiku-20240307` — replacement (display-only guidance): `claude-haiku-4-5-20251001`"),
         ("spirits/researcher/manifest.toml", "anthropic.claude-sonnet-5-5", "anthropic.claude-3-5-sonnet-20241022",
          "replacement (display-only guidance): `claude-sonnet-5-5`"),
-        ("spirits/hello-spirit/manifest.toml", "anthropic.claude-haiku-4-5-20251001", "anthropic.claude-sonnet-4-5-20250929", RETIRED),
+        ("spirits/hello-spirit/manifest.toml", "anthropic.claude-haiku-5-5", "anthropic.claude-sonnet-4-5-20250929", RETIRED),
         ("templates/spirit-rust/manifest.toml", "anthropic.claude-haiku-4-5-20251001", "anthropic.claude-3-haiku-20240307", RETIRED),
         ("examples/example-spirit/manifest.toml", "anthropic.claude-haiku-4-5-20251001", "anthropic.claude-3-haiku-20240307", RETIRED),
         ("xtask/provider-pricing.toml", "model = \"gpt-4o-mini\"", "model = \"gpt-4\"",
          "replacement (display-only guidance): `gpt-5.6-sol`"),
         ("xtask/provider-pricing.toml", "model = \"claude-sonnet-5-5\"", "model = \"claude-3-5-sonnet\"",
          "UNKNOWN model id `anthropic.claude-3-5-sonnet`"),
-        ("crates/maos-bin/src/main.rs", "\"claude-haiku-4-5-20251001\"", "\"claude-3-haiku-20240307\"", RETIRED),
+        ("crates/maos-bin/src/main.rs", "\"claude-haiku-5-5\"", "\"claude-3-haiku-20240307\"", RETIRED),
         ("crates/maos-bin/src/main.rs", "\"gpt-4o-mini\"", "\"gpt-4o-minnie\"",
          "UNKNOWN model id `openai.gpt-4o-minnie`"),
         ("crates/maos-bin/src/main.rs", "\"llama3.1:8b\"", "\"llama3:8b\"",
@@ -376,7 +376,7 @@ fn the_cli_subcommand_is_wired_green_at_head_and_red_on_a_plant() {
     let tree = Tree::real();
     let line = tree.plant(
         "spirits/butler/manifest.toml",
-        "anthropic.claude-haiku-4-5-20251001",
+        "anthropic.claude-haiku-5-5",
         "anthropic.claude-3-haiku-20240307",
     );
     let red = Command::new(xtask)

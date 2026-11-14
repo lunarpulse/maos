@@ -299,17 +299,7 @@ fn write_daemon_config(
 }
 
 fn target_debug_path() -> std::ffi::OsString {
-    let profile = std::env::current_exe()
-        .expect("test executable path")
-        .parent()
-        .and_then(Path::parent)
-        .expect("test profile directory")
-        .to_path_buf();
-    let mut paths = vec![profile.clone(), profile.join("deps")];
-    if let Some(existing) = std::env::var_os("PATH") {
-        paths.extend(std::env::split_paths(&existing));
-    }
-    std::env::join_paths(paths).expect("valid PATH")
+    fixtures::path_with_profile()
 }
 
 /// `maos` resolves `worker-cli-fixture` beside its own executable; the

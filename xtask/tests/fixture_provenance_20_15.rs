@@ -606,7 +606,9 @@ const CHILD: &str = "MAOS_FIXTURE_PROVENANCE_20_15_CHILD";
 const RESOLVED: &str = "public fixture resolved: ";
 
 /// Run the child-mode `test` of `exe` with the checkout as cwd; inherited CI,
-/// transport and `GIT_*` variables are scrubbed, only `vars` are declared.
+/// transport, `GIT_*` and cargo/nextest location variables are scrubbed (the
+/// child must locate its profile from where `exe` sits, not from the parent's
+/// real build), only `vars` are declared.
 fn run_child(exe: &Path, test: &str, selector: &str, root: &Path, vars: &[(&str, &str)]) -> Output {
     let mut child = Command::new(exe);
     scrub_git(&mut child)
@@ -614,6 +616,16 @@ fn run_child(exe: &Path, test: &str, selector: &str, root: &Path, vars: &[(&str,
         .current_dir(root);
     for inherited in ["CI", "GITHUB_ACTIONS", "MAOS_FIXTURE_TRANSPORT"] {
         child.env_remove(inherited);
+    }
+    for (key, _) in std::env::vars_os() {
+        let name = key.to_string_lossy();
+        if name.starts_with("CARGO_BIN_EXE_")
+            || name.starts_with("NEXTEST_BIN_EXE_")
+            || name == "CARGO_TARGET_DIR"
+            || name == "CARGO_BUILD_TARGET_DIR"
+        {
+            child.env_remove(&key);
+        }
     }
     child
         .env(CHILD, selector)
@@ -668,17 +680,18 @@ fn public_profile_binary_child() {
     }
 }
 
-#[test]
-fn public_profile_binary_requires_entries_for_manifest_owned_binaries_in_transport() {
+/// Run a copy of this test executable from `<profile>/<exe_dir>` (the Cargo
+/// layout under test) inside the ignored target dir: `profile_binary` must
+/// resolve `<profile>/<name>` from there.
+fn profile_binary_in_layout(exe_dir: &str) {
     let dir = repository();
     // `current_exe` is canonical, so the printed profile path is too.
     let root = &dir.path().canonicalize().unwrap();
-    // `profile_binary` resolves `<exe>/../../<name>`: run a copy of this test
-    // executable from `<target>/<profile>/deps` inside the ignored target dir.
     let profile = root.join("target/t/debug");
-    std::fs::create_dir_all(profile.join("deps")).unwrap();
+    let exe_dir = profile.join(exe_dir);
+    std::fs::create_dir_all(&exe_dir).unwrap();
     let exe = std::env::current_exe().unwrap();
-    let copy = profile.join("deps").join(exe.file_name().unwrap());
+    let copy = exe_dir.join(exe.file_name().unwrap());
     // `cp` alone holds the writable descriptor, so no sibling test's fork can
     // leave the copy "text file busy" when it is executed.
     assert!(Command::new("cp")
@@ -715,6 +728,18 @@ fn public_profile_binary_requires_entries_for_manifest_owned_binaries_in_transpo
         .unwrap();
         accepted(&run_child(&copy, test, name, root, &transport), &path);
     }
+}
+
+#[test]
+fn public_profile_binary_requires_entries_for_manifest_owned_binaries_in_transport() {
+    // Cargo <= 1.99: `<target>/<profile>/deps/<test>-<hash>`.
+    profile_binary_in_layout("deps");
+}
+
+#[test]
+fn public_profile_binary_requires_entries_for_manifest_owned_binaries_in_build_dir_layout() {
+    // Cargo >= 1.100: `<target>/<profile>/build/<pkg>/<hash>/out/<test>-<hash>`.
+    profile_binary_in_layout("build/xtask/0123456789abcdef/out");
 }
 
 #[test]

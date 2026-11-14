@@ -368,6 +368,8 @@ pub enum AdmissionRefusal {
     ProviderUnavailable { provider: String },
     /// The root's exact configured base URL does not satisfy the manifest.
     EndpointPinMismatch { provider: String },
+    /// S1 (Q6) — a manifest pins a model the root does not admit for that provider.
+    ModelNotAdmitted { provider: String, model: String },
     /// Fallback would require authority the primary token does not carry.
     FallbackUnsupported,
     /// Declared skill is not available and operator-admitted.
@@ -401,6 +403,7 @@ impl AdmissionRefusal {
             Self::MigratorMissing { .. } => "migrator_missing",
             Self::ProviderUnavailable { .. } => "provider_unavailable",
             Self::EndpointPinMismatch { .. } => "endpoint_pin_mismatch",
+            Self::ModelNotAdmitted { .. } => "model_not_admitted",
             Self::FallbackUnsupported => "fallback_unsupported",
             Self::SkillUnavailable { .. } => "skill_unavailable",
             Self::SkillEscalation { .. } => "skill_escalation",
@@ -478,6 +481,7 @@ impl std::fmt::Display for AdmissionRefusal {
             ),
             Self::ProviderUnavailable { provider } => write!(f, "provider_unavailable: '{provider}' is undeclared, unregistered, or its model assertion differs"),
             Self::EndpointPinMismatch { provider } => write!(f, "endpoint_pin_mismatch: '{provider}' does not match the configured endpoint"),
+            Self::ModelNotAdmitted { provider, model } => write!(f, "model_not_admitted: '{provider}' does not admit the pinned model '{model}'"),
             Self::FallbackUnsupported => f.write_str("fallback_unsupported: a primary token cannot authorise fallback providers"),
             Self::SkillUnavailable { skill } => write!(f, "skill_unavailable: {skill}"),
             Self::SkillEscalation { skill } => write!(f, "skill_escalation: {skill}"),
@@ -978,6 +982,148 @@ pub struct ConfiguredProvider {
 }
 pub type ProviderCatalog = BTreeMap<String, ConfiguredProvider>;
 
+/// Story 17-5's offline currency data, compiled in: the models a pin may name.
+/// An unparsable file leaves no allowed id: only each provider's default stays.
+static CURRENCY_ALLOWED: std::sync::LazyLock<BTreeMap<String, Vec<String>>> =
+    std::sync::LazyLock::new(|| {
+        let source = include_str!("../../../xtask/model-currency.toml");
+        let table: toml::value::Table = toml::from_str(source).unwrap_or_default();
+        let strings = |entry: &toml::Value| -> Vec<String> {
+            let list = entry.get("allowed").and_then(toml::Value::as_array);
+            let ids = list.into_iter().flatten().filter_map(toml::Value::as_str);
+            ids.map(str::to_owned).collect()
+        };
+        let providers = table.get("providers").and_then(toml::Value::as_table);
+        let entries = providers.into_iter().flatten();
+        entries
+            .map(|(id, entry)| (id.clone(), strings(entry)))
+            .collect()
+    });
+
+/// S1 (Q6) — every model the root admits for `provider`: its configured
+/// `default` plus the ids `xtask/model-currency.toml` allows for it, so a
+/// workflow default, a pinned Spirit and the eval judge coexist on one
+/// provider. Gemini admits only its default (20-4 review F1: the id is a URL
+/// path segment, so a Gemini pin must equal the configured model).
+pub fn admitted_models(provider: &str, default: &str) -> Vec<String> {
+    let mut models = vec![default.to_owned()];
+    if provider != "gemini" {
+        let others = CURRENCY_ALLOWED.get(provider).into_iter().flatten();
+        models.extend(others.filter(|model| *model != default).cloned());
+    }
+    models
+}
+
+/// The model a Spirit pins for `provider` (S1, Q6): `[providers].primary`'s
+/// `model_id` when that section selects the provider, else the model its
+/// `provider.complete` pins for it. `None` is provider-only.
+pub fn pin_for(
+    providers: Option<&maos_kernel_core::security::ProvidersSection>,
+    complete: &[String],
+    provider: &str,
+) -> Option<String> {
+    let primary = providers.map(|section| &section.primary);
+    let section_pin = primary
+        .filter(|p| p.id == provider)
+        .and_then(|p| p.model_id.clone());
+    section_pin.or_else(|| maos_manifest::pinned_model(complete, provider))
+}
+
+/// A Spirit's binding choices as `provider[.model]` entries: an explicit
+/// `[providers].primary` alone, otherwise the `provider.complete` entries in
+/// declaration order.
+pub fn declared_pins(gated: &GatedManifest) -> Vec<String> {
+    let complete = &gated.caps_required.provider.complete;
+    let Some(section) = &gated.providers else {
+        return complete.clone();
+    };
+    let id = &section.primary.id;
+    let pin = pin_for(Some(section), complete, id);
+    vec![pin.map_or_else(|| id.clone(), |model| format!("{id}.{model}"))]
+}
+
+/// The first declared binding choice, split into provider and pinned model.
+pub fn first_declared_pin(gated: &GatedManifest) -> Option<(String, Option<String>)> {
+    let pins = declared_pins(gated);
+    let (provider, model) = maos_manifest::split_provider_pin(pins.first()?);
+    Some((provider.to_owned(), model.map(str::to_owned)))
+}
+
+/// S1 (Q6) — a pinned model must be admitted for a provider the root has
+/// registered; refused here, before any token or transport call.
+pub fn check_declared_pins(
+    declared: &[String],
+    catalog: Option<&ProviderCatalog>,
+) -> Result<(), AdmissionRefusal> {
+    for entry in declared {
+        let (provider, Some(model)) = maos_manifest::split_provider_pin(entry) else {
+            continue;
+        };
+        let configured = catalog
+            .and_then(|c| c.get(provider))
+            .filter(|p| p.registered);
+        if configured.is_some_and(|c| {
+            !admitted_models(provider, c.model)
+                .iter()
+                .any(|m| m == model)
+        }) {
+            return Err(AdmissionRefusal::ModelNotAdmitted {
+                provider: provider.to_owned(),
+                model: model.to_owned(),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// S1 (Q6) — THE model-pin validation. Every path that admits a Spirit manifest
+/// (door/`maos run`/topology/shell/one-shot, through [`check_gated_pins`]) or stages a
+/// hot-swap successor (the successor factory, through [`check_staged_pins`]) runs
+/// exactly this: `[providers]` assertions, then each `provider.complete` pin, both
+/// refused before a pid, a token or a successor commit.
+fn check_pins(
+    providers: Option<&maos_kernel_core::security::ProvidersSection>,
+    complete: &[String],
+    catalog: Option<&ProviderCatalog>,
+) -> Result<(), AdmissionRefusal> {
+    if let Some(providers) = providers {
+        check_provider_pins(providers, catalog)?;
+    }
+    check_declared_pins(complete, catalog)
+}
+
+/// [`check_pins`] for a manifest that passed [`gate_manifest`].
+pub fn check_gated_pins(
+    gated: &GatedManifest,
+    catalog: Option<&ProviderCatalog>,
+) -> Result<(), AdmissionRefusal> {
+    check_pins(
+        gated.providers.as_ref(),
+        &gated.caps_required.provider.complete,
+        catalog,
+    )
+}
+
+/// [`check_pins`] for a staged successor's text. A hot-swap target need not pass the
+/// admission-only gates (a minimal successor omits `[sandbox]` and friends), so only
+/// the two sections a pin lives in are read.
+pub fn check_staged_pins(
+    text: &str,
+    catalog: Option<&ProviderCatalog>,
+) -> Result<(), AdmissionRefusal> {
+    let root: toml::Value =
+        toml::from_str(text).map_err(|error| AdmissionRefusal::ManifestParse {
+            detail: error.to_string(),
+        })?;
+    let providers = optional_section(
+        &root,
+        "providers",
+        maos_kernel_core::security::ProvidersSection::from_toml_str,
+    )?;
+    let caps = caps_required_or_empty(&root)?;
+    check_pins(providers.as_ref(), &caps.provider.complete, catalog)
+}
+
 /// Check configuration assertions before admission can mint authority.
 pub fn check_provider_pins(
     providers: &maos_kernel_core::security::ProvidersSection,
@@ -991,11 +1137,13 @@ pub fn check_provider_pins(
             .ok_or_else(|| AdmissionRefusal::ProviderUnavailable {
                 provider: config.id.clone(),
             })?;
-        if config
-            .model_id
-            .as_deref()
-            .is_some_and(|m| m != registered.model)
-        {
+        // S1: the assertion names any admitted model of the provider, not
+        // only the configured default.
+        if config.model_id.as_deref().is_some_and(|m| {
+            !admitted_models(&config.id, registered.model)
+                .iter()
+                .any(|admitted| admitted == m)
+        }) {
             return Err(AdmissionRefusal::ProviderUnavailable {
                 provider: config.id.clone(),
             });
@@ -1225,9 +1373,7 @@ async fn admit_inner(
     archive_now: bool,
 ) -> Result<Admitted, AdmissionRefusal> {
     let early_gates = (|| {
-        if let Some(providers) = &gated.providers {
-            check_provider_pins(providers, deps.providers)?;
-        }
+        check_gated_pins(gated, deps.providers)?;
         check_declared_skills(gated, deps.transparency_log)?;
         if gated.intent_promotion_set.is_some() && deps.iac.is_none() {
             return Err(AdmissionRefusal::Admission {

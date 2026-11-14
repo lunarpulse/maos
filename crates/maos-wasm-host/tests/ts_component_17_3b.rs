@@ -22,19 +22,14 @@ use maos_wasm_host::recall_wire::{
     self, RecallReply, RecallRequest, WireBytes, WireError, WireFilter,
 };
 
+#[path = "../../../tests/harness/layout.rs"]
+mod layout;
+
+/// The RELEASE runner: the `release` profile directory beside this test's own
+/// profile directory, so a `--target <triple>` build keeps its
+/// `<target>/<triple>/release/` (not `<target>/release/`).
 fn runner_binary_path() -> std::path::PathBuf {
-    let mut path = std::env::current_exe()
-        .expect("test binary path")
-        .parent()
-        .expect("deps directory")
-        .parent()
-        .expect("profile directory")
-        .parent()
-        .expect("target directory")
-        .to_path_buf();
-    path.push("release");
-    path.push("maos-wasm-runner");
-    path
+    layout::sibling_profile_dir(&layout::profile_dir(), "release").join("maos-wasm-runner")
 }
 
 fn address(role: Option<SpiritRole>) -> FrameAddress {

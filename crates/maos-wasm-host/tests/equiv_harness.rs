@@ -598,31 +598,18 @@ fn sort_key(e: &CapturedEffect) -> (&str, InvariantClass, String) {
 // §4  Subprocess runner helpers
 // ════════════════════════════════════════════════════════════════════════
 
-/// Path to a `target/<profile>/<name>` binary in the MAIN workspace target,
-/// derived from this test's own location under `target/<profile>/deps/`.
-fn target_binary(name: &str) -> PathBuf {
-    let mut path = std::env::current_exe()
-        .expect("current_exe")
-        .parent()
-        .expect("deps dir")
-        .parent() // → target/<profile>
-        .expect("profile dir")
-        .to_path_buf();
-    path.push(name);
-    path
-}
-
-/// Fail LOUD if a required MAIN-workspace binary was not built (used for
-/// `maos-wasm-runner`, a real `[[bin]]` of this package built by the test
-/// run). A missing binary is a test-environment defect, never a silent skip.
-fn require_binary(name: &str) -> PathBuf {
-    let path = target_binary(name);
+/// Fail LOUD if the `maos-wasm-runner` binary was not built. It is a `[[bin]]`
+/// of this package: the runtime `NEXTEST_BIN_EXE_*` / `CARGO_BIN_EXE_*` (rebased
+/// when a nextest archive is extracted elsewhere) wins over the compile-time
+/// path, which is the producer machine's. A missing binary is a
+/// test-environment defect, never a silent skip.
+fn require_runner_binary() -> PathBuf {
+    let path = fixtures::binary("maos-wasm-runner", env!("CARGO_BIN_EXE_maos-wasm-runner"));
     assert!(
         path.exists(),
-        "required binary `{name}` not found at {} — it has not been built yet \
-         (the runner is `maos-wasm-runner`, a [[bin]] of this package). Run \
-         `cargo test -p maos-wasm-host` (not `--lib`) so cargo builds every \
-         [[bin]] target alongside the test harness.",
+        "required binary `maos-wasm-runner` not found at {} — it has not been built yet \
+         (a [[bin]] of this package). Run `cargo test -p maos-wasm-host` (not `--lib`) \
+         so cargo builds every [[bin]] target alongside the test harness.",
         path.display()
     );
     path
@@ -786,7 +773,7 @@ const WASM_FUEL_BUDGET: &str = "1000000";
 /// if the `maos-wasm-runner` binary is absent or the guest traps (e.g.
 /// out-of-fuel).
 fn run_wasm_form(component_path: &str, input_frames: &[IacFrame]) -> Vec<IacFrame> {
-    let binary = require_binary("maos-wasm-runner");
+    let binary = require_runner_binary();
     drive_subprocess(
         &binary,
         &["--component", component_path, "--fuel", WASM_FUEL_BUDGET],

@@ -33,16 +33,15 @@ fn component_fixture_path() -> String {
     format!("{manifest_dir}/../../tests/fixtures/wasm/echo_spirit_component.wasm")
 }
 
+#[path = "../../../tests/harness/layout.rs"]
+mod layout;
+
+/// `maos-wasm-runner` is a `[[bin]]` of this package. A relocated nextest archive
+/// republishes its path at runtime; the compile-time `CARGO_BIN_EXE_*` is the
+/// producer machine's absolute path and is only the last resort (see
+/// `tests/harness/layout.rs`).
 fn runner_binary_path() -> std::path::PathBuf {
-    let mut path = std::env::current_exe()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_path_buf();
-    path.push("maos-wasm-runner");
-    path
+    layout::binary("maos-wasm-runner", env!("CARGO_BIN_EXE_maos-wasm-runner"))
 }
 
 /// AC3/F4 §A6: the proven-red path MUST be real. A missing runner binary is

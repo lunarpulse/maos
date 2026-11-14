@@ -17,18 +17,7 @@ use ed25519_dalek::SigningKey;
 use tempfile::TempDir;
 
 fn maosctl_path() -> PathBuf {
-    if let Some(p) = std::option_env!("CARGO_BIN_EXE_maosctl") {
-        return PathBuf::from(p);
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent().and_then(|p| p.parent()) {
-            let candidate = dir.join("maosctl");
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    PathBuf::from("maosctl")
+    PathBuf::from(env!("CARGO_BIN_EXE_maosctl"))
 }
 
 fn authority_key_hex(key: &SigningKey) -> String {

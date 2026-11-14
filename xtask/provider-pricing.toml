@@ -12,6 +12,18 @@ model = "claude-haiku-4-5-20251001"
 input_price_micro_per_1k = 1000
 output_price_micro_per_1k = 5000
 
+# 2026-11-12: Claude Haiku 5.5 (https://platform.claude.com/docs/en/about-claude/pricing).
+# Prices are TIERED by prompt length: $0.10 in / $0.50 out per MTok for prompts up
+# to 100,000 tokens, $0.50 / $2.50 above. This book has one row per (provider,
+# model) and no length tier, so the row carries the <=100K tier; a request whose
+# prompt exceeds 100,000 tokens is under-priced 5x by `cost-reconcile`. Pass
+# `--pricing <file>` to price long-context traffic at the higher tier.
+[[entries]]
+provider = "anthropic"
+model = "claude-haiku-5-5"
+input_price_micro_per_1k = 100
+output_price_micro_per_1k = 500
+
 [[entries]]
 provider = "openai"
 model = "gpt-4o-mini"

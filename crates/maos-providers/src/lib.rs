@@ -5,6 +5,7 @@
 //! v0.1-β ships the Anthropic driver (`complete` only). Streaming and
 //! multi-provider CI matrix ship in Story 5.5b.
 
+pub mod admitted;
 pub mod anthropic;
 pub mod fixture_replay;
 pub mod gemini;
@@ -13,6 +14,7 @@ pub mod openai;
 pub mod provider;
 pub mod rate_limit; // Story 6.4 / NFR-Scale-4
 
+pub use admitted::AdmittedModels;
 pub use anthropic::AnthropicProvider;
 pub use gemini::GeminiProvider;
 pub use ollama::OllamaProvider;

@@ -36,7 +36,7 @@ homepage = "https://github.com/lunarpulse/maos"
 # default `openai`) is not refused at issuance (17-11). The first declared
 # provider keys the class cassette.
 [capabilities.required]
-provider.complete = ["anthropic.claude-haiku-4-5-20251001", "openai.gpt-4o-mini"]
+provider.complete = ["anthropic.claude-haiku-5-5", "openai.gpt-4o-mini"]
 
 # Halt policy preferring RECALL over precision (§6.7): the Orchestrator halts
 # readily (low ambiguity threshold) rather than dispatching on an uncertain

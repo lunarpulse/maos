@@ -24,12 +24,34 @@ use maos_domain::halt::{HaltId, HaltState};
 use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope};
 use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
 use maos_domain::ports::capability::CapError;
+use maos_domain::ports::inference::{
+    InferenceError, InferencePort, InferenceRequest, InferenceResponse,
+};
 use maos_domain::ports::{CapabilityRegistryPort, MemoryManagerPort};
 use maos_kernel_core::capability::CapabilityRegistryAdapter;
 use maos_kernel_core::halt::{invoke_halt, HaltRegistry};
 use maos_kernel_core::iac::TransparencyLogAdapter;
 use maos_kernel_core::journal::JournalAdapter;
 use maos_kernel_core::memory::MemoryManagerAdapter;
+
+/// Bind hello's implicit requests to the provider its token names and, S1
+/// (Q6), to the model its manifest pins for that provider (`None`: the
+/// provider's default).
+pub struct BoundInference<P> {
+    pub inner: P,
+    pub provider: String,
+    pub model: Option<String>,
+}
+
+impl<P: std::borrow::Borrow<maos_kernel_core::inference::InferencePortAdapter>> InferencePort
+    for BoundInference<P>
+{
+    fn complete(&self, mut req: InferenceRequest) -> Result<InferenceResponse, InferenceError> {
+        req.provider_id = Some(self.provider.clone());
+        req.options.model_id.clone_from(&self.model);
+        InferencePort::complete(self.inner.borrow(), req)
+    }
+}
 
 /// The halt this shell raises, and the policy id the kernel journals it under.
 pub const AMBIGUITY_TAG: &str = "task.acceptance_criterion.ambiguous";

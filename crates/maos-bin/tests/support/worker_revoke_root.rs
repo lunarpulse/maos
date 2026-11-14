@@ -330,6 +330,9 @@ impl RevokeRoot {
         }
         .write_atomic(&home.join("control.json"))
         .expect("test root discovery");
+        // Production's executable-relative lookup must reach the prebuilt fixture
+        // from this test executable in either Cargo layout.
+        crate::fixtures::profile_binary_beside_test("worker-cli-fixture");
         let scope = Scope::CliSubprocessSpawn {
             cli_binary_path: maos_bin::worker_spawn::resolve_cli_binary("worker-cli-fixture")
                 .expect("Worker fixture"),

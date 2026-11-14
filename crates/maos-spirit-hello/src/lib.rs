@@ -158,7 +158,7 @@ fn run_prompt(
 }
 
 fn capability_scope_default() -> Vec<String> {
-    vec!["provider.complete:anthropic.claude-haiku-4-5-20251001".into()]
+    vec!["provider.complete:anthropic.claude-haiku-5-5".into()]
 }
 
 fn posture_default() -> String {

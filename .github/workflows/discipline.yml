@@ -87,7 +87,11 @@ jobs:
       - name: Capture first-pass artifact hashes
         run: |
           mkdir -p /tmp/build-artifacts-1
-          find target/debug/deps/ -name '*.rlib' -exec sha256sum {} \; | sort > /tmp/build-artifacts-1/rlibs.sha256
+          # Cargo >= 1.100 keeps rlibs under target/debug/build/<pkg>/<hash>/out/
+          # (no deps/); Cargo <= 1.99 under target/debug/deps/. `target/debug`
+          # covers both; an empty list would make the diff below vacuous.
+          find target/debug -name '*.rlib' -exec sha256sum {} \; | sort > /tmp/build-artifacts-1/rlibs.sha256
+          test -s /tmp/build-artifacts-1/rlibs.sha256
           if [ -f target/debug/maos ]; then
             sha256sum target/debug/maos > /tmp/build-artifacts-1/bin.sha256
           fi
@@ -98,7 +102,11 @@ jobs:
       - name: Capture second-pass artifact hashes
         run: |
           mkdir -p /tmp/build-artifacts-2
-          find target/debug/deps/ -name '*.rlib' -exec sha256sum {} \; | sort > /tmp/build-artifacts-2/rlibs.sha256
+          # Cargo >= 1.100 keeps rlibs under target/debug/build/<pkg>/<hash>/out/
+          # (no deps/); Cargo <= 1.99 under target/debug/deps/. `target/debug`
+          # covers both; an empty list would make the diff below vacuous.
+          find target/debug -name '*.rlib' -exec sha256sum {} \; | sort > /tmp/build-artifacts-2/rlibs.sha256
+          test -s /tmp/build-artifacts-2/rlibs.sha256
           if [ -f target/debug/maos ]; then
             sha256sum target/debug/maos > /tmp/build-artifacts-2/bin.sha256
           fi

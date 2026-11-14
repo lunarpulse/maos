@@ -658,7 +658,7 @@ fn construct_butler_core(
     pid_resolver: Option<Arc<dyn Fn() -> Option<u32> + Send + Sync>>,
     spirit_id: &str,
     seam: &butler::ButlerSeam,
-    declared: impl FnOnce() -> Option<String>,
+    declared: impl FnOnce() -> Option<(String, Option<String>)>,
 ) -> Result<
     (
         butler::Butler,
@@ -817,51 +817,6 @@ fn eval_failed(error: String) -> i32 {
     1
 }
 
-/// Story 17-11 / 18-1 — the Spirit's FIRST declared `ProviderInfer`: the
-/// provider a composition-root mint names (never the router default, which a
-/// Spirit need not declare — 17-11 entitlement refuses it at issuance).
-#[cfg(feature = "network")]
-fn first_declared_provider(gated: &maos_bin::admission::GatedManifest) -> Option<String> {
-    declared_providers(gated).into_iter().next()
-}
-
-/// Binding choices: explicit `[providers].primary`, otherwise declared order.
-#[cfg(feature = "network")]
-fn declared_providers(gated: &maos_bin::admission::GatedManifest) -> Vec<String> {
-    if let Some(providers) = &gated.providers {
-        return vec![providers.primary.id.clone()];
-    }
-    maos_kernel_core::security::capabilities_required_to_scopes(&gated.caps_required)
-        .into_iter()
-        .filter_map(|scope| match scope {
-            Scope::ProviderInfer { provider } => Some(provider),
-            _ => None,
-        })
-        .collect()
-}
-
-/// Bind hello's implicit requests to the same provider its token names.
-#[cfg(feature = "network")]
-struct BoundInference<P> {
-    inner: P,
-    provider: String,
-}
-#[cfg(feature = "network")]
-impl<P: std::borrow::Borrow<InferencePortAdapter>> maos_domain::ports::inference::InferencePort
-    for BoundInference<P>
-{
-    fn complete(
-        &self,
-        mut req: maos_domain::ports::inference::InferenceRequest,
-    ) -> Result<
-        maos_domain::ports::inference::InferenceResponse,
-        maos_domain::ports::inference::InferenceError,
-    > {
-        req.provider_id = Some(self.provider.clone());
-        maos_domain::ports::inference::InferencePort::complete(self.inner.borrow(), req)
-    }
-}
-
 /// Story 18-1 / 18-3 — the door-staged TARGET manifest, gated (its declared
 /// providers name a successor's token).
 #[cfg(feature = "network")]
@@ -1010,7 +965,7 @@ fn build_spirit_obj(
             let staged = target_manifest
                 .ok_or("orchestrator requires the target manifest for its declared providers")?;
             let gated = gate_staged(staged)?;
-            let declared = declared_providers(&gated);
+            let declared = maos_bin::admission::declared_pins(&gated);
             let (id, scheduler) = (class_name.to_owned(), Arc::clone(&deps.scheduler));
             let pid_of: ::orchestrator::PidSource = Arc::new(move || scheduler.resolve_pid(&id));
             let scalar = orchestrator_scalar_port(
@@ -1066,7 +1021,7 @@ fn build_spirit_obj(
                 .ok_or("butler seam not ready")?;
             let gated = gate_staged(staged)
                 .map_err(|e| format!("researcher staged manifest is unavailable: {e}"))?;
-            let declared = declared_providers(&gated);
+            let declared = maos_bin::admission::declared_pins(&gated);
             let wiring = deps
                 .researcher
                 .lock()
@@ -1121,7 +1076,7 @@ fn build_spirit_obj(
                 gate_staged(staged)
                     .ok()
                     .as_ref()
-                    .and_then(first_declared_provider)
+                    .and_then(maos_bin::admission::first_declared_pin)
             };
             let (butler, _receipt, _fixed_pid_binding) = construct_butler_core(
                 Some(policy),
@@ -3313,6 +3268,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let butler_principal: Arc<std::sync::OnceLock<String>> = Arc::default();
     let provider_catalog: Arc<std::sync::OnceLock<maos_bin::admission::ProviderCatalog>> =
         Arc::default();
+    let factory_provider_catalog = Arc::clone(&provider_catalog);
     let researcher_wiring: ResearcherSlot = Arc::default();
     let factory_researcher_wiring = Arc::clone(&researcher_wiring);
     let factory_distillate_writer = Arc::clone(&distillate_writer);
@@ -3341,6 +3297,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     reason: "successor manifest lacks [class]".into(),
                 }
             })?;
+            // S1 (Q6) — the successor's model pins are validated before anything is built, so a
+            // refused pin leaves the predecessor serving. Every swap policy, hop and form
+            // (in-process or spawned) is created here; the staged text is what the door vetted.
+            if let Some(staged) = factory_successor_slot.peek() {
+                maos_bin::admission::read_manifest(&staged)
+                    .and_then(|text| {
+                        maos_bin::admission::check_staged_pins(
+                            &text,
+                            factory_provider_catalog.get(),
+                        )
+                    })
+                    .map_err(|refusal| {
+                        maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+                            reason: refusal.to_string(),
+                        }
+                    })?;
+            }
             // Story 20-9 — a swap replaces a spawned Spirit with a spawned successor, and an
             // in-process one with an in-process successor; the form never changes at a pid.
             let successor_spawned = !class.forms.iter().any(|form| form == "rust-inproc");
@@ -3888,7 +3861,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Arc::clone(&secret_store)),
     ) {
         Ok(provider) => {
-            providers_map.insert("anthropic".into(), Arc::new(provider));
+            providers_map.insert(
+                "anthropic".into(),
+                admitted_driver("anthropic", crate::ANTHROPIC_DEFAULTS.1, provider),
+            );
             live_provider_available = true;
             default_id.get_or_insert_with(|| "anthropic".into());
             eprintln!("maos: Anthropic provider registered");
@@ -3907,7 +3883,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Arc::clone(&secret_store)),
     ) {
         Ok(provider) => {
-            providers_map.insert("openai".into(), Arc::new(provider));
+            providers_map.insert(
+                "openai".into(),
+                admitted_driver("openai", crate::OPENAI_DEFAULTS.1, provider),
+            );
             live_provider_available = true;
             default_id.get_or_insert_with(|| "openai".into());
             eprintln!("maos: OpenAI provider registered");
@@ -3926,7 +3905,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Arc::clone(&secret_store)),
     ) {
         Ok(provider) => {
-            providers_map.insert("gemini".into(), Arc::new(provider));
+            providers_map.insert(
+                "gemini".into(),
+                admitted_driver("gemini", crate::GEMINI_DEFAULTS.1, provider),
+            );
             live_provider_available = true;
             default_id.get_or_insert_with(|| "gemini".into());
             eprintln!("maos: Gemini provider registered");
@@ -3946,7 +3928,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Arc::clone(&secret_store)),
     ) {
         Ok(provider) => {
-            providers_map.insert("kimi".into(), Arc::new(provider));
+            providers_map.insert(
+                "kimi".into(),
+                admitted_driver("kimi", crate::KIMI_DEFAULTS.1, provider),
+            );
             live_provider_available = true;
             default_id.get_or_insert_with(|| "kimi".into());
             eprintln!("maos: Kimi provider registered");
@@ -3965,7 +3950,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ollama_url,
                 crate::OLLAMA_DEFAULTS.1.into(),
             ) {
-                providers_map.insert("ollama".into(), Arc::new(provider));
+                providers_map.insert(
+                    "ollama".into(),
+                    admitted_driver("ollama", crate::OLLAMA_DEFAULTS.1, provider),
+                );
                 live_provider_available |= ollama_is_explicit;
                 default_id.get_or_insert_with(|| "ollama".into());
                 eprintln!("maos: Ollama provider registered");
@@ -4553,10 +4541,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     name == "hello-spirit"
                 })
                 .map_err(|refusal| refusal.to_string())?;
-            if let Some(providers) = &gated.providers {
-                maos_bin::admission::check_provider_pins(providers, provider_catalog.get())
-                    .map_err(|refusal| refusal.to_string())?;
-            }
+            maos_bin::admission::check_gated_pins(&gated, provider_catalog.get())
+                .map_err(|refusal| refusal.to_string())?;
             let maos_bin::admission::GatedManifest {
                 sandbox_cfg,
                 resource_caps,
@@ -4572,6 +4558,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let default_provider = providers
                 .as_ref()
                 .map_or(default_provider, |p| p.primary.id.as_str());
+            let hello_model = maos_bin::admission::pin_for(
+                providers.as_ref(),
+                &caps_required.provider.complete,
+                default_provider,
+            );
             let bundle = maos_kernel_core::scheduler::SpiritManifestBundle {
                 budget,
                 class: Some(class_section.clone()),
@@ -4666,9 +4657,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // the reader moves to its own thread in D-16-2-D) and `stdout()`
             // unlocked (the REPL thread is the only writer).
             maos_shell::run_shell(
-                Arc::new(BoundInference {
+                Arc::new(maos_bin::shell_host::BoundInference {
                     inner: inference,
                     provider: default_provider.into(),
+                    model: hello_model,
                 })
                     as Arc<dyn maos_domain::ports::inference::InferencePort + Send + Sync>,
                 &host,
@@ -5832,10 +5824,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     })?;
                     gated.bind_registry_package_at(&child_path)
                         .map_err(|refusal| format!("maos run: topology package {}: {refusal}", child_path.display()))?;
-                    if let Some(section) = &gated.providers {
-                        maos_bin::admission::check_provider_pins(section, provider_catalog.get())
-                            .map_err(|refusal| refusal.to_string())?;
-                    }
+                    maos_bin::admission::check_gated_pins(&gated, provider_catalog.get())
+                        .map_err(|refusal| refusal.to_string())?;
                     gated.require_in_process("topology")?;
                     let kind = classify_spirit(&gated.class_section.name)
                         .expect("gate_manifest refused every class classify_spirit does not know");
@@ -5882,7 +5872,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     maos_bin::orchestrator_root::construct_at_admitted_pid(
                                         &spirit_id,
                                         &butler_seam,
-                                        &declared_providers(&gated),
+                                        &maos_bin::admission::declared_pins(&gated),
                                         &|pid_of| {
                                             let scalar = scalar_factory(pid_of)?;
                                             *scalar_slot.lock().unwrap_or_else(|e| e.into_inner()) =
@@ -6375,10 +6365,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
             .map_err(|refusal| format!("maos run: {refusal}"))?;
             gated.bind_registry_package_at(std::path::Path::new(&run.manifest_path))?;
-            if let Some(section) = &gated.providers {
-                maos_bin::admission::check_provider_pins(section, provider_catalog.get())
-                    .map_err(|refusal| refusal.to_string())?;
-            }
+            maos_bin::admission::check_gated_pins(&gated, provider_catalog.get())
+                .map_err(|refusal| refusal.to_string())?;
             let wasm = gated.class_section.forms == ["wasm-component"];
             if !wasm {
                 gated.require_in_process("standalone native manifest without a launch binding")?;
@@ -6482,7 +6470,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 None,
                                 &spirit_id,
                                 &seam,
-                                || first_declared_provider(&gated),
+                                || maos_bin::admission::first_declared_pin(&gated),
                             )
                             .map_err(|error| format!("maos run: {error}"))?;
                         halt_receipt_handle = butler_receipt;
@@ -6721,7 +6709,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             researcher,
                             &wiring,
                             &seam,
-                            &declared_providers(&gated),
+                            &maos_bin::admission::declared_pins(&gated),
                             &spirit_id,
                             pid_of,
                             &host,
@@ -6776,7 +6764,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             maos_bin::orchestrator_root::construct_at_admitted_pid(
                                 &spirit_id,
                                 &butler_seam,
-                                &declared_providers(&gated),
+                                &maos_bin::admission::declared_pins(&gated),
                                 &orchestrator_scalar_port(
                                     &orchestrator,
                                     &transparency_log,
@@ -9666,6 +9654,7 @@ description = "smoke test spirit successor"
         // manifest's [capabilities.required] section and registers scopes
         // in the policy table.
         let mut token_provider_id = router.default_id().unwrap_or("anthropic").to_string();
+        let token_model;
         {
             // Initialize monotonic counter for journal timestamps and token issuance.
             maos_kernel_core::capability::cap_tokens::init_monotonic_base();
@@ -9680,11 +9669,16 @@ description = "smoke test spirit successor"
             let gated =
                 maos_bin::admission::gate_manifest(&manifest_toml, &|name| name == "hello-spirit")
                     .map_err(|refusal| refusal.to_string())?;
+            maos_bin::admission::check_gated_pins(&gated, provider_catalog.get())
+                .map_err(|refusal| refusal.to_string())?;
             if let Some(providers) = &gated.providers {
-                maos_bin::admission::check_provider_pins(providers, provider_catalog.get())
-                    .map_err(|refusal| refusal.to_string())?;
                 token_provider_id = providers.primary.id.clone();
             }
+            token_model = maos_bin::admission::pin_for(
+                gated.providers.as_ref(),
+                &gated.caps_required.provider.complete,
+                &token_provider_id,
+            );
 
             let maos_bin::admission::GatedManifest {
                 sandbox_cfg,
@@ -9780,9 +9774,10 @@ description = "smoke test spirit successor"
         eprintln!("maos: issued token {token_id_hex}");
         eprintln!("maos: one-shot mode — executing hello-Spirit");
 
-        let bound_inference = BoundInference {
+        let bound_inference = maos_bin::shell_host::BoundInference {
             inner: &inference,
             provider: token_provider_id,
+            model: token_model,
         };
         // Call hello-Spirit (sync call on async runtime — fine for one-shot)
         let resp = maos_spirit_hello::run(
@@ -10435,9 +10430,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
             classify_spirit(name).is_some()
         })?;
         gated.bind_registry_package_at(manifest)?;
-        if let Some(section) = &gated.providers {
-            maos_bin::admission::check_provider_pins(section, self.provider_catalog.get())?;
-        }
+        maos_bin::admission::check_gated_pins(&gated, self.provider_catalog.get())?;
         gated.require_in_process("operator door")?;
         if requires_epistemic_halt_port(gated.epistemic_policy.as_ref())
             && classify_spirit(&gated.class_section.name) == Some(LoadedSpiritKind::Mira)
@@ -10565,9 +10558,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
     ) -> Result<maos_bin::admission::GatedManifest, maos_bin::admission::AdmissionRefusal> {
         let mut gated = maos_bin::admission::gate_manifest(manifest_toml, &|_| false)?;
         gated.bind_registry_package_at(manifest)?;
-        if let Some(section) = &gated.providers {
-            maos_bin::admission::check_provider_pins(section, self.provider_catalog.get())?;
-        }
+        maos_bin::admission::check_gated_pins(&gated, self.provider_catalog.get())?;
         if self.swap_slot.get().is_none() {
             return Err(
                 maos_bin::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
@@ -12594,10 +12585,8 @@ fn admit_daemon_control_spirit(
     let gated =
         maos_bin::admission::gate_manifest(&manifest_toml, &|name| classify_spirit(name).is_some())
             .map_err(|refusal| refusal.to_string())?;
-    if let Some(section) = &gated.providers {
-        maos_bin::admission::check_provider_pins(section, providers)
-            .map_err(|refusal| refusal.to_string())?;
-    }
+    maos_bin::admission::check_gated_pins(&gated, providers)
+        .map_err(|refusal| refusal.to_string())?;
     let maos_bin::admission::GatedManifest {
         sandbox_cfg,
         resource_caps,
@@ -17730,7 +17719,7 @@ mod story_13_5a_enterprise_daemon_seam {
     }
 }
 
-const ANTHROPIC_DEFAULTS: (&str, &str) = ("https://api.anthropic.com", "claude-haiku-4-5-20251001");
+const ANTHROPIC_DEFAULTS: (&str, &str) = ("https://api.anthropic.com", "claude-haiku-5-5");
 const OPENAI_DEFAULTS: (&str, &str) = ("https://api.openai.com", "gpt-4o-mini");
 const GEMINI_DEFAULTS: (&str, &str) = (
     "https://generativelanguage.googleapis.com",
@@ -17738,6 +17727,19 @@ const GEMINI_DEFAULTS: (&str, &str) = (
 );
 const KIMI_DEFAULTS: (&str, &str) = ("https://api.moonshot.ai", "kimi-k3.1-pro");
 const OLLAMA_DEFAULTS: (&str, &str) = ("http://localhost:11434", "llama3.1:8b");
+
+/// S1 (Q6) — `driver` serves its configured default and every other model the
+/// root admits for `provider`; a request naming any other model is refused
+/// before the wire.
+#[cfg(feature = "network")]
+fn admitted_driver(
+    provider: &str,
+    default_model: &str,
+    driver: impl maos_providers::Provider + 'static,
+) -> Arc<dyn maos_providers::Provider> {
+    let admitted = maos_bin::admission::admitted_models(provider, default_model);
+    Arc::new(maos_providers::AdmittedModels::new(driver, admitted))
+}
 
 #[cfg(feature = "network")]
 fn configured_provider_catalog(ollama_url: &str) -> maos_bin::admission::ProviderCatalog {

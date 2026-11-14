@@ -38,7 +38,7 @@ use maos_kernel_core::iac::transparency_log::FrameKind;
 use maos_kernel_core::inference::router::MultiProviderRouter;
 use maos_kernel_core::inference::InferencePortAdapter;
 use maos_kernel_core::security::capabilities_required_to_scopes;
-use maos_kernel_core::security::manifest::CapabilitiesRequired;
+use maos_kernel_core::security::manifest::{pinned_model, CapabilitiesRequired};
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 use researcher::{ClaimPayload, RecalledFrame, Researcher, ResearcherInferenceBinding};
 
@@ -130,10 +130,9 @@ pub fn evaluate(
     let manifest: toml::Value =
         toml::from_str(include_str!("../../../spirits/researcher/manifest.toml"))
             .map_err(|e| format!("researcher manifest: {e}"))?;
-    let declared = capabilities_required_to_scopes(
-        &CapabilitiesRequired::from_toml_str(&required(&manifest)?)
-            .map_err(|e| format!("researcher [capabilities.required]: {e}"))?,
-    );
+    let caps = CapabilitiesRequired::from_toml_str(&required(&manifest)?)
+        .map_err(|e| format!("researcher [capabilities.required]: {e}"))?;
+    let declared = capabilities_required_to_scopes(&caps);
     let provider = declared
         .iter()
         .find_map(|scope| match scope {
@@ -141,6 +140,14 @@ pub fn evaluate(
             _ => None,
         })
         .ok_or("researcher declares no inference provider")?;
+    // S1 (Q6): the survey completions are served by the model the Researcher's
+    // manifest pins for its provider, as in production.
+    let pinned = pinned_model(&caps.provider.complete, &provider);
+    // The pinned `temperature = 0.0` reaches the wire only if the judge's model
+    // accepts one (the Anthropic driver omits it for the 5.x families); the
+    // verdict sidecar and the report line say which, so the provenance is true.
+    let temperature_applied =
+        provider != "anthropic" || maos_providers::anthropic::accepts_sampling(&model);
     let route = |driver: Arc<dyn maos_providers::Provider>| {
         let drivers = BTreeMap::from([(provider.clone(), driver)]);
         Arc::new(MultiProviderRouter::new(drivers, Some(provider.clone())))
@@ -212,7 +219,8 @@ pub fn evaluate(
             provider.clone(),
             Arc::new(move |pid, provider| mint(pid, provider)),
             Arc::new(|| Some(EVAL_PID)),
-        );
+        )
+        .with_model(pinned.clone());
         let researcher = Researcher::new().with_deferred_inference_port(
             Arc::new(port_over(&world, router)),
             Arc::new(Mutex::new(Some(binding))),
@@ -329,8 +337,11 @@ pub fn evaluate(
     }
     if record {
         let sidecar = scorer::verdicts_sidecar(&cassette);
-        std::fs::write(&sidecar, scorer::live_verdicts(&facts, &model)?)
-            .map_err(|e| format!("verdicts sidecar {sidecar:?}: {e}"))?;
+        std::fs::write(
+            &sidecar,
+            scorer::live_verdicts(&facts, &model, temperature_applied)?,
+        )
+        .map_err(|e| format!("verdicts sidecar {sidecar:?}: {e}"))?;
     }
     let judge_provenance = scorer::judge_provenance(&rows, live);
     let score = scorer::score(&facts)?;
@@ -349,6 +360,7 @@ pub fn evaluate(
         "provenance": json.get("provenance"),
         "judge_provenance": judge_provenance,
         "judge_prompt_sha256": sha256_hex(scorer::JUDGE_PROMPT.as_bytes()),
+        "judge_temperature_applied": temperature_applied,
         "completions_consumed": calls,
         "judge_calls": judge_calls,
         "judge_tokens_minted": judge_tokens.len(),

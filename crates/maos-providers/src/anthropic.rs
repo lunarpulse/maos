@@ -74,27 +74,63 @@ impl Provider for AnthropicProvider {
         // configured one.
         let model_id = req.options.model_id.as_deref().unwrap_or(&self.model_id);
         let body = build_request_body(req, model_id);
-        let body_bytes =
-            serde_json::to_vec(&body).map_err(|e| ProviderError::Serde(e.to_string()))?;
 
         let url = format!("{}/v1/messages", self.endpoint_url);
-        let response_bytes = self
-            .transport
-            .http_post(
-                &url,
-                &body_bytes,
-                &[
-                    ("x-api-key", &self.api_key),
-                    ("anthropic-version", "2023-06-01"),
-                    ("content-type", "application/json"),
-                ],
-            )
-            .map_err(|e| ProviderError::Transport(e.to_string()))?;
+        // A non-2xx is a typed rejection carrying Anthropic's own
+        // `{"type":"error","error":{"type","message"}}` — never a bare status.
+        let response_bytes = crate::provider::post_json(
+            &*self.transport,
+            &url,
+            &body,
+            &[
+                ("x-api-key", &self.api_key),
+                ("anthropic-version", "2023-06-01"),
+                ("content-type", "application/json"),
+            ],
+        )?;
 
         let response_json: serde_json::Value = serde_json::from_slice(&response_bytes)
             .map_err(|e| ProviderError::Serde(e.to_string()))?;
 
         parse_response(&response_json, &self.endpoint_url, model_id)
+    }
+}
+
+/// Models whose API rejects `temperature`/`top_p`/`top_k` with a 400: the
+/// thinking docs' "Sampling parameters" list, verbatim (Fable 5.2/5.1/5, Mythos
+/// 5.2/5.1/5/Preview, Opus 5.5/5/4.8/4.7, Sonnet 5.5/5, Haiku 5.5). Exact ids
+/// only (an optional `-YYYYMMDD` snapshot suffix aside): an id the docs do not
+/// list keeps the sampling parameters it is asked for, as before. A newly
+/// documented id MUST be added here when its docs are read.
+const NO_SAMPLING: &str = "claude-fable-5-2 claude-fable-5-1 claude-fable-5 claude-mythos-5-2 \
+    claude-mythos-5-1 claude-mythos-5 claude-mythos-preview claude-opus-5-5 claude-opus-5 \
+    claude-opus-4-8 claude-opus-4-7 claude-sonnet-5-5 claude-sonnet-5 claude-haiku-5-5";
+
+/// `model_id` without an optional trailing `-YYYYMMDD` snapshot date.
+fn base_id(model_id: &str) -> &str {
+    match model_id.rsplit_once('-') {
+        Some((base, date)) if date.len() == 8 && date.bytes().all(|b| b.is_ascii_digit()) => base,
+        _ => model_id,
+    }
+}
+
+/// Whether `model_id` accepts a `temperature`; `false` means the driver omits
+/// the requested value from the wire (callers recording a judge's provenance
+/// ask this to stay truthful).
+pub fn accepts_sampling(model_id: &str) -> bool {
+    !NO_SAMPLING.split(' ').any(|id| id == base_id(model_id))
+}
+
+/// The documented way to answer without up-front thinking, which would
+/// otherwise spend a short `max_tokens` before any text: Haiku 5.5 accepts
+/// `"disabled"` at `high` effort or below (default `medium`); Sonnet 5.5
+/// rejects it and takes `"between_tools"` instead (default effort `high`).
+/// Models that think by default and offer no switch are left alone.
+fn thinking_off(model_id: &str) -> Option<&'static str> {
+    match base_id(model_id) {
+        "claude-sonnet-5-5" => Some("between_tools"),
+        "claude-haiku-5-5" => Some("disabled"),
+        _ => None,
     }
 }
 
@@ -107,25 +143,44 @@ fn build_request_body(req: &InferenceRequest, model_id: &str) -> serde_json::Val
             { "role": "user", "content": req.prompt }
         ]
     });
-    if let Some(t) = req.options.temperature {
+    if let (Some(t), true) = (req.options.temperature, accepts_sampling(model_id)) {
         body["temperature"] = serde_json::json!(t);
+    }
+    if let Some(kind) = thinking_off(model_id) {
+        body["thinking"] = serde_json::json!({ "type": kind });
     }
     body
 }
 
 /// Parse the Anthropic Messages API response into `InferenceResponse`.
+///
+/// The answer is the concatenation of the `text` blocks: models that think by
+/// default lead with `thinking` / `redacted_thinking` blocks, so position says
+/// nothing. A response with no `text` block (e.g. `max_tokens` spent on
+/// thinking) is a malformed response naming the block types it did carry.
 fn parse_response(
     json: &serde_json::Value,
     endpoint_url: &str,
     model_id: &str,
 ) -> Result<InferenceResponse, ProviderError> {
-    let content = json
+    let blocks = json
         .get("content")
         .and_then(|c| c.as_array())
-        .and_then(|arr| arr.first())
-        .and_then(|first| first.get("text"))
-        .and_then(|t| t.as_str())
-        .ok_or_else(|| ProviderError::Serde("missing content.text".into()))?;
+        .ok_or_else(|| ProviderError::Serde("missing content array".into()))?;
+    fn kind(block: &serde_json::Value) -> &str {
+        block.get("type").and_then(|t| t.as_str()).unwrap_or("?")
+    }
+    let texts: Vec<&str> = blocks
+        .iter()
+        .filter(|b| kind(b) == "text")
+        .filter_map(|b| b.get("text").and_then(|t| t.as_str()))
+        .collect();
+    if texts.is_empty() {
+        let seen: Vec<&str> = blocks.iter().map(kind).collect();
+        let stop = &json["stop_reason"];
+        let message = format!("no text content block (block types: {seen:?}, stop_reason: {stop})");
+        return Err(ProviderError::Serde(message));
+    }
 
     let stop_reason = json
         .get("stop_reason")
@@ -137,18 +192,15 @@ fn parse_response(
         })
         .unwrap_or(StopReason::StopSequence);
 
+    // Fail closed (NFR-Cost-1): a missing, non-integer or > u32 count is a
+    // typed malformed-response error, never a silent 0-token cost frame.
+    // `output_tokens` is the vendor's inclusive billed total (thinking included).
     let usage = json.get("usage");
-    let input_tokens = usage
-        .and_then(|u| u.get("input_tokens"))
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0) as u32;
-    let output_tokens = usage
-        .and_then(|u| u.get("output_tokens"))
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0) as u32;
+    let input_tokens = crate::provider::usage_count(usage, "input_tokens")?;
+    let output_tokens = crate::provider::usage_count(usage, "output_tokens")?;
 
     Ok(InferenceResponse {
-        text: content.into(),
+        text: texts.concat(),
         stop_reason,
         usage: TokenUsage {
             input_tokens,

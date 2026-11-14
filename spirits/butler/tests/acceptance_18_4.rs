@@ -125,6 +125,7 @@ fn scripted_mcp(log: &Arc<Mutex<Vec<String>>>) -> ScriptedMcp {
 fn bound_butler(completion: &str, clock: &Arc<ScenarioClock>) -> Butler {
     let binding = Arc::new(Mutex::new(Some(ButlerInferenceBinding {
         provider_id: "anthropic".into(),
+        model_id: None,
         mint: Arc::new(|| Ok((CapabilityToken::new(TokenId::ZERO, 41, 0, [0u8; 64]), 41))),
     })));
     Butler::with_scenario(conflict())

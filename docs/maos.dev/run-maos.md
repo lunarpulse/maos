@@ -141,18 +141,18 @@ endpoint_url = "http://127.0.0.1:11434"
 # provider_endpoint_pin = "<64 hex characters: SHA-256 of the exact base URL>"
 ```
 
-`primary.id` binds both token issuance and inference routing. `endpoint_url` and
-`model_id`, when present, are equality assertions against the boot configuration,
-not reconfiguration. Non-empty `fallback` is refused as `fallback_unsupported`:
-the primary token cannot authorise another provider.
+`primary.id` binds both token issuance and inference routing. `endpoint_url` is an
+equality assertion against the boot configuration, not reconfiguration; `model_id`,
+when present, must name a model the root admits for that provider (below). Non-empty
+`fallback` is refused as `fallback_unsupported`: the primary token cannot authorise
+another provider.
 
 Endpoint pinning is **opt-in**: declaring `[providers]` selects/asserts configuration,
 but only an explicit `provider_endpoint_pin` field enables the SHA-256 check.
 Manifests without `[providers]`, or with a primary id but no pin, are not
 endpoint-pinned. Deployment policy must require pins where endpoint locking is
-mandatory. Gemini also refuses per-request model ids that differ from its
-configured/admitted model; model ids must use only ASCII letters, digits, `.`, `_`,
-`:`, or `-`.
+mandatory. Model ids on the Gemini wire must use only ASCII letters, digits, `.`,
+`_`, `:`, or `-`.
 
 Gemini and OpenAI-compatible responses must include valid, nonnegative `u32`
 input/output usage counts; absent or overflowing accounting data is refused
@@ -183,6 +183,27 @@ deterministic calls pass the limiter; any other id still fails closed as
 (`ops-live-gemini-leg`, paid keys). The kernel IO adapter no longer echoes a
 rejected request header (a credential) and keeps a non-2xx status when the
 body exceeds 10 MiB.
+
+### Manifest model pins
+
+A `provider.complete` entry of the form `<provider>.<model>` is a **model pin**: the
+model the Spirit is served by on that provider. Precedence is *manifest pin over the
+configured provider default* (operator ruling Q6, 2026-11-13): the Researcher's
+`anthropic.claude-sonnet-5-5` reaches the wire as `claude-sonnet-5-5` even though the
+Anthropic driver is configured with `claude-haiku-5-5`. A bare `<provider>` entry is
+provider-only and is served the provider's configured default. The bound provider is
+the Spirit's first declared provider the root has registered (or `[providers].primary`,
+whose `model_id`, when set, is the pin); the model is that provider's pin.
+
+The root admits, per provider, its configured default plus every id
+`xtask/model-currency.toml` lists as `allowed`, so a Haiku workflow default, a Sonnet
+pinned Spirit and the Sonnet eval judge coexist on one configured provider. A pin
+outside that set is refused as `model_not_admitted` on every path that admits or stages
+a manifest (`maos run`, `maosctl load`, the shell and one-shot hello, and every
+hot- or cold-swap successor; a refused hot swap leaves the predecessor serving) and, if it
+reaches a driver anyway, before any transport call. The Gemini exception is deliberate (20-4
+review F1: the model id is a URL path segment): its admitted set is only its
+configured model, so a Gemini pin must equal that model.
 
 ### MCP server bearers
 

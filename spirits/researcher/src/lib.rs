@@ -460,10 +460,13 @@ pub type PidSource = Arc<dyn Fn() -> Option<u32> + Send + Sync>;
 pub type SeedSink = Arc<dyn Fn(u32, &[u8]) -> Result<[u8; 16], String> + Send + Sync>;
 
 /// Story 18-3 (CR-1, mirrors `butler::ButlerInferenceBinding`) — the provider
-/// the token and every request name, and the per-pass mint.
+/// the token and every request name, the model its manifest pins for that
+/// provider (S1: `None` is provider-only, served the provider's default) and
+/// the per-pass mint.
 #[derive(Clone)]
 pub struct ResearcherInferenceBinding {
     pub provider_id: String,
+    pub model_id: Option<String>,
     pub mint: InferenceMint,
 }
 
@@ -473,11 +476,18 @@ impl ResearcherInferenceBinding {
         let provider = provider_id.clone();
         Self {
             provider_id,
+            model_id: None,
             mint: Arc::new(move || {
                 let pid = pid_of().ok_or("the Spirit has no admitted pid yet")?;
                 mint(pid, &provider).map(|token| (token, pid))
             }),
         }
+    }
+
+    /// S1 — every request names the manifest's pinned model.
+    pub fn with_model(mut self, model_id: Option<String>) -> Self {
+        self.model_id = model_id;
+        self
     }
 }
 
@@ -959,6 +969,7 @@ impl Researcher {
     ) -> Self {
         let binding = ResearcherInferenceBinding {
             provider_id: provider_id.into(),
+            model_id: None,
             mint: Arc::new(move || Ok((token.clone(), spirit_pid))),
         };
         self.with_deferred_inference_port(port, Arc::new(Mutex::new(Some(binding))))
@@ -1308,7 +1319,7 @@ impl Researcher {
             InferenceOptions {
                 max_tokens,
                 temperature: Some(0.0),
-                model_id: None,
+                model_id: binding.model_id.clone(),
             },
             Some(binding.provider_id.clone()),
             Vec::new(),

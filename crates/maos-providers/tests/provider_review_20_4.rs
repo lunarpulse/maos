@@ -242,7 +242,7 @@ fn vendor_errors_and_display_are_bounded_f5() -> TestResult {
         io,
         "https://test.invalid".into(),
         "model".into(),
-        "key".into(),
+        "gemini-test-key-0123456789".into(),
     )?;
     let Err(ProviderError::ProviderRejected { status, body }) = driver.complete(&request()) else {
         return Err("missing rejection".into());
@@ -250,6 +250,8 @@ fn vendor_errors_and_display_are_bounded_f5() -> TestResult {
     assert_eq!(status, 429);
     assert!(body.len() <= 512);
     assert!(!body.chars().any(char::is_control));
+    assert!(body.starts_with("bad   é"), "vendor text readable: {body}");
+    assert!(!body.contains("withheld"), "{body}");
     for error in [
         ProviderError::Transport("\n".repeat(600)),
         ProviderError::Serde("x".repeat(1000)),

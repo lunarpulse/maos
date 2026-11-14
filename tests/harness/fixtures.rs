@@ -21,23 +21,13 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// The one command that builds every fixture resolved here.
 pub const BUILD_FIXTURES: &str = "cargo run -p xtask -- build-test-fixtures";
 
-/// `<target>/<profile>` of the running test binary
-/// (`<target>/<profile>/deps/<test>-<hash>`).
-pub fn profile_dir() -> PathBuf {
-    let exe = std::env::current_exe().expect("test executable path");
-    exe.parent()
-        .and_then(Path::parent)
-        .expect("test binary lives in <target>/<profile>/deps")
-        .to_path_buf()
-}
-
-/// `<target>` — the Cargo target directory the running test was built into.
-pub fn target_root() -> PathBuf {
-    profile_dir()
-        .parent()
-        .expect("<target>/<profile> has a parent")
-        .to_path_buf()
-}
+#[path = "layout.rs"]
+mod layout;
+/// Layout-agnostic `<target>/<profile>` / `<target>` / `PATH` of the running test
+/// (Cargo's `deps/` and 1.100 `build/<pkg>/<hash>/out/` layouts) and the
+/// same-package `binary` resolver; see `layout.rs`.
+#[allow(unused_imports)]
+pub use layout::{binary, path_with_profile, profile_dir, target_root};
 
 /// `$MAOS_FIXTURE_DIR` (absolute — the builder refuses a relative one too),
 /// else `<target>/maos-fixtures` (where the builder writes `manifest.json`).
@@ -534,5 +524,18 @@ pub fn profile_binary(name: &str) -> PathBuf {
     ) {
         panic!("test fixture stale — {error}; rebuild fixtures: `{BUILD_FIXTURES}{release}`");
     }
+    path
+}
+
+/// [`profile_binary`] for a binary that an IN-PROCESS test reaches through
+/// production's executable-relative lookup (`maos_bin::worker_spawn::
+/// resolve_cli_binary`, e.g. `worker-cli-fixture` named by a manifest
+/// `command`): the binary is additionally linked beside the test executable when
+/// the Cargo layout puts that executable where the lookup cannot reach the
+/// profile directory (Cargo >= 1.100 `build/<pkg>/<hash>/out/`). Production code
+/// stays layout-blind; the layout is handled here.
+pub fn profile_binary_beside_test(name: &str) -> PathBuf {
+    let path = profile_binary(name);
+    layout::stage_beside_test_exe(name);
     path
 }

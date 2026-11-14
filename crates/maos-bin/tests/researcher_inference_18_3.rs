@@ -580,7 +580,7 @@ fn the_root_binding_mints_once_per_pass_on_one_instance() {
     let researcher = maos_bin::researcher_root::bind(
         researcher::Researcher::new(),
         Arc::new(Echo),
-        "anthropic".into(),
+        ("anthropic".into(), None),
         &seam,
         Arc::new(|| Some(7)),
         &host,

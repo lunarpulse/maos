@@ -113,7 +113,7 @@ fn manifest_sections_parse_with_authoritative_validators() {
         .expect("[capabilities.required] valid");
     assert_eq!(
         caps.provider.complete,
-        ["anthropic.claude-haiku-4-5-20251001", "openai.gpt-4o-mini"],
+        ["anthropic.claude-haiku-5-5", "openai.gpt-4o-mini"],
         "provider.complete per D-19-1-05 A"
     );
     assert!(

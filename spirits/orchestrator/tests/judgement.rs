@@ -27,7 +27,7 @@ use orchestrator::{
 };
 
 const PID: u32 = 19;
-const PROVIDER: &str = "anthropic.claude-haiku-4-5-20251001";
+const PROVIDER: &str = "anthropic.claude-haiku-5-5";
 
 /// Records every request; answers `text` or fails with `error`.
 struct Port {

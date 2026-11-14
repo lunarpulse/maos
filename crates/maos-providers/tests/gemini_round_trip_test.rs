@@ -84,18 +84,17 @@ fn non_success_status_remains_data() -> TestResult {
         io,
         "https://test.invalid".into(),
         "model".into(),
-        "key".into(),
+        "gemini-test-key-0123456789".into(),
     )?;
+    // An error excerpt is rendered from the parsed JSON (compact, controls
+    // blanked), never from the vendor's bytes; the status is kept.
     match provider.complete(&request()) {
         Err(ProviderError::ProviderRejected {
             status: 429,
             body: actual,
         }) => assert_eq!(
             actual,
-            String::from_utf8(body)?
-                .chars()
-                .filter(|c| !c.is_control())
-                .collect::<String>()
+            serde_json::from_slice::<serde_json::Value>(&body)?.to_string()
         ),
         other => panic!("lost HTTP status: {other:?}"),
     }

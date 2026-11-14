@@ -214,38 +214,42 @@ fn the_release_body_is_the_committed_notes_file_with_generated_notes_appended() 
         "generated notes stay, appended after the committed body"
     );
 
-    // The action falls back silently when `body_path` is unreadable, so an rc tag is
-    // refused earlier by a step that is run here as the script it is.
-    let guard = &steps[index_of(&steps, "Require the release notes file (rc tags only)")];
-    assert_eq!(guard["if"].as_str(), Some("steps.tag.outputs.kind == 'rc'"));
+    // The action falls back silently when `body_path` is unreadable, so an rc or GA tag is
+    // refused earlier by a step that is run here as the script it is (operator ruling
+    // 2026-11-12, third set, B1: GA notes carry the perf label, so GA needs its notes).
+    let guard = &steps[index_of(&steps, NOTES_GUARD_STEP)];
+    assert_eq!(guard["if"].as_str(), Some(RC_OR_GA));
     assert_eq!(
         guard["env"]["TAG"].as_str(),
         Some("${{ steps.tag.outputs.tag }}")
     );
-    assert!(
-        index_of(&steps, "Require the release notes file (rc tags only)")
-            < index_of(&steps, "Create GitHub Release")
-    );
+    assert!(index_of(&steps, NOTES_GUARD_STEP) < index_of(&steps, "Create GitHub Release"));
     let run = guard["run"].as_str().unwrap();
-    let dir = tempfile::tempdir().unwrap();
-    let missing = bash(run, dir.path(), None, &[("TAG", "v1.0.0-rc.1")]);
-    assert!(!missing.status.success(), "{}", text(&missing));
-    assert!(
-        text(&missing).contains("release refused"),
-        "{}",
-        text(&missing)
-    );
-    std::fs::create_dir_all(dir.path().join("docs/release")).unwrap();
-    std::fs::write(dir.path().join("docs/release/v1.0.0-rc.1.md"), "").unwrap();
-    let empty = bash(run, dir.path(), None, &[("TAG", "v1.0.0-rc.1")]);
-    assert!(
-        !empty.status.success(),
-        "an empty notes file must be refused: {}",
-        text(&empty)
-    );
-    std::fs::write(dir.path().join("docs/release/v1.0.0-rc.1.md"), "# notes\n").unwrap();
-    let present = bash(run, dir.path(), None, &[("TAG", "v1.0.0-rc.1")]);
-    assert!(present.status.success(), "{}", text(&present));
+    for tag in ["v1.0.0-rc.1", "v1.0.0"] {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = bash(run, dir.path(), None, &[("TAG", tag)]);
+        assert!(!missing.status.success(), "{tag}: {}", text(&missing));
+        assert!(
+            text(&missing).contains("release refused"),
+            "{tag}: {}",
+            text(&missing)
+        );
+        std::fs::create_dir_all(dir.path().join("docs/release")).unwrap();
+        std::fs::write(dir.path().join(format!("docs/release/{tag}.md")), "").unwrap();
+        let empty = bash(run, dir.path(), None, &[("TAG", tag)]);
+        assert!(
+            !empty.status.success(),
+            "{tag}: an empty notes file must be refused: {}",
+            text(&empty)
+        );
+        std::fs::write(
+            dir.path().join(format!("docs/release/{tag}.md")),
+            "# notes\n",
+        )
+        .unwrap();
+        let present = bash(run, dir.path(), None, &[("TAG", tag)]);
+        assert!(present.status.success(), "{tag}: {}", text(&present));
+    }
 }
 
 // ---- GLM F6 / F4: the aggregate + ledger step ------------------------------------------
@@ -331,7 +335,7 @@ fn rc_and_ga_pass_the_ledger_pinned_to_its_logged_tip_and_alpha_does_not() {
 }
 
 #[test]
-fn perf_verdicts_are_judged_for_rc_and_ga_and_only_a_candidate_accepts_absent() {
+fn perf_verdicts_are_judged_for_rc_and_ga_and_both_accept_absent() {
     let (output, calls) = aggregate_step("rc");
     assert!(output.status.success(), "{}", text(&output));
     assert!(
@@ -348,12 +352,13 @@ fn perf_verdicts_are_judged_for_rc_and_ga_and_only_a_candidate_accepts_absent() 
         calls.contains("--perf-verdicts") && calls.contains("--perf-absent-ok"),
         "{calls}"
     );
+    // Operator ruling 2026-11-12 (third set, B1): GA accepts ABSENT too; the GA notes
+    // label it (see the label-step vectors below).
     let (output, calls) = aggregate_step("ga");
     assert!(output.status.success(), "{}", text(&output));
-    assert!(calls.contains("--perf-verdicts"), "{calls}");
     assert!(
-        !calls.contains("--perf-absent-ok"),
-        "GA needs PASS, never ABSENT: {calls}"
+        calls.contains("--perf-verdicts") && calls.contains("--perf-absent-ok"),
+        "GA accepts ABSENT (B1): {calls}"
     );
     let (output, calls) = aggregate_step("alpha");
     assert!(output.status.success(), "{}", text(&output));
@@ -435,7 +440,9 @@ fn a_perf_ledger_branch_that_exists_but_cannot_be_read_always_refuses() {
 // ---- review F2: the notes' ABSENT label must agree with the computed verdicts ----------
 
 const LABEL_STEP: &str =
-    "Require the rc notes perf label to agree with the perf verdicts (rc tags only)";
+    "Require the rc and GA notes perf label to agree with the perf verdicts (rc and GA tags only)";
+const NOTES_GUARD_STEP: &str = "Require the release notes file (rc and GA tags only)";
+const RC_OR_GA: &str = "steps.tag.outputs.kind == 'rc' || steps.tag.outputs.kind == 'ga'";
 const ABSENT_LINE: &str = "Perf verdicts: ABSENT";
 
 /// The `check-perf-verdict --json` shape: `{gate, sha, verdicts: [{metric, verdict, ..}]}`.
@@ -455,39 +462,167 @@ fn verdict_report(verdicts: &[&str]) -> String {
     serde_json::json!({ "gate": "check-perf-verdict", "sha": SHA, "verdicts": rows }).to_string()
 }
 
-/// Run the label step as the script it is: `notes` is the content of
-/// `docs/release/v1.0.0-rc.1.md` (None = no file); `report` the verdict JSON file (None = no file).
-fn label_step(notes: Option<&str>, report: Option<&str>) -> Output {
+/// Run the label step as the script it is for `kind` (`rc` | `ga`): `notes` is the content of
+/// `docs/release/<tag>.md` (None = no file); `report` the verdict JSON file (None = no file).
+fn label_step_for(kind: &str, notes: Option<&str>, report: Option<&str>) -> Output {
+    let tag = if kind == "ga" {
+        "v1.0.0"
+    } else {
+        "v1.0.0-rc.1"
+    };
     let release = release();
     let steps = steps(&release, "sign-and-publish");
     let run = script(&steps, LABEL_STEP);
     let dir = tempfile::tempdir().unwrap();
     if let Some(notes) = notes {
         std::fs::create_dir_all(dir.path().join("docs/release")).unwrap();
-        std::fs::write(dir.path().join("docs/release/v1.0.0-rc.1.md"), notes).unwrap();
+        std::fs::write(dir.path().join(format!("docs/release/{tag}.md")), notes).unwrap();
     }
     if let Some(report) = report {
         std::fs::write(dir.path().join("perf-verdicts.json"), report).unwrap();
     }
-    bash(&run, dir.path(), None, &[("TAG", "v1.0.0-rc.1")])
+    bash(&run, dir.path(), None, &[("TAG", tag), ("KIND", kind)])
+}
+
+/// The rc label step (`docs/release/v1.0.0-rc.1.md`).
+fn label_step(notes: Option<&str>, report: Option<&str>) -> Output {
+    label_step_for("rc", notes, report)
 }
 
 #[test]
-fn the_label_step_is_an_rc_only_step_after_the_verdicts_are_computed_and_before_publication() {
+fn the_label_step_is_an_rc_and_ga_step_after_the_verdicts_are_computed_and_before_publication() {
     let release = release();
     let steps = steps(&release, "sign-and-publish");
     let at = index_of(&steps, LABEL_STEP);
-    assert_eq!(
-        steps[at]["if"].as_str(),
-        Some("steps.tag.outputs.kind == 'rc'")
-    );
+    assert_eq!(steps[at]["if"].as_str(), Some(RC_OR_GA));
     assert_eq!(
         steps[at]["env"]["TAG"].as_str(),
         Some("${{ steps.tag.outputs.tag }}")
     );
+    assert_eq!(
+        steps[at]["env"]["KIND"].as_str(),
+        Some("${{ steps.tag.outputs.kind }}"),
+        "the step reads the one classification, never re-derives the kind from the tag text"
+    );
     assert!(index_of(&steps, "Require successful main discipline aggregate") < at);
     assert!(at < index_of(&steps, "Generate SHA256SUMS and sign"));
     assert!(at < index_of(&steps, "Create GitHub Release"));
+}
+
+// ---- operator ruling 2026-11-12, third set, B1: GA accepts ABSENT and its notes carry the label ----
+
+#[test]
+fn a_ga_with_the_label_and_an_all_absent_report_passes() {
+    let notes = format!("# v1.0.0\n\n{ABSENT_LINE}\n\nmore\n");
+    let output = label_step_for(
+        "ga",
+        Some(&notes),
+        Some(&verdict_report(&["ABSENT", "ABSENT", "ABSENT"])),
+    );
+    assert!(output.status.success(), "{}", text(&output));
+    assert!(
+        text(&output).contains("perf label agrees: every metric is ABSENT"),
+        "{}",
+        text(&output)
+    );
+    // Trailing whitespace is tolerated exactly as `check-rc-readiness` tolerates it.
+    let padded = format!("# v1.0.0\n{ABSENT_LINE}  \n");
+    let output = label_step_for(
+        "ga",
+        Some(&padded),
+        Some(&verdict_report(&["ABSENT", "ABSENT"])),
+    );
+    assert!(output.status.success(), "{}", text(&output));
+}
+
+#[test]
+fn a_ga_without_the_exact_label_line_is_refused_whatever_the_rows_even_all_pass() {
+    for report in [
+        verdict_report(&["ABSENT", "ABSENT"]),
+        verdict_report(&["PASS", "PASS", "PASS"]),
+        verdict_report(&["PASS", "ABSENT"]),
+        verdict_report(&["FAIL"]),
+        verdict_report(&[]),
+        "{".to_string(),
+    ] {
+        for notes in [
+            "# v1.0.0\n",
+            "# v1.0.0\nPerf verdicts: PASS\n",
+            "- `Perf verdicts: ABSENT`: a bullet quoting the label is not the line\n",
+            "Perf verdicts: ABSENT (waived)\n",
+            " Perf verdicts: ABSENT\n",
+            "",
+        ] {
+            let output = label_step_for("ga", Some(notes), Some(&report));
+            let shown = text(&output);
+            assert!(!output.status.success(), "{notes:?} / {report}: {shown}");
+            assert!(
+                shown.contains(
+                    "release refused: GA notes must carry the exact `Perf verdicts: ABSENT` line"
+                ),
+                "{notes:?} / {report}: {shown}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_ga_with_the_label_and_any_real_verdict_is_a_refused_contradiction() {
+    let notes = format!("# v1.0.0\n{ABSENT_LINE}\n");
+    for verdicts in [
+        vec!["PASS", "ABSENT", "ABSENT"],
+        vec!["PASS", "PASS", "PASS"],
+        vec!["ABSENT", "FAIL", "ABSENT"],
+        vec!["ABSENT", "INDETERMINATE"],
+    ] {
+        let output = label_step_for("ga", Some(&notes), Some(&verdict_report(&verdicts)));
+        let shown = text(&output);
+        assert!(!output.status.success(), "{verdicts:?}: {shown}");
+        assert!(
+            shown.contains("release refused: notes say ABSENT but the ledger has PASS/FAIL/INDETERMINATE verdicts: update the notes"),
+            "{verdicts:?}: {shown}"
+        );
+    }
+}
+
+#[test]
+fn a_ga_with_the_label_and_an_unreadable_or_empty_report_is_refused_not_assumed_absent() {
+    let notes = format!("{ABSENT_LINE}\n");
+    for report in [
+        None,
+        Some(""),
+        Some("{"),
+        Some("[]"),
+        Some("{\"verdicts\":[]}"),
+    ] {
+        let output = label_step_for("ga", Some(&notes), report);
+        assert!(!output.status.success(), "{report:?}: {}", text(&output));
+        assert!(
+            text(&output).contains("release refused"),
+            "{report:?}: {}",
+            text(&output)
+        );
+    }
+}
+
+#[test]
+fn a_ga_with_no_notes_file_is_refused_by_the_label_step_itself() {
+    // Unlike an rc (whose missing notes the readiness gate and the notes guard own), the GA
+    // label step has no other label enforcer: it refuses a missing notes file whatever the report.
+    for report in [
+        verdict_report(&["ABSENT", "ABSENT"]),
+        verdict_report(&["PASS", "PASS"]),
+    ] {
+        let output = label_step_for("ga", None, Some(&report));
+        let shown = text(&output);
+        assert!(!output.status.success(), "{report}: {shown}");
+        assert!(
+            shown.contains(
+                "release refused: GA notes must carry the exact `Perf verdicts: ABSENT` line"
+            ),
+            "{report}: {shown}"
+        );
+    }
 }
 
 #[test]

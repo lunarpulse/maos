@@ -12,6 +12,9 @@
 //! vectors name `ClaudeCli`/`CodexCli`/`parse_completion` at all.
 
 #[cfg(target_os = "linux")]
+#[path = "../../../tests/harness/layout.rs"]
+mod layout;
+#[cfg(target_os = "linux")]
 #[path = "../../../tests/harness/t3_substrate.rs"]
 mod t3_substrate;
 
@@ -757,12 +760,7 @@ mod planted_refusal {
     }
 
     fn profile_dir() -> std::path::PathBuf {
-        std::env::current_exe()
-            .expect("test executable path")
-            .parent()
-            .and_then(std::path::Path::parent)
-            .expect("test profile directory")
-            .to_path_buf()
+        crate::layout::profile_dir()
     }
 
     fn require_worker_t3(subject: &str) -> bool {
@@ -869,7 +867,7 @@ mod planted_refusal {
         manifest: &std::path::Path,
     ) -> std::process::Output {
         let bindir = root.join("bin");
-        let mut paths = vec![bindir, profile_dir(), profile_dir().join("deps")];
+        let mut paths = vec![bindir, profile_dir()];
         if let Some(existing) = std::env::var_os("PATH") {
             paths.extend(std::env::split_paths(&existing));
         }
@@ -1142,7 +1140,7 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":0
             .env("MAOS_HOME", &t.0)
             .env("MAOS_HOST_GRANTS", &grants)
             .env("PATH", {
-                let mut paths = vec![bindir, profile_dir(), profile_dir().join("deps")];
+                let mut paths = vec![bindir, profile_dir()];
                 if let Some(existing) = std::env::var_os("PATH") {
                     paths.extend(std::env::split_paths(&existing));
                 }
@@ -1181,7 +1179,7 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":0
         std::fs::create_dir_all(t.0.join(".codex")).unwrap();
         std::fs::write(t.0.join(".codex").join("auth.json"), b"{}").unwrap();
         let paths = {
-            let mut paths = vec![profile_dir(), profile_dir().join("deps")];
+            let mut paths = vec![profile_dir()];
             if let Some(existing) = std::env::var_os("PATH") {
                 paths.extend(std::env::split_paths(&existing));
             }

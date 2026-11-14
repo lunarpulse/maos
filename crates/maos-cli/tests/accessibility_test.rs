@@ -36,45 +36,28 @@
 
 #[path = "support/fixture_door.rs"]
 mod fixture_door;
+#[path = "../../../tests/harness/layout.rs"]
+mod layout;
 
 use std::path::PathBuf;
 use std::process::Command;
 
 use tempfile::TempDir;
 
-/// Resolve the `maosctl` binary: prefer `CARGO_BIN_EXE_maosctl` (injected
-/// by cargo at test build time), then a sibling of the test binary, then
-/// PATH. Mirrors `audit_no_color_test::maosctl_path`.
+/// Resolve the `maosctl` binary of this package: cargo injects its path at
+/// test build time, in every `target/` layout.
 fn maosctl_path() -> PathBuf {
-    if let Some(p) = std::option_env!("CARGO_BIN_EXE_maosctl") {
-        return PathBuf::from(p);
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent().and_then(|p| p.parent()) {
-            let candidate = dir.join("maosctl");
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    PathBuf::from("maosctl")
+    PathBuf::from(env!("CARGO_BIN_EXE_maosctl"))
 }
 
-/// Resolve the `maos-bin` binary: prefer `CARGO_BIN_EXE_maos` if
-/// cargo injected it, then sibling-of-test-exe at one level up. Used so
-/// the dispatched `start`/`unload`/`run` shells out to the right
-/// binary in hermetic test runs.
+/// Resolve the `maos-bin` binary (a sibling package's `[[bin]]`, so cargo
+/// injects no path for it): the profile directory the test was built into
+/// (layout-agnostic), else PATH. Used so the dispatched `start`/`unload`/`run`
+/// shells out to the right binary in hermetic test runs.
 fn maos_bin_path() -> PathBuf {
-    if let Some(p) = std::option_env!("CARGO_BIN_EXE_maos") {
-        return PathBuf::from(p);
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent().and_then(|p| p.parent()) {
-            let candidate = dir.join("maos");
-            if candidate.exists() {
-                return candidate;
-            }
-        }
+    let candidate = layout::profile_dir().join("maos");
+    if candidate.exists() {
+        return candidate;
     }
     PathBuf::from("maos")
 }

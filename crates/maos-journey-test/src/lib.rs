@@ -139,7 +139,15 @@ impl JourneyWorldBuilder {
                 .to_string_lossy()
                 .into_owned(),
         );
-        if let Some(cassette_path) = llm.cassette_path() {
+        // The CHILD's effective mode decides source-vs-copy, not this test
+        // process's: a world that forces `replay` on its child (J0) must read
+        // its own live copy even when the job exports `record`.
+        let child_mode = self
+            .extra_env
+            .get("MAOS_INFERENCE_MODE")
+            .cloned()
+            .or_else(|| std::env::var("MAOS_INFERENCE_MODE").ok());
+        if let Some(cassette_path) = llm.cassette_path(child_mode.as_deref()) {
             env.insert(
                 "MAOS_REPLAY_CASSETTE".into(),
                 cassette_path.to_string_lossy().into_owned(),
@@ -741,18 +749,10 @@ impl Drop for ConformantMcp {
 }
 
 /// A replay/record LLM provider keyed by a cassette file.
+#[derive(Default)]
 pub struct ReplayProvider {
     cassette_source: Option<PathBuf>,
     cassette_file: Option<PathBuf>,
-}
-
-impl Default for ReplayProvider {
-    fn default() -> Self {
-        Self {
-            cassette_source: None,
-            cassette_file: None,
-        }
-    }
 }
 
 impl ReplayProvider {
@@ -781,8 +781,10 @@ impl ReplayProvider {
     /// TODO: inject queued scalars into the cassette JSON when a consumer exists.
     pub fn queue_scalar(&self, _tag: &str, _value: f64) {}
 
-    pub fn cassette_path(&self) -> Option<&Path> {
-        if std::env::var("MAOS_INFERENCE_MODE").as_deref() == Ok("record") {
+    /// The cassette path the child reads (`replay`) or writes (`record`).
+    /// `child_mode` is the child's EFFECTIVE `MAOS_INFERENCE_MODE`.
+    pub fn cassette_path(&self, child_mode: Option<&str>) -> Option<&Path> {
+        if child_mode == Some("record") {
             self.cassette_source.as_deref()
         } else {
             self.cassette_file.as_deref()

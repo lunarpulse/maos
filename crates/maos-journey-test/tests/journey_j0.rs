@@ -77,20 +77,16 @@ fn j0_cassette_source() -> std::path::PathBuf {
     workspace_root().join("crates/maos-journey-test/cassettes/j0/shell-intro.json")
 }
 
-/// The J0 scene's shared setup: an isolated home with `maos init` done and
-/// a COPY of the seed cassette (never the repo file — a record-mode leg must
-/// not be able to rewrite the seed).
-fn j0_world() -> (tempfile::TempDir, JourneyWorld) {
-    let audit = AuditDb::temp();
-    let cassette_copy = tempfile::NamedTempFile::new().expect("cassette copy");
-    std::fs::copy(j0_cassette_source(), cassette_copy.path()).expect("copy cassette");
-    let world = JourneyWorld::builder()
-        .audit(audit)
-        .cassette(cassette_copy.path().to_str().unwrap())
+/// The J0 scene's shared setup: an isolated home with the seed cassette handed
+/// to the world, which copies it (never the repo file — a record-mode leg must
+/// not be able to rewrite the seed). The child is forced to `replay`, so the
+/// harness hands it that live copy even when the job exports `record`.
+fn j0_world() -> JourneyWorld {
+    JourneyWorld::builder()
+        .audit(AuditDb::temp())
+        .cassette(j0_cassette_source().to_str().unwrap())
         .env("MAOS_INFERENCE_MODE", "replay")
-        .build();
-    let guard = tempfile::TempDir::new().expect("cassette guard");
-    (guard, world)
+        .build()
 }
 
 /// `maos init` inside the world's home: one bounded run that must exit 0
@@ -331,7 +327,7 @@ fn j0_init_creates_config() {
 /// Log.
 #[test]
 fn j0_shell_banner_via_pty() {
-    let (_guard, world) = j0_world();
+    let world = j0_world();
     init_world(&world);
 
     let pty = spawn_shell(&world);
@@ -349,11 +345,70 @@ fn j0_shell_banner_via_pty() {
     drop(pty);
 }
 
+const RECORD_ENV_CHILD: &str = "MAOS_J0_RECORD_ENV_CHILD";
+
+/// Live-leg regression (journey-nightly run 43239794859): with
+/// `MAOS_INFERENCE_MODE=record` exported job-wide and NO provider key, the
+/// harness used to hand J0's replay child a deleted temp file as its cassette,
+/// so the shell died ("cassette read: … No such file or directory") before its
+/// banner. The test process itself must carry `record` (the trigger), so a
+/// child of this binary is re-run with that env and every provider key
+/// removed; hermetic — J0 never contacts a provider under replay.
+#[test]
+fn j0_shell_boots_when_the_job_exports_record_mode() {
+    let mut child = std::process::Command::new(std::env::current_exe().unwrap());
+    child
+        .args(["--ignored", "--exact", "j0_record_env_child"])
+        .env(RECORD_ENV_CHILD, "1")
+        .env("MAOS_INFERENCE_MODE", "record");
+    for key in [
+        "MAOS_ANTHROPIC_API_KEY",
+        "MAOS_OPENAI_API_KEY",
+        "MAOS_GEMINI_API_KEY",
+        "MAOS_KIMI_API_KEY",
+    ] {
+        child.env_remove(key);
+    }
+    let output = child.output().unwrap();
+    assert!(
+        output.status.success(),
+        "J0 must boot under a job-wide record mode:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+#[ignore = "spawned by j0_shell_boots_when_the_job_exports_record_mode with MAOS_INFERENCE_MODE=record"]
+fn j0_record_env_child() {
+    assert_eq!(std::env::var(RECORD_ENV_CHILD).as_deref(), Ok("1"));
+    assert_eq!(
+        std::env::var("MAOS_INFERENCE_MODE").as_deref(),
+        Ok("record"),
+        "the trigger: this process runs under a job-wide record mode"
+    );
+    let world = j0_world();
+    let cassette = std::path::PathBuf::from(&world.env()["MAOS_REPLAY_CASSETTE"]);
+    assert!(
+        cassette.is_file(),
+        "the replay child's cassette must exist: {}",
+        cassette.display()
+    );
+    assert_ne!(
+        cassette,
+        j0_cassette_source(),
+        "a replay child must read its own copy, never the repo seed"
+    );
+    init_world(&world);
+    // `spawn_shell` panics with the screen unless the EXACT banner appears.
+    drop(spawn_shell(&world));
+}
+
 /// AC1 — the halt resolves over the DOOR (`maosctl halt resolve`), the REPL
 /// renders it unprompted, and the Spirit proceeds with the context.
 #[test]
 fn j0_halt_resolved_over_the_door() {
-    let (_guard, world) = j0_world();
+    let world = j0_world();
     init_world(&world);
 
     let pty = spawn_shell(&world);
@@ -529,7 +584,7 @@ fn j0_halt_resolved_over_the_door() {
 /// approval-log and completion rows (one mechanism, two surfaces).
 #[test]
 fn j0_halt_resolved_in_the_repl() {
-    let (_guard, world) = j0_world();
+    let world = j0_world();
     init_world(&world);
 
     let pty = spawn_shell(&world);

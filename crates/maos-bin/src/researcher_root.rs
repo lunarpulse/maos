@@ -153,7 +153,7 @@ pub fn construct(
                 .map_err(|e| format!("cassette replay init failed: {e}"))?;
             let provider = declared
                 .first()
-                .cloned()
+                .map(|entry| maos_manifest::split_provider_pin(entry).0.to_owned())
                 .ok_or("cassette replay: the Spirit declares no provider")?;
             eprintln!(
                 "maos run: researcher cassette-replay inference wired ({})",
@@ -162,7 +162,7 @@ pub fn construct(
             Ok(bind(
                 researcher,
                 Arc::new(replay),
-                provider,
+                (provider, None),
                 seam,
                 pid_of,
                 host,
@@ -175,7 +175,10 @@ pub fn construct(
 /// D-18-3-02 B / D-18-3-04 A — under `--live` or an explicit mode (the seam
 /// carries a port builder), bind `researcher` to its first declared provider
 /// the router registers; none registered refuses here, at boot or load.
-/// Deterministic mode returns it unbound (ADR-064).
+/// S1 (Q6): the binding also carries the model the manifest pins for that
+/// provider (`declared` entries are `provider[.model]`); a provider-only
+/// declaration stays provider-only. Deterministic mode returns it unbound
+/// (ADR-064).
 pub fn attach(
     researcher: Researcher,
     seam: &butler::ButlerSeam,
@@ -186,22 +189,38 @@ pub fn attach(
     let Some((build_port, registered)) = seam.inference.as_ref() else {
         return Ok(researcher);
     };
-    let provider = researcher::declared_provider(declared, registered)?;
+    let providers: Vec<String> = declared
+        .iter()
+        .map(|entry| maos_manifest::split_provider_pin(entry).0.to_owned())
+        .collect();
+    let provider = researcher::declared_provider(&providers, registered)?;
+    let model = maos_manifest::pinned_model(declared, &provider);
     let port = build_port().ok_or("researcher inference: the host is shutting down")?;
-    Ok(bind(researcher, port, provider, seam, pid_of, host))
+    Ok(bind(
+        researcher,
+        port,
+        (provider, model),
+        seam,
+        pid_of,
+        host,
+    ))
 }
 
-/// Bind `port` with a per-pass mint (D-18-3-03 A) naming `provider`.
+/// Bind `port` with a per-pass mint (D-18-3-03 A) naming `(provider, model)`.
 pub fn bind(
     researcher: Researcher,
     port: Arc<dyn InferencePort + Send + Sync>,
-    provider: String,
+    (provider, model): (String, Option<String>),
     seam: &butler::ButlerSeam,
     pid_of: PidSource,
     host: &ResearcherHost,
 ) -> Researcher {
     eprintln!("researcher inference seam wired (provider `{provider}`)");
-    let binding = ResearcherInferenceBinding::per_pass(provider, Arc::clone(&seam.mint), pid_of);
+    if let Some(model) = &model {
+        eprintln!("researcher inference model pinned by its manifest: `{model}`");
+    }
+    let binding = ResearcherInferenceBinding::per_pass(provider, Arc::clone(&seam.mint), pid_of)
+        .with_model(model);
     let researcher = researcher
         .with_deferred_inference_port(port, Arc::new(Mutex::new(Some(binding))))
         .with_distillation_port(Arc::clone(&host.distill));

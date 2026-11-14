@@ -307,6 +307,10 @@ fn record_through_the_router_writes_a_live_cassette_and_sidecar_that_replay_gree
 
     let sidecar = read_json(&home.path().join("distill-corpus-v0.live.verdicts.json"));
     assert_eq!(sidecar["judge_model"], PINNED);
+    // `claude-sonnet-5-5` rejects `temperature`: the pinned 0.0 was requested
+    // but never applied, and both artifacts say so.
+    assert_eq!(sidecar["judge_temperature_applied"], false);
+    assert_eq!(line["judge_temperature_applied"], false);
     let prompt = format!("{:x}", Sha256::digest(JUDGE_PROMPT.as_bytes()));
     assert_eq!(sidecar["judge_prompt_sha256"], prompt.as_str());
     assert_eq!(sidecar["verdicts"]["rd01"]["rd01-c1"], true);

@@ -27,6 +27,20 @@
 # and `temperature`. `top_p` and `seed` are recorded here for the pinned-judge
 # contract but are NOT applied: the Inference Port's `InferenceOptions` has no
 # top_p/seed fields (review R3, 2026-10-25).
+#
+# 2026-11-13 provenance note (live-leg correction 1): Anthropic documents that
+# `temperature`, `top_p` and `top_k` return a 400 on Claude Sonnet 5.5 (thinking
+# docs, "Sampling parameters"). The Anthropic driver therefore OMITS the
+# requested `temperature = 0.0` for this model
+# (`maos_providers::anthropic::accepts_sampling`) and sends
+# `thinking: {"type": "between_tools"}` so the 8-token verdict is text, not
+# thinking. `temperature = 0.0` stays the pinned REQUEST (and the
+# `check-judge-config` schema value); it is NOT applied on the wire. A live
+# record states this in the report line and the verdict sidecar as
+# `judge_temperature_applied: false`. Determinism now rests on the prompt and
+# the recorded verdicts, not on sampling: CI replay reads the recorded judge
+# completions of a `live-record` cassette and the frozen corpus verdicts of a
+# `seed` cassette. The verdict sidecar is written by record and not read back.
 [judge.researcher-faithfulness]
 model = "anthropic:claude-sonnet-5-5@2026-10-25"
 temperature = 0.0

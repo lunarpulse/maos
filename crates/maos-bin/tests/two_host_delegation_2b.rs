@@ -280,23 +280,15 @@ fn write_daemon_config(
 }
 
 fn target_debug_path() -> std::ffi::OsString {
-    let profile = std::env::current_exe()
-        .expect("test executable path")
-        .parent()
-        .and_then(Path::parent)
-        .expect("test profile directory")
-        .to_path_buf();
-    let mut paths = vec![profile.clone(), profile.join("deps")];
-    if let Some(existing) = std::env::var_os("PATH") {
-        paths.extend(std::env::split_paths(&existing));
-    }
-    std::env::join_paths(paths).expect("valid PATH entries")
+    fixtures::path_with_profile()
 }
 
-/// `maos` resolves `worker-cli-fixture` beside its own executable; the
-/// prebuilt fixture must already sit in this test's profile directory.
+/// `maos` resolves `worker-cli-fixture` beside its own executable, and the
+/// in-process host-B tests resolve it beside THIS test executable; the prebuilt
+/// fixture must already sit in this test's profile directory and is linked
+/// beside the test executable.
 static WORKER_FIXTURE_PRESENT: LazyLock<()> = LazyLock::new(|| {
-    fixtures::profile_binary("worker-cli-fixture");
+    fixtures::profile_binary_beside_test("worker-cli-fixture");
 });
 
 fn ensure_fixture_binary() {

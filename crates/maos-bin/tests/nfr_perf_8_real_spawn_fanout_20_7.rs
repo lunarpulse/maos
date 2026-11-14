@@ -312,7 +312,7 @@ fn real_t3_workers_fan_out_through_the_real_supervisor() {
         if !t3_substrate::require_t3("NFR-Perf-8 real-spawn fan-out") {
             return;
         }
-        fixtures::profile_binary("worker-cli-fixture");
+        fixtures::profile_binary_beside_test("worker-cli-fixture");
         fan_out_child(profile);
         return;
     }

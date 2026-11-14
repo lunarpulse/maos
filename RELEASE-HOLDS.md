@@ -29,7 +29,7 @@
   2026-11-12 ruling (`rc` = b) the rc ships with perf verdicts recorded ABSENT and
   labelled in the release notes.
 
-## Claim boundaries — Holds 1–2 (not performed, not claimable)
+## Claim boundaries — Holds 1–2 and the perf boundary (not performed, not claimable)
 
 > **OPERATOR RULING 2026-11-12 (ask answer `ga` = boundary).** Operator words:
 > "we are not doing NFR-Sec-7 and NFR-Comp-1 as we do not have resources and
@@ -39,10 +39,17 @@
 > determination was made; assurance is AI-agent review plus the hermetic CI
 > proof only.** The release may NOT claim NFR-Sec-7 or NFR-Comp-1 is met.
 
+> **OPERATOR RULING 2026-11-12 (third set, B1; operator words "alloweed Absent").**
+> GA may ship with perf verdicts ABSENT. FAIL and INDETERMINATE stay refused. The
+> PRD hot-path performance criterion (`success-criteria.md:40-46`) is boundary 3
+> below: the GA notes carry the exact line `Perf verdicts: ABSENT` and the release
+> may NOT claim any NFR-Perf timing figure.
+
 | # | Boundary | Requirement (text retained; NOT met) | Owner | Status | GA effect |
 |---|----------|-------------|-------|--------|-----------|
 | 1 | External penetration test | **NFR-Sec-7** — external pen-test report, **zero P0/P1 findings open at ship**. Triage by joint panel (pen-test lead + MAOS security owner); disagreement → PRD-author tiebreak. P0/P1 per OWASP Risk Rating Methodology, frozen at engagement start. | Security owner + external firm | ⛔ Not performed (no resources/firm); NOT claimable | none (boundary) |
 | 2 | Export-control classification | **NFR-Comp-1** — ECCN classification letter on file; EAR99 vs 5D002 determination published in `STABILITY.md §Export`; dual-use review for kernel crypto primitives. | Export counsel + security owner | ⛔ No ECCN determination made (no counsel); NOT claimable | none (boundary) |
+| 3 | Hot-path performance budgets | **PRD success criterion** (`_bmad-output/planning-artifacts/prd/success-criteria.md:40-46`) — `iac/send` <10 µs P99, capability issuance <5 µs P99, dispatch <5 µs P99, `memory/read` <50 µs / <5 ms P99, hot-swap <50 ms / <500 ms P99, telemetry broadcast <1 µs; "enforced as CI gates by v1.0". **NOT met as stated.** | Owner: none (the stable perf runner is dropped as work, dedrift ruling 5) | ⛔ Perf verdicts ABSENT; the verdict command and its fixture-ledger tests exist (20-7 L1); no stable-runner timing was measured | none (boundary): the release notes say `Perf verdicts: ABSENT` (operator ruling 2026-11-12, third set, B1; `release.yml` enforces the line for GA); the release may NOT claim any NFR-Perf timing figure |
 
 ## Standing mitigations (in force now, not a GA precondition)
 
@@ -144,9 +151,15 @@ This section governs GA tags only. The signed `v0.1.0-alpha.1` pre-release and t
 3. The WASM-engine-off-by-default standing mitigation is in force until story
    `21-9-wasm-host-default-on` lands (operator ruling `wasm` = on, 2026-11-12);
    from then on the default artifact carries the engine and the notes say so.
-4. The signed-tag step needs whoever holds the signing key. That human/key part
-   is an **operator action that AI agents cannot perform**; this ledger does not
-   assume agents can sign. Update this ledger's Status to reflect the tag.
+4. The tag is an ordinary `git tag` pushed with the operator's authorisation; CI
+   signs the artifacts with the repository secret `RELEASE_SIGNING_KEY`
+   (`docs/release/tag-procedure.md`). No operator-held key is involved (SCP
+   2026-11-12 §12, 2026-11-13). Update this ledger's Status to reflect the tag.
+5. The GA release notes carry the exact line `Perf verdicts: ABSENT` (operator
+   ruling 2026-11-12, third set, B1; boundary 3 above) and the no-pen-test/no-ECCN
+   sentence of item 2. `release.yml` accepts ABSENT for GA
+   (`--perf-absent-ok`), refuses FAIL and INDETERMINATE, and refuses a GA notes file
+   that lacks the line (no all-PASS exception).
 
 ## Story 14-2 — mTLS rotation honesty clauses (2026-08-29)
 

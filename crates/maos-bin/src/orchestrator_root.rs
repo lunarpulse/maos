@@ -67,8 +67,9 @@ pub type ScalarPortFactory<'a> =
 /// D-19-4-01 A) and the context port through the seam's binder (18-5) on
 /// every path; under `--live` or an explicit mode the Inference Port from the
 /// seam's builder (18-1) with a per-pass mint naming the first declared
-/// provider the router registers. Unset mode returns it unbound (ADR-064).
-/// The port serves only `judge_ambiguity`, never dispatch.
+/// provider the router registers, and (S1, Q6) the model the manifest pins
+/// for it (`declared` entries are `provider[.model]`). Unset mode returns it
+/// unbound (ADR-064). The port serves only `judge_ambiguity`, never dispatch.
 pub fn construct(
     orchestrator: Orchestrator,
     seam: &butler::ButlerSeam,
@@ -84,10 +85,19 @@ pub fn construct(
     let Some((build_port, registered)) = seam.inference.as_ref() else {
         return Ok(orchestrator);
     };
-    let provider = declared_provider(declared, registered)?;
+    let providers: Vec<String> = declared
+        .iter()
+        .map(|entry| maos_manifest::split_provider_pin(entry).0.to_owned())
+        .collect();
+    let provider = declared_provider(&providers, registered)?;
+    let model = maos_manifest::pinned_model(declared, &provider);
     let port = build_port().ok_or("orchestrator inference: the host is shutting down")?;
     eprintln!("orchestrator inference seam wired (provider {provider})");
-    let binding = OrchestratorInferenceBinding::per_pass(provider, Arc::clone(&seam.mint), pid_of);
+    if let Some(model) = &model {
+        eprintln!("orchestrator inference model pinned by its manifest: {model}");
+    }
+    let binding = OrchestratorInferenceBinding::per_pass(provider, Arc::clone(&seam.mint), pid_of)
+        .with_model(model);
     Ok(orchestrator.with_deferred_inference_port(port, Arc::new(Mutex::new(Some(binding)))))
 }
 

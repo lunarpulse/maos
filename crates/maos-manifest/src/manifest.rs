@@ -880,6 +880,27 @@ impl RawCapabilitiesRequired {
     }
 }
 
+/// Split a `provider.complete` entry `<provider>[.<model>]` at its first `.`.
+/// A bare provider (or an empty prefix, which validation refuses) has no model.
+pub fn split_provider_pin(entry: &str) -> (&str, Option<&str>) {
+    match entry.split_once('.') {
+        Some((provider, model)) if !provider.is_empty() => {
+            (provider, Some(model).filter(|m| !m.is_empty()))
+        }
+        _ => (entry, None),
+    }
+}
+
+/// The model a Spirit's own manifest pins for `provider`: the first
+/// `<provider>.<model>` entry (declaration order). `None` is provider-only.
+pub fn pinned_model(declared: &[String], provider: &str) -> Option<String> {
+    declared
+        .iter()
+        .map(|entry| split_provider_pin(entry))
+        .find_map(|(p, model)| model.filter(|_| p == provider))
+        .map(str::to_owned)
+}
+
 /// Convert a `CapabilitiesRequired` manifest declaration to a `Vec<Scope>`.
 ///
 /// v0.1-β produces `Scope::ProviderInfer` from provider entries and
@@ -891,16 +912,8 @@ pub fn capabilities_required_to_scopes(
         .provider
         .complete
         .iter()
-        .map(|entry| {
-            let provider = entry.split('.').next().unwrap_or(entry);
-            if provider.is_empty() {
-                return maos_domain::invariants::i1::Scope::ProviderInfer {
-                    provider: entry.clone(),
-                };
-            }
-            maos_domain::invariants::i1::Scope::ProviderInfer {
-                provider: provider.to_string(),
-            }
+        .map(|entry| maos_domain::invariants::i1::Scope::ProviderInfer {
+            provider: split_provider_pin(entry).0.to_string(),
         })
         .collect();
     for server_entry in &caps.mcp.servers {
@@ -3086,6 +3099,24 @@ loom.wirte = true"#,
         )
         .unwrap_err();
         assert!(matches!(error, ManifestError::Toml(_)));
+    }
+
+    #[test]
+    fn provider_pins_split_at_the_first_dot_and_bare_providers_stay_provider_only() {
+        assert_eq!(
+            split_provider_pin("ollama.llama3.1:8b"),
+            ("ollama", Some("llama3.1:8b"))
+        );
+        assert_eq!(split_provider_pin("anthropic"), ("anthropic", None));
+        assert_eq!(split_provider_pin("anthropic."), ("anthropic", None));
+        assert_eq!(split_provider_pin(".x"), (".x", None));
+        let declared = ["anthropic".to_owned(), "openai.gpt-4o-mini".to_owned()];
+        assert_eq!(pinned_model(&declared, "anthropic"), None);
+        assert_eq!(
+            pinned_model(&declared, "openai").as_deref(),
+            Some("gpt-4o-mini")
+        );
+        assert_eq!(pinned_model(&declared, "gemini"), None);
     }
 
     fn loom_scopes(caps: &CapabilitiesRequired) -> Vec<maos_domain::invariants::i1::Scope> {

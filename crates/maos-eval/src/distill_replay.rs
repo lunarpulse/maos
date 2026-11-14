@@ -309,9 +309,14 @@ pub fn verdicts_sidecar(cassette: &std::path::Path) -> std::path::PathBuf {
     cassette.with_file_name(format!("{stem}.verdicts.json"))
 }
 
-/// The sidecar's bytes: the judge model, the prompt's SHA-256 and every
-/// [`served_live`] scenario's verdicts (scenario → claim_id → faithful).
-pub fn live_verdicts(facts: &[ScenarioFacts], model: &str) -> Result<String, String> {
+/// The sidecar's bytes: the judge model, whether its pinned temperature was
+/// applied on the wire, the prompt's SHA-256 and every [`served_live`]
+/// scenario's verdicts (scenario → claim_id → faithful).
+pub fn live_verdicts(
+    facts: &[ScenarioFacts],
+    model: &str,
+    temperature_applied: bool,
+) -> Result<String, String> {
     let verdicts: BTreeMap<&str, &BTreeMap<String, bool>> = facts
         .iter()
         .filter(|f| !f.control.is_some_and(Control::completion_planted))
@@ -319,6 +324,7 @@ pub fn live_verdicts(facts: &[ScenarioFacts], model: &str) -> Result<String, Str
         .collect();
     serde_json::to_string_pretty(&serde_json::json!({
         "judge_model": model,
+        "judge_temperature_applied": temperature_applied,
         "judge_prompt_sha256": crate::onboarding_gate_corpus::sha256_hex(JUDGE_PROMPT.as_bytes()),
         "verdicts": verdicts,
     }))

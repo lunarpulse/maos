@@ -29,6 +29,9 @@ use maos_bin::worker_workspace::{
 };
 
 #[cfg(target_os = "linux")]
+#[path = "../../../tests/harness/layout.rs"]
+mod layout;
+#[cfg(target_os = "linux")]
 #[path = "../../../tests/harness/t3_substrate.rs"]
 mod t3_substrate;
 
@@ -560,12 +563,7 @@ mod t3_runs {
     }
 
     fn profile_dir() -> PathBuf {
-        std::env::current_exe()
-            .expect("test executable path")
-            .parent()
-            .and_then(Path::parent)
-            .expect("test profile directory")
-            .to_path_buf()
+        crate::layout::profile_dir()
     }
 
     /// A fake worker binary named `claude`/`codex` on a prepended `PATH`,
@@ -626,7 +624,7 @@ mod t3_runs {
 
     /// `maos run <args> --once` on a fresh data home, clean environment.
     fn run_maos(root: &Path, args: &[&str], env: &[(&str, &std::ffi::OsStr)]) -> Output {
-        let mut paths = vec![root.join("bin"), profile_dir(), profile_dir().join("deps")];
+        let mut paths = vec![root.join("bin"), profile_dir()];
         if let Some(existing) = std::env::var_os("PATH") {
             paths.extend(std::env::split_paths(&existing));
         }

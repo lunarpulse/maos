@@ -117,10 +117,10 @@ Run these checks against the exact commit that will be tagged:
    runs never count). Against the real ledger the leg **refuses** until your
    dispatch exists (0 T3 records when measured 2026-11-04).
 
-   The perf-ledger leg (Operator ruling 2026-11-12, rc = b): `release.yml` runs
+   The perf-ledger leg (Operator ruling 2026-11-12, rc = b; GA: third set, B1): `release.yml` runs
    `check-perf-verdict --json` on the `perf-ledger` branch (absent = empty ledger) and
-   passes the report as `--perf-verdicts`; a release candidate adds `--perf-absent-ok`
-   (ABSENT accepted, labelled in the notes), GA does not (every row PASS), and FAIL or
+   passes the report as `--perf-verdicts`; release candidates and GA both add
+   `--perf-absent-ok` (ABSENT accepted, labelled in the notes), and FAIL or
    INDETERMINATE are always refused. The aggregate server-side `check_name=aggregate&filter=latest` filter is mandatory
    (no `status=completed` filter: a newer run still in progress is the run judged and
    refused, never hidden behind an older green one) and matches
@@ -157,6 +157,16 @@ Run these checks against the exact commit that will be tagged:
    `deferred-work.md` row. `release.yml` runs the same command with `--tag` before
    signing when the ref is an rc tag. See
    [`decisions-2026-11-12.md`](decisions-2026-11-12.md).
+
+   **GA notes checklist (operator ruling 2026-11-12, third set, B1; GA is not cut by this
+   procedure).** `check-rc-readiness` does not run for GA (its `version` leg requires
+   `X.Y.Z-rc.N`), so `release.yml` enforces the label itself for a `vX.Y.Z` tag:
+   `docs/release/v<version>.md` must exist and carry the exact line
+   `Perf verdicts: ABSENT` (unconditionally; there is no all-PASS exception), and the
+   step `Require the rc and GA notes perf label to agree with the perf verdicts` refuses a
+   GA notes file without that line, and refuses a label next to any PASS, FAIL or
+   INDETERMINATE row. The perf criterion is a claim boundary (`RELEASE-HOLDS.md`
+   boundary 3): the release may not claim any NFR-Perf timing figure.
 
 4. Confirm `MAOS_RELEASE_PUBKEY` and `RELEASE_SIGNING_KEY` are both `present`
    in [`docs/runbooks/provisioning-checklist.md`](../runbooks/provisioning-checklist.md).

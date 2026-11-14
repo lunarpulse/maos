@@ -35,6 +35,8 @@ use maos_kernel_core::security::sandbox::t3::{
     child::SandboxedContainerChild, image_lock::VerifiedImageAttestation,
 };
 
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
 #[path = "../../../tests/harness/t3_substrate.rs"]
 mod t3_substrate;
 
@@ -187,6 +189,11 @@ struct World {
 
 impl World {
     fn new(dir: &Path, quota: CapQuotaTracker) -> Self {
+        // Every real-worker case builds its world here, so each establishes its
+        // own prerequisite: `resolve_cli_binary` (the test's own lookup and the
+        // one inside `run_cli_wrapper_manifest`) looks beside this test
+        // executable, and the harness links the prebuilt fixture there.
+        fixtures::profile_binary_beside_test("worker-cli-fixture");
         maos_kernel_core::capability::cap_tokens::init_monotonic_base();
         let log = Arc::new(TransparencyLogAdapter::open_in_memory(NONCE));
         let policy = Arc::new(PolicyTable::new());
