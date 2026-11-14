@@ -373,7 +373,7 @@ fn the_release_job_runs_rc_readiness_before_signing_for_rc_tags_only() {
     );
     assert_eq!(
         step["env"]["TAG"].as_str(),
-        Some("${{ github.ref_name }}"),
+        Some("${{ steps.tag.outputs.tag }}"),
         "the tag name reaches the shell as data, never as script text"
     );
     let (sign, _) = step_named(&steps, "Generate SHA256SUMS and sign");

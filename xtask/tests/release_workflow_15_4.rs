@@ -73,10 +73,30 @@ fn release_workflow_flattens_and_publishes_the_explicit_artifact_set() {
         get(triggers, "workflow_dispatch").is_some(),
         "pre-tag macOS rehearsal must be manually dispatchable"
     );
+    // Rehearsal contract (rc.1 failure, run 43544486838): a dispatch with `dry_run` true runs
+    // the whole job, and NOTHING but the publishing step is gated on the event itself.
+    const PUBLISH_IF: &str = "github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == true)";
     assert_eq!(
         key(publish, "if").as_str(),
+        Some(PUBLISH_IF),
+        "a tag push publishes; a dispatch only rehearses, and only with dry_run true"
+    );
+    let dry_run = key(key(key(triggers, "workflow_dispatch"), "inputs"), "dry_run");
+    assert_eq!(key(dry_run, "type").as_str(), Some("boolean"));
+    assert_eq!(
+        key(dry_run, "default").as_bool(),
+        Some(true),
+        "the dispatch default is the non-publishing rehearsal"
+    );
+    assert_eq!(
+        key(key(jobs, "refuse-dispatch-publish"), "if").as_str(),
+        Some("github.event_name == 'workflow_dispatch' && inputs.dry_run != true"),
+        "dry_run=false must fail loudly, not skip"
+    );
+    assert_eq!(
+        key(named_step(publish, "Create GitHub Release"), "if").as_str(),
         Some("github.event_name == 'push'"),
-        "manual rehearsals must never publish"
+        "manual rehearsals must never publish, whatever any input says"
     );
 
     // Epic-15 retrospective, 2026-09-12 (operator-ratified): the pre-merge

@@ -1,0 +1,11 @@
+2026-11-14T02:31:36.2401889Z  Server Version: 28.0.4
+2026-11-14T02:31:36.2402259Z  Storage Driver: overlay2
+2026-11-14T02:31:47.7688259Z Unable to find image 'ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852' locally
+2026-11-14T02:31:48.1829458Z docker.io/library/ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852: Pulling from library/ubuntu
+2026-11-14T02:31:48.5683904Z Digest: sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
+2026-11-14T02:31:48.5688599Z Status: Downloaded newer image for ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
+2026-11-14T02:32:44.4908272Z Unable to find image 'ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852' locally
+2026-11-14T02:32:44.6333818Z docker.io/library/ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852: Pulling from library/ubuntu
+2026-11-14T02:32:46.0419302Z Digest: sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
+2026-11-14T02:32:46.0430295Z docker: cannot overwrite digest sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
+2026-11-14T02:32:46.0461474Z ##[error]Process completed with exit code 125.

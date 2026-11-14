@@ -1,0 +1,27 @@
+# moby/moby v28.0.4 reference/store.go (addReference), fetched from raw.githubusercontent.com on 2026-11-14; lines 140-165
+
+	repo, exists := store.Repositories[refName]
+	if !exists || repo == nil {
+		repo = make(map[string]digest.Digest)
+		store.Repositories[refName] = repo
+	}
+
+	oldID, exists := repo[refStr]
+
+	if exists {
+		if oldID == id {
+			// Nothing to do. The caller may have checked for this using store.Get in advance, but store.mu was unlocked in the meantime, so this can legitimately happen nevertheless.
+			return nil
+		}
+
+		// force only works for tags
+		if digested, isDigest := ref.(reference.Canonical); isDigest {
+			return errors.WithStack(conflictingTagError("cannot overwrite digest " + digested.Digest().String()))
+		}
+
+		if !force {
+			return errors.WithStack(
+				conflictingTagError(
+					fmt.Sprintf("tag %s is already set to image %s, use the force option to replace it", refStr, oldID.String()),
+				),
+			)
