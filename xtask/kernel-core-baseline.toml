@@ -502,7 +502,11 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26062
+src_lines = 26061
+# HISTORY: 27-1-manifest-model-pin-to-wire -> exact formatted physical 26062 -> 26061 (-1),
+# tokei 20428, 90 files, none added or removed; changed files: inference/mod.rs; digests and
+# set_hash adopted from `--emit-pin`. S1: the inference TL serves the manifest model pin on the
+# wire (kernel-core inference/mod.rs -1 line; 26062 -> 26061)
 # HISTORY: 21-5-orchestrator-port-and-move -> exact formatted physical 27103 -> 26062 (-1041),
 # tokei 21256 -> 20429 (-827), 95 -> 90 files (the five orchestrator/*.rs rows deleted); changed
 # files: lib.rs, scheduler/scheduler_loop.rs, isolation/mod.rs; digests and set_hash adopted from
@@ -1116,7 +1120,7 @@ src_lines = 26062
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "6eaa5c6ab6e8e49505d16615ad5c20c58d1988fe8713e26be23ef6892dbc50fc"
+set_hash = "97af61f5e61077fc1be810f9bb0786115dbccb29cb4e571e3ecc6e4abc847a74"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -1143,7 +1147,7 @@ set_hash = "6eaa5c6ab6e8e49505d16615ad5c20c58d1988fe8713e26be23ef6892dbc50fc"
 "hot_swap/saga.rs" = "886994c9ab553372c85df2caf8de395c0b712b888656c030674babf12f8efc77"
 "hot_swap/state_codec.rs" = "8d1c62a7486582eb329b208bd4dca5280ac62d1462c89cdfb1d8691aaa3861dd"
 "iac.rs" = "18c0b4e562376fd5b6170fac0544bb3465c4fc452b46c702a8bc1c070d7a08bf"
-"inference/mod.rs" = "0a0543ea7c7b3ff3814abbf75202911c4d5fe213d075cbf0961550261e6933df"
+"inference/mod.rs" = "864778ae4df25be04404c707b81fb73147e22af98d2dc2ac16d74ea3eaea21d0"
 "inference/router.rs" = "82135d50d4187cc946044802c9adb5d378e023440d790c8fd1e6ebe51cceee29"
 "io/mod.rs" = "57d2b794bb4cbae5deb1fbf3332132fe4a2e6b239b12a95fe5b9f48eb195619b"
 "isolation/mod.rs" = "e6c54ed505f5f6fc9e07fe28ca239504dcdc02abae039f021dfaf17ecf047b24"

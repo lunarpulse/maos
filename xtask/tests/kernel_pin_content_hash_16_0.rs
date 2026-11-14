@@ -818,7 +818,7 @@ fn no_key_before_src_lines_begins_with_src_lines() {
 fn the_three_other_readers_still_resolve_the_pin() {
     assert_eq!(
         read_pinned(&baseline_toml()).expect("read_pinned"),
-        26062,
+        26061,
         "the xtask reader"
     );
 
@@ -836,7 +836,7 @@ fn the_three_other_readers_still_resolve_the_pin() {
         .map(str::trim)
         .and_then(|v| v.parse().ok())
         .expect("the a2a-tcp guard's parse still resolves");
-    assert_eq!(a2a, 26062, "the a2a-tcp reader");
+    assert_eq!(a2a, 26061, "the a2a-tcp reader");
 
     // `fkcs_oracle.rs:170` — exact `strip_prefix("src_lines = ")`.
     let oracle: usize = text
@@ -845,7 +845,7 @@ fn the_three_other_readers_still_resolve_the_pin() {
         .expect("the fkcs oracle's parse still resolves")
         .parse()
         .expect("parses");
-    assert_eq!(oracle, 26062, "the fkcs oracle reader");
+    assert_eq!(oracle, 26061, "the fkcs oracle reader");
 }
 
 #[test]
@@ -856,7 +856,7 @@ fn the_pin_is_readable_by_a_real_toml_parser() {
     // line-count-neutral; Story 16-5's ratification ledger now places it at line 496.
     let text = std::fs::read_to_string(baseline_toml()).expect("read baseline");
     let parsed: toml::Value = toml::from_str(&text).expect("the baseline file must be valid TOML");
-    assert_eq!(parsed["src_lines"].as_integer(), Some(26062));
+    assert_eq!(parsed["src_lines"].as_integer(), Some(26061));
 
     let numbered = text
         .lines()
