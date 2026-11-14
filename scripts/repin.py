@@ -1,21 +1,33 @@
 #!/usr/bin/env python3
-"""repin.py -- re-pin the kernel / per-crate line-count pins in ONE command.
+"""repin.py -- re-pin the kernel exact pin per landing; re-base the per-crate ceilings.
 
-Replaces the manual pin set every landing edits by hand after `cargo fmt --all`:
+Two jobs (SCP 2026-11-12 section 5.B7c, option A):
+
+1. PER LANDING (`--check` / `--apply`): the kernel EXACT pin, after `cargo fmt --all`.
 
   xtask/kernel-core-baseline.toml        src_lines, [kernel_src] set_hash + per-file
                                          digests, one HISTORY comment block
-  xtask/kloc.toml                        per-crate rows, `_aggregate_hardfail`
-                                         (= measured aggregate + 1), HISTORY segments
   xtask/tests/kernel_pin_content_hash_16_0.rs   the four `src_lines` constants
-  xtask/tests/recovery_lane_ceiling_rule.rs     RATIFIED_AT_EASING
+
+2. AT A RETROSPECTIVE / THE B7c-A LANDING (`--rebase`): the per-crate CEILINGS.
+
+  xtask/kloc.toml                        every crate row := measured + max(100,
+                                         ceil(0.02 * measured)); one dated
+                                         `# RE-BASED <date> (<reason>)` segment per
+                                         changed row. Per-crate rows are ceilings with
+                                         stated headroom, NOT per-landing exact pins:
+                                         `--check`/`--apply` never touch them. The
+                                         zero-headroom `maos-kernel-core` row is HELD
+                                         (never raised; `--lower-kernel` lowers it to
+                                         its measured value).
 
 It MEASURES with the prebuilt xtask gates (`check-kernel-baseline --json` /
 `--emit-pin`, `kloc-check --json`, `check-service-boundary --json`) and never runs
 cargo. Python 3, standard library only. See scripts/README-repin.md.
 
   scripts/repin.py --check                         # table pin vs measured, rc != 0 on drift
-  scripts/repin.py --apply --story 20-13 --note "TEXT"   # rewrite pins, print diff
+  scripts/repin.py --apply --story 20-13 --note "TEXT"   # rewrite the kernel pin, print diff
+  scripts/repin.py --rebase --note "REASON" [--measure-root DIR | --measure-json FILE] [--lower-kernel] [--dry-run]
 
 Exit codes: 0 in sync / applied / nothing to do; 1 drift (--check) or a post-write
 verification failure (rolled back); 2 a HUMAN decision is needed (nothing written);
@@ -28,14 +40,13 @@ line it does not own. Every replacement is exactly-once or the run aborts.
 from __future__ import annotations
 
 import argparse
+import datetime
 import difflib
 import io
 import os
 import re
-import shutil
 import subprocess
 import sys
-import tarfile
 import tempfile
 import textwrap
 from pathlib import Path
@@ -44,14 +55,18 @@ KERNEL_CRATE = "maos-kernel-core"
 BASELINE = "xtask/kernel-core-baseline.toml"
 KLOC = "xtask/kloc.toml"
 KPIN_TEST = "xtask/tests/kernel_pin_content_hash_16_0.rs"
-RECOVERY_TEST = "xtask/tests/recovery_lane_ceiling_rule.rs"
 SURFACE = "docs/ci-baselines/kernel-surface-v0.1-beta.json"
 TRACKER = "_bmad-output/implementation-artifacts/sprint-status.yaml"
-OWNED_FILES = (BASELINE, KLOC, KPIN_TEST, RECOVERY_TEST)
+OWNED_FILES = (BASELINE, KPIN_TEST)
 
-# ADR-069 (see recovery_lane_ceiling_rule.rs): alarm needs `ENVELOPE ALARM` in the row.
+# ADR-069 (see recovery_lane_ceiling_rule.rs): the alarm needs `ENVELOPE ALARM` in the kernel ROW comment.
 ADR_069_ALARM = 22_000
 ADR_069_ENVELOPE = 23_000
+# Mirrors ZERO_HEADROOM_CRATES in xtask/tests/recovery_lane_ceiling_rule.rs: `--rebase` never raises these.
+ZERO_HEADROOM_CRATES = (KERNEL_CRATE,)
+# ceiling(crate) = measured + max(REBASE_FLOOR, ceil(REBASE_PCT * measured)), PCT as a percentage.
+REBASE_FLOOR = 100
+REBASE_PCT = 2
 LIVE_STATUSES = ("in-progress", "review", "ready-for-dev")
 EXIT_OK, EXIT_DRIFT, EXIT_HUMAN, EXIT_TOOL = 0, 1, 2, 3
 DIFF_LINE_CAP = 240
@@ -60,7 +75,8 @@ ROW_RE = re.compile(
     r'^(?P<key>"[^"]+"|[A-Za-z0-9_.\-]+)(?P<eq>[ \t]*=[ \t]*)(?P<val>\d+)'
     r"(?P<gap>[ \t]*)(?P<comment>#.*)?$"
 )
-ARROW_RE = re.compile(r"\b([0-9]+)\s*(?:→|->)\s*([0-9]+)\b")  # == d11 ratchet's arrow_grants
+# The segment `--rebase` writes at the head of a row's inline comment (the reason has no `|`).
+REBASED_RE = re.compile(r"^RE-BASED \d{4}-\d{2}-\d{2} \([^|]*\)(?: \| |$)")
 
 
 class Refuse(Exception):
@@ -191,7 +207,6 @@ KPIN_PATTERNS = [
     ("fkcs oracle reader", re.compile(r'(assert_eq!\(oracle, )(\d[\d_]*)(, "the fkcs oracle reader"\);)')),
     ("toml-parser reader", re.compile(r'(assert_eq!\(parsed\["src_lines"\]\.as_integer\(\), Some\()(\d[\d_]*)(\)\);)')),
 ]
-RECOVERY_RE = re.compile(r"^(?P<pre>[ \t]*const RATIFIED_AT_EASING: i64 = )(?P<val>\d[\d_]*)(?P<post>;)$", re.M)
 
 
 def kpin_values(text: str) -> dict[str, int]:
@@ -202,13 +217,6 @@ def kpin_values(text: str) -> dict[str, int]:
             raise ToolError(f"{KPIN_TEST}: `{name}` constant matched {len(found)} times, expected exactly 1")
         out[name] = int(found[0][1].replace("_", ""))
     return out
-
-
-def recovery_value(text: str) -> int:
-    found = RECOVERY_RE.findall(text)
-    if len(found) != 1:
-        raise ToolError(f"{RECOVERY_TEST}: RATIFIED_AT_EASING matched {len(found)} times, expected exactly 1")
-    return int(found[0][1].replace("_", ""))
 
 
 def load_tracker(root: Path) -> dict[str, str]:
@@ -244,8 +252,8 @@ def resolve_story(root: Path, story: str) -> str:
                 + (f" (ambiguous prefix: {', '.join(hits)})" if hits else f" (no key in {TRACKER})")
             )
         key = hits[0]
-    if key not in story_keys(key):
-        raise Refuse(f"`{key}` is not a story key (epic rows cannot own a pin move; the d11 ratchet refuses them)")
+    if key.startswith("epic-"):
+        raise Refuse(f"`{key}` is an epic row; a kernel pin move must cite a live story")
     if tracker[key] not in LIVE_STATUSES:
         raise Refuse(
             f"story `{key}` has tracker status `{tracker[key]}`; a pin move must cite a live story "
@@ -258,8 +266,8 @@ def resolve_story(root: Path, story: str) -> str:
 
 
 def measure(root: Path, xtask: Path) -> dict:
-    rc, kloc = gate_json(xtask, root, ["kloc-check", "--json"])
-    rc_kb, kb = gate_json(xtask, root, ["check-kernel-baseline", "--json"])
+    _, kloc = gate_json(xtask, root, ["kloc-check", "--json"])
+    _, kb = gate_json(xtask, root, ["check-kernel-baseline", "--json"])
     rc_pin, pin_out, pin_err = run_gate(xtask, root, ["check-kernel-baseline", "--emit-pin"])
     if rc_pin != 0:
         raise ToolError(f"check-kernel-baseline --emit-pin failed: {pin_err.strip()[:400]}")
@@ -267,9 +275,10 @@ def measure(root: Path, xtask: Path) -> dict:
     if set_hash != kb["set-hash"]:
         raise ToolError("`--emit-pin` set_hash disagrees with `check-kernel-baseline --json`")
     rc_sb, sb = gate_json(xtask, root, ["check-service-boundary", "--json"])
+    if KERNEL_CRATE not in kloc["per_crate"]:
+        raise ToolError(f"`kloc-check --json` reports no `{KERNEL_CRATE}` measurement")
     return {
-        "per_crate": kloc["per_crate"],
-        "aggregate": kloc["aggregate"],
+        "kernel_tokei": kloc["per_crate"][KERNEL_CRATE],
         "physical": kb["actual-lines"],
         "kb": kb,
         "set_hash": set_hash,
@@ -279,39 +288,6 @@ def measure(root: Path, xtask: Path) -> dict:
     }
 
 
-def measure_base(root: Path, xtask: Path, base_ref: str | None, base_tree: str | None):
-    """Per-crate (pin, measured) of the PRE-landing tree: tells exact-pinned rows (pin ==
-    measured, lowered with the code) from reserve rows (pin > measured, left alone)."""
-    tmp = None
-    try:
-        if base_tree:
-            tree = Path(base_tree)
-        else:
-            if subprocess.run(["git", "-C", str(root), "rev-parse", "--git-dir"],
-                              capture_output=True).returncode != 0:
-                return None, "no git checkout and no --base-tree"
-            tmp = tempfile.mkdtemp(prefix="repin-base-")
-            p = subprocess.Popen(
-                ["git", "-C", str(root), "archive", base_ref or "HEAD", "crates", "xtask"],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            with tarfile.open(fileobj=p.stdout, mode="r|") as tf:
-                try:
-                    tf.extractall(tmp, filter="data")
-                except TypeError:  # Python < 3.12
-                    tf.extractall(tmp)
-            if p.wait() != 0:
-                return None, f"git archive {base_ref or 'HEAD'} failed: {p.stderr.read().decode()[:200]}"
-            tree = Path(tmp)
-        _, kloc = gate_json(xtask, tree, ["kloc-check", "--json"])
-        rows = kloc_rows(read(tree, KLOC))
-        return {c: (rows[c][1] if c in rows else None, m) for c, m in kloc["per_crate"].items()}, ""
-    except (ToolError, OSError, tarfile.TarError) as e:
-        return None, str(e)
-    finally:
-        if tmp:
-            shutil.rmtree(tmp, ignore_errors=True)
-
-
 # --------------------------------------------------------------------------- analysis
 
 
@@ -319,17 +295,24 @@ def signed(n: int) -> str:
     return f"{n:+d}"
 
 
-def analyze(root: Path, m: dict, base, adjudicated: set[str], lower: set[str], note: str | None):
-    """Returns (table rows, wanted new values, drift items, refusals)."""
+def row_comment(kloc_text: str, key: str) -> str:
+    idx, _ = kloc_rows(kloc_text)[key]
+    m = ROW_RE.match(kloc_text.split("\n")[idx])
+    return (m["comment"] or "") if m else ""
+
+
+def analyze(root: Path, m: dict):
+    """Returns (table rows, wanted new values, drift items, refusals) for the kernel exact pin."""
     table: list[tuple[str, str, str, str]] = []  # location, pin, measured, status
     drift: list[str] = []
     refusals: list[str] = []
-    want: dict = {"rows": {}, "row_kind": {}}
+    want: dict = {}
 
-    base_text = read(root, BASELINE)
-    bp = baseline_pins(base_text)
+    bp = baseline_pins(read(root, BASELINE))
     kloc_text = read(root, KLOC)
     rows = kloc_rows(kloc_text)
+    if KERNEL_CRATE not in rows:
+        raise ToolError(f"{KLOC}: no `{KERNEL_CRATE}` row")
 
     # -- kernel baseline: src_lines, set hash, per-file digests
     st = "ok" if bp["src_lines"] == m["physical"] else "DRIFT"
@@ -359,58 +342,6 @@ def analyze(root: Path, m: dict, base, adjudicated: set[str], lower: set[str], n
         want["set_hash"] = m["set_hash"]
     want["added"], want["removed"] = added, removed
 
-    # -- per-crate rows
-    per = m["per_crate"]
-    missing = sorted(c for c in per if c not in rows)
-    if missing:
-        refusals.append("measured crate(s) with no kloc.toml row: " + ", ".join(missing)
-                        + " (a new row is a budget decision)")
-    for crate, meas in sorted(per.items()):
-        if crate not in rows:
-            continue
-        pin = rows[crate][1]
-        base_pin, base_meas = (base.get(crate, (None, None)) if base else (None, None))
-        exact_row = (crate == KERNEL_CRATE) or crate in lower or (
-            base is not None and base_pin is not None and base_pin == base_meas)
-        if meas == pin:
-            table.append((f"{KLOC}: {crate}", str(pin), str(meas), "ok"))
-            continue
-        if meas > pin:
-            if crate in adjudicated:
-                status, kind = f"OVERDRAFT (adjudicated, +{meas - pin})", "overdraft"
-                want["rows"][crate] = meas
-                want["row_kind"][crate] = kind
-                drift.append(crate)
-            else:
-                status = f"OVERDRAFT +{meas - pin}"
-                refusals.append(
-                    f"{crate} is over its ceiling: kloc.toml row {pin}, measured {meas} "
-                    f"(+{meas - pin})"
-                    + (f", pre-landing measured {base_meas}" if base_meas is not None else "")
-                    + (f"; kernel physical {m['physical']}" if crate == KERNEL_CRATE else "")
-                    + ". The orchestrator adjudicates; then re-run with `--adjudicated " + crate + "`.")
-        elif exact_row:
-            status = f"LOWER {signed(meas - pin)}"
-            want["rows"][crate] = meas
-            want["row_kind"][crate] = "lower"
-            drift.append(crate)
-        else:
-            status = "reserve row (kept)"
-        table.append((f"{KLOC}: {crate}", str(pin), str(meas), status))
-    for crate in sorted(adjudicated - set(want["rows"]) - {c for c, v in per.items() if c in rows and v <= rows[c][1]}):
-        refusals.append(f"--adjudicated {crate}: unknown crate or not measured (typo?)")
-
-    # -- aggregate
-    if "_aggregate_hardfail" not in rows:
-        raise ToolError(f"{KLOC}: no `_aggregate_hardfail` row")
-    hard_pin = rows["_aggregate_hardfail"][1]
-    want_hard = m["aggregate"] + 1
-    st = "ok" if hard_pin == want_hard else "DRIFT"
-    table.append((f"{KLOC}: _aggregate_hardfail", str(hard_pin), f"{m['aggregate']}+1={want_hard}", st))
-    if st != "ok":
-        drift.append("_aggregate_hardfail")
-        want["hardfail"] = want_hard
-
     # -- tests
     kp = kpin_values(read(root, KPIN_TEST))
     for name, val in kp.items():
@@ -419,23 +350,24 @@ def analyze(root: Path, m: dict, base, adjudicated: set[str], lower: set[str], n
         if st != "ok":
             want["kpin"] = m["physical"]
             drift.append(f"kpin:{name}")
-    rec = recovery_value(read(root, RECOVERY_TEST))
-    new_kernel_row = want["rows"].get(KERNEL_CRATE, rows[KERNEL_CRATE][1])
-    st = "ok" if rec == new_kernel_row else "DRIFT"
-    table.append((f"{RECOVERY_TEST}: RATIFIED_AT_EASING", str(rec), str(new_kernel_row), st))
-    if st != "ok":
-        want["recovery"] = new_kernel_row
-        drift.append("RATIFIED_AT_EASING")
 
-    # -- kernel ADR-069 envelope
-    if KERNEL_CRATE in want["rows"]:
-        k = want["rows"][KERNEL_CRATE]
-        if k > ADR_069_ENVELOPE:
-            refusals.append(f"kernel tokei {k} exceeds the ADR-069 envelope {ADR_069_ENVELOPE}: a new operator decision")
-        elif k > ADR_069_ALARM and "ENVELOPE ALARM" not in (note or ""):
-            refusals.append(
-                f"kernel tokei {k} crosses the ADR-069 alarm {ADR_069_ALARM}: the row HISTORY must carry "
-                "`ENVELOPE ALARM` (pass it in --note) after the operator ack")
+    # -- kernel ceiling row (read-only here: ceilings move only via --rebase) + ADR-069 envelope
+    row = rows[KERNEL_CRATE][1]
+    tokei = m["kernel_tokei"]
+    if tokei > row:
+        table.append((f"{KLOC}: {KERNEL_CRATE} (ceiling)", str(row), str(tokei), f"OVER CEILING +{tokei - row}"))
+        refusals.append(
+            f"{KERNEL_CRATE} tokei {tokei} is over its kloc.toml ceiling {row} (+{tokei - row}); kernel growth needs "
+            "its own measured FLAG-Winston grant on the row, never this command")
+    else:
+        table.append((f"{KLOC}: {KERNEL_CRATE} (ceiling)", str(row), str(tokei), "ok"))
+    if tokei > ADR_069_ENVELOPE:
+        refusals.append(f"kernel tokei {tokei} exceeds the ADR-069 envelope {ADR_069_ENVELOPE}: a new operator decision")
+    elif tokei > ADR_069_ALARM and "ENVELOPE ALARM" not in row_comment(kloc_text, KERNEL_CRATE):
+        refusals.append(
+            f"kernel tokei {tokei} crosses the ADR-069 alarm {ADR_069_ALARM}: add `ENVELOPE ALARM` (the "
+            f"operator's ack) to the {KERNEL_CRATE} row comment in {KLOC} first (a --note is not enough: the "
+            "retained ceiling test reads the row), then re-run")
 
     # -- surface / service boundary
     if m["sb_passed"]:
@@ -451,7 +383,6 @@ def analyze(root: Path, m: dict, base, adjudicated: set[str], lower: set[str], n
         drift.append("surface")
 
     want["measured"] = m
-    want["rows_state"] = rows
     want["bp"] = bp
     return table, want, drift, refusals
 
@@ -468,72 +399,20 @@ def print_table(table):
 # ------------------------------------------------------------------------ text edits
 
 
-def story_keys(segment: str) -> list[str]:
-    """Port of d11_xtask_ceiling_ratchet.rs `story_keys`."""
-    out = []
-    for token in re.split(r"[^A-Za-z0-9\-]", segment):
-        token = token.strip("-")
-        parts = token.split("-")
-        if len(parts) >= 3 and parts[0] and parts[0].isdigit() and parts[1][:1].isdigit():
-            out.append(token)
-    return out
-
-
-def rewrite_row(line: str, new_val: int, segment: str) -> str:
-    m = ROW_RE.match(line)
-    if not m:
-        raise ToolError(f"row does not parse: {line[:80]}")
-    old_comment = (m["comment"] or "")[1:].lstrip()
-    comment = f"# {segment}" + (f" | PRIOR: {old_comment}" if old_comment else "")
-    gap = m["gap"] or "   "
-    return f"{m['key']}{m['eq']}{new_val}{gap}{comment}"
-
-
 def delta_phrase(old: int, new: int) -> str:
     return f"{old} -> {new} ({signed(new - old)})"
 
 
-def build_texts(root: Path, want: dict, story: str, note: str, base) -> dict[str, str]:
+def build_texts(root: Path, want: dict, story: str, note: str) -> dict[str, str]:
     m = want["measured"]
-    rows = want["rows_state"]
     bp = want["bp"]
     texts = {rel: read(root, rel) for rel in OWNED_FILES}
     new_texts: dict[str, str] = {}
 
-    # ---- kloc.toml
-    lines = texts[KLOC].split("\n")
-    stamp = "exact formatted cargo fmt --all / kloc-check --json"
-    for crate, new_val in want["rows"].items():
-        idx, old_val = rows[crate]
-        extra = ""
-        if crate == KERNEL_CRATE and "src_lines" in want:
-            extra = f"; physical {delta_phrase(bp['src_lines'], want['src_lines'])}"
-        if want["row_kind"][crate] == "overdraft":
-            extra += f"; overdraft over the live pin {old_val}, adjudicated"
-        elif want["row_kind"][crate] == "lower":
-            extra += "; lower re-pin"
-        seg = f"HISTORY: {story} -> {stamp}: {delta_phrase(old_val, new_val)}{extra}; {note}"
-        lines[idx] = rewrite_row(lines[idx], new_val, seg)
-    if "hardfail" in want:
-        idx, old_val = rows["_aggregate_hardfail"]
-        parts = []
-        for crate in sorted(m["per_crate"]):
-            if crate.startswith("("):  # fallback labels (spikes/templates): not in the partial base tree
-                continue
-            if base and crate in base and base[crate][1] is not None and m["per_crate"][crate] != base[crate][1]:
-                parts.append(f"{crate.replace('maos-', '')} {signed(m['per_crate'][crate] - base[crate][1])}")
-            elif not base and crate in want["rows"]:
-                parts.append(f"{crate.replace('maos-', '')} {signed(want['rows'][crate] - rows[crate][1])}")
-        seg = (f"HISTORY: {story} -> {stamp}: {old_val} -> {want['hardfail']} (measured {m['aggregate']} + 1, "
-               f"{signed(want['hardfail'] - old_val)}" + (f"; {', '.join(parts)}" if parts else "") + f"); {note}")
-        lines[idx] = rewrite_row(lines[idx], want["hardfail"], seg)
-    if lines != texts[KLOC].split("\n"):
-        new_texts[KLOC] = "\n".join(lines)
-
     # ---- kernel-core-baseline.toml
     if any(k in want for k in ("src_lines", "set_hash", "digests_changed")):
         blines = texts[BASELINE].split("\n")
-        pinned = want["bp"]["files"]
+        pinned = bp["files"]
         for path in want.get("digests_changed", []):
             i, _ = pinned[path]
             blines[i] = f'"{path}" = "{m["digests"][path]}"'
@@ -543,13 +422,10 @@ def build_texts(root: Path, want: dict, story: str, note: str, base) -> dict[str
             blines[bp["src_idx"]] = f"src_lines = {want['src_lines']}"
         phys = (f"physical {delta_phrase(bp['src_lines'], want['src_lines'])}" if "src_lines" in want
                 else f"physical {bp['src_lines']} (unchanged)")
-        k_old = rows[KERNEL_CRATE][1]
-        k_new = want["rows"].get(KERNEL_CRATE, k_old)
-        tok = f"tokei {delta_phrase(k_old, k_new)}" if k_new != k_old else f"tokei {k_old} (unchanged)"
         files = want.get("digests_changed", [])
-        text = (f"HISTORY: {story} -> exact formatted {phys}, {tok}, {len(m['digests'])} files, none added "
-                f"or removed; changed files: {', '.join(files) if files else 'none (set hash only)'}; digests "
-                f"and set_hash adopted from `--emit-pin`. {note}")
+        text = (f"HISTORY: {story} -> exact formatted {phys}, tokei {m['kernel_tokei']}, {len(m['digests'])} "
+                f"files, none added or removed; changed files: {', '.join(files) if files else 'none (set hash only)'}; "
+                f"digests and set_hash adopted from `--emit-pin`. {note}")
         block = textwrap.wrap(text, width=96, initial_indent="# ", subsequent_indent="# ",
                               break_long_words=False, break_on_hyphens=False)
         blines[bp["src_idx"] + 1:bp["src_idx"] + 1] = block
@@ -563,45 +439,11 @@ def build_texts(root: Path, want: dict, story: str, note: str, base) -> dict[str
             if n != 1:
                 raise ToolError(f"{KPIN_TEST}: `{name}` replaced {n} times, expected exactly 1")
         new_texts[KPIN_TEST] = t
-
-    # ---- recovery_lane_ceiling_rule.rs
-    if "recovery" in want:
-        t = texts[RECOVERY_TEST]
-        k_old = rows[KERNEL_CRATE][1]
-        phys = f", physical {delta_phrase(bp['src_lines'], want['src_lines'])}" if "src_lines" in want else ""
-        ledger = textwrap.wrap(
-            f"{story}: exact formatted {delta_phrase(k_old, want['recovery'])}{phys}; {note}",
-            width=88, initial_indent="    // ", subsequent_indent="    // ",
-            break_long_words=False, break_on_hyphens=False)
-        t, n = RECOVERY_RE.subn(
-            lambda mo: f"{mo['pre']}{want['recovery']:_}{mo['post']}\n" + "\n".join(ledger), t)
-        if n != 1:
-            raise ToolError(f"{RECOVERY_TEST}: RATIFIED_AT_EASING replaced {n} times, expected exactly 1")
-        new_texts[RECOVERY_TEST] = t
     return new_texts
 
 
-def validate_new_texts(root: Path, new_texts: dict[str, str], want: dict, story: str):
-    """The d11 contract for every row we wrote: first segment cites the live story and its
-    first arrow is old -> new; plus a re-parse of every owned file."""
-    tracker = load_tracker(root)
-    if KLOC in new_texts:
-        after = kloc_rows(new_texts[KLOC])
-        lines = new_texts[KLOC].split("\n")
-        written = dict(want["rows"])
-        if "hardfail" in want:
-            written["_aggregate_hardfail"] = want["hardfail"]
-        for key, new_val in written.items():
-            idx, val = after[key]
-            if val != new_val:
-                raise ToolError(f"internal: row {key} reads back {val}, expected {new_val}")
-            comment = lines[idx].split("#", 1)[1]
-            first = comment.split("|")[0]
-            if story not in story_keys(first) or tracker.get(story) not in LIVE_STATUSES:
-                raise ToolError(f"internal: row {key}: first HISTORY segment does not cite live story {story}")
-            arrows = ARROW_RE.findall(first)
-            if not arrows or int(arrows[0][1]) != new_val:
-                raise ToolError(f"internal: row {key}: first arrow of the HISTORY segment is not `old -> {new_val}`")
+def validate_new_texts(new_texts: dict[str, str], want: dict):
+    """A re-parse of every owned file we wrote."""
     if BASELINE in new_texts:
         bp = baseline_pins(new_texts[BASELINE])
         if "src_lines" in want and bp["src_lines"] != want["src_lines"]:
@@ -616,21 +458,197 @@ def validate_new_texts(root: Path, new_texts: dict[str, str], want: dict, story:
         vals = set(kpin_values(new_texts[KPIN_TEST]).values())
         if vals != {want["kpin"]}:
             raise ToolError("internal: kernel_pin test constants do not all read back the new value")
-    if RECOVERY_TEST in new_texts and recovery_value(new_texts[RECOVERY_TEST]) != want["recovery"]:
-        raise ToolError("internal: RATIFIED_AT_EASING does not read back")
 
 
 def print_diff(root: Path, new_texts: dict[str, str]):
     def cap(s: str) -> str:
         return s if len(s) <= DIFF_LINE_CAP else s[:DIFF_LINE_CAP - 20] + f" ...[+{len(s) - DIFF_LINE_CAP + 20} chars]"
 
-    for rel in OWNED_FILES:
-        if rel not in new_texts:
-            continue
+    for rel in sorted(new_texts):
         old = read(root, rel).split("\n")
         new = new_texts[rel].split("\n")
         for l in difflib.unified_diff(old, new, f"a/{rel}", f"b/{rel}", lineterm="", n=0):
             print(cap(l))
+
+
+# ------------------------------------------------------------------------------ rebase
+
+
+def ceiling_for(measured: int) -> int:
+    """measured + max(100, ceil(0.02 * measured)), in integers."""
+    return measured + max(REBASE_FLOOR, -(-measured * REBASE_PCT // 100))
+
+
+def rebase_row(line: str, new_val: int, date: str, reason: str) -> str:
+    """The row with its value replaced and ONE `RE-BASED <date> (<reason>)` segment at the
+    head of its inline comment (a previous RE-BASED segment is replaced, the rest is kept)."""
+    m = ROW_RE.match(line)
+    if not m:
+        raise ToolError(f"row does not parse: {line[:80]}")
+    prior = REBASED_RE.sub("", (m["comment"] or "")[1:].lstrip(), count=1)
+    comment = f"# RE-BASED {date} ({reason})" + (f" | {prior}" if prior else "")
+    return f"{m['key']}{m['eq']}{new_val}{m['gap'] or '   '}{comment}"
+
+
+def load_measure_json(path: Path) -> dict[str, int]:
+    """The `per_crate` map of a `kloc-check --json` report (any xtask build; a `passed: false` report and
+    extra keys are fine). A report without a usable `per_crate` map is refused as a tool error."""
+    import json
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            report = json.load(f)
+    except (OSError, ValueError) as e:
+        raise ToolError(f"--measure-json {path}: {e}") from e
+    per_crate = report.get("per_crate") if isinstance(report, dict) else None
+    if not isinstance(per_crate, dict) or not per_crate or not all(
+            isinstance(k, str) and isinstance(v, int) and not isinstance(v, bool) and v >= 0
+            for k, v in per_crate.items()):
+        raise ToolError(f"--measure-json {path}: not a `kloc-check --json` report with a `per_crate` "
+                        "map of crate -> tokei lines")
+    return per_crate
+
+
+def rebase_plan(root: Path, measure_root: Path | None, measure_json: Path | None, xtask: Path, date: str,
+                reason: str, lower_kernel: bool):
+    """Returns (table, new text or None, refusals). The kloc.toml of `root` is the one rewritten;
+    the measurement comes from `measure_json` (a saved `kloc-check --json` report) or `measure_root`
+    (measured with `xtask`), floored at what `root` measures itself with `xtask`.
+    ZERO_HEADROOM_CRATES rows are held (never raised); `lower_kernel` lets them drop to measured."""
+    kloc_text = read(root, KLOC)
+    rows = kloc_rows(kloc_text)
+    if measure_json is not None:
+        meas = load_measure_json(measure_json)
+    else:
+        _, mk = gate_json(xtask, measure_root, ["kloc-check", "--json"])
+        meas = mk["per_crate"]
+    if measure_json is None and measure_root == root:
+        floor = meas
+    else:
+        _, fk = gate_json(xtask, root, ["kloc-check", "--json"])
+        floor = fk["per_crate"]
+
+    refusals: list[str] = []
+    missing = sorted(c for c in set(meas) | set(floor) if c not in rows)
+    if missing:
+        refusals.append("measured crate(s) with no kloc.toml row: " + ", ".join(missing)
+                        + " (a new row is a budget decision)")
+
+    lines = kloc_text.split("\n")
+    table: list[tuple[str, int, int, int, int, str]] = []  # crate, before, measured, floor, after, status
+    for crate, (idx, old) in rows.items():
+        if crate.startswith("_"):
+            continue  # `_aggregate_alarm` is a warning threshold, not a crate ceiling
+        if crate not in meas:
+            table.append((crate, old, 0, 0, old, "not measured (kept)"))
+            continue
+        m, fl = meas[crate], floor.get(crate, 0)
+        if m == 0 and fl == 0:
+            table.append((crate, old, m, fl, old, "no code (kept)"))  # phantom/tripwire row stays
+            continue
+        if crate in ZERO_HEADROOM_CRATES:
+            held = max(m, fl)  # zero headroom: the only move a re-base may make is down, to measured
+            if held > old:
+                refusals.append(f"{crate} measures {held}, over its zero-headroom ceiling {old}: it is raised "
+                                "only with its own measured grant, never by a re-base")
+            if not lower_kernel or held >= old:
+                table.append((crate, old, m, fl, old, "held (zero headroom)"))
+                continue
+            new = held
+        else:
+            new = max(ceiling_for(m), fl)
+        if new == old:
+            table.append((crate, old, m, fl, old, "ok"))
+            continue
+        lines[idx] = rebase_row(lines[idx], new, date, reason)
+        table.append((crate, old, m, fl, new, "RE-BASED " + signed(new - old)))
+
+    new_text = "\n".join(lines)
+    k = next((r for r in table if r[0] == KERNEL_CRATE), None)
+    if k is not None:
+        after = k[4]
+        if after > ADR_069_ENVELOPE:
+            refusals.append(f"{KERNEL_CRATE} row {after} is above the ADR-069 envelope "
+                            f"{ADR_069_ENVELOPE}: a new operator decision, not a re-base")
+        elif after > ADR_069_ALARM:
+            if "ENVELOPE ALARM" not in row_comment(new_text, KERNEL_CRATE):
+                refusals.append(f"{KERNEL_CRATE} row {after} is above the ADR-069 alarm {ADR_069_ALARM}: add "
+                                f"`ENVELOPE ALARM` (the operator's ack) to the {KERNEL_CRATE} row comment in "
+                                f"{KLOC} first, then re-run")
+    return table, (new_text if new_text != kloc_text else None), refusals
+
+
+def print_rebase_table(table):
+    hdr = ("CRATE", "BEFORE", "MEASURED", "ROOT-FLOOR", "AFTER", "STATUS")
+    body = [(c, str(b), str(m), str(f), str(a), st) for c, b, m, f, a, st in table]
+    w = [max(len(r[i]) for r in body + [hdr]) for i in range(5)]
+    for r in [hdr] + body:
+        print("  ".join(r[i].ljust(w[i]) if i == 0 else r[i].rjust(w[i]) for i in range(5)) + "  " + r[5])
+
+
+def rebase(root: Path, xtask: Path, args) -> int:
+    measure_root = None if args.measure_json else (Path(args.measure_root).resolve() if args.measure_root else root)
+    measure_json = Path(args.measure_json).resolve() if args.measure_json else None
+    measured_in = measure_json if measure_json else measure_root
+    try:
+        if measure_root is not None and not (measure_root / KLOC).is_file():
+            raise ToolError(f"{measure_root} is not a maos tree: missing {KLOC}")
+        if not (root / KLOC).is_file():
+            raise ToolError(f"{root} is not a maos repo root: missing {KLOC}")
+        reason = " ".join((args.note or "").split())
+        if not reason or "|" in reason:
+            raise Refuse("--rebase needs --note REASON (the dated RE-BASED segment; no `|` characters)")
+        date = args.date or datetime.date.today().isoformat()
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+            raise Refuse("--date must be YYYY-MM-DD")
+        table, new_text, refusals = rebase_plan(root, measure_root, measure_json, xtask, date, reason,
+                                                args.lower_kernel)
+    except Refuse as r:
+        print("REFUSED -- a human decision is needed; nothing was written:", file=sys.stderr)
+        print(f"  - {r}", file=sys.stderr)
+        return EXIT_HUMAN
+    except ToolError as e:
+        print(f"repin: ERROR: {e}", file=sys.stderr)
+        return EXIT_TOOL
+
+    print_rebase_table(table)
+    changed = sum(1 for r in table if r[5].startswith("RE-BASED"))
+    print(f"\n{changed} of {len(table)} crate row(s) change; measured in {measured_in}, "
+          f"floored at the measurement of {root}; ceiling = measured + max({REBASE_FLOOR}, ceil({REBASE_PCT}%)); "
+          f"zero-headroom rows ({', '.join(ZERO_HEADROOM_CRATES)}) are held"
+          + (", lowered to measured (--lower-kernel)" if args.lower_kernel else ""))
+    if refusals:
+        print("\nREFUSED -- a human decision is needed; nothing was written:", file=sys.stderr)
+        for r in refusals:
+            print(f"  - {r}", file=sys.stderr)
+        return EXIT_HUMAN
+    if new_text is None:
+        print("\nnothing to do: every crate row already equals its re-based ceiling")
+        return EXIT_OK
+    if args.dry_run:
+        print("\n--dry-run: nothing written")
+        return EXIT_OK
+
+    print("\n--- diff ---")
+    print_diff(root, {KLOC: new_text})
+    original = read(root, KLOC)
+    try:
+        write_atomic(root / KLOC, new_text)
+        after = kloc_rows(read(root, KLOC))
+        for crate, _, _, _, new, _ in table:
+            if after[crate][1] != new:
+                raise ToolError(f"internal: row {crate} reads back {after[crate][1]}, expected {new}")
+        rc, k = gate_json(xtask, root, ["kloc-check", "--json"])
+        if rc != 0 or not k.get("passed"):
+            raise ToolError(f"post-write verification failed: kloc-check passed={k.get('passed')} "
+                            f"over_budget={k.get('over_budget')}")
+    except (ToolError, OSError) as e:
+        write_atomic(root / KLOC, original)
+        print(f"repin: ERROR: {e}; {KLOC} restored", file=sys.stderr)
+        return EXIT_DRIFT
+    print(f"\nAPPLIED to {KLOC}: {changed} row(s) re-based")
+    print("verified: kloc-check PASSED; the kernel exact pin is untouched (run `repin.py --check`)")
+    return EXIT_OK
 
 
 # ------------------------------------------------------------------------------ main
@@ -638,44 +656,57 @@ def print_diff(root: Path, new_texts: dict[str, str]):
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
-        description="Re-pin the kernel/crate line-count pins from the prebuilt xtask gates (no cargo).")
+        description="Re-pin the kernel exact pin per landing, or re-base the per-crate ceilings, "
+                    "from the prebuilt xtask gates (no cargo).")
     mode = ap.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--check", action="store_true", help="print pin vs measured; rc != 0 on drift")
-    mode.add_argument("--apply", action="store_true", help="rewrite the pins and print the diff")
-    ap.add_argument("--story", help="live tracker story key (or unique prefix, e.g. 20-13); cited by the HISTORY segments")
-    ap.add_argument("--note", help="HISTORY text (driver, ruling); no `|` characters")
-    ap.add_argument("--adjudicated", action="append", default=[], metavar="CRATE",
-                    help="the orchestrator adjudicated this crate's overdraft: pin it to the measured value (repeatable)")
-    ap.add_argument("--lower", action="append", default=[], metavar="CRATE",
-                    help="force a lower re-pin of a reserve row (rows are lowered automatically only when "
-                         "they were exact before the landing)")
+    mode.add_argument("--check", action="store_true", help="print kernel pin vs measured; rc != 0 on drift")
+    mode.add_argument("--apply", action="store_true", help="rewrite the kernel pin and print the diff")
+    mode.add_argument("--rebase", action="store_true",
+                      help="re-base every kloc.toml crate row to measured + max(100, ceil(2%%)) "
+                           "(retrospectives / the B7c-A landing only); the kernel row is held")
+    ap.add_argument("--story", help="live tracker story key (or unique prefix, e.g. 20-13); cited by the baseline HISTORY block")
+    ap.add_argument("--note", help="--apply: HISTORY text (driver, ruling); --rebase: the reason (no `|`)")
+    src = ap.add_mutually_exclusive_group()
+    src.add_argument("--measure-root", metavar="DIR",
+                     help="--rebase: tree measured by the prebuilt `xtask kloc-check --json` (default --root; that "
+                          "tree's kloc.toml must satisfy the xtask's gate); rows are never lowered below what "
+                          "--root itself measures")
+    src.add_argument("--measure-json", metavar="FILE",
+                     help="--rebase: per-crate measurements read from a `kloc-check --json` report made by any "
+                          "xtask build (its `per_crate` map; a passed:false report is fine); --root is still "
+                          "measured with --xtask and acts as the floor")
+    ap.add_argument("--lower-kernel", action="store_true",
+                    help="--rebase: lower the zero-headroom `maos-kernel-core` row to its measured value "
+                         "(default off: the kernel row is held, never raised by a re-base)")
+    ap.add_argument("--date", help="--rebase: date written into the RE-BASED segment (default today, YYYY-MM-DD)")
+    ap.add_argument("--dry-run", action="store_true", help="--rebase: print the table, write nothing")
     ap.add_argument("--root", help="repo root (default: parent of scripts/)")
     ap.add_argument("--xtask", help="prebuilt xtask binary (default: $REPIN_XTASK, $CARGO_TARGET_DIR, <root>/target)")
-    ap.add_argument("--base", default="HEAD", help="git ref of the pre-landing tree (default HEAD)")
-    ap.add_argument("--base-tree", help="directory holding the pre-landing crates/ and xtask/ (instead of --base)")
     args = ap.parse_args(argv)
 
     root = Path(args.root).resolve() if args.root else Path(__file__).resolve().parent.parent
-    adjudicated = {c for a in args.adjudicated for c in a.split(",") if c}
-    lower = {c for a in args.lower for c in a.split(",") if c}
+    if args.measure_json and not args.rebase:
+        ap.error("--measure-json is only valid with --rebase")
+    if args.rebase:
+        try:
+            return rebase(root, find_xtask(root, args.xtask), args)
+        except ToolError as e:
+            print(f"repin: ERROR: {e}", file=sys.stderr)
+            return EXIT_TOOL
     try:
-        for rel in OWNED_FILES + (TRACKER,):
+        for rel in OWNED_FILES + (KLOC, TRACKER):
             if not (root / rel).is_file():
                 raise ToolError(f"{root} is not a maos repo root: missing {rel}")
         xtask = find_xtask(root, args.xtask)
         m = measure(root, xtask)
-        base, base_why = measure_base(root, xtask, args.base, args.base_tree)
-        if base is None:
-            print(f"repin: no pre-landing baseline ({base_why}); reserve-vs-exact rows cannot be told "
-                  "apart, so measured < pin rows are left alone (use --lower CRATE)", file=sys.stderr)
-        table, want, drift, refusals = analyze(root, m, base, adjudicated, lower, args.note)
+        table, want, drift, refusals = analyze(root, m)
     except ToolError as e:
         print(f"repin: ERROR: {e}", file=sys.stderr)
         return EXIT_TOOL
 
     print_table(table)
-    print(f"\nmeasured: kernel physical {m['physical']} / tokei {m['per_crate'].get(KERNEL_CRATE)}, "
-          f"aggregate {m['aggregate']}, {len(m['digests'])} kernel files")
+    print(f"\nmeasured: kernel physical {m['physical']} / tokei {m['kernel_tokei']}, "
+          f"{len(m['digests'])} kernel files")
 
     if args.check:
         if refusals:
@@ -701,8 +732,6 @@ def main(argv=None) -> int:
             raise Refuse("--apply needs --story KEY (a live tracker story) and --note TEXT (the HISTORY text) "
                          "because pins would move")
         note = " ".join(args.note.split())
-        if "|" in note:
-            raise Refuse("--note must not contain `|` (it is the HISTORY segment separator the d11 ratchet splits on)")
         story_key = resolve_story(root, args.story)
     except Refuse as r:
         print("\nREFUSED -- a human decision is needed; nothing was written:", file=sys.stderr)
@@ -710,8 +739,8 @@ def main(argv=None) -> int:
         return EXIT_HUMAN
 
     try:
-        new_texts = build_texts(root, want, story_key, note, base)
-        validate_new_texts(root, new_texts, want, story_key)
+        new_texts = build_texts(root, want, story_key, note)
+        validate_new_texts(new_texts, want)
     except ToolError as e:
         print(f"repin: ERROR: {e}", file=sys.stderr)
         return EXIT_TOOL
@@ -727,18 +756,15 @@ def main(argv=None) -> int:
         for rel, text in new_texts.items():
             write_atomic(root / rel, text)
         rc_k, k = gate_json(xtask, root, ["check-kernel-baseline", "--json"])
-        rc_l, l = gate_json(xtask, root, ["kloc-check", "--json"])
-        if rc_k != 0 or not k.get("passed") or rc_l != 0 or not l.get("passed"):
-            raise ToolError(f"post-write verification failed: check-kernel-baseline passed={k.get('passed')}, "
-                            f"kloc-check passed={l.get('passed')} over_budget={l.get('over_budget')}")
+        if rc_k != 0 or not k.get("passed"):
+            raise ToolError(f"post-write verification failed: check-kernel-baseline passed={k.get('passed')}")
     except (ToolError, OSError) as e:
         for rel, text in originals.items():
             write_atomic(root / rel, text)
         print(f"repin: ERROR: {e}; all files restored", file=sys.stderr)
         return EXIT_DRIFT
     print(f"\nAPPLIED to {len(new_texts)} file(s): {', '.join(sorted(new_texts))}")
-    print("verified: check-kernel-baseline PASSED, kloc-check PASSED "
-          f"(aggregate {l['aggregate']}); run `repin.py --check` for the full table")
+    print("verified: check-kernel-baseline PASSED; run `repin.py --check` for the full table")
     return EXIT_OK
 
 

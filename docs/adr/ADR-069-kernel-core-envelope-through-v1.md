@@ -88,3 +88,16 @@ time." Record: `_bmad-output/planning-artifacts/decisions-2026-11-12-dedrift.md`
   permission.
 
 The row stood at 20,429 tokei at the ruling, 2,571 below the envelope.
+
+## Amendment — 2026-11-13 (SCP 2026-11-12 §5.B7c, option A)
+
+- **Per-crate rows are ceilings, re-based at retrospectives.** The `xtask/kloc.toml` crate rows are ceilings with stated
+  headroom (`measured + max(100, ceil(2%))`), re-based at each epic retrospective with `scripts/repin.py --rebase`; no
+  landing re-pins a crate row or writes a per-landing `kloc.toml` HISTORY segment. `_aggregate_hardfail` and the
+  per-landing crate re-pin are retired (`_aggregate_alarm` stays, as a warning only), and so is the d11 xtask ceiling
+  ratchet that required a cited open story. The `maos-kernel-core` row stays a zero-headroom crate: a re-base holds it.
+- **Unchanged.** The kernel exact pin (`xtask/kernel-core-baseline.toml`, `check-kernel-baseline`,
+  `kernel_pin_content_hash_16_0.rs`) and its HISTORY, and this ADR's alarm (22,000: `ENVELOPE ALARM` in the row) and
+  envelope (23,000), still enforced by `xtask/tests/recovery_lane_ceiling_rule.rs`.
+- **Tooling.** `scripts/repin.py` now re-pins only the kernel exact pin per landing (`--check` / `--apply`); the crate
+  rows move only through `--rebase`.

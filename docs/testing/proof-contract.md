@@ -42,9 +42,10 @@ on one image.**
 - Mutation re-plants are recorded once by the dev pass; the review repeats one only for a disputed finding.
 - **Closing a story re-runs the tree-bound tests that read its status.** Flipping a sprint key to `done` changes the
   verdict of tests that read `sprint-status.yaml` and the story records: before the closing commit, run
-  `cargo nextest run -p xtask --locked --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule`. (20-12
-  closed with an xtask ceiling citing it and no exact `<old> → <new>` arrow grant on an `xtask` line of its record;
-  `the_live_xtask_ceiling_cites_a_real_sprint_story` went red only after the flip, and four main runs carried it.)
+  `cargo nextest run -p xtask --locked --test recovery_lane_ceiling_rule`. (It keeps the ADR-069 envelope/alarm
+  checks and the tree-bound seal notice; per-crate ceilings need no cited open story since SCP 2026-11-12 §5.B7c
+  option A, so the d11 ceiling ratchet no longer exists. 20-12's xtask-ceiling red that motivated this rule is
+  history, not a current failure mode.)
 - **A manifest or admission change widens the focused set to every reader of it.** When the diff changes a checked-in
   manifest (`spirits/*/manifest.toml`, `examples/*/manifest.toml`) or the manifest/capability parser
   (`crates/maos-manifest/src`, `capabilities_required_to_scopes`), the focused set adds every test file that names
@@ -73,6 +74,31 @@ on one image.**
   *Session-only substitution (operator, latest 2026-10-27):* for the 20-15/20-16 review-correction phase coding
   and high-risk reviews run on `anthropic/claude-opus-5-5` and light reviews/docs on Sonnet 5.5, superseding an
   earlier temporary Terra substitution. This does not rewrite the standing policy above.
+
+### Retrospective size trend table
+
+Since SCP 2026-11-12 §5.B7c (option A, ruled 2026-11-13) the per-crate `xtask/kloc.toml` rows are **ceilings with
+stated headroom, re-based at each epic retrospective** (`scripts/repin.py --rebase`); a landing re-pins only the
+kernel exact pin (`scripts/repin.py --apply`). To keep the growth visible without a per-landing re-pin, every epic
+retrospective produces one row of this table (documentation only: no gate reads it), measured on the retrospective
+commit after `cargo fmt --all` with the prebuilt xtask and `tokei` 14.0.0:
+
+```
+git rev-parse --short=8 HEAD                          # the measured sha
+xtask kloc-check --json                               # per_crate."maos-kernel-core", per_crate."maos-bin", aggregate
+tokei xtask/src                                       # xtask src: Rust "Code" of the Total row
+tokei xtask/tests                                     # xtask tests: Rust "Code" of the Total row
+xtask check-kernel-baseline --json                    # kernel physical lines ("actual-lines"), the exact pin
+```
+
+| Retrospective | sha | kernel tokei | maos-bin | xtask src | xtask tests | aggregate |
+|---|---|---|---|---|---|---|
+
+`kernel tokei`, `maos-bin` and `aggregate` are the `kloc-check --json` values (`per_crate."maos-kernel-core"`,
+`per_crate."maos-bin"`, `aggregate`); `xtask src` and `xtask tests` are the `tokei` Code totals of the two
+directories (the `xtask` crate row of `kloc-check` counts production source only, so tests are tracked here, not
+against a ceiling). Run `xtask check-kernel-baseline --json` in the same session and note the kernel physical line
+count beside the row when the kernel pin moved during the epic. Append the row; never edit an earlier one.
 
 ## Test cost (AC1/AC2)
 

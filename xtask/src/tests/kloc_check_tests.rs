@@ -63,16 +63,8 @@ fn alarm_fires_at_threshold() {
 }
 
 #[test]
-fn hardfail_at_aggregate_threshold() {
-    let mut per_crate: BTreeMap<String, u64> = BTreeMap::new();
-    per_crate.insert("maos-kernel-core".to_string(), 20001u64);
-    let aggregate: u64 = per_crate.values().sum();
-    assert!(aggregate >= 20000, "should hard-fail at {} >= 20000", aggregate);
-}
-
-#[test]
-fn hardfail_at_per_crate_threshold() {
-    // Even if aggregate is small, per-crate over-budget should fail.
+fn per_crate_breach_is_detected() {
+    // Even if the aggregate is small, a per-crate over-budget must fail.
     let budget = 6000u64;
     let actual = 6001u64;
     assert!(actual > budget, "per-crate breach should be detected");
@@ -93,7 +85,7 @@ fn tokei_version_parser_names_both_versions() {
 #[test]
 fn tokei_version_pin_is_enforced_at_the_call_site() {
     let (_workspace, config) = write_kloc_fixture(
-        "_aggregate_alarm = 100\n_aggregate_hardfail = 200\nfixture = 100\n",
+        "_aggregate_alarm = 100\nfixture = 100\n",
         Some("fixture"),
     );
     let error = kloc_check_with_tokei(config.to_str().unwrap(), "cargo").unwrap_err();
@@ -106,7 +98,7 @@ fn tokei_version_pin_is_enforced_at_the_call_site() {
 #[test]
 fn absent_tokei_binary_is_named_not_skipped() {
     let (_workspace, config) = write_kloc_fixture(
-        "_aggregate_alarm = 100\n_aggregate_hardfail = 200\nfixture = 100\n",
+        "_aggregate_alarm = 100\nfixture = 100\n",
         Some("fixture"),
     );
     let error = kloc_check_with_tokei(
@@ -118,16 +110,15 @@ fn absent_tokei_binary_is_named_not_skipped() {
 }
 
 /// AC6(a) at its CALL SITE. `run()` only dispatches `render_operator_output`,
-/// so reverting either message to a hardcoded literal, or wiring the alarm
-/// notice to `aggregate_hardfail`, reds this test (Story 15-2 review R-P2).
+/// so reverting either message to a hardcoded literal, or wiring the failure
+/// headline away from `aggregate_alarm`, reds this test (Story 15-2 review
+/// R-P2; hardfail leg removed by SCP 2026-11-12 §5.B7c option A).
 #[test]
 fn operator_output_names_the_configured_thresholds() {
-    // aggregate 1 >= alarm 0 AND >= hardfail 1 — distinct integers, so a
-    // notice wired to the wrong threshold is observable.
-    let (_workspace, config) = write_kloc_fixture(
-        "_aggregate_alarm = 0\n_aggregate_hardfail = 1\nfixture = 100\n",
-        Some("fixture"),
-    );
+    // aggregate 1 >= alarm 0 AND the fixture crate breaches its ceiling 0 —
+    // distinct integers, so a notice wired to the wrong value is observable.
+    let (_workspace, config) =
+        write_kloc_fixture("_aggregate_alarm = 0\nfixture = 0\n", Some("fixture"));
     let report = kloc_check(config.to_str().unwrap()).unwrap();
     assert_eq!(report.aggregate, 1);
     let out = render_operator_output(&report);
@@ -136,23 +127,22 @@ fn operator_output_names_the_configured_thresholds() {
         out.alarm.expect("alarm must fire at aggregate >= _aggregate_alarm"),
         "workspace aggregate KLOC alarm: configured threshold=0, current=1"
     );
-    let failure = out.failure.expect("aggregate breach must render a failure line");
+    let failure = out.failure.expect("a per-crate breach must render a failure line");
     assert_eq!(
         failure.lines().next().unwrap(),
-        "workspace aggregate KLOC hard fail: configured threshold=1, current=1; per-crate breakdown:"
+        "per-crate KLOC ceiling breach: fixture 1 > 0; workspace aggregate=1 (alarm threshold=0); per-crate breakdown:"
     );
     assert!(!failure.contains("20 KLOC") && !failure.contains("NFR-Maint-1"));
     assert!(out.passed.is_none());
 }
 
-/// R-P1: a per-crate-only breach must NOT be reported as an aggregate hard
-/// fail. Reverting the headline to the unconditional aggregate notice reds this.
+/// R-P1: a per-crate breach names the breached crate and prints the aggregate
+/// beside the ALARM threshold (the only aggregate threshold left), and never
+/// claims an aggregate hard fail.
 #[test]
-fn per_crate_only_breach_does_not_claim_an_aggregate_hard_fail() {
-    let (_workspace, config) = write_kloc_fixture(
-        "_aggregate_alarm = 100\n_aggregate_hardfail = 200\nfixture = 0\n",
-        Some("fixture"),
-    );
+fn per_crate_breach_names_the_crate_and_the_alarm_threshold() {
+    let (_workspace, config) =
+        write_kloc_fixture("_aggregate_alarm = 100\nfixture = 0\n", Some("fixture"));
     let report = kloc_check(config.to_str().unwrap()).unwrap();
     assert!(!report.passed);
     assert_eq!(report.over_budget, vec!["fixture 1 > 0".to_string()]);
@@ -166,9 +156,9 @@ fn per_crate_only_breach_does_not_claim_an_aggregate_hard_fail() {
     );
     assert!(
         !failure.contains("hard fail"),
-        "the aggregate was never breached: {failure}"
+        "no aggregate hard fail exists: {failure}"
     );
-    assert!(failure.contains("configured threshold=200"));
+    assert!(failure.contains("workspace aggregate=1 (alarm threshold=100)"));
     assert!(failure.contains("| fixture | 1 | 0 | ❌ OVER |"));
 }
 
@@ -177,7 +167,7 @@ fn per_crate_only_breach_does_not_claim_an_aggregate_hard_fail() {
 #[test]
 fn alarm_binds_at_the_configured_threshold_and_stays_advisory() {
     let (_below, below) = write_kloc_fixture(
-        "_aggregate_alarm = 2\n_aggregate_hardfail = 100\nfixture = 100\n",
+        "_aggregate_alarm = 2\nfixture = 100\n",
         Some("fixture"),
     );
     let report = kloc_check(below.to_str().unwrap()).unwrap();
@@ -186,7 +176,7 @@ fn alarm_binds_at_the_configured_threshold_and_stays_advisory() {
     assert!(report.passed);
 
     let (_at, at) = write_kloc_fixture(
-        "_aggregate_alarm = 1\n_aggregate_hardfail = 100\nfixture = 100\n",
+        "_aggregate_alarm = 1\nfixture = 100\n",
         Some("fixture"),
     );
     let report = kloc_check(at.to_str().unwrap()).unwrap();
@@ -218,7 +208,7 @@ fn write_kloc_fixture(config: &str, crate_name: Option<&str>) -> (tempfile::Temp
 #[test]
 fn measured_crate_without_budget_is_named() {
     let (_workspace, config) = write_kloc_fixture(
-        "_aggregate_alarm = 100\n_aggregate_hardfail = 200\n",
+        "_aggregate_alarm = 100\n",
         Some("unbudgeted"),
     );
     let error = kloc_check(config.to_str().unwrap()).unwrap_err();
@@ -228,13 +218,13 @@ fn measured_crate_without_budget_is_named() {
 
 #[test]
 fn missing_or_non_integer_aggregate_threshold_is_named() {
-    let (_workspace, missing) = write_kloc_fixture("_aggregate_hardfail = 200\n", None);
+    let (_workspace, missing) = write_kloc_fixture("", None);
     let error = kloc_check(missing.to_str().unwrap()).unwrap_err();
     assert!(error.contains("_aggregate_alarm"));
     assert!(error.contains("missing"));
 
     let (_workspace, non_integer) = write_kloc_fixture(
-        "_aggregate_alarm = \"100\"\n_aggregate_hardfail = 200\n",
+        "_aggregate_alarm = \"100\"\n",
         None,
     );
     let error = kloc_check(non_integer.to_str().unwrap()).unwrap_err();
@@ -242,47 +232,47 @@ fn missing_or_non_integer_aggregate_threshold_is_named() {
     assert!(error.contains("integer"));
 }
 
-/// R-P4: the BLOCKING threshold needs its own control. Restoring
-/// `unwrap_or(20000)` for `_aggregate_hardfail` alone reds this test.
+/// SCP 2026-11-12 §5.B7c option A (ruled 2026-11-13): `_aggregate_hardfail` is
+/// retired. A config that still carries it is REFUSED, naming the key and the
+/// retirement, so the retired blocking threshold cannot silently linger. The
+/// refusal fires whatever the value is (integer or quoted) and even when
+/// `_aggregate_alarm` is missing, before any other threshold or tokei work.
 #[test]
-fn missing_or_non_integer_hardfail_threshold_is_named() {
-    let (_workspace, missing) = write_kloc_fixture("_aggregate_alarm = 100\n", None);
-    let error = kloc_check(missing.to_str().unwrap()).unwrap_err();
-    assert!(error.contains("_aggregate_hardfail"), "{error}");
-    assert!(error.contains("missing"), "{error}");
-
-    let (_workspace, non_integer) = write_kloc_fixture(
+fn a_config_carrying_the_retired_aggregate_hardfail_is_refused() {
+    for config in [
+        "_aggregate_alarm = 100\n_aggregate_hardfail = 200\nfixture = 100\n",
         "_aggregate_alarm = 100\n_aggregate_hardfail = \"200\"\n",
-        None,
-    );
-    let error = kloc_check(non_integer.to_str().unwrap()).unwrap_err();
-    assert!(error.contains("_aggregate_hardfail"), "{error}");
-    assert!(error.contains("integer"), "{error}");
-
-    let (_workspace, negative) = write_kloc_fixture(
-        "_aggregate_alarm = 100\n_aggregate_hardfail = -1\n",
-        None,
-    );
-    let error = kloc_check(negative.to_str().unwrap()).unwrap_err();
-    assert!(error.contains("_aggregate_hardfail"), "{error}");
-    assert!(error.contains("non-negative"), "{error}");
+        "_aggregate_hardfail = 200\n",
+    ] {
+        let (_workspace, path) = write_kloc_fixture(config, Some("fixture"));
+        let error = kloc_check(path.to_str().unwrap()).unwrap_err();
+        assert!(error.contains("`_aggregate_hardfail`"), "{error}");
+        assert!(error.contains("retired"), "{error}");
+        assert!(error.contains("SCP 2026-11-12 B7c"), "{error}");
+        assert!(error.contains("option A"), "{error}");
+    }
 }
 
-/// R-P6: an alarm above the hard fail can never be observed.
+/// Option A: `_aggregate_alarm` is a warning only. An aggregate above the alarm
+/// with every crate under its ceiling PASSES, raises the alarm, and renders no
+/// failure line.
 #[test]
-fn inverted_aggregate_thresholds_are_named() {
+fn aggregate_above_the_alarm_with_every_crate_under_ceiling_passes() {
     let (_workspace, config) =
-        write_kloc_fixture("_aggregate_alarm = 300\n_aggregate_hardfail = 200\n", None);
-    let error = kloc_check(config.to_str().unwrap()).unwrap_err();
-    assert!(error.contains("_aggregate_alarm"), "{error}");
-    assert!(error.contains("can never fire"), "{error}");
+        write_kloc_fixture("_aggregate_alarm = 0\nfixture = 100\n", Some("fixture"));
+    let report = kloc_check(config.to_str().unwrap()).unwrap();
+    assert_eq!(report.aggregate, 1);
+    assert!(report.alarm, "aggregate 1 >= alarm 0");
+    assert!(report.passed, "the alarm is a warning, never a failure");
+    assert!(report.over_budget.is_empty(), "{:?}", report.over_budget);
 
-    // Equality is legal: the alarm fires in the same run the hard fail blocks.
-    let (_workspace, equal) = write_kloc_fixture(
-        "_aggregate_alarm = 200\n_aggregate_hardfail = 200\nfixture = 100\n",
-        Some("fixture"),
+    let out = render_operator_output(&report);
+    assert!(out.alarm.is_some());
+    assert!(out.failure.is_none());
+    assert_eq!(
+        out.passed.as_deref(),
+        Some("kloc-check: PASSED (aggregate=1 LOC)")
     );
-    kloc_check(equal.to_str().unwrap()).expect("alarm == hardfail must be accepted");
 }
 
 /// R-P7: the `[in_progress_decomposition]` placement trap (§2a) — a budget row
@@ -292,7 +282,7 @@ fn inverted_aggregate_thresholds_are_named() {
 #[test]
 fn budget_row_nested_below_a_table_header_is_named() {
     let (_workspace, config) = write_kloc_fixture(
-        "_aggregate_alarm = 100\n_aggregate_hardfail = 200\n\
+        "_aggregate_alarm = 100\n\
          [in_progress_decomposition]\n\
          phase_1 = { target = \"maos-iac\", status = \"done\", epic = \"6.5\" }\n\
          maos-egress = 780\n",
@@ -304,7 +294,7 @@ fn budget_row_nested_below_a_table_header_is_named() {
 
     // The real file's metadata table alone must stay green.
     let (_workspace, clean) = write_kloc_fixture(
-        "_aggregate_alarm = 100\n_aggregate_hardfail = 200\nfixture = 100\n\
+        "_aggregate_alarm = 100\nfixture = 100\n\
          [in_progress_decomposition]\n\
          phase_1 = { target = \"maos-iac\", status = \"done\", epic = \"6.5\" }\n",
         Some("fixture"),
@@ -315,7 +305,7 @@ fn budget_row_nested_below_a_table_header_is_named() {
 #[test]
 fn quoted_or_negative_crate_budget_is_named() {
     let (_workspace, quoted) = write_kloc_fixture(
-        "_aggregate_alarm = 100\n_aggregate_hardfail = 200\nfixture = \"10\"\n",
+        "_aggregate_alarm = 100\nfixture = \"10\"\n",
         None,
     );
     let error = kloc_check(quoted.to_str().unwrap()).unwrap_err();
@@ -323,7 +313,7 @@ fn quoted_or_negative_crate_budget_is_named() {
     assert!(error.contains("integer"));
 
     let (_workspace, negative) = write_kloc_fixture(
-        "_aggregate_alarm = 100\n_aggregate_hardfail = 200\nfixture = -1\n",
+        "_aggregate_alarm = 100\nfixture = -1\n",
         None,
     );
     let error = kloc_check(negative.to_str().unwrap()).unwrap_err();

@@ -37,8 +37,6 @@ pub struct Report {
     pub aggregate: u64,
     #[serde(skip)]
     aggregate_alarm: u64,
-    #[serde(skip)]
-    aggregate_hardfail: u64,
     pub per_crate: BTreeMap<String, u64>,
     /// The validated budget map the report was judged against. Carried so the
     /// operator table renders from the SAME parsed-and-validated values the
@@ -113,20 +111,17 @@ fn render_operator_output(report: &Report) -> OperatorOutput {
         return out;
     }
 
-    // A per-crate breach is NOT an aggregate breach. Labelling one as the other
-    // names a threshold that was never crossed, which is the same lie about the
-    // cause that AC6(a) exists to close one level down in the ❌ column
-    // (Story 15-2 §2d and review R-P1).
-    let headline = if report.aggregate >= report.aggregate_hardfail {
-        format_aggregate_notice("hard fail", report.aggregate_hardfail, report.aggregate)
-    } else {
-        format!(
-            "per-crate KLOC ceiling breach: {}; workspace aggregate={} is UNDER its configured threshold={}",
-            report.over_budget.join(", "),
-            report.aggregate,
-            report.aggregate_hardfail
-        )
-    };
+    // A failure is always a per-crate breach: the aggregate threshold
+    // (`_aggregate_alarm`) is a warning and never fails the gate, so the headline
+    // names the breached crates and prints the aggregate beside the alarm
+    // threshold, never a threshold that was not crossed (Story 15-2 §2d and
+    // review R-P1; SCP 2026-11-12 §5.B7c option A).
+    let headline = format!(
+        "per-crate KLOC ceiling breach: {}; workspace aggregate={} (alarm threshold={})",
+        report.over_budget.join(", "),
+        report.aggregate,
+        report.aggregate_alarm
+    );
 
     let mut table = String::from("| Crate | LOC | Budget | Status |\n|---|---|---|---|\n");
     for (crate_name, loc) in &report.per_crate {
@@ -225,17 +220,15 @@ fn kloc_check_with_tokei(config_path: &str, tokei_path: &str) -> Result<Report, 
         .parse()
         .map_err(|e| format!("cannot parse {config_path}: {e}"))?;
 
-    let aggregate_alarm = required_nonnegative_integer(&config, "_aggregate_alarm")?;
-    let aggregate_hardfail = required_nonnegative_integer(&config, "_aggregate_hardfail")?;
-    // An alarm above the hard fail can never be observed: the gate errors out
-    // before the warning it was supposed to precede. That is the dead-signal
-    // state F8 exists to end, reachable by one transposed digit
-    // (Story 15-2 review R-P6).
-    if aggregate_alarm > aggregate_hardfail {
+    // `_aggregate_hardfail` was retired by SCP 2026-11-12 §5.B7c (option A, ruled
+    // 2026-11-13). A config that still carries it is refused so the retired
+    // blocking threshold cannot silently linger as a number nothing enforces.
+    if config.contains_key("_aggregate_hardfail") {
         return Err(format!(
-            "KLOC `_aggregate_alarm` ({aggregate_alarm}) must not exceed `_aggregate_hardfail` ({aggregate_hardfail}): an alarm above the hard fail can never fire"
+            "KLOC config key `_aggregate_hardfail` was retired by SCP 2026-11-12 B7c (option A, ruled 2026-11-13): delete it from {config_path}; `_aggregate_alarm` remains a warning and per-crate ceilings are the only blocking rows"
         ));
     }
+    let aggregate_alarm = required_nonnegative_integer(&config, "_aggregate_alarm")?;
 
     let mut budgets = BTreeMap::new();
     for (key, value) in &config {
@@ -357,9 +350,8 @@ fn kloc_check_with_tokei(config_path: &str, tokei_path: &str) -> Result<Report, 
     let alarm = aggregate >= aggregate_alarm;
     let mut over_budget = Vec::new();
 
-    if aggregate >= aggregate_hardfail {
-        over_budget.push(format!("aggregate {} >= {}", aggregate, aggregate_hardfail));
-    }
+    // `_aggregate_alarm` is a warning only (SCP 2026-11-12 §5.B7c option A): the
+    // aggregate never fails the gate on its own; only a per-crate ceiling does.
 
     for (crate_name, loc) in &per_crate {
         if let Some(&budget) = budgets.get(crate_name) {
@@ -376,7 +368,6 @@ fn kloc_check_with_tokei(config_path: &str, tokei_path: &str) -> Result<Report, 
         alarm,
         aggregate,
         aggregate_alarm,
-        aggregate_hardfail,
         per_crate,
         budgets,
         over_budget,

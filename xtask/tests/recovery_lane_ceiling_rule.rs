@@ -8,22 +8,24 @@
 //! all developed. Be aware only important and necessary increments allowed, no
 //! slops or uncontrolled addition to the kloc."*
 //!
-//! **What that is, mechanically.** Story 15-4 already built half of this for one
-//! crate in `d11_xtask_ceiling_ratchet.rs`: a raise governs on **cause, not
-//! count** (it must cite an OPEN sprint story), and the ceiling **freezes once
-//! every numbered `epic-N` key is `done``. That freeze IS "we seal it after all
+//! **What that is, mechanically.** A raise governs on **cause, not count**
+//! (it must cite an OPEN sprint story), and the ceiling **freezes once every
+//! numbered `epic-N` key is `done`**. That freeze IS "we seal it after all
 //! developed", derived from the tree rather than promised for a date. This file
-//! generalises the same procedure from `xtask` to every crate and adds the one
-//! boundary the operator drew explicitly.
+//! carries the decision procedure for every crate and adds the one boundary the
+//! operator drew explicitly. (SCP 2026-11-12 §5.B7c option A, ruled 2026-11-13,
+//! retired the `xtask`-only `d11_xtask_ceiling_ratchet.rs` predecessor and the
+//! exact-move test on the kernel row; the ADR-069 envelope tests below remain.)
 //!
-//! **The boundary — what was NOT eased.** `maos-kernel-core` keeps ZERO
-//! headroom, and `kernel-core-baseline.toml`'s pin and the per-line FLAG-Winston
-//! grant are untouched. `xtask/kloc.toml`'s own CEILING RULE block states why the
-//! two are different mechanisms: *"the PIN is anti-DRIFT (it never forbade
-//! growth, only UNRECORDED growth); the CEILINGS are anti-GROWTH."* The operator
-//! eased budgets. Easing the pin would silently widen the very drift Story
-//! `16-0-kernel-pin-content-hash` exists to close, so [`ZERO_HEADROOM_CRATES`] is
-//! asserted against the tree below.
+//! **The boundary — what was NOT eased.** `maos-kernel-core` keeps its exact
+//! pin (`kernel-core-baseline.toml`, `check-kernel-baseline`) and the per-line
+//! FLAG-Winston grant, untouched. `xtask/kloc.toml`'s own CEILING RULE block
+//! states why the two are different mechanisms: *"the PIN is anti-DRIFT (it
+//! never forbade growth, only UNRECORDED growth); the CEILINGS are
+//! anti-GROWTH."* The operator eased budgets. Easing the pin would silently
+//! widen the very drift Story `16-0-kernel-pin-content-hash` exists to close,
+//! so [`ZERO_HEADROOM_CRATES`] must keep a row in the tree below and the kernel
+//! row stays inside the ADR-069 envelope.
 //!
 //! **"No slops" is the evidence requirement, not the ceiling value.** What is
 //! eased is *who may raise and when*; what is unchanged is that the code must
@@ -32,7 +34,7 @@
 //! first two; the third is a review obligation no parser can take over.
 //!
 //! Kloc-free: `xtask` is at zero headroom and `xtask/tests/` is excluded from the
-//! measurement (`xtask/kloc.toml:195`) — same placement as the D11 ratchet.
+//! measurement (`xtask/kloc.toml`'s `-e tests` exclusion in `kloc_check.rs`).
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -259,130 +261,12 @@ fn the_tree_bound_inputs_exist() {
     }
 }
 
-/// The boundary, against the tree: the eased rule must not have been used to give
-/// `maos-kernel-core` working headroom. Measured == ceiling is the invariant
-/// D13(a) bought; `kloc-check` is what measures, so this asserts the *declared*
-/// half — that no one silently raised the row while the easing was in force.
-#[test]
-fn kernel_core_ceiling_has_not_moved_under_the_easing() {
-    // Story 18-5-context-token-budget-accounting ◆ FLAG-Winston landing,
-    // D-18-5-02 A + D-18-5-03 B + D-18-5-10 A ratified by Lunarpulse
-    // 2026-10-26: allowance +27 physical / +23 tokei, ADR-069 envelope.
-    // Exact measured landing: 20_617 -> 20_639 (+22), physical 26387 -> 26414
-    // (+27), all 95 files retained, ZERO HEADROOM. Driver: capability/mod.rs
-    // builds/exposes the registry's ADR-016 ledger, checks context after policy
-    // and before quota with ProviderInfer/MemWrite/IacSend exits, and clears the
-    // pid's slot on revoke_all_for_pid; mcp/mod.rs checks context before token
-    // verification and wire use; inference/mod.rs spawns RateLimited delivery
-    // instead of dropping its unpolled future. The +23 allowance is not headroom:
-    // the ceiling is the measured +22.
-    const RATIFIED_AT_EASING: i64 = 20_429;
-    // 21-5-orchestrator-port-and-move: exact formatted 21256 -> 20429 (-827), physical
-    // 27103 -> 26062 (-1041); ADR-069 RELIEF VALVE (21-5, ruling s21): L2 landing, the
-    // FR20 buffer + journal helpers + parked FR54 gateway host (5 files) leave
-    // maos-kernel-core for the new leaf maos-orchestrator-buffer behind
-    // maos_domain::orchestrator::OrchestratorResumePort (KP, FLAG-Winston GRANTED ask
-    // d21, D-21-5-01 A/-02 A/-11 A/-12 A); kernel tokei 21256 -> 20429 (-827), physical
-    // 27103 -> 26062 (-1041), 95 -> 90 files, 1571 to the 22000 alarm (was 744), 2571
-    // to the 23000 envelope; the freed lines are not growth capacity (15.5 Decision
-    // 2a); one SpiritSchedulerAdapter surface refresh (2daf34b2 -> d2170d38) + 21
-    // triples removed under ADR-070; leaf row 917 -> 833 exact measured (D-21-5-10 A,
-    // priced 829, one-lock replay +4); xtask +1 FORBIDDEN_CRATES entry (D-21-5-09 A,
-    // priced +1, adjudicated); aggregate +7 (203243 -> 203250)
-    // 20-9 landing 2 (20-9 L2, AC7/AC8), FLAG-Winston row R (D-20-9-13 A + D-20-9-14 A, ruled
-    // 2026-11-03 ask d_batch4) plus the operator-granted options (a1) typed NotLoaded refusal, (b)
-    // atomic archive record, (c) idle-watchdog parallel fire (asks of 2026-11-12): exact formatted
-    // 21202 -> 21256 (+54), physical 27044 -> 27103 (+59), inside the shared STOP 22000;
-    // schedule_watchdog.rs `poll_once` + D07 A suppression, coordinator.rs, archive.rs,
-    // idle_watchdog.rs; the surface gate flags nothing.
-    // 20-13 landing 2 (20-13 L2, AC7), FLAG-Winston KT3 (D-20-13-04 A, literal shape ruled
-    // 2026-11-12 ask `kt3`): exact formatted 21203 -> 21202 (-1), physical 27043 -> 27044 (+1),
-    // the priced KT3 figure; SecurityManagerAdapter takes the selected provider, T3 admission
-    // verifies through it; one surface-hash refresh (SecurityManagerAdapter).
-    // 20-14 landing 2 review round 1 (GPT P2 x3, GLM S1-S3), same KT row: exact formatted
-    // 21201 -> 21203 (+2), physical 27040 -> 27043 (+3), inside the x2 ceiling 21221 and the
-    // shared STOP 21250; the wide `tokens()` accessor is replaced by two narrow delegates.
-    // 20-14 landing 2 (20-14 L2), FLAG-Winston KT (D-20-14-02 B, ruled 2026-11-03 ask
-    // d_batch4): exact formatted 21181 -> 21201 (+20), physical 27014 -> 27040 (+26),
-    // inside the x2 ceiling 21221 and the shared STOP 21250; capability/mod.rs accessor,
-    // inference/mod.rs emission (scope read, session-principal source, CostFrameBody).
-    // 20-8 landing 2 review corrections (GPT P2 x2, same KS row): exact formatted
-    // 21178 -> 21181 (+3), physical 27009 -> 27014 (+5), inside the x2 ceiling
-    // 21207; coordinator.rs reversible-hex receipt reason, upgrade.rs extraction.
-    // 20-8 landing 2 (final kernel landing), FLAG-Winston KS (D-20-8-07 A, ruled
-    // 2026-11-03 ask d_batch4): exact formatted 21141 -> 21178 (+37), physical
-    // 26967 -> 27009 (+42), inside the D02 A x2 ceiling 21207 re-based onto the
-    // live base; coordinator.rs refusal, upgrade.rs successor parse, SCB field.
-    // 20-1b landing 2 (final kernel landing), FLAG-Winston R = KQ1 + P (ruled
-    // 2026-11-01/02 ask rows201, D-20-1-02 A + D-20-1-03 A): exact formatted
-    // 21073 -> 21141 (+68), physical 26889 -> 26967 (+78), inside the D02 A x2
-    // ceiling 21209 re-based onto the live base; capability/mod.rs,
-    // revocation/applier.rs, revocation/poller.rs, scheduler/scheduler_loop.rs.
-    // 20-11 landing 2 correction round 3, inside the KS + O4 x2 ceiling 21078: exact
-    // formatted 21075 -> 21073 (-2), physical 26891 -> 26889; invoke_halt I2 assert,
-    // watchdog fence off the hook, terminate_spirit marker helper.
-    // 20-11 landing 2 review corrections (operator ask s2 = allow), inside the
-    // KS + O4 x2 ceiling 21078: exact formatted 21069 -> 21075 (+6), physical
-    // 26880 -> 26891 (+11); schedule_watchdog.rs fence (P1), halt/mod.rs and
-    // halt/termination.rs atomic receipt frame ids (F3).
-    // 20-11-erasure-inventory-closure landing 2, FLAG-Winston R = KS + O4 (ruled
-    // 2026-11-02 ask s2011 / 2026-11-04 ask halt_grant): exact formatted 21051 ->
-    // 21069 (+18), physical 26854 -> 26880 (+26); halt/mod.rs, halt/termination.rs,
-    // scheduler/schedule_watchdog.rs, scheduler/scheduler_loop.rs.
-    // 20-4-gemini-driver-and-endpoint-pin landing 2, FLAG-Winston R = KA + KIO1 +
-    // KIO2 (ruled 2026-11-02, ask s204): exact formatted 21042 -> 21051 (+9),
-    // physical 26841 -> 26854 (+13), ceiling 21060; inference/mod.rs and io/mod.rs.
-    // 20-7 landing 1, FLAG-Winston R = K1w + K2r (rows207), 2026-11-01/02:
-    // exact formatted21011 -> 21042 (+31), physical26801 -> 26841 (+40), ceiling
-    // 21073; t3/child.rs only. The 20-1b grant shares the 21011 base: the second
-    // kernel landing re-bases (cumulative expected 21110, STOP above 21209).
-    // 20-3c landing 2, FLAG-Winston R = K1p + E3 (rows203c/grant203c), 2026-11-01:
-    // exact formatted20992 -> 21011 (+19), physical26793 -> 26801 (+8), ZERO HEADROOM.
-    // 20-3b landing 2 round-3 corrections, operator ruling w10, 2026-10-31:
-    // exact formatted20889 -> 20992 (+103), physical26680 -> 26793 (+113), ZERO HEADROOM.
-    // 20-3b landing 2 round-2 corrections, operator ruling w9, 2026-10-31:
-    // exact formatted20834 -> 20889 (+55), physical26620 -> 26680 (+60), ZERO HEADROOM.
-    // 20-3b landing 2 review corrections, operator ruling w8, 2026-10-31:
-    // exact formatted20748 -> 20834 (+86), physical26548 -> 26620 (+72), ZERO HEADROOM.
-    // 20-3b landing 2, 2026-10-30, FLAG-Winston grant (d03 A):
-    // exact formatted 20618 -> 20748 (+130), physical26409 -> 26548 (+139), within26591/20778.
-    // 19-5 review/implementation, 2026-10-29, FLAG-Winston D-01 A/07 B/09 A:
-    // exact LOWER re-pin 20674 -> 20618 (-56), physical26463 -> 26409 (-54), 95 files unchanged.
-    // 19-2 FR51 FLAG-Winston grant D-19-2-20 B (+93/+58): 20628 -> 20674 (+46), physical +74.
-    // 19-3 D-19-3-01 A K2 mount, D19-2 A FLAG-Winston grant: 20619 -> 20628 (+9), physical +11.
-    // 20-15-ci-build-once-nextest-archive conmon_oom_cwd FLAG-Winston, operator2026-10-27:
-    // exact20610 -> 20619 (+9), physical26367 -> 26378 (+11), security/sandbox/t3/spawn.rs only.
-    // 18-7-live-skill-authoring-and-revisions D-01/02 A, operator2026-10-26:
-    // exact20606 -> 20610 (+4), physical26362 -> 26367 (+5), four ruled files.
-    // 18-6-fr45-forget-redistillation-and-cascade-closure review, operator2026-10-26:
-    // exact20650 -> 20606 (-44), physical26407 -> 26362 (-45), memory/mod.rs only.
-    // 18-6-fr45-forget-redistillation-and-cascade-closure, FLAG-Winston
-    // operator2026-10-26:20643 -> 20650 (+7), physical26418 -> 26407 (-11),
-    // memory/mod.rs only; exact within the +8 physical/+17 tokei grant.
-    // 18-5-context-token-budget-accounting review E1-A, operator 2026-10-26:
-    // exact formatted 20639 -> 20643 (+4), physical26414 -> 26418 (+4).
-    // Real teardown hooks and post-verification context check only; receipt
-    // journaling and typed refusal construction live in maos-iac.
-    // PRIOR: Story 18-3-researcher-replay-live-and-judged-five-metric ◆ FLAG-Winston landing, review ruling D-18-3-R5 A ratified by Lunarpulse 2026-10-25 (+10 physical / +9 tokei over 18-8's landed pin, ADR-069 envelope, exact at landing), exact formatted re-pin 2026-10-25: 20_608 -> 20_617 (+9), physical 26377 -> 26387 (+10), 95 files unchanged, ZERO HEADROOM; driver: review TIA-7 halt gating — `HookDispatcher::fire_on_idle` returns `HookOutcome::HaltPending` while the pid has a pending halt, hook_dispatch.rs / hot_swap/coordinator.rs / scheduler/scheduler_loop.rs. PRIOR: Story 18-8-conformant-mcp-client ◆ FLAG-Winston landing, D-18-8-01 A ratified by Lunarpulse 2026-10-25 (+15 physical / +13 tokei over 18-1's landed pin, exact at landing), exact formatted re-pin 2026-10-25: 20_595 -> 20_608 (+13), physical 26363 -> 26377 (+14), 95 files unchanged, ZERO HEADROOM; driver: AC4 full exchange — `IoSubsystemAdapter::http_post_exchange` returns status + body + header with a non-2xx as data, `http_post` delegates to it, GET/POST share `read_capped` (cap + 1 ⇒ over-cap `Decode`), io/mod.rs only. PRIOR: Story 18-1-butler-inference-seam-and-conformant-mcp ◆ FLAG-Winston landing, D-18-1-10 A ratified by Lunarpulse 2026-10-25 (+2 physical / +1 tokei, exact at landing), exact formatted re-pin 2026-10-25: 20_594 -> 20_595 (+1), physical 26361 -> 26363 (+2), 95 files unchanged, ZERO HEADROOM; driver: AC7 fail-closed fallback authorization in `InferencePortAdapter::complete` (empty id `Unconfigured`; a fallback id the token does not name `CapabilityDenied` before dispatch) and `MultiProviderRouter::dispatch` no longer mapping `""` to the default, inference/{mod,router}.rs only. PRIOR: Story 17-9 FLAG-Winston landing, D-17-9-FW-02 ratified by Lunarpulse 2026-10-22 (<= 26361 physical / <= 20594 tokei, exact at landing), exact formatted re-pin 2026-10-22: 20_538 -> 20_594 (+56), physical 26304 -> 26361 (+57), 95 files unchanged, ZERO HEADROOM; driver: the per-window issuance quota in `issue_with_mediation` (policy -> charge -> issue -> refund/commit, `audit_quota`), the import-free `CapAuditEvent::Quota` writer arm, the move-only ScheduleWatchdog reorder. PRIOR: Story 17-4 FLAG-Winston landing, D-17-4-PF-R1 ratified by Lunarpulse 2026-10-19, exact formatted re-pin 2026-10-20: 20_527 -> 20_538 (+11), physical 26291 -> 26304 (+13), 95 files unchanged, ZERO HEADROOM; driver: the broad scalar.tap channel + `subscribe_all` and the two `seq` test literals, telemetry/mod.rs only. PRIOR: Story 17-3d FLAG-Winston landing, exact LOWER formatted re-pin 2026-10-18, no raise (D-17-3d-FW-02): 20_545 -> 20_527 (-18), physical 26311 -> 26291, 95 files unchanged, ZERO HEADROOM; driver: `CapabilitiesRequired` literal (+1) and the deleted dormant `log_recall` seam. PRIOR: Story 17-7 review repairs, Lunarpulse-approved exact formatted re-pin 2026-10-15: 20_050 -> 20_545 (+495), physical 25775 -> 26311, 95 files unchanged, ZERO HEADROOM. PRIOR: Story 17-7 FLAG-Winston landing re-pin 2026-10-14, operator-approved exact measured (FW-02 ruling <=19_946 exceeded by +104, approved as a measured request): 19_492 -> 20_050 (+558), physical 25145 -> 25775, 95 files. PRIOR: Story 17-2 non-author A6 exact lower re-pin 2026-10-12: 19_495 -> 19_492 (-3), physical25149 -> 25146; no raise. PRIOR: Story 17-2 FW-02 exact lower formatted re-pin 2026-10-12: 19_553 -> 19_495 (-58), physical 25267 -> 25149, 96 -> 95 files; no kernel raise. PRIOR: 17-1 §A6 review re-pin 2026-10-10 (ceiling 19_564 held): 19_513 -> 19_553, baseline 25212 -> 25267. PRIOR: Story 17-1 FLAG-Winston landing re-pin, operator-ruled variant B ceiling 19_564 (2026-10-06) with the D-16 deletion-only charter extension (S3, 2026-10-07): 19_529 -> 19_513 (exact measured), baseline 25293 -> 25212, 98 -> 96 files. PRIOR: Detached 17-3c §A6 review, operator-approved 2026-10-06: 19_412 -> 19_529 (+117; KLOC sign-off), baseline 25149 -> 25293 (kernel-baseline approval). PRIOR: detached 17-3c candidate grant 19_309 -> 19_412, baseline 25032 -> 25149. PRIOR: Story 17-6 review FLAG-Winston operator-ratified 2026-09-28: 19_292 -> 19_309 (+17), opened Landlock rule fd matches parsed inode; baseline 25015 -> 25032. PRIOR: Story 17-6 T2 repair (+80 tokei; aarch64 ppoll and argument-conditioned prctl included), baseline 24920 -> 25015.
-    let budgets = real_kloc_toml();
-    let actual = budgets
-        .get("maos-kernel-core")
-        .and_then(toml::Value::as_integer)
-        .expect("maos-kernel-core ceiling is an integer");
-    assert!(
-        actual <= RATIFIED_AT_EASING,
-        "maos-kernel-core ceiling moved {RATIFIED_AT_EASING} -> {actual}. The RECOVERY-LANE \
-         CEILING RULE eased the per-crate BUDGETS only; the kernel pin and the per-line \
-         FLAG-Winston grant were explicitly NOT eased (Epic-15 retrospective, 2026-09-12). \
-         Raising this row needs its own operator decision, not the easing."
-    );
-}
-
 /// ADR-069 (operator-ratified 2026-10-23, routing-audit DECIDE-4): through
 /// `v1.0.0` GA the `maos-kernel-core` production-line ceiling may not exceed
-/// 23,000. Per-story FLAG-Winston grants still move the row (and the
-/// `RATIFIED_AT_EASING` figure above) one measured step at a time; this is the
-/// bound no grant may cross without a new operator decision.
+/// 23,000. The row is re-based at each epic retrospective (SCP 2026-11-12 §5.B7c
+/// option A, ruled 2026-11-13) and may carry a dated `RAISED` line between them;
+/// this is the bound no raise may cross without a new operator decision. The
+/// kernel's exact pin is `kernel-core-baseline.toml`, not this row.
 const ADR_069_ENVELOPE: i64 = 23_000;
 /// ADR-069 §3: the first grant above 22,000 acknowledges the alarm in the row.
 const ADR_069_ALARM: i64 = 22_000;
@@ -431,8 +315,9 @@ fn crossing_the_adr_069_alarm_is_acknowledged_in_the_row() {
     }
 }
 
-/// The lane is not sealed yet — and when it is, this test is the notice. Mirrors
-/// the D11 ratchet's tree-bound freeze so the seal cannot be missed.
+/// The lane is not sealed yet — and when it is, this test is the notice, so the
+/// seal cannot be missed (the tree-bound freeze formerly shared with the retired
+/// D11 xtask ratchet).
 #[test]
 fn the_lane_is_not_sealed_while_a_numbered_epic_is_open() {
     let statuses = real_statuses();

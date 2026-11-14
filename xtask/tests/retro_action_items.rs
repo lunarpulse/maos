@@ -24,7 +24,8 @@
 //! **Why this file and not `xtask/src`.** `xtask` sits at zero kloc headroom
 //! (43797/43797, D-15-4-A) and `xtask/tests/` is excluded from the measurement
 //! (`xtask/kloc.toml:195`), so this control costs no budget — the same placement
-//! and the same reasoning as `d11_xtask_ceiling_ratchet.rs`. The synthetic vectors
+//! and reasoning as the former `d11_xtask_ceiling_ratchet.rs` (retired 2026-11-13,
+//! SCP 2026-11-12 §5.B7c option A). The synthetic vectors
 //! exercise the decision procedure; the tree-bound tests at the bottom apply it to
 //! the REAL `sprint-status.yaml` and the REAL retro documents, because a policy
 //! that only ever sees fixtures is exactly the null control this replaces.
