@@ -722,7 +722,7 @@ fn the_real_check_perf_verdict_json_is_what_the_label_step_reads() {
         .unwrap();
     assert!(produced.status.success(), "{}", text(&produced));
     let report = String::from_utf8(produced.stdout).unwrap();
-    let notes = std::fs::read_to_string(root().join("docs/release/v1.0.0-rc.1.md")).unwrap();
+    let notes = std::fs::read_to_string(root().join("docs/release/v1.0.0-rc.2.md")).unwrap();
     let output = label_step(Some(&notes), Some(&report));
     assert!(output.status.success(), "{}", text(&output));
 }
