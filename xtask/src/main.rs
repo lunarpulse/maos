@@ -496,8 +496,9 @@ enum Commands {
     },
     /// Story 4.1 A2 — check release binary for forbidden test-double symbols.
     CheckMockNotInRelease {
-        #[arg(long, default_value = "target/release/maos")]
-        binary: String,
+        /// Defaults to `<target dir>/release/maos` (CARGO_TARGET_DIR, else `target`).
+        #[arg(long)]
+        binary: Option<String>,
         #[arg(long)]
         build_first: bool,
         #[arg(long)]
@@ -911,9 +912,9 @@ enum Commands {
     /// Story 9.4 R-AG1 — air-gap no-network-symbols CI gate + dirty-fixture bite.
     #[command(name = "check-air-gap")]
     CheckAirGap {
-        /// Path to the air-gap binary to scan.
-        #[arg(long, default_value = "target/debug/maos")]
-        binary: String,
+        /// Path to the air-gap binary to scan; defaults to `<target dir>/debug/maos`.
+        #[arg(long)]
+        binary: Option<String>,
         /// Path to the dirty-fixture binary (must be rejected by the gate).
         #[arg(long)]
         dirty_fixture: Option<String>,
@@ -1166,6 +1167,12 @@ enum Commands {
     },
 }
 
+/// `<target dir>/<profile>/maos`: the binary a gate scans when `--binary` is absent.
+fn default_binary(profile: &str) -> String {
+    let path = gate_common::target_dir().join(profile).join("maos");
+    path.to_string_lossy().into_owned()
+}
+
 fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
@@ -1364,7 +1371,11 @@ fn main() {
             binary,
             build_first,
             json,
-        } => check_mock_not_in_release::run(&binary, build_first, json),
+        } => check_mock_not_in_release::run(
+            &binary.unwrap_or_else(|| default_binary("release")),
+            build_first,
+            json,
+        ),
         Commands::CheckPubFieldConstructors { json } => check_pub_field_constructors::run(json),
         Commands::CheckCompositionRootCompleteness {
             api_rs,
@@ -1561,7 +1572,12 @@ fn main() {
             build_first,
             dirty_fixture,
             json,
-        } => check_air_gap::run(&binary, build_first, dirty_fixture.as_deref(), json),
+        } => check_air_gap::run(
+            &binary.unwrap_or_else(|| default_binary("debug")),
+            build_first,
+            dirty_fixture.as_deref(),
+            json,
+        ),
         Commands::GenAbiDocs { out_dir, check } => gen_abi_docs::run(Some(&out_dir), check),
         Commands::CheckShipGateCompleteness { json } => check_ship_gate_completeness::run(json),
         Commands::CheckPentestGate { json } => check_pentest_gate::run(json),

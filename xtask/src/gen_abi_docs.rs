@@ -14,7 +14,7 @@ use std::process::Command;
 /// Runbook for bumping the pin (only when rustdoc JSON actually drifts):
 ///   1. Install the new nightly: `rustup toolchain install nightly-YYYY-MM-DD --profile minimal`
 ///   2. Run: `cargo +nightly-YYYY-MM-DD rustdoc -p maos-spirit-abi -- -Z unstable-options --output-format json`
-///   3. Read `format_version` from `target/doc/maos_spirit_abi.json` and update `EXPECTED_FORMAT_VERSION`.
+///   3. Read `format_version` from `<target dir>/doc/maos_spirit_abi.json` and update `EXPECTED_FORMAT_VERSION`.
 ///   4. Regenerate: `cargo run -p xtask -- gen-abi-docs`
 ///   5. Commit the changed `NIGHTLY`, `EXPECTED_FORMAT_VERSION`, and regenerated `.md` files together.
 pub const NIGHTLY: &str = "nightly-2026-05-01";
@@ -1328,8 +1328,9 @@ fn generate_rustdoc_json() -> Result<PathBuf, String> {
         return Err(format!("cargo rustdoc exited with {status}"));
     }
 
-    // Default rustdoc JSON output path for a crate in a workspace.
-    let path = PathBuf::from("target/doc/maos_spirit_abi.json");
+    // Cargo writes it under its target directory, which the nightly cargo above
+    // inherits from CARGO_TARGET_DIR / CARGO_BUILD_TARGET_DIR.
+    let path = crate::gate_common::target_dir().join("doc/maos_spirit_abi.json");
     if !path.exists() {
         return Err(format!("expected rustdoc JSON at {}", path.display()));
     }

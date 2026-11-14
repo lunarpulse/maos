@@ -4,6 +4,9 @@ use ed25519_dalek::Signer as _;
 use maos_audit::erasure::{merkle, proof::*};
 use sha2::{Digest as _, Sha256};
 
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
+
 const SEED: [u8; 32] = [29; 32];
 
 fn fixture(seed: &[u8; 32]) -> ErasureProof {
@@ -335,6 +338,21 @@ if case == "duplicate_keys":
     encoded = encoded.replace('"spirit_id":','"spirit_id":"wrong","spirit_id":',1)
 sys.stdout.buffer.write(encoded.encode("utf-8"))
 "#;
+    // Story 20-12 AC3 local SKIP profile: the signer and `verify.py` both need
+    // `cryptography`'s Ed25519; a declared-CI host runs on and fails closed below.
+    let present = Command::new("python3")
+        .args([
+            "-c",
+            "import cryptography.hazmat.primitives.asymmetric.ed25519",
+        ])
+        .output()
+        .is_ok_and(|out| out.status.success());
+    if ci::skip_unless(
+        "Python Ed25519 backend for tools/verify-erasure/verify.py (pip install cryptography)",
+        present,
+    ) {
+        return;
+    }
     let base =
         serde_json::to_vec(&fixture(&SEED)).unwrap_or_else(|error| panic!("fixture JSON: {error}"));
     let verifier = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

@@ -6,6 +6,8 @@
 
 #[path = "../../../tests/harness/fixtures.rs"]
 mod fixtures;
+#[path = "../../../tests/harness/layout.rs"]
+mod layout;
 #[path = "../../../tests/harness/t3_substrate.rs"]
 mod t3_substrate;
 
@@ -54,13 +56,7 @@ impl Root {
         let workspace = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
         let runtime_home = self.dir.join("home");
         let home = t3_substrate::isolated_runtime_home(&runtime_home);
-        let mut paths = vec![
-            workspace.join("target/debug"),
-            workspace.join("target/debug/deps"),
-        ];
-        if let Some(path) = std::env::var_os("PATH") {
-            paths.extend(std::env::split_paths(&path));
-        }
+        let paths = layout::path_with_profile();
         let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
         command
             .env_clear()
@@ -71,7 +67,7 @@ impl Root {
             .env("HOME", home)
             .env("MAOS_HOME", self.dir.join("home"))
             .env("XDG_DATA_HOME", self.dir.join("home"))
-            .env("PATH", std::env::join_paths(paths).expect("valid PATH"))
+            .env("PATH", paths)
             .env("MAOS_OLLAMA_URL", "skip")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -667,13 +663,7 @@ fn fd_request_above_inherited_hard_limit_refuses_before_worker_payload() {
     verify_actual_runtime_fd_boundary(&root);
     let before = runtime_ids(&root);
     let workspace = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
-    let mut paths = vec![
-        workspace.join("target/debug"),
-        workspace.join("target/debug/deps"),
-    ];
-    if let Some(path) = std::env::var_os("PATH") {
-        paths.extend(std::env::split_paths(&path));
-    }
+    let paths = layout::path_with_profile();
     let mut command = Command::new("prlimit");
     command
         .arg("--nofile=64:64")
@@ -691,7 +681,7 @@ fn fd_request_above_inherited_hard_limit_refuses_before_worker_payload() {
         .env("MAOS_HOME", root.dir.join("home"))
         .env("XDG_DATA_HOME", root.dir.join("home"))
         .env("MAOS_OLLAMA_URL", "skip")
-        .env("PATH", std::env::join_paths(paths).expect("valid PATH"))
+        .env("PATH", paths)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     for key in [

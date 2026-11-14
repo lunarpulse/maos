@@ -7,9 +7,27 @@ use maos_kernel_core::iac::transparency_log::{FrameKind, TransparencyLogAdapter}
 use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::sync::Arc;
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
 #[cfg(feature = "network")]
 #[path = "../../../tests/harness/registry_trust_20_1b.rs"]
 mod registry_trust;
+
+/// Story 20-12 AC3 local SKIP profile. `tools/verify-erasure/verify.py` verifies
+/// with `cryptography`'s Ed25519 only; a declared-CI host fails closed instead.
+fn skip_python_verifier() -> bool {
+    let present = Command::new("python3")
+        .args([
+            "-c",
+            "import cryptography.hazmat.primitives.asymmetric.ed25519",
+        ])
+        .output()
+        .is_ok_and(|out| out.status.success());
+    ci::skip_unless(
+        "Python Ed25519 backend for tools/verify-erasure/verify.py (pip install cryptography)",
+        present,
+    )
+}
 
 struct Fixture {
     dir: tempfile::TempDir,
@@ -280,6 +298,7 @@ fn ac1_category_evidence_is_required_by_both_verifiers() {
         proof["categories"].as_array().expect("categories").len()
     );
     verify(&proof);
+    let python = !skip_python_verifier();
     let verifier =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tools/verify-erasure/verify.py");
     let path = f.dir.path().join("bundle.json");
@@ -289,13 +308,15 @@ fn ac1_category_evidence_is_required_by_both_verifiers() {
         serde_json::to_vec(&proof).unwrap_or_else(|e| panic!("encode {e}")),
     )
     .expect("bundle");
-    assert!(Command::new("python3")
-        .arg(&verifier)
-        .arg(&path)
-        .arg(&pubkey)
-        .status()
-        .expect("python verifier")
-        .success());
+    if python {
+        assert!(Command::new("python3")
+            .arg(&verifier)
+            .arg(&path)
+            .arg(&pubkey)
+            .status()
+            .expect("python verifier")
+            .success());
+    }
     proof["category_evidence"]
         .as_array_mut()
         .expect("evidence")
@@ -332,18 +353,20 @@ fn ac1_category_evidence_is_required_by_both_verifiers() {
         serde_json::to_vec(&proof).unwrap_or_else(|e| panic!("encode {e}")),
     )
     .expect("tampered bundle");
-    let rejected = Command::new("python3")
-        .arg(&verifier)
-        .arg(&path)
-        .arg(&pubkey)
-        .output()
-        .expect("python verifier");
-    assert!(!rejected.status.success());
-    assert!(
-        String::from_utf8_lossy(&rejected.stderr)
-            .contains("complete mandatory inventory is required"),
-        "{rejected:?}"
-    );
+    if python {
+        let rejected = Command::new("python3")
+            .arg(&verifier)
+            .arg(&path)
+            .arg(&pubkey)
+            .output()
+            .expect("python verifier");
+        assert!(!rejected.status.success());
+        assert!(
+            String::from_utf8_lossy(&rejected.stderr)
+                .contains("complete mandatory inventory is required"),
+            "{rejected:?}"
+        );
+    }
 }
 
 fn seed_principal(f: &Fixture) {
@@ -1022,7 +1045,9 @@ fn ac3_offline_orphaned_halt_gets_one_terminal_receipt_and_isolation_holds() {
         "another Spirit's halt"
     );
     verify(&proof);
-    assert!(python_accepts(&f, &proof));
+    if !skip_python_verifier() {
+        assert!(python_accepts(&f, &proof));
+    }
 }
 #[test]
 fn ac3_spirit_with_only_an_orphaned_halt_is_not_not_found() {
@@ -1052,7 +1077,9 @@ fn ac3_no_halts_is_verified_empty_from_the_query() {
         "VerifiedEmpty"
     );
     verify(&proof);
-    assert!(python_accepts(&f, &proof));
+    if !skip_python_verifier() {
+        assert!(python_accepts(&f, &proof));
+    }
 }
 
 fn halt_payload(halt: &str) -> maos_domain::frame::EpistemicHaltPayload {

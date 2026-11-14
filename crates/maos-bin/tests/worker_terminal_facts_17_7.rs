@@ -15,6 +15,8 @@ use maos_kernel_core::security::sandbox::t3::child::{
     SandboxedContainerChild, KILL_BUDGET, REMOVE_BUDGET, TEARDOWN_BUDGET,
 };
 
+#[path = "../../../tests/harness/layout.rs"]
+mod layout;
 #[path = "../../../tests/harness/t3_substrate.rs"]
 mod t3_substrate;
 
@@ -80,10 +82,7 @@ fn real_worker_run(mode: Option<&str>, oom: bool) -> TerminalRun {
     )
     .expect("write T3 worker manifest");
     let root = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
-    let mut paths = vec![root.join("target/debug"), root.join("target/debug/deps")];
-    if let Some(path) = std::env::var_os("PATH") {
-        paths.extend(std::env::split_paths(&path));
-    }
+    let paths = layout::path_with_profile();
     let output = Command::new("timeout")
         .arg("120s")
         .arg(env!("CARGO_BIN_EXE_maos"))
@@ -95,7 +94,7 @@ fn real_worker_run(mode: Option<&str>, oom: bool) -> TerminalRun {
         .env("MAOS_HOME", &home)
         .env("XDG_DATA_HOME", &home)
         .env("MAOS_TEST_BOOT_NONCE", 5895u64.to_string())
-        .env("PATH", std::env::join_paths(paths).expect("valid PATH"))
+        .env("PATH", paths)
         .envs(std::env::vars().filter(|(key, _)| {
             key.starts_with("MAOS_T3_")
                 || matches!(key.as_str(), "XDG_RUNTIME_DIR" | "DBUS_SESSION_BUS_ADDRESS")
@@ -218,13 +217,7 @@ fn kill_payload_worker() -> (TerminalRun, Duration) {
     )
     .expect("write hanging worker manifest");
     let root_dir = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
-    let mut paths = vec![
-        root_dir.join("target/debug"),
-        root_dir.join("target/debug/deps"),
-    ];
-    if let Some(path) = std::env::var_os("PATH") {
-        paths.extend(std::env::split_paths(&path));
-    }
+    let paths = layout::path_with_profile();
     let mut child = Command::new(env!("CARGO_BIN_EXE_maos"))
         .arg("run")
         .arg(&manifest)
@@ -235,7 +228,7 @@ fn kill_payload_worker() -> (TerminalRun, Duration) {
         .env("XDG_DATA_HOME", &home)
         .env("MAOS_OLLAMA_URL", "skip")
         .env("MAOS_TEST_BOOT_NONCE", "5895")
-        .env("PATH", std::env::join_paths(paths).expect("valid PATH"))
+        .env("PATH", paths)
         .envs(std::env::vars().filter(|(key, _)| key.starts_with("MAOS_T3_")))
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())

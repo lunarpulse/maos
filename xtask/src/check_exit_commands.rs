@@ -1578,11 +1578,13 @@ fn load_surfaces(root: &Path) -> (Surfaces, Vec<String>) {
         ("maos-spirit", "maos-spirit"),
         ("maos-wasm-runner", "maos-wasm-runner"),
     ] {
-        let path = root.join("target/debug").join(target);
+        let shown = crate::gate_common::target_dir().join(format!("debug/{target}"));
+        let path = root.join(&shown);
         if !path.exists() {
             notes.push(format!(
-                "{binary}: not built at target/debug/{target} — treated as absent, so its tokens \
-                 must be owed by a named open story"
+                "{binary}: not built at {} — treated as absent, so its tokens \
+                 must be owed by a named open story",
+                shown.display()
             ));
             continue;
         }

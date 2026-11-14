@@ -17,12 +17,7 @@ const MANIFEST: &str = "[cli_wrapper]\ncommand = \"worker-cli-fixture\"\n\
 fn maos(home: &Path, args: &[&str]) -> Command {
     let user_home = home.parent().expect("scratch user HOME contains MAOS_HOME");
     let root = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
-    let mut paths = vec![root.join("target/debug"), root.join("target/debug/deps")];
-    paths.extend(
-        std::env::var_os("PATH")
-            .iter()
-            .flat_map(std::env::split_paths),
-    );
+    let paths = super::layout::path_with_profile();
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
     command
         .args(args)
@@ -34,7 +29,7 @@ fn maos(home: &Path, args: &[&str]) -> Command {
         .env("MAOS_HOME", home)
         .env("XDG_DATA_HOME", home)
         .env("MAOS_OLLAMA_URL", "skip")
-        .env("PATH", std::env::join_paths(paths).expect("PATH"))
+        .env("PATH", paths)
         .envs(std::env::vars().filter(|(key, _)| {
             key.starts_with("MAOS_T3_")
                 || matches!(key.as_str(), "XDG_RUNTIME_DIR" | "DBUS_SESSION_BUS_ADDRESS")

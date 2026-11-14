@@ -481,7 +481,7 @@ fn preflight(skip_build: bool) -> Result<Bins, String> {
             ));
         }
     }
-    let dir = PathBuf::from("target/debug");
+    let dir = crate::gate_common::target_dir().join("debug");
     let maos = dir.join("maos");
     let fixture = dir.join("worker-cli-fixture");
     let maosctl = dir.join("maosctl");
@@ -515,9 +515,12 @@ fn preflight(skip_build: bool) -> Result<Bins, String> {
     // lookup must not depend on the cwd the daemon child happens to inherit.
     let dir = dir
         .canonicalize()
-        .map_err(|e| format!("demo-j1: cannot resolve target/debug: {e}"))?;
+        .map_err(|e| format!("demo-j1: cannot resolve {}: {e}", dir.display()))?;
     let maos = dir.join("maos");
-    println!("  binaries         maos + worker-cli-fixture present as siblings in target/debug");
+    println!(
+        "  binaries         maos + worker-cli-fixture present as siblings in {}",
+        dir.display()
+    );
     Ok(Bins { maos, dir })
 }
 

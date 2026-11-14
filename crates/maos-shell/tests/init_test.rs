@@ -2,25 +2,20 @@
 
 use std::process::Command;
 
+#[path = "../../../tests/harness/layout.rs"]
+mod layout;
+
 fn workspace_root() -> String {
     std::env::var("CARGO_MANIFEST_DIR")
         .map(|d| format!("{d}/../.."))
         .unwrap_or_else(|_| ".".into())
 }
 
+/// `maos` is a sibling package's `[[bin]]`, so Cargo injects no path for it:
+/// the profile directory the test was built into (layout-agnostic, honours
+/// `CARGO_TARGET_DIR`).
 fn maos_bin() -> std::path::PathBuf {
-    let dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR set");
-    let workspace = std::path::Path::new(&dir)
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap();
-    let profile = if cfg!(debug_assertions) {
-        "debug"
-    } else {
-        "release"
-    };
-    let path = workspace.join("target").join(profile).join("maos");
+    let path = layout::profile_dir().join("maos");
     assert!(
         path.exists(),
         "maos binary not found at {path:?}; run `cargo build -p maos-bin` first"

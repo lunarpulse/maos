@@ -39,6 +39,27 @@ pub const STORY_DIR: &str = "_bmad-output/implementation-artifacts";
 /// The project's own authoritative story list, which lives inside [`STORY_DIR`].
 pub const SPRINT_STATUS_FILE: &str = "sprint-status.yaml";
 
+/// Cargo's target directory for a given `CARGO_TARGET_DIR` / `CARGO_BUILD_TARGET_DIR`
+/// (in that precedence; empty counts as unset), else `target`. A relative value
+/// stays relative, as Cargo reads it: against the cwd every gate already runs in.
+pub fn target_dir_from(
+    explicit: Option<std::ffi::OsString>,
+    build: Option<std::ffi::OsString>,
+) -> std::path::PathBuf {
+    let set = |value: Option<std::ffi::OsString>| value.filter(|v| !v.is_empty());
+    set(explicit)
+        .or_else(|| set(build))
+        .map_or_else(|| "target".into(), Into::into)
+}
+
+/// [`target_dir_from`] over the process environment.
+pub fn target_dir() -> std::path::PathBuf {
+    target_dir_from(
+        std::env::var_os("CARGO_TARGET_DIR"),
+        std::env::var_os("CARGO_BUILD_TARGET_DIR"),
+    )
+}
+
 /// The set of story keys this project declares, derived from `sprint-status.yaml`'s
 /// `development_status` block.
 ///

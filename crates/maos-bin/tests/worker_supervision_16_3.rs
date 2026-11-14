@@ -26,6 +26,8 @@
 
 #[path = "../../../tests/harness/fixtures.rs"]
 mod fixtures;
+#[path = "../../../tests/harness/layout.rs"]
+mod layout;
 #[path = "support/t0_worker.rs"]
 mod t0_worker;
 #[path = "../../../tests/harness/t3_substrate.rs"]
@@ -1531,10 +1533,7 @@ impl RootRun {
     fn command(&self, manifest: &Path) -> std::process::Command {
         let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_maos"));
         let root = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
-        let mut paths = vec![root.join("target/debug"), root.join("target/debug/deps")];
-        if let Some(existing) = std::env::var_os("PATH") {
-            paths.extend(std::env::split_paths(&existing));
-        }
+        let paths = layout::path_with_profile();
         command
             .env_clear()
             .current_dir(&root)
@@ -1551,7 +1550,7 @@ impl RootRun {
             .env("MAOS_HOME", self.dir.join("home"))
             .env("XDG_DATA_HOME", self.dir.join("home"))
             .env("MAOS_OLLAMA_URL", "skip")
-            .env("PATH", std::env::join_paths(paths).expect("valid PATH"))
+            .env("PATH", paths)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
         for key in [
