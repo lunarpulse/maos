@@ -2,10 +2,14 @@ name: release
 on:
   push:
     tags: ['v*']
-  # Pre-tag build rehearsals. `sign-and-publish` is guarded on
-  # `github.event_name == 'push'`, so NEITHER of these can publish.
+  # Pre-tag rehearsals. NONE of these can publish: `Create GitHub Release` carries its own
+  # `github.event_name == 'push'` guard that no input can change, and `sign-and-publish`
+  # itself runs only for a tag push or a `dry_run` dispatch.
   #
-  #  * workflow_dispatch — rehearse at `main` after a merge.
+  #  * workflow_dispatch — rehearse at `main` after a merge, or at any branch ref:
+  #    `gh workflow run release.yml --ref <branch> -f dry_run=true`. Since the rc.1 failure
+  #    (run 43544486838) it also runs `sign-and-publish` end to end up to, and excluding,
+  #    publication. `dry_run=false` is refused by `refuse-dispatch-publish`.
   #  * pull_request      — rehearse BEFORE a merge, label-gated (see `build.if`).
   #    Added 2026-09-12 (Epic-15 retrospective, operator-ratified) so that
   #    `aarch64-apple-darwin`'s first compile in this project's history happens
@@ -15,6 +19,11 @@ on:
   #    rehearsal is supposed to de-risk. A `pull_request` run uses the workflow
   #    file from the merge commit, so this trigger works on the PR that adds it.
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Rehearse sign-and-publish without publishing. Must stay true: a dispatch can never publish (push a v* tag to publish).'
+        type: boolean
+        default: true
   pull_request:
     branches: [main]
 
@@ -100,9 +109,25 @@ jobs:
           name: maos-spirit-${{ matrix.suffix }}
           path: dist/maos-spirit-${{ matrix.suffix }}
 
+  refuse-dispatch-publish:
+    # `dry_run` exists to be explicit, not to be switchable: a dispatch can never publish.
+    # `dry_run=false` fails here, loudly, instead of silently skipping `sign-and-publish`.
+    if: github.event_name == 'workflow_dispatch' && inputs.dry_run != true
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          echo "release refused: workflow_dispatch can never publish; dry_run must stay true (push a v* tag to publish)"
+          exit 1
+
   sign-and-publish:
+    # Runs for a tag push (publishes) and for a `dry_run` workflow_dispatch (REHEARSAL: every
+    # step below runs against the dispatched commit, publication excluded).
+    # ADVISORY — owner: release operator; reason: the `continue-on-error` expressions below are false on a tag push (guards stay fatal) and true only on a dispatch rehearsal, where `Rehearsal verdict` re-fails the job on any guard that did not succeed.
     needs: build
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == true)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: release
@@ -114,6 +139,8 @@ jobs:
         with:
           fetch-depth: 0
       - name: Require the tagged commit to be on main
+        id: ancestry
+        continue-on-error: ${{ github.event_name != 'push' }}
         run: |
           set -euo pipefail
           # Review GLM F3: every gate below is compiled from the tagged tree, so a tag on an
@@ -126,10 +153,21 @@ jobs:
         id: tag
         env:
           TAG: ${{ github.ref_name }}
+          REHEARSAL: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           set -euo pipefail
           # Review GLM F2: the ONE decision point. Every control below reads `kind`; any tag
           # that is not exactly an rc, a GA or the explicit v0.x alpha line is refused.
+          # Rehearsal (workflow_dispatch): the ref is a branch, not a tag. Classify the tag THIS
+          # TREE would be released as, "v" + [workspace.package].version (the equality
+          # `check-rc-readiness --tag` enforces), through the same grammar below: an
+          # unclassifiable version is refused exactly as a real tag would be. A push never
+          # takes this branch.
+          if [[ "${REHEARSAL:-}" == true ]]; then
+            version="$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')"
+            TAG="v$version"
+            echo "REHEARSAL: the ref is not a tag; classifying the tag this tree would carry: $TAG"
+          fi
           if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then kind=rc
           elif [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then kind=ga
           elif [[ "$TAG" =~ ^v0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]; then kind=alpha
@@ -137,16 +175,21 @@ jobs:
             echo "release refused: tag '$TAG' is not vX.Y.Z, vX.Y.Z-rc.N or the v0.x.y-alpha.N line"; exit 1
           fi
           echo "kind=$kind" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
       - name: Require rc tree readiness (rc tags only)
+        id: readiness
         if: steps.tag.outputs.kind == 'rc'
+        continue-on-error: ${{ github.event_name != 'push' }}
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: cargo run --locked -p xtask -- check-rc-readiness --tag "$TAG"
       - name: Require successful main discipline aggregate
+        id: aggregate
+        continue-on-error: ${{ github.event_name != 'push' }}
         env:
           GH_TOKEN: ${{ github.token }}
           KIND: ${{ steps.tag.outputs.kind }}
@@ -206,9 +249,11 @@ jobs:
           gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=aggregate&filter=latest" |
             cargo run --locked -p xtask -- check-release-precondition "${fuzz_args[@]}" "${perf_args[@]}"
       - name: Require the rc notes perf label to agree with the perf verdicts (rc tags only)
+        id: perf_label
         if: steps.tag.outputs.kind == 'rc'
+        continue-on-error: ${{ github.event_name != 'push' }}
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
           # Review F2: `check-rc-readiness` requires the notes line `Perf verdicts: ABSENT` but
@@ -285,10 +330,23 @@ jobs:
       - name: Build deb and RPM for both Linux architectures without rewriting binaries
         run: |
           set -euo pipefail
+          # rc.1 (run 43544486838) failed here: both iterations pulled the ONE multi-arch index
+          # digest (ubuntu:24.04@sha256:fe81560990fa...ef852), and Docker 28.0.4's reference store
+          # maps a digest reference to exactly one image ID, so the second platform died with
+          # `docker: cannot overwrite digest sha256:fe81...` (exit 125). Each platform now pins its
+          # OWN child manifest digest, both taken from that same index entry (linux/amd64 and
+          # linux/arm64; attestation entries ignored). Evidence and the re-derivation command:
+          # _bmad-output/implementation-artifacts/release-docker-digest-fix-evidence/README.md
+          # The in-container architecture check refuses a digest filed under the wrong platform.
           # The runner must own the source directory for later atomic renames.
           mkdir -p dist/packages
           for arch in amd64 arm64; do
-            docker run --rm --platform "linux/$arch" -v "$PWD:$PWD" -w "$PWD" ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852 bash -euc '
+            case "$arch" in
+              amd64) image="ubuntu:24.04@sha256:78d4744ead1f5b19b04d0df558ab182a5300903900755e515b2ca4d10eb2044d" ;;
+              arm64) image="ubuntu:24.04@sha256:19cad59657037cffa0ac9a48107019b768900ff1071140965827513ac866bd5e" ;;
+            esac
+            docker run --rm --platform "linux/$arch" -e EXPECTED_ARCH="$arch" -v "$PWD:$PWD" -w "$PWD" "$image" bash -euc '
+              test "$(dpkg --print-architecture)" = "$EXPECTED_ARCH"
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential debhelper python3-cryptography rpm
               packaging/build-packages.sh dist deb dist/packages
@@ -304,9 +362,11 @@ jobs:
           cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS-packages --output dist/SHA256SUMS-packages.sig
           cargo run --locked -p xtask -- release-verify --verify --sha256sums dist/SHA256SUMS-packages --sig dist/SHA256SUMS-packages.sig --artifacts-dir dist
       - name: Require the release notes file (rc tags only)
+        id: notes
         if: steps.tag.outputs.kind == 'rc'
+        continue-on-error: ${{ github.event_name != 'push' }}
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
           # softprops/action-gh-release silently falls back to generated notes when
@@ -314,7 +374,34 @@ jobs:
           if [[ ! -s "docs/release/${TAG}.md" ]]; then
             echo "release refused: docs/release/${TAG}.md is missing or empty (an rc tag needs its notes)"; exit 1
           fi
+      - name: Rehearsal - every publish file pattern resolves (dispatch only)
+        if: github.event_name != 'push'
+        run: |
+          set -euo pipefail
+          # `Create GitHub Release` (push only) uses `fail_on_unmatched_files: true`. Resolve the
+          # very same list here, read from this workflow file, so a missing artifact is found in a
+          # rehearsal and not by the first real publication.
+          python3 - <<'PY'
+          import glob
+          import re
+          import sys
+
+          text = open(".github/workflows/release.yml", encoding="utf-8").read()
+          block = re.search(r"^ +files: \|\n((?: +dist/\S+\n)+)", text, re.M)
+          if block is None:
+              print("rehearsal red: the Create GitHub Release file list was not found")
+              sys.exit(1)
+          patterns = [line.strip() for line in block.group(1).splitlines()]
+          missing = [pattern for pattern in patterns if not glob.glob(pattern)]
+          if missing:
+              print("rehearsal red: publish file patterns that match nothing: " + ", ".join(missing))
+              sys.exit(1)
+          print("all " + str(len(patterns)) + " publish file patterns resolve")
+          PY
       - name: Create GitHub Release
+        # The ONLY publishing step. Gated on the event itself, never on an input: a
+        # workflow_dispatch cannot reach it whatever `dry_run` says.
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: |
@@ -350,3 +437,38 @@ jobs:
           # SemVer: a hyphenated tag (v0.1.0-alpha.1) is a pre-release and must never
           # be served as `latest`. Derived from the tag so GA needs no edit here.
           prerelease: ${{ contains(github.ref_name, '-') }}
+      - name: Rehearsal verdict (dispatch only; nothing was published)
+        if: always() && github.event_name != 'push'
+        env:
+          REHEARSAL_TAG: ${{ steps.tag.outputs.tag }}
+          ANCESTRY: ${{ steps.ancestry.outcome }}
+          CLASSIFY: ${{ steps.tag.outcome }}
+          READINESS: ${{ steps.readiness.outcome }}
+          AGGREGATE: ${{ steps.aggregate.outcome }}
+          PERF_LABEL: ${{ steps.perf_label.outcome }}
+          NOTES: ${{ steps.notes.outcome }}
+        run: |
+          set -euo pipefail
+          # The guards above are `continue-on-error` on a dispatch so one rehearsal also exercises
+          # the package, sign and file-list steps. Their REAL outcome is judged here: any guard
+          # that failed or never reported fails the job, because a tag push at this SHA would have
+          # been refused. `skipped` is a pass only for the rc-only guards on a non-rc tree; a guard
+          # skipped because an earlier fatal step failed is covered by that step failing the job.
+          red=0
+          {
+            echo "## Release rehearsal: NO GitHub Release was created"
+            echo "Rehearsed tag \`${REHEARSAL_TAG:-unresolved}\` at \`$GITHUB_SHA\`"
+            echo
+            echo "| guard | outcome |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for guard in "main ancestry=$ANCESTRY" "tag classification=$CLASSIFY" "rc tree readiness=$READINESS" "discipline aggregate and ledgers=$AGGREGATE" "rc notes perf label=$PERF_LABEL" "rc notes file=$NOTES"; do
+            name="${guard%%=*}"
+            outcome="${guard#*=}"
+            echo "| $name | ${outcome:-not run} |" >> "$GITHUB_STEP_SUMMARY"
+            case "$outcome" in
+              success|skipped) ;;
+              *) echo "::error::rehearsal guard '$name' = '${outcome:-not run}': a tag push at $GITHUB_SHA would be refused"; red=1 ;;
+            esac
+          done
+          exit "$red"

@@ -50,6 +50,24 @@ tag=v1.0.0-rc.1   # example; must equal "v" + [workspace.package].version in Car
 > tag signature is created or verified, artifact signing runs in CI, and `release`
 > environment protection stays **UNCLAIMED**. Force push, moving, deleting or re-cutting the
 > tag, other tags and history rewrite remain per-event asks.
+>
+> **Dated note 2026-11-14 (rc.1 tag run; the notes above are kept as written):** the `v1.0.0-rc.1`
+> tag push (at `1a57035e`) ran `release.yml` run 43544486838. Its `sign-and-publish` job failed
+> in the step "Build deb and RPM for both Linux architectures without rewriting binaries" with
+> `docker: cannot overwrite digest sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852`
+> (exit 125); a re-run failed identically. Cause: the step's loop ran `docker run --platform
+> linux/$arch` for `amd64` then `arm64` against the same pinned multi-arch **index** digest, and
+> Docker 28.0.4's reference store (the runner reported `Storage Driver: overlay2`) maps one digest
+> reference to exactly one image ID, so the second platform's pull collided with the first.
+> Nothing was published (no GitHub Release exists for the tag). Fix: each platform now pins
+> its own **child manifest** digest taken from that same index (still digest-pinned; evidence in
+> `_bmad-output/implementation-artifacts/release-docker-digest-fix-evidence/`), and the job gained
+> a non-publishing rehearsal (step 6b), because this step and everything after it in the job had
+> never run hosted: the old dispatch rehearsal skipped the whole job. The fix is **UNVERIFIED hosted**
+> until the operator dispatches the rehearsal. rc.2 plan: `v1.0.0-rc.1` stays as an unpublished tag
+> and is never moved or deleted; after the fix reaches `main`, a new candidate (workspace version
+> `1.0.0-rc.2`, `docs/release/v1.0.0-rc.2.md`, a T3 fuzz chain for the new SHA) runs this checklist
+> again and is tagged `v1.0.0-rc.2` only after the step-6b rehearsal is green at that SHA.
 
 ## Pre-tag checklist
 
@@ -178,9 +196,9 @@ Run these checks against the exact commit that will be tagged:
    `release-rehearsal`. `release.yml` triggers on `pull_request` into `main` and
    its `build` job runs only when that label is present
    (`github.event_name != 'pull_request' || contains(…, 'release-rehearsal')`);
-   `sign-and-publish` is guarded on `github.event_name == 'push'`, so a
-   rehearsal can never publish. This is the path that de-risks the merge itself:
-   a red macOS leg is found on the PR, not on `main`.
+   `sign-and-publish` never runs for a `pull_request` (it needs a tag push or a `dry_run`
+   dispatch), so a pull-request rehearsal can never publish. This is the path that de-risks the merge itself:
+   a red macOS leg is found on the PR, not on `main`. It does **not** exercise the package/sign path; step 6b does.
 
    ```bash
    gh pr edit "$pr_number" --add-label release-rehearsal
@@ -189,10 +207,24 @@ Run these checks against the exact commit that will be tagged:
      --jq "[.[] | select(.headSha == \"${pr_head_sha}\")][0].databaseId")" --exit-status
    ```
 
-   **6b — after the merge (fallback).** Manually dispatch `release.yml` at `main`
-   and require its
-   `build (aarch64-apple-darwin, darwin-arm64, macos-latest)` leg to pass.
-   Use this when the candidate is already on `main` — note that
+   **6b — after the merge (fallback), and the only rehearsal of the package/sign path.**
+   Manually dispatch `release.yml` at `main` (or at any branch ref) and require its
+   `build (aarch64-apple-darwin, darwin-arm64, macos-latest)` leg **and** its
+   `sign-and-publish` job to pass. Since the rc.1 failure (note above) the dispatch runs
+   `sign-and-publish` end to end — main-ancestry, tag classification, rc readiness, the
+   aggregate/fuzz/perf ledgers, signing, the production-key refusals, rendering, the amd64/arm64
+   `deb`/`rpm` container builds, package signing, the rc notes guards and a check that every
+   file the release would upload exists — up to, and excluding, `Create GitHub Release`, which is
+   gated on `github.event_name == 'push'` and can never run for a dispatch. Rehearsal semantics:
+   the ref is a branch, so the job classifies the tag the tree *would* carry (`v` + the workspace
+   version) through the same grammar; the guards run against the dispatched commit but do not stop
+   the job (so one run also exercises the packaging), and the final `Rehearsal verdict` step fails
+   the run if any of them did not succeed, listing each outcome in the run summary. A rehearsal on
+   a branch commit is therefore expected to be red on the ancestry and ledger guards; at the
+   candidate `origin/main` tip, with the T3 chain present, it must be fully green.
+   `dry_run` defaults to `true`; `dry_run=false` fails the run by design (a dispatch cannot publish).
+   The step needs the `release` environment to accept the dispatched ref and the `MAOS_RELEASE_PUBKEY`
+   / `RELEASE_SIGNING_KEY` secrets (as `sign-and-publish` already does).
    `workflow_dispatch` is unavailable until the workflow itself has reached the
    default branch, which is why 6a exists.
    The dispatch is asynchronous, so select the run by commit, not by
@@ -204,7 +236,7 @@ Run these checks against the exact commit that will be tagged:
    to 60 seconds while the asynchronous dispatch registers:
 
    ```bash
-   gh workflow run release.yml --ref main
+   gh workflow run release.yml --ref main -f dry_run=true
    run_id=""
    for _ in 1 2 3 4 5 6; do
      sleep 10
@@ -216,6 +248,10 @@ Run these checks against the exact commit that will be tagged:
    test -n "$run_id" # fails the checklist unless this run is $candidate_sha's
    gh run watch "$run_id" --exit-status
    ```
+
+   To rehearse a fix on a branch before merging it, dispatch that ref the same way
+   (`gh workflow run release.yml --ref <branch> -f dry_run=true`) and select the run with
+   `--branch <branch>` and that branch's head SHA.
 
 7. Re-read `candidate_sha` after the dispatch. If `main` moved, restart this
    checklist for the new tip.

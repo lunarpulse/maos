@@ -1,0 +1,14 @@
+HTTP/2 200 
+date: Sat, 14 Nov 2026 04:35:39 GMT
+content-type: application/vnd.oci.image.index.v1+json
+content-length: 6688
+docker-content-digest: sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
+docker-distribution-api-version: registry/2.0
+etag: "sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852"
+docker-ratelimit-source: 101.179.185.138
+x-ratelimit-limit: 100;w=3600
+ratelimit-limit: 100;w=3600
+x-ratelimit-remaining: 99;w=3600
+ratelimit-remaining: 99;w=3600
+strict-transport-security: max-age=31536000
+

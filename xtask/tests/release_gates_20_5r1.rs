@@ -110,7 +110,7 @@ fn the_tag_grammar_has_one_fail_closed_decision_point() {
         ("v1.0.0", "kind=ga"),
         ("v0.1.0-alpha.1", "kind=alpha"),
     ] {
-        assert_eq!(classify(tag), (true, kind.to_string()), "{tag}");
+        assert_eq!(classify(tag), (true, format!("{kind}\ntag={tag}")), "{tag}");
     }
     for tag in [
         "v1.0.0-RC.1",
@@ -134,6 +134,44 @@ fn the_tag_grammar_has_one_fail_closed_decision_point() {
             (false, String::new()),
             "{tag} must be refused with no kind"
         );
+    }
+}
+
+/// rc.1 rehearsal (dispatch): the ref is a branch, so the tag is derived from the checked-out
+/// `[workspace.package].version` and judged by the SAME grammar; a push never derives anything.
+#[test]
+fn a_dispatch_rehearsal_classifies_the_tag_the_tree_would_carry() {
+    let release = release();
+    let steps = steps(&release, "sign-and-publish");
+    let script = script(&steps, "Classify the tag (fail closed)");
+    for (version, rehearsal, accepted) in [
+        ("1.0.0-rc.2", "true", Some("kind=rc\ntag=v1.0.0-rc.2")),
+        ("1.0.0", "true", Some("kind=ga\ntag=v1.0.0")),
+        ("1.0.0-beta.1", "true", None),
+        ("1.0.0-rc.2", "false", None),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let manifest = format!("[workspace.package]\nversion = \"{version}\"\n");
+        std::fs::write(dir.path().join("Cargo.toml"), manifest).unwrap();
+        let out_file = dir.path().join("github-output");
+        std::fs::write(&out_file, "").unwrap();
+        let env = [
+            ("TAG", "a-branch-name"),
+            ("REHEARSAL", rehearsal),
+            ("GITHUB_OUTPUT", out_file.to_str().unwrap()),
+        ];
+        let output = bash(&script, dir.path(), None, &env);
+        let written = std::fs::read_to_string(&out_file).unwrap();
+        match accepted {
+            Some(expected) => {
+                assert!(output.status.success(), "{version}: {}", text(&output));
+                assert_eq!(written.trim(), expected, "{version}");
+            }
+            None => {
+                assert!(!output.status.success(), "{version}: {}", text(&output));
+                assert!(written.is_empty(), "{version}: no kind on a refusal");
+            }
+        }
     }
 }
 
@@ -180,7 +218,10 @@ fn the_release_body_is_the_committed_notes_file_with_generated_notes_appended() 
     // refused earlier by a step that is run here as the script it is.
     let guard = &steps[index_of(&steps, "Require the release notes file (rc tags only)")];
     assert_eq!(guard["if"].as_str(), Some("steps.tag.outputs.kind == 'rc'"));
-    assert_eq!(guard["env"]["TAG"].as_str(), Some("${{ github.ref_name }}"));
+    assert_eq!(
+        guard["env"]["TAG"].as_str(),
+        Some("${{ steps.tag.outputs.tag }}")
+    );
     assert!(
         index_of(&steps, "Require the release notes file (rc tags only)")
             < index_of(&steps, "Create GitHub Release")
@@ -442,7 +483,7 @@ fn the_label_step_is_an_rc_only_step_after_the_verdicts_are_computed_and_before_
     );
     assert_eq!(
         steps[at]["env"]["TAG"].as_str(),
-        Some("${{ github.ref_name }}")
+        Some("${{ steps.tag.outputs.tag }}")
     );
     assert!(index_of(&steps, "Require successful main discipline aggregate") < at);
     assert!(at < index_of(&steps, "Generate SHA256SUMS and sign"));
