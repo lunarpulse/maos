@@ -875,6 +875,9 @@ jobs:
     # arms of main.rs, so row persistence is tested via the one-shot path
     # (which generates cap-audit rows deterministicly), and the server
     # path is structurally validated for drain-block reachability.
+    # Hermetic since CI release-ready program W1b: the one-shot runs under
+    # `MAOS_INFERENCE_MODE=replay` against the committed seed cassette, so the
+    # leg needs no provider key and the script has no skip branch.
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -995,20 +998,12 @@ jobs:
       - name: Run local_runner smoke tests (maos-spirit-sdk, gated feature)
         run: cargo test -p maos-spirit-sdk --features local_runner --locked
 
-  researcher-bench:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run §13.1 J-Researcher Criterion benchmark (AC7)
-        run: cargo bench -p maos-bench --bench section_13_1 -- --test
-
+  # Story 8.4 AC7 / Story 8.5 AC3+AC6 — the ONE job that runs the §13.1 `section_13_1`
+  # Criterion bench, which covers J0, J1 (founder loop), J4 (Mira-Nash) and J6 (Diego)
+  # plus J-Researcher as correctness smokes. The former `mira-nash-bench` and
+  # `researcher-bench` jobs ran the identical command and were removed in the CI
+  # release-ready program W1b (2026-11-15).
+  # Timing regression enforcement belongs to 20-7 / ADR-068.
   founder-loop-bench:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -1021,24 +1016,6 @@ jobs:
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run §13.1 J1 founder-loop CliWrapper IPC benchmark (Story 8.4, AC7)
-        # correctness smoke (`--test`, one iteration);
-        # no timing baseline exists — 20-7 owns regression.
-        run: cargo bench -p maos-bench --bench section_13_1 -- --test
-
-  # Story 8.5 AC3/AC6 — J4 (Mira-Nash) + J6 (Diego) correctness smoke.
-  # Timing regression enforcement belongs to 20-7 / ADR-068.
-  mira-nash-bench:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run §13.1 J4 + J6 Criterion benchmarks (Story 8.5, AC3/AC6)
         # correctness smoke (`--test`, one iteration);
         # no timing baseline exists — 20-7 owns regression.
         run: cargo bench -p maos-bench --bench section_13_1 -- --test
@@ -6293,9 +6270,7 @@ jobs:
       - maosctl-smoke
       - hello-spirit-bench
       - example-spirit-tests
-      - researcher-bench
       - founder-loop-bench
-      - mira-nash-bench
       - example-spirit-drift
       - example-spirit-ts-tests
       - coverage-matrix-nfr-test-3

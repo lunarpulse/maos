@@ -574,27 +574,36 @@ fn j4_budget_and_smoke_jobs_make_no_stable_runner_claim() {
         .iter()
         .all(|s| s["continue-on-error"].is_null()));
     let source = fs::read_to_string(root().join(".github/workflows/discipline.yml")).unwrap();
-    for name in ["founder-loop-bench", "mira-nash-bench"] {
-        let section = source
-            .split(&format!("  {name}:\n"))
-            .nth(1)
+    // Both former bench jobs ran the same `section_13_1` command; only this one remains.
+    let name = "founder-loop-bench";
+    let section = source
+        .split(&format!("  {name}:\n"))
+        .nth(1)
+        .unwrap()
+        .split("\n  #")
+        .next()
+        .unwrap();
+    assert!(section.contains("correctness smoke (`--test`, one iteration);"));
+    assert!(section.contains("no timing baseline exists — 20-7 owns regression"));
+    assert!(script(
+        &wf,
+        name,
+        wf["jobs"][name]["steps"]
+            .as_sequence()
             .unwrap()
-            .split("\n  #")
-            .next()
-            .unwrap();
-        assert!(section.contains("correctness smoke (`--test`, one iteration);"));
-        assert!(section.contains("no timing baseline exists — 20-7 owns regression"));
-        assert!(script(
-            &wf,
-            name,
-            wf["jobs"][name]["steps"]
-                .as_sequence()
-                .unwrap()
-                .last()
-                .unwrap()["name"]
-                .as_str()
-                .unwrap()
-        )
-        .contains("-- --test"));
-    }
+            .last()
+            .unwrap()["name"]
+            .as_str()
+            .unwrap()
+    )
+    .contains("-- --test"));
+    // `section_13_1` (J0/J1/J4/J6/J-Researcher) runs once, in `founder-loop-bench`, which
+    // still blocks `aggregate`. The identical `mira-nash-bench` job was removed (CI
+    // release-ready program W1b, 2026-11-15).
+    assert!(wf["jobs"]["mira-nash-bench"].is_null());
+    assert!(wf["jobs"]["aggregate"]["needs"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .any(|need| need.as_str() == Some("founder-loop-bench")));
 }

@@ -12,16 +12,25 @@
 # rows persisted before shutdown survive the drain.
 #
 # Wired into CI as `.github/workflows/discipline.yml::server-exit-drain`.
+#
+# Hermetic (CI release-ready program W1b, 2026-11-15): leg (A) runs the one-shot
+# under `MAOS_INFERENCE_MODE=replay` against the committed seed cassette (the
+# `onb_nfr2_timing.sh` precedent), so it needs no provider key and cannot be
+# skipped. A non-zero one-shot exit is ALWAYS a failure; there is no
+# "SKIPPED (no API key)" branch. Leg (B) already needs no key.
 
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+# The one-shot reads `spirits/hello-spirit/manifest.toml` and the cassette by
+# repo-relative path.
+cd "$REPO_ROOT"
 
 echo "::group::Build maos-bin (release, locked)"
 cargo build -p maos-bin --release --locked --quiet
 echo "::endgroup::"
 
-MAOS_BIN="${REPO_ROOT}/target/release/maos"
+MAOS_BIN="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/release/maos"
 
 # ── (A) One-shot drain: generate cap-audit rows, verify persistence ──
 echo "::group::(A) One-shot drain: hello-spirit -> verify cap-audit rows persist"
@@ -35,39 +44,33 @@ DB_A="${HOME_A}/audit/transparency.sqlite"
 cleanup_a() { rm -rf "$HOME_A"; }
 trap cleanup_a EXIT
 
+DRAIN_CASSETTE="crates/maos-journey-test/cassettes/j0/shell-intro.json"
+
 set +e
-MAOS_HOME="$HOME_A" MAOS_ONE_SHOT="hello-spirit" "$MAOS_BIN" </dev/null >/dev/null 2>/dev/null
+MAOS_HOME="$HOME_A" MAOS_ONE_SHOT="hello-spirit" MAOS_INFERENCE_MODE=replay \
+    MAOS_REPLAY_CASSETTE="$DRAIN_CASSETTE" NO_COLOR=1 \
+    "$MAOS_BIN" </dev/null >/dev/null 2>/dev/null
 ONE_SHOT_RC=$?
 set -e
 
-if [ "$ONE_SHOT_RC" -eq 0 ]; then
-    ROW_COUNT_A="$(sqlite3 "$DB_A" "SELECT COUNT(*) FROM transparency_log WHERE kind = 7;")"
-    if [ "$ROW_COUNT_A" -lt 1 ]; then
-        echo "FAIL: one-shot drain — expected >=1 CapabilityInvocation row, got ${ROW_COUNT_A}" >&2
-        exit 1
-    fi
-
-    INFERENCE_COUNT="$(sqlite3 "$DB_A" "SELECT COUNT(*) FROM transparency_log WHERE kind = 9;")"
-    if [ "$INFERENCE_COUNT" -lt 1 ]; then
-        echo "FAIL: one-shot drain — expected >=1 InferenceCall row, got ${INFERENCE_COUNT}" >&2
-        exit 1
-    fi
-
-    echo "one-shot drain: OK (${ROW_COUNT_A} cap-audit, ${INFERENCE_COUNT} inference rows persisted)"
-else
-    if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-        echo "FAIL: one-shot drain — hello-spirit failed with exit code ${ONE_SHOT_RC} despite ANTHROPIC_API_KEY being set" >&2
-        exit 1
-    fi
-    # Distinguish structural failures (segfault, missing binary) from
-    # expected "no API key" exits. Exit codes 1-2 are typical Rust error
-    # paths; higher codes signal crashes or signal deaths.
-    if [ "$ONE_SHOT_RC" -gt 128 ]; then
-        echo "FAIL: one-shot drain — exited with signal code ${ONE_SHOT_RC} (likely crash; not an API-key issue)" >&2
-        exit 1
-    fi
-    echo "one-shot drain: SKIPPED (ANTHROPIC_API_KEY unset; exit code ${ONE_SHOT_RC} consistent with unconfigured provider)"
+if [ "$ONE_SHOT_RC" -ne 0 ]; then
+    echo "FAIL: one-shot drain — hello-spirit replay one-shot exited ${ONE_SHOT_RC}; the replay path needs no provider key, so this is a real failure, not a skip" >&2
+    exit 1
 fi
+
+ROW_COUNT_A="$(sqlite3 "$DB_A" "SELECT COUNT(*) FROM transparency_log WHERE kind = 7;")"
+if [ "$ROW_COUNT_A" -lt 1 ]; then
+    echo "FAIL: one-shot drain — expected >=1 CapabilityInvocation row, got ${ROW_COUNT_A}" >&2
+    exit 1
+fi
+
+INFERENCE_COUNT="$(sqlite3 "$DB_A" "SELECT COUNT(*) FROM transparency_log WHERE kind = 9;")"
+if [ "$INFERENCE_COUNT" -lt 1 ]; then
+    echo "FAIL: one-shot drain — expected >=1 InferenceCall row, got ${INFERENCE_COUNT}" >&2
+    exit 1
+fi
+
+echo "one-shot drain: OK (${ROW_COUNT_A} cap-audit, ${INFERENCE_COUNT} inference rows persisted)"
 
 rm -rf "$HOME_A"
 trap - EXIT

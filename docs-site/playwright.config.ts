@@ -21,7 +21,12 @@ export default defineConfig({
   testDir: "./tests/playwright",
   fullyParallel: false,
   forbidOnly: isCI(),
-  retries: isCI() ? 2 : 0,
+  // No retries (CI release-ready program W1b, 2026-11-15): the no-retry-to-green ruling.
+  // With `retries: 2` the a11y scan was attempted three times at ~3 min each (runs
+  // 43709134600 and 43720285510); the 10-minute step limit in docs-site.yml cancelled
+  // gate:behavioral during the second retry, so the first failure's reason was hidden
+  // instead of reported.
+  retries: 0,
   workers: 1,
   reporter: isCI() ? [["list"], ["html", { open: "never" }]] : "list",
   use: {

@@ -1795,8 +1795,7 @@ fn install_spirit(args: &InstallArgs) -> ExitCode {
     // affordance. `MAOS_INSTALL_DRY_RUN=1` short-circuits the cargo build
     // so the accessibility cascade test in `tests/accessibility_test.rs`
     // can assert zero ANSI bytes without paying the ~30s build cost, and
-    // the integration smokes (`maosctl_smoke.sh`, `v01_evaluator_path.sh`)
-    // keep under 60s.
+    // the integration smoke (`maosctl_smoke.sh`) keeps under 60s.
     if std::env::var_os("MAOS_INSTALL_DRY_RUN").is_some() {
         eprintln!("maosctl: {spirit_crate} compiled successfully");
         return ExitCode::SUCCESS;

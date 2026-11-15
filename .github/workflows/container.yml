@@ -35,6 +35,21 @@ jobs:
           test "$pubkey" != bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7
           mkdir -p dist
           gh release download "$TAG" --dir dist
+          # GitHub stores a release asset named with `~` under a name with `.` in its place
+          # (rc.2: `maos-1.0.0~rc.2-1.aarch64.rpm` is stored and downloaded as
+          # `maos-1.0.0.rc.2-1.aarch64.rpm`; run 43700484370 failed with `manifest entry ...
+          # not found`). The signed manifest keeps the package-manager names, so restore each
+          # tilde name before verifying. This only renames; `release-verify --verify` below
+          # still checks the Ed25519 signature and the SHA-256 of every renamed file against
+          # the signed manifest, so a wrong file under a restored name is refused. A GA name
+          # (`maos-1.0.0-1.*.rpm`, `maos_1.0.0-1_*.deb`, no `~`) never enters this loop.
+          while read -r _ name; do
+            [[ "$name" == *"~"* && "$name" =~ ^[A-Za-z0-9_.~+-]+$ ]] || continue
+            stored="${name//\~/.}"
+            if [[ ! -e "dist/$name" && -f "dist/$stored" && ! -L "dist/$stored" ]]; then
+              mv -- "dist/$stored" "dist/$name"
+            fi
+          done < dist/SHA256SUMS-packages
           target/debug/xtask release-verify --verify --sha256sums dist/SHA256SUMS --sig dist/SHA256SUMS.sig --artifacts-dir dist
           target/debug/xtask release-verify --verify --sha256sums dist/SHA256SUMS-packages --sig dist/SHA256SUMS-packages.sig --artifacts-dir dist
           echo "pubkey=$pubkey" >> "$GITHUB_ENV"

@@ -11,7 +11,7 @@
 # Acceptance demo: subject-access returns entries in <2s; sealed-export
 # bundle verifies on a third-party verifier (tools/verify-audit-bundle/verify.py).
 #
-# Pattern: audit_spine_smoke.sh — atomic mktemp, trap-cleanup, NO_COLOR.
+# Pattern: atomic mktemp, trap-cleanup, NO_COLOR.
 
 set -euo pipefail
 
