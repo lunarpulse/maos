@@ -50,3 +50,23 @@ Expected effect (estimate, not measured): release-ready about 12,000-15,000 job-
 
 ## 7. Open verification (before W1)
 Low-confidence jobs (`nfr-rel-3/4/9/10`, `upgrade-policy-corpus`, `nfr-aud-7`, `t3-smoke-busybox`), which hosts the release claims for the cgroup/wasm legs, whether the aggregate/ship-gate needs lists match this plan, and the GA impact of the package-name issue.
+
+## 8. Execution record (2026-11-15, orchestrator)
+Waves W0-W4 are landed on main (W0 `f9d5f3e3`, W1a `9d939d56`, W1b+docs `b51d0091`, W2+W3 `9b43ab1b`, W4 `6a4bda5c`), each with local `xtask prepush` exit 0 and a hosted discipline `aggregate` success on the same SHA.
+
+**Corrections to this plan, found by review:** (1) section 4's statement that `windows-check` and `check-cert-rotation-trigger` leave `v1-0-ship-gate.needs` is WRONG: their registry `binding = "blocking"` (disposition and binding are different fields) and `CURRENT_PHASE` is `v1_5`, so they stay in the merge path; the merge/release split is `release-ready` (W4). (2) The plan expected `mira-nash-bench` to run a feature-gated bench without the feature; it runs `section_13_1`, byte-identical to `founder-loop-bench` and `researcher-bench`, so both duplicates were removed. (3) `example-spirit-ts-tests` stays in the merge path: `wasm-host-tests` needs its artifact (deferred-work row).
+
+**Measured (hosted, same method: sum of job durations; matrix legs counted):**
+
+| Run | Jobs | Job-seconds | Longest job |
+|---|---:|---:|---|
+| baseline 43571926114 (`650efcff`) | 199 | 45,244 | workspace-test-suite 31.7 min |
+| W1a 43748593387 | 177 | 40,819 | workspace-test-suite 31.1 min |
+| W2+W3 43755858681 | 129 | 29,349 | workspace-test-suite 30.9 min |
+| W4 43763468882 (`6a4bda5c`) | 130 | 28,311 | workspace-test-suite 32.4 min |
+
+Job-seconds fell 37 percent. The critical-path job did not move (about 31-32 min); end-to-end wall time (59-75 min) is dominated by hosted runner queueing (up to 39-52 min before a job starts), not by job length, so wall time was not improved by these waves.
+
+**Rehearsal of W4:** `release.yml` `workflow_dispatch dry_run=true` on `6a4bda5c` (run 43769873728): builds, signing and deb/rpm steps green; classified `rc`; the only refused guard was the T3 fuzz chain for this SHA (none was dispatched, ~26 h), as designed. The `release-ready` leg raised no refusal, but the precondition did not reach a final PASS because of the T3 refusal. Nothing was published.
+
+**Open:** `nfr-rel-11` and `expensive-tests` (nightly) must be re-promoted before GA; GA perf wording conflict (decisions-2026-11-14 vs B1) needs an operator reading; the shared-runner queueing; `ci-nightly.yml` has not yet run on hosted; the new `xtask-gates` and `smoke-suite` jobs have one green hosted run each.
