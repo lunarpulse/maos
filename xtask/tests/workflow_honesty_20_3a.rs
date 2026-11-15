@@ -268,7 +268,7 @@ fn cargo_tree_failure_and_default_fault_feature_are_blocking() {
 }
 
 #[test]
-fn aggregate_executes_js_and_reports_advisory_failure_and_not_run() {
+fn aggregate_executes_js_and_reports_not_run() {
     let wf = workflow("discipline.yml");
     let source = step(&wf, "aggregate", "Post/update PR comment")["with"]["script"]
         .as_str()
@@ -276,7 +276,6 @@ fn aggregate_executes_js_and_reports_advisory_failure_and_not_run() {
     let source = expand(
         source,
         &[
-            ("needs.determinism-tests.outputs.test_result", "failure"),
             ("needs.check-unsafe.result", "skipped"),
             ("needs.macos-check.result", "skipped"),
             ("needs.macos-scope.outputs.applicable", "false"),
@@ -290,13 +289,56 @@ fn aggregate_executes_js_and_reports_advisory_failure_and_not_run() {
     show("aggregate github-script", &out);
     assert!(out.status.success());
     let body = String::from_utf8(out.stdout).unwrap();
-    assert!(body.contains("| determinism-tests (advisory)¹ | ⚠️ failure |"));
     assert!(body
         .lines()
         .find(|l| l.starts_with("| check-unsafe |"))
         .unwrap()
         .contains("NOT RUN"));
     assert!(body.contains("NOT APPLICABLE (not a pass)"));
+}
+
+/// A job-level `continue-on-error` reports `success` to the fan-in whatever the job
+/// did, so it proves nothing there; a gate whose registry `binding` is not `blocking`
+/// is not hermetic evidence either. Neither may be an `aggregate.needs` entry.
+/// The advisory jobs keep running; they just block nothing.
+#[test]
+fn aggregate_needs_holds_no_advisory_job() {
+    let wf = workflow("discipline.yml");
+    let needs = wf["jobs"]["aggregate"]["needs"].as_sequence().unwrap();
+    let text = fs::read_to_string(root().join("xtask/gate-registry.toml")).unwrap();
+    let registry: toml::Value = toml::from_str(&text).unwrap();
+    let non_blocking: Vec<&str> = registry["ship_gate"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|gate| gate["binding"].as_str() != Some("blocking"))
+        .filter_map(|gate| gate["name"].as_str())
+        .collect();
+    for name in needs.iter().filter_map(Value::as_str) {
+        assert!(
+            wf["jobs"][name]["continue-on-error"].is_null(),
+            "{name}: a job-level continue-on-error cannot be an aggregate need"
+        );
+        assert!(
+            !non_blocking.contains(&name),
+            "{name}: its registry binding is not `blocking`, so it cannot be an aggregate need"
+        );
+    }
+    for advisory in [
+        "reproducible-build",
+        "determinism-tests",
+        "nfr-perf-1-iac-routing-budget",
+        "nfr-perf-8-orchestrator-fanout",
+    ] {
+        assert!(
+            wf["jobs"][advisory].is_mapping(),
+            "{advisory} must still run"
+        );
+        assert!(
+            !needs.iter().any(|need| need.as_str() == Some(advisory)),
+            "{advisory} is advisory and must stay out of aggregate.needs"
+        );
+    }
 }
 
 #[test]

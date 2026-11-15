@@ -1271,10 +1271,9 @@ coverage:
       the 2-annotator human protocol in docs/safety-critical-corpus-methodology.md).
       Inter-annotator agreement Cohen's κ = 0.83 per Spirit (≥ 0.7 safety-critical
       floor; distinct from distillate NFR-Aud-7's 0.85, rationale documented).
-      Verified by the safety-critical-corpus-8-5 job (cargo test -p maos-eval --test
-      safety_critical_corpus_8_5) — fail-loud on shrink < 150/Spirit or κ < 0.7.
-      gates [] — the test job is wired into discipline.yml directly, not a
-      gate-registry gate. v1.5 binding.
+      Verified by the maos-eval safety_critical_corpus_8_5 test (cargo test -p maos-eval
+      --test safety_critical_corpus_8_5), run by workspace-test-suite — fail-loud on shrink
+      < 150/Spirit or κ < 0.7. gates [] — the test is not a gate-registry gate. v1.5 binding.
   NFR-Comp-1:
     gates:
     - check-export-control
@@ -1690,8 +1689,8 @@ coverage:
     gates: [nfr-perf-6-hook-dispatch-envelope]
     corpora: []
     notes: |
-      Story 18-3 AC3 — job researcher-tests, step "NFR-Perf-6 hook-dispatch
-      envelope": crates/maos-kernel-core/tests/hook_dispatch_paused_time_18_3.rs
+      Story 18-3 AC3 — the NFR-Perf-6 hook-dispatch envelope, run by workspace-test-suite:
+      crates/maos-kernel-core/tests/hook_dispatch_paused_time_18_3.rs
       drives the Researcher's 60 s cap (read from spirits/researcher/manifest.toml
       [budget]) under tokio paused time through the unchanged kernel
       dispatcher (80 % BudgetWarning, 100 % BudgetExceeded, real-time Fired),
@@ -2096,11 +2095,11 @@ coverage:
     phase: v0.3
     valid_until: '2027-05-12'
   NFR-Test-13:
-    gates: [manifest-field-coverage]
+    gates: [manifest_field_coverage]
     corpora: []
     phase: v0.1
     valid_until: '2027-05-12'
-    notes: Fixture directory crates/maos-kernel-core/tests/fixtures/manifest is exercised by manifest-field-coverage, not a registered MANIFEST.toml corpus.
+    notes: Fixture directory crates/maos-kernel-core/tests/fixtures/manifest is exercised by the manifest_field_coverage test (workspace-test-suite), not a registered MANIFEST.toml corpus.
   NFR-Test-14:
     gates: []
     enforcement: advisory-until-engagement

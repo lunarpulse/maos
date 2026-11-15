@@ -60,6 +60,7 @@ jobs:
   reproducible-build:
     runs-on: ubuntu-24.04
     timeout-minutes: 50
+    # Not in `aggregate.needs` (CI release-ready program W1a, operator ruling 2026-11-14): this advisory job runs and reports but blocks nothing; it moves to the nightly workflow in W3.
     # ADVISORY — owner: Winston; reason: byte identity needs a pinned deterministic build substrate.
     # ADVISORY gate (2026-06-12). Cargo/rustc does not guarantee byte-identical
     # debug artifacts across consecutive builds because incremental metadata,
@@ -404,23 +405,6 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-a2a-sender-completeness
         run: cargo run -p xtask -- check-a2a-sender-completeness --json
-
-  check-mock-not-in-release:
-    runs-on: ubuntu-24.04
-    needs: reproducible-build
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build maos-bin in release mode
-        run: cargo build --release -p maos-bin --locked
-      - name: Run check-mock-not-in-release
-        run: cargo run -p xtask --release -- check-mock-not-in-release --binary target/release/maos --json
 
   check-pub-field-constructors:
     runs-on: ubuntu-24.04
@@ -906,20 +890,6 @@ jobs:
       - name: Run server-exit-drain
         run: bash tests/integration/server_exit_drain.sh
 
-  audit-spine-smoke:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run audit-spine-smoke
-        run: bash tests/integration/audit_spine_smoke.sh
-
   cap-token-verify-bench:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -948,26 +918,12 @@ jobs:
       - name: Run cap-registry-smoke
         run: bash tests/integration/cap_registry_smoke.sh
 
-  fr4-1000-call-fixture:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run FR4 1000-call mediation fixture
-        run: cargo test -p maos-kernel-core --test fr4_1000_call_fixture
-
   audit-query-fr4-smoke:
     # Story 1b.5b AC4 — end-to-end `maosctl audit query` mechanical
     # verification path. Seeds the on-disk Transparency Log via the
     # one-shot hello-Spirit binary, then asserts the FR4 NDJSON schema
-    # via jq. Complementary to `fr4-1000-call-fixture` (kernel-side
-    # mediation) — this gate exercises the read-side surface.
+    # via jq. Complementary to the `fr4_1000_call_fixture` test (kernel-side
+    # mediation; run by workspace-test-suite) — this gate exercises the read-side surface.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -1004,57 +960,6 @@ jobs:
       - name: Run maosctl lifecycle smoke
         run: bash tests/integration/maosctl_smoke.sh
 
-  manifest-field-coverage:
-    # Story 1b.5c AC3 — NFR-Test-13 manifest-field coverage gate. Walks
-    # the fixture tree under `crates/maos-kernel-core/tests/fixtures/manifest/`
-    # and asserts ≥3 cases per (section, field) tuple in the live
-    # MANIFEST_FIELDS allowlist; orphan fixtures fail the build.
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run NFR-Test-13 manifest-field coverage gate
-        run: cargo test -p maos-kernel-core --test manifest_field_coverage --locked
-
-  v01-evaluator-path:
-    # Story 1b.5c AC4 — composite v0.1 release-tag gate. Runs the full
-    # 1b.5a + 1b.5b + 1b.5c evaluator path in one sequential bash
-    # script. Blocks the v0.1 release tag per the AC text.
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Install jq (smoke harness dependency)
-        run: sudo apt-get update && sudo apt-get install -y jq
-      - name: Run v0.1 evaluator path composite script
-        run: bash tests/integration/v01_evaluator_path.sh
-
-  hello-spirit-tests:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run hello-Spirit tests
-        run: cargo test -p maos-spirit-hello --locked
-
   hello-spirit-bench:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -1090,51 +995,6 @@ jobs:
       - name: Run local_runner smoke tests (maos-spirit-sdk, gated feature)
         run: cargo test -p maos-spirit-sdk --features local_runner --locked
 
-  butler-tests:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build + spirit-test the Butler v0.3 reference Spirit (Story 8.1, AC9)
-        # Covers on_idle + manifest envelope (spirit_smoke), the self-validating
-        # 30-scenario halt corpus + seam closure (corpus_halt), the FR17 morning
-        # digest + I11 chain (digest), the 0/100 hallucination + ≥95/100 open-halt
-        # corpus (hallucination), the J0 latency budget (latency), and the
-        # SHA-256 corpus pins (corpus_pin).
-        run: cargo test -p butler --locked
-
-  researcher-tests:
-    runs-on: ubuntu-24.04
-    # Story 18-3 AC3.2 / CR-5: 15 -> 30 for the kernel-core envelope tests below.
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build + spirit-test the Researcher v0.5 reference Spirit (Story 8.2, AC9)
-        # Covers on_idle survey + manifest envelope vs the authoritative validators
-        # (spirit_smoke), the participant-scoped log.recall walker + ScopeViolation
-        # against the real LogRecallAdapter (recall_walker), the I11 distillate chain
-        # + transitive flatten + kernel intent_lineage (distillation_i11), the
-        # five-metric traceability/secret-leakage self-verification (five_metric_self_verify),
-        # and the scalar.tap subscription + FR17 composability demo (scalar_tap).
-        run: cargo test -p researcher --locked
-      # Story 18-3 AC3.2 / CR-5 — NFR-Perf-6: the Researcher's 60 s hook cap
-      # read from its manifest, driven under tokio paused time through the
-      # unchanged kernel dispatcher, beside the wall-clock budget envelope.
-      - name: NFR-Perf-6 hook-dispatch envelope (Story 18-3 AC3)
-        run: cargo test --locked -p maos-kernel-core --test hook_dispatch_paused_time_18_3 --test hook_dispatch_budget_envelope
-
   researcher-bench:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -1148,148 +1008,6 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run §13.1 J-Researcher Criterion benchmark (AC7)
         run: cargo bench -p maos-bench --bench section_13_1 -- --test
-
-  observer-tests:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build + spirit-test the Observer v0.5 reference Spirit (Story 8.3, AC8)
-        # Covers the on_idle watchdog pass + the read-only `cautious` manifest
-        # envelope vs the authoritative validators (spirit_smoke), the broad
-        # scalar.tap subscription + FR31 client-side namespace filter against the
-        # real TelemetryStreamAdapter (scalar_tap_subscribe), the pre-halt
-        # scalar-drift early-warning surfaced via the real NotificationDispatcher
-        # BEFORE the halt fires (drift_watchdog), the structural-anomaly suspect
-        # path over fixture-replayed SandboxBlock-shaped inputs (structural_anomaly),
-        # and the SHA-pinned fixtures (fixtures_pin). No bench job — Observer v0.5
-        # carries no §13.1 latency budget (J4 <10ms is v1.5; Decision F).
-        run: cargo test -p observer --locked
-
-  # Story 8.5 AC9 — Mira (Host A, prod-edge diagnostic) reference Spirit.
-  mira-tests:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build + spirit-test the Mira v1.5 reference Spirit (Story 8.5, AC2/AC4/AC8)
-        # Covers the deterministic diagnosis + halt-boundary unit logic, the
-        # manifest envelope incl. the [epistemic_policy] halt rule (spirit_smoke),
-        # the bilateral A2A pairing over the real LoopbackA2ARouter + pre-paired
-        # cert fingerprints + TOFU verify/mismatch + send/accept consent
-        # (a2a_pairing), the halt → mobile-push test-double + Nash-via-consent +
-        # three-tap KernelHaltResolver chain (halt_bilateral), and the SHA-pinned
-        # fixtures (fixtures_pin).
-        run: cargo test -p mira --locked
-
-  # Story 8.5 AC9 — Nash (Host B, dev-environment architect) reference Spirit.
-  nash-tests:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build + spirit-test the Nash v1.5 reference Spirit (Story 8.5, AC2/AC8)
-        # Covers the deterministic architect path + the advisory wire-shape
-        # round-trip (unit), the assistive manifest envelope vs the authoritative
-        # validators incl. the deliberate absence of [epistemic_policy]
-        # (spirit_smoke), and the SHA-pinned fixtures (fixtures_pin).
-        run: cargo test -p nash --locked
-
-  orchestrator-tests:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build + spirit-test the Orchestrator v0.8 reference Spirit (Story 8.4, AC2/AC3)
-        # Covers the on_idle coordination pass + the autonomous-with-halt manifest
-        # envelope vs the authoritative validators (spirit_smoke), the FR20
-        # safe-point buffer drain against the real OrchestratorBuffer
-        # (orchestrator_buffer), the FR21 4-scenario distillate-dispatch matrix
-        # against the real IacBus gate + producer-side DistillateWriter
-        # (distillate_dispatch, Decision K), and the SHA-pinned wedge-scenario
-        # fixture (fixtures_pin).
-        run: cargo test -p orchestrator --locked
-
-  worker-tests:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build + test the Worker v0.8 CliWrapperSpirit reference (Story 8.4, AC4)
-        # Covers the [cli_wrapper] (NOT [class]) + T3 manifest vs the authoritative
-        # validators (spirit_smoke), and the REAL Story-6.2 admission path over the
-        # in-crate worker-cli-fixture binary (cli_wrapper_admission): matching shape
-        # admits, mismatch fails loud + journals a CliWrapperShapeMismatch row, the
-        # resumption gate, the below-T3 rejection, the argv_prefix_hash TOCTOU bind,
-        # CliSubprocessOutput=21 provenance rows, and the EManifestSchemaConflict
-        # negative. Live multi-CLI stdio bridge is OUT OF SCOPE (Decision B).
-        run: cargo test -p worker --locked
-
-  architect-tests:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build + spirit-test the Architect v0.8 reference Spirit (Story 8.4, AC5)
-        # Covers the assistive manifest envelope vs the authoritative validators
-        # (spirit_smoke), the deterministic/bit-identical propose() (lib + the
-        # SHA-pinned design-specs fixture), and the FR21-clean Architect→distill→
-        # Reviewer code-review loop against the real gate + DistillateWriter
-        # (code_review_loop). No live LLM in CI (Decision E).
-        run: cargo test -p architect --locked
-
-  reviewer-tests:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build + spirit-test the Reviewer v0.8 reference Spirit (Story 8.4, AC5)
-        # Covers the assistive manifest envelope vs the authoritative validators
-        # (spirit_smoke), and the deterministic/bit-identical review() (lib + the
-        # SHA-pinned review-cases fixture). No live LLM in CI (Decision E).
-        run: cargo test -p reviewer --locked
 
   founder-loop-bench:
     runs-on: ubuntu-24.04
@@ -1325,24 +1043,6 @@ jobs:
         # no timing baseline exists — 20-7 owns regression.
         run: cargo bench -p maos-bench --bench section_13_1 -- --test
 
-  # Story 8.5 AC5 — safety-critical corpus + Cohen's κ (N≥150/Spirit, κ≥0.7).
-  # NOTE: This job is standalone to match the existing maos-eval test pattern
-  # (each maos-eval test target has its own job). There is no single "maos-eval"
-  # aggregate job to wire into.
-  safety-critical-corpus-8-5:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run safety-critical corpus + Cohen's κ test (Story 8.5, AC5)
-        run: cargo test -p maos-eval --test safety_critical_corpus_8_5 --locked
-
   example-spirit-drift:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -1360,7 +1060,7 @@ jobs:
   example-spirit-ts-tests:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    needs: [reproducible-build, check-workspace-count]
+    needs: [check-workspace-count]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -1739,10 +1439,7 @@ jobs:
             rm -f "$log"
             return "$status"
           }
-          if ! run_corpus; then
-            echo "::warning::worker crash corpus failed; retrying once"
-            run_corpus
-          fi
+          run_corpus
 
   # Story 5.3 — NFR-Rel-2 hung-Spirit detection ≤60s
   nfr-rel-2-hang-detection-60s:
@@ -1776,10 +1473,7 @@ jobs:
             rm -f "$log"
             return "$status"
           }
-          if ! run_corpus; then
-            echo "::warning::worker hang corpus failed; retrying once"
-            run_corpus
-          fi
+          run_corpus
 
   # Story 5.3 — NFR-Rel-4 silent-failure detection
   nfr-rel-4-silent-failure-detection:
@@ -1962,8 +1656,9 @@ jobs:
   # Determinism integration tests for maos-corpus-gen — non-blocking at v0.1-α per DF6
   # (deferred-work.md). Promotes to blocking when NFR-Sec-4 redaction filter ships (v0.5).
   # The job always reports success at the GitHub Actions level; the underlying test
-  # outcome is surfaced via the `test_result` job output so the aggregate comment can
-  # show "advisory ⚠️" without flipping the overall workflow status to failure.
+  # outcome is surfaced via the `test_result` job output and a `::warning::` annotation.
+  # Not in `aggregate.needs` (CI release-ready program W1a, operator ruling 2026-11-14):
+  # advisory signal only; it moves to the nightly workflow in W3.
   determinism-tests:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -3119,21 +2814,6 @@ jobs:
   # the successor gates. Removed rather than parked
   # `if: false` (no fake-green). See ADR-043 for the item-by-item successor map.
 
-  # Story 6.1 — retract corpus integration tests (AC2)
-  retract-corpus-tests:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run retract corpus integration tests
-        run: cargo test -p maos-kernel-core --test retract_corpus_v0 retract_corpus_fixtures --locked
-
   # Story 6.2 AC1 Task 0.2 — Epic 4 retro §A6 / Epic 5 §A3 carry-forward closure:
   # check-serde-error-handling gate enforces typed serde::Error handling
   # (no .unwrap() / no Display-via-anyhow). The xtask exists at
@@ -3159,6 +2839,8 @@ jobs:
   # Story 6.2 AC1 Task 0.1 — Story 6.1 D-4.* deferred closure: IAC routing
   # budget bench. Establishes per-frame routing latency baseline that
   # NFR-Perf-8 (Story 6.2 AC3) reuses.
+  # Not in `aggregate.needs` (CI release-ready program W1a, operator ruling 2026-11-14):
+  # advisory measurement; it moves to the nightly workflow in W3.
   nfr-perf-1-iac-routing-budget:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -3229,6 +2911,8 @@ jobs:
   # Story 6.2 AC3, renamed by 20-7 AC4 — IN-PROCESS IAC dispatch under fan-out
   # load (15 s window). NOT NFR-Perf-8: that is the real-spawn bench
   # (`nfr_perf_8_real_spawn_fanout_20_7`, weekly 1 h on Tier W in perf.yml).
+  # Not in `aggregate.needs` (CI release-ready program W1a, operator ruling 2026-11-14):
+  # advisory measurement; it moves to the nightly workflow in W3.
   nfr-perf-8-orchestrator-fanout:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -6434,83 +6118,6 @@ jobs:
           path: target/nextest/ci/junit.xml
           if-no-files-found: error
 
-  # Story 16-1 / AC1 — exit lines 5-6 of the J0 block, named in their own step
-  # so a failure says "the door does not work" rather than being one red line
-  # in a 45-minute workspace run.
-  one-daemon-one-door:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-      # ⚠ `maosctl` MUST be built here (Epic-16 retrospective, 2026-09-21).
-      # `one_daemon_one_door_16_1.rs:54-68` resolves `maosctl` beside
-      # `CARGO_BIN_EXE_maos` and hard-asserts `path.is_file()`. `maos-cli` is a
-      # plain `[dependencies]` entry of maos-bin (`crates/maos-bin/Cargo.toml:44`),
-      # so cargo builds its LIB and never its `[[bin]] maosctl`
-      # (`crates/maos-cli/Cargo.toml:10-12`). Story 16-1's own record flagged
-      # this: the job was green only because `Swatinem/rust-cache@v2` restored a
-      # `target/` that still held a `maosctl` from an earlier job. On a cold
-      # cache it reds — which is exactly what it did on PR #7. A test that
-      # passes because of cache state is not passing.
-      - name: Build worker-cli-fixture and maosctl (maos-bin tests spawn both)
-        run: |
-          cargo build --locked -p worker --bin worker-cli-fixture
-          cargo build --locked -p maos-cli --bin maosctl
-      - name: maosctl reaches the live daemon, and the pause is real
-        run: cargo test --locked -p maos-bin --test one_daemon_one_door_16_1 -- --test-threads=1
-
-  # Story 16-6 / AC6 — exit line 5b of the J0 block: an operator adds a
-  # Spirit to a running daemon and takes it away again. Named, like
-  # one-daemon-one-door, so a failure says "load is broken" rather than being
-  # one red line in a 45-minute workspace run. NOT added to aggregate.needs
-  # or EXPECTED_GATES (16-1's enrolment precedent).
-  #
-  # ⚠ This job does NOT copy one-daemon-one-door verbatim: that template
-  # builds only `worker-cli-fixture`, while the test resolves `maosctl`
-  # beside CARGO_BIN_EXE_maos and hard-asserts it exists. `maos-cli` is a
-  # plain `[dependencies]` entry of maos-bin, so cargo builds its LIB and
-  # never its `[[bin]] maosctl` — the 16-1 job is green only because
-  # Swatinem/rust-cache restores a target/ some other job populated, which
-  # means it would panic on a cold runner. The explicit build step below is
-  # the fix; the 16-1 job carries the same latent defect and it is reported
-  # to the Epic-16 retrospective rather than inherited here.
-  maosctl-load-over-the-door:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Build maosctl (the test resolves it beside the maos binary)
-        run: cargo build --locked -p maos-cli --bin maosctl
-      - name: An operator adds a Spirit to a running daemon, and takes it away
-        run: cargo test --locked -p maos-bin --test maosctl_load_16_6 -- --test-threads=1
-
-  # Story 16-2 / D-16-2-L — the J0 scene in its own job (one-daemon-one-door
-  # shape): the halt -> resolve -> proceed journey must fail as ITSELF, not
-  # as one line in the workspace suite. NOT added to aggregate.needs or
-  # EXPECTED_GATES (16-1's enrolment precedent — the scene's steps also run
-  # inside journey-hermetic-tier-1, already aggregated).
-  j0-scene:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Build maos + maosctl (the scene drives both binaries)
-        run: cargo build --locked -p maos-bin -p maos-cli
-      - name: The J0 halt-resolve-proceed scene (both surfaces)
-        run: cargo test --locked -p maos-journey-test --test journey_j0
-
   # explicit result checks to prevent skip-propagation false positives.
   v1-0-ship-gate:
     runs-on: ubuntu-24.04
@@ -6568,9 +6175,6 @@ jobs:
       - check-perf-runner-policy
       - check-perf-counts
       - air-gap-netns-witness
-      - one-daemon-one-door
-      - j0-scene
-      - maosctl-load-over-the-door
     if: always()
     steps:
       - name: Ship gate results summary
@@ -6616,9 +6220,6 @@ jobs:
           echo "| check-test-budget | ${{ needs.check-test-budget.result }} | cargo run -p xtask -- check-test-budget --junit <workspace junit> |"
           echo "| check-perf-runner-policy | ${{ needs.check-perf-runner-policy.result }} | cargo run -p xtask -- check-perf-runner-policy |"
           echo "| check-perf-counts | ${{ needs.check-perf-counts.result }} | cargo run -p xtask -- check-perf-counts --dir tier-c |"
-          echo "| one-daemon-one-door | ${{ needs.one-daemon-one-door.result }} | cargo test -p maos-bin --test one_daemon_one_door_16_1 |"
-          echo "| j0-scene | ${{ needs.j0-scene.result }} | cargo test -p maos-journey-test --test journey_j0 |"
-          echo "| maosctl-load-over-the-door | ${{ needs.maosctl-load-over-the-door.result }} | cargo test -p maos-bin --test maosctl_load_16_6 |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -6659,15 +6260,12 @@ jobs:
           echo "  check-test-budget: ${{ needs.check-test-budget.result }}"
           echo "  check-perf-runner-policy: ${{ needs.check-perf-runner-policy.result }}"
           echo "  check-perf-counts: ${{ needs.check-perf-counts.result }}"
-          echo "  one-daemon-one-door: ${{ needs.one-daemon-one-door.result }}"
-          echo "  j0-scene: ${{ needs.j0-scene.result }}"
           exit 1
 
   aggregate:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
-      - reproducible-build
       # Story 18-0 AC2 (D-18-0-04) — the blocking supply-chain gate.
       - cargo-deny
       - check-unsafe
@@ -6680,7 +6278,6 @@ jobs:
       - check-fr47
       - check-workspace-count
       - check-a2a-sender-completeness
-      - check-mock-not-in-release
       - check-pub-field-constructors
       - check-composition-root-completeness
       - check-service-boundary
@@ -6690,30 +6287,15 @@ jobs:
       - check-judge-config
       - check-security-md
       - server-exit-drain
-      - audit-spine-smoke
       - cap-token-verify-bench
       - cap-registry-smoke
-      - fr4-1000-call-fixture
       - audit-query-fr4-smoke
       - maosctl-smoke
-      - manifest-field-coverage
-      - v01-evaluator-path
-      - hello-spirit-tests
       - hello-spirit-bench
       - example-spirit-tests
-      - butler-tests
-      - researcher-tests
       - researcher-bench
-      - observer-tests
-      - mira-tests
-      - nash-tests
-      - orchestrator-tests
-      - worker-tests
-      - architect-tests
-      - reviewer-tests
       - founder-loop-bench
       - mira-nash-bench
-      - safety-critical-corpus-8-5
       - example-spirit-drift
       - example-spirit-ts-tests
       - coverage-matrix-nfr-test-3
@@ -6735,7 +6317,6 @@ jobs:
       - nfr-rel-9-revocation-5s-p99
       - upgrade-policy-corpus
       - revocation-corpus
-      - determinism-tests
       - t3-escape-corpus
       - nfr-sec-1-t3-image-signature
       - t3-smoke-busybox
@@ -6744,10 +6325,7 @@ jobs:
       - epic-19-exit
       - epic-20-exit
       - multi-provider-drift-tests
-      - retract-corpus-tests
       - check-serde-error-handling
-      - nfr-perf-1-iac-routing-budget
-      - nfr-perf-8-orchestrator-fanout
       - nfr-aud-14-intent-lineage-corpus
       - smoke-orchestrator-fanout-6-2
       - smoke-a2a-loopback-6-3
@@ -6815,7 +6393,6 @@ jobs:
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          echo "rb=${{ needs.reproducible-build.result }}" >> $GITHUB_OUTPUT
           echo "cu=${{ needs.check-unsafe.result }}" >> $GITHUB_OUTPUT
           echo "cek=${{ needs.check-empty-kernel.result }}" >> $GITHUB_OUTPUT
           echo "cl=${{ needs.check-loom.result }}" >> $GITHUB_OUTPUT
@@ -6829,15 +6406,10 @@ jobs:
           echo "cjc=${{ needs.check-judge-config.result }}" >> $GITHUB_OUTPUT
           echo "csm=${{ needs.check-security-md.result }}" >> $GITHUB_OUTPUT
           echo "sed=${{ needs.server-exit-drain.result }}" >> $GITHUB_OUTPUT
-          echo "ass=${{ needs.audit-spine-smoke.result }}" >> $GITHUB_OUTPUT
           echo "ctvb=${{ needs.cap-token-verify-bench.result }}" >> $GITHUB_OUTPUT
           echo "crs=${{ needs.cap-registry-smoke.result }}" >> $GITHUB_OUTPUT
-          echo "fr4=${{ needs.fr4-1000-call-fixture.result }}" >> $GITHUB_OUTPUT
           echo "aqfs=${{ needs.audit-query-fr4-smoke.result }}" >> $GITHUB_OUTPUT
           echo "ms=${{ needs.maosctl-smoke.result }}" >> $GITHUB_OUTPUT
-          echo "mfc=${{ needs.manifest-field-coverage.result }}" >> $GITHUB_OUTPUT
-          echo "v01=${{ needs.v01-evaluator-path.result }}" >> $GITHUB_OUTPUT
-          echo "hst=${{ needs.hello-spirit-tests.result }}" >> $GITHUB_OUTPUT
           echo "hsb=${{ needs.hello-spirit-bench.result }}" >> $GITHUB_OUTPUT
           echo "onb=${{ needs.onb-nfr2-timing.result }}" >> $GITHUB_OUTPUT
           echo "est=${{ needs.example-spirit-tests.result }}" >> $GITHUB_OUTPUT
@@ -6854,7 +6426,6 @@ jobs:
           echo "cwc=${{ needs.check-workspace-count.result }}" >> $GITHUB_OUTPUT
           echo "cpfc=${{ needs.check-pub-field-constructors.result }}" >> $GITHUB_OUTPUT
           echo "ccrc=${{ needs.check-composition-root-completeness.result }}" >> $GITHUB_OUTPUT
-          echo "rct=${{ needs.retract-corpus-tests.result }}" >> $GITHUB_OUTPUT
           echo "sd715=${{ needs.smoke-discipline-7-1-5.result }}" >> $GITHUB_OUTPUT
           echo "casc=${{ needs.check-a2a-sender-completeness.result }}" >> $GITHUB_OUTPUT
           echo "safc=${{ needs.smoke-a2a-fail-closed-8-8.result }}" >> $GITHUB_OUTPUT
@@ -6868,7 +6439,7 @@ jobs:
           echo "| cgroup-ceiling-undelegated | ${{ needs.cgroup-ceiling-undelegated.result }} | 4-image Delegate=no refusal/fallback proof |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Discipline prerequisite | Result |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          jq -r 'to_entries[] | "| \(.key) | \(if .value.result == "skipped" then "NOT RUN — skipped" elif .key == "determinism-tests" then (if .value.outputs.test_result == "success" then "✅ success (advisory)" elif .value.outputs.test_result == "failure" then "⚠️ failure (advisory)" else "NOT RUN — advisory outcome absent" end) else .value.result end) |"' \
+          jq -r 'to_entries[] | "| \(.key) | \(if .value.result == "skipped" then "NOT RUN — skipped" else .value.result end) |"' \
             <<< "$NEEDS_JSON" >> "$GITHUB_STEP_SUMMARY"
       # Story 20-6 AC3 — a skipped macOS guard is NOT-APPLICABLE, said out loud.
       # `needs.*.result == 'skipped'` is not a failure, so without this step a
@@ -6919,7 +6490,6 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const rb = '${{ needs.reproducible-build.result }}';
             const cu = '${{ needs.check-unsafe.result }}';
             const cek = '${{ needs.check-empty-kernel.result }}';
             const cl = '${{ needs.check-loom.result }}';
@@ -6933,15 +6503,10 @@ jobs:
             const cjc = '${{ needs.check-judge-config.result }}';
             const csm = '${{ needs.check-security-md.result }}';
             const sed = '${{ needs.server-exit-drain.result }}';
-            const ass = '${{ needs.audit-spine-smoke.result }}';
             const ctvb = '${{ needs.cap-token-verify-bench.result }}';
             const crs = '${{ needs.cap-registry-smoke.result }}';
-            const fr4 = '${{ needs.fr4-1000-call-fixture.result }}';
             const aqfs = '${{ needs.audit-query-fr4-smoke.result }}';
             const ms = '${{ needs.maosctl-smoke.result }}';
-            const mfc = '${{ needs.manifest-field-coverage.result }}';
-            const v01 = '${{ needs.v01-evaluator-path.result }}';
-            const hst = '${{ needs.hello-spirit-tests.result }}';
             const hsb = '${{ needs.hello-spirit-bench.result }}';
             const onb = '${{ needs.onb-nfr2-timing.result }}';
             const est = '${{ needs.example-spirit-tests.result }}';
@@ -6958,7 +6523,6 @@ jobs:
             const cwc = '${{ needs.check-workspace-count.result }}';
             const cpfc = '${{ needs.check-pub-field-constructors.result }}';
             const ccrc = '${{ needs.check-composition-root-completeness.result }}';
-            const rct = '${{ needs.retract-corpus-tests.result }}';
             const sd715 = '${{ needs.smoke-discipline-7-1-5.result }}';
             const casc = '${{ needs.check-a2a-sender-completeness.result }}';
             const safc = '${{ needs.smoke-a2a-fail-closed-8-8.result }}';
@@ -6971,13 +6535,7 @@ jobs:
             const mcs = '${{ needs.macos-check.result }}';
             const mcsScope = '${{ needs.macos-scope.result }}';
             const mcsApplicable = '${{ needs.macos-scope.outputs.applicable }}';
-            // Pre-existing latent bug fixed by Story 8.16 (surfaced on the FIRST PR, run 27397275823):
-            // `dt` is used in the advisory determinism-tests table row but was never declared, so the
-            // github-script threw ReferenceError on every `pull_request` event (this step is PR-only,
-            // and all prior CI ran on `push`, where it is skipped).
-            const dt = '${{ needs.determinism-tests.outputs.test_result }}';
             const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '❌ NOT RUN —' : '❌');
-            const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '❌ NOT RUN —');
             // A skip is "not applicable" ONLY when the filter ran and said so; a skip behind a failed
             // filter, or behind `applicable=true`, is a guard that did not run — never a green-looking cell.
             // Declared AFTER `icon`: reading a `const` above its declaration throws (TDZ) and reds aggregate.
@@ -6991,7 +6549,6 @@ jobs:
 
             | Gate | Result |
             |------|--------|
-            | reproducible-build | ${icon(rb)} ${rb} |
             | check-unsafe | ${icon(cu)} ${cu} |
             | check-empty-kernel | ${icon(cek)} ${cek} |
             | check-loom | ${icon(cl)} ${cl} |
@@ -7005,15 +6562,10 @@ jobs:
             | check-judge-config | ${icon(cjc)} ${cjc} |
             | check-security-md | ${icon(csm)} ${csm} |
             | server-exit-drain | ${icon(sed)} ${sed} |
-            | audit-spine-smoke | ${icon(ass)} ${ass} |
             | cap-token-verify-bench | ${icon(ctvb)} ${ctvb} |
             | cap-registry-smoke | ${icon(crs)} ${crs} |
-            | fr4-1000-call-fixture | ${icon(fr4)} ${fr4} |
             | audit-query-fr4-smoke | ${icon(aqfs)} ${aqfs} |
             | maosctl-smoke | ${icon(ms)} ${ms} |
-            | manifest-field-coverage | ${icon(mfc)} ${mfc} |
-            | v01-evaluator-path | ${icon(v01)} ${v01} |
-            | hello-spirit-tests | ${icon(hst)} ${hst} |
             | hello-spirit-bench | ${icon(hsb)} ${hsb} |
             | onb-nfr2-timing | ${icon(onb)} ${onb} |
             | example-spirit-tests | ${icon(est)} ${est} |
@@ -7035,15 +6587,11 @@ jobs:
             | smoke-discipline-7-1-5 | ${icon(sd715)} ${sd715} |
             | check-a2a-sender-completeness | ${icon(casc)} ${casc} |
             | smoke-a2a-fail-closed-8-8 | ${icon(safc)} ${safc} |
-            | retract-corpus-tests | ${icon(rct)} ${rct} |
             | check-kernel-baseline | ${icon(ckb)} ${ckb} |
             | check-epic-close-coherence | ${icon(ecc)} ${ecc} |
             | journey-hermetic-tier-1 | ${icon(jht1)} ${jht1} |
             | release-dry-run | ${icon(rdr)} ${rdr} |
             | macos-check (path-filtered, Story 20-6) | ${mcsCell} |
-            | determinism-tests (advisory)¹ | ${advisoryIcon(dt)} ${dt} |
-
-            ¹ Advisory at v0.1-α per DF6 — does not block merge. Promotes to blocking when NFR-Sec-4 ships (v0.5).
 
             <!-- discipline-gate-comment -->`;
 

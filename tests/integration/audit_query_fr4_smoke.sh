@@ -50,9 +50,16 @@ MAOS_ONE_SHOT=hello-spirit "${REPO_ROOT}/target/release/maos" >/dev/null
 echo "::endgroup::"
 
 echo "::group::maosctl audit query — FR4 NDJSON schema check"
-FIRST_LINE="$("${REPO_ROOT}/target/release/maosctl" audit query \
+AUDIT_OUT="$("${REPO_ROOT}/target/release/maosctl" audit query \
   --spirit hello-spirit \
-  --format ndjson | head -1)"
+  --format ndjson)"
+
+# v0.1 accessibility contract (NFR-Ops-5): no ANSI escape byte on stdout under NO_COLOR=1.
+if printf '%s' "$AUDIT_OUT" | grep -q $'\x1b'; then
+  echo "FR4 smoke FAILED: audit query stdout contained ANSI escape bytes — NFR-Ops-5 violation" >&2
+  exit 1
+fi
+FIRST_LINE="$(printf '%s\n' "$AUDIT_OUT" | head -1)"
 
 if [ -z "$FIRST_LINE" ]; then
   echo "FR4 smoke FAILED: maosctl audit query produced no rows" >&2

@@ -204,9 +204,11 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   `--dry-run` soft-floor measurement and expensive-suite selector discovery;
   fixture producer `--only`/`--release` setup is covered by the full local build,
   not treated as an alternative invocation of a Blocking gate.
-  Explicit no-standalone-form exclusions: invariant-lock's PR/reviewer/journal context, the CI release-binary
-  mock scan, the Epic-19 scene/twin reconciliation, target-matrix/signing release dry-runs, and the junit
+  Explicit no-standalone-form exclusions: invariant-lock's PR/reviewer/journal context, the Epic-19 scene/twin
+  reconciliation, target-matrix/signing release dry-runs, and the junit
   budget gate (already conditionally mirrored over fresh local junit). None is downgraded to advisory in CI.
+  The release-binary mock scan (`check-mock-not-in-release`) is no longer a discipline job: `release.yml` runs it
+  on every shipped `maos` binary.
   Build-free docs checks include route-manifest parity, glossary, anchors and ko coverage
   (`KO_COVERAGE_MIN=100`). The CI pin reader compares test-bound count pins against `cargo nextest list`, marker
   specs against emission-site counts, and checks color settings on parsed cargo/nextest output; it covers recognised

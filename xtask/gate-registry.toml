@@ -16,6 +16,7 @@ gates = [
     "audit_spine_integration",
     "cap_registry_integration",
     "fr4_1000_call_fixture",
+    "manifest_field_coverage",
     "cap_token_verify_assertion",
     # workspace-test-suite: maos-iac transparency_log unit-test module.
     "approval_log_is_distinct_table",
@@ -28,7 +29,11 @@ gates = [
     "smoke-skill-7-4",
     "nfr-rel-3-hsis-95pct",
     "coverage-matrix-nfr-test-3",
-    # Advisory only: absent from aggregate.needs and local Blocking prepush set.
+    # Flat coverage-matrix name set (NFR-Meta-3): valid `gates:` references, not dispositions (those are the
+    # `[[ship_gate]]` rows below). Every name here that is a discipline job is a blocking `aggregate.needs` entry
+    # except `reproducible-build`, which is advisory (continue-on-error) and no longer in `aggregate.needs`
+    # (CI release-ready program W1a, operator ruling 2026-11-14); `clippy-ratchet`, `rebaseline-check`,
+    # `calibrate` and `example-spirit-regen` have no discipline job of that name, so no `aggregate.needs` entry.
     "clippy-ratchet",
     "reproducible-build",
     "check-unsafe",
@@ -45,7 +50,6 @@ gates = [
     "rebaseline-check",
     "calibrate",
     "check-security-md",
-    "manifest-field-coverage",
     "example-spirit-regen",
     "example-spirit-tests",
     "example-spirit-drift",
@@ -84,7 +88,7 @@ gates = [
     # and the Digest-class traceability/leakage test).
     "nfr-aud-7-distillate-five-metrics-floor",
     # Story 18-3 (CR-5, AC3) — NFR-Perf-6: the Researcher's 60 s hook cap under
-    # tokio paused time (`hook_dispatch_paused_time_18_3`, job researcher-tests).
+    # tokio paused time (`hook_dispatch_paused_time_18_3`, run by workspace-test-suite).
     "nfr-perf-6-hook-dispatch-envelope",
     # Story 10.1b AC1 — pen-test gate (conditional: advisory-if-absent).
     "check-pentest-gate",

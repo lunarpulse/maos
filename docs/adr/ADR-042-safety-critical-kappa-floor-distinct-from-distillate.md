@@ -1,6 +1,6 @@
 ---
 Status: binding-v1.5
-Gate: maos-eval safety-critical-corpus-8-5 job (κ ≥ 0.7, N ≥ 150/Spirit, SHA-pin); distillate floor κ ≥ 0.85 enforced by nfr-aud-7-distillate-five-metrics-floor
+Gate: maos-eval `safety_critical_corpus_8_5` test, run by `workspace-test-suite` (κ ≥ 0.7, N ≥ 150/Spirit, SHA-pin); distillate floor κ ≥ 0.85 enforced by nfr-aud-7-distillate-five-metrics-floor
 Decided: 2026-06-04
 Accepted-in-PR: <PR_NUMBER>
 Revisits: Story 8.5 Decision F; docs/safety-critical-corpus-methodology.md
@@ -19,6 +19,6 @@ The two floors are intentionally NOT harmonized. Each is the appropriate "substa
 
 **Alternatives considered.**
 - *One unified κ floor (0.85 or 0.7) for all corpora* — rejected: a single number either over-rejects categorical corpora (at 0.85) or under-protects hedge corpora (at 0.7). The floor must track the measurement.
-- *No floor for the safety-critical corpus, report-only* — rejected: the corpus gates a safety-critical reference deployment; a hard, fail-loud floor is required (the `safety-critical-corpus-8-5` job fails if κ < 0.7 or N shrinks below 150/Spirit).
+- *No floor for the safety-critical corpus, report-only* — rejected: the corpus gates a safety-critical reference deployment; a hard, fail-loud floor is required (the `safety_critical_corpus_8_5` test fails if κ < 0.7 or N shrinks below 150/Spirit).
 
 **What would force a revisit.** A **third** κ floor appearing (a new corpus class) is the trigger to generalize this ADR into a per-corpus-class κ-floor table, so the rationale stays legible and no future maintainer "tidies" the floors into one value. Amendment via the ADR-037 process. The κ values + the stand-in 2-annotator protocol are documented in `docs/safety-critical-corpus-methodology.md`; the floors live as named constants (`maos_eval::safety_critical_corpus::SAFETY_CRITICAL_KAPPA_FLOOR = 0.7`; distillate floor in `distillate_corpus`).

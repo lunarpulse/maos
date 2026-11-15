@@ -9,10 +9,6 @@ const NO_LOCAL_FORM: &[(&str, &str)] = &[
         "PR changed-files/reviews/journal context; standalone cassette-age leg is mirrored",
     ),
     (
-        "check-mock-not-in-release",
-        "CI release binary; local release build is conditional",
-    ),
-    (
         "epic-19-exit",
         "scene fixture setup plus mutation/twin reconciliation, not a standalone xtask gate",
     ),

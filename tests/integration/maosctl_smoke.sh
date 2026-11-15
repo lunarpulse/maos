@@ -66,13 +66,18 @@ export MAOS_BIN_PATH="$MAOS_BIN"
 echo "::group::install hello-spirit"
 # Use the dry-run shortcut to keep the smoke under 60s — the real cargo
 # build is exercised by `audit-query-fr4-smoke` (which calls the same
-# binaries) and by the `v01-evaluator-path` composite gate.
+# binaries).
 MAOS_INSTALL_DRY_RUN=1 "${MAOSCTL}" install hello-spirit
 echo "::endgroup::"
 
 # ───────────────────────────────────────────────────────────────
 echo "::group::run hello-spirit"
 RUN_OUT="$("${MAOSCTL}" run hello-spirit)"
+# v0.1 accessibility contract (NFR-Ops-5): no ANSI escape byte on stdout under NO_COLOR=1.
+if printf '%s' "$RUN_OUT" | grep -q $'\x1b'; then
+  echo "run: stdout contained ANSI escape bytes — NFR-Ops-5 violation" >&2
+  exit 1
+fi
 echo "$RUN_OUT" | jq -e '
   .introduction != null
   and .capability_scope != null
@@ -94,14 +99,21 @@ echo "::endgroup::"
 # on it working with no daemon.
 JOURNAL_BYTES_BEFORE="$(wc -c < "$JOURNAL" | tr -d ' ')"
 
+# Exit code, journal immutability, and the v0.1 accessibility contract: a
+# refusal carries no ANSI escape byte on EITHER stream under NO_COLOR=1 (the
+# real refusal path; no accessibility shortcut env is set).
 assert_exit_and_journal_unchanged() {
   local verb="$1" spirit="$2" want="$3"
   set +e
-  "${MAOSCTL}" "$verb" "$spirit" >/dev/null 2>"${JOURNAL}.err"
+  "${MAOSCTL}" "$verb" "$spirit" >"${JOURNAL}.out" 2>"${JOURNAL}.err"
   local got=$?
   set -e
   if [ "$got" != "$want" ]; then
     echo "$verb $spirit: expected exit $want, got $got — $(cat "${JOURNAL}.err")" >&2
+    exit 1
+  fi
+  if grep -q $'\x1b' "${JOURNAL}.out" || grep -q $'\x1b' "${JOURNAL}.err"; then
+    echo "$verb $spirit: refusal carried ANSI escape bytes — NFR-Ops-5 violation" >&2
     exit 1
   fi
   local after
@@ -140,7 +152,7 @@ echo "::endgroup::"
 echo "::group::start unknown-spirit (negative)"
 assert_exit_and_journal_unchanged start unknown-spirit 78
 echo "::endgroup::"
-rm -f "${JOURNAL}.err"
+rm -f "${JOURNAL}.err" "${JOURNAL}.out"
 
 END_NS=$(python3 -c 'import time; print(int(time.time()*1e9))' 2>/dev/null || echo "$(date +%s)000000000")
 ELAPSED_MS=$(( (END_NS - START_NS) / 1000000 ))

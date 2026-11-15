@@ -13,8 +13,12 @@
 #   (6) `cargo test -p maos-kernel-core --test manifest_field_coverage` PASSES
 #   (7) every step emits zero ANSI bytes on stdout under NO_COLOR=1
 #
-# Composite gate — this script blocks the v0.1 release tag.
-# Wired into CI as `.github/workflows/discipline.yml::v01-evaluator-path`.
+# Historical composite gate, no longer run by CI: the CI release-ready program
+# (W1a, 2026-11-15) removed the `v01-evaluator-path` job. Steps (5) and (6) run in
+# `workspace-test-suite`; (1), (2) and (4) in `maosctl-smoke` (stdout ANSI-free check
+# of `run`, both-stream ANSI-free refusal check); (3) in `audit-query-fr4-smoke` (FR4
+# keys and the stdout ANSI-free check). Every assertion has a surviving caller. Kept
+# for manual runs.
 
 set -euo pipefail
 
