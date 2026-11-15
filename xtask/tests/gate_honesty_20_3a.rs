@@ -299,26 +299,54 @@ fn migration_manifest_and_corpus_errors_emit_named_red_reports() {
     }
 }
 
+/// CI release-ready program W2: the three evidence gates run as named steps of the
+/// consolidated `xtask-gates` job, which runs every gate after a red one. Its steps may
+/// therefore carry an `if`, but only the run-state guard — never a condition over the
+/// evidence the gate judges (absence must still invoke the gate and read ABSENT).
+const RUN_STATE_GUARDS: [&str; 2] = [
+    "!cancelled()",
+    "!cancelled()&&steps.build-xtask.outcome=='success'",
+];
+
+fn is_run_state_guard(condition: &serde_yaml::Value) -> bool {
+    let compact: String = condition
+        .as_str()
+        .unwrap_or_default()
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
+    let inner = compact
+        .strip_prefix("${{")
+        .and_then(|rest| rest.strip_suffix("}}"))
+        .unwrap_or(&compact);
+    RUN_STATE_GUARDS.contains(&inner)
+}
+
 fn check_gate_workflow(workflow: &serde_yaml::Value) -> Result<Vec<(&'static str, &str)>, String> {
     let mut scripts = Vec::new();
-    for (gate, name) in [
-        ("check-pentest-gate", "Check pen-test results"),
-        ("check-third-party-trial", "Check third-party trial results"),
-        ("check-red-team-gate", "Check red-team gate results"),
+    for (job_name, gate, name) in [
+        ("xtask-gates", "check-pentest-gate", "check-pentest-gate"),
         (
+            "xtask-gates",
+            "check-third-party-trial",
+            "check-third-party-trial",
+        ),
+        ("xtask-gates", "check-red-team-gate", "check-red-team-gate"),
+        (
+            "check-migration-merkle",
             "check-migration-merkle",
             "Check migration Merkle gate results",
         ),
     ] {
-        let job = workflow["jobs"][gate]
+        let job = workflow["jobs"][job_name]
             .as_mapping()
-            .ok_or_else(|| format!("missing job {gate}"))?;
+            .ok_or_else(|| format!("missing job {job_name}"))?;
         for key in ["if", "continue-on-error"] {
             if job.contains_key(&serde_yaml::Value::from(key)) {
                 return Err(format!("{gate}: job has {key}"));
             }
         }
-        let steps = workflow["jobs"][gate]["steps"]
+        let steps = workflow["jobs"][job_name]["steps"]
             .as_sequence()
             .ok_or_else(|| format!("{gate}: missing steps"))?;
         let step = steps
@@ -328,10 +356,15 @@ fn check_gate_workflow(workflow: &serde_yaml::Value) -> Result<Vec<(&'static str
         let mapping = step
             .as_mapping()
             .ok_or_else(|| format!("{gate}: invalid step"))?;
-        for key in ["if", "continue-on-error"] {
-            if mapping.contains_key(&serde_yaml::Value::from(key)) {
-                return Err(format!("{gate}: step has {key}"));
-            }
+        if mapping.contains_key(&serde_yaml::Value::from("continue-on-error")) {
+            return Err(format!("{gate}: step has continue-on-error"));
+        }
+        let allowed = match mapping.get(&serde_yaml::Value::from("if")) {
+            None => true,
+            Some(condition) => job_name == "xtask-gates" && is_run_state_guard(condition),
+        };
+        if !allowed {
+            return Err(format!("{gate}: step has if"));
         }
         let script = step["run"]
             .as_str()
@@ -350,16 +383,39 @@ fn workflow_checker_rejects_evidence_condition_plant() {
         &fs::read_to_string(root().join(".github/workflows/discipline.yml")).unwrap(),
     )
     .unwrap();
-    let steps = workflow["jobs"]["check-pentest-gate"]["steps"]
+    let steps = workflow["jobs"]["xtask-gates"]["steps"]
         .as_sequence_mut()
         .unwrap();
     let step = steps
         .iter_mut()
-        .find(|step| step["name"] == "Check pen-test results")
+        .find(|step| step["name"] == "check-pentest-gate")
         .unwrap();
     step["if"] = serde_yaml::Value::from("hashFiles('docs/pen-test/findings/summary.toml') != ''");
     let error = check_gate_workflow(&workflow).unwrap_err();
     assert!(error.contains("check-pentest-gate: step has if"), "{error}");
+}
+
+#[test]
+fn workflow_checker_rejects_masking_plants_on_the_consolidated_steps() {
+    for (key, value) in [("continue-on-error", "true"), ("if", "failure()")] {
+        let mut workflow: serde_yaml::Value = serde_yaml::from_str(
+            &fs::read_to_string(root().join(".github/workflows/discipline.yml")).unwrap(),
+        )
+        .unwrap();
+        let steps = workflow["jobs"]["xtask-gates"]["steps"]
+            .as_sequence_mut()
+            .unwrap();
+        let step = steps
+            .iter_mut()
+            .find(|step| step["name"] == "check-red-team-gate")
+            .unwrap();
+        step[key] = serde_yaml::Value::from(value);
+        let error = check_gate_workflow(&workflow).unwrap_err();
+        assert!(
+            error.contains(&format!("check-red-team-gate: step has {key}")),
+            "{error}"
+        );
+    }
 }
 
 #[cfg(unix)]

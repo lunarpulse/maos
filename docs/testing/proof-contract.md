@@ -209,6 +209,13 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   budget gate (already conditionally mirrored over fresh local junit). None is downgraded to advisory in CI.
   The release-binary mock scan (`check-mock-not-in-release`) is no longer a discipline job: `release.yml` runs it
   on every shipped `maos` binary.
+  Hosted twin (CI release-ready program W2, 2026-11-15): the deterministic xtask gates listed above run on the hosted
+  side as named steps of ONE job, `xtask-gates` (xtask built once; every gate step runs even when an earlier one is red,
+  and the job then fails listing each step that did not pass; no `continue-on-error`, no retry), and the `maos-bin`
+  smokes as named steps of `smoke-suite`. A gate's step name is its gate name, the command and `--json` output are the
+  ones the per-gate job ran, and `check-ship-gate-completeness` enrols the ship gates that live there by step name.
+  `check-workspace-count`, `check-corpus`, `check-review-findings-resolved` and `check-dev-record-completeness` stay
+  jobs because other jobs `needs` them. The pin above reads the steps of `xtask-gates` exactly as it read the old jobs.
   Build-free docs checks include route-manifest parity, glossary, anchors and ko coverage
   (`KO_COVERAGE_MIN=100`). The CI pin reader compares test-bound count pins against `cargo nextest list`, marker
   specs against emission-site counts, and checks color settings on parsed cargo/nextest output; it covers recognised

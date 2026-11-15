@@ -11,7 +11,8 @@
 # the reachability of the drain block in the long-running path AND that
 # rows persisted before shutdown survive the drain.
 #
-# Wired into CI as `.github/workflows/discipline.yml::server-exit-drain`.
+# Wired into CI as the `server-exit-drain` step of the `smoke-suite` job
+# (`.github/workflows/discipline.yml::smoke-suite`).
 #
 # Hermetic (CI release-ready program W1b, 2026-11-15): leg (A) runs the one-shot
 # under `MAOS_INFERENCE_MODE=replay` against the committed seed cassette (the

@@ -184,7 +184,7 @@ The engagement produces the following artifacts, all committed under `docs/pen-t
 
 1. **Findings summary** — `docs/pen-test/findings/summary.toml`, conforming to the schema in
    [`docs/pen-test/findings/summary-schema.toml`](findings/summary-schema.toml). This is the
-   input to the `check-pentest-gate` CI job: it carries the `p0_open` / `p1_open` counters, the
+   input to the `check-pentest-gate` CI gate (a step of the `xtask-gates` job): it carries the `p0_open` / `p1_open` counters, the
    engagement start/end dates, and the OWASP methodology commit reference. The gate passes only
    when both open-counters are zero.
 2. **Per-finding writeups** — one structured writeup per finding under `docs/pen-test/findings/`,

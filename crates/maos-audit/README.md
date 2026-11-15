@@ -16,8 +16,8 @@ mechanically; FR4 is no longer asserted in a README — it is verified by
 
 This is the evaluator-facing path. It is the AC4 contract for Story 1b.5b
 and the canonical reproduction recipe for FR4 mediation. The full
-end-to-end path is exercised in CI by
-`.github/workflows/discipline.yml::audit-query-fr4-smoke`.
+end-to-end path is exercised in CI by the `audit-query-fr4-smoke` step of
+`.github/workflows/discipline.yml::smoke-suite`.
 
 ```sh
 # 1. Clone and build (Story 1a.4 evaluator path).

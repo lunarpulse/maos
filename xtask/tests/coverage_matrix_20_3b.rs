@@ -125,5 +125,5 @@ fn no_go_keeps_the_live_completeness_control_and_documents_why() {
     assert!(include_str!("../src/main.rs").contains("CheckCoverageMatrixCompleteness"));
     assert!(include_str!("../src/prepush.rs").contains("\"check-coverage-matrix-completeness\""));
     assert!(include_str!("../../.github/workflows/discipline.yml")
-        .contains("  check-coverage-matrix-completeness:"));
+        .contains("      - name: check-coverage-matrix-completeness\n"));
 }

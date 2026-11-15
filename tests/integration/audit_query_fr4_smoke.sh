@@ -15,7 +15,8 @@
 # missing key or false value). Wall-clock elapsed is printed for the
 # operator NFR-Onb-2 (≤5-minute evaluator path).
 #
-# Wired into CI by `.github/workflows/discipline.yml::audit-query-fr4-smoke`.
+# Wired into CI by the `audit-query-fr4-smoke` step of the `smoke-suite` job
+# (`.github/workflows/discipline.yml::smoke-suite`).
 
 set -euo pipefail
 

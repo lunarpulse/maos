@@ -88,8 +88,69 @@ fn real_tree_has_48_bound_and_enrolled_gates() {
 #[test]
 fn removing_per_commit_ship_edge_reds() {
     let copy = tree();
-    drop_need(copy.path(), "v1-0-ship-gate", "check-breaking-md");
-    red(run(copy.path()), "check-breaking-md");
+    drop_need(copy.path(), "v1-0-ship-gate", "check-export-control");
+    red(run(copy.path()), "check-export-control");
+}
+
+#[test]
+fn removing_the_consolidated_job_edge_reds_every_gate_it_carries() {
+    let copy = tree();
+    drop_need(copy.path(), "v1-0-ship-gate", "xtask-gates");
+    let output = run(copy.path());
+    let text = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for gate in [
+        "check-stability-matrix",
+        "check-breaking-md",
+        "check-pentest-gate",
+        "check-third-party-trial",
+        "check-red-team-gate",
+        "check-env-contract",
+        "check-test-cost",
+    ] {
+        assert!(
+            text.contains(&format!(
+                "{gate}: expected exactly one ship enrolment, found 0"
+            )),
+            "{gate}: {text}"
+        );
+    }
+    red(output, "check-breaking-md");
+}
+
+#[test]
+fn renaming_a_consolidated_gate_step_reds_that_gate() {
+    let copy = tree();
+    plant(
+        copy.path(),
+        ".github/workflows/discipline.yml",
+        "      - name: check-breaking-md\n",
+        "      - name: check-breaking-md-renamed\n",
+    );
+    red(
+        run(copy.path()),
+        "check-breaking-md: expected exactly one ship enrolment, found 0",
+    );
+}
+
+#[test]
+fn a_gate_enrolled_directly_and_as_a_consolidated_step_reds() {
+    let copy = tree();
+    let path = workflow(copy.path(), "discipline.yml");
+    let mut yaml: serde_yaml::Value =
+        serde_yaml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    yaml["jobs"]["v1-0-ship-gate"]["needs"]
+        .as_sequence_mut()
+        .unwrap()
+        .push(serde_yaml::Value::String("check-breaking-md".into()));
+    fs::write(path, serde_yaml::to_string(&yaml).unwrap()).unwrap();
+    red(
+        run(copy.path()),
+        "check-breaking-md: expected exactly one ship enrolment, found 2",
+    );
 }
 
 #[test]

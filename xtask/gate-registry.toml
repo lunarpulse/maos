@@ -34,6 +34,11 @@ gates = [
     # except `reproducible-build`, which is advisory (continue-on-error) and no longer in `aggregate.needs`
     # (CI release-ready program W1a, operator ruling 2026-11-14); `clippy-ratchet`, `rebaseline-check`,
     # `calibrate` and `example-spirit-regen` have no discipline job of that name, so no `aggregate.needs` entry.
+    # CI release-ready program W2 (2026-11-15): the deterministic xtask gates and the maos-bin smokes named here
+    # no longer run as a job each. Each is a NAMED STEP (step name == the name below) of the consolidated
+    # `xtask-gates` / `smoke-suite` jobs, and THOSE are the `aggregate.needs` entries. The gate's identity (this
+    # name, its xtask subcommand, its JSON) is unchanged; `check-workspace-count`, `check-corpus`,
+    # `check-review-findings-resolved` and `check-dev-record-completeness` stay jobs because other jobs `needs` them.
     "clippy-ratchet",
     "reproducible-build",
     "check-unsafe",
@@ -245,7 +250,9 @@ gates = [
 # disposition per phase, mechanizing the advisory→blocking cutover. The
 # `check-ship-gate-completeness` lint and the `v1.5-ship-gate` aggregate job
 # consume this to enforce that a gate's phase disposition is explicit and that
-# the "WILL block at v1.5" promise is testable, not aspirational.
+# the "WILL block at v1.5" promise is testable, not aspirational. A gate whose per-commit
+# enrolment is a step of the consolidated `xtask-gates` job (CI release-ready program W2)
+# keeps its row, and its name, here: the lint resolves it by step name.
 #
 # Story 20-3a AC4.1 — every row also carries a REQUIRED `binding`, the gate's
 # dev-time enforcement class, separate from the GA ladder above:
@@ -261,8 +268,9 @@ gates = [
 # other disposition passes it advisory with a warning and `passed: false`
 # (`gate_common::OutOfLedgerVerdict`). The loader refuses a missing or unknown
 # value; this field is the only class home for names with no module.
-# Story 20-3a AC4 — measured discipline.yml jobs, all required by
-# v1-0-ship-gate.needs with no continue-on-error or substrate skip:
+# Story 20-3a AC4 — measured discipline.yml gates, all required by
+# v1-0-ship-gate.needs (directly, or as a named step of the `xtask-gates` job) with no
+# continue-on-error or substrate skip:
 # ccac-n600-ship-gate runs the committed CCAC corpus (P0 ship-blocker);
 # nfr-rel-3-hsis-95pct runs the committed HSIS per-class pass-rate oracle;
 # check-stability-matrix checks generated workspace metadata for drift;

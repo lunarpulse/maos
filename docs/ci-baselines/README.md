@@ -91,5 +91,9 @@ The v0.1-alpha `discipline.yml` runs the following gates:
 | calibrate | 0.4 | per-commit, populated by Story 0.4 corpus |
 | determinism-tests | 0.5 / E0-retro / 20-3a | advisory — owner: Winston; DF6 signal pending NFR-Sec-4; not proof |
 
+Since the CI release-ready program W2 (2026-11-15) the xtask-driven rows above (`check-unsafe`, `check-empty-kernel`,
+`check-loom`, `check-service-boundary`, `check-judge-config`, `coverage-matrix`, `corpus-staleness`) are named steps of
+the single `xtask-gates` job rather than one job each; their names, commands and `--json` output are unchanged.
+
 **Any green gate going red is a merge-block** — except gates explicitly marked
 "advisory," which surface warnings without flipping overall workflow status.

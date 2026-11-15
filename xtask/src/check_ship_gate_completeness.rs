@@ -3,7 +3,9 @@
 //! Story 20-3a AC4 — ship-gate enrolment and binding drift:
 //! 1. The 48 expected names and required-binding registry rows are one set.
 //! 2. Each name resolves exactly once: a per-commit `v1-0-ship-gate.needs`
-//!    entry or an explicitly mapped cadence job key.
+//!    entry, a step named after the gate in the consolidated job
+//!    (`CONSOLIDATED_JOB`, itself a `v1-0-ship-gate.needs` entry), or an
+//!    explicitly mapped cadence job key.
 //! 3. `aggregate.needs` reaches `v1-0-ship-gate` directly.
 //! 4. Story 13.6e AC5: consumes the ledger-set gates' published `product_claim`
 //!    artifacts and refuses a ship badge asserted over `NOT_PROVEN` evidence.
@@ -139,6 +141,14 @@ const CADENCE_GATES: &[(&str, &str, &str)] = &[
     ("check-fuzz-floor", "fuzz-cadence.yml", "check-fuzz-floor"),
 ];
 
+/// CI release-ready program W2 (2026-11-15): the deterministic xtask gates run
+/// as NAMED STEPS of this one `discipline.yml` job instead of one job each. A
+/// gate is enrolled through it when the job is a `v1-0-ship-gate.needs` entry
+/// (the edge is what makes its steps block the ship gate) and one of the job's
+/// steps is named exactly like the gate. Resolution stays "exactly once": a gate
+/// that is both a direct `needs` job and a step there is refused.
+const CONSOLIDATED_JOB: &str = "xtask-gates";
+
 /// Is this invocation the one that DOWNLOADED the ledger artifacts?
 ///
 /// Pure so it can be tested without mutating process env (these tests run in
@@ -198,6 +208,7 @@ fn ledger_ship_badge_problems(
 pub fn run(json: bool) -> Result<(), String> {
     let workflow = load_workflow("discipline.yml")?;
     let needs = extract_job_needs(&workflow, "v1-0-ship-gate")?;
+    let consolidated = consolidated_gate_steps(&workflow, &needs)?;
     let cadence = [
         ("rpo-rto-cadence.yml", load_workflow("rpo-rto-cadence.yml")?),
         ("fuzz-cadence.yml", load_workflow("fuzz-cadence.yml")?),
@@ -206,6 +217,10 @@ pub fn run(json: bool) -> Result<(), String> {
     let mut enrolment_problems = Vec::new();
     for gate in EXPECTED_GATES {
         let mut enrolments = needs.iter().filter(|name| name.as_str() == *gate).count();
+        enrolments += consolidated
+            .iter()
+            .filter(|name| name.as_str() == *gate)
+            .count();
         if let Some((_, filename, job)) = CADENCE_GATES.iter().find(|(name, _, _)| name == gate) {
             let (_, workflow) = cadence
                 .iter()
@@ -315,6 +330,8 @@ pub fn run(json: bool) -> Result<(), String> {
                 "found_count": needs.len(),
                 "missing": missing,
                 "found": needs,
+                "consolidated_job": CONSOLIDATED_JOB,
+                "consolidated_steps": consolidated,
                 "enrolment_problems": enrolment_problems,
                 "ledger_set": crate::evidence_ledger::ledger_gates(),
                 // Never silently skipped: when false, the ledger legs did not
@@ -398,6 +415,25 @@ fn extract_job_needs(workflow: &serde_yaml::Value, job: &str) -> Result<Vec<Stri
         .collect()
 }
 
+/// The step names of `CONSOLIDATED_JOB`, but only when that job is a
+/// `v1-0-ship-gate.needs` entry: without the edge its steps block nothing, so
+/// they enrol nothing.
+fn consolidated_gate_steps(
+    workflow: &serde_yaml::Value,
+    needs: &[String],
+) -> Result<Vec<String>, String> {
+    if !needs.iter().any(|name| name == CONSOLIDATED_JOB) {
+        return Ok(Vec::new());
+    }
+    let steps = workflow["jobs"][CONSOLIDATED_JOB]["steps"]
+        .as_sequence()
+        .ok_or_else(|| format!("{CONSOLIDATED_JOB}.steps: expected a step list"))?;
+    Ok(steps
+        .iter()
+        .filter_map(|step| step["name"].as_str().map(str::to_string))
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -467,6 +503,45 @@ jobs:
         assert_eq!(needs.len(), 3);
         // check-breaking-md is missing — the run() would fail.
         assert!(!needs.contains(&"check-breaking-md".to_string()));
+    }
+
+    #[test]
+    fn consolidated_steps_enrol_only_through_a_needed_job() {
+        let yaml = r#"
+jobs:
+  v1-0-ship-gate:
+    needs: [xtask-gates, check-export-control]
+  xtask-gates:
+    steps:
+      - uses: actions/checkout@v5
+      - name: check-breaking-md
+        run: cargo run -p xtask -- check-breaking-md --json
+      - name: check-stability-matrix
+        run: cargo run -p xtask -- stability-matrix --check --json
+"#;
+        let workflow: serde_yaml::Value = serde_yaml::from_str(yaml).unwrap();
+        let needs = extract_job_needs(&workflow, "v1-0-ship-gate").unwrap();
+        let found = consolidated_gate_steps(&workflow, &needs).unwrap();
+        assert_eq!(found, ["check-breaking-md", "check-stability-matrix"]);
+        // The job exists but is no `v1-0-ship-gate.needs` entry: its steps block
+        // nothing, so they enrol nothing.
+        let detached = vec!["check-export-control".to_string()];
+        let enrolled = consolidated_gate_steps(&workflow, &detached).unwrap();
+        assert!(enrolled.is_empty());
+    }
+
+    #[test]
+    fn consolidated_job_without_steps_is_an_error_not_a_pass() {
+        let yaml = r#"
+jobs:
+  v1-0-ship-gate:
+    needs: [xtask-gates]
+  xtask-gates:
+    runs-on: ubuntu-24.04
+"#;
+        let workflow: serde_yaml::Value = serde_yaml::from_str(yaml).unwrap();
+        let needs = extract_job_needs(&workflow, "v1-0-ship-gate").unwrap();
+        assert!(consolidated_gate_steps(&workflow, &needs).is_err());
     }
 
     fn dispositions(

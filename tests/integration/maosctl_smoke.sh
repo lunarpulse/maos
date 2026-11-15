@@ -9,8 +9,9 @@
 # warm-cached in CI); `run` produces the FR58 JSON keys on stdout.
 #
 # Pattern matches `audit_query_fr4_smoke.sh` (Story 1b.5b) — atomic
-# mktemp, trap-cleanup, NO_COLOR-by-default. Wired into CI as
-# `.github/workflows/discipline.yml::maosctl-smoke`.
+# mktemp, trap-cleanup, NO_COLOR-by-default. Wired into CI as the
+# `maosctl-smoke` step of the `smoke-suite` job
+# (`.github/workflows/discipline.yml::smoke-suite`).
 
 set -euo pipefail
 

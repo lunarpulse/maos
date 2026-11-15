@@ -247,8 +247,8 @@ fn proven_red_steps_run_after_a_red_gate_step() {
     let jobs = key(&workflow, "jobs");
     for (job_name, step, test) in [
         (
-            "check-test-cost",
-            "Run the 20-12 AC2 proven-red vectors",
+            "xtask-gates",
+            "check-test-cost proven-red vectors (20-12 AC2)",
             "check_test_cost_proven_red",
         ),
         (

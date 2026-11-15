@@ -197,6 +197,491 @@ jobs:
       - name: cargo deny check
         run: cargo deny check --disable-fetch
 
+  # CI release-ready program W2 (2026-11-15; `_bmad-output/planning-artifacts/ci-release-ready-program-2026-11-14.md`
+  # §6) — the deterministic xtask gates are NAMED STEPS of this ONE hosted job. xtask is built once (`build-xtask`)
+  # and every gate step runs that build; before W2 each gate below was its own job (27 jobs, each a checkout +
+  # toolchain + cache restore + its own xtask build).
+  #
+  # Membership rule: the old job's only work was `cargo run -p xtask -- <gate>` (plus xtask-only proven-red test
+  # steps), the gate is one `xtask prepush` already runs locally (`xtask/src/prepush.rs` GATES; the steps keep that
+  # order), it judges committed files only, and it needed no secret, service, matrix runner, extra toolchain or
+  # feature, artifact or `needs` edge. A gate another job `needs` (check-workspace-count, check-corpus,
+  # check-review-findings-resolved, check-dev-record-completeness) keeps its own job, so consolidation puts no new
+  # edge in front of any other job.
+  #
+  # Identity is unchanged: step `name` == `id` == the gate's registry / old job name, running the old command and
+  # printing the old `--json`. `check-ship-gate-completeness` enrols the EXPECTED_GATES that live here by step name
+  # (`xtask/src/check_ship_gate_completeness.rs`, CONSOLIDATED_JOB).
+  #
+  # EVERY gate runs even when an earlier one is red: each gate step is `if: !cancelled() && <xtask built>`, never
+  # `continue-on-error`, so a red gate is a red step and a red job. The last step lists every step whose outcome was
+  # not `success` and fails the job. No retry. The per-step outcomes are also job `outputs`, so `aggregate`,
+  # `v1-0-ship-gate`, `v1-5-ship-gate` and the PR comment can read ONE gate's result, not only the job's.
+  xtask-gates:
+    runs-on: ubuntu-24.04
+    # 27 gates + 2 xtask test targets, sequential after one cold xtask build (the old jobs summed to about 3,000
+    # job-seconds; plan §6). 45 keeps the 30-minute floor with headroom for that build.
+    timeout-minutes: 45
+    outputs:
+      build-xtask: ${{ steps.build-xtask.outcome }}
+      check-stability-matrix: ${{ steps.check-stability-matrix.outcome }}
+      check-serde-error-handling: ${{ steps.check-serde-error-handling.outcome }}
+      check-manifest-schema-version: ${{ steps.check-manifest-schema-version.outcome }}
+      check-skill-schema: ${{ steps.check-skill-schema.outcome }}
+      check-epic-close-coherence: ${{ steps.check-epic-close-coherence.outcome }}
+      check-coverage-matrix-completeness: ${{ steps.check-coverage-matrix-completeness.outcome }}
+      check-test-cost: ${{ steps.check-test-cost.outcome }}
+      check-test-cost-vectors: ${{ steps.check-test-cost-vectors.outcome }}
+      check-env-contract: ${{ steps.check-env-contract.outcome }}
+      check-unsafe: ${{ steps.check-unsafe.outcome }}
+      check-service-boundary: ${{ steps.check-service-boundary.outcome }}
+      check-breaking-md: ${{ steps.check-breaking-md.outcome }}
+      check-pub-field-constructors: ${{ steps.check-pub-field-constructors.outcome }}
+      check-dependency-closure: ${{ steps.check-dependency-closure.outcome }}
+      coverage-matrix: ${{ steps.coverage-matrix.outcome }}
+      check-empty-kernel: ${{ steps.check-empty-kernel.outcome }}
+      check-loom: ${{ steps.check-loom.outcome }}
+      check-fr47: ${{ steps.check-fr47.outcome }}
+      check-a2a-sender-completeness: ${{ steps.check-a2a-sender-completeness.outcome }}
+      check-judge-config: ${{ steps.check-judge-config.outcome }}
+      check-security-md: ${{ steps.check-security-md.outcome }}
+      check-security-md-vectors: ${{ steps.check-security-md-vectors.outcome }}
+      example-spirit-drift: ${{ steps.example-spirit-drift.outcome }}
+      corpus-staleness: ${{ steps.corpus-staleness.outcome }}
+      check-dev-model-tier: ${{ steps.check-dev-model-tier.outcome }}
+      check-pentest-gate: ${{ steps.check-pentest-gate.outcome }}
+      check-third-party-trial: ${{ steps.check-third-party-trial.outcome }}
+      check-red-team-gate: ${{ steps.check-red-team-gate.outcome }}
+      nfr-onb-1-gate: ${{ steps.nfr-onb-1-gate.outcome }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: xtask-gates-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build xtask once (every gate step runs this build)
+        id: build-xtask
+        run: cargo build -p xtask
+      # Story 7.5a AC3 — STABILITY.md generated-from-workspace; --check fails on drift (NFR-Maint-4).
+      - name: check-stability-matrix
+        id: check-stability-matrix
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- stability-matrix --check --json
+      # Story 6.2 AC1 Task 0.2 — Epic 4 retro §A6 / Epic 5 §A3 carry-forward closure: the gate enforces typed
+      # serde::Error handling (no .unwrap() / no Display-via-anyhow); `xtask/src/check_serde_error_handling.rs`.
+      # HARD-FAIL since Story 7.1.7 (baseline-reset). The 300 pre-existing sites are FROZEN in
+      # xtask/serde-error-allowlist.toml; the gate now fails only on NEW `serde_json::*` +
+      # `.unwrap()/.expect()/.unwrap_or_*()` sites beyond that set. Full remediation of the frozen sites is tracked
+      # as a follow-up (Story 8.x).
+      - name: check-serde-error-handling
+        id: check-serde-error-handling
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-serde-error-handling --json
+      # Epic 6 §A4 (retro 2026-05-28) — keeps MANIFEST_SCHEMA_VERSION + MIN/MAX constants self-consistent and
+      # blocks hardcoded `manifest_schema_version` comparisons in `maos-manifest` production code (Story 7.5a's
+      # ABI Stability Triple consumes these constants directly).
+      - name: check-manifest-schema-version
+        id: check-manifest-schema-version
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-manifest-schema-version --json
+      # Story 7.4 AC6 — maos.skill.v1 schema posture gate.
+      - name: check-skill-schema
+        id: check-skill-schema
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-skill-schema --json
+      # Epic-13 retro C1 + 20-3b: close-out sources agree and no workflow gate is parked.
+      - name: check-epic-close-coherence
+        id: check-epic-close-coherence
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-epic-close-coherence --json
+      # Story 10.1b AC3 — coverage matrix completeness: no v1.0 NFR has empty gates.
+      - name: check-coverage-matrix-completeness
+        id: check-coverage-matrix-completeness
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-coverage-matrix-completeness --json
+      # Story 20-12 AC2 — no test compiles the tree. A cargo spawn (`Command::new("cargo")`, `env!`/`var`/
+      # `var_os("CARGO")`), `rustc` or `trybuild` under any workspace member's tests dir reds here unless the line
+      # above says `// expensive: <reason>`, its tests are `#[ignore = "expensive: …"]` and the binary is registered in
+      # `xtask/test-budgets.toml [[expensive]]` under a job that runs ignored tests — or, for a cargo tree/metadata/
+      # locate-project/pkgid query, `// cargo-query: <reason>` (stays in the default run). Hermetic: it reads
+      # committed sources only. Proven-red vectors run right after it.
+      - name: check-test-cost
+        id: check-test-cost
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-test-cost --json
+      # 18-0 AC6: runs after a red gate step too (the vectors prove the gate can red).
+      - name: check-test-cost proven-red vectors (20-12 AC2)
+        id: check-test-cost-vectors
+        if: ${{ !cancelled() }}
+        run: cargo test -p xtask --test check_test_cost_proven_red
+      # Story 12.6 — blocking registry coverage for maos-bin/src only; Story 12.7 widens this workspace-wide.
+      - name: check-env-contract
+        id: check-env-contract
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-env-contract --json
+      - name: check-unsafe
+        id: check-unsafe
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-unsafe --json
+      - name: check-service-boundary
+        id: check-service-boundary
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-service-boundary --json
+      # Story 7.5a AC3 — BREAKING.md dated-entry + Migration taxonomy CI-grep-enforced (NFR-Maint-7).
+      - name: check-breaking-md
+        id: check-breaking-md
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-breaking-md --json
+      - name: check-pub-field-constructors
+        id: check-pub-field-constructors
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-pub-field-constructors --json
+      # Story 10.4a / 11.1a — dependency-closure gate: the kernel-core + domain trees exclude the Postgres/pgvector
+      # stack AND the WASM runtime stack (wasmtime/wasmtime-wasi/wit-bindgen, ADR-031/ADR-041 isolation).
+      - name: check-dependency-closure
+        id: check-dependency-closure
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-dependency-closure --json
+      - name: coverage-matrix
+        id: coverage-matrix
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- coverage-matrix --json
+      - name: check-empty-kernel
+        id: check-empty-kernel
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-empty-kernel --json
+      - name: check-loom
+        id: check-loom
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-loom --json
+      - name: check-fr47
+        id: check-fr47
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-fr47 --json
+      # Story 8.8 AC3 — cross-Host A2A sender-completeness (GREEN-at-HEAD precondition for the fail-closed flip;
+      # never flipped-while-red).
+      - name: check-a2a-sender-completeness
+        id: check-a2a-sender-completeness
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-a2a-sender-completeness --json
+      - name: check-judge-config
+        id: check-judge-config
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-judge-config --json
+      - name: check-security-md
+        id: check-security-md
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-security-md --json
+      - name: check-security-md proven-red vectors
+        id: check-security-md-vectors
+        if: ${{ !cancelled() }}
+        run: cargo test -p xtask check_security_md::tests -- --test-threads=1
+      # The template drift check covers the Rust and TypeScript templates (`templates-regen --check`).
+      - name: example-spirit-drift
+        id: example-spirit-drift
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- templates-regen --check --json
+      - name: corpus-staleness
+        id: corpus-staleness
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- corpus-staleness --json
+      # Epic 12 retro B3 (Option C Blocking; closes E11 retro A1) — frontier-era (epic >= 12) stories must record an
+      # allowlisted dev model + a §A6 review artifact. Makes the frontier-allowlist policy mechanical, not cultural.
+      - name: check-dev-model-tier
+        id: check-dev-model-tier
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-dev-model-tier --json
+      # Story 10.1b AC1 — pen-test gate: conditional per calibrate-per-commit pattern. When summary.toml exists,
+      # parse and assert p0_open == 0 && p1_open == 0. When absent, report ABSENT (not a pass), advisory at v1_5.
+      - name: check-pentest-gate
+        id: check-pentest-gate
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-pentest-gate --json
+      # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
+      # Story 15-3 AC2(b): the ship-phase env block that stood on the old job is retired. A GitHub *repository
+      # variable* could move this one gate's ship phase with no code change, and `check-env-contract` can never see
+      # it (it scans only the maos-bin src tree), so it was a third phase source no instrument could audit. The
+      # variable's name is recorded in ADR-065 rather than here: AC1's oracle counts FILES carrying the token, so
+      # repeating it would defeat the check that it is gone. The phase is now `gate_common::CURRENT_PHASE`, and
+      # advancing it at the v2.0 ship gate is a one-line code change under review.
+      - name: check-third-party-trial
+        id: check-third-party-trial
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-third-party-trial
+      # Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase, advisory-until-engagement).
+      - name: check-red-team-gate
+        id: check-red-team-gate
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- check-red-team-gate --json
+      # Story 7.5b AC9 — NFR-Onb-1 30-min first-Spirit validation gate (discipline rail). Stratification + cohort
+      # evaluator + Butler-corpus seam over committed example artifacts; FAILs loudly on drift. Verdicts are
+      # provisional until Story 8.1's canonical Butler corpus lands (the resolver auto-prefers it).
+      - name: nfr-onb-1-gate
+        id: nfr-onb-1-gate
+        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
+        run: cargo run -p xtask -- nfr-onb-1-gate --check --json
+      - name: Report every gate result; fail if any did not pass
+        if: ${{ !cancelled() }}
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          set -euo pipefail
+          # Steps without an `id` (checkout, toolchain, cache, this step) carry a generated `__…` key: not gates.
+          gates="$(jq -c 'with_entries(select(.key | startswith("__") | not))' <<< "$STEPS_JSON")"
+          # An empty or reshaped context must never read as green: the build step is always in it.
+          if ! jq -e 'has("build-xtask")' <<< "$gates" > /dev/null; then
+            echo "::error title=xtask-gates::the steps context does not carry build-xtask; refusing a vacuous pass"
+            exit 1
+          fi
+          {
+            echo "| Step | Outcome |"
+            echo "|---|---|"
+            jq -r 'to_entries[] | "| \(.key) | \(.value.outcome) |"' <<< "$gates"
+          } >> "$GITHUB_STEP_SUMMARY"
+          failed="$(jq -r 'to_entries[] | select(.value.outcome != "success") | "\(.key)=\(.value.outcome)"' <<< "$gates")"
+          if [ -n "$failed" ]; then
+            echo "xtask-gates: every gate ran; these steps did not pass:"
+            while IFS= read -r line; do
+              echo "  $line"
+              echo "::error title=xtask-gates::$line"
+            done <<< "$failed"
+            exit 1
+          fi
+          echo "xtask-gates: all $(jq 'length' <<< "$gates") steps passed"
+
+  # CI release-ready program W2 (2026-11-15) — the 15 shell/smoke jobs that each rebuilt `maos-bin` (plan §3: 16
+  # jobs, 5,239 job-seconds) are NAMED STEPS of this ONE job. `maos-bin` is built once per profile in ONE shared
+  # `target/` (release + fixture_replay, release, debug); the later steps' own `cargo build` / `cargo run` find those
+  # artifacts fresh. No smoke assertion changed: every step runs the old job's command or script verbatim, and step
+  # `name` == `id` == the old job name. `onb-nfr2-timing` is NOT part of it: its assertion IS a `cargo clean` cold
+  # build plus its timing, which cannot share a build.
+  #
+  # Isolation: before W2 each smoke had a pristine runner, so nothing under HOME / XDG (Transparency Log, journals,
+  # the operator door's control.json) could leak from one smoke into the next. Every smoke step therefore starts
+  # under a fresh HOME, with CARGO_HOME / RUSTUP_HOME pinned to the real ones first so the toolchain and the registry
+  # cache stay shared. The release-binary smokes run before the debug ones, and no step runs `cargo clean`.
+  #
+  # Same failure contract as `xtask-gates`: every step runs after a red one (`if: !cancelled()`, never
+  # `continue-on-error`), the last step lists every step that was not `success` and fails the job, no retry, and
+  # the per-step outcomes are job `outputs`. `needs` is the old smoke-discipline-7-1-5 edge (that smoke runs the
+  # two gates inside the binary); `!cancelled()` keeps the other smokes running when those gates are red.
+  smoke-suite:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    needs: [check-review-findings-resolved, check-dev-record-completeness]
+    if: ${{ !cancelled() }}
+    outputs:
+      smoke-deps: ${{ steps.smoke-deps.outcome }}
+      build-maos-bin-fixture-replay: ${{ steps.build-maos-bin-fixture-replay.outcome }}
+      smoke-orchestrator-fanout-6-2: ${{ steps.smoke-orchestrator-fanout-6-2.outcome }}
+      smoke-a2a-loopback-6-3: ${{ steps.smoke-a2a-loopback-6-3.outcome }}
+      smoke-a2a-consent-vocab-8-7: ${{ steps.smoke-a2a-consent-vocab-8-7.outcome }}
+      smoke-a2a-fail-closed-8-8: ${{ steps.smoke-a2a-fail-closed-8-8.outcome }}
+      smoke-a2a-tcp-8-6: ${{ steps.smoke-a2a-tcp-8-6.outcome }}
+      smoke-schedule-6-4: ${{ steps.smoke-schedule-6-4.outcome }}
+      server-exit-drain: ${{ steps.server-exit-drain.outcome }}
+      audit-query-fr4-smoke: ${{ steps.audit-query-fr4-smoke.outcome }}
+      maosctl-smoke: ${{ steps.maosctl-smoke.outcome }}
+      smoke-discipline-7-1-5: ${{ steps.smoke-discipline-7-1-5.outcome }}
+      cap-registry-smoke: ${{ steps.cap-registry-smoke.outcome }}
+      smoke-skill-7-4: ${{ steps.smoke-skill-7-4.outcome }}
+      smoke-abi-7-5a: ${{ steps.smoke-abi-7-5a.outcome }}
+      smoke-registry-7-2: ${{ steps.smoke-registry-7-2.outcome }}
+      smoke-compliance-7-3: ${{ steps.smoke-compliance-7-3.outcome }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: smoke-suite-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install the smoke harness dependencies (sqlite3, jq)
+        id: smoke-deps
+        run: sudo apt-get update && sudo apt-get install -y sqlite3 jq
+      # The six MAOS_ONE_SHOT demos run the binary directly, so they need the fixture_replay build.
+      - name: Build maos-bin (release, fixture_replay)
+        id: build-maos-bin-fixture-replay
+        if: ${{ !cancelled() }}
+        run: cargo build -p maos-bin --release --features fixture_replay
+      # Story 6.2 AC7 — smoke-orchestrator-fanout-6-2 end-to-end demo arm.
+      - name: smoke-orchestrator-fanout-6-2
+        id: smoke-orchestrator-fanout-6-2
+        if: ${{ !cancelled() && steps.build-maos-bin-fixture-replay.outcome == 'success' }}
+        env:
+          MAOS_ONE_SHOT: smoke-orchestrator-fanout-6-2
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          ./target/release/maos
+      # Story 6.3 AC7 — smoke-a2a-loopback-6-3 A2A wedge demo.
+      - name: smoke-a2a-loopback-6-3
+        id: smoke-a2a-loopback-6-3
+        if: ${{ !cancelled() && steps.build-maos-bin-fixture-replay.outcome == 'success' }}
+        env:
+          MAOS_ONE_SHOT: smoke-a2a-loopback-6-3
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          ./target/release/maos
+      # Story 8.7 AC6 — smoke-a2a-consent-vocab-8-7 fine-grained typed-intent consent demo (one fine-grained admit +
+      # one fine-grained code-mutation-directive deny).
+      - name: smoke-a2a-consent-vocab-8-7
+        id: smoke-a2a-consent-vocab-8-7
+        if: ${{ !cancelled() && steps.build-maos-bin-fixture-replay.outcome == 'success' }}
+        env:
+          MAOS_ONE_SHOT: smoke-a2a-consent-vocab-8-7
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          ./target/release/maos
+      # Story 8.8 AC4 — smoke-a2a-fail-closed-8-8: fail-closed cross-Host consent demo (classified admit +
+      # absent-deny -32009 + non-canonical-deny -32009).
+      - name: smoke-a2a-fail-closed-8-8
+        id: smoke-a2a-fail-closed-8-8
+        if: ${{ !cancelled() && steps.build-maos-bin-fixture-replay.outcome == 'success' }}
+        env:
+          MAOS_ONE_SHOT: smoke-a2a-fail-closed-8-8
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          ./target/release/maos
+      # Story 8.6 AC-T13/AC-A7 — smoke-a2a-tcp-8-6: live cross-Host Mira(host_a) → Nash(host_b) advisory over a REAL
+      # TCP/mTLS socket (genuine handshake + wire, NOT the in-process loopback shortcut).
+      - name: smoke-a2a-tcp-8-6
+        id: smoke-a2a-tcp-8-6
+        if: ${{ !cancelled() && steps.build-maos-bin-fixture-replay.outcome == 'success' }}
+        env:
+          MAOS_ONE_SHOT: smoke-a2a-tcp-8-6
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          ./target/release/maos
+      # Story 6.4 AC5 — end-to-end wedge demo: ScheduleWatchdog firing + rate-limit cap + ConsentRupture detection +
+      # RateLimited frame emission.
+      - name: smoke-schedule-6-4
+        id: smoke-schedule-6-4
+        if: ${{ !cancelled() && steps.build-maos-bin-fixture-replay.outcome == 'success' }}
+        env:
+          MAOS_ONE_SHOT: smoke-schedule-6-4
+          MAOS_SCHEDULE_FAST: "1"
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          ./target/release/maos
+      # Story 2.5 AC1 — verifies cap-audit drain on SIGTERM in both one-shot and long-running server paths. The drain
+      # block is identical in both arms of main.rs, so row persistence is tested via the one-shot path (which
+      # generates cap-audit rows deterministicly), and the server path is structurally validated for drain-block
+      # reachability. Hermetic since CI release-ready program W1b: the one-shot runs under
+      # `MAOS_INFERENCE_MODE=replay` against the committed seed cassette, so the leg needs no provider key and the
+      # script has no skip branch.
+      - name: server-exit-drain
+        id: server-exit-drain
+        if: ${{ !cancelled() }}
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          bash tests/integration/server_exit_drain.sh
+      # Story 1b.5b AC4 — end-to-end `maosctl audit query` mechanical verification path. Seeds the on-disk
+      # Transparency Log via the one-shot hello-Spirit binary, then asserts the FR4 NDJSON schema via jq.
+      # Complementary to the `fr4_1000_call_fixture` test (kernel-side mediation; run by workspace-test-suite) —
+      # this gate exercises the read-side surface.
+      - name: audit-query-fr4-smoke
+        id: audit-query-fr4-smoke
+        if: ${{ !cancelled() }}
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          bash tests/integration/audit_query_fr4_smoke.sh
+      # Story 1b.5c AC1 — end-to-end `maosctl` lifecycle smoke. Drives all five v0.1 verbs
+      # (install/run/start/stop/unload) against the reference `hello-spirit` and asserts each side-effect
+      # mechanically (FR58 JSON on run; one Lifecycle Journal NDJSON line per lifecycle verb; exit 2 + zero journal
+      # mutation on unknown-spirit).
+      - name: maosctl-smoke
+        id: maosctl-smoke
+        if: ${{ !cancelled() }}
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          bash tests/integration/maosctl_smoke.sh
+      - name: smoke-discipline-7-1-5
+        id: smoke-discipline-7-1-5
+        if: ${{ !cancelled() }}
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          MAOS_ONE_SHOT=smoke-discipline-7-1-5 cargo run --release -p maos-bin
+      - name: cap-registry-smoke
+        id: cap-registry-smoke
+        if: ${{ !cancelled() }}
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          bash tests/integration/cap_registry_smoke.sh
+      # Story 18-7 — library-only skill smoke (4 deterministic JSON lines).
+      - name: smoke-skill-7-4
+        id: smoke-skill-7-4
+        if: ${{ !cancelled() }}
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          cargo build -p maos-bin
+          out="$(MAOS_ONE_SHOT=smoke-skill-7-4 cargo run -q -p maos-bin)"
+          echo "$out"
+          lines="$(printf '%s\n' "$out" | grep -c '"step"')"
+          test "$lines" -eq 4 || { echo "expected 4 JSON step lines, got $lines"; exit 1; }
+          printf '%s\n' "$out" | grep -q '"total":210' || { echo "LCAS total != 210"; exit 1; }
+      # Story 7.5a AC6 — ABI Stability Triple observability smoke (5 deterministic JSON lines).
+      - name: smoke-abi-7-5a
+        id: smoke-abi-7-5a
+        if: ${{ !cancelled() }}
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          cargo build -p maos-bin
+          out="$(MAOS_ONE_SHOT=smoke-abi-7-5a cargo run -q -p maos-bin)"
+          echo "$out"
+          lines="$(printf '%s\n' "$out" | grep -c '"step"')"
+          test "$lines" -eq 5 || { echo "expected 5 JSON step lines, got $lines"; exit 1; }
+          printf '%s\n' "$out" | grep -q '"error":"ESubstrateTooOld"' || { echo "missing ESubstrateTooOld refusal"; exit 1; }
+          printf '%s\n' "$out" | grep -q '"error":"EAbiTooOld"' || { echo "missing EAbiTooOld refusal"; exit 1; }
+          printf '%s\n' "$out" | grep -q '"outcome":"in_sync"' || { echo "STABILITY.md not in sync"; exit 1; }
+      # Story 7.2 AC6 — end-to-end v1.0 binding round-trip (publish → search → install → yank → audit → import).
+      # maos-cli produces the `maosctl` binary the smoke's step-8 air-gap import invokes (resolved as a
+      # daemon-sibling). Without it, maosctl is absent in CI and the smoke aborts at `maosctl import`.
+      - name: smoke-registry-7-2
+        id: smoke-registry-7-2
+        if: ${{ !cancelled() }}
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          cargo build -p maos-bin -p maos-spirit-cli -p maos-cli
+          MAOS_ONE_SHOT=smoke-registry-7-2 cargo run -p maos-bin
+      # Story 7.3 AC6 — Layer-1.5 observability: v1.0 admission-verification demo.
+      - name: smoke-compliance-7-3
+        id: smoke-compliance-7-3
+        if: ${{ !cancelled() }}
+        run: |
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
+          cargo build -p maos-bin -p maos-spirit-cli
+          MAOS_ONE_SHOT=smoke-compliance-7-3 cargo run -p maos-bin
+      - name: Report every smoke result; fail if any did not pass
+        if: ${{ !cancelled() }}
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          set -euo pipefail
+          # Steps without an `id` (checkout, toolchain, cache, this step) carry a generated `__…` key: not smokes.
+          smokes="$(jq -c 'with_entries(select(.key | startswith("__") | not))' <<< "$STEPS_JSON")"
+          # An empty or reshaped context must never read as green: the dependency step is always in it.
+          if ! jq -e 'has("smoke-deps")' <<< "$smokes" > /dev/null; then
+            echo "::error title=smoke-suite::the steps context does not carry smoke-deps; refusing a vacuous pass"
+            exit 1
+          fi
+          {
+            echo "| Step | Outcome |"
+            echo "|---|---|"
+            jq -r 'to_entries[] | "| \(.key) | \(.value.outcome) |"' <<< "$smokes"
+          } >> "$GITHUB_STEP_SUMMARY"
+          failed="$(jq -r 'to_entries[] | select(.value.outcome != "success") | "\(.key)=\(.value.outcome)"' <<< "$smokes")"
+          if [ -n "$failed" ]; then
+            echo "smoke-suite: every smoke ran; these steps did not pass:"
+            while IFS= read -r line; do
+              echo "  $line"
+              echo "::error title=smoke-suite::$line"
+            done <<< "$failed"
+            exit 1
+          fi
+          echo "smoke-suite: all $(jq 'length' <<< "$smokes") steps passed"
+
   # 20-3b row 11 B: advisory debt lane, deliberately NOT in aggregate.needs.
   # Count both repeated warning occurrences and source-distinct diagnostics.
   clippy-advisory:
@@ -224,20 +709,6 @@ jobs:
         with:
           name: clippy-advisory-diagnostics
           path: clippy.jsonl
-
-  check-unsafe:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-unsafe
-        run: cargo run -p xtask -- check-unsafe --json
 
   # Epic 12 retro B4 (Option C Blocking, hermetic) — a `cargo fmt` reflow must
   # red at its ORIGIN commit, not drift silently into a later story's kernel
@@ -334,48 +805,6 @@ jobs:
       - name: Run gen-abi-docs anti-rot gate
         run: cargo run -p xtask -- gen-abi-docs --check
 
-  check-empty-kernel:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-empty-kernel
-        run: cargo run -p xtask -- check-empty-kernel --json
-
-  check-loom:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-loom
-        run: cargo run -p xtask -- check-loom --json
-
-  check-fr47:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-fr47
-        run: cargo run -p xtask -- check-fr47 --json
-
   check-workspace-count:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -389,36 +818,6 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-workspace-count
         run: cargo run -p xtask -- check-workspace-count --json
-
-  # Story 8.8 AC3 — cross-Host A2A sender-completeness (GREEN-at-HEAD precondition
-  # for the fail-closed flip; never flipped-while-red).
-  check-a2a-sender-completeness:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-a2a-sender-completeness
-        run: cargo run -p xtask -- check-a2a-sender-completeness --json
-
-  check-pub-field-constructors:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-pub-field-constructors
-        run: cargo run -p xtask -- check-pub-field-constructors --json
 
   check-composition-root-completeness:
     runs-on: ubuntu-24.04
@@ -440,35 +839,6 @@ jobs:
           cargo run --locked -p xtask -- build-test-fixtures --only maos-crypto-recording
           cargo build --locked -p maos-cli
           cargo test --locked -p maos-bin --test crypto_real_shell_20_13 --test crypto_real_boot_20_13
-
-  check-service-boundary:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-service-boundary
-        run: cargo run -p xtask -- check-service-boundary --json
-
-  # Story 12.6 — blocking registry coverage for maos-bin/src only; Story 12.7 widens this workspace-wide.
-  check-env-contract:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-env-contract
-        run: cargo run -p xtask -- check-env-contract --json
 
   # Story 14-0 AC1 — the Epic-14 preflight decision register's reader.
   #
@@ -580,33 +950,6 @@ jobs:
         run: cargo run -p xtask -- check-model-currency --json
       - name: Run the 17-5 proven-red vectors
         run: cargo test -p xtask --test model_currency_gate
-
-  # Story 20-12 AC2 — no test compiles the tree. A cargo spawn
-  # (`Command::new("cargo")`, `env!`/`var`/`var_os("CARGO")`), `rustc` or
-  # `trybuild` under any workspace member's tests dir reds here unless the line
-  # above says `// expensive: <reason>`, its tests are `#[ignore = "expensive: …"]`
-  # and the binary is registered in `xtask/test-budgets.toml [[expensive]]`
-  # under a job that runs ignored tests — or, for a cargo tree/metadata/
-  # locate-project/pkgid query, `// cargo-query: <reason>` (stays in the default
-  # run). Hermetic: it reads committed sources only. Proven-red vectors run in
-  # the same job.
-  check-test-cost:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-test-cost
-        run: cargo run -p xtask -- check-test-cost --json
-      # 18-0 AC6: runs after a red gate step too (the vectors prove the gate can red).
-      - name: Run the 20-12 AC2 proven-red vectors
-        if: ${{ !cancelled() }}
-        run: cargo test -p xtask --test check_test_cost_proven_red
 
   # Story 20-12 AC1 — every test binary in the workspace suite's nextest junit
   # keeps its Σ per-test time under its `xtask/test-budgets.toml` budget
@@ -839,60 +1182,6 @@ jobs:
           fi
           echo "maos-audit read-only guard passed."
 
-  check-judge-config:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-judge-config
-        run: cargo run -p xtask -- check-judge-config --json
-
-  check-security-md:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-security-md
-        run: cargo run -p xtask -- check-security-md --json
-      - name: Run check-security-md proven-red vectors
-        run: cargo test -p xtask check_security_md::tests -- --test-threads=1
-
-  server-exit-drain:
-    # Story 2.5 AC1 — verifies cap-audit drain on SIGTERM in both one-shot
-    # and long-running server paths. The drain block is identical in both
-    # arms of main.rs, so row persistence is tested via the one-shot path
-    # (which generates cap-audit rows deterministicly), and the server
-    # path is structurally validated for drain-block reachability.
-    # Hermetic since CI release-ready program W1b: the one-shot runs under
-    # `MAOS_INFERENCE_MODE=replay` against the committed seed cassette, so the
-    # leg needs no provider key and the script has no skip branch.
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Install sqlite3 (test harness dependency)
-        run: sudo apt-get update && sudo apt-get install -y sqlite3
-      - name: Run server-exit-drain
-        run: bash tests/integration/server_exit_drain.sh
-
   cap-token-verify-bench:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -906,62 +1195,6 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run cap-token-verify bench (fail-on-regress mode)
         run: cargo bench -p maos-kernel-core --bench cap_token_verify_p99 -- --test
-
-  cap-registry-smoke:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run cap-registry-smoke
-        run: bash tests/integration/cap_registry_smoke.sh
-
-  audit-query-fr4-smoke:
-    # Story 1b.5b AC4 — end-to-end `maosctl audit query` mechanical
-    # verification path. Seeds the on-disk Transparency Log via the
-    # one-shot hello-Spirit binary, then asserts the FR4 NDJSON schema
-    # via jq. Complementary to the `fr4_1000_call_fixture` test (kernel-side
-    # mediation; run by workspace-test-suite) — this gate exercises the read-side surface.
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Install jq (smoke harness dependency)
-        run: sudo apt-get update && sudo apt-get install -y jq
-      - name: Run audit-query FR4 smoke
-        run: bash tests/integration/audit_query_fr4_smoke.sh
-
-  maosctl-smoke:
-    # Story 1b.5c AC1 — end-to-end `maosctl` lifecycle smoke. Drives all
-    # five v0.1 verbs (install/run/start/stop/unload) against the
-    # reference `hello-spirit` and asserts each side-effect mechanically
-    # (FR58 JSON on run; one Lifecycle Journal NDJSON line per lifecycle
-    # verb; exit 2 + zero journal mutation on unknown-spirit).
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Install jq (smoke harness dependency)
-        run: sudo apt-get update && sudo apt-get install -y jq
-      - name: Run maosctl lifecycle smoke
-        run: bash tests/integration/maosctl_smoke.sh
 
   hello-spirit-bench:
     runs-on: ubuntu-24.04
@@ -1019,20 +1252,6 @@ jobs:
         # correctness smoke (`--test`, one iteration);
         # no timing baseline exists — 20-7 owns regression.
         run: cargo bench -p maos-bench --bench section_13_1 -- --test
-
-  example-spirit-drift:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run template drift check (Rust + TS)
-        run: cargo run -p xtask -- templates-regen --check --json
 
   example-spirit-ts-tests:
     runs-on: ubuntu-24.04
@@ -1238,34 +1457,6 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run NFR-Onb-2 5-minute evaluator path script
         run: bash tests/integration/onb_nfr2_timing.sh
-
-  coverage-matrix:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run coverage-matrix
-        run: cargo run -p xtask -- coverage-matrix --json
-
-  corpus-staleness:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run corpus-staleness
-        run: cargo run -p xtask -- corpus-staleness --json
 
   calibrate-per-commit:
     runs-on: ubuntu-24.04
@@ -2791,28 +2982,6 @@ jobs:
   # the successor gates. Removed rather than parked
   # `if: false` (no fake-green). See ADR-043 for the item-by-item successor map.
 
-  # Story 6.2 AC1 Task 0.2 — Epic 4 retro §A6 / Epic 5 §A3 carry-forward closure:
-  # check-serde-error-handling gate enforces typed serde::Error handling
-  # (no .unwrap() / no Display-via-anyhow). The xtask exists at
-  # `xtask/src/check_serde_error_handling.rs`; this job wires it into CI.
-  check-serde-error-handling:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    # HARD-FAIL since Story 7.1.7 (baseline-reset). The 300 pre-existing sites are
-    # FROZEN in xtask/serde-error-allowlist.toml; the gate now fails only on NEW
-    # `serde_json::*` + `.unwrap()/.expect()/.unwrap_or_*()` sites beyond that set.
-    # Full remediation of the frozen sites is tracked as a follow-up (Story 8.x).
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-serde-error-handling
-        run: cargo run -p xtask -- check-serde-error-handling --json
-
   # Story 6.2 AC1 Task 0.1 — Story 6.1 D-4.* deferred closure: IAC routing
   # budget bench. Establishes per-frame routing latency baseline that
   # NFR-Perf-8 (Story 6.2 AC3) reuses.
@@ -2923,84 +3092,6 @@ jobs:
       - name: Run intent_lineage corpus
         run: cargo test -p maos-kernel-core --test intent_lineage_corpus_v0 --locked
 
-  # Story 6.2 AC7 — smoke-orchestrator-fanout-6-2 end-to-end demo arm.
-  smoke-orchestrator-fanout-6-2:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build maos-bin
-        run: cargo build -p maos-bin --release --features fixture_replay
-      - name: Run smoke-orchestrator-fanout-6-2
-        env:
-          MAOS_ONE_SHOT: smoke-orchestrator-fanout-6-2
-        run: ./target/release/maos
-
-  # Story 6.3 AC7 — smoke-a2a-loopback-6-3 A2A wedge demo.
-  smoke-a2a-loopback-6-3:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build maos-bin
-        run: cargo build -p maos-bin --release --features fixture_replay
-      - name: Run smoke-a2a-loopback-6-3
-        env:
-          MAOS_ONE_SHOT: smoke-a2a-loopback-6-3
-        run: ./target/release/maos
-
-  # Story 8.7 AC6 — smoke-a2a-consent-vocab-8-7 fine-grained typed-intent consent
-  # demo (one fine-grained admit + one fine-grained code-mutation-directive deny).
-  smoke-a2a-consent-vocab-8-7:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build maos-bin
-        run: cargo build -p maos-bin --release --features fixture_replay
-      - name: Run smoke-a2a-consent-vocab-8-7
-        env:
-          MAOS_ONE_SHOT: smoke-a2a-consent-vocab-8-7
-        run: ./target/release/maos
-
-  # Story 8.8 AC4 — smoke-a2a-fail-closed-8-8: fail-closed cross-Host consent
-  # demo (classified admit + absent-deny -32009 + non-canonical-deny -32009).
-  smoke-a2a-fail-closed-8-8:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build maos-bin
-        run: cargo build -p maos-bin --release --features fixture_replay
-      - name: Run smoke-a2a-fail-closed-8-8
-        env:
-          MAOS_ONE_SHOT: smoke-a2a-fail-closed-8-8
-        run: ./target/release/maos
-
   # Story 8.6 AC-T13 — live cross-Host TCP/mTLS transport suite, hermetic + the
   # CI determinism repeat-runner (50× / --test-threads=8 / --retries 0). Any
   # single flake fails the AC; this is the gate that stops this security story
@@ -3027,27 +3118,6 @@ jobs:
             cargo test -p maos-a2a-tcp --locked -- --test-threads=8 || { echo "FLAKE on run $i"; exit 1; }
             echo "::endgroup::"
           done
-
-  # Story 8.6 AC-T13/AC-A7 — smoke-a2a-tcp-8-6: live cross-Host Mira(host_a) →
-  # Nash(host_b) advisory over a REAL TCP/mTLS socket (genuine handshake + wire,
-  # NOT the in-process loopback shortcut).
-  smoke-a2a-tcp-8-6:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build maos-bin
-        run: cargo build -p maos-bin --release --features fixture_replay
-      - name: Run smoke-a2a-tcp-8-6
-        env:
-          MAOS_ONE_SHOT: smoke-a2a-tcp-8-6
-        run: ./target/release/maos
 
   # Story 6.3 AC2 — FR23a + NFR-Sec-11/12 corpus + cross-Host AC3 + NFR-Rel-6 + chaos + churn
   a2a-loopback-corpus-v0:
@@ -3083,27 +3153,6 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run intent_lineage_corpus_load
         run: cargo test -p maos-eval --test intent_lineage_corpus_load --locked
-
-  # Story 6.4 AC5 — end-to-end wedge demo: ScheduleWatchdog firing + rate-limit cap +
-  # ConsentRupture detection + RateLimited frame emission.
-  smoke-schedule-6-4:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build maos-bin
-        run: cargo build -p maos-bin --release --features fixture_replay
-      - name: Run smoke-schedule-6-4
-        env:
-          MAOS_ONE_SHOT: smoke-schedule-6-4
-          MAOS_SCHEDULE_FAST: "1"
-        run: ./target/release/maos
 
   # Story 6.4 AC2 — FR26 / ADR-025 schedule firing corpus (8 integration tests).
   fr26-schedule-firing-corpus:
@@ -3165,24 +3214,6 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run intent_lineage_corpus_load (100-scenario corpus)
         run: cargo test -p maos-eval --test intent_lineage_corpus_load --locked
-
-  # Epic 6 §A4 (retro 2026-05-28) — keeps MANIFEST_SCHEMA_VERSION + MIN/MAX
-  # constants self-consistent and blocks hardcoded `manifest_schema_version`
-  # comparisons in `maos-manifest` production code. Story 7.5a's ABI
-  # Stability Triple consumes these constants directly.
-  check-manifest-schema-version:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-manifest-schema-version
-        run: cargo run -p xtask -- check-manifest-schema-version --json
 
   # Epic 6 §A4 (retro 2026-05-28) — Story 7.5a precursor integration test.
   # Verifies N-1 supported floor (v1 manifest loads on v2 kernel) and the
@@ -3249,23 +3280,6 @@ jobs:
         run: cargo test -p xtask --test owner_assertion_epic_key_rejected
 
 
-
-  # Epic 12 retro B3 (Option C Blocking; closes E11 retro A1) — frontier-era
-  # (epic >= 12) stories must record an allowlisted dev model + a §A6 review
-  # artifact. Makes the frontier-allowlist policy mechanical, not just cultural.
-  check-dev-model-tier:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-dev-model-tier
-        run: cargo run -p xtask -- check-dev-model-tier --json
 
   # j1-crosshost-1a AC4 — the J1 `developer-remote` delegation must be provably
   # FRAME-BORNE. Hermetic and Blocking from the day it lands: the regression it
@@ -3485,21 +3499,6 @@ jobs:
         run: cargo test -p xtask --test kernel_pin_content_hash_16_0
 
 
-  # Epic-13 retro C1 + 20-3b: close-out sources agree and no workflow gate is parked.
-  check-epic-close-coherence:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-epic-close-coherence
-        run: cargo run -p xtask -- check-epic-close-coherence --json
-
   # Pre-merge coverage for the HERMETIC journey suite. The full
   # `maos-journey-test` crate runs only in journey-nightly.yml (scheduled),
   # never here — so push/PR CI was green while a Story-8.15 self-contradiction
@@ -3549,39 +3548,6 @@ jobs:
           cargo nextest run --locked --color never -p maos-bin --test skill_port_18_7 2>&1 | tee skill-port-18-7.log
           grep -q '10 tests run: 10 passed' skill-port-18-7.log
 
-  smoke-discipline-7-1-5:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    needs: [check-review-findings-resolved, check-dev-record-completeness]
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - run: MAOS_ONE_SHOT=smoke-discipline-7-1-5 cargo run --release -p maos-bin
-
-  # Story 7.2 AC6 — end-to-end v1.0 binding round-trip (publish → search →
-  # install → yank → audit → import).
-  smoke-registry-7-2:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      # maos-cli produces the `maosctl` binary the smoke's step-8 air-gap import
-      # invokes (resolved as a daemon-sibling). Without it, maosctl is absent in CI
-      # and the smoke aborts at `maosctl import`.
-      - run: cargo build -p maos-bin -p maos-spirit-cli -p maos-cli
-      - run: MAOS_ONE_SHOT=smoke-registry-7-2 cargo run -p maos-bin
-
   # Story 7.2 AC4 — FR59 ≤5min yank-propagation latency gate.
   fr59-yank-propagation-5min:
     runs-on: ubuntu-24.04
@@ -3630,110 +3596,6 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - run: cargo test -p maos-compliance --test ccac_ship_gate_test -- --nocapture
 
-  # Story 7.3 AC6 — Layer-1.5 observability: v1.0 admission-verification demo.
-  smoke-compliance-7-3:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo build -p maos-bin -p maos-spirit-cli
-      - run: MAOS_ONE_SHOT=smoke-compliance-7-3 cargo run -p maos-bin
-
-  # Story 18-7 — library-only skill smoke (4 deterministic JSON lines).
-  smoke-skill-7-4:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo build -p maos-bin
-      - name: Run smoke-skill-7-4 and assert 4 JSON lines + exit 0
-        run: |
-          out="$(MAOS_ONE_SHOT=smoke-skill-7-4 cargo run -q -p maos-bin)"
-          echo "$out"
-          lines="$(printf '%s\n' "$out" | grep -c '"step"')"
-          test "$lines" -eq 4 || { echo "expected 4 JSON step lines, got $lines"; exit 1; }
-          printf '%s\n' "$out" | grep -q '"total":210' || { echo "LCAS total != 210"; exit 1; }
-
-  # Story 7.4 AC6 — maos.skill.v1 schema posture gate
-  check-skill-schema:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-skill-schema
-        run: cargo run -p xtask -- check-skill-schema --json
-
-  # Story 7.5a AC6 — ABI Stability Triple observability smoke (5 deterministic JSON lines)
-  smoke-abi-7-5a:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo build -p maos-bin
-      - name: Run smoke-abi-7-5a and assert 5 JSON lines + exit 0
-        run: |
-          out="$(MAOS_ONE_SHOT=smoke-abi-7-5a cargo run -q -p maos-bin)"
-          echo "$out"
-          lines="$(printf '%s\n' "$out" | grep -c '"step"')"
-          test "$lines" -eq 5 || { echo "expected 5 JSON step lines, got $lines"; exit 1; }
-          printf '%s\n' "$out" | grep -q '"error":"ESubstrateTooOld"' || { echo "missing ESubstrateTooOld refusal"; exit 1; }
-          printf '%s\n' "$out" | grep -q '"error":"EAbiTooOld"' || { echo "missing EAbiTooOld refusal"; exit 1; }
-          printf '%s\n' "$out" | grep -q '"outcome":"in_sync"' || { echo "STABILITY.md not in sync"; exit 1; }
-
-  # Story 7.5a AC3 — STABILITY.md generated-from-workspace; --check fails on drift (NFR-Maint-4)
-  check-stability-matrix:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run stability-matrix --check
-        run: cargo run -p xtask -- stability-matrix --check --json
-
-  # Story 7.5a AC3 — BREAKING.md dated-entry + Migration taxonomy CI-grep-enforced (NFR-Maint-7)
-  check-breaking-md:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-breaking-md
-        run: cargo run -p xtask -- check-breaking-md --json
-
   # Story 10.1a AC4 — xtask CI lint: asserts expected gate job names are present
   # in the v1.0-ship-gate aggregate job's needs: array.
   #
@@ -3781,24 +3643,6 @@ jobs:
           MAOS_LEDGER_ARTIFACTS: tests/reports
         run: cargo run -p xtask -- check-ship-gate-completeness --json
 
-  # Story 7.5b AC9 — NFR-Onb-1 30-min first-Spirit validation gate (discipline rail).
-  # Stratification + cohort evaluator + Butler-corpus seam over committed example
-  # artifacts; FAILs loudly on drift. Verdicts are provisional until Story 8.1's
-  # canonical Butler corpus lands (the resolver auto-prefers it).
-  nfr-onb-1-gate:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run nfr-onb-1-gate --check
-        run: cargo run -p xtask -- nfr-onb-1-gate --check --json
-
   # Story 7.5b AC8 — smoke-onb-1-7-5b: the ONE end-to-end dry-run self-trial.
   # Scaffolds a Spirit, runs it through LocalRunner against the fixture corpus,
   # scores it, emits one outcome, evaluates N=1 → provisional. Wiring proof,
@@ -3818,38 +3662,6 @@ jobs:
         run: cargo test -p maos-eval --test onb_1_self_trial -- --nocapture
 
 
-  # Story 10.1b AC1 — Pen-test gate: conditional per calibrate-per-commit pattern.
-  # When summary.toml exists, parse and assert p0_open == 0 && p1_open == 0.
-  # When absent, report ABSENT (not a pass), advisory at v1_5.
-  check-pentest-gate:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Check pen-test results
-        run: cargo run -p xtask -- check-pentest-gate --json
-
-  # Story 10.1b AC3 — Coverage matrix completeness: no v1.0 NFR has empty gates.
-  check-coverage-matrix-completeness:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Check coverage matrix completeness
-        run: cargo run -p xtask -- check-coverage-matrix-completeness --json
-
   # Story 10.1b AC2 — OWASP freeze hash-check: SHA-256 from gate-registry.toml.
   # Hash stored in the invariant-locked registry so any OWASP doc edit requires
   # a registry update, which is auditable and protected by review.
@@ -3868,46 +3680,6 @@ jobs:
             exit 1
           fi
           echo "OWASP freeze hash verified: $ACTUAL_HASH"
-
-  # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
-  check-third-party-trial:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    # Story 15-3 AC2(b): the ship-phase env block that stood here is retired.
-    # A GitHub *repository variable* could move this one gate's ship phase with
-    # no code change, and `check-env-contract` can never see it (it scans only
-    # the maos-bin src tree), so it was a third phase source no instrument could
-    # audit. The variable's name is recorded in ADR-065 rather than here: AC1's
-    # oracle counts FILES carrying the token, so repeating it would defeat the
-    # check that it is gone. The phase is now `gate_common::CURRENT_PHASE`, and
-    # advancing it at the v2.0 ship gate is a one-line code change under review.
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Check third-party trial results
-        run: |
-          cargo run -p xtask -- check-third-party-trial
-
-
-  # Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase, advisory-until-engagement).
-  check-red-team-gate:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Check red-team gate results
-        run: cargo run -p xtask -- check-red-team-gate --json
 
   # Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate.
   # ABSENT blocks at v1_5 (20-3a R1), so the job does not wait for a corpus to
@@ -3980,23 +3752,6 @@ jobs:
           cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
       - name: Run check-host-surface
         run: cargo run -p xtask -- check-host-surface --json
-
-  # Story 10.4a / 11.1a — dependency-closure gate: kernel-core + domain
-  # trees exclude the Postgres/pgvector stack AND the WASM runtime stack
-  # (wasmtime/wasmtime-wasi/wit-bindgen, ADR-031/ADR-041 isolation).
-  check-dependency-closure:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-dependency-closure
-        run: cargo run -p xtask -- check-dependency-closure --json
 
   # Story 11.1a AC2/AC3/AC4 — WASM host adapter BEHAVIORAL tests. The four
   # xtask gates above (check-host-surface / check-dependency-closure /
@@ -6102,17 +5857,11 @@ jobs:
     needs:
       - ccac-n600-ship-gate
       - nfr-rel-3-hsis-95pct
-      - check-stability-matrix
-      - check-breaking-md
+      - xtask-gates
       - check-ship-gate-completeness
-      - check-pentest-gate
-      - check-coverage-matrix-completeness
       - check-owasp-freeze-hash
-      - check-third-party-trial
-      - check-red-team-gate
       - check-export-control
       - check-host-surface
-      - check-dependency-closure
       - check-fuzz-targets
       - fuzz-build
       - check-ko-coverage
@@ -6139,7 +5888,6 @@ jobs:
       - check-fkcs
       - check-trial-attestation
       - check-escape-detector
-      - check-env-contract
       - check-vetting-attestation
       - check-loom-substrate-drift
       - check-decision-register
@@ -6147,7 +5895,6 @@ jobs:
       - check-exit-commands
       - check-model-currency
       - workspace-test-suite
-      - check-test-cost
       - check-test-budget
       - check-perf-runner-policy
       - check-perf-counts
@@ -6161,16 +5908,18 @@ jobs:
           echo "| Gate | Status | Evidence |"
           echo "|------|--------|----------|"
           echo "| ccac-n600-ship-gate | ${{ needs.ccac-n600-ship-gate.result }} | cargo test -p maos-compliance --test ccac_ship_gate_test |"
-          echo "| check-breaking-md | ${{ needs.check-breaking-md.result }} | cargo run -p xtask -- check-breaking-md |"
+          echo "| check-stability-matrix | ${{ needs.xtask-gates.outputs.check-stability-matrix }} | cargo run -p xtask -- stability-matrix --check |"
+          echo "| check-breaking-md | ${{ needs.xtask-gates.outputs.check-breaking-md }} | cargo run -p xtask -- check-breaking-md |"
           echo "| check-ship-gate-completeness | ${{ needs.check-ship-gate-completeness.result }} | cargo run -p xtask -- check-ship-gate-completeness |"
-          echo "| check-pentest-gate | ${{ needs.check-pentest-gate.result }} | cargo run -p xtask -- check-pentest-gate |"
-          echo "| check-coverage-matrix-completeness | ${{ needs.check-coverage-matrix-completeness.result }} | cargo run -p xtask -- check-coverage-matrix-completeness |"
+          echo "| check-pentest-gate | ${{ needs.xtask-gates.outputs.check-pentest-gate }} | cargo run -p xtask -- check-pentest-gate |"
+          echo "| check-coverage-matrix-completeness | ${{ needs.xtask-gates.outputs.check-coverage-matrix-completeness }} | cargo run -p xtask -- check-coverage-matrix-completeness |"
           echo "| check-owasp-freeze-hash | ${{ needs.check-owasp-freeze-hash.result }} | sha256sum --check docs/pen-test/owasp-risk-rating-v1.0-frozen.md.sha256 |"
-          echo "| check-third-party-trial | ${{ needs.check-third-party-trial.result }} | cargo run -p xtask -- check-third-party-trial |"
-          echo "| check-red-team-gate | ${{ needs.check-red-team-gate.result }} | cargo run -p xtask -- check-red-team-gate |"
+          echo "| check-third-party-trial | ${{ needs.xtask-gates.outputs.check-third-party-trial }} | cargo run -p xtask -- check-third-party-trial |"
+          echo "| check-red-team-gate | ${{ needs.xtask-gates.outputs.check-red-team-gate }} | cargo run -p xtask -- check-red-team-gate |"
           echo "| check-export-control | ${{ needs.check-export-control.result }} | cargo run -p xtask -- check-export-control |"
           echo "| check-host-surface | ${{ needs.check-host-surface.result }} | cargo run -p xtask -- check-host-surface |"
-          echo "| check-dependency-closure | ${{ needs.check-dependency-closure.result }} | cargo run -p xtask -- check-dependency-closure |"
+          echo "| check-dependency-closure | ${{ needs.xtask-gates.outputs.check-dependency-closure }} | cargo run -p xtask -- check-dependency-closure |"
+          echo "| check-env-contract | ${{ needs.xtask-gates.outputs.check-env-contract }} | cargo run -p xtask -- check-env-contract |"
           echo "| check-fuzz-targets | ${{ needs.check-fuzz-targets.result }} | cargo run -p xtask -- check-fuzz-targets |"
           echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser + fuzz_exec_deps_parse_elf) |"
           echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
@@ -6193,10 +5942,11 @@ jobs:
           echo "| check-exit-commands | ${{ needs.check-exit-commands.result }} | cargo run -p xtask -- check-exit-commands |"
           echo "| check-model-currency | ${{ needs.check-model-currency.result }} | cargo run -p xtask -- check-model-currency |"
           echo "| workspace-test-suite | ${{ needs.workspace-test-suite.result }} | cargo nextest run --workspace --locked --no-fail-fast --profile ci |"
-          echo "| check-test-cost | ${{ needs.check-test-cost.result }} | cargo run -p xtask -- check-test-cost |"
+          echo "| check-test-cost | ${{ needs.xtask-gates.outputs.check-test-cost }} | cargo run -p xtask -- check-test-cost (+ its proven-red vectors, step check-test-cost-vectors) |"
           echo "| check-test-budget | ${{ needs.check-test-budget.result }} | cargo run -p xtask -- check-test-budget --junit <workspace junit> |"
           echo "| check-perf-runner-policy | ${{ needs.check-perf-runner-policy.result }} | cargo run -p xtask -- check-perf-runner-policy |"
           echo "| check-perf-counts | ${{ needs.check-perf-counts.result }} | cargo run -p xtask -- check-perf-counts --dir tier-c |"
+          echo "| xtask-gates (job) | ${{ needs.xtask-gates.result }} | one job, one xtask build, every deterministic gate a named step; the per-gate rows above read its step outputs |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -6204,14 +5954,16 @@ jobs:
           echo "v1.0 ship gate FAILED: one or more sub-gates did not pass."
           echo "  ccac-n600-ship-gate: ${{ needs.ccac-n600-ship-gate.result }}"
           echo "  nfr-rel-3-hsis-95pct: ${{ needs.nfr-rel-3-hsis-95pct.result }}"
-          echo "  check-stability-matrix: ${{ needs.check-stability-matrix.result }}"
-          echo "  check-breaking-md: ${{ needs.check-breaking-md.result }}"
+          echo "  check-stability-matrix: ${{ needs.xtask-gates.outputs.check-stability-matrix }}"
+          echo "  check-breaking-md: ${{ needs.xtask-gates.outputs.check-breaking-md }}"
           echo "  check-ship-gate-completeness: ${{ needs.check-ship-gate-completeness.result }}"
-          echo "  check-pentest-gate: ${{ needs.check-pentest-gate.result }}"
-          echo "  check-coverage-matrix-completeness: ${{ needs.check-coverage-matrix-completeness.result }}"
+          echo "  check-pentest-gate: ${{ needs.xtask-gates.outputs.check-pentest-gate }}"
+          echo "  check-coverage-matrix-completeness: ${{ needs.xtask-gates.outputs.check-coverage-matrix-completeness }}"
           echo "  check-owasp-freeze-hash: ${{ needs.check-owasp-freeze-hash.result }}"
-          echo "  check-third-party-trial: ${{ needs.check-third-party-trial.result }}"
-          echo "  check-red-team-gate: ${{ needs.check-red-team-gate.result }}"
+          echo "  check-third-party-trial: ${{ needs.xtask-gates.outputs.check-third-party-trial }}"
+          echo "  check-red-team-gate: ${{ needs.xtask-gates.outputs.check-red-team-gate }}"
+          echo "  check-dependency-closure: ${{ needs.xtask-gates.outputs.check-dependency-closure }}"
+          echo "  check-env-contract: ${{ needs.xtask-gates.outputs.check-env-contract }}"
           echo "  check-export-control: ${{ needs.check-export-control.result }}"
           echo "  check-fuzz-targets: ${{ needs.check-fuzz-targets.result }}"
           echo "  fuzz-build: ${{ needs.fuzz-build.result }}"
@@ -6233,10 +5985,11 @@ jobs:
           echo "  check-exit-commands: ${{ needs.check-exit-commands.result }}"
           echo "  check-model-currency: ${{ needs.check-model-currency.result }}"
           echo "  workspace-test-suite: ${{ needs.workspace-test-suite.result }}"
-          echo "  check-test-cost: ${{ needs.check-test-cost.result }}"
+          echo "  check-test-cost: ${{ needs.xtask-gates.outputs.check-test-cost }} (vectors: ${{ needs.xtask-gates.outputs.check-test-cost-vectors }})"
           echo "  check-test-budget: ${{ needs.check-test-budget.result }}"
           echo "  check-perf-runner-policy: ${{ needs.check-perf-runner-policy.result }}"
           echo "  check-perf-counts: ${{ needs.check-perf-counts.result }}"
+          echo "  xtask-gates: ${{ needs.xtask-gates.result }}"
           exit 1
 
   aggregate:
@@ -6245,41 +5998,27 @@ jobs:
     needs:
       # Story 18-0 AC2 (D-18-0-04) — the blocking supply-chain gate.
       - cargo-deny
-      - check-unsafe
+      - xtask-gates
+      - smoke-suite
       - check-fmt
       - kloc-check
       - abi-diff
       - gen-abi-docs
-      - check-empty-kernel
-      - check-loom
-      - check-fr47
       - check-workspace-count
-      - check-a2a-sender-completeness
-      - check-pub-field-constructors
       - check-composition-root-completeness
-      - check-service-boundary
       - invariant-lock
       - check-corpus
       - maos-audit-read-only
-      - check-judge-config
-      - check-security-md
-      - server-exit-drain
       - cap-token-verify-bench
-      - cap-registry-smoke
-      - audit-query-fr4-smoke
-      - maosctl-smoke
       - hello-spirit-bench
       - example-spirit-tests
       - founder-loop-bench
-      - example-spirit-drift
       - example-spirit-ts-tests
       - coverage-matrix-nfr-test-3
       - spirit-test-tests
       - lcas-corpus-tests
       - isolation-framework-tests
       - onb-nfr2-timing
-      - coverage-matrix
-      - corpus-staleness
       - calibrate-per-commit
       - nfr-aud-7-distillate-five-metrics-floor
       - nfr-sec-14-cross-spirit-isolation-200
@@ -6300,50 +6039,27 @@ jobs:
       - epic-19-exit
       - epic-20-exit
       - multi-provider-drift-tests
-      - check-serde-error-handling
       - nfr-aud-14-intent-lineage-corpus
-      - smoke-orchestrator-fanout-6-2
-      - smoke-a2a-loopback-6-3
-      - smoke-a2a-consent-vocab-8-7
-      - smoke-a2a-fail-closed-8-8
       - a2a-tcp-tests-8-6
-      - smoke-a2a-tcp-8-6
       - a2a-loopback-corpus-v0
       - intent-lineage-a2a-extension-6-3
-      - smoke-schedule-6-4
       - fr26-schedule-firing-corpus
       - adr-034-consent-rupture-corpus
       - nfr-scale-4-rate-limit-isolation
       - intent-lineage-6-4-extension
-      - check-manifest-schema-version
       - manifest-n-minus-1-test
       - check-review-findings-resolved
       - check-dev-record-completeness
-      - check-dev-model-tier
       - check-kernel-baseline
-      - check-epic-close-coherence
       - journey-hermetic-tier-1
-      - smoke-discipline-7-1-5
-      - smoke-registry-7-2
       - fr59-yank-propagation-5min
       - air-gap-import-corpus
       - ccac-n600-ship-gate
-      - smoke-compliance-7-3
-      - smoke-skill-7-4
-      - check-skill-schema
-      - smoke-abi-7-5a
-      - check-stability-matrix
-      - check-breaking-md
-      - nfr-onb-1-gate
       - smoke-onb-1-7-5b
       - v1-0-ship-gate
       - check-ship-gate-completeness
-      - check-pentest-gate
-      - check-coverage-matrix-completeness
       - check-owasp-freeze-hash
-      - check-third-party-trial
       - check-trial-attestation
-      - check-red-team-gate
       - check-migration-merkle
       - workspace-test-suite
       # Story 20-12 AC4 — the budget gate over the workspace junit, and the one
@@ -6368,44 +6084,25 @@ jobs:
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          echo "cu=${{ needs.check-unsafe.result }}" >> $GITHUB_OUTPUT
-          echo "cek=${{ needs.check-empty-kernel.result }}" >> $GITHUB_OUTPUT
-          echo "cl=${{ needs.check-loom.result }}" >> $GITHUB_OUTPUT
-          echo "csb=${{ needs.check-service-boundary.result }}" >> $GITHUB_OUTPUT
           echo "gad=${{ needs.gen-abi-docs.result }}" >> $GITHUB_OUTPUT
           echo "kc=${{ needs.kloc-check.result }}" >> $GITHUB_OUTPUT
           echo "ad=${{ needs.abi-diff.result }}" >> $GITHUB_OUTPUT
           echo "il=${{ needs.invariant-lock.result }}" >> $GITHUB_OUTPUT
           echo "cc=${{ needs.check-corpus.result }}" >> $GITHUB_OUTPUT
           echo "mar=${{ needs.maos-audit-read-only.result }}" >> $GITHUB_OUTPUT
-          echo "cjc=${{ needs.check-judge-config.result }}" >> $GITHUB_OUTPUT
-          echo "csm=${{ needs.check-security-md.result }}" >> $GITHUB_OUTPUT
-          echo "sed=${{ needs.server-exit-drain.result }}" >> $GITHUB_OUTPUT
           echo "ctvb=${{ needs.cap-token-verify-bench.result }}" >> $GITHUB_OUTPUT
-          echo "crs=${{ needs.cap-registry-smoke.result }}" >> $GITHUB_OUTPUT
-          echo "aqfs=${{ needs.audit-query-fr4-smoke.result }}" >> $GITHUB_OUTPUT
-          echo "ms=${{ needs.maosctl-smoke.result }}" >> $GITHUB_OUTPUT
           echo "hsb=${{ needs.hello-spirit-bench.result }}" >> $GITHUB_OUTPUT
           echo "onb=${{ needs.onb-nfr2-timing.result }}" >> $GITHUB_OUTPUT
           echo "est=${{ needs.example-spirit-tests.result }}" >> $GITHUB_OUTPUT
-          echo "esd=${{ needs.example-spirit-drift.result }}" >> $GITHUB_OUTPUT
           echo "estts=${{ needs.example-spirit-ts-tests.result }}" >> $GITHUB_OUTPUT
           echo "stt=${{ needs.spirit-test-tests.result }}" >> $GITHUB_OUTPUT
           echo "cmn3=${{ needs.coverage-matrix-nfr-test-3.result }}" >> $GITHUB_OUTPUT
           echo "lct=${{ needs.lcas-corpus-tests.result }}" >> $GITHUB_OUTPUT
           echo "ift=${{ needs.isolation-framework-tests.result }}" >> $GITHUB_OUTPUT
-          echo "cm=${{ needs.coverage-matrix.result }}" >> $GITHUB_OUTPUT
-          echo "cs=${{ needs.corpus-staleness.result }}" >> $GITHUB_OUTPUT
           echo "cpc=${{ needs.calibrate-per-commit.result }}" >> $GITHUB_OUTPUT
-          echo "cf47=${{ needs.check-fr47.result }}" >> $GITHUB_OUTPUT
           echo "cwc=${{ needs.check-workspace-count.result }}" >> $GITHUB_OUTPUT
-          echo "cpfc=${{ needs.check-pub-field-constructors.result }}" >> $GITHUB_OUTPUT
           echo "ccrc=${{ needs.check-composition-root-completeness.result }}" >> $GITHUB_OUTPUT
-          echo "sd715=${{ needs.smoke-discipline-7-1-5.result }}" >> $GITHUB_OUTPUT
-          echo "casc=${{ needs.check-a2a-sender-completeness.result }}" >> $GITHUB_OUTPUT
-          echo "safc=${{ needs.smoke-a2a-fail-closed-8-8.result }}" >> $GITHUB_OUTPUT
           echo "ckb=${{ needs.check-kernel-baseline.result }}" >> $GITHUB_OUTPUT
-          echo "ecc=${{ needs.check-epic-close-coherence.result }}" >> $GITHUB_OUTPUT
           echo "jht1=${{ needs.journey-hermetic-tier-1.result }}" >> $GITHUB_OUTPUT
           echo "rdr=${{ needs.release-dry-run.result }}" >> $GITHUB_OUTPUT
           echo "| Required 17-2 job | Result | Scope |" >> "$GITHUB_STEP_SUMMARY"
@@ -6415,6 +6112,8 @@ jobs:
           echo "| Discipline prerequisite | Result |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
           jq -r 'to_entries[] | "| \(.key) | \(if .value.result == "skipped" then "NOT RUN — skipped" else .value.result end) |"' \
+            <<< "$NEEDS_JSON" >> "$GITHUB_STEP_SUMMARY"
+          jq -r 'to_entries[] | select(.key == "xtask-gates" or .key == "smoke-suite") | .key as $job | (.value.outputs // {}) | to_entries[] | "| \($job) / \(.key) | \(.value) |"' \
             <<< "$NEEDS_JSON" >> "$GITHUB_STEP_SUMMARY"
       # Story 20-6 AC3 — a skipped macOS guard is NOT-APPLICABLE, said out loud.
       # `needs.*.result == 'skipped'` is not a failure, so without this step a
@@ -6463,46 +6162,64 @@ jobs:
       - name: Post/update PR comment
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        env:
+          XTASK_GATE_OUTCOMES: ${{ toJSON(needs.xtask-gates.outputs) }}
+          SMOKE_OUTCOMES: ${{ toJSON(needs.smoke-suite.outputs) }}
         with:
           script: |
-            const cu = '${{ needs.check-unsafe.result }}';
-            const cek = '${{ needs.check-empty-kernel.result }}';
-            const cl = '${{ needs.check-loom.result }}';
-            const csb = '${{ needs.check-service-boundary.result }}';
+            // CI release-ready program W2: the deterministic xtask gates and the maos-bin smokes are named steps of
+            // `xtask-gates` / `smoke-suite`, which publish one outcome per step as job outputs. A job that published
+            // none (skipped, cancelled, failed before its steps) reads as the job's own result, so a missing outcome
+            // is never a green-looking cell.
+            const outcomes = (json) => JSON.parse(json || '{}') || {};
+            const xtaskGatesResult = '${{ needs.xtask-gates.result }}';
+            const smokeSuiteResult = '${{ needs.smoke-suite.result }}';
+            const xtaskGateOutcomes = outcomes(process.env.XTASK_GATE_OUTCOMES);
+            const smokeOutcomes = outcomes(process.env.SMOKE_OUTCOMES);
+            const xg = (gate) => xtaskGateOutcomes[gate] || xtaskGatesResult;
+            const sm = (step) => smokeOutcomes[step] || smokeSuiteResult;
+            // A gate whose old job also ran xtask-only vector steps shows the first non-success of the gate step and
+            // its vectors step, as the old per-job result did.
+            const both = (...results) => results.find((r) => r !== 'success') || 'success';
+            const cu = xg('check-unsafe');
+            const cek = xg('check-empty-kernel');
+            const cl = xg('check-loom');
+            const csb = xg('check-service-boundary');
             const kc = '${{ needs.kloc-check.result }}';
             const ad = '${{ needs.abi-diff.result }}';
             const gad = '${{ needs.gen-abi-docs.result }}';
             const il = '${{ needs.invariant-lock.result }}';
             const cc = '${{ needs.check-corpus.result }}';
             const mar = '${{ needs.maos-audit-read-only.result }}';
-            const cjc = '${{ needs.check-judge-config.result }}';
-            const csm = '${{ needs.check-security-md.result }}';
-            const sed = '${{ needs.server-exit-drain.result }}';
+            const cjc = xg('check-judge-config');
+            const csm = both(xg('check-security-md'), xg('check-security-md-vectors'));
+            const ctc = both(xg('check-test-cost'), xg('check-test-cost-vectors'));
+            const sed = sm('server-exit-drain');
             const ctvb = '${{ needs.cap-token-verify-bench.result }}';
-            const crs = '${{ needs.cap-registry-smoke.result }}';
-            const aqfs = '${{ needs.audit-query-fr4-smoke.result }}';
-            const ms = '${{ needs.maosctl-smoke.result }}';
+            const crs = sm('cap-registry-smoke');
+            const aqfs = sm('audit-query-fr4-smoke');
+            const ms = sm('maosctl-smoke');
             const hsb = '${{ needs.hello-spirit-bench.result }}';
             const onb = '${{ needs.onb-nfr2-timing.result }}';
             const est = '${{ needs.example-spirit-tests.result }}';
-            const esd = '${{ needs.example-spirit-drift.result }}';
+            const esd = xg('example-spirit-drift');
             const estts = '${{ needs.example-spirit-ts-tests.result }}';
             const stt = '${{ needs.spirit-test-tests.result }}';
             const cmn3 = '${{ needs.coverage-matrix-nfr-test-3.result }}';
             const lct = '${{ needs.lcas-corpus-tests.result }}';
             const ift = '${{ needs.isolation-framework-tests.result }}';
-            const cm = '${{ needs.coverage-matrix.result }}';
-            const cs = '${{ needs.corpus-staleness.result }}';
+            const cm = xg('coverage-matrix');
+            const cs = xg('corpus-staleness');
             const cpc = '${{ needs.calibrate-per-commit.result }}';  // conditionally skipped until Story 0.4
-            const cf47 = '${{ needs.check-fr47.result }}';
+            const cf47 = xg('check-fr47');
             const cwc = '${{ needs.check-workspace-count.result }}';
-            const cpfc = '${{ needs.check-pub-field-constructors.result }}';
+            const cpfc = xg('check-pub-field-constructors');
             const ccrc = '${{ needs.check-composition-root-completeness.result }}';
-            const sd715 = '${{ needs.smoke-discipline-7-1-5.result }}';
-            const casc = '${{ needs.check-a2a-sender-completeness.result }}';
-            const safc = '${{ needs.smoke-a2a-fail-closed-8-8.result }}';
+            const sd715 = sm('smoke-discipline-7-1-5');
+            const casc = xg('check-a2a-sender-completeness');
+            const safc = sm('smoke-a2a-fail-closed-8-8');
             const ckb = '${{ needs.check-kernel-baseline.result }}';
-            const ecc = '${{ needs.check-epic-close-coherence.result }}';
+            const ecc = xg('check-epic-close-coherence');
             const jht1 = '${{ needs.journey-hermetic-tier-1.result }}';
             const cgd = '${{ needs.cgroup-ceiling-delegated.result }}';
             const cgu = '${{ needs.cgroup-ceiling-undelegated.result }}';
@@ -6536,6 +6253,7 @@ jobs:
             | maos-audit-read-only | ${icon(mar)} ${mar} |
             | check-judge-config | ${icon(cjc)} ${cjc} |
             | check-security-md | ${icon(csm)} ${csm} |
+            | check-test-cost | ${icon(ctc)} ${ctc} |
             | server-exit-drain | ${icon(sed)} ${sed} |
             | cap-token-verify-bench | ${icon(ctvb)} ${ctvb} |
             | cap-registry-smoke | ${icon(crs)} ${crs} |
@@ -6566,6 +6284,8 @@ jobs:
             | check-epic-close-coherence | ${icon(ecc)} ${ecc} |
             | journey-hermetic-tier-1 | ${icon(jht1)} ${jht1} |
             | release-dry-run | ${icon(rdr)} ${rdr} |
+            | xtask-gates (job) | ${icon(xtaskGatesResult)} ${xtaskGatesResult} |
+            | smoke-suite (job) | ${icon(smokeSuiteResult)} ${smokeSuiteResult} |
             | macos-check (path-filtered, Story 20-6) | ${mcsCell} |
 
             <!-- discipline-gate-comment -->`;
@@ -6616,8 +6336,7 @@ jobs:
     timeout-minutes: 30
     needs:
       - v1-0-ship-gate
-      - check-red-team-gate
-      - check-third-party-trial
+      - xtask-gates
       - check-enterprise-identity
       - check-fkcs
       - check-trial-attestation
@@ -6630,8 +6349,8 @@ jobs:
           echo "| Gate | Status | Disposition @ v1.5 |"
           echo "|------|--------|---------------------|"
           echo "| v1-0-ship-gate | ${{ needs.v1-0-ship-gate.result }} | blocking (inherited) |"
-          echo "| check-red-team-gate | ${{ needs.check-red-team-gate.result }} | blocking-when-present |"
-          echo "| check-third-party-trial | ${{ needs.check-third-party-trial.result }} | blocking-when-present |"
+          echo "| check-red-team-gate | ${{ needs.xtask-gates.outputs.check-red-team-gate }} | blocking-when-present |"
+          echo "| check-third-party-trial | ${{ needs.xtask-gates.outputs.check-third-party-trial }} | blocking-when-present |"
           echo "| check-enterprise-identity | ${{ needs.check-enterprise-identity.result }} | advisory |"
           echo "| check-fkcs | ${{ needs.check-fkcs.result }} | advisory |"
           echo "| check-trial-attestation | ${{ needs.check-trial-attestation.result }} | advisory |"
@@ -6641,5 +6360,6 @@ jobs:
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
         run: |
           echo "v1.5 ship gate FAILED: one or more v1.5-blocking sub-gates did not pass."
-          echo "  check-red-team-gate: ${{ needs.check-red-team-gate.result }}"
+          echo "  check-red-team-gate: ${{ needs.xtask-gates.outputs.check-red-team-gate }}"
+          echo "  xtask-gates: ${{ needs.xtask-gates.result }}"
           exit 1

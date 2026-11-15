@@ -270,30 +270,57 @@ fn cargo_tree_failure_and_default_fault_feature_are_blocking() {
 #[test]
 fn aggregate_executes_js_and_reports_not_run() {
     let wf = workflow("discipline.yml");
-    let source = step(&wf, "aggregate", "Post/update PR comment")["with"]["script"]
-        .as_str()
-        .unwrap();
+    let comment = step(&wf, "aggregate", "Post/update PR comment");
+    for name in ["XTASK_GATE_OUTCOMES", "SMOKE_OUTCOMES"] {
+        assert!(comment["env"][name].is_string(), "{name} is not wired");
+    }
+    let source = comment["with"]["script"].as_str().unwrap();
     let source = expand(
         source,
         &[
-            ("needs.check-unsafe.result", "skipped"),
+            ("needs.smoke-suite.result", "skipped"),
+            ("needs.xtask-gates.result", "failure"),
             ("needs.macos-check.result", "skipped"),
             ("needs.macos-scope.outputs.applicable", "false"),
         ],
     );
+    let gates = json!({
+        "check-unsafe": "skipped",
+        "check-security-md": "success",
+        "check-security-md-vectors": "failure",
+        "check-test-cost": "success",
+        "check-test-cost-vectors": "cancelled"
+    });
     let harness = format!("const context = {{repo:{{owner:'o',repo:'r'}},issue:{{number:1}}}}; const github = {{rest:{{issues:{{listComments:async()=>({{data:[]}}),createComment:async x=>console.log(x.body)}}}}}}; (async()=>{{{source}}})().catch(e=>{{console.error(e);process.exit(1)}});");
     let out = Command::new("node")
         .args(["-e", &harness])
+        .env("XTASK_GATE_OUTCOMES", gates.to_string())
+        .env("SMOKE_OUTCOMES", r#"{"server-exit-drain":"failure"}"#)
         .output()
         .expect("node executes github-script");
     show("aggregate github-script", &out);
     assert!(out.status.success());
     let body = String::from_utf8(out.stdout).unwrap();
-    assert!(body
-        .lines()
-        .find(|l| l.starts_with("| check-unsafe |"))
-        .unwrap()
-        .contains("NOT RUN"));
+    let lines: Vec<&str> = body.lines().collect();
+    let row = |name: &str| -> String {
+        let prefix = format!("| {name} |");
+        let found = lines.iter().find(|l| l.starts_with(&prefix));
+        let found = found.unwrap_or_else(|| panic!("no {name} row"));
+        found.to_string()
+    };
+    // `xtask-gates` publishes one outcome per gate; a gate it published none for reads as the job's result
+    // (here a failed job: an unpublished gate reads `failure`, never green).
+    assert!(row("check-unsafe").contains("NOT RUN"));
+    assert!(row("check-loom").contains("failure"));
+    // A gate and its vectors step are one row: either not `success` makes the row red.
+    assert!(row("check-security-md").contains("failure"));
+    assert!(row("check-test-cost").contains("cancelled"));
+    // The consolidated jobs' own results are rows, so a failed/skipped job is never all-green.
+    assert!(row("xtask-gates (job)").contains("failure"));
+    assert!(row("smoke-suite (job)").contains("NOT RUN"));
+    // The same for the steps of `smoke-suite` (here a skipped job: unpublished steps read NOT RUN).
+    assert!(row("server-exit-drain").contains("failure"));
+    assert!(row("cap-registry-smoke").contains("NOT RUN"));
     assert!(body.contains("NOT APPLICABLE (not a pass)"));
 }
 
