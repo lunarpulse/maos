@@ -63,11 +63,6 @@ jobs:
     needs: fuzz-run-t2
     if: always()
     timeout-minutes: 20
-    # Shares its group with fuzz-prerelease's `t3-ledger-collect` so appends to
-    # the `fuzz-ledger` branch serialize (job level: the soak matrix is unaffected).
-    concurrency:
-      group: fuzz-ledger-write
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v5
         with:

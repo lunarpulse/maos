@@ -328,12 +328,6 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    # Both ledger writers share this group so appends to the `fuzz-ledger`
-    # branch serialize. Job level on purpose: a ~26 h T3 chain must not queue
-    # the nightly fuzz runs themselves, only the short collector.
-    concurrency:
-      group: fuzz-ledger-write
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v5
         with:
