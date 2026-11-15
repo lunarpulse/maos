@@ -2958,17 +2958,36 @@ fn ac4_root_e_a_faithful_successor_survives_the_hot_swap() {
     // fires once per quiet period and a hot swap keeps the control block's
     // idle stamps, so a successor swapped in AFTER the predecessor's pass gets
     // no pass of its own until an inbound frame arrives (measured 2026-10-25).
-    // `MAOS_IDLE_FAST=1` shortens butler's idle window from 30 s to ~300 ms,
-    // so a post-swap halt is observable inside a test budget.
-    let root = Root::butler_with("root-e", &[("MAOS_IDLE_FAST", "1")]);
+    // `MAOS_IDLE_FAST=1` divides the idle window by 100. At butler's shipped
+    // 30 s that is ~300 ms, which `maosctl spirit upgrade` can overrun on a
+    // loaded host (the swap then lands after the predecessor's pass and the
+    // halt never re-fires: the measured full-prepush flake). The fixture
+    // therefore declares `idle_window_ms = 300000` (3 s fast) so the swap
+    // lands inside the first window by a wide margin, and the successor's
+    // own pass is still observable inside the test budget.
+    const SCHEDULING: &str = "[scheduling]\nidle_window_ms = 300000\n";
+    let boot_manifest = std::env::temp_dir().join(format!(
+        "maos-door-16-1-root-e-boot-{}.toml",
+        std::process::id()
+    ));
+    std::fs::write(&boot_manifest, format!("{}\n{SCHEDULING}", butler_source()))
+        .expect("write the slow-window boot manifest");
+    let root = Root::spawn(
+        "root-e",
+        utf8(&boot_manifest),
+        &[("MAOS_IDLE_FAST", "1")],
+        None,
+    );
+    let _ = std::fs::remove_file(&boot_manifest);
 
-    // The 0.3.1 target: butler's own manifest with ONLY the version bumped.
+    // The 0.3.1 target: butler's own manifest with ONLY the version bumped
+    // (plus the same `[scheduling]` the boot manifest declares).
     // Story 19-5 (D-19-5-07 B, AC2.5): the kernel defaults an upgrade target's
     // absent `[scheduling]`/`[lifecycle]` as admission does, so the empty
     // sections this fixture used to append are gone — the same file is a
     // valid hot-swap and cold-swap target. Generated at test time rather than
     // committed, so it cannot drift away from the manifest the daemon loaded.
-    let target_body = butler_at("0.3.1", "");
+    let target_body = butler_at("0.3.1", SCHEDULING);
     let target = root.scratch.join("butler-0.3.1.toml");
     std::fs::write(&target, &target_body).expect("write the 0.3.1 fixture");
     let predecessor = pid_of(&root, "butler");

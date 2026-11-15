@@ -5984,7 +5984,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         spirit_obj,
                         boot_nonce,
                         maos_bin::admission::StartPolicy::StartNow,
+                        // Recorded before `start`, as in the single-Spirit arm: see there.
                         &mut |pid| {
+                            record_admitted_manifest(
+                                &admitted_manifests,
+                                &spirit_id,
+                                &gated.manifest_toml,
+                            );
                             for fixup in pid_fixups.iter_mut() {
                                 fixup(pid);
                             }
@@ -5993,7 +5999,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .await
                     .map_err(|refusal| format!("maos run: topology entry '{spirit_id}': {refusal}"))?;
                     let pid = admitted.pid;
-                    record_admitted_manifest(&admitted_manifests, &spirit_id, &gated.manifest_toml);
                     println!(
                         "{}",
                         serde_json::json!({
@@ -6877,7 +6882,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 spirit_obj,
                 boot_nonce,
                 maos_bin::admission::StartPolicy::StartNow,
+                // The admitted manifest is recorded BEFORE `start` (this callback runs
+                // at load): the door reports Running as soon as `start` returns, and a
+                // cold swap issued then is refused `cold_swap_predecessor_unknown`
+                // when the record lands only after admission returns. A refusal here
+                // aborts the boot (`?` below), so a premature record cannot outlive it.
                 &mut |pid| {
+                    record_admitted_manifest(
+                        &admitted_manifests,
+                        &gated.spirit_id,
+                        &gated.manifest_toml,
+                    );
                     for fixup in pid_fixups.iter_mut() {
                         fixup(pid);
                     }
@@ -6887,7 +6902,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map_err(|refusal| format!("maos run: {refusal}"))?;
             drop(pid_fixups);
             let pid = admitted.pid;
-            record_admitted_manifest(&admitted_manifests, &gated.spirit_id, &gated.manifest_toml);
             // Story 17-10 (D-17-10-FW-05) — the tail correlates this pid's kill
             // facts against its manifest-declared `[sandbox] tier` (not the
             // effective admitted tier, which admission may lower).
