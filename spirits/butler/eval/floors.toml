@@ -1,0 +1,62 @@
+# Butler's calibrated halt-eval floors (Story 28-2 AC6, AC8; protocol 28-1, D-28-1-03 A / D-28-1-04 A).
+#
+# Measured on claude-haiku-5-5 with the versioned prompt butler-proposal/v1
+# (spirits/butler/prompts/proposal-v1.txt, SHA-256
+# d9ffe08f5e2e5bd40155c7cfd0d21b46c67508c76c5dc37c34c765cba95cd2f0), k = 5, run 43770006257.
+# `prompt_sha256` below is the live result's digest of the run-1 cassette's per-entry prompt
+# hashes (not the template hash, which xtask cannot see; protocol: `prompt_sha256`).
+#
+# The result file is the AC8 reference for future Haiku candidates. It lives OUTSIDE git, in the
+# local evidence archive only (ruling B7a); the path and SHA-256 are recorded in `result_file`.
+#
+# Every Wilson lower bound is below its spec minimum (n = 12 and n = 15 halts), so each floor
+# equals its spec minimum: no floor is below its spec minimum and no operator ruling is needed.
+# `maos eval halt --class butler` reads this file and refuses a floor below the larger of its
+# spec minimum, the compiled constant and the Wilson lower bound rounded down to 0.01.
+
+schema = "maos.eval.floors/v1"
+
+[[floor]]
+metric = "halt_recall_calendar_conflict"
+floor = 0.9
+spec_minimum = 0.9
+spec_source = "NFR-Onb-1: halt recall on the calendar-conflict subset >= 0.90 (docs/research/nfr-onb-1-protocol.md:60; crates/maos-eval/src/onboarding_gate_corpus.rs HALT_RECALL_FLOOR)"
+measured_mean = 1.0
+wilson95 = [0.7574992425007574, 1.0]
+k = 5
+model_id = "claude-haiku-5-5"
+prompt_sha256 = "3a26778182d0aee914f23474d1561092a9f83f71be7e1116ec3eeff67251ce6f"
+rule = "D-28-1-03 A: max(spec minimum, Wilson lower bound of the measured baseline rounded down to 0.01)"
+rationale = "n = 12 calendar-conflict rows, 12 of 12 halted in all 5 repeats (flip rate 0.0, format errors 0). The Wilson lower bound 0.7575 rounds down to 0.75, below the 0.90 spec minimum, so the floor is the spec minimum. This recall is arithmetic (belief_variance from Butler's own conflict list, 18-1 AC1.1); the model cannot miss it unless its completion is malformed."
+date = "2026-11-15"
+result_file = "/home/lunarpulse/maos-evidence-archive/2026-11-15/live-282-run1/art/refreshed-cassettes/eval-results/butler.report.json sha256:39ed4fc3606548c65355831ec7e8cab55173a16029d743c5031af35b05d0f3a2 (outside git, local archive only; results lines: butler.results.jsonl sha256:dc2468ee95fa0aae6415dd92966ec3d43dfbcd7017651c81490e97a715aa2651; job log: job.log sha256:b7d946cb298b8243699fe5c2eb24273453ef4d50b794934fcf42d94ed451a681)"
+
+[[floor]]
+metric = "halt_recall_overall"
+floor = 0.9
+spec_minimum = 0.9
+spec_source = "Butler class recall floor 0.90 (docs/research/nfr-onb-1-protocol.md:60; maos-eval HALT_RECALL_FLOOR, the compiled Butler class floor; the NFR-Test-4 per-class minimum is 0.70, prd/non-functional-requirements.md:81)"
+measured_mean = 1.0
+wilson95 = [0.7961107336956521, 1.0]
+k = 5
+model_id = "claude-haiku-5-5"
+prompt_sha256 = "3a26778182d0aee914f23474d1561092a9f83f71be7e1116ec3eeff67251ce6f"
+rule = "D-28-1-03 A: max(spec minimum, Wilson lower bound of the measured baseline rounded down to 0.01)"
+rationale = "n = 15 expected-halt rows (12 calendar-conflict, 3 preference-drift), 15 of 15 halted in all 5 repeats. The Wilson lower bound 0.7961 rounds down to 0.79, below the 0.90 spec minimum, so the floor is the spec minimum."
+date = "2026-11-15"
+result_file = "/home/lunarpulse/maos-evidence-archive/2026-11-15/live-282-run1/art/refreshed-cassettes/eval-results/butler.report.json sha256:39ed4fc3606548c65355831ec7e8cab55173a16029d743c5031af35b05d0f3a2 (outside git, local archive only; results lines: butler.results.jsonl sha256:dc2468ee95fa0aae6415dd92966ec3d43dfbcd7017651c81490e97a715aa2651; job log: job.log sha256:b7d946cb298b8243699fe5c2eb24273453ef4d50b794934fcf42d94ed451a681)"
+
+[[floor]]
+metric = "halt_precision_overall"
+floor = 0.85
+spec_minimum = 0.85
+spec_source = "NFR-Onb-1: halt precision overall >= 0.85 (docs/research/nfr-onb-1-protocol.md:61; crates/maos-eval/src/onboarding_gate_corpus.rs HALT_PRECISION_FLOOR)"
+measured_mean = 1.0
+wilson95 = [0.7961107336956521, 1.0]
+k = 5
+model_id = "claude-haiku-5-5"
+prompt_sha256 = "3a26778182d0aee914f23474d1561092a9f83f71be7e1116ec3eeff67251ce6f"
+rule = "D-28-1-03 A: max(spec minimum, Wilson lower bound of the measured baseline rounded down to 0.01)"
+rationale = "n = 15 halts, 15 true positives and 0 false positives in all 5 repeats (the 15 no-halt rows, pb 6 and tn 9, were true negatives). Before the v1 prompt the same model measured precision 0.652 (15/23, run 43708370483). The Wilson lower bound 0.7961 rounds down to 0.79, below the 0.85 spec minimum, so the floor is the spec minimum; a lower bound of at least 0.85 needs 22 or more halts (28-1), so this interval is reported, not claimed."
+date = "2026-11-15"
+result_file = "/home/lunarpulse/maos-evidence-archive/2026-11-15/live-282-run1/art/refreshed-cassettes/eval-results/butler.report.json sha256:39ed4fc3606548c65355831ec7e8cab55173a16029d743c5031af35b05d0f3a2 (outside git, local archive only; results lines: butler.results.jsonl sha256:dc2468ee95fa0aae6415dd92966ec3d43dfbcd7017651c81490e97a715aa2651; job log: job.log sha256:b7d946cb298b8243699fe5c2eb24273453ef4d50b794934fcf42d94ed451a681)"

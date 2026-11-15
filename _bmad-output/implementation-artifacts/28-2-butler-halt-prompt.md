@@ -12,7 +12,7 @@ review: "bmad-code-review under docs/testing/proof-contract.md; author and revie
 
 # Story 28.2: The Butler halt prompt
 
-Status: ready-for-dev
+Status: review
 
 <!-- Created 2026-11-15 at bf3cba25 by bmad-create-story under the lighter measured creation contract. Operator ruling: _bmad-output/planning-artifacts/decisions-2026-11-15-spirit-quality.md (rulings 1, 2, 3, 5). Live evidence outside git (ruling B7a): /home/lunarpulse/maos-evidence-archive/2026-11-15/live-rerecord-run-43708370483-cassettes/j-butler/halt-corpus-v0.3.live.json and the job log (line 4466). Per-row values below were read from that cassette at creation. No cargo or gate was run. D-28-2-01…06 are PROPOSED. Starts after 28-1's rulings and AC1. -->
 
@@ -88,14 +88,14 @@ Precision 15/23 = 0.652 (Wilson 95 % [0.449, 0.812]); recall 15/15 = 1.0 (calend
 
 ## Tasks / Subtasks
 
-- [ ] T0 Rulings D-28-2-01…06 recorded; 28-1 AC1/AC4/AC7 landed.
+- [x] T0 Rulings D-28-2-01…06 recorded; 28-1 AC1/AC4/AC7 landed.
 - [x] T1 Train split + prompt file v1 + `proposal_prompt` rendering + prompt pin test (AC3, AC4). Authored; the checks have not been run (the orchestrator runs them).
 - [x] T2 Re-derive hashes for the seed scene/context cassettes and controls; corpus `prompt_sha256` fields via `generate()`; re-pin `corpus_pin.rs` and `coverage-matrix.yaml` (AC7). Generator paths written; the regeneration commands and the three corpus re-pins are the orchestrator's (see Completion Notes).
 - [x] T3 Hermetic dry run on a hand-planted v1 cassette (replay green, controls red as designed). Read-through done (Completion Notes); the replay itself is the orchestrator's run.
-- [ ] T4 Paid dispatch (`tier-2-rerecord`, `repeats` per D-28-1-02); archive the artifact; summarise here (AC5).
-- [ ] T5 Calibrate and write `floors.toml`; promote the cassette; `halt_live_baseline_28_2.rs`; update `eval_halt_18_2.rs` (AC1, AC2, AC6, AC7, AC8).
-- [ ] T6 If AC5 misses after tuning: stop and raise the spec-change D-row (no floor lowering in code).
-- [ ] T7 Landing: `cargo fmt --all`; `check-kernel-baseline --json` (expect unchanged; if moved, `scripts/repin.py` + HISTORY row in the same commit); `kloc-check --json` (expect 0 charged); prepush.
+- [x] T4 Paid dispatch (`tier-2-rerecord`, `repeats` per D-28-1-02); archive the artifact; summarise here (AC5). Run 43770006257, k = 5; summary in the Dev Agent Record.
+- [x] T5 Calibrate and write `floors.toml`; promote the cassette; `halt_live_baseline_28_2.rs`; update `eval_halt_18_2.rs` (AC1, AC2, AC6, AC7, AC8). Written; the checks are the orchestrator's run.
+- [x] T6 Not needed: AC5 met the GA bar after tuning, so no spec-change D-row was raised.
+- [x] T7 Landing: `cargo fmt --all`; `check-kernel-baseline --json` (unchanged); `kloc-check --json` (0 charged); prepush (recorded in the landing commit).
 
 ## Dev Notes
 
@@ -113,7 +113,7 @@ Precision 15/23 = 0.652 (Wilson 95 % [0.449, 0.812]); recall 15/15 = 1.0 (calend
 
 ### Agent Model Used
 
-anthropic/claude-sonnet-5-5 (Dev282, implementation agent; edit-only, no cargo/tests/gates run).
+anthropic/claude-sonnet-5-5 (Dev282, implementation agent; edit-only: the orchestrator compiled, ran the generators, tests and the paid dispatch).
 
 ### Completion Notes List
 
@@ -127,6 +127,25 @@ anthropic/claude-sonnet-5-5 (Dev282, implementation agent; edit-only, no cargo/t
   4. `cargo fmt --all`, then `cargo test -p butler` and `cargo test -p maos-bin --test eval_halt_18_2 --test butler_scene_18_4 --test context_budget_18_5 --test butler_inference_18_1`. The 11 maos-bin tests and `journey_forget_18_6` that read `on-idle-halt.json` pass it to `MAOS_REPLAY_CASSETTE` under strict replay, so they pass again once step 2 ran (no file of theirs holds a hash).
 - **T3 (read-through, not run).** The strict replay checks `prompt_sha256`/`prompt_len` per entry (`cassette_replay.rs:151-158`); after steps 1–2 every entry carries the v1 hash. Replay stays green: the seed's no-halt rows answer drift 1.0 or the given alignment ≥ 0.75 (≥ 0.6), the df rows keep 0.4/0.5/0.35, the cc rows halt on `belief_variance`. The drift-blind control still plants 0.99 on df01–df03 (no conflict, 0.99 < 1.0 writes `user_preference_drift` 0.99, above 0.6 → no halt): overall recall 12/15 = 0.80 < 0.90, still detected. The precision-planted control still plants 0.3 on tn01/tn03/tn05 (alignment absent): 3 false positives, precision 15/18 = 0.833 < 0.85, still missed precision. Both controls differ from the seed only in their planted completions (`the_negative_controls_differ_from_the_seed_only_in_their_planted_rows`). The live, hosted model result is T4's; the seed proves the plumbing, not the model.
 - **Not verified / open.** No test, build, formatter or gate ran, so the prompt pin, the example-rendering test (it relies on `serde_json` writing the `f32` 0.45 as `0.45`), and the sections test are unrun. `MANIFEST.toml`'s `prompt_version_hash` (all zero) was left as is. T0, T4–T7, `floors.toml`, the live cassette promotion (AC7's `the_seed_says_what_it_is` replacement) and the status keys remain the orchestrator's.
+- **T4 — live measurement (AC5).** `journey-nightly` run 43770006257 (`tier-2-rerecord`), `claude-haiku-5-5`, prompt `butler-proposal/v1` (`proposal-v1.txt` SHA-256 `d9ffe08f5e2e5bd40155c7cfd0d21b46c67508c76c5dc37c34c765cba95cd2f0`; the result's per-entry prompt digest `3a26778182d0aee914f23474d1561092a9f83f71be7e1116ec3eeff67251ce6f`), corpus SHA-256 `d4b7b0f1a139e78103c19ace68c3da718843dd82fbe90dde068b810f09290f1d`, k = 5. Evidence (outside git, local archive only, ruling B7a): `/home/lunarpulse/maos-evidence-archive/2026-11-15/live-282-run1/art/refreshed-cassettes/eval-results/butler.report.json` (SHA-256 `39ed4fc3606548c65355831ec7e8cab55173a16029d743c5031af35b05d0f3a2`), `butler.results.jsonl` (`dc2468ee95fa0aae6415dd92966ec3d43dfbcd7017651c81490e97a715aa2651`), `job.log` (`b7d946cb298b8243699fe5c2eb24273453ef4d50b794934fcf42d94ed451a681`).
+
+  | Metric | mean | min | max | n | Wilson 95 % | Floor (spec) | Pass |
+  |---|---|---|---|---|---|---|---|
+  | `halt_recall_calendar_conflict` | 1.0 | 1.0 | 1.0 | 12 | [0.7575, 1.0] | 0.90 | yes |
+  | `halt_recall_overall` | 1.0 | 1.0 | 1.0 | 15 | [0.7961, 1.0] | 0.90 | yes |
+  | `halt_precision_overall` | 1.0 | 1.0 | 1.0 | 15 | [0.7961, 1.0] | 0.85 | yes |
+  | `format_error_rate` | 0.0 | 0.0 | 0.0 | 30 | [0.0, 0.1135] | 0.00 (ceiling) | yes |
+
+  | Family | Rows | TP | FP | TN | FN |
+  |---|---|---|---|---|---|
+  | cc (confirmed overlap) | 12 | 12 | 0 | 0 | 0 |
+  | df (`preference_alignment` 0.4 / 0.5 / 0.35) | 3 | 3 | 0 | 0 | 0 |
+  | pb (tentative / cancelled overlap) | 6 | 0 | 0 | 6 | 0 |
+  | tn (back-to-back / gap) | 9 | 0 | 0 | 9 | 0 |
+
+  Flip rows: none (flip rate 0.0). Format errors: 0 (30 rows × 5 repeats). Tokens: 352 795 in / 17 063 out. Cost 0.043811 USD (price book `xtask/provider-pricing.toml`, SHA-256 `0fc3ce27f9604d18b88a7082e6114171f7ed336307aa6f965749705a927716a9`). Result `pass: true`, no failures. Before the v1 prompt (run 43708370483, k = 1): precision 0.652 (15/23), 8 false positives; now 0 false positives, so the GA bar of AC5 is met and T6 is not needed. Honest limits: `deferred-work.md` "Butler live baseline (28-2): what the evidence does not show".
+- **T5 — calibration, promotion, tests.** All five repeats scored identically, so by D-28-2-05 A (median, ties to the lowest index) repeat 1 is promoted: `halt-corpus-v0.3.json` is `halt-corpus-v0.3.live.1.json` byte for byte (SHA-256 `70ffe3847b1994b18bd03d9b18a3a4d91cc4b34cc2a9428ac538db7b9f389e22`, `provenance: live-record`, `model_id: claude-haiku-5-5`, 30 entries). `spirits/butler/eval/floors.toml` (`maos.eval.floors/v1`, AC6, AC8): each floor is `max(spec minimum, Wilson lower bound rounded down to 0.01)`: calendar-conflict recall max(0.90, 0.75) = 0.90, overall recall max(0.90, 0.79) = 0.90, precision max(0.85, 0.79) = 0.85; no floor is below its spec minimum, so no operator ruling or spec-change D-row is owed. The record cites the archive path and SHA-256 above as its result file (outside git). `spirits/butler/tests/halt_live_baseline_28_2.rs` (AC1): live-record provenance and the manifest's model pin; every entry's hash and length equal the v1 rendering for its row; the prompt file SHA-256 pin; no train row input equals a test input and the prompt holds none; `floors.toml` loads and applies over the class constants, holds all three floors, each equal to its calibrated value, with its evidence fields and the promoted cassette's prompt digest; proven red on in-memory variants (a seed cassette, a model other than the pin, a one-byte prompt edit, a train row copied from cc01, a test input written into the prompt, a floor below its spec minimum, a floor below its own Wilson lower bound, a missing floor, a floor above its calibration). Shared helpers moved to `spirits/butler/tests/common/mod.rs` (`halt_prompt_28_2.rs` uses them). `halt_eval_corpus_18_2.rs`: `the_seed_says_what_it_is` is removed; the two negative controls are derived by planting into the promoted cassette (`derived_from` records its SHA-256; provenance `seed`, as replay accepts only seed or live-record; model `planted-negative-control`). `eval_halt_18_2.rs` asserts `live-record`, the calibrated floors, `false_positives` 0 and `missed_floors` empty; its drift-blind (recall 0.800 below 0.90) and precision-planted (precision 0.833 below 0.85) assertions are unchanged. `deferred-work.md` rows updated (the Butler half of the promotion row closed; the first-measurements row updated; one row for the limits of the evidence).
+- **T5 command (orchestrator).** `MAOS_GEN_HALT_EVAL=1 cargo test -p butler --test halt_eval_corpus_18_2 -- --ignored generate` re-derives the two controls from the promoted cassette (the corpus fields are rewritten to the same bytes while the prompt is unchanged); then `cargo fmt --all`, `cargo test -p butler`, `cargo test -p maos-bin --test eval_halt_18_2`.
 
 ### File List
 
@@ -137,8 +156,17 @@ anthropic/claude-sonnet-5-5 (Dev282, implementation agent; edit-only, no cargo/t
 - `spirits/butler/tests/halt_eval_corpus_18_2.rs` (M: `generate()` seed completions follow the v1 rules)
 - `spirits/butler/tests/corpus_pin.rs` (M: comment only; `PINNED` moves at regeneration)
 - Regenerated by the orchestrator, not hand-edited: `spirits/butler/tests/fixtures/calendar-comms-v0.3.jsonl` (derived `prompt_sha256` fields), `halt-corpus-v0.3.drift-blind.json`, `halt-corpus-v0.3.precision-planted.json`, `crates/maos-journey-test/cassettes/j-butler/{halt-corpus-v0.3,on-idle-halt,context-budget-18-5}.json`; re-pins in `corpus_pin.rs`, `tests/corpora/MANIFEST.toml`, `tests/coverage-matrix.yaml`.
+- `spirits/butler/eval/floors.toml` (A)
+- `spirits/butler/tests/halt_live_baseline_28_2.rs` (A)
+- `spirits/butler/tests/common/mod.rs` (A: shared prompt pin, fixture paths, readers, disjointness check)
+- `spirits/butler/tests/halt_prompt_28_2.rs` (M: uses `common`)
+- `spirits/butler/tests/halt_eval_corpus_18_2.rs` (M: `the_seed_says_what_it_is` removed; `generate()` plants the controls into the promoted cassette)
+- `crates/maos-bin/tests/eval_halt_18_2.rs` (M: promoted live figures)
+- `_bmad-output/implementation-artifacts/deferred-work.md` (M)
+- Regenerated by the orchestrator: `spirits/butler/tests/fixtures/halt-corpus-v0.3.{drift-blind,precision-planted}.json`
 
 ## Change Log
 
 - 2026-11-15: created (bmad-create-story, anthropic/claude-opus-5-5) at `bf3cba25`; D-28-2-01…06 PROPOSED.
 - 2026-11-15: D-28-2-01…06 ACCEPTED (operator: proceed with recommendation). Statuses in the Decisions table above.
+- 2026-11-15: implemented by anthropic/claude-sonnet-5-5 (edit-only); paid live dispatch run 43770006257 (claude-haiku-5-5, v1 prompt, k = 5): precision 1.0, recall 1.0, 0 format errors, 0 flips; floors stay at the spec minimums (0.90/0.90/0.85, D-28-1-03 A). Verified by the orchestrator (butler 224 tests, maos-bin eval tests 40, `maos eval halt --class butler` replay exit 0), reviewed by openai-codex/gpt-6.1-sol (GLM quota exhausted; different family): ship. The orchestrator ran the generators and the paid dispatch; the coder could not run anything. Limits stated in deferred-work.md (n = 15 halts, same boundary families, one model).

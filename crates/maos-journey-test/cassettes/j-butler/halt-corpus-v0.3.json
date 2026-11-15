@@ -1,550 +1,550 @@
 {
+  "schema_version": "maos.journey.cassette/v1",
+  "provenance": "live-record",
+  "recorded_at": "2026-11-15T00:00:00Z",
+  "model_id": "claude-haiku-5-5",
+  "spirit_id": "maos",
+  "session": "process-27774",
   "entries": [
     {
-      "prompt_len": 5839,
+      "sequence": 0,
       "prompt_sha256": "f8dba30d07e552be1a3aafe0873db13592dfb26a6bcac54bcc207303b866c8cb",
+      "prompt_len": 5839,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.9,\"evidence\":\"Unresolved conflict a~b: both a and b are confirmed and overlap between minutes 570 and 600.\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2354,
+          "output_tokens": 141
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 0
+      }
     },
     {
-      "prompt_len": 5839,
+      "sequence": 1,
       "prompt_sha256": "d7560bfbe1badbecd1bb23d76bfbc28ff3109fea0d88ef8e22c62b2f96dbf3ab",
+      "prompt_len": 5839,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.9,\"evidence\":\"Unresolved calendar conflict a~b: both events a and b are confirmed and overlap between minutes 630 and 660.\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2354,
+          "output_tokens": 145
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 1
+      }
     },
     {
-      "prompt_len": 5839,
+      "sequence": 2,
       "prompt_sha256": "587142c7e3bce82f2994c7145f674ecb51baa20f7c053dd76e02f9e52903a213",
+      "prompt_len": 5839,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.9,\"evidence\":\"Unresolved conflict a~b: both events are confirmed and overlap between minutes 510 and 540.\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2354,
+          "output_tokens": 139
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 2
+      }
     },
     {
-      "prompt_len": 5839,
+      "sequence": 3,
       "prompt_sha256": "188d113f0023c6ace3ca6185c0bf1b5566bc41a06857781a801db832a234b605",
+      "prompt_len": 5839,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.9,\"evidence\":\"a~b is an unresolved conflict: both events a and b are confirmed and overlap between minutes 930 and 960.\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2354,
+          "output_tokens": 143
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 3
+      }
     },
     {
-      "prompt_len": 5839,
+      "sequence": 4,
       "prompt_sha256": "34056a8766568ee5ee97f4cb06e544058f7defbf2df8089d1b0dd1a2b5e3a9c2",
+      "prompt_len": 5839,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.9,\"evidence\":\"a~b is an unresolved conflict: both a and b are confirmed and overlap between 800 and 840.\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2354,
+          "output_tokens": 139
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 4
+      }
     },
     {
-      "prompt_len": 5839,
+      "sequence": 5,
       "prompt_sha256": "10b20230621f2466ce01b69e7db4cea3c24e9530f90e54db352eb368120d0485",
+      "prompt_len": 5839,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.9,\"evidence\":\"Unresolved calendar conflict a~b: confirmed events a and b overlap between 700 and 720.\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2354,
+          "output_tokens": 139
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 5
+      }
     },
     {
-      "prompt_len": 5843,
+      "sequence": 6,
       "prompt_sha256": "8abb766f7a15e789fbf953452cc3e32b479671bc74f3c78a64eb7b0808d92c4b",
+      "prompt_len": 5843,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.9,\"evidence\":\"a~b is an unresolved conflict: both a and b are confirmed and overlap between 1050 and 1080.\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2358,
+          "output_tokens": 141
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 6
+      }
     },
     {
-      "prompt_len": 5839,
+      "sequence": 7,
       "prompt_sha256": "12c546291576445d3a7377085d09958a1b09fe5d0609b9ecd148ace0fd210215",
+      "prompt_len": 5839,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.9,\"evidence\":\"Unresolved conflict a~b: both a and b are confirmed and overlap between minutes 450 and 480.\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2354,
+          "output_tokens": 141
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 7
+      }
     },
     {
-      "prompt_len": 5839,
+      "sequence": 8,
       "prompt_sha256": "f755060f9f3d0ebce37eb2282bc0cd805346eb44f4a0224c840fa5c8472bf809",
+      "prompt_len": 5839,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.9,\"evidence\":\"Unresolved conflict a~b: both events are confirmed and overlap between 870 and 900.\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2354,
+          "output_tokens": 136
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 8
+      }
     },
     {
-      "prompt_len": 5839,
+      "sequence": 9,
       "prompt_sha256": "d9b5644ef76abf1a0fe6699a1339ff10c8edc1ed4e439a8915be89b5d4edf769",
-      "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
-        "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
-        "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
-        }
-      },
-      "sequence": 9
-    },
-    {
-      "prompt_len": 5841,
-      "prompt_sha256": "36f2a4999d9a2932b919f130698d78d7ca2258913f65e6760763bd492d2c2e67",
-      "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
-        "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
-        "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
-        }
-      },
-      "sequence": 10
-    },
-    {
       "prompt_len": 5839,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.9,\"evidence\":\"a~b is an unresolved overlap of two confirmed events (a 740-780 window); preference_alignment is null so no drift signal.\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 2354,
+          "output_tokens": 148
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 10,
+      "prompt_sha256": "36f2a4999d9a2932b919f130698d78d7ca2258913f65e6760763bd492d2c2e67",
+      "prompt_len": 5841,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.9,\"evidence\":\"Unresolved conflict a~b: both events a and b are confirmed and overlap between 990 and 1020.\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 2356,
+          "output_tokens": 140
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 11,
       "prompt_sha256": "130a9669b1321ed573aedcd37a0b4cb12775d624e46ed8633387497f3d1ce459",
+      "prompt_len": 5839,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.9,\"evidence\":\"a~b is an unresolved calendar conflict: both events a and b are confirmed and overlap between 520 and 560.\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2354,
+          "output_tokens": 143
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 11
+      }
     },
     {
-      "prompt_len": 5818,
+      "sequence": 12,
       "prompt_sha256": "05b983f1ade8221e195039698ba7dc847c17c25632825f31b9ea3b6668a52e4a",
-      "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
-        "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 2 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.4}",
-        "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
-        }
-      },
-      "sequence": 12
-    },
-    {
       "prompt_len": 5818,
+      "response": {
+        "text": "{\"pattern\":\"preference-drift\",\"confidence\":0.9,\"evidence\":\"No listed conflict; preference_alignment is 0.4.\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.4}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 2348,
+          "output_tokens": 99
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 13,
       "prompt_sha256": "4a5f8e57266d89a538b557cb6286b886ce6a992be25159cb74196e1eec4d2109",
+      "prompt_len": 5818,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"preference-drift\",\"confidence\":0.9,\"evidence\":\"No listed conflict; preference_alignment is 0.5.\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.5}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 2 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.5}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2348,
+          "output_tokens": 99
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 13
+      }
     },
     {
-      "prompt_len": 5819,
+      "sequence": 14,
       "prompt_sha256": "e89d05a67cea37aded7260d8b5f5e79a75ac488f04e2ea8f77575cfc906a05fe",
+      "prompt_len": 5819,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"preference-drift\",\"confidence\":0.9,\"evidence\":\"No listed conflict; preference_alignment is 0.35.\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.35}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 2 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.35}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2348,
+          "output_tokens": 99
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 14
+      }
     },
     {
-      "prompt_len": 5836,
+      "sequence": 15,
       "prompt_sha256": "20c041f6141a5511c343192dc0e18f79264485a970219489a6b44afbcddc9a57",
+      "prompt_len": 5836,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"no-issue\",\"confidence\":0.9,\"evidence\":\"b is tentative, so it does not conflict with confirmed a; no preference signal.\",\"options\":[\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2349,
+          "output_tokens": 86
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 15
+      }
     },
     {
-      "prompt_len": 5836,
+      "sequence": 16,
       "prompt_sha256": "77e792aa557c0b8c4778f59d25e3add34468142744df54da21c32e632b9bc1ae",
+      "prompt_len": 5836,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"no-issue\",\"confidence\":0.9,\"evidence\":\"b is cancelled, so it does not conflict with confirmed a; no preference signal.\",\"options\":[\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2350,
+          "output_tokens": 87
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 16
+      }
     },
     {
-      "prompt_len": 5836,
+      "sequence": 17,
       "prompt_sha256": "becc196d2456970e789c1dcaa9de14bdcd7d8bf877a20c3ed09ce7032c51e37e",
+      "prompt_len": 5836,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"no-issue\",\"confidence\":0.9,\"evidence\":\"b is tentative, so it does not conflict with confirmed a; no preference signal.\",\"options\":[\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2349,
+          "output_tokens": 86
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 17
+      }
     },
     {
-      "prompt_len": 5836,
+      "sequence": 18,
       "prompt_sha256": "ee89ad4096afc799906e4e8d63b1d3d3369166604ed81c95190278f59293b8ab",
+      "prompt_len": 5836,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"no-issue\",\"confidence\":0.9,\"evidence\":\"b is cancelled, so it does not conflict with confirmed a; no preference signal.\",\"options\":[\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2350,
+          "output_tokens": 87
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 18
+      }
     },
     {
-      "prompt_len": 5836,
+      "sequence": 19,
       "prompt_sha256": "98d22e876f88781db796f42c7b27a6b80ad862fdb3860ea9da8b276fe8917633",
+      "prompt_len": 5836,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"no-issue\",\"confidence\":0.9,\"evidence\":\"b is tentative, so it does not conflict with confirmed a; no preference signal.\",\"options\":[\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2349,
+          "output_tokens": 86
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 19
+      }
     },
     {
-      "prompt_len": 5836,
+      "sequence": 20,
       "prompt_sha256": "736c9addd753043a9158915facf1b73e22a899321fea29f0fceb1c05a44c8f37",
+      "prompt_len": 5836,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"no-issue\",\"confidence\":0.9,\"evidence\":\"b is cancelled, so it does not conflict with confirmed a; no preference signal.\",\"options\":[\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2350,
+          "output_tokens": 87
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 20
+      }
     },
     {
-      "prompt_len": 5836,
+      "sequence": 21,
       "prompt_sha256": "92f32f9dd9c6d3bc8d20f0db76ff28cd30a2e8b84992bbda7ce74d85712523b6",
+      "prompt_len": 5836,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"no-issue\",\"confidence\":0.9,\"evidence\":\"Events a (540-600) and b (610-660) are both confirmed with a 10-minute gap and no overlap; no conflict listed and no preference signal.\",\"options\":[\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2350,
+          "output_tokens": 109
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 21
+      }
     },
     {
-      "prompt_len": 5835,
+      "sequence": 22,
       "prompt_sha256": "f8d42cf44f24b318b7cb95d726953ff3d7b1cea01f41f11f7c7354bab7d9d2be",
-      "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
-        "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.9}",
-        "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
-        }
-      },
-      "sequence": 22
-    },
-    {
-      "prompt_len": 5838,
-      "prompt_sha256": "766b10960d6142afc302036f44d3b98437ce883c66fdf83b4ffa6c27ec5ff224",
-      "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
-        "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
-        "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
-        }
-      },
-      "sequence": 23
-    },
-    {
-      "prompt_len": 5836,
-      "prompt_sha256": "5dca3e3fbea7b0126e989d9b261bd2a3040aeab0f4dfe400fa6cd0478b410633",
-      "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
-        "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.75}",
-        "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
-        }
-      },
-      "sequence": 24
-    },
-    {
-      "prompt_len": 5836,
-      "prompt_sha256": "8934bc47590da2837094958336984aa5e2e57d4653343fa6603c54ad149a7391",
-      "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
-        "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
-        "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
-        }
-      },
-      "sequence": 25
-    },
-    {
       "prompt_len": 5835,
+      "response": {
+        "text": "{\"pattern\":\"preference-drift\",\"confidence\":0.9,\"evidence\":\"No listed conflict; preference_alignment is 0.9.\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.9}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 2352,
+          "output_tokens": 99
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 23,
+      "prompt_sha256": "766b10960d6142afc302036f44d3b98437ce883c66fdf83b4ffa6c27ec5ff224",
+      "prompt_len": 5838,
+      "response": {
+        "text": "{\"pattern\":\"no-issue\",\"confidence\":0.9,\"evidence\":\"a ends at 960 and b starts at 1000 with a gap, so they do not overlap; no unresolved conflicts and no preference signal.\",\"options\":[\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 2352,
+          "output_tokens": 105
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 24,
+      "prompt_sha256": "5dca3e3fbea7b0126e989d9b261bd2a3040aeab0f4dfe400fa6cd0478b410633",
+      "prompt_len": 5836,
+      "response": {
+        "text": "{\"pattern\":\"preference-drift\",\"confidence\":0.9,\"evidence\":\"No listed conflict; preference_alignment is 0.75.\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.75}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 2352,
+          "output_tokens": 99
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 25,
+      "prompt_sha256": "8934bc47590da2837094958336984aa5e2e57d4653343fa6603c54ad149a7391",
+      "prompt_len": 5836,
+      "response": {
+        "text": "{\"pattern\":\"no-issue\",\"confidence\":0.9,\"evidence\":\"a ends at 480 and b starts at 500: no overlap between confirmed events a and b; no preference signal.\",\"options\":[\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 2350,
+          "output_tokens": 95
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 26,
       "prompt_sha256": "a692c018db6e631f62056a693af077d926be83a9fb96746942128e2b99c85971",
+      "prompt_len": 5835,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"preference-drift\",\"confidence\":0.9,\"evidence\":\"No listed conflict; preference_alignment is 0.8.\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.8}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.8}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2352,
+          "output_tokens": 99
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 26
+      }
     },
     {
-      "prompt_len": 5840,
+      "sequence": 27,
       "prompt_sha256": "e9bb48933441699acf4a32e854eeac346c70028d3708673d2d1a0284fa741bb4",
+      "prompt_len": 5840,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"no-issue\",\"confidence\":0.9,\"evidence\":\"Events a [1020,1080) and b [1100,1160) do not overlap and the conflict list is empty; no preference signal.\",\"options\":[\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2354,
+          "output_tokens": 100
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 27
+      }
     },
     {
-      "prompt_len": 5836,
+      "sequence": 28,
       "prompt_sha256": "b123b59dd5ee1b5ab15ae7017e67614dab7c5ec76dee14735b70ba4769423c82",
+      "prompt_len": 5836,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"preference-drift\",\"confidence\":0.9,\"evidence\":\"No listed conflict; preference_alignment is 0.95.\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.95}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.95}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2352,
+          "output_tokens": 99
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 28
+      }
     },
     {
-      "prompt_len": 5836,
+      "sequence": 29,
       "prompt_sha256": "de7d2a03c2bff488581492fb6a5ac691f58e53212743de8c284d129628fe0fd9",
+      "prompt_len": 5836,
       "response": {
-        "provider_attribution": {
-          "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-          "model_id": "hand-authored-seed",
-          "provider_id": "replay"
-        },
+        "text": "{\"pattern\":\"no-issue\",\"confidence\":0.9,\"evidence\":\"a [560,600) and b [700,760) do not overlap, and no conflict is listed; preference_alignment is null with no preference-change comms entry.\",\"options\":[\"snooze: Snooze and revisit later\"],\"user_preference_drift\":1.0}",
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
-          "input_tokens": 400,
-          "output_tokens": 80
+          "input_tokens": 2350,
+          "output_tokens": 107
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
         }
-      },
-      "sequence": 29
+      }
     }
-  ],
-  "model_id": "hand-authored-seed",
-  "provenance": "seed",
-  "recorded_at": "2026-10-25T00:00:00Z",
-  "schema_version": "maos.journey.cassette/v1",
-  "session": "halt-corpus-v0.3",
-  "spirit_id": "butler"
+  ]
 }

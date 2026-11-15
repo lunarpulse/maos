@@ -6,9 +6,11 @@
 //! a fresh `HOME`/`MAOS_HOME`/`XDG_DATA_HOME`, no provider key and
 //! `MAOS_OLLAMA_URL=skip`; no test spawns cargo.
 //!
-//! - AC1: the seed cassette exits 0 with the numbers and a verifiable
-//!   sidecar; the drift-blind and precision-planted cassettes exit 1 naming
-//!   the missed floor; a 29-entry cassette and a drifted prompt hash exit 1
+//! - AC1: the committed class cassette (the promoted `live-record` of
+//!   `claude-haiku-5-5`, Story 28-2) exits 0 with the numbers and a verifiable
+//!   sidecar; the drift-blind and precision-planted cassettes (planted copies
+//!   of it) exit 1 naming the missed floor; a 29-entry cassette and a drifted
+//!   prompt hash exit 1
 //!   naming the row; usage errors exit 2.
 //! - AC3: `record` without a provider refuses and writes nothing; a record
 //!   through a router whose `anthropic` driver is a local stub writes 30
@@ -33,6 +35,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const CORPUS: &str = "spirits/butler/tests/fixtures/calendar-comms-v0.3.jsonl";
+/// The committed class cassette: the promoted live recording (Story 28-2).
 const SEED: &str = "crates/maos-journey-test/cassettes/j-butler/halt-corpus-v0.3.json";
 const DRIFT_BLIND: &str = "spirits/butler/tests/fixtures/halt-corpus-v0.3.drift-blind.json";
 const PRECISION_PLANTED: &str =
@@ -114,7 +117,7 @@ fn read_json(path: &Path) -> Value {
 }
 
 #[test]
-fn exit_line_2_replays_the_seed_cassette_and_holds_every_floor() {
+fn exit_line_2_replays_the_promoted_live_cassette_and_holds_every_floor() {
     let home = tempfile::tempdir().unwrap();
     let out = butler(home.path(), None);
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
@@ -125,7 +128,13 @@ fn exit_line_2_replays_the_seed_cassette_and_holds_every_floor() {
     assert_eq!(line["score"]["halt_precision_overall"], 1.0);
     assert_eq!(line["score"]["expected_halts"], 15);
     assert_eq!(line["completions_consumed"], 30);
-    assert_eq!(line["provenance"], "seed");
+    assert_eq!(line["provenance"], "live-record");
+    // Story 28-2: the calibrated floors (`spirits/butler/eval/floors.toml`) equal the spec minimums.
+    assert_eq!(line["floors"]["halt_recall_calendar_conflict"], 0.9);
+    assert_eq!(line["floors"]["halt_recall_overall"], 0.9);
+    assert_eq!(line["floors"]["halt_precision_overall"], 0.85);
+    assert_eq!(line["score"]["false_positives"], 0);
+    assert_eq!(line["missed_floors"], serde_json::json!([]));
     assert_eq!(line["model_driven"], true);
     assert_eq!(line["signer"], "dev-seed");
     assert_eq!(

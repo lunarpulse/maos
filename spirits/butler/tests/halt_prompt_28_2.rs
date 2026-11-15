@@ -10,27 +10,21 @@
 //! then re-pin the corpus SHA-256 in `corpus_pin.rs`, `tests/corpora/MANIFEST.toml`
 //! and `tests/coverage-matrix.yaml`.
 
-use std::path::PathBuf;
+mod common;
 
 use butler::{
     parse_proposal, proposal_prompt, Butler, CalendarEvent, EventStatus, ScenarioInput,
     PROPOSAL_PROMPT_TEMPLATE, PROPOSAL_PROMPT_VERSION,
 };
+use common::{
+    input_of, jsonl, root, sha256, train_rows, PINNED_PROMPT_SHA256, PROMPT_FILE, TEST, TRAIN,
+};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 
-const PROMPT_FILE: &str = "spirits/butler/prompts/proposal-v1.txt";
-const TRAIN: &str = "spirits/butler/tests/fixtures/calendar-comms-v0.3.train.jsonl";
-const TEST: &str = "spirits/butler/tests/fixtures/calendar-comms-v0.3.jsonl";
 const SCENE_CASSETTES: [&str; 2] = [
     "crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json",
     "crates/maos-journey-test/cassettes/j-butler/context-budget-18-5.json",
 ];
-
-/// The SHA-256 of `proposal-v1.txt`. A prompt edit bumps
-/// `PROPOSAL_PROMPT_VERSION` and this value in the same commit.
-const PINNED_PROMPT_SHA256: &str =
-    "d9ffe08f5e2e5bd40155c7cfd0d21b46c67508c76c5dc37c34c765cba95cd2f0";
 
 /// The fixed sections, in order.
 const SECTIONS: [&str; 7] = [
@@ -42,35 +36,6 @@ const SECTIONS: [&str; 7] = [
     "EXAMPLES",
     "INPUT",
 ];
-
-fn root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
-}
-
-fn sha256(text: &str) -> String {
-    format!("{:x}", Sha256::digest(text.as_bytes()))
-}
-
-fn jsonl(rel: &str) -> Vec<Value> {
-    std::fs::read_to_string(root().join(rel))
-        .unwrap()
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .map(|l| serde_json::from_str(l).unwrap())
-        .collect()
-}
-
-/// The train split's rows (the provenance header is not a row).
-fn train_rows() -> Vec<Value> {
-    jsonl(TRAIN)
-        .into_iter()
-        .filter(|r| r.get("_provenance").is_none())
-        .collect()
-}
-
-fn input_of(row: &Value) -> ScenarioInput {
-    serde_json::from_value(row["input"].clone()).unwrap()
-}
 
 fn conflict_list(input: &ScenarioInput) -> String {
     Butler::new()
@@ -283,36 +248,9 @@ fn the_examples_are_train_rows_with_conforming_replies() {
 /// 28-1 AC2 — the train split and the prompt never contain a test row's input.
 #[test]
 fn no_train_input_is_a_test_input_and_the_prompt_holds_no_test_input() {
-    let test_inputs: Vec<ScenarioInput> = jsonl(TEST).iter().map(input_of).collect();
-    assert_eq!(test_inputs.len(), 30);
-    for row in train_rows() {
-        let input = input_of(&row);
-        let id = &row["scenario_id"];
-        for test in &test_inputs {
-            assert_ne!(&input, test, "{id}: a train input equals a test input");
-            for event in &input.calendar {
-                assert!(!test.calendar.contains(event), "{id}: shares a test event");
-            }
-            for message in &input.comms {
-                assert!(!test.comms.contains(message), "{id}: shares a test message");
-            }
-        }
-    }
-    for test in &test_inputs {
-        let mut pieces = vec![serde_json::to_string(test).unwrap()];
-        pieces.extend(
-            test.calendar
-                .iter()
-                .map(|e| serde_json::to_string(e).unwrap()),
-        );
-        pieces.extend(test.comms.iter().map(|m| serde_json::to_string(m).unwrap()));
-        for piece in pieces {
-            assert!(
-                !PROPOSAL_PROMPT_TEMPLATE.contains(&piece),
-                "the prompt holds a test row input: {piece}"
-            );
-        }
-    }
+    let test = jsonl(TEST);
+    assert_eq!(test.len(), 30);
+    common::disjointness(&train_rows(), &test, PROPOSAL_PROMPT_TEMPLATE).unwrap();
 }
 
 /// The scenario the daemon root seeds (`butler_scene_18_4.rs`,

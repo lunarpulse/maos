@@ -2,11 +2,14 @@
 //! model I/O.
 //!
 //! Every row names its completion (`completion {cassette, sequence}`) and the
-//! SHA-256 of the prompt Butler sends for it; the hand-authored seed cassette
-//! carries those real hashes (never the all-zero wildcard, which strict replay
-//! does not check, `crates/maos-bin/src/cassette_replay.rs:151-152`). The
-//! drift-blind and precision-planted negative controls differ from the seed
-//! only in their planted rows. Regenerate all four files with
+//! SHA-256 of the prompt Butler sends for it; the class cassette carries those
+//! real hashes (never the all-zero wildcard, which strict replay does not
+//! check, `crates/maos-bin/src/cassette_replay.rs:151-152`). Story 28-2: that
+//! cassette is the promoted live recording of the manifest's pinned model
+//! (its provenance is asserted by `halt_live_baseline_28_2.rs`); the
+//! drift-blind and precision-planted negative controls are that cassette with
+//! only their planted rows' completions overwritten. Re-derive the corpus
+//! fields and both controls after promoting a cassette or changing the prompt with
 //! `MAOS_GEN_HALT_EVAL=1 cargo test -p butler --test halt_eval_corpus_18_2 -- --ignored generate`.
 //! AC4.5: the Butler class's FR15 witness (one model-driven halt resolved
 //! once per kind, journaled) lives here too.
@@ -17,7 +20,7 @@ mod fr15_resolution;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use butler::{proposal_prompt, Butler, ScenarioInput, DETERMINISTIC_OPTIONS};
+use butler::{proposal_prompt, Butler, ScenarioInput};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
@@ -118,31 +121,30 @@ fn no_entry_carries_the_wildcard_hash() {
 }
 
 #[test]
-fn the_seed_says_what_it_is() {
-    let cassette = read_json(CASSETTE);
-    assert_eq!(cassette["schema_version"], "maos.journey.cassette/v1");
-    assert_eq!(cassette["provenance"], "seed");
-    assert_eq!(cassette["model_id"], "hand-authored-seed");
-    assert!(cassette["recorded_at"].as_str().is_some());
-}
-
-#[test]
-fn the_negative_controls_differ_from_the_seed_only_in_their_planted_rows() {
+fn the_negative_controls_differ_from_the_promoted_cassette_only_in_their_planted_rows() {
     let rows = rows();
-    let seed = read_json(CASSETTE);
+    let promoted_text = std::fs::read_to_string(root().join(CASSETTE)).unwrap();
+    let promoted = read_json(CASSETTE);
     for (file, planted, planted_drift) in CONTROLS {
         let control = read_json(file);
-        let pairs = seed["entries"]
+        // A planted derivative of THIS promoted cassette, not of an older one.
+        assert_eq!(control["provenance"], "seed", "{file}");
+        assert_eq!(
+            control["derived_from"],
+            json!({"cassette": CASSETTE, "sha256": sha256(&promoted_text)}),
+            "{file}: re-run the generator after promoting a cassette"
+        );
+        let pairs = promoted["entries"]
             .as_array()
             .unwrap()
             .iter()
             .zip(control["entries"].as_array().unwrap());
         let mut differing = Vec::new();
-        for (row, (seed_entry, control_entry)) in rows.iter().zip(pairs) {
-            if seed_entry != control_entry {
+        for (row, (promoted_entry, control_entry)) in rows.iter().zip(pairs) {
+            if promoted_entry != control_entry {
                 differing.push(row["scenario_id"].as_str().unwrap());
                 assert_eq!(drift(control_entry), planted_drift, "{file}");
-                let mut expected = seed_entry.clone();
+                let mut expected = promoted_entry.clone();
                 expected["response"]["text"] = control_entry["response"]["text"].clone();
                 assert_eq!(
                     &expected, control_entry,
@@ -153,7 +155,7 @@ fn the_negative_controls_differ_from_the_seed_only_in_their_planted_rows() {
         assert_eq!(differing, planted, "{file}");
         assert_eq!(
             control["entries"].as_array().unwrap().len(),
-            seed["entries"].as_array().unwrap().len()
+            promoted["entries"].as_array().unwrap().len()
         );
     }
 }
@@ -182,76 +184,42 @@ fn fr15_a_butler_halt_resolves_once_per_kind_journaled() {
     fr15_resolution::resolve_each_kind("butler", &policy, scalar);
 }
 
-/// Writes the rows' `completion`/`prompt_sha256`, the seed cassette (the
-/// completion `prompts/proposal-v1.txt`'s decision procedure yields: drift =
-/// the row's `preference_alignment`, else 1.0) and the two controls. Story
-/// 28-2: the seed answers as the v1 prompt instructs; the live-record
-/// cassette that replaces it is what the reference model said.
+/// Story 28-2 (AC7, D-28-2-05 A) — re-derives the rows' `completion` and
+/// `prompt_sha256` fields (v1 prompt; unchanged while the prompt is) and the
+/// two negative controls, by PLANTING into the promoted live cassette: each
+/// control is that cassette's entries with only the planted rows' completion
+/// text overwritten. The promoted cassette itself is never written here: it is
+/// what the reference model said.
 #[test]
-#[ignore = "generator: rewrites the 18-2 halt-eval corpus fields and cassettes"]
+#[ignore = "generator: rewrites the corpus fields and the two negative controls"]
 fn generate() {
     if std::env::var_os("MAOS_GEN_HALT_EVAL").is_none() {
         return;
     }
     let mut rows = rows();
-    let mut entries = Vec::new();
     for (index, row) in rows.iter_mut().enumerate() {
-        let prompt = prompt(row);
-        let input: ScenarioInput = serde_json::from_value(row["input"].clone()).unwrap();
-        let conflicts = Butler::new().assess(&input).conflicts.len();
-        let (pattern, options) = if conflicts > 0 {
-            ("calendar-conflict", DETERMINISTIC_OPTIONS.to_vec())
-        } else if input.preference_alignment.is_some_and(|p| p < 1.0) {
-            ("preference-drift", DETERMINISTIC_OPTIONS[1..].to_vec())
-        } else {
-            ("no-issue", DETERMINISTIC_OPTIONS[2..].to_vec())
-        };
-        let completion = json!({
-            "pattern": pattern,
-            "confidence": 0.9,
-            "evidence": format!(
-                "{conflicts} unresolved calendar conflict(s); {} message(s)",
-                input.comms.len()
-            ),
-            "options": options,
-            // The f32 alignment's shortest decimal form, so the seed reads 0.4, not 0.4000000059604645.
-            "user_preference_drift": input
-                .preference_alignment
-                .map_or(1.0, |p| p.to_string().parse::<f64>().unwrap()),
-        });
         row["completion"] = json!({"cassette": CASSETTE, "sequence": index});
-        row["prompt_sha256"] = json!(sha256(&prompt));
-        entries.push(json!({
-            "sequence": index,
-            "prompt_sha256": sha256(&prompt),
-            "prompt_len": prompt.len(),
-            "response": {
-                "text": completion.to_string(),
-                "stop_reason": "stop_sequence",
-                "usage": {"input_tokens": 400, "output_tokens": 80},
-                "provider_attribution": {
-                    "provider_id": "replay",
-                    "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
-                    "model_id": "hand-authored-seed"
-                }
-            }
-        }));
+        let hash = sha256(&prompt(row));
+        row["prompt_sha256"] = json!(hash);
     }
     let corpus: String = rows.iter().map(|r| format!("{r}\n")).collect();
     std::fs::write(root().join(CORPUS), corpus).unwrap();
-    let cassette = |entries: Vec<Value>| {
-        let value = json!({
-            "schema_version": "maos.journey.cassette/v1",
-            "provenance": "seed",
-            "recorded_at": "2026-10-25T00:00:00Z",
-            "model_id": "hand-authored-seed",
-            "spirit_id": "butler",
-            "session": "halt-corpus-v0.3",
-            "entries": entries,
-        });
-        serde_json::to_string_pretty(&value).unwrap() + "\n"
-    };
-    std::fs::write(root().join(CASSETTE), cassette(entries.clone())).unwrap();
+
+    let promoted_text = std::fs::read_to_string(root().join(CASSETTE)).unwrap();
+    let promoted: Value = serde_json::from_str(&promoted_text).unwrap();
+    assert_eq!(
+        promoted["provenance"], "live-record",
+        "plant into a live recording"
+    );
+    let entries = promoted["entries"].as_array().unwrap();
+    assert_eq!(entries.len(), rows.len());
+    for (row, entry) in rows.iter().zip(entries) {
+        assert_eq!(
+            entry["prompt_sha256"], row["prompt_sha256"],
+            "{}",
+            row["scenario_id"]
+        );
+    }
     for (file, planted, planted_drift) in CONTROLS {
         let mut control = entries.clone();
         for (row, entry) in rows.iter().zip(control.iter_mut()) {
@@ -262,6 +230,18 @@ fn generate() {
                 entry["response"]["text"] = json!(completion.to_string());
             }
         }
-        std::fs::write(root().join(file), cassette(control)).unwrap();
+        let value = json!({
+            "schema_version": "maos.journey.cassette/v1",
+            // A hand-planted derivative, not a recording: replay accepts only seed or live-record.
+            "provenance": "seed",
+            "recorded_at": promoted["recorded_at"],
+            "model_id": "planted-negative-control",
+            "spirit_id": "butler",
+            "session": "halt-corpus-v0.3",
+            "derived_from": {"cassette": CASSETTE, "sha256": sha256(&promoted_text)},
+            "entries": control,
+        });
+        let text = serde_json::to_string_pretty(&value).unwrap() + "\n";
+        std::fs::write(root().join(file), text).unwrap();
     }
 }
