@@ -30,17 +30,17 @@ use std::{
     time::{Duration, Instant},
 };
 
-fn stub_runtime(dir: &Path, body: &str) -> (ContainerRuntime, PathBuf) {
+fn write_stub_script(executable: &Path, log_line: &str, body: &str) {
     use std::os::unix::fs::PermissionsExt;
+    let script = format!("#!/bin/sh\n{log_line}\nprintf '%s\\n' \"$1\" >> \"$LOG\"\n{body}\n");
+    fs::write(executable, script).unwrap();
+    fs::set_permissions(executable, fs::Permissions::from_mode(0o700)).unwrap();
+}
+
+fn stub_runtime(dir: &Path, body: &str) -> (ContainerRuntime, PathBuf) {
     let executable = dir.join("stub-runtime");
     let log = dir.join("runtime.log");
-    let script = format!(
-        "#!/bin/sh\nLOG='{}'\nprintf '%s\\n' \"$1\" >> \"$LOG\"\n{}\n",
-        log.display(),
-        body
-    );
-    fs::write(&executable, script).unwrap();
-    fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
+    write_stub_script(&executable, &format!("LOG='{}'", log.display()), body);
     (
         ContainerRuntime {
             kind: ContainerRuntimeKind::Podman,
@@ -48,6 +48,24 @@ fn stub_runtime(dir: &Path, body: &str) -> (ContainerRuntime, PathBuf) {
             version: "stub".into(),
         },
         log,
+    )
+}
+
+/// A runtime whose executable is a symlink to a script written once, before
+/// any concurrent spawning. Writing a script and exec'ing it from many threads
+/// races `fork`: a sibling thread's child can inherit the still-open write fd
+/// and the exec fails with ETXTBSY (the stub never runs, so the test saw
+/// "observer never entered inspect"). The script finds its log via `$0`.
+fn stub_runtime_linked(dir: &Path, shared_script: &Path) -> (ContainerRuntime, PathBuf) {
+    let executable = dir.join("stub-runtime");
+    std::os::unix::fs::symlink(shared_script, &executable).unwrap();
+    (
+        ContainerRuntime {
+            kind: ContainerRuntimeKind::Podman,
+            path: executable,
+            version: "stub".into(),
+        },
+        dir.join("runtime.log"),
     )
 }
 
@@ -504,21 +522,9 @@ esac
 /// snapshot deadline while every later one reports `exited` (the hosted S3
 /// signature). Whatever the waiter/owner interleaving at the deadline,
 /// teardown must wait for the owner to publish and then remove the container.
-fn stalled_snapshot_instance(index: usize) -> Result<(), String> {
+fn stalled_snapshot_instance(index: usize, shared_script: &Path) -> Result<(), String> {
     let temp = tempfile::tempdir().unwrap();
-    let (runtime, calls) = stub_runtime(
-        temp.path(),
-        r#"
-case "$1" in
-  kill) exit 0 ;;
-  inspect)
-    if mkdir "$LOG.first" 2>/dev/null; then exec sleep 30; fi
-    printf '{"Status":"exited","ExitCode":137,"OOMKilled":false,"Error":"","StartedAt":"zero","FinishedAt":"zero"}\n' ;;
-  rm) exit 0 ;;
-  container) exit 1 ;;
-esac
-"#,
-    );
+    let (runtime, calls) = stub_runtime_linked(temp.path(), shared_script);
     let state_dir = temp.path().join("state");
     fs::create_dir(&state_dir).unwrap();
     let child = SandboxedContainerChild::adopt(runtime, format!("{index:064x}"), &state_dir);
@@ -554,8 +560,28 @@ esac
 #[test]
 fn teardown_waits_for_a_stalled_snapshot_owner_then_removes_the_container_20_7() {
     const INSTANCES: usize = 20;
+    // Written once, before any worker thread exists: see `stub_runtime_linked`.
+    let shared_dir = tempfile::tempdir().unwrap();
+    let shared = shared_dir.path().join("stalled-snapshot-runtime");
+    write_stub_script(
+        &shared,
+        "LOG=\"${0%/*}/runtime.log\"",
+        r#"
+case "$1" in
+  kill) exit 0 ;;
+  inspect)
+    if mkdir "$LOG.first" 2>/dev/null; then exec sleep 30; fi
+    printf '{"Status":"exited","ExitCode":137,"OOMKilled":false,"Error":"","StartedAt":"zero","FinishedAt":"zero"}\n' ;;
+  rm) exit 0 ;;
+  container) exit 1 ;;
+esac
+"#,
+    );
     let workers: Vec<_> = (0..INSTANCES)
-        .map(|index| std::thread::spawn(move || stalled_snapshot_instance(index)))
+        .map(|index| {
+            let shared = shared.clone();
+            std::thread::spawn(move || stalled_snapshot_instance(index, &shared))
+        })
         .collect();
     let failures: Vec<String> = workers
         .into_iter()
