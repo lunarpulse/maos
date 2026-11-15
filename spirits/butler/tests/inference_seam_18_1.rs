@@ -411,7 +411,7 @@ fn the_prompt_states_the_drift_scale() {
     assert!(
         requests[0]
             .2
-            .contains("1.0 = fully aligned with the director's preferences; lower = more drift"),
+            .contains("1.0 = fully aligned and lower = more drift"),
         "the prompt must state the scale: {}",
         requests[0].2
     );

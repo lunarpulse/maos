@@ -1,0 +1,52 @@
+# Price book for `maosctl audit cost-reconcile` (ADR-046 §7; the default `--pricing`).
+# Prices in micro-USD per 1k tokens, as the vendors list them on 2026-10-06
+# (Anthropic pricing page; OpenAI GPT-4o Mini model page). Pricing is policy: an
+# operator on negotiated rates passes `--pricing <file>`. Model ids are real pins —
+# each must be current per `xtask/model-currency.toml` (`xtask check-model-currency`
+# scans this file) — and `cost-reconcile` matches them exactly against the
+# `(provider, model)` of the journaled cost frames, so a row prices real traffic.
+
+[[entries]]
+provider = "anthropic"
+model = "claude-haiku-4-5-20251001"
+input_price_micro_per_1k = 1000
+output_price_micro_per_1k = 5000
+
+# 2026-11-12: Claude Haiku 5.5 (https://platform.claude.com/docs/en/about-claude/pricing).
+# Prices are TIERED by prompt length: $0.10 in / $0.50 out per MTok for prompts up
+# to 100,000 tokens, $0.50 / $2.50 above. This book has one row per (provider,
+# model) and no length tier, so the row carries the <=100K tier; a request whose
+# prompt exceeds 100,000 tokens is under-priced 5x by `cost-reconcile`. Pass
+# `--pricing <file>` to price long-context traffic at the higher tier.
+[[entries]]
+provider = "anthropic"
+model = "claude-haiku-5-5"
+input_price_micro_per_1k = 100
+output_price_micro_per_1k = 500
+
+[[entries]]
+provider = "openai"
+model = "gpt-4o-mini"
+input_price_micro_per_1k = 150
+output_price_micro_per_1k = 600
+
+[[entries]]
+provider = "anthropic"
+model = "claude-sonnet-5-5"
+input_price_micro_per_1k = 2000
+output_price_micro_per_1k = 10000
+
+# 20-4: standard, uncached text rates, verified 2026-11-03.
+# https://ai.google.dev/gemini-api/docs/pricing#gemini-3.5-flash-lite
+[[entries]]
+provider = "gemini"
+model = "gemini-3.5-flash-lite"
+input_price_micro_per_1k = 300
+output_price_micro_per_1k = 2500
+
+# https://platform.kimi.ai/docs/pricing/chat (rendered table; D-20-4-12 B)
+[[entries]]
+provider = "kimi"
+model = "kimi-k3.1-pro"
+input_price_micro_per_1k = 2000
+output_price_micro_per_1k = 10000

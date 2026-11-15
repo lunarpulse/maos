@@ -31,8 +31,17 @@ const FALSE_POSITIVES: [&str; 8] = [
 ];
 const CASSETTE: &str = "halt-corpus-v0.3.live.json";
 
-fn root() -> PathBuf {
+/// The workspace root: only the working directory of the spawned xtask.
+fn workspace() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
+}
+
+/// The `--root` the report resolves its corpus, cassettes and price book against: a FROZEN copy
+/// under the fixtures (`root/spirits/butler/tests/fixtures/calendar-comms-v0.3.jsonl` is the
+/// corpus the archived live run scored, sha 7c5bf481...; the live corpus moves whenever a prompt
+/// is re-versioned, and so does the price book), so these numbers never depend on later stories.
+fn root() -> PathBuf {
+    fixtures().join("root")
 }
 
 fn fixtures() -> PathBuf {
@@ -46,7 +55,7 @@ fn s(path: &Path) -> &str {
 fn xtask(args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args(args)
-        .current_dir(root())
+        .current_dir(workspace())
         .output()
         .expect("spawn xtask")
 }

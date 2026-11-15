@@ -182,8 +182,11 @@ fn fr15_a_butler_halt_resolves_once_per_kind_journaled() {
     fr15_resolution::resolve_each_kind("butler", &policy, scalar);
 }
 
-/// Writes the rows' `completion`/`prompt_sha256`, the seed cassette (drift =
-/// the row's `preference_alignment`, else 0.95) and the two controls.
+/// Writes the rows' `completion`/`prompt_sha256`, the seed cassette (the
+/// completion `prompts/proposal-v1.txt`'s decision procedure yields: drift =
+/// the row's `preference_alignment`, else 1.0) and the two controls. Story
+/// 28-2: the seed answers as the v1 prompt instructs; the live-record
+/// cassette that replaces it is what the reference model said.
 #[test]
 #[ignore = "generator: rewrites the 18-2 halt-eval corpus fields and cassettes"]
 fn generate() {
@@ -196,18 +199,25 @@ fn generate() {
         let prompt = prompt(row);
         let input: ScenarioInput = serde_json::from_value(row["input"].clone()).unwrap();
         let conflicts = Butler::new().assess(&input).conflicts.len();
+        let (pattern, options) = if conflicts > 0 {
+            ("calendar-conflict", DETERMINISTIC_OPTIONS.to_vec())
+        } else if input.preference_alignment.is_some_and(|p| p < 1.0) {
+            ("preference-drift", DETERMINISTIC_OPTIONS[1..].to_vec())
+        } else {
+            ("no-issue", DETERMINISTIC_OPTIONS[2..].to_vec())
+        };
         let completion = json!({
-            "pattern": if conflicts > 0 { "calendar-conflict" } else { "comms-triage" },
-            "confidence": if conflicts > 0 { 0.86 } else { 0.5 },
+            "pattern": pattern,
+            "confidence": 0.9,
             "evidence": format!(
                 "{conflicts} unresolved calendar conflict(s); {} message(s)",
                 input.comms.len()
             ),
-            "options": DETERMINISTIC_OPTIONS,
+            "options": options,
             // The f32 alignment's shortest decimal form, so the seed reads 0.4, not 0.4000000059604645.
             "user_preference_drift": input
                 .preference_alignment
-                .map_or(0.95, |p| p.to_string().parse::<f64>().unwrap()),
+                .map_or(1.0, |p| p.to_string().parse::<f64>().unwrap()),
         });
         row["completion"] = json!({"cassette": CASSETTE, "sequence": index});
         row["prompt_sha256"] = json!(sha256(&prompt));

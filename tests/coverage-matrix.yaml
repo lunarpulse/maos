@@ -1485,6 +1485,8 @@ coverage:
       stamped provisional) until Story 8.1 lands the canonical
       spirits/butler/tests/fixtures/calendar-comms-v0.3.jsonl corpus, which the
       resolver auto-prefers. Story 8.1 LANDED that corpus (30 scenarios, SHA-256
+      d4b7b0f1a139e78103c19ace68c3da718843dd82fbe90dde068b810f09290f1d since
+      Story 28-2's versioned prompt moved every prompt_sha256 (was
       7c5bf48176b97b9cbd125e7b0899f1327b12902a6dd08ef3c10268c5a1ac64e7 since
       Story 18-4's closed option vocabulary moved every prompt_sha256 (was
       60ed4f9384cb2e89d47d299f1656611b90a748c044dad7856a7485ba58f8b9da since

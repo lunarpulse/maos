@@ -89,9 +89,9 @@ Precision 15/23 = 0.652 (Wilson 95 % [0.449, 0.812]); recall 15/15 = 1.0 (calend
 ## Tasks / Subtasks
 
 - [ ] T0 Rulings D-28-2-01…06 recorded; 28-1 AC1/AC4/AC7 landed.
-- [ ] T1 Train split + prompt file v1 + `proposal_prompt` rendering + prompt pin test (AC3, AC4).
-- [ ] T2 Re-derive hashes for the seed scene/context cassettes and controls; corpus `prompt_sha256` fields via `generate()`; re-pin `corpus_pin.rs` and `coverage-matrix.yaml` (AC7).
-- [ ] T3 Hermetic dry run on a hand-planted v1 cassette (replay green, controls red as designed).
+- [x] T1 Train split + prompt file v1 + `proposal_prompt` rendering + prompt pin test (AC3, AC4). Authored; the checks have not been run (the orchestrator runs them).
+- [x] T2 Re-derive hashes for the seed scene/context cassettes and controls; corpus `prompt_sha256` fields via `generate()`; re-pin `corpus_pin.rs` and `coverage-matrix.yaml` (AC7). Generator paths written; the regeneration commands and the three corpus re-pins are the orchestrator's (see Completion Notes).
+- [x] T3 Hermetic dry run on a hand-planted v1 cassette (replay green, controls red as designed). Read-through done (Completion Notes); the replay itself is the orchestrator's run.
 - [ ] T4 Paid dispatch (`tier-2-rerecord`, `repeats` per D-28-1-02); archive the artifact; summarise here (AC5).
 - [ ] T5 Calibrate and write `floors.toml`; promote the cassette; `halt_live_baseline_28_2.rs`; update `eval_halt_18_2.rs` (AC1, AC2, AC6, AC7, AC8).
 - [ ] T6 If AC5 misses after tuning: stop and raise the spec-change D-row (no floor lowering in code).
@@ -113,11 +113,30 @@ Precision 15/23 = 0.652 (Wilson 95 % [0.449, 0.812]); recall 15/15 = 1.0 (calend
 
 ### Agent Model Used
 
-<set by dev at story start>
+anthropic/claude-sonnet-5-5 (Dev282, implementation agent; edit-only, no cargo/tests/gates run).
 
 ### Completion Notes List
 
+- **T1.** `spirits/butler/prompts/proposal-v1.txt` (sections `## ROLE`, `OBJECTIVE`, `DEFINITIONS`, `DECISION PROCEDURE`, `OUTPUT SCHEMA`, `EXAMPLES`, `INPUT`). `proposal_prompt` (`lib.rs`) renders `PROPOSAL_PROMPT_TEMPLATE` (`include_str!`) in one pass at the two markers `{{conflicts}}` and `{{scenario}}` (a scenario that contains a marker is never re-scanned). `PROPOSAL_PROMPT_VERSION = "butler-proposal/v1"`. DEFINITIONS: a conflict is an overlap `[start, end)` of two confirmed events; only Butler's listed pairs count; tentative/cancelled never conflict; touching or gapped events do not overlap; `user_preference_drift` = `preference_alignment` when a number, else 1.0 (the comms entries carry only id/from/urgency/awaiting_reply, so none states a preference change; an urgent or unanswered message is not drift; never 0.5 as a default). DECISION PROCEDURE: 1 conflicts listed → `calendar-conflict` (options linear_note, reminder, snooze); 2 none listed and alignment < 1.0 → `preference-drift` (reminder, snooze); 3 otherwise → `no-issue` (snooze); 4 drift = alignment or 1.0; 5 confidence 0.9; 6 one-sentence evidence. OUTPUT SCHEMA: one JSON object, first character `{`, no fence, five required fields, closed option vocabulary with the exact option texts. EXAMPLES: four boundary examples = the four `example: true` rows of the train split (tentative overlap; cancelled overlap; back-to-back, no preference signal; `preference_alignment` 0.45).
+- **Train split.** `spirits/butler/tests/fixtures/calendar-comms-v0.3.train.jsonl`: provenance header (hand-authored 2026-11-15) + 6 rows (tr01–tr04 are the examples; tr05 gap; tr06 confirmed overlap). Ids are `t-*`, titles are named; no input shares an event or a message with any test row.
+- **Tests** (`spirits/butler/tests/halt_prompt_28_2.rs`): prompt SHA-256 pin (`d9ffe08f…cd2f0`, measured with `sha256sum`) + version + file == constant; fixed sections once and in order; byte-identical rendering and the exact INPUT tail for all 30 test rows; marker injection; train header and four boundaries; every train label equals the decision procedure applied to Butler's own conflict list; the EXAMPLES are the flagged train rows rendered exactly as INPUT renders them, each reply parses with `parse_proposal` and follows the rules; element-level disjointness of train and test inputs and no test input in the prompt; the two seed scene cassettes bind the v1 prompt. `generate_scene_cassettes` (ignored, `MAOS_GEN_SCENE_CASSETTES`) rewrites only `prompt_sha256` and `prompt_len` of `on-idle-halt.json` and `context-budget-18-5.json` in place (D-28-2-06 A).
+- **T2 — regeneration commands (orchestrator, in this order; none was run):**
+  1. `MAOS_GEN_HALT_EVAL=1 cargo test -p butler --test halt_eval_corpus_18_2 -- --ignored generate` — rewrites `calendar-comms-v0.3.jsonl` (`prompt_sha256` per row), `halt-corpus-v0.3.json` (entry `prompt_sha256`/`prompt_len`; the seed completions now follow the v1 rules: absent alignment → 1.0, pattern `calendar-conflict`/`preference-drift`/`no-issue`, confidence 0.9, options by rule), `halt-corpus-v0.3.drift-blind.json`, `halt-corpus-v0.3.precision-planted.json`.
+  2. `MAOS_GEN_SCENE_CASSETTES=1 cargo test -p butler --test halt_prompt_28_2 -- --ignored generate_scene_cassettes` — rewrites `crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json` (21 entries) and `context-budget-18-5.json` (4 entries).
+  3. `sha256sum spirits/butler/tests/fixtures/calendar-comms-v0.3.jsonl`, then replace the old value `7c5bf48176b97b9cbd125e7b0899f1327b12902a6dd08ef3c10268c5a1ac64e7` with it in `spirits/butler/tests/corpus_pin.rs:28`, `tests/corpora/MANIFEST.toml:137` (the 18-2 R5 entry; found beyond the assignment's list) and `tests/coverage-matrix.yaml:1489` (and add the "was 7c5bf481…" clause to its history sentence).
+  4. `cargo fmt --all`, then `cargo test -p butler` and `cargo test -p maos-bin --test eval_halt_18_2 --test butler_scene_18_4 --test context_budget_18_5 --test butler_inference_18_1`. The 11 maos-bin tests and `journey_forget_18_6` that read `on-idle-halt.json` pass it to `MAOS_REPLAY_CASSETTE` under strict replay, so they pass again once step 2 ran (no file of theirs holds a hash).
+- **T3 (read-through, not run).** The strict replay checks `prompt_sha256`/`prompt_len` per entry (`cassette_replay.rs:151-158`); after steps 1–2 every entry carries the v1 hash. Replay stays green: the seed's no-halt rows answer drift 1.0 or the given alignment ≥ 0.75 (≥ 0.6), the df rows keep 0.4/0.5/0.35, the cc rows halt on `belief_variance`. The drift-blind control still plants 0.99 on df01–df03 (no conflict, 0.99 < 1.0 writes `user_preference_drift` 0.99, above 0.6 → no halt): overall recall 12/15 = 0.80 < 0.90, still detected. The precision-planted control still plants 0.3 on tn01/tn03/tn05 (alignment absent): 3 false positives, precision 15/18 = 0.833 < 0.85, still missed precision. Both controls differ from the seed only in their planted completions (`the_negative_controls_differ_from_the_seed_only_in_their_planted_rows`). The live, hosted model result is T4's; the seed proves the plumbing, not the model.
+- **Not verified / open.** No test, build, formatter or gate ran, so the prompt pin, the example-rendering test (it relies on `serde_json` writing the `f32` 0.45 as `0.45`), and the sections test are unrun. `MANIFEST.toml`'s `prompt_version_hash` (all zero) was left as is. T0, T4–T7, `floors.toml`, the live cassette promotion (AC7's `the_seed_says_what_it_is` replacement) and the status keys remain the orchestrator's.
+
 ### File List
+
+- `spirits/butler/prompts/proposal-v1.txt` (A)
+- `spirits/butler/src/lib.rs` (M: `PROPOSAL_PROMPT_VERSION`, `PROPOSAL_PROMPT_TEMPLATE`, `proposal_prompt`)
+- `spirits/butler/tests/fixtures/calendar-comms-v0.3.train.jsonl` (A)
+- `spirits/butler/tests/halt_prompt_28_2.rs` (A)
+- `spirits/butler/tests/halt_eval_corpus_18_2.rs` (M: `generate()` seed completions follow the v1 rules)
+- `spirits/butler/tests/corpus_pin.rs` (M: comment only; `PINNED` moves at regeneration)
+- Regenerated by the orchestrator, not hand-edited: `spirits/butler/tests/fixtures/calendar-comms-v0.3.jsonl` (derived `prompt_sha256` fields), `halt-corpus-v0.3.drift-blind.json`, `halt-corpus-v0.3.precision-planted.json`, `crates/maos-journey-test/cassettes/j-butler/{halt-corpus-v0.3,on-idle-halt,context-budget-18-5}.json`; re-pins in `corpus_pin.rs`, `tests/corpora/MANIFEST.toml`, `tests/coverage-matrix.yaml`.
 
 ## Change Log
 

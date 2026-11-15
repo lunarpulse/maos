@@ -191,9 +191,23 @@ pub fn parse_proposal(text: &str) -> Result<ButlerProposal, ButlerError> {
     Ok(proposal)
 }
 
+/// Story 28-2 (D-28-2-02 A) — the version of Butler's proposal prompt. A prompt
+/// edit bumps this and the SHA-256 pinned by `tests/halt_prompt_28_2.rs`.
+pub const PROPOSAL_PROMPT_VERSION: &str = "butler-proposal/v1";
+
+/// Story 28-2 — the prompt's fixed sections (ROLE, OBJECTIVE, DEFINITIONS,
+/// DECISION PROCEDURE, OUTPUT SCHEMA, EXAMPLES, INPUT) as a file. The INPUT
+/// section carries the two markers [`proposal_prompt`] fills.
+pub const PROPOSAL_PROMPT_TEMPLATE: &str = include_str!("../prompts/proposal-v1.txt");
+
+const CONFLICTS_MARKER: &str = "{{conflicts}}";
+const SCENARIO_MARKER: &str = "{{scenario}}";
+
 /// Story 18-1 (AC1) — the prompt, built from the scenario (calendar, comms)
-/// and the arithmetic conflict set. Deterministic for a given scenario, so a
-/// recorded cassette's prompt hash is stable.
+/// and the arithmetic conflict set. Story 28-2: rendered from
+/// [`PROPOSAL_PROMPT_TEMPLATE`] in one pass (the scenario text is never
+/// re-scanned for markers), so the output is byte-identical for identical
+/// input and a recorded cassette's prompt hash is stable.
 pub fn proposal_prompt(
     scenario: &ScenarioInput,
     assessment: &Assessment,
@@ -206,20 +220,26 @@ pub fn proposal_prompt(
         .map(|c| format!("{}~{}", c.a, c.b))
         .collect::<Vec<_>>()
         .join(",");
-    // Review BH-1/EC-5: the scale's direction is stated — `primary_scalar`
-    // reads the value as alignment and the manifest halts `on_value_below`.
-    // Story 18-4 (D-18-4-03 A): the option vocabulary is closed and stated.
-    Ok(format!(
-        "You are Butler, the director's anticipatory assistant. Read the calendar and \
-         comms below and propose ONE notification. Reply with exactly one JSON object \
-         and nothing else: {{\"pattern\": string, \"confidence\": number in [0,1], \
-         \"evidence\": string, \"options\": [string, ...], \"user_preference_drift\": \
-         number in [0,1]}}. Each option is \"<action>: <text>\" where <action> is one of \
-         linear_note, reminder, snooze, each at most once; picking the option runs that \
-         action. user_preference_drift: 1.0 = fully aligned with the \
-         director's preferences; lower = more drift.\n\nUnresolved calendar conflicts: \
-         [{conflicts}]\n\nScenario: {scenario_json}"
-    ))
+    let missing = |marker: &str| {
+        ButlerError::Internal(format!(
+            "prompt {PROPOSAL_PROMPT_VERSION} has no `{marker}` marker"
+        ))
+    };
+    let (head, rest) = PROPOSAL_PROMPT_TEMPLATE
+        .split_once(CONFLICTS_MARKER)
+        .ok_or_else(|| missing(CONFLICTS_MARKER))?;
+    let (middle, tail) = rest
+        .split_once(SCENARIO_MARKER)
+        .ok_or_else(|| missing(SCENARIO_MARKER))?;
+    let mut prompt = String::with_capacity(
+        head.len() + conflicts.len() + middle.len() + scenario_json.len() + tail.len(),
+    );
+    prompt.push_str(head);
+    prompt.push_str(&conflicts);
+    prompt.push_str(middle);
+    prompt.push_str(&scenario_json);
+    prompt.push_str(tail);
+    Ok(prompt)
 }
 
 /// Story 18-1 (D-18-1-05 A) — mints a fresh `ProviderInfer` token and the

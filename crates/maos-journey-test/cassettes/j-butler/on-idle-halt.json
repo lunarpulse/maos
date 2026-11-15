@@ -8,8 +8,8 @@
   "entries": [
     {
       "sequence": 0,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -19,8 +19,8 @@
     },
     {
       "sequence": 1,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -30,8 +30,8 @@
     },
     {
       "sequence": 2,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -41,8 +41,8 @@
     },
     {
       "sequence": 3,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -52,8 +52,8 @@
     },
     {
       "sequence": 4,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -63,8 +63,8 @@
     },
     {
       "sequence": 5,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -74,8 +74,8 @@
     },
     {
       "sequence": 6,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -85,8 +85,8 @@
     },
     {
       "sequence": 7,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -96,8 +96,8 @@
     },
     {
       "sequence": 8,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -107,8 +107,8 @@
     },
     {
       "sequence": 9,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -118,8 +118,8 @@
     },
     {
       "sequence": 10,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -129,8 +129,8 @@
     },
     {
       "sequence": 11,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -140,8 +140,8 @@
     },
     {
       "sequence": 12,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -151,8 +151,8 @@
     },
     {
       "sequence": 13,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -162,8 +162,8 @@
     },
     {
       "sequence": 14,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -173,8 +173,8 @@
     },
     {
       "sequence": 15,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -184,8 +184,8 @@
     },
     {
       "sequence": 16,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -195,8 +195,8 @@
     },
     {
       "sequence": 17,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -206,8 +206,8 @@
     },
     {
       "sequence": 18,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -217,8 +217,8 @@
     },
     {
       "sequence": 19,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
@@ -228,8 +228,8 @@
     },
     {
       "sequence": 20,
-      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
-      "prompt_len": 843,
+      "prompt_sha256": "9db9ca7b2246d0eb94051b46c4d4cf37a05fc5439a254ccec6e22b832a21c1c0",
+      "prompt_len": 5813,
       "response": {
         "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",

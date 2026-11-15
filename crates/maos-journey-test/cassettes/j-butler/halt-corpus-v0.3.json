@@ -1,8 +1,8 @@
 {
   "entries": [
     {
-      "prompt_len": 869,
-      "prompt_sha256": "17a71a6d2c61d922f28ba231bd07986936e8ea232bfb202f694d1e6258724141",
+      "prompt_len": 5839,
+      "prompt_sha256": "f8dba30d07e552be1a3aafe0873db13592dfb26a6bcac54bcc207303b866c8cb",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -10,7 +10,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.86,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -19,8 +19,8 @@
       "sequence": 0
     },
     {
-      "prompt_len": 869,
-      "prompt_sha256": "fe5621de7455234e6818d44fd30bd9cdd50d293553bcf2cde06a750454fb6add",
+      "prompt_len": 5839,
+      "prompt_sha256": "d7560bfbe1badbecd1bb23d76bfbc28ff3109fea0d88ef8e22c62b2f96dbf3ab",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -28,7 +28,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.86,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -37,8 +37,8 @@
       "sequence": 1
     },
     {
-      "prompt_len": 869,
-      "prompt_sha256": "5ac2c3fa57b8520e9460f65b3d5116883e94fd4f19c9cebf1cecd7dbbde1a587",
+      "prompt_len": 5839,
+      "prompt_sha256": "587142c7e3bce82f2994c7145f674ecb51baa20f7c053dd76e02f9e52903a213",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -46,7 +46,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.86,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -55,8 +55,8 @@
       "sequence": 2
     },
     {
-      "prompt_len": 869,
-      "prompt_sha256": "b2c8ae9e7cd8c4f31db6db5104a597cd2a6ef836924f00fe78f6c11e391b4945",
+      "prompt_len": 5839,
+      "prompt_sha256": "188d113f0023c6ace3ca6185c0bf1b5566bc41a06857781a801db832a234b605",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -64,7 +64,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.86,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -73,8 +73,8 @@
       "sequence": 3
     },
     {
-      "prompt_len": 869,
-      "prompt_sha256": "a5d57e039c5e3ebbd23048450b854491a5b8f82dd3dbee6505a706197a1468f8",
+      "prompt_len": 5839,
+      "prompt_sha256": "34056a8766568ee5ee97f4cb06e544058f7defbf2df8089d1b0dd1a2b5e3a9c2",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -82,7 +82,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.86,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -91,8 +91,8 @@
       "sequence": 4
     },
     {
-      "prompt_len": 869,
-      "prompt_sha256": "cd0d65f6d2ad56fbc5d0326d2afb47b9754461359f81a42bf8ba6bb291e3b5d0",
+      "prompt_len": 5839,
+      "prompt_sha256": "10b20230621f2466ce01b69e7db4cea3c24e9530f90e54db352eb368120d0485",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -100,7 +100,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.86,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -109,8 +109,8 @@
       "sequence": 5
     },
     {
-      "prompt_len": 873,
-      "prompt_sha256": "ac07b44c75d437d5d8f0204c9678c0a97468b281dc07f38089b5189c76b5739a",
+      "prompt_len": 5843,
+      "prompt_sha256": "8abb766f7a15e789fbf953452cc3e32b479671bc74f3c78a64eb7b0808d92c4b",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -118,7 +118,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.86,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -127,8 +127,8 @@
       "sequence": 6
     },
     {
-      "prompt_len": 869,
-      "prompt_sha256": "7937d83faac5cadee9603d1f5b35710ca03aa786a9f6e78588403eaf5a211007",
+      "prompt_len": 5839,
+      "prompt_sha256": "12c546291576445d3a7377085d09958a1b09fe5d0609b9ecd148ace0fd210215",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -136,7 +136,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.86,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -145,8 +145,8 @@
       "sequence": 7
     },
     {
-      "prompt_len": 869,
-      "prompt_sha256": "4f719eda299976da6668a3b08ff7ccdfe56efa4e14f34d1f085d44d771dbc54d",
+      "prompt_len": 5839,
+      "prompt_sha256": "f755060f9f3d0ebce37eb2282bc0cd805346eb44f4a0224c840fa5c8472bf809",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -154,7 +154,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.86,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -163,8 +163,8 @@
       "sequence": 8
     },
     {
-      "prompt_len": 869,
-      "prompt_sha256": "059621ecde3b5dd2e7db2845c99e71ca18402d7274a802f5b016013318c7f9fa",
+      "prompt_len": 5839,
+      "prompt_sha256": "d9b5644ef76abf1a0fe6699a1339ff10c8edc1ed4e439a8915be89b5d4edf769",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -172,7 +172,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.86,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -181,8 +181,8 @@
       "sequence": 9
     },
     {
-      "prompt_len": 871,
-      "prompt_sha256": "14f4b1d9acc30f06c44accdea05c694d1272c361d0d8a5bfac4a80197295c489",
+      "prompt_len": 5841,
+      "prompt_sha256": "36f2a4999d9a2932b919f130698d78d7ca2258913f65e6760763bd492d2c2e67",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -190,7 +190,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.86,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -199,8 +199,8 @@
       "sequence": 10
     },
     {
-      "prompt_len": 869,
-      "prompt_sha256": "6b6f1e562d3a488698e0be8eee6856a0a0b9a7c6e781fc6c562e07831689a381",
+      "prompt_len": 5839,
+      "prompt_sha256": "130a9669b1321ed573aedcd37a0b4cb12775d624e46ed8633387497f3d1ce459",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -208,7 +208,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.86,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"1 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"calendar-conflict\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -217,8 +217,8 @@
       "sequence": 11
     },
     {
-      "prompt_len": 848,
-      "prompt_sha256": "7a01dcbd28b46953db4415bcf230df26a4d1958a6e1606b5643be9ff295a6c02",
+      "prompt_len": 5818,
+      "prompt_sha256": "05b983f1ade8221e195039698ba7dc847c17c25632825f31b9ea3b6668a52e4a",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -226,7 +226,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 2 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.4}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 2 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.4}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -235,8 +235,8 @@
       "sequence": 12
     },
     {
-      "prompt_len": 848,
-      "prompt_sha256": "facefcf0d7ebe468f64d94386c00bd426aedb3754d7f810bdf0d369b0b1c3371",
+      "prompt_len": 5818,
+      "prompt_sha256": "4a5f8e57266d89a538b557cb6286b886ce6a992be25159cb74196e1eec4d2109",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -244,7 +244,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 2 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.5}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 2 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.5}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -253,8 +253,8 @@
       "sequence": 13
     },
     {
-      "prompt_len": 849,
-      "prompt_sha256": "1c7caa26bdc836f653f373aa7059529b2ee9d8b9dafc31167cbfc629a6d84355",
+      "prompt_len": 5819,
+      "prompt_sha256": "e89d05a67cea37aded7260d8b5f5e79a75ac488f04e2ea8f77575cfc906a05fe",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -262,7 +262,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 2 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.35}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 2 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.35}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -271,8 +271,8 @@
       "sequence": 14
     },
     {
-      "prompt_len": 866,
-      "prompt_sha256": "13ef083952c041ea4543f0570090fbd3e36fa578496c075116cd5af69373485a",
+      "prompt_len": 5836,
+      "prompt_sha256": "20c041f6141a5511c343192dc0e18f79264485a970219489a6b44afbcddc9a57",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -280,7 +280,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -289,8 +289,8 @@
       "sequence": 15
     },
     {
-      "prompt_len": 866,
-      "prompt_sha256": "b0e89d4ab31c3549167d2b08e46506dc83e18bfd1993c87ede4f68bd1e59077e",
+      "prompt_len": 5836,
+      "prompt_sha256": "77e792aa557c0b8c4778f59d25e3add34468142744df54da21c32e632b9bc1ae",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -298,7 +298,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -307,8 +307,8 @@
       "sequence": 16
     },
     {
-      "prompt_len": 866,
-      "prompt_sha256": "c9d7a980796c891b7f668a2960084f692e8f604fbb9731893233610d4a2a9417",
+      "prompt_len": 5836,
+      "prompt_sha256": "becc196d2456970e789c1dcaa9de14bdcd7d8bf877a20c3ed09ce7032c51e37e",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -316,7 +316,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -325,8 +325,8 @@
       "sequence": 17
     },
     {
-      "prompt_len": 866,
-      "prompt_sha256": "407cdaf9f4c170a989a56c0f2b4e86f551260110074d3d433261b2e1c67fa7b2",
+      "prompt_len": 5836,
+      "prompt_sha256": "ee89ad4096afc799906e4e8d63b1d3d3369166604ed81c95190278f59293b8ab",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -334,7 +334,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -343,8 +343,8 @@
       "sequence": 18
     },
     {
-      "prompt_len": 866,
-      "prompt_sha256": "c7d549a1aaea17962eab0b21cf35df70f68f8b98f95dae548b36cf0feeb4c4f5",
+      "prompt_len": 5836,
+      "prompt_sha256": "98d22e876f88781db796f42c7b27a6b80ad862fdb3860ea9da8b276fe8917633",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -352,7 +352,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -361,8 +361,8 @@
       "sequence": 19
     },
     {
-      "prompt_len": 866,
-      "prompt_sha256": "e6a052ae7b85c92c03c0f47b7b1c1d2e21876bfea9eb04b4c653f9f1d72caf24",
+      "prompt_len": 5836,
+      "prompt_sha256": "736c9addd753043a9158915facf1b73e22a899321fea29f0fceb1c05a44c8f37",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -370,7 +370,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -379,8 +379,8 @@
       "sequence": 20
     },
     {
-      "prompt_len": 866,
-      "prompt_sha256": "2b736d4da1df16a48c7f4c5a749e38e0ab50494ee3b23376efc8cfd71fa4137f",
+      "prompt_len": 5836,
+      "prompt_sha256": "92f32f9dd9c6d3bc8d20f0db76ff28cd30a2e8b84992bbda7ce74d85712523b6",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -388,7 +388,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -397,8 +397,8 @@
       "sequence": 21
     },
     {
-      "prompt_len": 865,
-      "prompt_sha256": "b29d64d33074707cd8b587bff5991eb857b66d0a1ae4c75edf9b24cb3fc2ec45",
+      "prompt_len": 5835,
+      "prompt_sha256": "f8d42cf44f24b318b7cb95d726953ff3d7b1cea01f41f11f7c7354bab7d9d2be",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -406,7 +406,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.9}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.9}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -415,8 +415,8 @@
       "sequence": 22
     },
     {
-      "prompt_len": 868,
-      "prompt_sha256": "c3a9b7dee68a6af556ece500387707164053e463407a2f3f03ecba1ff64869c9",
+      "prompt_len": 5838,
+      "prompt_sha256": "766b10960d6142afc302036f44d3b98437ce883c66fdf83b4ffa6c27ec5ff224",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -424,7 +424,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -433,8 +433,8 @@
       "sequence": 23
     },
     {
-      "prompt_len": 866,
-      "prompt_sha256": "12a20eec033252e85e6fe90b3efffc8d68e702d6325f13a4895394f3326b1086",
+      "prompt_len": 5836,
+      "prompt_sha256": "5dca3e3fbea7b0126e989d9b261bd2a3040aeab0f4dfe400fa6cd0478b410633",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -442,7 +442,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.75}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.75}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -451,8 +451,8 @@
       "sequence": 24
     },
     {
-      "prompt_len": 866,
-      "prompt_sha256": "76d9603623d91bd6f328c22c7a6c729e2eccf0b5f4ba37f080a97ae3648c0d5c",
+      "prompt_len": 5836,
+      "prompt_sha256": "8934bc47590da2837094958336984aa5e2e57d4653343fa6603c54ad149a7391",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -460,7 +460,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -469,8 +469,8 @@
       "sequence": 25
     },
     {
-      "prompt_len": 865,
-      "prompt_sha256": "80ed2427171f809986e3763084c7ba3da987b7363feeecb567f1665b89237cb1",
+      "prompt_len": 5835,
+      "prompt_sha256": "a692c018db6e631f62056a693af077d926be83a9fb96746942128e2b99c85971",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -478,7 +478,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.8}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.8}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -487,8 +487,8 @@
       "sequence": 26
     },
     {
-      "prompt_len": 870,
-      "prompt_sha256": "35b762f2511d53b19ccea2e586d52cf13ccb8ae71663899e69bd104b4ddc4f92",
+      "prompt_len": 5840,
+      "prompt_sha256": "e9bb48933441699acf4a32e854eeac346c70028d3708673d2d1a0284fa741bb4",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -496,7 +496,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -505,8 +505,8 @@
       "sequence": 27
     },
     {
-      "prompt_len": 866,
-      "prompt_sha256": "836bcc8648e54667551a93e6d10575f78831581f161da05147c6a7a9160bc4af",
+      "prompt_len": 5836,
+      "prompt_sha256": "b123b59dd5ee1b5ab15ae7017e67614dab7c5ec76dee14735b70ba4769423c82",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -514,7 +514,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"preference-drift\",\"user_preference_drift\":0.95}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80
@@ -523,8 +523,8 @@
       "sequence": 28
     },
     {
-      "prompt_len": 866,
-      "prompt_sha256": "e95641f9a502eb70493931c057199c8d82a650b40b42462c4bd5edd5c7d5f9ee",
+      "prompt_len": 5836,
+      "prompt_sha256": "de7d2a03c2bff488581492fb6a5ac691f58e53212743de8c284d129628fe0fd9",
       "response": {
         "provider_attribution": {
           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",
@@ -532,7 +532,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "{\"confidence\":0.5,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"pattern\":\"comms-triage\",\"user_preference_drift\":0.95}",
+        "text": "{\"confidence\":0.9,\"evidence\":\"0 unresolved calendar conflict(s); 1 message(s)\",\"options\":[\"snooze: Snooze and revisit later\"],\"pattern\":\"no-issue\",\"user_preference_drift\":1.0}",
         "usage": {
           "input_tokens": 400,
           "output_tokens": 80

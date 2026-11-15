@@ -22,10 +22,14 @@ fn sha256_hex(path: &str) -> String {
 /// `prompt_sha256` (was 89c073353f8697159c61794f6fd59546933eb5d79d6c2891e090483960d2f3ad);
 /// re-pinned by Story 18-4 (D-18-4-03 A): the prompt declares the closed
 /// option vocabulary, so every `prompt_sha256` moved (was
-/// 60ed4f9384cb2e89d47d299f1656611b90a748c044dad7856a7485ba58f8b9da).
+/// 60ed4f9384cb2e89d47d299f1656611b90a748c044dad7856a7485ba58f8b9da);
+/// re-pinned by Story 28-2 (D-28-2-01 A): the versioned prompt `proposal-v1.txt`
+/// moved every `prompt_sha256` (was
+/// 7c5bf48176b97b9cbd125e7b0899f1327b12902a6dd08ef3c10268c5a1ac64e7; Story 28-2's v1 prompt moved every
+/// `prompt_sha256` again).
 #[test]
 fn calendar_comms_corpus_sha_is_pinned() {
-    const PINNED: &str = "7c5bf48176b97b9cbd125e7b0899f1327b12902a6dd08ef3c10268c5a1ac64e7";
+    const PINNED: &str = "d4b7b0f1a139e78103c19ace68c3da718843dd82fbe90dde068b810f09290f1d";
     let actual = sha256_hex("tests/fixtures/calendar-comms-v0.3.jsonl");
     assert_eq!(
         actual, PINNED,
