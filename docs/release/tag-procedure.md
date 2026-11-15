@@ -83,8 +83,23 @@ Run these checks against the exact commit that will be tagged:
    test "$candidate_sha" = "$(git rev-parse origin/main)"
    ```
 
-2. Require the `aggregate` check run for that commit to be completed and
-   successful, **and a complete T3 fuzz chain for the same commit** (Story 20-5):
+2. Require the discipline check run(s) for that commit to be completed and
+   successful, **and a complete T3 fuzz chain for the same commit** (Story 20-5).
+   Which check run is a function of the tag kind (CI release-ready program W4,
+   operator decision 1, `_bmad-output/planning-artifacts/decisions-2026-11-14-release-ci.md`):
+   a **release candidate (`vX.Y.Z-rc.N`) is gated on `release-ready`**, the
+   release-critical subset of `aggregate`; **GA (`vX.Y.Z`) is gated on BOTH
+   `aggregate` (strict, every gate) and `release-ready`**; the `v0.x.y-alpha.N`
+   line stays gated on `aggregate` alone. `aggregate` is the merge-path check
+   (branch protection) and stays unchanged; an rc whose `release-ready` is green is
+   allowed even when a merge-hygiene gate `release-ready` excludes (see
+   `RELEASE_READY_EXCLUDED` in `xtask/src/check_ship_gate_completeness.rs`) left
+   `aggregate` red, and the release log records the `aggregate` verdict it did not
+   judge. GA stays strict on the CI evidence: it needs `aggregate` green (every gate,
+   so no excluded gate may be red) AND `release-ready`. Perf is unchanged by the split
+   (ruling 2026-11-12, B1): GA, like an rc, passes `--perf-absent-ok` (ABSENT accepted and
+   labelled `Perf verdicts: ABSENT` in the notes, which the perf-label step enforces for
+   GA), and FAIL or INDETERMINATE are always refused.
 
    First dispatch the 24 h chain at the candidate and wait for it. It is the
    operator's dispatch — the release job refuses a SHA without the chain, and a tag
@@ -106,8 +121,14 @@ Run these checks against the exact commit that will be tagged:
    repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
    gh api -H "Accept: application/vnd.github.raw+json" \
      "repos/${repo}/contents/fuzz-ledger.json?ref=fuzz-ledger" > fuzz-ledger.json
-   gh api "repos/${repo}/commits/${candidate_sha}/check-runs?check_name=aggregate&filter=latest" \
-     | cargo run --locked -p xtask -- check-release-precondition --fuzz-ledger fuzz-ledger.json
+   # release candidate: release-ready
+   gh api "repos/${repo}/commits/${candidate_sha}/check-runs?check_name=release-ready&filter=latest" \
+     | cargo run --locked -p xtask -- check-release-precondition --kind rc --fuzz-ledger fuzz-ledger.json
+   # GA: aggregate AND release-ready, one query per name, both documents piped in
+   { for name in aggregate release-ready; do
+       gh api "repos/${repo}/commits/${candidate_sha}/check-runs?check_name=${name}&filter=latest"
+     done; } \
+     | cargo run --locked -p xtask -- check-release-precondition --kind ga --fuzz-ledger fuzz-ledger.json
    ```
 
    The chain rule is the collector's (`fuzz-prerelease.yml` `t3-ledger-collect`):
@@ -121,16 +142,19 @@ Run these checks against the exact commit that will be tagged:
    `check-perf-verdict --json` on the `perf-ledger` branch (absent = empty ledger) and
    passes the report as `--perf-verdicts`; release candidates and GA both add
    `--perf-absent-ok` (ABSENT accepted, labelled in the notes), and FAIL or
-   INDETERMINATE are always refused. The aggregate server-side `check_name=aggregate&filter=latest` filter is mandatory
-   (no `status=completed` filter: a newer run still in progress is the run judged and
+   INDETERMINATE are always refused. The server-side `check_name=<name>&filter=latest` filter is mandatory
+   for every judged name (`release-ready` for an rc, `aggregate` and `release-ready` for GA, `aggregate` for the
+   alpha line; no `status=completed` filter: a newer run still in progress is the run judged and
    refused, never hidden behind an older green one) and matches
-   the query the `Require successful main discipline aggregate` step runs in
+   the queries the `Require successful main discipline aggregate` step runs in
    `.github/workflows/release.yml` `sign-and-publish`: the check-runs list defaults to
-   30 entries per page while `discipline.yml` declares 161 jobs, so an
-   unfiltered query can page `aggregate` out of the response, making
+   30 entries per page while `discipline.yml` declares 160+ jobs, so an
+   unfiltered query can page the check run out of the response, making
    `check-release-precondition` report a false
-   `no aggregate check-run exists for this tagged SHA` refusal for a
-   commit whose check run actually exists and is green.
+   `no <name> check-run exists for this tagged SHA` refusal for a
+   commit whose check run actually exists and is green. A run under any other name
+   never matches (a green `aggregate` is not a `release-ready`), and an unclassified
+   `--kind` is refused before anything is read.
 
 3. Confirm the regenerated lockfiles and stability contract are current, and
    that the tree is a release candidate (Story 20-5; offline, reads committed
@@ -192,7 +216,7 @@ Run these checks against the exact commit that will be tagged:
    20-6).** Since 2026-10 a pull request or push that touches a
    platform-sensitive path also runs `cargo check --target aarch64-apple-darwin`
    on a macOS runner (`discipline.yml` `macos-scope` → `macos-check`). When the
-   path filter judges a diff irrelevant, `aggregate` reports the guard as
+   path filter judges a diff irrelevant, `aggregate` and `release-ready` report the guard as
    **NOT APPLICABLE — not a pass**, and the filter cannot see a change that
    alters what `release.yml` builds without touching a filtered path (a
    transitive dependency's own platform code, a `stable` toolchain release, or
@@ -222,7 +246,7 @@ Run these checks against the exact commit that will be tagged:
    `build (aarch64-apple-darwin, darwin-arm64, macos-latest)` leg **and** its
    `sign-and-publish` job to pass. Since the rc.1 failure (note above) the dispatch runs
    `sign-and-publish` end to end — main-ancestry, tag classification, rc readiness, the
-   aggregate/fuzz/perf ledgers, signing, the production-key refusals, rendering, the amd64/arm64
+   release-ready/aggregate (by tag kind), fuzz and perf ledgers, signing, the production-key refusals, rendering, the amd64/arm64
    `deb`/`rpm` container builds, package signing, the rc notes guards and a check that every
    file the release would upload exists — up to, and excluding, `Create GitHub Release`, which is
    gated on `github.event_name == 'push'` and can never run for a dispatch. Rehearsal semantics:

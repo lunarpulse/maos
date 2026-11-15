@@ -340,7 +340,10 @@ fn unregistered_jobs_are_enrolled_in_aggregate_only() {
             "{unregistered} is in aggregate.needs"
         );
         for name in mapping(jobs).keys().filter_map(Value::as_str) {
-            if name == "aggregate" {
+            // `release-ready` is the second fan-in over the same jobs (CI release-ready program W4): a
+            // subset of `aggregate`, validated against it by `check-ship-gate-completeness`, so it
+            // `needs` the unregistered jobs `aggregate` needs. Every other job stays refused.
+            if name == "aggregate" || name == "release-ready" {
                 continue;
             }
             assert!(

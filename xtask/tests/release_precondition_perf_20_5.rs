@@ -21,11 +21,13 @@ fn report(sha: &str, verdicts: &[&str]) -> String {
 fn run(perf: Option<&str>, absent_ok: bool) -> Output {
     let dir = tempfile::tempdir().unwrap();
     let runs = dir.path().join("runs.json");
-    let body = json!({ "check_runs": [{ "name": "aggregate", "status": "completed", "conclusion": "success", "head_sha": SHA }] });
+    let body = json!({ "check_runs": [{ "name": "release-ready", "status": "completed", "conclusion": "success", "head_sha": SHA }] });
     std::fs::write(&runs, body.to_string()).unwrap();
     let mut command = Command::new(env!("CARGO_BIN_EXE_xtask"));
     command.args([
         "check-release-precondition",
+        "--kind",
+        "rc",
         "--check-runs",
         runs.to_str().unwrap(),
     ]);

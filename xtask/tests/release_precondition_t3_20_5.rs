@@ -52,7 +52,7 @@ fn run_with(ledger_text: Option<String>, head_sha: &str) -> Output {
         serde_json::to_vec(&json!({
             "total_count": 1,
             "check_runs": [{
-                "name": "aggregate",
+                "name": "release-ready",
                 "status": "completed",
                 "conclusion": "success",
                 "head_sha": head_sha
@@ -65,6 +65,8 @@ fn run_with(ledger_text: Option<String>, head_sha: &str) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_xtask"));
     command.args([
         "check-release-precondition",
+        "--kind",
+        "rc",
         "--check-runs",
         check_runs.to_str().unwrap(),
     ]);
@@ -281,12 +283,12 @@ fn an_empty_released_sha_is_refused_not_matched_against_empty_commits() {
 }
 
 #[test]
-fn the_aggregate_leg_still_refuses_first() {
+fn the_release_ready_leg_still_refuses_first() {
     let dir = tempfile::tempdir().unwrap();
     let check_runs = dir.path().join("check-runs.json");
     std::fs::write(
         &check_runs,
-        json!({"check_runs": [{"name": "aggregate", "status": "completed",
+        json!({"check_runs": [{"name": "release-ready", "status": "completed",
                                "conclusion": "failure", "head_sha": SHA}]})
         .to_string(),
     )
@@ -296,6 +298,8 @@ fn the_aggregate_leg_still_refuses_first() {
     let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args([
             "check-release-precondition",
+            "--kind",
+            "rc",
             "--check-runs",
             check_runs.to_str().unwrap(),
             "--fuzz-ledger",
@@ -351,12 +355,18 @@ fn the_release_job_passes_the_fuzz_ledger_to_the_precondition_for_rc_and_ga_tags
         "the ledger is fetched read-only from the ledger branch: {run}"
     );
     assert!(
-        run.contains("check_name=aggregate&filter=latest"),
-        "the aggregate leg keeps its server-side latest filter: {run}"
+        run.contains("check-runs?check_name=${check_name}&filter=latest"),
+        "every judged check keeps its server-side latest filter: {run}"
     );
     assert!(
         run.contains("rc) fuzz_args") && run.contains("ga) fuzz_args") && run.contains("alpha)"),
-        "rc and GA kinds require the chain, the alpha kind keeps the aggregate-only precondition: {run}"
+        "rc and GA kinds require the chain, the alpha kind has no chain requirement: {run}"
+    );
+    assert!(
+        run.contains("check_names=(release-ready) ;;")
+            && run.contains("check_names=(aggregate release-ready) ;;")
+            && run.contains("alpha) check_names=(aggregate) ;;"),
+        "rc judges release-ready, GA aggregate AND release-ready, alpha aggregate: {run}"
     );
 }
 

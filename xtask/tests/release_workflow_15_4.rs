@@ -255,8 +255,8 @@ fn release_workflow_flattens_and_publishes_the_explicit_artifact_set() {
         Some("${{ github.token }}")
     );
     let guard_command = key(guard, "run").as_str().expect("guard command");
-    assert!(guard_command.contains("check-runs?check_name=aggregate&filter=latest"));
-    assert!(guard_command.contains("check-release-precondition"));
+    assert!(guard_command.contains("check-runs?check_name=${check_name}&filter=latest"));
+    assert!(guard_command.contains("check-release-precondition --kind \"$KIND\""));
 
     let production_key = "${{ secrets.MAOS_RELEASE_PUBKEY }}";
     assert_eq!(

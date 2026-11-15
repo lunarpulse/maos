@@ -815,10 +815,16 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Story 15-4 AC3 — require a successful discipline aggregate before publication.
+    /// Story 15-4 AC3 — require the successful discipline check(s) for the tag kind before publication
+    /// (rc: `release-ready`; ga: `aggregate` and `release-ready`; alpha: `aggregate`).
     #[command(name = "check-release-precondition")]
     CheckReleasePrecondition {
-        /// GitHub check-runs API response; reads stdin when omitted.
+        /// The tag kind `release.yml` classified: `rc`, `ga` or `alpha`. It picks the check-run
+        /// name(s) judged; any other value is refused before anything is read.
+        #[arg(long)]
+        kind: String,
+        /// GitHub check-runs API response(s), one JSON document per required check name (the
+        /// `check_name=<name>&filter=latest` queries concatenated); reads stdin when omitted.
         #[arg(long)]
         check_runs: Option<String>,
         /// Story 20-5 AC4 — `fuzz-ledger.json`: also require a complete T3 fuzz chain
@@ -830,7 +836,7 @@ enum Commands {
         /// `--perf-absent-ok`.
         #[arg(long)]
         perf_verdicts: Option<String>,
-        /// Accept ABSENT perf verdicts (release candidates only; GA needs PASS).
+        /// Accept ABSENT perf verdicts (`release.yml` passes it for rc and GA, ruling 2026-11-12 B1).
         #[arg(long, requires = "perf_verdicts")]
         perf_absent_ok: bool,
         #[arg(long)]
@@ -1518,12 +1524,14 @@ fn main() {
             check_rc_readiness::run(&workspace_root, tag.as_deref(), json)
         }
         Commands::CheckReleasePrecondition {
+            kind,
             check_runs,
             fuzz_ledger,
             perf_verdicts,
             perf_absent_ok,
             json,
         } => check_release_precondition::run(
+            &kind,
             check_runs.as_deref(),
             fuzz_ledger.as_deref(),
             perf_verdicts.as_deref(),

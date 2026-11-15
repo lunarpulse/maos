@@ -141,8 +141,8 @@ than inherited from planning prose.
   `EvidenceVerifier::key_available()` is false
   (`xtask/src/check_multi_tenant_loom.rs:192`), while `EvidenceVerifier::load`
   documents that "CI may omit the key" (`xtask/src/evidence_ledger.rs:541-545`).
-  The gate reaches `aggregate` through `v1-0-ship-gate`, so `aggregate` — and
-  `check_release_precondition` for the tag — stays red until this is ruled.
+  The gate reaches `aggregate` through `v1-0-ship-gate` and is a required `release-ready` need, so `aggregate` and
+  `release-ready` — and `check_release_precondition` for the tag (rc: `release-ready`; GA: both) — stay red until this is ruled.
   Measured on run 36002875453 (`cd4422ef`): every other leg green; this leg was
   already `ABSENT` on 6af9423a, masked because the gate names only its first
   red. **Operator ruling:** a DEDICATED CI-only audit key, never the

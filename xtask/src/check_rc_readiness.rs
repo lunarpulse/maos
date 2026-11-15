@@ -2,7 +2,7 @@
 
 //! Story 20-5 AC5 — `check-rc-readiness`: the tree-state half of the `v1.0.0-rc.N`
 //! readiness contract. It reads committed files from the workspace root only; the
-//! CI-evidence half (the discipline aggregate, the T3 fuzz chain, perf verdicts) is
+//! CI-evidence half (the discipline `release-ready` check, the T3 fuzz chain, perf verdicts) is
 //! `check-release-precondition` on the tag SHA. It never tags, signs, fetches or writes.
 //!
 //! Operator ruling 2026-11-12 (rc = b): the rc ships with perf verdicts ABSENT, labelled in

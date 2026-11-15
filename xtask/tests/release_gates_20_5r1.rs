@@ -740,15 +740,79 @@ fn an_unclassified_kind_is_refused_before_any_call() {
 }
 
 #[test]
-fn the_aggregate_query_never_hides_a_newer_run_in_progress() {
+fn the_check_run_queries_never_hide_a_newer_run_in_progress() {
     let release = release();
     let steps = steps(&release, "sign-and-publish");
     let run = script(&steps, "Require successful main discipline aggregate");
-    assert!(run.contains("check_name=aggregate&filter=latest"), "{run}");
+    assert!(
+        run.contains("check-runs?check_name=${check_name}&filter=latest"),
+        "every judged query is server-side `filter=latest` per check name: {run}"
+    );
     assert!(
         !run.contains("status=completed"),
         "a status filter would surface an older green run while the newest is still running: {run}"
     );
+}
+
+/// The `gh api` check-run queries whose responses are PIPED INTO the precondition (the judged ones),
+/// as `<name>&filter=latest`. The recorded-only `--jq` query of an rc is not one of them.
+fn judged_queries(calls: &str) -> Vec<String> {
+    calls
+        .lines()
+        .filter(|line| line.starts_with("gh ") && line.contains("check-runs?check_name="))
+        .filter(|line| !line.contains("--jq"))
+        .filter_map(|line| line.rsplit("check_name=").next().map(str::to_string))
+        .collect()
+}
+
+/// CI release-ready program W4: the check-run(s) judged are a function of the one classification.
+/// rc -> `release-ready`; GA -> `aggregate` AND `release-ready`; alpha -> `aggregate`; the xtask is
+/// told the kind so it requires the same names.
+#[test]
+fn each_tag_kind_queries_and_requires_its_own_check_runs() {
+    for (kind, expected) in [
+        ("rc", vec!["release-ready&filter=latest"]),
+        (
+            "ga",
+            vec!["aggregate&filter=latest", "release-ready&filter=latest"],
+        ),
+        ("alpha", vec!["aggregate&filter=latest"]),
+    ] {
+        let (output, calls) = aggregate_step(kind);
+        assert!(output.status.success(), "{kind}: {}", text(&output));
+        assert_eq!(judged_queries(&calls), expected, "{kind}: {calls}");
+        assert!(
+            calls.contains(&format!("check-release-precondition --kind {kind}")),
+            "{kind}: the precondition is told the kind: {calls}"
+        );
+    }
+}
+
+/// An rc does not require the merge-path `aggregate`, but its verdict is recorded in the release log
+/// (best effort, never judged); GA and alpha judge it and print no such line.
+#[test]
+fn an_rc_records_the_unjudged_merge_path_aggregate() {
+    let (output, calls) = aggregate_step("rc");
+    assert!(output.status.success(), "{}", text(&output));
+    assert!(
+        calls.lines().any(
+            |line| line.contains("check_name=aggregate&filter=latest") && line.contains("--jq")
+        ),
+        "{calls}"
+    );
+    assert!(
+        text(&output).contains("merge-path aggregate (not required for a release candidate"),
+        "{}",
+        text(&output)
+    );
+    for kind in ["ga", "alpha"] {
+        let (output, _) = aggregate_step(kind);
+        assert!(
+            !text(&output).contains("not required for a release candidate"),
+            "{kind}: {}",
+            text(&output)
+        );
+    }
 }
 
 // ---- GLM F3: the tagged commit must be on main ---------------------------------------

@@ -219,6 +219,22 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   ones the per-gate job ran, and `check-ship-gate-completeness` enrols the ship gates that live there by step name.
   `check-workspace-count`, `check-corpus`, `check-review-findings-resolved` and `check-dev-record-completeness` stay
   jobs because other jobs `needs` them. The pin above reads the steps of `xtask-gates` exactly as it read the old jobs.
+  Release gating (CI release-ready program W4, 2026-11-15; operator decision 1 of
+  `_bmad-output/planning-artifacts/decisions-2026-11-14-release-ci.md`): `discipline.yml` has a second fan-in,
+  `release-ready`, the release-critical SUBSET of `aggregate`. `aggregate` stays the branch-protection check and is
+  unchanged. `release-ready.needs` is `aggregate.needs` (with `v1-0-ship-gate` expanded into the jobs it fans in)
+  minus the exclusion table `RELEASE_READY_EXCLUDED` in `xtask/src/check_ship_gate_completeness.rs`, one reason per row
+  (merge-hygiene gates the plan names: `check-fuzz-targets`, `fuzz-build`, `check-env-contract`,
+  `check-decision-register`, `check-loom-substrate-drift`, `check-ship-gate-completeness`, `check-model-currency`,
+  `check-test-cost`, `check-test-budget`, `check-exit-commands`, `multi-provider-drift-tests`);
+  `check-ship-gate-completeness` fails when the workflow drifts from the table or when a release-critical gate
+  (`RELEASE_READY_R_SET`, including `check-stability-matrix`, `check-breaking-md`, `check-export-control`,
+  `check-ko-coverage` and `workspace-test-suite`) is excluded. A red excluded `xtask-gates` STEP does not red
+  `release-ready` but is printed in its job summary and as a warning; the excluded jobs are neither waited for nor read
+  there. `check-release-precondition --kind <rc|ga|alpha>` picks the check-run(s) judged: a release candidate requires
+  `release-ready`; GA requires `aggregate` (strict) AND `release-ready`; the alpha line requires `aggregate`; an
+  unclassified kind is refused. Every check name is queried with the server-side `check_name=<name>&filter=latest`
+  filter, and a run under any other name never matches.
   Build-free docs checks include route-manifest parity, glossary, anchors and ko coverage
   (`KO_COVERAGE_MIN=100`). The CI pin reader compares test-bound count pins against `cargo nextest list`, marker
   specs against emission-site counts, and checks color settings on parsed cargo/nextest output; it covers recognised

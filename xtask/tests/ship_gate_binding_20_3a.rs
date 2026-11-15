@@ -225,3 +225,190 @@ fn cadence_gate_cannot_also_enrol_per_commit() {
     fs::write(path, serde_yaml::to_string(&yaml).unwrap()).unwrap();
     red(run(copy.path()), "check-fuzz-floor");
 }
+
+// ---- CI release-ready program W4: `release-ready` is `aggregate` minus the exclusion table ----------
+
+fn add_need(root: &Path, job: &str, name: &str) {
+    let path = workflow(root, "discipline.yml");
+    let mut yaml: serde_yaml::Value =
+        serde_yaml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    yaml["jobs"][job]["needs"]
+        .as_sequence_mut()
+        .unwrap()
+        .push(serde_yaml::Value::String(name.into()));
+    fs::write(path, serde_yaml::to_string(&yaml).unwrap()).unwrap();
+}
+
+#[test]
+fn real_tree_release_ready_is_aggregate_minus_twelve_documented_exclusions() {
+    let copy = tree();
+    let output = run(copy.path());
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    // aggregate.needs (74) with v1-0-ship-gate expanded to its 44 needs is 107 jobs; nine are excluded jobs.
+    assert_eq!(report["release_ready_needs"], 98);
+    assert_eq!(
+        report["release_ready_excluded"].as_array().unwrap().len(),
+        12
+    );
+}
+
+#[test]
+fn dropping_a_required_job_from_release_ready_reds() {
+    for job in [
+        "workspace-test-suite",
+        "check-export-control",
+        "epic-20-exit",
+        "windows-check",
+    ] {
+        let copy = tree();
+        drop_need(copy.path(), "release-ready", job);
+        red(
+            run(copy.path()),
+            &format!(
+                "{job}: aggregate reaches it, but release-ready neither requires nor excludes it"
+            ),
+        );
+    }
+}
+
+#[test]
+fn keeping_an_excluded_job_in_release_ready_reds() {
+    let copy = tree();
+    add_need(copy.path(), "release-ready", "check-model-currency");
+    red(
+        run(copy.path()),
+        "check-model-currency: excluded, yet in release-ready.needs",
+    );
+}
+
+#[test]
+fn a_release_ready_job_aggregate_does_not_reach_reds() {
+    let copy = tree();
+    add_need(copy.path(), "release-ready", "a-nightly-only-job");
+    red(
+        run(copy.path()),
+        "a-nightly-only-job: in release-ready.needs but not reached by aggregate",
+    );
+    let copy = tree();
+    drop_need(copy.path(), "aggregate", "check-kernel-baseline");
+    red(
+        run(copy.path()),
+        "check-kernel-baseline: in release-ready.needs but not reached by aggregate",
+    );
+}
+
+#[test]
+fn the_excluded_xtask_gate_steps_env_must_match_the_table() {
+    let pinned =
+        "EXCLUDED_XTASK_GATES: \"check-env-contract check-test-cost check-test-cost-vectors\"";
+    for changed in [
+        "EXCLUDED_XTASK_GATES: \"check-env-contract check-test-cost\"",
+        "EXCLUDED_XTASK_GATES: \"check-env-contract check-test-cost check-test-cost-vectors check-breaking-md\"",
+    ] {
+        let copy = tree();
+        plant(copy.path(), ".github/workflows/discipline.yml", pinned, changed);
+        red(run(copy.path()), "EXCLUDED_XTASK_GATES");
+    }
+}
+
+#[test]
+fn a_consolidated_gate_without_a_job_output_reds() {
+    let copy = tree();
+    plant(
+        copy.path(),
+        ".github/workflows/discipline.yml",
+        "      check-stability-matrix: ${{ steps.check-stability-matrix.outcome }}\n",
+        "",
+    );
+    red(
+        run(copy.path()),
+        "check-stability-matrix: xtask-gates step has no job output",
+    );
+}
+
+#[test]
+fn removing_a_pinned_job_from_both_lists_reds() {
+    for job in [
+        "nfr-rel-1-crash-detection-2s",
+        "workspace-test-suite",
+        "epic-20-exit",
+        "package-recipes",
+    ] {
+        let copy = tree();
+        drop_need(copy.path(), "aggregate", job);
+        drop_need(copy.path(), "release-ready", job);
+        red(
+            run(copy.path()),
+            &format!("{job}: pinned release-critical job missing from release-ready.needs"),
+        );
+    }
+}
+
+#[test]
+fn replacing_a_pinned_job_in_both_lists_with_another_reds() {
+    let copy = tree();
+    for job in ["aggregate", "release-ready"] {
+        drop_need(copy.path(), job, "nfr-rel-1-crash-detection-2s");
+        add_need(copy.path(), job, "a-replacement-job");
+    }
+    let output = run(copy.path());
+    let text = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        text.contains("a-replacement-job: in release-ready.needs but not pinned"),
+        "{text}"
+    );
+    red(
+        output,
+        "nfr-rel-1-crash-detection-2s: pinned release-critical job missing",
+    );
+}
+
+#[test]
+fn an_unknown_xtask_gates_step_reds() {
+    let copy = tree();
+    let path = workflow(copy.path(), "discipline.yml");
+    let mut yaml: serde_yaml::Value =
+        serde_yaml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    let step: serde_yaml::Value =
+        serde_yaml::from_str("{name: extra-gate, id: extra-gate, run: 'true'}").unwrap();
+    yaml["jobs"]["xtask-gates"]["steps"]
+        .as_sequence_mut()
+        .unwrap()
+        .push(step);
+    fs::write(path, serde_yaml::to_string(&yaml).unwrap()).unwrap();
+    let output = run(copy.path());
+    let text = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        text.contains("extra-gate: xtask-gates step has no job output"),
+        "{text}"
+    );
+    red(
+        output,
+        "extra-gate: xtask-gates step is neither excluded nor pinned",
+    );
+}
+
+#[test]
+fn the_required_xtask_steps_env_must_be_every_non_excluded_step() {
+    let copy = tree();
+    plant(
+        copy.path(),
+        ".github/workflows/discipline.yml",
+        "REQUIRED_XTASK_STEPS: \"build-xtask check-stability-matrix check-serde-error-handling",
+        "REQUIRED_XTASK_STEPS: \"build-xtask check-serde-error-handling",
+    );
+    red(run(copy.path()), "REQUIRED_XTASK_STEPS");
+}

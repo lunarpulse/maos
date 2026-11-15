@@ -1,4 +1,9 @@
-//! Story 15-4 AC3 — publication requires a successful discipline aggregate.
+//! Story 15-4 AC3 — publication requires successful discipline check-run(s) on the tagged SHA.
+//! CI release-ready program W4 (operator decision 1, `decisions-2026-11-14-release-ci.md`) — WHICH
+//! check-run(s) is a function of the tag kind `release.yml` classified: a release candidate (`rc`) is
+//! judged on `release-ready` (the release-critical subset of `aggregate`), GA (`ga`) on `aggregate`
+//! (strict, every gate) AND `release-ready`, the alpha line on `aggregate` alone; any other kind is
+//! refused before anything is read.
 //! Story 20-5 AC4 — and, when `--fuzz-ledger` is given, a complete T3 fuzz chain for the
 //! released SHA (the `fuzz-prerelease.yml` collector's rule, one source for both).
 //! Operator ruling 2026-11-12 (rc = b) — and, when `--perf-verdicts` is given, the
@@ -10,7 +15,29 @@ use std::io::Read;
 
 use serde::{Deserialize, Serialize};
 
-const CHECK_NAME: &str = "aggregate";
+use crate::check_ship_gate_completeness::RELEASE_READY_JOB;
+
+/// The merge-path check `aggregate`: the branch-protection name, required in full for GA and alpha.
+const AGGREGATE_JOB: &str = "aggregate";
+
+/// The check-run names a release candidate must carry green: the release-critical subset only.
+const RC_CHECKS: &[&str] = &[RELEASE_READY_JOB];
+/// GA stays strict: every gate (`aggregate`) AND the release-critical set.
+const GA_CHECKS: &[&str] = &[AGGREGATE_JOB, RELEASE_READY_JOB];
+/// The alpha line keeps its aggregate-only rule.
+const ALPHA_CHECKS: &[&str] = &[AGGREGATE_JOB];
+
+/// The check-run names a tag of `kind` must carry green, or the refusal for an unclassified kind.
+/// The one place the kind -> check mapping lives; `release.yml` queries the same names server-side
+/// (`check_name=<name>&filter=latest`), and a name this function requires that the input lacks refuses.
+fn required_check_names(kind: &str) -> Result<&'static [&'static str], String> {
+    match kind {
+        "rc" => Ok(RC_CHECKS),
+        "ga" => Ok(GA_CHECKS),
+        "alpha" => Ok(ALPHA_CHECKS),
+        other => Err(format!("release refused: unclassified tag kind '{other}'")),
+    }
+}
 
 #[derive(Debug, Deserialize)]
 struct CheckRunsResponse {
@@ -30,7 +57,8 @@ struct CheckRun {
 #[derive(Debug, Serialize)]
 struct Report<'a> {
     passed: bool,
-    check_name: &'a str,
+    kind: &'a str,
+    check_names: &'a [&'static str],
     status: &'a str,
     conclusion: &'a str,
     head_sha: &'a str,
@@ -111,7 +139,7 @@ struct FuzzRecord {
 fn check_t3_fuzz_chain(ledger_path: &str, sha: &str) -> Result<(), String> {
     if sha.is_empty() {
         return Err(
-            "release precondition failed: the aggregate check-run carries no head_sha, so no T3 fuzz chain can be matched to a commit"
+            "release precondition failed: the judged check-run carries no head_sha, so no T3 fuzz chain can be matched to a commit"
                 .to_string(),
         );
     }
@@ -156,12 +184,15 @@ fn check_t3_fuzz_chain(ledger_path: &str, sha: &str) -> Result<(), String> {
 }
 
 pub fn run(
+    kind: &str,
     check_runs_path: Option<&str>,
     fuzz_ledger: Option<&str>,
     perf_verdicts: Option<&str>,
     perf_absent_ok: bool,
     json: bool,
 ) -> Result<(), String> {
+    // Refused before any input is read: an unclassified kind has no check to judge.
+    let names = required_check_names(kind)?;
     let input = match check_runs_path {
         Some(path) => std::fs::read_to_string(path)
             .map_err(|error| format!("failed to read check-runs response {path}: {error}"))?,
@@ -175,39 +206,57 @@ pub fn run(
             input
         }
     };
+    if input.trim().is_empty() {
+        return Err("invalid GitHub check-runs response: empty input".to_string());
+    }
 
-    let response: CheckRunsResponse = serde_json::from_str(&input)
-        .map_err(|error| format!("invalid GitHub check-runs response: {error}"))?;
-    let aggregate_runs: Vec<&CheckRun> = response
-        .check_runs
-        .iter()
-        .filter(|run| run.name == CHECK_NAME)
+    // One JSON document per queried check name (`release.yml` concatenates the
+    // `check_name=<name>&filter=latest` responses for a GA tag).
+    let check_runs: Vec<CheckRun> = serde_json::Deserializer::from_str(&input)
+        .into_iter::<CheckRunsResponse>()
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("invalid GitHub check-runs response: {error}"))?
+        .into_iter()
+        .flat_map(|response| response.check_runs)
         .collect();
 
-    if aggregate_runs.is_empty() {
-        return Err(
-            "release precondition failed: no aggregate check-run exists for this tagged SHA; discipline runs only after the commit reaches main"
-                .to_string(),
-        );
+    // Every required name is judged and every refusal is reported: a GA tag with both
+    // checks red says so, rather than naming only the first.
+    let mut refusals = Vec::new();
+    let mut judged: Vec<&CheckRun> = Vec::new();
+    for name in names {
+        // `filter=latest` reduces each response to one run per check name, so the first run
+        // of a name IS the run this release is judged on. Never search for *any* success: a
+        // payload holding both the pull_request and the push run for one SHA would let a
+        // stale success wave through a failed current check. A run of any other name
+        // (`aggregate` for an rc, `journal-aggregate` for anything) is never a match.
+        let Some(run) = check_runs.iter().find(|run| run.name == *name) else {
+            refusals.push(format!(
+                "no {name} check-run exists for this tagged SHA; discipline runs only after the commit reaches main"
+            ));
+            continue;
+        };
+        if run.status != "completed" {
+            refusals.push(format!(
+                "{name} check-run status is {}, not completed",
+                run.status
+            ));
+        } else if run.conclusion.as_deref() != Some("success") {
+            refusals.push(format!(
+                "{name} check-run conclusion is {}, not success",
+                run.conclusion.as_deref().unwrap_or("null")
+            ));
+        } else {
+            judged.push(run);
+        }
     }
-
-    // `filter=latest` reduces the response to one run per check name, so index 0 IS
-    // the run this release is judged on. Never search for *any* success: a payload
-    // holding both the pull_request and the push run for one SHA would let a stale
-    // success wave through a failed current aggregate.
-    let run = aggregate_runs[0];
-    if run.status != "completed" {
+    if !refusals.is_empty() {
         return Err(format!(
-            "release precondition failed: aggregate check-run status is {}, not completed",
-            run.status
+            "release precondition failed: {}",
+            refusals.join("; ")
         ));
     }
-    if run.conclusion.as_deref() != Some("success") {
-        return Err(format!(
-            "release precondition failed: aggregate check-run conclusion is {}, not success",
-            run.conclusion.as_deref().unwrap_or("null")
-        ));
-    }
+    let run = judged[0];
     if let Some(ledger) = fuzz_ledger {
         check_t3_fuzz_chain(ledger, &run.head_sha)?;
     }
@@ -219,7 +268,8 @@ pub fn run(
             "{}",
             serde_json::to_string(&Report {
                 passed: true,
-                check_name: CHECK_NAME,
+                kind,
+                check_names: names,
                 status: &run.status,
                 conclusion: "success",
                 head_sha: &run.head_sha,
@@ -229,7 +279,10 @@ pub fn run(
             .map_err(|error| format!("failed to serialize release precondition: {error}"))?
         );
     } else {
-        eprintln!("check-release-precondition: PASS — aggregate completed successfully");
+        eprintln!(
+            "check-release-precondition: PASS — {} completed successfully ({kind})",
+            names.join(" and ")
+        );
         if fuzz_ledger.is_some() {
             eprintln!(
                 "check-release-precondition: PASS — complete T3 fuzz chain for every target at {}",

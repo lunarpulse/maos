@@ -13,10 +13,11 @@ on:
 #
 # ⚠ `cancel-in-progress` is deliberately TRUE ONLY FOR PULL REQUESTS. A
 # superseded PR run is worthless, but a superseded `main` run is NOT: the
-# release precondition looks for an `aggregate` check-run with
-# `completed/success` ON THE TAGGED SHA (`check_release_precondition.rs:53`,
-# `const CHECK_NAME: &str = "aggregate"` at :7). Cancelling main runs would
-# silently leave tag-able commits with no aggregate verdict at all — turning a
+# release precondition looks for the `release-ready` check-run (release
+# candidates), the `aggregate` check-run (alpha) or both (GA) with
+# `completed/success` ON THE TAGGED SHA (`check_release_precondition.rs`,
+# `required_check_names`). Cancelling main runs would
+# silently leave tag-able commits with no verdict at all — turning a
 # queue optimisation into a release-blocking hole. Main runs therefore always
 # run to completion, and the group key falls back to the SHA so they never
 # cancel one another.
@@ -5950,6 +5951,218 @@ jobs:
         run: |
           echo "macos-check was judged applicable by macos-scope but did not run — the guard is unverified."
           exit 1
+
+  # CI release-ready program W4 (2026-11-15; `_bmad-output/planning-artifacts/ci-release-ready-program-2026-11-14.md`
+  # §2 and §4, operator decision 1 of `decisions-2026-11-14-release-ci.md`) — the release-critical fan-in.
+  # `check-release-precondition` reads THIS check-run for a release candidate (`-rc.N`); GA requires `aggregate`
+  # (strict, every gate) AND this one; the alpha line stays `aggregate`-only. `aggregate` is unchanged and stays the
+  # branch-protection check.
+  #
+  # A SUBSET of `aggregate`: its `needs` are `aggregate.needs` with `v1-0-ship-gate` expanded into the jobs it fans in,
+  # MINUS the exclusion table in `xtask/src/check_ship_gate_completeness.rs` (`RELEASE_READY_EXCLUDED`, one reason per
+  # row; plan §4 merge-hygiene gates). `check-ship-gate-completeness` fails the merge path when this list drifts from
+  # that table, when an excluded gate is still listed, when a release-critical gate (`RELEASE_READY_R_SET`) is
+  # excluded, or when `EXCLUDED_XTASK_GATES` below is not the excluded `xtask-gates` steps. Everything not excluded
+  # stays required: workspace-test-suite, the epic exits, the cgroup / wasm-host legs, nfr-rel-1/2/9, the air-gap
+  # witness, the package and container builds, and the R-set xtask gates (check-stability-matrix, check-breaking-md,
+  # ...), which are read per step from `xtask-gates`.
+  #
+  # Result rule, as `aggregate`: failure, cancelled and skipped are red (`macos-check` is the one skipped exemption;
+  # its applicability is judged as 20-6 AC3 does). `xtask-gates` is read per step output: a red excluded step does
+  # NOT red this job, but it is never hidden (job summary plus a warning annotation), and a `xtask-gates` failure that
+  # no step output explains is red. The excluded JOBS are neither waited for nor read here; `aggregate` carries them.
+  # No PR comment: `aggregate` already posts the one comment of the run.
+  release-ready:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs:
+      - cargo-deny
+      - xtask-gates
+      - smoke-suite
+      - check-fmt
+      - kloc-check
+      - abi-diff
+      - gen-abi-docs
+      - check-workspace-count
+      - check-composition-root-completeness
+      - invariant-lock
+      - check-corpus
+      - maos-audit-read-only
+      - cap-token-verify-bench
+      - hello-spirit-bench
+      - example-spirit-tests
+      - founder-loop-bench
+      - example-spirit-ts-tests
+      - coverage-matrix-nfr-test-3
+      - spirit-test-tests
+      - lcas-corpus-tests
+      - isolation-framework-tests
+      - onb-nfr2-timing
+      - calibrate-per-commit
+      - nfr-aud-7-distillate-five-metrics-floor
+      - nfr-sec-14-cross-spirit-isolation-200
+      - nfr-rel-3-hsis-95pct
+      - nfr-rel-1-crash-detection-2s
+      - nfr-rel-2-hang-detection-60s
+      - nfr-rel-4-silent-failure-detection
+      - nfr-rel-10-cold-restart
+      - nfr-rel-9-revocation-5s-p99
+      - upgrade-policy-corpus
+      - revocation-corpus
+      - t3-escape-corpus
+      - nfr-sec-1-t3-image-signature
+      - t3-smoke-busybox
+      - epic-17-exit
+      - epic-18-exit
+      - epic-19-exit
+      - epic-20-exit
+      - nfr-aud-14-intent-lineage-corpus
+      - a2a-tcp-tests-8-6
+      - a2a-loopback-corpus-v0
+      - intent-lineage-a2a-extension-6-3
+      - fr26-schedule-firing-corpus
+      - adr-034-consent-rupture-corpus
+      - nfr-scale-4-rate-limit-isolation
+      - intent-lineage-6-4-extension
+      - manifest-n-minus-1-test
+      - check-review-findings-resolved
+      - check-dev-record-completeness
+      - check-kernel-baseline
+      - journey-hermetic-tier-1
+      - fr59-yank-propagation-5min
+      - air-gap-import-corpus
+      - ccac-n600-ship-gate
+      - smoke-onb-1-7-5b
+      - check-owasp-freeze-hash
+      - check-trial-attestation
+      - check-migration-merkle
+      - workspace-test-suite
+      - release-dry-run
+      - air-gap-netns-witness
+      - container-build
+      - package-recipes
+      - cargo-install
+      - macos-scope
+      - macos-check
+      - cgroup-ceiling-delegated
+      - cgroup-ceiling-undelegated
+      # The `v1-0-ship-gate.needs` members `aggregate` reaches through that fan-in, minus the excluded merge-path ones.
+      - check-export-control
+      - check-host-surface
+      - check-ko-coverage
+      - windows-check
+      - check-live-bilateral-consent
+      - check-rotation-real-timing
+      - check-j4-latency
+      - check-j1-loopback-delegation
+      - check-j1-two-host-signed-run
+      - check-mobile-push-on-halt
+      - check-ff-j6
+      - check-skill-conformance
+      - wasm-host-tests
+      - check-wasm-form-equiv
+      - check-cross-region-consensus
+      - check-multi-region-slo
+      - check-scale-churn
+      - check-cohort-mesh
+      - check-multi-tenant-loom
+      - check-reza-production-path
+      - check-enterprise-pdp
+      - check-enterprise-identity
+      - check-fkcs
+      - check-escape-detector
+      - check-vetting-attestation
+      - check-cert-rotation-trigger
+      - check-perf-runner-policy
+      - check-perf-counts
+    if: always()
+    steps:
+      - name: Judge the release-critical set
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          # The `xtask-gates` steps this job does not require (their failure is recorded, never hidden). Pinned to
+          # `RELEASE_READY_EXCLUDED` by `check-ship-gate-completeness`.
+          EXCLUDED_XTASK_GATES: "check-env-contract check-test-cost check-test-cost-vectors"
+          # EVERY other step of `xtask-gates` (gates and vector steps, build included): each must be PRESENT in the job
+          # outputs and `success`, so a dropped output is a red, never an invisible failure. Pinned by
+          # `check-ship-gate-completeness` to (all `xtask-gates` step ids) minus `RELEASE_READY_EXCLUDED`.
+          REQUIRED_XTASK_STEPS: "build-xtask check-stability-matrix check-serde-error-handling check-manifest-schema-version check-skill-schema check-epic-close-coherence check-coverage-matrix-completeness check-unsafe check-service-boundary check-breaking-md check-pub-field-constructors check-dependency-closure coverage-matrix check-empty-kernel check-loom check-fr47 check-a2a-sender-completeness check-judge-config check-security-md check-security-md-vectors example-spirit-drift corpus-staleness check-dev-model-tier check-pentest-gate check-third-party-trial check-red-team-gate nfr-onb-1-gate"
+        run: |
+          set -euo pipefail
+          excluded="$(jq -c -n --arg s "$EXCLUDED_XTASK_GATES" '$s | split(" ") | map(select(length > 0))')"
+          required="$(jq -c -n --arg s "$REQUIRED_XTASK_STEPS" '$s | split(" ") | map(select(length > 0))')"
+          red=""
+          # 1. Every needed job but xtask-gates. `macos-check` is the ONLY skipped-job exemption (as in aggregate).
+          red_jobs="$(jq -r '
+            to_entries
+            | map(select(.key != "xtask-gates"))
+            | map(select(.value.result == "failure" or .value.result == "cancelled" or (.key != "macos-check" and .value.result == "skipped")))
+            | map("\(.key)=\(.value.result)") | join(" ")' <<< "$NEEDS_JSON")"
+          if [ -n "$red_jobs" ]; then red="$red; jobs: $red_jobs"; fi
+          # 2. xtask-gates, read per step output. An empty output (step never ran) is not success.
+          xg_result="$(jq -r '.["xtask-gates"].result' <<< "$NEEDS_JSON")"
+          xg_outputs="$(jq -c '.["xtask-gates"].outputs // {}' <<< "$NEEDS_JSON")"
+          # A required step whose output is absent is "missing", never skipped over.
+          required_bad="$(jq -r -n --argjson req "$required" --argjson out "$xg_outputs" '
+            $req | map(. as $k | {key: $k, value: (($out | .[$k]) // "missing")}) | map(select(.value != "success"))
+            | map("\(.key)=\(.value)") | join(" ")')"
+          excluded_bad="$(jq -r --argjson ex "$excluded" '
+            to_entries | map(select(.key as $k | any($ex[]; . == $k))) | map(select(.value != "success"))
+            | map("\(.key)=\(.value)") | join(" ")' <<< "$xg_outputs")"
+          if ! jq -e 'has("build-xtask")' <<< "$xg_outputs" > /dev/null; then
+            red="$red; xtask-gates published no build-xtask outcome (result: $xg_result)"
+          elif [ -n "$required_bad" ]; then
+            red="$red; xtask-gates required step(s): $required_bad"
+          else
+            case "$xg_result" in
+              success) ;;
+              failure)
+                if [ -z "$excluded_bad" ]; then
+                  red="$red; xtask-gates failed but no gate step output explains it"
+                fi ;;
+              *) red="$red; xtask-gates=$xg_result" ;;
+            esac
+          fi
+          # 3. macOS guard disposition (Story 20-6 AC3, same rule as aggregate).
+          macos_result="$(jq -r '.["macos-check"].result' <<< "$NEEDS_JSON")"
+          scope_result="$(jq -r '.["macos-scope"].result' <<< "$NEEDS_JSON")"
+          scope_applicable="$(jq -r '.["macos-scope"].outputs.applicable // ""' <<< "$NEEDS_JSON")"
+          macos_line="macos-check: $macos_result"
+          if [ "$macos_result" = skipped ]; then
+            if [ "$scope_applicable" = false ]; then
+              macos_line="macos-check: NOT APPLICABLE (not a pass); the pre-tag rehearsal (docs/release/tag-procedure.md step 6) stays mandatory"
+            elif [ "$scope_result" != success ]; then
+              macos_line="macos-check: NOT RUN because macos-scope was $scope_result (reds this check)"
+            else
+              macos_line="macos-check: SKIPPED although macos-scope judged it applicable; the guard did not run"
+              red="$red; macos-check applicable but did not run"
+            fi
+          fi
+          {
+            echo "## release-ready (release-critical subset of aggregate)"
+            echo
+            echo "| Job | Result |"
+            echo "|---|---|"
+            jq -r 'to_entries[] | select(.key != "xtask-gates") | "| \(.key) | \(if .value.result == "skipped" then "NOT RUN, skipped" else .value.result end) |"' <<< "$NEEDS_JSON"
+            echo "| xtask-gates (job) | $xg_result |"
+            jq -r --argjson ex "$excluded" 'to_entries[] | .key as $k | "| xtask-gates / \($k) | \(.value)\(if any($ex[]; . == $k) then " (EXCLUDED: not required here)" else "" end) |"' <<< "$xg_outputs"
+            echo
+            echo "$macos_line"
+            echo
+            echo "Excluded merge-path JOBS are neither waited for nor read here: \`aggregate\` carries them (table: \`RELEASE_READY_EXCLUDED\` in xtask/src/check_ship_gate_completeness.rs)."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "$macos_line"
+          # An excluded step that is not green never turns this check red and is never hidden.
+          if [ -n "$excluded_bad" ]; then
+            note="EXCLUDED merge-path xtask-gates step(s) not green: $excluded_bad. Not required for a release candidate; GA also requires aggregate."
+            echo "::warning title=release-ready records an excluded gate failure::$note"
+            { echo; echo "**$note**"; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$red" ]; then
+            echo "release-ready FAILED:${red#;}"
+            exit 1
+          fi
+          echo "release-ready: every required gate passed"
 
   # Story 10.2 D3/F3→B — v1.5 Ship-Gate Aggregate: the phase-graduation mechanism.
   # Mirrors v1.0-ship-gate membership but enforces gates whose registry disposition

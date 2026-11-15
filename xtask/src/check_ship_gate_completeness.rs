@@ -7,6 +7,9 @@
 //!    (`CONSOLIDATED_JOB`, itself a `v1-0-ship-gate.needs` entry), or an
 //!    explicitly mapped cadence job key.
 //! 3. `aggregate.needs` reaches `v1-0-ship-gate` directly.
+//! 3b. CI release-ready program W4: `release-ready.needs` is `aggregate.needs` (with
+//!    `v1-0-ship-gate` expanded) minus the documented exclusion table
+//!    (`RELEASE_READY_EXCLUDED`); no release-critical gate is ever excluded.
 //! 4. Story 13.6e AC5: consumes the ledger-set gates' published `product_claim`
 //!    artifacts and refuses a ship badge asserted over `NOT_PROVEN` evidence.
 //!    Before this story the gate read only `discipline.yml` text and registry
@@ -149,6 +152,290 @@ const CADENCE_GATES: &[(&str, &str, &str)] = &[
 /// that is both a direct `needs` job and a step there is refused.
 const CONSOLIDATED_JOB: &str = "xtask-gates";
 
+/// The `discipline.yml` job a release candidate is judged on (`check-release-precondition`
+/// reads its check-run by this name; `aggregate` stays the merge-path check).
+pub(crate) const RELEASE_READY_JOB: &str = "release-ready";
+
+/// The step env that names the `CONSOLIDATED_JOB` steps `release-ready` does not require.
+const RELEASE_READY_EXCLUDED_ENV: &str = "EXCLUDED_XTASK_GATES";
+
+/// CI release-ready program W4 (operator decision 1, `decisions-2026-11-14-release-ci.md`): what
+/// `release-ready` does NOT require of a release candidate, and why, in ONE place (the workflow's
+/// `release-ready.needs` and its `EXCLUDED_XTASK_GATES` env are validated against it below).
+///
+/// `release-ready` is a SUBSET of `aggregate`. Its `needs` are the jobs `aggregate` reaches
+/// (`aggregate.needs` with `v1-0-ship-gate` expanded into the jobs it fans in, because most
+/// merge-path gates are `v1-0-ship-gate.needs` members and a fan-in that kept that edge would still
+/// go red on them) MINUS the job rows below. A row naming a step of `CONSOLIDATED_JOB` is read from
+/// the job's per-step outputs instead: the job stays required, only that step's outcome is not.
+/// An excluded failure never turns `release-ready` red and is never hidden: the workflow prints it in
+/// the job summary and as a warning. GA stays strict: `check-release-precondition` requires
+/// `aggregate` AND `release-ready` for `vX.Y.Z`.
+///
+/// Every row is a gate the plan (`ci-release-ready-program-2026-11-14.md` section 4) names as merge
+/// hygiene: the merge path already guarantees it, or another release control reads the same evidence
+/// at the exact SHA. Adding a row needs a reason a reviewer can check; a gate in
+/// the pinned release-critical set (`xtask/release-ready-required.toml`) can never be a row.
+const RELEASE_READY_EXCLUDED: &[(&str, &str)] = &[
+    (
+        "check-fuzz-targets",
+        "merge hygiene (plan section 4): the T3 fuzz chain `check-release-precondition --fuzz-ledger` requires already builds and runs the targets at the exact SHA",
+    ),
+    (
+        "fuzz-build",
+        "merge hygiene (plan section 4): same as check-fuzz-targets, the T3 chain builds the targets at the exact SHA",
+    ),
+    (
+        "check-decision-register",
+        "merge hygiene (plan section 4): reads committed decision-register deadlines; the merge path guarantees it",
+    ),
+    (
+        "check-loom-substrate-drift",
+        "merge hygiene (plan section 4): workflow/reader env and service-block drift over committed files",
+    ),
+    (
+        "check-ship-gate-completeness",
+        "merge hygiene (plan section 4): enrolment and release-ready membership over committed files; runs on the merge path",
+    ),
+    (
+        "check-model-currency",
+        "merge hygiene (plan section 4): model-pin currency over committed files",
+    ),
+    (
+        "check-test-budget",
+        "merge hygiene (plan section 4): per-binary time budget over the workspace junit; flaky (10 red runs)",
+    ),
+    (
+        "check-exit-commands",
+        "merge hygiene (plan section 4): registry-advisory at v1_0; exit-command text over committed files",
+    ),
+    (
+        "multi-provider-drift-tests",
+        "merge path (plan section 4): xtask unit tests of the drift checker, which workspace-test-suite also runs; no registry row",
+    ),
+    (
+        "check-env-contract",
+        "merge hygiene (plan section 4): maos-bin env registry over committed files; a step of xtask-gates",
+    ),
+    (
+        "check-test-cost",
+        "merge hygiene (plan section 4): no test compiles the tree, over committed sources; a step of xtask-gates",
+    ),
+    (
+        "check-test-cost-vectors",
+        "merge hygiene (plan section 4): the proven-red vectors of check-test-cost; a step of xtask-gates",
+    ),
+];
+
+/// The release-critical set `release-ready` must require, pinned in `xtask/release-ready-required.toml`
+/// INDEPENDENTLY of `aggregate.needs` and `release-ready.needs`: removing a job from both workflow lists
+/// (or swapping it for another one) leaves the pin unmet and reds `check-ship-gate-completeness`. `jobs` is
+/// exactly `release-ready.needs`; `steps` is exactly the non-excluded steps of `CONSOLIDATED_JOB`. An
+/// exclusion row naming a pinned name is refused.
+const RELEASE_READY_REQUIRED: &str = include_str!("../release-ready-required.toml");
+
+/// The step env that lists every `CONSOLIDATED_JOB` step `release-ready` REQUIRES (present and `success`).
+const RELEASE_READY_REQUIRED_ENV: &str = "REQUIRED_XTASK_STEPS";
+
+#[derive(serde::Deserialize)]
+struct RequiredPin {
+    jobs: Vec<String>,
+    steps: Vec<String>,
+}
+
+fn required_pin() -> Result<RequiredPin, String> {
+    toml::from_str(RELEASE_READY_REQUIRED)
+        .map_err(|error| format!("xtask/release-ready-required.toml: {error}"))
+}
+
+/// The workflow and pin views `release_ready_problems` judges, read from `discipline.yml`.
+struct ReleaseReadyInputs<'a> {
+    aggregate_needs: &'a [String],
+    ship_gate_needs: &'a [String],
+    ready_needs: &'a [String],
+    consolidated_step_ids: &'a [String],
+    consolidated_outputs: &'a [String],
+    excluded_env: Option<&'a str>,
+    required_env: Option<&'a str>,
+    pin: &'a RequiredPin,
+}
+
+/// Is `release-ready` exactly `aggregate` minus the exclusion table, and exactly the pinned set?
+/// Refuses when: a row has no reason, repeats, names a pinned gate, or resolves to nothing; a job
+/// `aggregate` reaches is neither required nor excluded; `release-ready` requires a job `aggregate` does
+/// not, or an excluded one; `release-ready.needs` or the required `xtask-gates` steps differ from the pin;
+/// any step of `xtask-gates` has no job output to read; `EXCLUDED_XTASK_GATES` is not the excluded steps
+/// or `REQUIRED_XTASK_STEPS` is not every other step.
+fn release_ready_problems(
+    inputs: &ReleaseReadyInputs<'_>,
+    excluded: &[(&str, &str)],
+) -> Vec<String> {
+    use std::collections::BTreeSet;
+    let mut problems = Vec::new();
+    let reach: BTreeSet<&str> = inputs
+        .aggregate_needs
+        .iter()
+        .map(String::as_str)
+        .filter(|name| *name != "v1-0-ship-gate")
+        .chain(inputs.ship_gate_needs.iter().map(String::as_str))
+        .collect();
+    let ready: BTreeSet<&str> = inputs.ready_needs.iter().map(String::as_str).collect();
+    let is_step = |name: &str| inputs.consolidated_step_ids.iter().any(|id| id == name);
+    let has_output = |name: &str| inputs.consolidated_outputs.iter().any(|out| out == name);
+    let pinned =
+        |name: &str| (inputs.pin.jobs.iter().chain(&inputs.pin.steps)).any(|pin| pin == name);
+    if ready.len() != inputs.ready_needs.len() {
+        problems.push(format!("{RELEASE_READY_JOB}.needs lists a job twice"));
+    }
+    let mut seen = BTreeSet::new();
+    let mut excluded_jobs = BTreeSet::new();
+    let mut excluded_steps = BTreeSet::new();
+    for (name, reason) in excluded {
+        if !seen.insert(*name) {
+            problems.push(format!("{name}: excluded from {RELEASE_READY_JOB} twice"));
+        }
+        if reason.trim().is_empty() {
+            problems.push(format!(
+                "{name}: excluded from {RELEASE_READY_JOB} with no reason"
+            ));
+        }
+        if pinned(name) {
+            problems.push(format!(
+                "{name}: is a release-critical gate and can never be excluded from {RELEASE_READY_JOB}"
+            ));
+        }
+        if reach.contains(name) {
+            excluded_jobs.insert(*name);
+            if ready.contains(name) {
+                problems.push(format!(
+                    "{name}: excluded, yet in {RELEASE_READY_JOB}.needs"
+                ));
+            }
+        } else if is_step(name) {
+            excluded_steps.insert(*name);
+            if !has_output(name) {
+                problems.push(format!(
+                    "{name}: excluded step has no {CONSOLIDATED_JOB} job output, so its failure could not be recorded"
+                ));
+            }
+        } else {
+            problems.push(format!(
+                "{name}: excluded from {RELEASE_READY_JOB} but is neither an aggregate job nor a {CONSOLIDATED_JOB} step"
+            ));
+        }
+    }
+    for name in &reach {
+        if !ready.contains(name) && !excluded_jobs.contains(name) {
+            problems.push(format!(
+                "{name}: aggregate reaches it, but {RELEASE_READY_JOB} neither requires nor excludes it"
+            ));
+        }
+    }
+    for name in &ready {
+        if !reach.contains(name) {
+            problems.push(format!(
+                "{name}: in {RELEASE_READY_JOB}.needs but not reached by aggregate; release-ready must be a subset"
+            ));
+        }
+    }
+    let pin_jobs: BTreeSet<&str> = inputs.pin.jobs.iter().map(String::as_str).collect();
+    for job in &pin_jobs {
+        if !ready.contains(job) {
+            problems.push(format!(
+                "{job}: pinned release-critical job missing from {RELEASE_READY_JOB}.needs"
+            ));
+        }
+    }
+    for job in &ready {
+        if !pin_jobs.contains(job) {
+            problems.push(format!(
+                "{job}: in {RELEASE_READY_JOB}.needs but not pinned in xtask/release-ready-required.toml"
+            ));
+        }
+    }
+    let required_steps: BTreeSet<&str> = inputs
+        .consolidated_step_ids
+        .iter()
+        .map(String::as_str)
+        .filter(|id| !excluded_steps.contains(id))
+        .collect();
+    let pin_steps: BTreeSet<&str> = inputs.pin.steps.iter().map(String::as_str).collect();
+    for id in required_steps.difference(&pin_steps) {
+        problems.push(format!(
+            "{id}: {CONSOLIDATED_JOB} step is neither excluded nor pinned in xtask/release-ready-required.toml"
+        ));
+    }
+    for id in pin_steps.difference(&required_steps) {
+        problems.push(format!(
+            "{id}: pinned required step is not a (non-excluded) step of {CONSOLIDATED_JOB}"
+        ));
+    }
+    for id in inputs.consolidated_step_ids {
+        if !has_output(id) {
+            problems.push(format!(
+                "{id}: {CONSOLIDATED_JOB} step has no job output, so {RELEASE_READY_JOB} cannot read it"
+            ));
+        }
+    }
+    let required_env: BTreeSet<&str> = inputs
+        .required_env
+        .unwrap_or("")
+        .split_whitespace()
+        .collect();
+    if required_env != required_steps {
+        problems.push(format!(
+            "{RELEASE_READY_JOB} step env {RELEASE_READY_REQUIRED_ENV} is {required_env:?}, not the required {CONSOLIDATED_JOB} steps {required_steps:?}"
+        ));
+    }
+    let env: BTreeSet<&str> = inputs
+        .excluded_env
+        .unwrap_or("")
+        .split_whitespace()
+        .collect();
+    if env != excluded_steps {
+        problems.push(format!(
+            "{RELEASE_READY_JOB} step env {RELEASE_READY_EXCLUDED_ENV} is {env:?}, not the excluded {CONSOLIDATED_JOB} steps {excluded_steps:?}"
+        ));
+    }
+    problems
+}
+
+/// An env var of the `release-ready` step that carries it (`EXCLUDED_XTASK_GATES`, `REQUIRED_XTASK_STEPS`).
+fn release_ready_step_env(workflow: &serde_yaml::Value, var: &str) -> Option<String> {
+    workflow["jobs"][RELEASE_READY_JOB]["steps"]
+        .as_sequence()?
+        .iter()
+        .find_map(|step| step["env"][var].as_str().map(str::to_string))
+}
+
+/// The step ids of `CONSOLIDATED_JOB`: a gate step AND a vector-test step (whose display name differs
+/// from its id) are both steps of the job, and the id is what `steps.<id>.outcome` and the job
+/// outputs bind to, so the id is how `release-ready` names a step.
+fn consolidated_step_ids(workflow: &serde_yaml::Value) -> Vec<String> {
+    workflow["jobs"][CONSOLIDATED_JOB]["steps"]
+        .as_sequence()
+        .map(|steps| {
+            steps
+                .iter()
+                .filter_map(|step| step["id"].as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The job-output keys of `CONSOLIDATED_JOB`: the per-step outcomes other jobs can read.
+fn consolidated_outputs(workflow: &serde_yaml::Value) -> Vec<String> {
+    workflow["jobs"][CONSOLIDATED_JOB]["outputs"]
+        .as_mapping()
+        .map(|outputs| {
+            outputs
+                .keys()
+                .filter_map(|key| key.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// Is this invocation the one that DOWNLOADED the ledger artifacts?
 ///
 /// Pure so it can be tested without mutating process env (these tests run in
@@ -245,6 +532,22 @@ pub fn run(json: bool) -> Result<(), String> {
     if !aggregate_needs.iter().any(|name| name == "v1-0-ship-gate") {
         enrolment_problems.push("aggregate.needs must contain v1-0-ship-gate".to_string());
     }
+    // CI release-ready program W4: `release-ready` is `aggregate` minus the documented exclusion table.
+    let ready_needs = extract_job_needs(&workflow, RELEASE_READY_JOB)?;
+    let pin = required_pin()?;
+    enrolment_problems.extend(release_ready_problems(
+        &ReleaseReadyInputs {
+            aggregate_needs: &aggregate_needs,
+            ship_gate_needs: &needs,
+            ready_needs: &ready_needs,
+            consolidated_step_ids: &consolidated_step_ids(&workflow),
+            consolidated_outputs: &consolidated_outputs(&workflow),
+            excluded_env: release_ready_step_env(&workflow, RELEASE_READY_EXCLUDED_ENV).as_deref(),
+            required_env: release_ready_step_env(&workflow, RELEASE_READY_REQUIRED_ENV).as_deref(),
+            pin: &pin,
+        },
+        RELEASE_READY_EXCLUDED,
+    ));
     // D3/F3→B: validate that every ship gate has a [[ship_gate]] disposition entry
     // in gate-registry.toml. This mechanizes the advisory→blocking graduation.
     let registry_path = Path::new("xtask/gate-registry.toml");
@@ -332,6 +635,8 @@ pub fn run(json: bool) -> Result<(), String> {
                 "found": needs,
                 "consolidated_job": CONSOLIDATED_JOB,
                 "consolidated_steps": consolidated,
+                "release_ready_needs": ready_needs.len(),
+                "release_ready_excluded": RELEASE_READY_EXCLUDED.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
                 "enrolment_problems": enrolment_problems,
                 "ledger_set": crate::evidence_ledger::ledger_gates(),
                 // Never silently skipped: when false, the ledger legs did not
@@ -649,5 +954,164 @@ jobs:
         assert_eq!(expected.len(), 48, "duplicate expected gate");
         assert_eq!(registry.ship_gates.len(), 48, "duplicate registry gate");
         assert_eq!(names, expected);
+    }
+
+    fn real_release_ready_problems(
+        excluded: &[(&str, &str)],
+        edit: impl FnOnce(&mut Vec<String>, &mut Vec<String>),
+    ) -> Vec<String> {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../.github/workflows/discipline.yml");
+        let workflow: serde_yaml::Value =
+            serde_yaml::from_str(&std::fs::read_to_string(path).expect("discipline.yml"))
+                .expect("discipline.yml parses");
+        let mut aggregate = extract_job_needs(&workflow, "aggregate").unwrap();
+        let ship = extract_job_needs(&workflow, "v1-0-ship-gate").unwrap();
+        let mut ready = extract_job_needs(&workflow, RELEASE_READY_JOB).unwrap();
+        edit(&mut aggregate, &mut ready);
+        let steps = consolidated_step_ids(&workflow);
+        let pin = required_pin().unwrap();
+        release_ready_problems(
+            &ReleaseReadyInputs {
+                aggregate_needs: &aggregate,
+                ship_gate_needs: &ship,
+                ready_needs: &ready,
+                consolidated_step_ids: &steps,
+                consolidated_outputs: &consolidated_outputs(&workflow),
+                excluded_env: release_ready_step_env(&workflow, RELEASE_READY_EXCLUDED_ENV)
+                    .as_deref(),
+                required_env: release_ready_step_env(&workflow, RELEASE_READY_REQUIRED_ENV)
+                    .as_deref(),
+                pin: &pin,
+            },
+            excluded,
+        )
+    }
+
+    /// The real workflow is exactly `aggregate` minus the table, and the table is the pinned plan set:
+    /// adding a row is a deliberate edit of this list as well, never a drive-by.
+    #[test]
+    fn release_ready_is_aggregate_minus_the_pinned_exclusion_table() {
+        let problems = real_release_ready_problems(RELEASE_READY_EXCLUDED, |_, _| {});
+        assert!(problems.is_empty(), "{problems:?}");
+        let mut names: Vec<&str> = RELEASE_READY_EXCLUDED
+            .iter()
+            .map(|(name, _)| *name)
+            .collect();
+        names.sort_unstable();
+        assert_eq!(
+            names,
+            [
+                "check-decision-register",
+                "check-env-contract",
+                "check-exit-commands",
+                "check-fuzz-targets",
+                "check-loom-substrate-drift",
+                "check-model-currency",
+                "check-ship-gate-completeness",
+                "check-test-budget",
+                "check-test-cost",
+                "check-test-cost-vectors",
+                "fuzz-build",
+                "multi-provider-drift-tests",
+            ]
+        );
+        assert!(RELEASE_READY_EXCLUDED
+            .iter()
+            .all(|(_, reason)| !reason.trim().is_empty()));
+    }
+
+    /// Proven red: a release-critical gate cannot be excluded, a row needs a reason, a row must resolve.
+    #[test]
+    fn release_ready_refuses_an_r_set_exclusion_a_blank_reason_and_a_phantom_row() {
+        for (row, cause) in [
+            (("check-breaking-md", "no"), "can never be excluded"),
+            (("workspace-test-suite", "no"), "can never be excluded"),
+            (("check-ko-coverage", "no"), "can never be excluded"),
+            (("check-model-currency", "  "), "with no reason"),
+            (("no-such-gate", "reason"), "neither an aggregate job nor"),
+        ] {
+            let mut table = RELEASE_READY_EXCLUDED.to_vec();
+            table.push(row);
+            let problems = real_release_ready_problems(&table, |_, _| {});
+            assert!(
+                problems.iter().any(|p| p.contains(cause)),
+                "{row:?}: {problems:?}"
+            );
+        }
+    }
+
+    /// Proven red: dropping a required job, keeping an excluded one, or adding a non-aggregate one all red.
+    #[test]
+    fn release_ready_membership_drift_reds_both_ways() {
+        let dropped = real_release_ready_problems(RELEASE_READY_EXCLUDED, |_, ready| {
+            ready.retain(|name| name != "workspace-test-suite");
+        });
+        assert!(
+            dropped.iter().any(|p| p.contains("workspace-test-suite")),
+            "{dropped:?}"
+        );
+        let kept = real_release_ready_problems(RELEASE_READY_EXCLUDED, |_, ready| {
+            ready.push("check-model-currency".into());
+        });
+        assert!(
+            kept.iter().any(|p| p.contains("excluded, yet in")),
+            "{kept:?}"
+        );
+        let extra = real_release_ready_problems(RELEASE_READY_EXCLUDED, |_, ready| {
+            ready.push("not-an-aggregate-job".into());
+        });
+        assert!(
+            extra.iter().any(|p| p.contains("must be a subset")),
+            "{extra:?}"
+        );
+    }
+
+    /// The pin is independent of both workflow lists: removing a release-critical job from BOTH
+    /// `aggregate.needs` and `release-ready.needs` leaves the pin unmet and is refused.
+    #[test]
+    fn removing_a_pinned_job_from_both_lists_is_refused() {
+        for job in [
+            "nfr-rel-1-crash-detection-2s",
+            "nfr-rel-2-hang-detection-60s",
+            "nfr-rel-9-revocation-5s-p99",
+            "workspace-test-suite",
+            "epic-20-exit",
+            "cgroup-ceiling-delegated",
+            "wasm-host-tests",
+            "air-gap-netns-witness",
+            "package-recipes",
+            "container-build",
+        ] {
+            let problems =
+                real_release_ready_problems(RELEASE_READY_EXCLUDED, |aggregate, ready| {
+                    aggregate.retain(|name| name != job);
+                    ready.retain(|name| name != job);
+                });
+            let cause = format!("{job}: pinned release-critical job missing");
+            assert!(
+                problems.iter().any(|p| p.contains(&cause)),
+                "{job}: {problems:?}"
+            );
+        }
+    }
+
+    /// Swapping a pinned job for another one (the count is unchanged) is refused too: the pin is the set,
+    /// not a size.
+    #[test]
+    fn replacing_a_pinned_job_with_another_in_both_lists_is_refused() {
+        let problems = real_release_ready_problems(RELEASE_READY_EXCLUDED, |aggregate, ready| {
+            for list in [aggregate, ready] {
+                list.retain(|name| name != "nfr-rel-1-crash-detection-2s");
+                list.push("a-replacement-job".into());
+            }
+        });
+        let missing = "nfr-rel-1-crash-detection-2s: pinned release-critical job missing";
+        let unpinned = "a-replacement-job: in release-ready.needs but not pinned";
+        assert!(problems.iter().any(|p| p.contains(missing)), "{problems:?}");
+        assert!(
+            problems.iter().any(|p| p.contains(unpinned)),
+            "{problems:?}"
+        );
     }
 }

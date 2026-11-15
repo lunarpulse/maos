@@ -195,10 +195,18 @@ jobs:
           KIND: ${{ steps.tag.outputs.kind }}
         run: |
           set -euo pipefail
+          # CI release-ready program W4 (operator decision 1, decisions-2026-11-14-release-ci.md):
+          # WHICH discipline check-run is judged is a function of the tag kind, the one
+          # classification above. A release candidate is judged on `release-ready` (the
+          # release-critical subset of `aggregate`); GA stays strict and needs `aggregate`
+          # AND `release-ready`; the alpha line keeps the `aggregate`-only rule. The names
+          # below are the ones `check-release-precondition --kind` requires: a name queried
+          # here that the xtask does not require is ignored, a name it requires that is
+          # missing from the input is refused.
           # Story 20-5 AC4: a release candidate or GA tag also needs a complete T3 fuzz
           # chain (3 targets x 5 links x >= 24 h measured) for this exact SHA in the
           # `fuzz-ledger` branch; the operator dispatches `fuzz-prerelease` before
-          # tagging. The alpha line keeps the aggregate-only rule; an unclassified kind
+          # tagging. The alpha line has no chain requirement; an unclassified kind
           # is refused (it cannot reach here through the classify step).
           # Operator ruling 2026-11-12 (rc = b; GA: third set, B1): perf verdicts are judged
           # for rc and GA from the `perf-ledger` branch (an absent branch is an empty ledger:
@@ -208,10 +216,11 @@ jobs:
           # requires it for an rc); FAIL and INDETERMINATE are always refused.
           fuzz_args=()
           perf_args=()
+          check_names=()
           case "$KIND" in
-            rc) fuzz_args=(--fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json"); perf_args=(--perf-verdicts "$RUNNER_TEMP/perf-verdicts.json" --perf-absent-ok) ;;
-            ga) fuzz_args=(--fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json"); perf_args=(--perf-verdicts "$RUNNER_TEMP/perf-verdicts.json" --perf-absent-ok) ;;
-            alpha) ;;
+            rc) fuzz_args=(--fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json"); perf_args=(--perf-verdicts "$RUNNER_TEMP/perf-verdicts.json" --perf-absent-ok); check_names=(release-ready) ;;
+            ga) fuzz_args=(--fuzz-ledger "$RUNNER_TEMP/fuzz-ledger.json"); perf_args=(--perf-verdicts "$RUNNER_TEMP/perf-verdicts.json" --perf-absent-ok); check_names=(aggregate release-ready) ;;
+            alpha) check_names=(aggregate) ;;
             *) echo "release refused: unclassified tag kind '$KIND'"; exit 1 ;;
           esac
           if [ "${#fuzz_args[@]}" -gt 0 ]; then
@@ -243,10 +252,23 @@ jobs:
             # never read as ABSENT.
             cargo run --locked -p xtask -- check-perf-verdict --sha "${{ github.sha }}" --ledger "$RUNNER_TEMP/perf-ledger.jsonl" --json > "$RUNNER_TEMP/perf-verdicts.json" || true
           fi
+          if [ "$KIND" = rc ]; then
+            # Recorded, never judged: a release candidate does not require the merge-path
+            # `aggregate`, so a red one is stated here instead of being invisible in the
+            # release log. The verdict printed cannot pass or fail the step, but the query
+            # itself is not swallowed: if the API cannot be read the step fails loudly (the
+            # judged queries below would fail on the same API anyway).
+            merge_path="$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=aggregate&filter=latest" --jq 'if (.check_runs | length) == 0 then "absent" else "\(.check_runs[0].status)/\(.check_runs[0].conclusion)" end')"
+            echo "::notice title=rc judged on release-ready::merge-path aggregate (not required for a release candidate; GA requires it): $merge_path"
+          fi
           # Review GLM F6: no status filter, so a newer run still in progress is the run
-          # judged (and refused) instead of an older green one.
-          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=aggregate&filter=latest" |
-            cargo run --locked -p xtask -- check-release-precondition "${fuzz_args[@]}" "${perf_args[@]}"
+          # judged (and refused) instead of an older green one. One server-side
+          # `filter=latest` query per required name; the xtask judges the first run of each.
+          {
+            for check_name in "${check_names[@]}"; do
+              gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=${check_name}&filter=latest"
+            done
+          } | cargo run --locked -p xtask -- check-release-precondition --kind "$KIND" "${fuzz_args[@]}" "${perf_args[@]}"
       - name: Require the rc and GA notes perf label to agree with the perf verdicts (rc and GA tags only)
         id: perf_label
         if: steps.tag.outputs.kind == 'rc' || steps.tag.outputs.kind == 'ga'
