@@ -17,7 +17,7 @@
 #
 # [[expensive]] registers every test binary holding `#[ignore = "expensive: …"]`
 # tests (`check-test-cost` enforces both directions). `job` is the CI job that
-# runs them and must run ignored tests: `expensive-tests` runs exactly the rows
+# runs them (in `discipline.yml` or `ci-nightly.yml`) and must run ignored tests: `expensive-tests` (nightly since W3) runs exactly the rows
 # naming it (filter from `cargo run -p xtask -- check-test-cost
 # --expensive-filter`); other rows name the dedicated job that provisions their
 # substrate. Tests that only run `cargo tree`/`metadata`/`locate-project`/

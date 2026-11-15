@@ -56,12 +56,26 @@ binary_id(xtask::example_spirit_regen_integration)
 | binary_id(maos-bin::spawned_swap_20_9)
 | binary_id(maos-bin::spawned_door_20_9)
 | binary_id(maos-bin::spawned_installed_20_9)
+| binary_id(maos-bin::root_shutdown_unload_16_3)
+| binary_id(maos-kernel-core::t3_terminal_helpers_17_7)
 """
 test-group = "serial"
 # AC15 real TLS/CLI and 20-8 skill witnesses share the owned serial resource
 # group; the two 20-8 binaries have separately owned 31s exceptions. The 20-9 binaries
 # (wasm-host only) run real runner children against fixed idle/schedule/revert windows
 # (MAOS_*_FAST) and a real daemon: serial, and each binary stays inside the 30 s default.
+# CI release-ready program W3 (timing profile; no budget changed): the two other recurring hosted
+# flake sites join the group, each on its own evidence. `maos-bin::root_shutdown_unload_16_3` spawns
+# real `maos run` roots and T3 containers, scans `/proc` for host-namespace grandchildren
+# (`wait_for_host_grandchild`, `ps -eo`) and holds wall-clock bounds (the root must exit within 3 s of
+# SIGTERM, a Worker's pid within 5 s); its dedicated CI job (`nfr-rel-11-halt-receipt-999pct`) already
+# runs it `--test-threads=1` and says the vectors "assume sequential execution". Under process-per-test
+# nextest the 15 vectors would otherwise overlap each other. `maos-kernel-core::t3_terminal_helpers_17_7`
+# shares no host state (own tempdirs, stub runtimes) but is wall-clock-sensitive (150 ms/500 ms
+# receipt and deadline windows,
+# 1 s/2 s/3 s teardown bounds, a 20-thread stalled-snapshot vector), so its tests must not overlap each
+# other under load. Serialising the group removes the self-inflicted overlap; it does not make the
+# rest of the suite quieter, and it relaxes no assertion or budget.
 
 [profile.ci]
 fail-fast = false

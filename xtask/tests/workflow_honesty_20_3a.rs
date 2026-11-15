@@ -170,15 +170,22 @@ fn every_workflow_escape_hatch_has_an_owner_or_benign_classification() {
 
 #[test]
 fn grep_scans_fail_on_unreadable_input_but_not_no_match() {
-    let wf = workflow("discipline.yml");
-    for (job, name) in [
-        ("reproducible-build", "Grep for nightly-only features"),
+    let discipline = workflow("discipline.yml");
+    // `reproducible-build` runs nightly in `ci-nightly.yml` since the CI release-ready program W3.
+    let nightly = workflow("ci-nightly.yml");
+    for (wf, job, name) in [
         (
+            &nightly,
+            "reproducible-build",
+            "Grep for nightly-only features",
+        ),
+        (
+            &discipline,
             "maos-audit-read-only",
             "Grep for write-open patterns in maos-audit",
         ),
     ] {
-        let source = script(&wf, job, name);
+        let source = script(wf, job, name);
         let dir = tempfile::tempdir().unwrap();
         fs::create_dir_all(dir.path().join("crates/maos-audit")).unwrap();
         fs::create_dir(dir.path().join("xtask")).unwrap();
@@ -351,19 +358,30 @@ fn aggregate_needs_holds_no_advisory_job() {
             "{name}: its registry binding is not `blocking`, so it cannot be an aggregate need"
         );
     }
+    // The advisory/measurement jobs and the two slow/sensitive release-relevant ones run nightly in
+    // `ci-nightly.yml` (CI release-ready program W3): still running, on no merge path.
+    let nightly = workflow("ci-nightly.yml");
     for advisory in [
         "reproducible-build",
         "determinism-tests",
         "nfr-perf-1-iac-routing-budget",
         "nfr-perf-8-orchestrator-fanout",
+        "nfr-perf-j4-latency",
+        "clippy-advisory",
+        "nfr-rel-11-halt-receipt-999pct",
+        "expensive-tests",
     ] {
         assert!(
-            wf["jobs"][advisory].is_mapping(),
-            "{advisory} must still run"
+            nightly["jobs"][advisory].is_mapping(),
+            "{advisory} must still run (nightly, ci-nightly.yml)"
+        );
+        assert!(
+            wf["jobs"][advisory].is_null(),
+            "{advisory} runs nightly; it must not also be a discipline job"
         );
         assert!(
             !needs.iter().any(|need| need.as_str() == Some(advisory)),
-            "{advisory} is advisory and must stay out of aggregate.needs"
+            "{advisory} runs nightly and must stay out of aggregate.needs"
         );
     }
 }

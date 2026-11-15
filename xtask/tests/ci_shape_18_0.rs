@@ -26,6 +26,13 @@ fn workflow() -> Value {
         .expect("parse discipline workflow")
 }
 
+/// The scheduled `ci-nightly.yml` (CI release-ready program W3): the jobs that left `aggregate.needs` run here.
+fn nightly_ci_workflow() -> Value {
+    let path = root().join(".github/workflows/ci-nightly.yml");
+    serde_yaml::from_str(&fs::read_to_string(path).expect("read ci-nightly workflow"))
+        .expect("parse ci-nightly workflow")
+}
+
 fn mapping(value: &Value) -> &Mapping {
     value.as_mapping().expect("expected mapping")
 }
@@ -273,7 +280,8 @@ fn proven_red_steps_run_after_a_red_gate_step() {
 
 #[test]
 fn expensive_tests_uploads_its_junit_and_builds_no_fixtures() {
-    let workflow = workflow();
+    // W3: the job runs nightly in `ci-nightly.yml`, no longer on the merge path.
+    let workflow = nightly_ci_workflow();
     let jobs = key(&workflow, "jobs");
     let job = key(jobs, "expensive-tests");
     assert_no_continue_on_error(job, "expensive-tests");
@@ -325,7 +333,8 @@ fn expensive_tests_uploads_its_junit_and_builds_no_fixtures() {
 fn unregistered_jobs_are_enrolled_in_aggregate_only() {
     let workflow = workflow();
     let jobs = key(&workflow, "jobs");
-    for unregistered in ["expensive-tests", "cargo-deny", "epic-18-exit"] {
+    // `expensive-tests` left this list in W3 (nightly); `ci_nightly_w3.rs` pins where it lives now.
+    for unregistered in ["cargo-deny", "epic-18-exit"] {
         assert!(
             needs(jobs, "aggregate").contains(&unregistered.to_string()),
             "{unregistered} is in aggregate.needs"
@@ -360,9 +369,10 @@ fn cargo_deny_is_its_own_blocking_job_in_aggregate() {
     {
         assert_no_continue_on_error(step, "a cargo deny step");
     }
-    // The advisory job no longer hides it.
+    // The advisory job no longer hides it (the job runs nightly now, in `ci-nightly.yml`).
+    let nightly = nightly_ci_workflow();
     assert!(
-        steps(key(jobs, "reproducible-build"))
+        steps(key(key(&nightly, "jobs"), "reproducible-build"))
             .iter()
             .filter_map(|step| str_of(step, "run"))
             .all(|run| !run.contains("cargo deny")),
@@ -1560,15 +1570,17 @@ fn producer_keeps_package_feature_families_and_nextest_version() {
         assert_ne!(planted, pack, "pack plant must change the step: {from}");
         assert!(!pack_binds_manifest_and_nextest(&planted), "{from}");
     }
-    // AC2.3: one nextest version across the discipline and nightly workflows.
+    // AC2.3: one nextest version across the discipline, nightly and ci-nightly workflows.
     let nightly: Value = serde_yaml::from_str(
         &fs::read_to_string(root().join(".github/workflows/journey-nightly.yml"))
             .expect("read journey-nightly"),
     )
     .expect("parse journey-nightly");
+    let ci_nightly = nightly_ci_workflow();
     for job in mapping(jobs)
         .values()
         .chain(mapping(key(&nightly, "jobs")).values())
+        .chain(mapping(key(&ci_nightly, "jobs")).values())
     {
         for step in steps(job) {
             if let Some(tool) = get(step, "with").and_then(|with| str_of(with, "tool")) {

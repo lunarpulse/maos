@@ -1,0 +1,47 @@
+name: Record a ci-nightly job result
+description: |
+  CI release-ready program W3 (2026-11-15). A job moved off the merge path runs
+  nightly in `ci-nightly.yml`; its result must be RECORDED so a regression is
+  seen. This writes one line per job to the job summary and uploads the same
+  line as the artifact `nightly-result-<job>` (retained 90 days), so the history
+  of a job (for example the 10-consecutive-green rule that re-promotes
+  `nfr-rel-11-halt-receipt-999pct` and `expensive-tests`) can be read from the
+  run list and the artifacts instead of from memory.
+
+  Call it as the LAST step with `if: ${{ always() }}` and
+  `status: ${{ job.status }}` (or a step output when a step carries its own
+  `continue-on-error`, as `determinism-tests` does). The checkout must already
+  have run: a local action is read from the workspace.
+
+inputs:
+  job:
+    description: The ci-nightly job key being recorded.
+    required: true
+  status:
+    description: success, failure or cancelled.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Write the result line
+      shell: bash
+      env:
+        NIGHTLY_JOB: ${{ inputs.job }}
+        NIGHTLY_STATUS: ${{ inputs.status }}
+        NIGHTLY_SHA: ${{ github.sha }}
+        NIGHTLY_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        set -euo pipefail
+        line="nightly-result job=${NIGHTLY_JOB} status=${NIGHTLY_STATUS} sha=${NIGHTLY_SHA} at=$(date -u +%Y-%m-%dT%H:%M:%SZ) run=${NIGHTLY_RUN_URL}"
+        echo "$line"
+        echo "$line" >> "$GITHUB_STEP_SUMMARY"
+        mkdir -p "${RUNNER_TEMP}/nightly-result"
+        printf '%s\n' "$line" > "${RUNNER_TEMP}/nightly-result/${NIGHTLY_JOB}.txt"
+    - name: Upload the result line
+      uses: actions/upload-artifact@v4
+      with:
+        name: nightly-result-${{ inputs.job }}
+        path: ${{ runner.temp }}/nightly-result/${{ inputs.job }}.txt
+        retention-days: 90
+        if-no-files-found: error

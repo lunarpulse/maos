@@ -444,7 +444,20 @@ jobs:
       - run: cargo run -p xtask -- check-foo --json
 ";
 
-/// `REGISTERED` with its row's `job` replaced, audited against [`WORKFLOW`]
+/// The scheduled workflow the register's `expensive-tests` job moved to (CI release-ready program W3).
+const NIGHTLY: &str = "\
+jobs:
+  nightly-expensive:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: cargo nextest run --workspace --run-ignored ignored-only -E \"$filter\"
+  nightly-lazy:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: cargo nextest run --workspace
+";
+
+/// `REGISTERED` with its row's `job` replaced, audited against [`WORKFLOW`] and [`NIGHTLY`]
 /// (and an `xtask/src/check_foo.rs` gate that passes `--ignored`).
 fn audit_job(job: &str) -> Vec<xtask::check_test_cost::Finding> {
     let register = REGISTERED.replace("expensive-tests", job);
@@ -452,6 +465,7 @@ fn audit_job(job: &str) -> Vec<xtask::check_test_cost::Finding> {
         &[],
         &[
             (".github/workflows/discipline.yml", WORKFLOW),
+            (".github/workflows/ci-nightly.yml", NIGHTLY),
             (
                 "xtask/src/check_foo.rs",
                 "fn legs() { cmd.args([\"--\", \"filter\", \"--ignored\"]); }\n",
@@ -465,6 +479,15 @@ fn audit_job(job: &str) -> Vec<xtask::check_test_cost::Finding> {
 fn an_expensive_job_must_run_ignored_tests() {
     assert!(audit_job("expensive-tests").is_empty());
     assert!(audit_job("gated-job").is_empty());
+    // A job that lives only in the scheduled workflow resolves there, and is held to the same rule.
+    assert!(audit_job("nightly-expensive").is_empty());
+    let nightly_lazy = audit_job("nightly-lazy");
+    assert!(
+        nightly_lazy.iter().any(|f| f
+            .detail
+            .contains("names job `nightly-lazy`, whose steps never run ignored tests")),
+        "{nightly_lazy:#?}"
+    );
     let lazy = audit_job("lazy-job");
     assert!(
         lazy.iter().any(|f| f

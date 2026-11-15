@@ -1,0 +1,476 @@
+name: ci-nightly
+
+# CI release-ready program W3 (operator rulings 2026-11-14, decisions-2026-11-14-release-ci.md
+# section 4; plan: ci-release-ready-program-2026-11-14.md sections 4 and 6). The jobs below
+# left `discipline.yml` (and with it `aggregate.needs`, the merge path). They are NOT
+# deleted: each runs here every night and records its result (a one-line job summary entry
+# plus the artifact `nightly-result-<job>`, see `.github/actions/record-nightly-result`),
+# so a regression is seen even though it no longer blocks a merge.
+#
+# Two classes, with different red semantics:
+#   * Slow/sensitive release-relevant jobs (`nfr-rel-11-halt-receipt-999pct`,
+#     `expensive-tests`): NO `continue-on-error`. A red job reds this run: that is the
+#     signal. They return to `discipline.yml` and `aggregate.needs` after 10 consecutive
+#     green nightly runs, and MUST be back before GA (deferred-work.md, owner
+#     `ops-ci-release-ready`, rule10(a)).
+#   * Advisory / measurement jobs (`reproducible-build`, `determinism-tests`,
+#     `nfr-perf-1-iac-routing-budget`, `nfr-perf-j4-latency`, `nfr-perf-8-orchestrator-fanout`,
+#     `clippy-advisory`): they carried `continue-on-error` in `discipline.yml` and keep it
+#     with the same ADVISORY label (owner and reason). They report, they gate nothing; the
+#     recorded line says `failure` when one fails.
+#
+# No retry-to-green anywhere in this file: a red night is read, not re-run.
+
+on:
+  schedule:
+    - cron: '40 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize: a manual dispatch must not overlap the cron and double the runner load.
+concurrency:
+  group: ci-nightly
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_PUBLIC_API_VERSION: "0.51.0"
+  MAOS_SECRETS_BACKEND: env
+  # Harm-reduction against transient crates.io network errors (same value as discipline.yml);
+  # not a retry of a failed job.
+  CARGO_NET_RETRY: "10"
+
+jobs:
+  # Story 5.3 — NFR-Rel-11 halt-receipt production rate ≥99.9%.
+  # Left `aggregate.needs` in W3: the 5 s root-shutdown bound of the 16-3 suite is wall-clock
+  # sensitive on shared hosted runners (recurring hosted failure at root_shutdown_unload_16_3.rs).
+  # Back on the release path after 10 consecutive green nightly runs; MUST be back before GA.
+  nfr-rel-11-halt-receipt-999pct:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run halt receipt production rate test
+        run: cargo test -p maos-kernel-core --test halt_receipt_production_rate --release
+      # Story 17-1 — the root-shutdown Workers run under real T3.
+      - uses: ./.github/actions/provision-t3-test-substrate
+      # Story 16-3 (AC4) — NFR-Rel-11's PLANNED half, at every `maos run` root.
+      # The kernel test above drives `terminate_spirit` directly; this second
+      # step drives the real roots, where the receipt was actually missing.
+      #
+      # All three binaries are built with the SAME `--release` profile as the
+      # test run: `maosctl` is resolved as the `maos` binary's SIBLING and the
+      # fixture as a sibling/parent of the running exe, so a debug-profile
+      # build of either is invisible to a release test.
+      - name: Build release binaries for the root-shutdown suite
+        run: |
+          cargo build --release -p maos-bin --bin maos
+          cargo build --release -p maos-cli --bin maosctl
+          cargo build --release -p worker --bin worker-cli-fixture
+      # `--test-threads=1` is REQUIRED: these vectors spawn real roots with
+      # scratch doors and scan `/proc`, and assume sequential execution.
+      #
+      # ── PROFILE SPLIT (Epic-16 retrospective, 2026-09-21) ──────────────────
+      # The suite is run in TWO profiles because two correct decisions collide
+      # on the `cohort::*` vectors, and they were RED from the day Story 16-3
+      # created this file:
+      #
+      #   * `crates/maos-bin/src/main.rs:1948` gates the `MAOS_TEST_BOOT_NONCE`
+      #     override on `cfg!(debug_assertions)`. That is deliberate and stays:
+      #     a shipped release binary that accepts an env-supplied boot nonce has
+      #     no NFR-Rel-6 restart detection at all.
+      #   * The cohort vectors pre-pair `boot_nonce` in each host's
+      #     `[tcp] peer_pins` row (`root_shutdown_unload_16_3.rs:1670`), because
+      #     `PinnedFingerprint.boot_nonce` is a REQUIRED field with no serde
+      #     default (`maos-a2a-tcp/src/config.rs:31-36`) and
+      #     `TofuPinStore::verify_pinned_sync` returns `NotPinned` rather than
+      #     TOFU-pinning on first contact (`maos-a2a-core/src/tofu.rs:457-466`).
+      #     So the config IS the pre-pairing mechanism; there is no way for the
+      #     harness to omit the nonce.
+      #
+      # Under `--release` both hosts therefore mint RANDOM nonces from
+      # `getrandom` (`main.rs:1956-1959`), neither matches the pinned
+      # `NONCE_A`/`NONCE_B`, the receiver fires `CODE_SPIRIT_RESTART_DETECTED`
+      # (`maos-a2a-core/src/router.rs:1372-1380`) and the sender reports
+      # `CrossHostPinMismatch`. Measured: 9 of 11 vectors pass in release; the
+      # 3 `cohort::*` vectors pass 3/3 in debug.
+      #
+      # REJECTED at the 2026-09-21 round-table (unanimous): a `test-boot-nonce`
+      # cargo feature — all four fault-inject precedents guard
+      # `not(debug_assertions)` with `compile_error!`, so it would need
+      # `--release` AND the feature, inverting the house rule on a security
+      # path; loosening the `cfg!`; and `#[ignore]`, which is E16-A2 in disguise.
+      # The designed `re-pin` recovery is NOT driven here: since Story 19-7 its
+      # production caller is the `cohort-a2a-daemon` door
+      # (`maosctl a2a repin approve`), and its two-process vector lives in
+      # `crates/maos-bin/tests/f4_pairing.rs` (`workspace-test-suite`).
+      #
+      # The profile split keeps each run INTERNALLY consistent, which is what
+      # the note above actually requires: `maosctl` and the fixture are resolved
+      # as siblings of the running `maos`, so a release test needs release
+      # siblings and a debug test needs debug siblings. Both hold below.
+      # ───────────────────────────────────────────────────────────────────────
+      - name: Run root shutdown unload suite (release — 10 vectors)
+        run: cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort
+      # The debug siblings, for the debug half. Same sibling-consistency rule.
+      - name: Build debug binaries for the cohort vectors
+        run: |
+          cargo build -p maos-bin --bin maos
+          cargo build -p maos-cli --bin maosctl
+          cargo build -p worker --bin worker-cli-fixture
+      - name: Run root shutdown unload cohort vectors (debug — boot-nonce override live)
+        run: cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort
+      # Coverage guard: the split MUST NOT silently drop a vector. 10 + 5 = 15.
+      # 20-3a added harness ownership; 20-1b adds the AST teardown guard,
+      # no-Worker local-timer drain and declared-capability negative control.
+      # A renamed module makes `--skip cohort` match nothing, the release run
+      # then executes all 15 and fails LOUD on the live-Worker cohort vectors.
+      - name: Assert the two halves still sum to the whole suite
+        run: |
+          set -euo pipefail
+          # Keep the cargo output in the log: a failure here was undiagnosable when it was swallowed by sed (run 43155033280 job 130972879907).
+          cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort 2>&1 | tee /tmp/split-rel.log
+          cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort 2>&1 | tee /tmp/split-dbg.log
+          rel=$(sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' /tmp/split-rel.log | tail -1)
+          dbg=$(sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' /tmp/split-dbg.log | tail -1)
+          echo "release=${rel} debug=${dbg} total=$(( rel + dbg ))"
+          if [ "$(( rel + dbg ))" -ne 15 ]; then
+            echo "root_shutdown_unload_16_3 profile split lost coverage: ${rel} + ${dbg} != 15"
+            exit 1
+          fi
+      - name: Record the nightly result
+        if: ${{ always() }}
+        uses: ./.github/actions/record-nightly-result
+        with:
+          job: nfr-rel-11-halt-receipt-999pct
+          status: ${{ job.status }}
+
+  # Story 20-12 AC2 — the ONE job that runs the registered expensive tests:
+  # exactly the `xtask/test-budgets.toml [[expensive]]` rows whose `job` is
+  # `expensive-tests`, restricted to their `#[ignore = "expensive: …"]` tests
+  # (filter derived by `check-test-cost --expensive-filter`, so the job cannot
+  # drift from the register). Rows naming a dedicated job (the 16-3 corpora,
+  # the 11.3 meshes) run there, where their substrate is provisioned.
+  # One image: none of these tests has the image as its subject. No fixture
+  # build (D-18-0-09): no registered `job = "expensive-tests"` row needs one; a
+  # fixture-needing test without a build fails closed naming `build-test-fixtures`.
+  # CI release-ready program W3: left `aggregate.needs` (the plan puts it nightly until its
+  # timing bounds are deterministic) and lives here; `check-test-cost` resolves the register's
+  # `job` names in `discipline.yml` and in this file. Back on the release path after 10
+  # consecutive green nightly runs; MUST be back before GA.
+  expensive-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: expensive-tests-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - name: Install nightly toolchain and cargo-public-api (abi_diff_integration)
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
+      - name: Run the registered expensive tests
+        run: |
+          set -euo pipefail
+          filter="$(cargo run -q -p xtask -- check-test-cost --expensive-filter)"
+          echo "expensive filter: $filter"
+          cargo nextest run --workspace --locked --profile expensive --run-ignored ignored-only -E "$filter"
+      - name: Upload the expensive-tests junit
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: expensive-tests-junit
+          path: target/nextest/expensive/junit.xml
+          if-no-files-found: error
+      - name: Record the nightly result
+        if: ${{ always() }}
+        uses: ./.github/actions/record-nightly-result
+        with:
+          job: expensive-tests
+          status: ${{ job.status }}
+
+  reproducible-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    # Not in `aggregate.needs` (CI release-ready program W1a, operator ruling 2026-11-14); it moved here from `discipline.yml` in W3.
+    # ADVISORY — owner: Winston; reason: byte identity needs a pinned deterministic build substrate.
+    # ADVISORY gate (2026-06-12). Cargo/rustc does not guarantee byte-identical
+    # debug artifacts across consecutive builds because incremental metadata,
+    # crate hashes and path-prefix data can vary depending on cargo/rustc
+    # version and the Swatinem/rust-cache state. This gate is therefore
+    # treated as a best-effort signal rather than a blocking requirement.
+    # `continue-on-error` keeps the failure VISIBLE in the job list while
+    # allowing the rest of the discipline run to proceed.
+    # FLAG-Winston: ratify this advisory posture; remove once the project
+    # switches to a deterministic release build path with pinned linkers and
+    # reproducible-build flags (e.g. -C metadata, -C split-debuginfo, remapped
+    # paths).
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build (first pass)
+        run: cargo build --locked --all-targets --workspace
+      - name: Capture first-pass artifact hashes
+        run: |
+          mkdir -p /tmp/build-artifacts-1
+          # Cargo >= 1.100 keeps rlibs under target/debug/build/<pkg>/<hash>/out/
+          # (no deps/); Cargo <= 1.99 under target/debug/deps/. `target/debug`
+          # covers both; an empty list would make the diff below vacuous.
+          find target/debug -name '*.rlib' -exec sha256sum {} \; | sort > /tmp/build-artifacts-1/rlibs.sha256
+          test -s /tmp/build-artifacts-1/rlibs.sha256
+          if [ -f target/debug/maos ]; then
+            sha256sum target/debug/maos > /tmp/build-artifacts-1/bin.sha256
+          fi
+      - name: Clean build artifacts
+        run: cargo clean
+      - name: Build (second pass for reproducibility)
+        run: cargo build --locked --all-targets --workspace
+      - name: Capture second-pass artifact hashes
+        run: |
+          mkdir -p /tmp/build-artifacts-2
+          # Cargo >= 1.100 keeps rlibs under target/debug/build/<pkg>/<hash>/out/
+          # (no deps/); Cargo <= 1.99 under target/debug/deps/. `target/debug`
+          # covers both; an empty list would make the diff below vacuous.
+          find target/debug -name '*.rlib' -exec sha256sum {} \; | sort > /tmp/build-artifacts-2/rlibs.sha256
+          test -s /tmp/build-artifacts-2/rlibs.sha256
+          if [ -f target/debug/maos ]; then
+            sha256sum target/debug/maos > /tmp/build-artifacts-2/bin.sha256
+          fi
+      - name: Verify byte-identical artifacts
+        run: |
+          echo "=== RLIB byte-identity check ==="
+          if ! diff /tmp/build-artifacts-1/rlibs.sha256 /tmp/build-artifacts-2/rlibs.sha256; then
+            echo "NFR-Test-2 / reproducible-build violation: rlib artifacts differ between consecutive builds"
+            exit 1
+          fi
+          if [ -f /tmp/build-artifacts-1/bin.sha256 ]; then
+            if ! diff /tmp/build-artifacts-1/bin.sha256 /tmp/build-artifacts-2/bin.sha256; then
+              echo "NFR-Test-2 / reproducible-build violation: binary artifacts differ between consecutive builds"
+              exit 1
+            fi
+          fi
+          echo "Byte-identity verified: artifacts match across two consecutive builds."
+      - name: Grep for nightly-only features
+        run: |
+          violations=0
+          # Check for #![feature(...)] gates in Rust source.
+          if grep -rn '#!\[feature(' crates/ xtask/ --include='*.rs'; then
+            echo "NFR-Test-2 / reproducible-build violation: nightly feature referenced at listed locations"
+            violations=1
+          else
+            rc=$?
+            if [ "$rc" -ge 2 ]; then exit "$rc"; fi
+          fi
+          # Check for cargo +nightly references in code/config/scripts only.
+          # Excludes:
+          #   - .md   (docs may describe the forbidden pattern as spec text)
+          #   - .github/  (this very grep step defines the pattern as a string
+          #                literal; a recursive scan over .yml would self-match)
+          # A workflow that actually invoked `cargo +nightly` would fail at run
+          # time on a stable runner regardless, so the .github exclusion is safe.
+          if grep -rn --exclude-dir=.github 'cargo +nightly' . --include='*.yml' --include='*.yaml' --include='*.sh' --include='*.toml'; then
+            echo "NFR-Test-2 / reproducible-build violation: cargo +nightly referenced at listed locations"
+            violations=1
+          else
+            rc=$?
+            if [ "$rc" -ge 2 ]; then exit "$rc"; fi
+          fi
+          # Check for RUSTC_BOOTSTRAP. Same scope rationale as above.
+          if grep -rn --exclude-dir=.github 'RUSTC_BOOTSTRAP' . --include='*.rs' --include='*.toml' --include='*.yml' --include='*.yaml' --include='*.sh'; then
+            echo "NFR-Test-2 / reproducible-build violation: RUSTC_BOOTSTRAP referenced at listed locations"
+            violations=1
+          else
+            rc=$?
+            if [ "$rc" -ge 2 ]; then exit "$rc"; fi
+          fi
+          if [ "$violations" -ne 0 ]; then
+            exit 1
+          fi
+          echo "No nightly-only features detected."
+      - name: Record the nightly result
+        if: ${{ always() }}
+        uses: ./.github/actions/record-nightly-result
+        with:
+          job: reproducible-build
+          status: ${{ job.status }}
+
+  # Determinism integration tests for maos-corpus-gen — non-blocking at v0.1-α per DF6
+  # (deferred-work.md). Promotes to blocking when NFR-Sec-4 redaction filter ships (v0.5).
+  # The job always reports success at the GitHub Actions level; the underlying test
+  # outcome is surfaced via the `test_result` job output, a `::warning::` annotation and the
+  # recorded nightly line (which reads the step outcome, not the job status).
+  # Not in `aggregate.needs` (CI release-ready program W1a, operator ruling 2026-11-14); it
+  # moved here from `discipline.yml` in W3.
+  determinism-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # ADVISORY — owner: Winston; reason: DF6 determinism signal is not binding evidence pending NFR-Sec-4.
+    outputs:
+      test_result: ${{ steps.surface.outputs.result }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run determinism integration tests (advisory at v0.1-α per DF6)
+        id: dtests
+        continue-on-error: true
+        run: cargo test -p maos-corpus-gen --test determinism_integration
+      - name: Surface advisory outcome
+        id: surface
+        env:
+          DTESTS_OUTCOME: ${{ steps.dtests.outcome }}
+        run: |
+          if [ "$DTESTS_OUTCOME" = "failure" ]; then
+            echo "::warning::DF6: determinism integration tests failed — advisory at v0.1-α; promotes to blocking when NFR-Sec-4 ships"
+            echo "result=failure" >> $GITHUB_OUTPUT
+          else
+            echo "Determinism integration tests passed."
+            echo "result=success" >> $GITHUB_OUTPUT
+          fi
+      - name: Record the nightly result
+        if: ${{ always() }}
+        uses: ./.github/actions/record-nightly-result
+        with:
+          job: determinism-tests
+          status: ${{ steps.surface.outputs.result || job.status }}
+
+  # Story 6.2 AC1 Task 0.1 — Story 6.1 D-4.* deferred closure: IAC routing
+  # budget bench. Establishes per-frame routing latency baseline that
+  # NFR-Perf-8 (Story 6.2 AC3) reuses.
+  # Not in `aggregate.needs` (CI release-ready program W1a, operator ruling 2026-11-14); it
+  # moved here from `discipline.yml` in W3.
+  nfr-perf-1-iac-routing-budget:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    continue-on-error: true  # ADVISORY — owner: Murat — retired by 20-7 (ADR-068); reason: (Story 8.16 §A5 triage 2026-06-12): perf bench, wall-clock-sensitive on shared GH runners — reports, does not gate. Hard NFR-Perf-1 verification is the maos-bench measurement track, not this CI smoke. Not masking a regression.
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run iac-routing-budget bench
+        run: cargo bench -p maos-bench --bench iac_routing_budget --features kernel_measurement -- --quick
+      - name: Record the nightly result
+        if: ${{ always() }}
+        uses: ./.github/actions/record-nightly-result
+        with:
+          job: nfr-perf-1-iac-routing-budget
+          status: ${{ job.status }}
+
+  # Story 10.4c AC3 / Task-3.1 (review D3) — J4 §13.1 latency regression track
+  # (Gate 2a decay/regression). Mirrors the NFR-Perf-* bench idiom: reuses the
+  # real run_j4_measurement, reports the J4 P95 for trendable regression
+  # tracking. Advisory on shared GH runners (continue-on-error) — identical
+  # posture to nfr-perf-1/8; hard blocking-regression-vs-committed-baseline is
+  # the v1.5 hardening. Catches silent decay below the absolute 10ms budget.
+  # Moved here from `discipline.yml` in W3 (nothing needed it; no registry row).
+  nfr-perf-j4-latency:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    continue-on-error: true  # ADVISORY — owner: Murat — retired by 20-7 (ADR-068); reason: (review D3): perf bench, wall-clock-sensitive on shared GH runners — reports, does not gate. Mirrors nfr-perf-1/8. Not masking a regression.
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run J4 latency regression bench
+        run: cargo bench -p maos-bench --bench j4_latency_regression --features kernel_measurement -- --quick
+      - name: Record the nightly result
+        if: ${{ always() }}
+        uses: ./.github/actions/record-nightly-result
+        with:
+          job: nfr-perf-j4-latency
+          status: ${{ job.status }}
+
+  # Story 6.2 AC3, renamed by 20-7 AC4 — IN-PROCESS IAC dispatch under fan-out
+  # load (15 s window). NOT NFR-Perf-8: that is the real-spawn bench
+  # (`nfr_perf_8_real_spawn_fanout_20_7`, weekly 1 h on Tier W in perf.yml).
+  # Not in `aggregate.needs` (CI release-ready program W1a, operator ruling 2026-11-14); it
+  # moved here from `discipline.yml` in W3.
+  nfr-perf-8-orchestrator-fanout:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    continue-on-error: true  # ADVISORY — owner: Murat — retired by 20-7 (ADR-068); reason: (Story 8.16 §A5 triage 2026-06-12; supersedes the stale "flip before Epic 6" note): NFR-Perf-8 fan-out bench is wall-clock-sensitive on shared GH runners — reports, does not gate. Hard verification is the maos-bench track. Not masking a regression.
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run the in-process dispatch smoke (renamed from orchestrator_fanout_nfr_perf_8, 20-7 AC4; NOT an NFR-Perf-8 claim)
+        run: cargo bench -p maos-bench --bench orchestrator_inproc_dispatch --features kernel_measurement -- --quick
+      - name: Record the nightly result
+        if: ${{ always() }}
+        uses: ./.github/actions/record-nightly-result
+        with:
+          job: nfr-perf-8-orchestrator-fanout
+          status: ${{ job.status }}
+
+  # 20-3b row 11 B: advisory debt lane, deliberately NOT in aggregate.needs.
+  # Count both repeated warning occurrences and source-distinct diagnostics.
+  # Moved here from `discipline.yml` in W3 (it never gated anything).
+  clippy-advisory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # ADVISORY — owner: 20-3b; reason: hosted baseline is 1383/897 warnings (run 41305010381; 20-3b hosted T0 was 1456/904); ratchet prevents growth without claiming debt closure.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: clippy-advisory-${{ hashFiles('**/Cargo.lock') }}
+      - name: Collect warnings without deny-warnings
+        run: env -u CI -u GITHUB_ACTIONS cargo clippy --workspace --all-targets --locked --message-format=json > clippy.jsonl
+      - name: Refuse warning-count growth against T0
+        run: cargo run -q --locked -p xtask -- clippy-ratchet --input clippy.jsonl
+      - name: Preserve malformed-stream refusal and downward baseline ratchets
+        run: cargo test --locked -p xtask --test clippy_ratchet_20_3b
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: clippy-advisory-diagnostics
+          path: clippy.jsonl
+      - name: Record the nightly result
+        if: ${{ always() }}
+        uses: ./.github/actions/record-nightly-result
+        with:
+          job: clippy-advisory
+          status: ${{ job.status }}

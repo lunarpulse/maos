@@ -77,11 +77,6 @@ fn missing_local_blocking(
                 {
                     continue;
                 }
-                // Exact auxiliary selector discovery, not a gate execution. A
-                // different command in this job is still scanned/fails closed.
-                if name == "expensive-tests" && line == "filter=\"$(cargo run -q -p xtask -- check-test-cost --expensive-filter)\"" {
-                    continue;
-                }
                 // Source paths and cargo test/build commands are not self-executed gates.
                 if line.starts_with("cargo test ") || line.starts_with("cargo build ") {
                     continue;
@@ -258,7 +253,7 @@ fn missing_check_flag_or_wrong_baseline_value_reds_argument_pin() -> Result<(), 
 
 #[test]
 fn auxiliary_measurement_jobs_cannot_hide_an_additional_gate() -> Result<(), String> {
-    for job in ["coverage-matrix-nfr-test-3", "expensive-tests"] {
+    for job in ["coverage-matrix-nfr-test-3"] {
         let workflow =
             plant_job("VAR=1 cargo run -p xtask -- check-new-local").replace("new-gate", job);
         assert_eq!(

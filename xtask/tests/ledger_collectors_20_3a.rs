@@ -455,8 +455,9 @@ fn collector_refuses_multiple_json_values_without_changing_ledger() {
 
 #[test]
 fn nightly_scan_executes_real_tree_and_rejects_planted_inline_override() {
+    // `reproducible-build` runs nightly in `ci-nightly.yml` since the CI release-ready program W3.
     let workflow: serde_yaml::Value = serde_yaml::from_str(
-        &fs::read_to_string(root().join(".github/workflows/discipline.yml")).unwrap(),
+        &fs::read_to_string(root().join(".github/workflows/ci-nightly.yml")).unwrap(),
     )
     .unwrap();
     let step = workflow["jobs"]["reproducible-build"]["steps"]

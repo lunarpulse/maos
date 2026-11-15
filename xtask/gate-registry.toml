@@ -32,7 +32,8 @@ gates = [
     # Flat coverage-matrix name set (NFR-Meta-3): valid `gates:` references, not dispositions (those are the
     # `[[ship_gate]]` rows below). Every name here that is a discipline job is a blocking `aggregate.needs` entry
     # except `reproducible-build`, which is advisory (continue-on-error) and no longer in `aggregate.needs`
-    # (CI release-ready program W1a, operator ruling 2026-11-14); `clippy-ratchet`, `rebaseline-check`,
+    # (CI release-ready program W1a, operator ruling 2026-11-14; since W3 it runs nightly in `ci-nightly.yml`,
+    # not in `discipline.yml`); `clippy-ratchet`, `rebaseline-check`,
     # `calibrate` and `example-spirit-regen` have no discipline job of that name, so no `aggregate.needs` entry.
     # CI release-ready program W2 (2026-11-15): the deterministic xtask gates and the maos-bin smokes named here
     # no longer run as a job each. Each is a NAMED STEP (step name == the name below) of the consolidated

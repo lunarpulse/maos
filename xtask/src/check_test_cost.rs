@@ -15,7 +15,7 @@
 //!   a test itself, or a helper/static that only such tests name. Every file
 //!   holding an `expensive:` ignore must be registered in `xtask/test-budgets.toml`
 //!   `[[expensive]]` (and every row must still name one), and the row's `job`
-//!   must exist in `discipline.yml` and run ignored tests (`--run-ignored`,
+//!   must exist in `discipline.yml` or `ci-nightly.yml` and run ignored tests (`--run-ignored`,
 //!   `--ignored` or `--include-ignored`, directly or through the `xtask` gate it
 //!   invokes). The rows naming `expensive-tests` are exactly what that job runs.
 //! - `// cargo-query: <reason>` (review 2026-10-23) — a cargo subcommand that
@@ -41,8 +41,13 @@ const QUERY_MARKER: &str = "// cargo-query:";
 const IGNORE: &str = "#[ignore = \"expensive:";
 /// The CI job that runs every `[[expensive]]` row without a dedicated job.
 pub const EXPENSIVE_JOB: &str = "expensive-tests";
-/// The workflow every `[[expensive]]` job must live in.
-pub const WORKFLOW: &str = ".github/workflows/discipline.yml";
+/// The workflows an `[[expensive]]` job may live in: the merge-path `discipline.yml` and the scheduled
+/// `ci-nightly.yml` (the CI release-ready program W3 moved `expensive-tests` there). A job is resolved
+/// in the first of them that holds it; a workflow that does not exist contributes nothing.
+pub const WORKFLOWS: [&str; 2] = [
+    ".github/workflows/discipline.yml",
+    ".github/workflows/ci-nightly.yml",
+];
 
 /// A spawn trigger and what it runs (`cargo` triggers may be a cargo-query).
 const TRIGGERS: [(&str, &str); 7] = [
@@ -548,28 +553,38 @@ fn runs_ignored(root: &Path, block: &[&str]) -> bool {
     })
 }
 
-/// Every `[[expensive]]` row's `job` must exist in [`WORKFLOW`] under `root` and
+/// Every `[[expensive]]` row's `job` must exist in one of [`WORKFLOWS`] under `root` and
 /// run ignored tests — a row naming a job that never runs them registers tests
 /// that run nowhere.
 pub fn audit_jobs(root: &Path, budgets: &Budgets) -> Vec<Finding> {
-    let workflow = match std::fs::read_to_string(root.join(WORKFLOW)) {
-        Ok(text) => text,
-        Err(e) => {
-            return vec![Finding {
-                file: WORKFLOW.to_owned(),
-                line: 0,
-                detail: format!("cannot read the workflow: {e}"),
-            }]
+    let mut workflows = Vec::new();
+    let mut unreadable = Vec::new();
+    for path in WORKFLOWS {
+        match std::fs::read_to_string(root.join(path)) {
+            Ok(text) => workflows.push(text),
+            Err(e) => unreadable.push(format!("{path}: {e}")),
         }
-    };
+    }
+    if workflows.is_empty() {
+        return vec![Finding {
+            file: WORKFLOWS[0].to_owned(),
+            line: 0,
+            detail: format!("cannot read the workflows: {}", unreadable.join("; ")),
+        }];
+    }
     budgets
         .expensive
         .iter()
         .filter_map(|row| {
-            let detail = match job_block(&workflow, &row.job) {
+            let detail = match workflows
+                .iter()
+                .find_map(|workflow| job_block(workflow, &row.job))
+            {
                 None => format!(
-                    "[[expensive]] {} names job `{}`, absent from {WORKFLOW}",
-                    row.binary, row.job
+                    "[[expensive]] {} names job `{}`, absent from {}",
+                    row.binary,
+                    row.job,
+                    WORKFLOWS.join(" and ")
                 ),
                 Some(block) if runs_ignored(root, &block) => return None,
                 Some(_) => format!(

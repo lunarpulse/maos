@@ -93,11 +93,17 @@ fn malformed_truncated_or_failed_clippy_stream_is_not_zero_debt() {
 
 #[test]
 fn advisory_lane_is_enrolled_but_not_in_blocking_fanin() -> Result<(), String> {
+    // The lane runs nightly in `ci-nightly.yml` since the CI release-ready program W3; the merge path
+    // (`discipline.yml`) holds neither the job nor an `aggregate.needs` entry for it.
     let workflow: serde_yaml::Value =
         serde_yaml::from_str(include_str!("../../.github/workflows/discipline.yml"))
             .map_err(|e| e.to_string())?;
-    let job = &workflow["jobs"]["clippy-advisory"];
+    let nightly: serde_yaml::Value =
+        serde_yaml::from_str(include_str!("../../.github/workflows/ci-nightly.yml"))
+            .map_err(|e| e.to_string())?;
+    let job = &nightly["jobs"]["clippy-advisory"];
     assert_eq!(job["continue-on-error"].as_bool(), Some(true));
+    assert!(workflow["jobs"]["clippy-advisory"].is_null());
     let needs = workflow["jobs"]["aggregate"]["needs"]
         .as_sequence()
         .ok_or("aggregate needs missing")?;
