@@ -142,8 +142,17 @@ fn exit_line_2_replays_the_seed_cassette_and_holds_every_floor() {
     let dev_pubkey = maos_audit::sealed_export::derive_pubkey(&sidecar::DEV_SEED);
     let (body, _) = sidecar::verify(&bytes, &dev_pubkey, "butler", "0.3.0").unwrap();
     let body = serde_json::to_value(body).unwrap();
+    // Story 28-1 AC4: the line carries every row's decision and no malformed completion;
+    // the sidecar body keeps only the score's count.
+    assert_eq!(line["verdicts"].as_object().unwrap().len(), 30);
+    assert_eq!(line["verdicts"]["cc01"], true);
+    assert_eq!(line["verdicts"]["tn01"], false);
+    assert_eq!(line["format_errors"], serde_json::json!([]));
+    assert_eq!(line["score"]["format_errors"], 0);
     let mut expected = line.clone();
-    expected.as_object_mut().unwrap().remove("event");
+    for key in ["event", "verdicts", "format_errors"] {
+        expected.as_object_mut().unwrap().remove(key);
+    }
     assert_eq!(body, expected);
 }
 
@@ -278,6 +287,29 @@ fn a_drifted_prompt_hash_exits_1() {
     assert!(
         err.contains("row cc01: pass refused") && err.contains("drift"),
         "{err}"
+    );
+}
+
+/// Story 28-1 AC4 (D-28-1-05 A), proven red: a completion in a fence is not a
+/// Butler proposal. HEAD aborts with "malformed proposal" and prints no
+/// numbers; now the row scores as no halt, is named, and fails the run.
+#[test]
+fn a_malformed_completion_scores_as_no_halt_and_fails_the_run() {
+    let home = tempfile::tempdir().unwrap();
+    let cassette = variant(home.path(), |c| {
+        c["entries"][0]["response"]["text"] = "```json\n{\"pattern\": \"x\"}\n```".into();
+    });
+    let out = butler(home.path(), Some(&cassette));
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    let line = line(&out);
+    assert_eq!(line["format_errors"], serde_json::json!(["cc01"]));
+    assert_eq!(line["verdicts"]["cc01"], false);
+    assert_eq!(line["score"]["format_errors"], 1);
+    assert_eq!(line["pass"], false);
+    assert!(
+        stderr(&out).contains("format_error_rate 0.033 above floor 0.00"),
+        "{}",
+        stderr(&out)
     );
 }
 

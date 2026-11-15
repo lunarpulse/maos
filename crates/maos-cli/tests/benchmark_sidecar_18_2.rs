@@ -45,6 +45,7 @@ fn body(spirit_version: &str, signer: &str) -> BenchmarkBody {
             halt_recall_calendar_conflict: Some(1.0),
             halt_recall_overall: 0.8,
             halt_precision_overall: 1.0,
+            format_errors: 0,
         },
         floors: ClassFloors {
             halt_recall_calendar_conflict: Some(0.9),

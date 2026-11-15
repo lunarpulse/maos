@@ -149,7 +149,12 @@ fn the_orchestrator_class_replays_its_seed_and_holds_every_floor() {
     let (body, _) = sidecar::verify(&bytes, &dev_pubkey, "orchestrator", VERSION).unwrap();
     let body = serde_json::to_value(body).unwrap();
     let mut expected = line.clone();
-    expected.as_object_mut().unwrap().remove("event");
+    assert_eq!(line["verdicts"].as_object().unwrap().len(), 30);
+    assert_eq!(line["format_errors"], serde_json::json!([]));
+    assert_eq!(line["score"]["format_errors"], 0);
+    for key in ["event", "verdicts", "format_errors"] {
+        expected.as_object_mut().unwrap().remove(key);
+    }
     assert_eq!(body, expected);
 }
 
@@ -195,6 +200,27 @@ fn the_class_gate_runs_from_a_cwd_other_than_the_workspace_root() {
         assert_the_seed_holds_every_floor(&line(&out));
         assert!(sidecar_path(home.path()).is_file(), "{cwd:?}");
     }
+}
+
+/// Story 28-1 AC4 (D-28-1-05 A): a completion that is not a
+/// `dispatch_ambiguity` judgement scores as no halt, is named, and fails the run.
+#[test]
+fn a_malformed_completion_scores_as_no_halt_and_fails_the_run() {
+    let home = tempfile::tempdir().unwrap();
+    let cassette = variant(home.path(), |c| {
+        c["entries"][0]["response"]["text"] = "the section is ambiguous".into();
+    });
+    let out = orchestrator(home.path(), Some(&cassette));
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    let line = line(&out);
+    assert_eq!(line["format_errors"], serde_json::json!(["am01"]));
+    assert_eq!(line["verdicts"]["am01"], false);
+    assert_eq!(line["pass"], false);
+    assert!(
+        stderr(&out).contains("format_error_rate 0.033 above floor 0.00"),
+        "{}",
+        stderr(&out)
+    );
 }
 
 #[test]

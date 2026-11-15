@@ -1,0 +1,550 @@
+{
+  "schema_version": "maos.journey.cassette/v1",
+  "provenance": "live-record",
+  "recorded_at": "2026-11-15T00:00:00Z",
+  "model_id": "claude-haiku-5-5",
+  "spirit_id": "maos",
+  "session": "process-27981",
+  "entries": [
+    {
+      "sequence": 0,
+      "prompt_sha256": "17a71a6d2c61d922f28ba231bd07986936e8ea232bfb202f694d1e6258724141",
+      "prompt_len": 869,
+      "response": {
+        "text": "{\"pattern\": \"Unresolved overlapping confirmed meetings: A (540-600) and B (570-630) overlap by 30 minutes\", \"confidence\": 0.92, \"evidence\": \"Calendar events 'a' (9:00-10:00) and 'b' (9:30-10:30) are both confirmed and overlap; the conflict is listed as unresolved. The only comm (m1) is a low-urgency colleague message not awaiting reply and is unrelated to the conflict.\", \"options\": [\"reminder: Meetings A (9:00-10:00) and B (9:30-10:30) overlap by 30 minutes. Review and reschedule one of them.\", \"linear_note: Calendar conflict logged: A (9:00-10:00) overlaps B (9:30-10:30). Resolution pending.\", \"snooze: Hold this conflict notice until later so you can review the overlap when you have a free moment.\"], \"user_preference_drift\": 0.9}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 347,
+          "output_tokens": 313
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 1,
+      "prompt_sha256": "fe5621de7455234e6818d44fd30bd9cdd50d293553bcf2cde06a750454fb6add",
+      "prompt_len": 869,
+      "response": {
+        "text": "{\"pattern\": \"Overlapping confirmed meetings: A (600-660) and B (630-720) conflict for 30 minutes, unresolved.\", \"confidence\": 0.9, \"evidence\": \"Calendar shows event a ends at 660 min while event b starts at 630 min, both confirmed; the conflict is listed as unresolved. Only one low-urgency colleague message exists and it does not await a reply.\", \"options\": [\"reminder: Meetings A and B overlap from 10:30 to 11:00; please choose which to keep or reschedule one before the first one starts.\", \"snooze: Hold this conflict notice until later today so you can review the overlap when your schedule is less busy.\", \"linear_note: Log that meetings A and B overlap by 30 minutes so the conflict is recorded for follow-up.\"], \"user_preference_drift\": 0.9}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 347,
+          "output_tokens": 280
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 2,
+      "prompt_sha256": "5ac2c3fa57b8520e9460f65b3d5116883e94fd4f19c9cebf1cecd7dbbde1a587",
+      "prompt_len": 869,
+      "response": {
+        "text": "{\"pattern\": \"Overlapping confirmed meetings: A (480-540) and B (510-555) conflict by 30 minutes\", \"confidence\": 0.9, \"evidence\": \"Calendar event a runs 480-540 min and event b runs 510-555 min, both confirmed, with an unresolved conflict flagged as a~b. The only comm (m1) is low urgency and not awaiting reply, so it is unrelated to the conflict.\", \"options\": [\"reminder: Meeting A (480-540) overlaps Meeting B (510-555) by 30 minutes. Decide which to attend or reschedule one before it starts.\", \"snooze: Hold the calendar conflict alert for later so you can resolve A vs. B when you have time.\", \"linear_note: Log that confirmed meetings A and B overlap 510-540 min and need a resolution.\"], \"user_preference_drift\": 0.9}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 347,
+          "output_tokens": 293
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 3,
+      "prompt_sha256": "b2c8ae9e7cd8c4f31db6db5104a597cd2a6ef836924f00fe78f6c11e391b4945",
+      "prompt_len": 869,
+      "response": {
+        "text": "{\"pattern\": \"Unresolved overlapping confirmed meetings: A (900-960) and B (930-990) overlap by 30 minutes\", \"confidence\": 0.9, \"evidence\": \"Calendar entries a (start 900, end 960) and b (start 930, end 990) are both confirmed and conflict between minutes 930 and 960; the conflict is listed as unresolved. The only comm (m1) is a low-urgency colleague message not awaiting a reply, so it does not bear on the conflict.\", \"options\": [\"reminder: Meetings A and B overlap from 930 to 960. Decide which to keep, move, or shorten before the first one starts.\", \"snooze: Hold this conflict notice until later today so you can review the overlap when you have time.\", \"linear_note: Calendar conflict logged: A (900-960) overlaps B (930-990) by 30 minutes; both are confirmed and unresolved.\"], \"user_preference_drift\": 0.9}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 347,
+          "output_tokens": 315
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 4,
+      "prompt_sha256": "a5d57e039c5e3ebbd23048450b854491a5b8f82dd3dbee6505a706197a1468f8",
+      "prompt_len": 869,
+      "response": {
+        "text": "{\"pattern\": \"Unresolved overlapping confirmed meetings: A (780-840) and B (800-860) conflict by 40 minutes\", \"confidence\": 0.9, \"evidence\": \"Calendar events a and b are both confirmed and overlap between minute 800 and 840; the conflict is listed as unresolved. Comms contain only a low-urgency colleague message (m1) with no reply awaited, so nothing there requires immediate action.\", \"options\": [\"reminder: Meetings A and B overlap from 13:20 to 14:00; decide which to attend or reschedule one before the conflict arrives.\", \"snooze: Hold this conflict notice until later today so you can resolve the A/B overlap when you have time.\", \"linear_note: Log that meetings A and B overlap by 40 minutes (13:20-14:00) as an unresolved conflict for follow-up.\"], \"user_preference_drift\": 0.85}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 347,
+          "output_tokens": 301
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 5,
+      "prompt_sha256": "cd0d65f6d2ad56fbc5d0326d2afb47b9754461359f81a42bf8ba6bb291e3b5d0",
+      "prompt_len": 869,
+      "response": {
+        "text": "{\"pattern\": \"Unresolved overlapping confirmed meetings: A (11:00-12:00) and B (11:40-12:40) conflict\", \"confidence\": 0.9, \"evidence\": \"Calendar event 'a' runs 660-720 min and event 'b' runs 700-760 min, overlapping by 20 minutes; both are confirmed and the conflict is listed as unresolved. The only comm (m1) is a low-urgency colleague message not awaiting reply, so it is unrelated to the conflict.\", \"options\": [\"reminder: Meetings A (11:00-12:00) and B (11:40-12:40) overlap by 20 minutes. Please decide which to keep, move, or shorten.\", \"linear_note: Calendar conflict logged: A (11:00-12:00) overlaps B (11:40-12:40) with both confirmed; resolution pending director decision.\", \"snooze: Hold the A/B calendar conflict notice until the director next reviews the schedule.\"], \"user_preference_drift\": 0.9}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 347,
+          "output_tokens": 338
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 6,
+      "prompt_sha256": "ac07b44c75d437d5d8f0204c9678c0a97468b281dc07f38089b5189c76b5739a",
+      "prompt_len": 873,
+      "response": {
+        "text": "{\"pattern\": \"Unresolved double-booking: calendar events a (1020-1080) and b (1050-1110) overlap by 30 minutes, both confirmed.\", \"confidence\": 0.9, \"evidence\": \"Event a runs 1020-1080 min and event b runs 1050-1110 min, so they overlap from 1050 to 1080. Both are confirmed and the conflict is unresolved.\", \"options\": [\"reminder: Heads up, your confirmed meetings A and B overlap by 30 minutes. Want to reschedule one of them?\", \"snooze: Hold this conflict notice until later today so you can resolve the overlap when you have a moment.\", \"linear_note: Calendar conflict logged: meetings A and B overlap 1050-1080 min and remain unresolved.\"], \"user_preference_drift\": 0.5}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 351,
+          "output_tokens": 274
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 7,
+      "prompt_sha256": "7937d83faac5cadee9603d1f5b35710ca03aa786a9f6e78588403eaf5a211007",
+      "prompt_len": 869,
+      "response": {
+        "text": "{\"pattern\": \"Unresolved overlapping confirmed meetings: A (7:00-8:00) and B (7:30-8:20) conflict in the director's calendar\", \"confidence\": 0.9, \"evidence\": \"Calendar event a runs 420-480 min and event b runs 450-500 min, overlapping by 30 minutes; both are confirmed and the conflict is listed as unresolved. The only comm (m1) is low urgency and needs no reply.\", \"options\": [\"reminder: Meetings A (7:00-8:00) and B (7:30-8:20) overlap by 30 minutes and both are confirmed. Please decide which to keep, move, or shorten.\", \"linear_note: Calendar conflict logged: A (420-480) overlaps B (450-500); both confirmed, unresolved.\", \"snooze: Hold this conflict notice until later so you can review the overlap when you have time.\"], \"user_preference_drift\": 0.9}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 347,
+          "output_tokens": 310
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 8,
+      "prompt_sha256": "4f719eda299976da6668a3b08ff7ccdfe56efa4e14f34d1f085d44d771dbc54d",
+      "prompt_len": 869,
+      "response": {
+        "text": "{\"pattern\": \"unresolved overlapping calendar events A and B (A 840-900, B 870-930, 30-minute overlap)\", \"confidence\": 0.9, \"evidence\": \"Calendar events 'a' (start 840, end 900) and 'b' (start 870, end 930) are both confirmed and overlap by 30 minutes; the conflict is listed as unresolved.\", \"options\": [\"reminder: Heads up: your confirmed meetings A and B overlap from 870 to 900 minutes. Want to reschedule one of them?\", \"snooze: Hold this conflict notice until later today so you can review the overlap when you have time.\", \"linear_note: Calendar conflict logged: A (840-900) overlaps B (870-930); unresolved.\"], \"user_preference_drift\": 0.9}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 347,
+          "output_tokens": 262
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 9,
+      "prompt_sha256": "059621ecde3b5dd2e7db2845c99e71ca18402d7274a802f5b016013318c7f9fa",
+      "prompt_len": 869,
+      "response": {
+        "text": "{\"pattern\": \"Overlapping confirmed meetings: A (720-780) and B (740-800) conflict by 40 minutes\", \"confidence\": 0.9, \"evidence\": \"Calendar events 'a' (12:00-13:00) and 'b' (12:20-13:20) are both confirmed and unresolved; the conflict is recorded as [a~b]. Comms contain only a low-urgency colleague message not awaiting reply, so nothing else competes for attention.\", \"options\": [\"reminder: Meetings A and B overlap by 40 minutes (12:20-13:00). Please choose which to attend or ask to reschedule one.\", \"snooze: Hold the A/B conflict notice until closer to 12:00 so it surfaces when it is actionable.\", \"linear_note: Log that meetings A (12:00-13:00) and B (12:20-13:20) overlap and remain unresolved.\"], \"user_preference_drift\": 0.85}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 347,
+          "output_tokens": 310
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 10,
+      "prompt_sha256": "14f4b1d9acc30f06c44accdea05c694d1272c361d0d8a5bfac4a80197295c489",
+      "prompt_len": 871,
+      "response": {
+        "text": "{\"pattern\": \"Unresolved calendar conflict: events a and b overlap (a runs 960–1020 min, b runs 990–1040 min), with both marked confirmed.\", \"confidence\": 0.9, \"evidence\": \"Calendar entries 'A' (start 960, end 1020) and 'B' (start 990, end 1040) overlap by 30 minutes; the conflict is listed as unresolved.\", \"options\": [\"reminder: Events A and B overlap by 30 minutes (990–1020). Please review and decide which to keep or reschedule.\", \"snooze: Hold this conflict alert for later so you can review your schedule when it is more convenient.\", \"linear_note: Calendar conflict noted: A (960–1020) overlaps B (990–1040); no action taken yet.\"], \"user_preference_drift\": 0.5}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 349,
+          "output_tokens": 273
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 11,
+      "prompt_sha256": "6b6f1e562d3a488698e0be8eee6856a0a0b9a7c6e781fc6c562e07831689a381",
+      "prompt_len": 869,
+      "response": {
+        "text": "{\"pattern\": \"Unresolved calendar conflict: meetings A (500-560) and B (520-580) overlap by 40 minutes\", \"confidence\": 0.9, \"evidence\": \"Calendar entries a and b are both confirmed and their time ranges overlap between minute 520 and 560; the unresolved conflict is flagged as a~b.\", \"options\": [\"reminder: Meetings A and B overlap from 520 to 560 minutes. Want to reschedule one of them?\", \"snooze: Hold this conflict notice until later today so you can resolve it when you have time.\", \"linear_note: Log that meetings A and B overlap by 40 minutes so the conflict is tracked.\"], \"user_preference_drift\": 0.5}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 347,
+          "output_tokens": 239
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 12,
+      "prompt_sha256": "7a01dcbd28b46953db4415bcf230df26a4d1958a6e1606b5643be9ff295a6c02",
+      "prompt_len": 848,
+      "response": {
+        "text": "{\"pattern\": \"Two unanswered high-urgency messages (CEO, urgency 3; investor, urgency 2) are awaiting reply while the calendar shows a confirmed block 540-600 with no conflicts.\", \"confidence\": 0.7, \"evidence\": \"comms u1 (from ceo, urgency 3, awaiting_reply true) and u2 (from investor, urgency 2, awaiting_reply true); calendar event a (A, 540-600, confirmed); no unresolved calendar conflicts.\", \"options\": [\"reminder: Reply to the CEO's urgent message (u1) before your next block, and follow up with the investor (u2) today.\", \"linear_note: Two replies pending: CEO (urgency 3) and investor (urgency 2). Neither conflicts with the calendar.\", \"snooze: Hold these two pending replies for 60 minutes to avoid interrupting event A.\"], \"user_preference_drift\": 0.4}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 341,
+          "output_tokens": 313
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 13,
+      "prompt_sha256": "facefcf0d7ebe468f64d94386c00bd426aedb3754d7f810bdf0d369b0b1c3371",
+      "prompt_len": 848,
+      "response": {
+        "text": "{\"pattern\": \"Two unanswered high-priority messages (CEO, urgency 3; investor, urgency 2) are awaiting replies while the calendar shows no conflicts, suggesting a reply window is open.\", \"confidence\": 0.7, \"evidence\": \"Comms u1 (from ceo, urgency 3) and u2 (from investor, urgency 2) both have awaiting_reply=true; the only calendar item is a confirmed block 540-600 with no unresolved conflicts, leaving free time to respond.\", \"options\": [\"reminder: Reply to the CEO's urgent message (u1) before the next calendar block.\", \"linear_note: Log that the CEO (urgency 3) and investor (urgency 2) messages are both awaiting replies.\", \"snooze: Delay these reply prompts for 60 minutes while you finish your current block.\"], \"user_preference_drift\": 0.5}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 341,
+          "output_tokens": 294
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 14,
+      "prompt_sha256": "1c7caa26bdc836f653f373aa7059529b2ee9d8b9dafc31167cbfc629a6d84355",
+      "prompt_len": 849,
+      "response": {
+        "text": "{\"pattern\": \"Two unanswered high-urgency messages (CEO, investor) are awaiting replies while the calendar is otherwise clear, suggesting a risk of delayed responses to senior stakeholders.\", \"confidence\": 0.7, \"evidence\": \"comms u1 (from ceo, urgency 3, awaiting_reply true) and u2 (from investor, urgency 2, awaiting_reply true); calendar contains only one confirmed event (A, 540-600 min) and no unresolved conflicts.\", \"options\": [\"reminder: Reply to the CEO's urgent message (u1) and the investor's message (u2) today.\", \"snooze: Hold this reminder for 2 hours and resurface it before your next free slot.\", \"linear_note: Log that the CEO (urgency 3) and investor (urgency 2) messages are awaiting replies.\"], \"user_preference_drift\": 0.35}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 341,
+          "output_tokens": 298
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 15,
+      "prompt_sha256": "13ef083952c041ea4543f0570090fbd3e36fa578496c075116cd5af69373485a",
+      "prompt_len": 866,
+      "response": {
+        "text": "{\"pattern\": \"Overlapping calendar events: event A (540-600, confirmed) and event B (570-630, tentative) overlap by 30 minutes, with no conflict currently flagged as unresolved.\", \"confidence\": 0.85, \"evidence\": \"Calendar shows A (start 540, end 600, confirmed) and B (start 570, end 630, tentative) overlapping between minutes 570 and 600. The unresolved conflicts list is empty, so this overlap has not been surfaced to the director yet. A colleague message m1 exists with urgency 1 and no reply awaited, which is not directly related to the overlap.\", \"options\": [\"reminder: Heads up: your confirmed meeting A (9:00-10:00) overlaps tentative meeting B (9:30-10:30) by 30 minutes. Want to resolve this?\", \"linear_note: Calendar overlap noted: A (540-600, confirmed) and B (570-630, tentative) overlap 570-600. Flagged for review.\"], \"user_preference_drift\": 0.9}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 342,
+          "output_tokens": 345
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 16,
+      "prompt_sha256": "b0e89d4ab31c3549167d2b08e46506dc83e18bfd1993c87ede4f68bd1e59077e",
+      "prompt_len": 866,
+      "response": {
+        "text": "{\"pattern\": \"Cancelled calendar event B overlaps confirmed event A; no unresolved conflicts flagged, so the overlap is likely stale rather than a live conflict.\", \"confidence\": 0.3, \"evidence\": \"Event B (630-720) is status 'cancelled' and overlaps confirmed event A (600-660). Unresolved conflicts list is empty. One low-urgency colleague message (m1) requires no reply.\", \"options\": [\"linear_note: Note that cancelled event B no longer conflicts with confirmed event A, so no action is needed.\", \"reminder: Check that cancelled event B has been fully removed from the calendar to avoid confusion.\"], \"user_preference_drift\": 0.5}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 343,
+          "output_tokens": 237
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 17,
+      "prompt_sha256": "c9d7a980796c891b7f668a2960084f692e8f604fbb9731893233610d4a2a9417",
+      "prompt_len": 866,
+      "response": {
+        "text": "{\"pattern\": \"Overlapping calendar events: confirmed event A (480-540) and tentative event B (510-555) conflict by 30 minutes\", \"confidence\": 0.9, \"evidence\": \"Event A runs 480-540 minutes and event B runs 510-555 minutes, so they overlap from 510-540. Event B is only tentative, so the conflict may be resolvable by rescheduling B rather than A.\", \"options\": [\"reminder: Event B (tentative) overlaps confirmed event A from 510-540 minutes; consider rescheduling B.\", \"snooze: Hold the calendar conflict notice until B's status is confirmed or changed.\"], \"user_preference_drift\": 0.5}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 342,
+          "output_tokens": 231
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 18,
+      "prompt_sha256": "407cdaf9f4c170a989a56c0f2b4e86f551260110074d3d433261b2e1c67fa7b2",
+      "prompt_len": 866,
+      "response": {
+        "text": "{\"pattern\": \"Calendar event B is cancelled while event A is confirmed and overlapping in time, with no conflict currently flagged; a single colleague message (m1) requires no reply.\", \"confidence\": 0.3, \"evidence\": \"Event B (930-990) has status 'cancelled' and overlaps confirmed event A (900-960), but the unresolved conflicts list is empty, which is consistent with B no longer being active. Comms m1 from a colleague has urgency 1 and awaiting_reply false, indicating no action needed. preference_alignment is null, so no preference data is available to confirm the director's preferences.\", \"options\": [\"linear_note: Event B was cancelled and no longer conflicts with confirmed event A; no action needed.\", \"reminder: Confirm that event B's cancellation is intended and no follow-up is needed for event A's time block.\"], \"user_preference_drift\": 0.5}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 343,
+          "output_tokens": 296
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 19,
+      "prompt_sha256": "c7d549a1aaea17962eab0b21cf35df70f68f8b98f95dae548b36cf0feeb4c4f5",
+      "prompt_len": 866,
+      "response": {
+        "text": "{\"pattern\": \"Overlapping calendar events: confirmed event A (780-840) overlaps tentative event B (800-860) by 40 minutes\", \"confidence\": 0.85, \"evidence\": \"Calendar shows event A (confirmed, 780-840 min) and event B (tentative, 800-860 min) overlap between 800 and 840 min; the conflict is unresolved, and the only comm (m1) is a low-urgency colleague message not awaiting reply.\", \"options\": [\"reminder: Event B (tentative) overlaps confirmed event A by 40 minutes; please decide which to keep or reschedule B.\", \"snooze: Defer this conflict notice until the next scheduled review so you can confirm or move event B later.\"], \"user_preference_drift\": 0.9}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 342,
+          "output_tokens": 255
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 20,
+      "prompt_sha256": "e6a052ae7b85c92c03c0f47b7b1c1d2e21876bfea9eb04b4c653f9f1d72caf24",
+      "prompt_len": 866,
+      "response": {
+        "text": "{\"pattern\": \"Calendar event B (700-760) is cancelled and overlaps no active event; no unresolved conflict exists, so no conflict notification is warranted\", \"confidence\": 0.6, \"evidence\": \"Unresolved calendar conflicts is empty. Event b is status 'cancelled' and would overlap confirmed event a (660-720) only if it were active. Comm m1 from colleague has urgency 1 and awaiting_reply false, so no reply is pending. preference_alignment is null, so drift cannot be assessed from data.\", \"options\": [\"linear_note: Calendar item B (700-760) is cancelled; no conflicts remain with A (660-720).\", \"snooze: Hold off on calendar notifications until a new conflict or pending reply appears.\"], \"user_preference_drift\": 0.5}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 343,
+          "output_tokens": 268
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 21,
+      "prompt_sha256": "2b736d4da1df16a48c7f4c5a749e38e0ab50494ee3b23376efc8cfd71fa4137f",
+      "prompt_len": 866,
+      "response": {
+        "text": "{\"pattern\": \"Back-to-back meetings with no buffer between A (9:00-10:00) and B (10:10-11:00), and an unanswered colleague message\", \"confidence\": 0.3, \"evidence\": \"Calendar shows meeting A ending at 600 min and meeting B starting at 610 min (a 10-minute gap). No unresolved conflicts are listed. Comms contain one low-urgency colleague message (m1) with awaiting_reply false, so no reply is pending. Preference alignment data is null, so the director's preferences cannot be confirmed.\", \"options\": [\"reminder: Meeting B (10:10-11:00) starts 10 minutes after meeting A ends; allow time to transition.\"], \"user_preference_drift\": 0.5}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 343,
+          "output_tokens": 249
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 22,
+      "prompt_sha256": "b29d64d33074707cd8b587bff5991eb857b66d0a1ae4c75edf9b24cb3fc2ec45",
+      "prompt_len": 865,
+      "response": {
+        "text": "{\"pattern\": \"Back-to-back confirmed meetings with no unresolved conflicts; one low-urgency colleague message not awaiting reply\", \"confidence\": 0.35, \"evidence\": \"Calendar shows meeting A (480-540) and meeting B (560-620) with a 20-minute gap; no conflicts are unresolved. Only one comm (m1) exists, with urgency 1 and no reply awaited, so it does not warrant interrupting the director.\", \"options\": [\"linear_note: Note that meetings A and B are scheduled with a 20-minute gap between them, and a low-urgency message from a colleague is waiting for review when convenient.\"], \"user_preference_drift\": 0.9}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 345,
+          "output_tokens": 230
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 23,
+      "prompt_sha256": "c3a9b7dee68a6af556ece500387707164053e463407a2f3f03ecba1ff64869c9",
+      "prompt_len": 868,
+      "response": {
+        "text": "{\"pattern\": \"No unresolved calendar conflicts; two confirmed meetings (A at 900-960, B at 1000-1060) with a 40-minute gap, and one low-urgency colleague message not awaiting a reply.\", \"confidence\": 0.4, \"evidence\": \"Calendar shows non-overlapping confirmed meetings A and B separated by a 40-minute gap. Comms contains a single colleague message with urgency 1 and awaiting_reply false. No conflicts are listed as unresolved, and preference_alignment is null, so there is no clear signal warranting an interruption.\", \"options\": [\"linear_note: Add a note summarizing today's schedule: meetings A (15:00-16:00) and B (16:40-17:40), with a colleague message to review when convenient.\"], \"user_preference_drift\": 0.5}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 345,
+          "output_tokens": 273
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 24,
+      "prompt_sha256": "12a20eec033252e85e6fe90b3efffc8d68e702d6325f13a4895394f3326b1086",
+      "prompt_len": 866,
+      "response": {
+        "text": "{\"pattern\": \"No unresolved calendar conflicts; two confirmed meetings (A at 11:00-12:00, B at 13:20-14:20) with a 80-minute gap, and one low-urgency colleague message not awaiting reply.\", \"confidence\": 0.3, \"evidence\": \"Calendar shows no overlaps and no conflicts flagged. Comm m1 from colleague has urgency 1 and awaiting_reply is false, so it does not require action. Preference alignment is 0.75.\", \"options\": [\"linear_note: Logged: no conflicts today; meetings A and B are confirmed with an 80-minute gap, and one low-urgency colleague message needs no reply.\", \"reminder: Heads-up before meeting B (13:20) so you have time to prepare after the gap.\"], \"user_preference_drift\": 0.75}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 345,
+          "output_tokens": 276
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 25,
+      "prompt_sha256": "76d9603623d91bd6f328c22c7a6c729e2eccf0b5f4ba37f080a97ae3648c0d5c",
+      "prompt_len": 866,
+      "response": {
+        "text": "{\"pattern\": \"No unresolved calendar conflicts; two confirmed meetings (A 07:00–08:00, B 08:20–09:20) with a 20-minute gap, and one low-urgency colleague message not awaiting reply\", \"confidence\": 0.3, \"evidence\": \"Calendar shows events a and b with no overlap; comms m1 from colleague has urgency 1 and awaiting_reply is false; preference_alignment is null so no stated preferences are available to confirm fit.\", \"options\": [\"linear_note: Log that no conflicts exist and the colleague message (urgency 1) needs no reply today.\", \"snooze: Defer surfacing this non-urgent colleague message until the next scheduled review.\"], \"user_preference_drift\": 0.5}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 343,
+          "output_tokens": 251
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 26,
+      "prompt_sha256": "80ed2427171f809986e3763084c7ba3da987b7363feeecb567f1665b89237cb1",
+      "prompt_len": 865,
+      "response": {
+        "text": "{\"pattern\": \"No unresolved calendar conflicts; two confirmed meetings (A at 780-840 min, B at 900-960 min) with a one-hour gap, and one low-urgency colleague message not awaiting reply.\", \"confidence\": 0.3, \"evidence\": \"Calendar shows no overlaps and no pending conflicts. Comms contain a single low-urgency (1) message from a colleague that does not require a reply, so there is little time-sensitive action to surface.\", \"options\": [\"linear_note: Log that the director's afternoon has no conflicts and one colleague message (low urgency, no reply needed) for reference.\"], \"user_preference_drift\": 0.9}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 345,
+          "output_tokens": 222
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 27,
+      "prompt_sha256": "35b762f2511d53b19ccea2e586d52cf13ccb8ae71663899e69bd104b4ddc4f92",
+      "prompt_len": 870,
+      "response": {
+        "text": "{\"pattern\": \"Back-to-back calendar blocks with no buffer between confirmed meetings A and B\", \"confidence\": 0.35, \"evidence\": \"Meeting A ends at 1080 min and meeting B starts at 1100 min, leaving a 20-minute gap; no unresolved conflicts are recorded, and the only comms item is a low-urgency colleague message that is not awaiting a reply.\", \"options\": [\"reminder: Meeting B starts in 20 minutes after meeting A, so allow time to transition.\", \"linear_note: Consider a short buffer before meeting B when scheduling is next reviewed.\", \"snooze: Hold this notice until the next calendar change.\"], \"user_preference_drift\": 0.9}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 347,
+          "output_tokens": 240
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 28,
+      "prompt_sha256": "836bcc8648e54667551a93e6d10575f78831581f161da05147c6a7a9160bc4af",
+      "prompt_len": 866,
+      "response": {
+        "text": "{\"pattern\": \"Back-to-back confirmed meetings with no conflicts; no urgent unanswered comms\", \"confidence\": 0.3, \"evidence\": \"Meetings A (500-560) and B (600-660) are confirmed with a 40-minute gap and no unresolved conflicts. Comm m1 from a colleague has low urgency (1) and does not await a reply.\", \"options\": [\"reminder: Meeting B starts in 10 minutes; review any materials before it begins.\"], \"user_preference_drift\": 0.95}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 345,
+          "output_tokens": 174
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 29,
+      "prompt_sha256": "e95641f9a502eb70493931c057199c8d82a650b40b42462c4bd5edd5c7d5f9ee",
+      "prompt_len": 866,
+      "response": {
+        "text": "{\"pattern\": \"No unresolved calendar conflicts; two confirmed meetings (A and B) with a gap between them and one low-urgency colleague message not awaiting reply\", \"confidence\": 0.3, \"evidence\": \"Calendar shows meeting A (560-600) and meeting B (700-760) with no overlap; comms contain a single message m1 from colleague with urgency 1 and awaiting_reply false, so no action is required.\", \"options\": [\"linear_note: Schedule is clear with no conflicts; colleague message m1 needs no reply.\"], \"user_preference_drift\": 0.5}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 343,
+          "output_tokens": 197
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-haiku-5-5"
+        }
+      }
+    }
+  ]
+}

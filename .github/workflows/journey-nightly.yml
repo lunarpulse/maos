@@ -3,8 +3,9 @@ name: journey-nightly
 on:
   schedule:
     - cron: '30 4 * * *'
-  # Manual dispatch carries the two paid-leg opt-ins. Both default to false and
-  # `inputs.*` is empty on `schedule`, so the daily cron can never select them.
+  # Manual dispatch carries the two paid-leg opt-ins (both default to false) and the
+  # `repeats` count. `inputs.*` is empty on `schedule`, so the daily cron can never
+  # select a paid leg.
   workflow_dispatch:
     inputs:
       rerecord:
@@ -15,6 +16,14 @@ on:
         description: 'Also run the Researcher five-metric + Sonnet judge leg (needs rerecord)'
         type: boolean
         default: false
+      # Story 28-1 (D-28-1-02 A, D-28-1-07 A): k live passes per evaluated class.
+      # A `choice` so the bound (<= 10) is enforced at dispatch; the first re-record
+      # step re-checks it. Read only through `env:`, never inside a `run` script.
+      repeats:
+        description: 'Live repeats k per evaluated class (1-10, default 5); every repeat is a paid pass'
+        type: choice
+        default: '5'
+        options: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
 
 env:
   CARGO_TERM_COLOR: always
@@ -93,7 +102,7 @@ jobs:
   tier-2-rerecord:
     runs-on: ubuntu-24.04
     needs: [tier-2-journey, secret-gate]
-    timeout-minutes: 30
+    timeout-minutes: 60
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.rerecord == true && needs.secret-gate.outputs.has_anthropic_key == 'true' }}
     steps:
       - uses: actions/checkout@v5
@@ -107,6 +116,18 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest@0.9.149
+
+      - name: Validate the repeats input
+        env:
+          REPEATS: ${{ inputs.repeats }}
+        run: |
+          case "$REPEATS" in
+            ''|*[!0-9]*) echo "::error::repeats must be a whole number 1-10, got '$REPEATS'"; exit 2 ;;
+          esac
+          if [ "$REPEATS" -lt 1 ] || [ "$REPEATS" -gt 10 ]; then
+            echo "::error::repeats must be 1-10, got $REPEATS"
+            exit 2
+          fi
 
       - name: Build workspace
         run: cargo build --locked --all-targets --workspace
@@ -124,56 +145,111 @@ jobs:
             --test-threads 1 \
             --no-fail-fast
 
-      # Story 18-2 AC3 (D-18-2-06 A) — re-record the 30-row Butler halt-eval
-      # cassette through the shared router's live driver (the 15-6 recorder;
-      # `provenance: live-record`) and score it. A live run that misses a
-      # floor exits 1 after the cassette is written; the upload still runs.
-      # This run is the proof of the binary's record-flush success path
-      # (review ruling D-18-2-R4). Ruling D-18-2-R3: it writes the SIBLING
-      # `halt-corpus-v0.3.live.json`, never the committed seed. Promotion is an
-      # operator procedure: download `refreshed-cassettes`, review the live
-      # cassette (30 entries, real prompt hashes, `provenance: live-record`),
-      # replay it with `maos eval halt --class butler --cassette <live>`, then
-      # copy it over `halt-corpus-v0.3.json` in a PR that re-pins the seed-pinned
-      # tests (deferred row, owner `ops-nightly-cassette-rerecord`).
+      # Story 18-2 AC3 (D-18-2-06 A) + Story 28-1 AC5 (D-28-1-02 A) — re-record the
+      # 30-row Butler halt-eval cassette `repeats` times through the shared router's
+      # live driver (the 15-6 recorder; `provenance: live-record`) and score each
+      # pass. Repeat i writes the SIBLING `halt-corpus-v0.3.live.<i>.json` (review
+      # ruling D-18-2-R3: never the committed seed) and appends its stdout line to
+      # `eval-results/butler.results.jsonl`. A pass that misses a floor exits 1 after
+      # its cassette is written: that is a measured result, kept, and the loop goes
+      # on; any other exit code stops the step. The verdict is the aggregate's: the
+      # report step below. This run is the proof of the binary's record-flush success
+      # path (review ruling D-18-2-R4). Promotion is an operator procedure: download
+      # `refreshed-cassettes`, review the live cassette (30 entries, real prompt
+      # hashes, `provenance: live-record`), replay it with `maos eval halt --class
+      # butler --cassette <live>`, then copy it over `halt-corpus-v0.3.json` in a PR
+      # that re-pins the seed-pinned tests (deferred row, owner
+      # `ops-nightly-cassette-rerecord`).
       - name: Re-record the Butler halt-eval cassette (live)
         env:
           MAOS_INFERENCE_MODE: record
-          MAOS_REPLAY_CASSETTE: crates/maos-journey-test/cassettes/j-butler/halt-corpus-v0.3.live.json
           MAOS_ANTHROPIC_API_KEY: ${{ secrets.MAOS_ANTHROPIC_API_KEY }}
-        run: target/debug/maos eval halt --class butler
+          REPEATS: ${{ inputs.repeats }}
+        run: |
+          results=crates/maos-journey-test/cassettes/eval-results
+          mkdir -p "$results"
+          for i in $(seq 1 "$REPEATS"); do
+            rc=0
+            MAOS_REPLAY_CASSETTE="crates/maos-journey-test/cassettes/j-butler/halt-corpus-v0.3.live.$i.json" \
+              target/debug/maos eval halt --class butler >> "$results/butler.results.jsonl" || rc=$?
+            if [ "$rc" -gt 1 ]; then
+              echo "::error::Butler repeat $i exited $rc"
+              exit "$rc"
+            fi
+          done
 
-      # Story 18-3 AC2.4 (D-18-3-07 A, review R3/R4) — record the Researcher
-      # five-metric run through the shared router's live driver (the 15-6
-      # recorder) into the SIBLING `distill-corpus-v0.live.json`, never the
-      # committed seed cassette or corpus. Opt-in: also requires the dispatch
-      # input `include_researcher=true` (the Sonnet judge leg is the most
+      # Story 28-1 AC5 — aggregate the k lines: mean over the repeats, Wilson 95 % over
+      # the per-row majority decision, confusion by family, flip rate, tokens and USD.
+      # Exits 1 when a floor is missed or fewer than k lines were produced; the report
+      # file is written either way and uploaded with the cassettes.
+      - name: Report the Butler live evaluation (k repeats)
+        if: ${{ !cancelled() }}
+        env:
+          REPEATS: ${{ inputs.repeats }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          results=crates/maos-journey-test/cassettes/eval-results
+          cargo run --locked -p xtask -- eval-report \
+            --results "$results/butler.results.jsonl" \
+            --repeats "$REPEATS" --run-id "$RUN_ID" \
+            --out "$results/butler.report.json"
+
+      # Story 18-3 AC2.4 (D-18-3-07 A, review R3/R4) + Story 28-1 AC5 — record the
+      # Researcher five-metric run `repeats` times through the shared router's live
+      # driver (the 15-6 recorder) into the SIBLINGS `distill-corpus-v0.live.<i>.json`,
+      # never the committed seed cassette or corpus. Opt-in: also requires the
+      # dispatch input `include_researcher=true` (the Sonnet judge leg is the most
       # expensive; operator ruling 2026-11-12). Layout `provenance: live-record`:
       # the live rows' survey completions (the completion-planted hedge-drop
       # and planted-secret controls are served from the committed cassette),
       # then one judge completion per finding of those rows, the judge pinned
       # to `tests/judge-config.toml` [judge.researcher-faithfulness] (a reply
       # attributed to another model is refused after the flush). The per-
-      # finding live verdicts land beside it in
-      # `distill-corpus-v0.live.verdicts.json` (scenario → claim_id → verdict,
-      # judge model, prompt SHA-256); the upload below carries both. Runs even
-      # if the Butler step missed a floor. Promotion is the D-18-2-R3 operator
-      # procedure: download `refreshed-cassettes`, replay with `maos eval
-      # distill --class researcher --cassette <live>` (it scores the RECORDED
-      # judge completions and fails on any unconsumed entry), then re-pin the
-      # corpus's frozen surveys and copy the sidecar's verdicts into the
-      # corpus rows (`provenance: live-record`) in a PR (owner
-      # `ops-nightly-cassette-rerecord`).
+      # finding live verdicts land beside each cassette in
+      # `distill-corpus-v0.live.<i>.verdicts.json` (scenario → claim_id → verdict,
+      # judge model, prompt SHA-256); the upload below carries them. Every stdout
+      # line is appended to `eval-results/researcher.results.jsonl`; exit 1 (a missed
+      # floor) is kept and the loop goes on. Runs even if the Butler steps missed a
+      # floor. Promotion is the D-18-2-R3 operator procedure: download
+      # `refreshed-cassettes`, replay with `maos eval distill --class researcher
+      # --cassette <live>` (it scores the RECORDED judge completions and fails on any
+      # unconsumed entry), then re-pin the corpus's frozen surveys and copy the
+      # sidecar's verdicts into the corpus rows (`provenance: live-record`) in a PR
+      # (owner `ops-nightly-cassette-rerecord`).
       - name: Re-record the Researcher five-metric cassette and judge (live)
         if: ${{ !cancelled() && inputs.include_researcher == true }}
         env:
           MAOS_INFERENCE_MODE: record
-          MAOS_REPLAY_CASSETTE: crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.live.json
           MAOS_ANTHROPIC_API_KEY: ${{ secrets.MAOS_ANTHROPIC_API_KEY }}
-        run: target/debug/maos eval distill --class researcher
+          REPEATS: ${{ inputs.repeats }}
+        run: |
+          results=crates/maos-journey-test/cassettes/eval-results
+          mkdir -p "$results"
+          for i in $(seq 1 "$REPEATS"); do
+            rc=0
+            MAOS_REPLAY_CASSETTE="crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.live.$i.json" \
+              target/debug/maos eval distill --class researcher >> "$results/researcher.results.jsonl" || rc=$?
+            if [ "$rc" -gt 1 ]; then
+              echo "::error::Researcher repeat $i exited $rc"
+              exit "$rc"
+            fi
+          done
 
-      # The cassettes directory carries every `.live.json` and the Researcher
-      # judge sidecar `j-researcher/distill-corpus-v0.live.verdicts.json`.
+      - name: Report the Researcher live evaluation (k repeats)
+        if: ${{ !cancelled() && inputs.include_researcher == true }}
+        env:
+          REPEATS: ${{ inputs.repeats }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          results=crates/maos-journey-test/cassettes/eval-results
+          cargo run --locked -p xtask -- eval-report \
+            --results "$results/researcher.results.jsonl" \
+            --repeats "$REPEATS" --run-id "$RUN_ID" \
+            --out "$results/researcher.report.json"
+
+      # The cassettes directory carries every `.live.<i>.json`, the Researcher judge
+      # sidecars `j-researcher/distill-corpus-v0.live.<i>.verdicts.json` and
+      # `eval-results/` (`<class>.results.jsonl` and `<class>.report.json`).
       - name: Upload refreshed cassettes
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

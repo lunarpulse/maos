@@ -41,6 +41,10 @@ pub struct HaltScore {
     pub halt_recall_calendar_conflict: Option<f64>,
     pub halt_recall_overall: f64,
     pub halt_precision_overall: f64,
+    /// Story 28-1 (D-28-1-05 A): rows whose completion was malformed. Each is
+    /// scored as no halt (the shipped Spirit writes no scalar); the floor is 0.
+    #[serde(default)]
+    pub format_errors: usize,
 }
 
 /// Score `verdicts` (scenario id → halted) against `corpus`. Calendar-conflict
@@ -105,6 +109,7 @@ pub fn score_class(
             tp as f64 / expected_halts as f64
         },
         halt_precision_overall: outcome.halt_precision_overall,
+        format_errors: 0,
     })
 }
 
@@ -113,7 +118,7 @@ pub fn missed_floors(score: &HaltScore, floors: &ClassFloors) -> Vec<String> {
     let cc = score
         .halt_recall_calendar_conflict
         .zip(floors.halt_recall_calendar_conflict);
-    [
+    let mut missed: Vec<String> = [
         cc.map(|(v, f)| ("halt_recall_calendar_conflict", v, f)),
         Some((
             "halt_recall_overall",
@@ -130,7 +135,122 @@ pub fn missed_floors(score: &HaltScore, floors: &ClassFloors) -> Vec<String> {
     .flatten()
     .filter(|(_, value, floor)| value < floor)
     .map(|(name, value, floor)| format!("{name} {value:.3} below floor {floor:.2}"))
-    .collect()
+    .collect();
+    if score.format_errors > 0 {
+        let rate = score.format_errors as f64 / score.rows.max(1) as f64;
+        missed.push(format!("format_error_rate {rate:.3} above floor 0.00"));
+    }
+    missed
+}
+
+/// Story 28-1 (D-28-1-04 A) — the schema id of a class's calibrated-floor
+/// record, `spirits/<class>/eval/floors.toml`.
+pub const FLOORS_SCHEMA: &str = "maos.eval.floors/v1";
+
+/// One calibrated floor and the evidence it rests on (D-28-1-03 A: the
+/// larger of the spec minimum and the Wilson lower bound of the tuned
+/// measurement, rounded down to 0.01).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FloorEntry {
+    /// A [`ClassFloors`] field name.
+    pub metric: String,
+    pub floor: f64,
+    pub spec_minimum: f64,
+    pub spec_source: String,
+    /// The operator ruling that lowers a floor below the spec minimum.
+    pub operator_ruling: Option<String>,
+    pub measured_mean: f64,
+    pub wilson95: [f64; 2],
+    pub k: usize,
+    pub model_id: String,
+    pub prompt_sha256: String,
+    pub rule: String,
+    pub rationale: String,
+    pub date: String,
+    pub result_file: String,
+}
+
+/// A class's floor record: the file `maos eval halt` reads when present.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FloorRecord {
+    pub schema: String,
+    pub floor: Vec<FloorEntry>,
+}
+
+/// `x` rounded strictly down to 0.01 (D-28-1-03 A). `xtask eval-report
+/// --calibrate` calls this same function, so the calibrated number and the
+/// load-time check cannot disagree.
+pub fn round_down_hundredth(x: f64) -> f64 {
+    (x * 100.0).floor() / 100.0
+}
+
+impl FloorRecord {
+    /// `base` (the spec minimums) with this record's floors applied. Refused:
+    /// a wrong schema, an unknown or repeated metric, a floor outside [0, 1],
+    /// and, without an `operator_ruling`, a floor below the one its own
+    /// evidence requires (D-28-1-03 A: the largest of the spec minimum, `base`
+    /// and the recorded Wilson lower bound rounded down to 0.01).
+    pub fn apply(&self, base: ClassFloors) -> Result<ClassFloors, String> {
+        if self.schema != FLOORS_SCHEMA {
+            return Err(format!("floor record schema is '{}'", self.schema));
+        }
+        let mut floors = base;
+        let mut seen = Vec::new();
+        for e in &self.floor {
+            let (slot, compiled) = match e.metric.as_str() {
+                "halt_recall_calendar_conflict" => (
+                    floors.halt_recall_calendar_conflict.as_mut(),
+                    base.halt_recall_calendar_conflict.unwrap_or_default(),
+                ),
+                "halt_recall_overall" => (
+                    Some(&mut floors.halt_recall_overall),
+                    base.halt_recall_overall,
+                ),
+                "halt_precision_overall" => (
+                    Some(&mut floors.halt_precision_overall),
+                    base.halt_precision_overall,
+                ),
+                other => return Err(format!("floor record metric '{other}' is not a floor")),
+            };
+            let slot = slot.ok_or_else(|| format!("class has no floor '{}'", e.metric))?;
+            if seen.contains(&e.metric) {
+                return Err(format!("floor record repeats '{}'", e.metric));
+            }
+            seen.push(e.metric.clone());
+            let ruled = e
+                .operator_ruling
+                .as_deref()
+                .is_some_and(|r| !r.trim().is_empty());
+            let [lo, hi] = e.wilson95;
+            let unit = |v: f64| (0.0..=1.0).contains(&v);
+            if !(e.spec_minimum.is_finite()
+                && unit(e.floor)
+                && unit(e.measured_mean)
+                && unit(lo)
+                && unit(hi)
+                && lo <= hi)
+            {
+                return Err(format!(
+                    "floor record '{}': floor, measured_mean and wilson95 must be finite and \
+                     within [0, 1] with lo <= hi, and spec_minimum finite",
+                    e.metric
+                ));
+            }
+            let lower = round_down_hundredth(lo);
+            let required = e.spec_minimum.max(compiled).max(lower);
+            if !ruled && e.floor < required {
+                return Err(format!(
+                    "floor {} of '{}' is below its calibrated {required} (spec minimum {}, \
+                     Wilson lower bound {lower}) without an operator ruling",
+                    e.floor, e.metric, e.spec_minimum
+                ));
+            }
+            *slot = e.floor;
+        }
+        Ok(floors)
+    }
 }
 
 /// A model-driven class's number is the model's only if every row consumed

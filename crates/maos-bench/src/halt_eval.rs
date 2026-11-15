@@ -30,7 +30,7 @@ use maos_domain::ports::epistemic_scalar::ScalarPortError;
 use maos_domain::ports::inference::{InferenceError, InferenceRequest, InferenceResponse};
 use maos_domain::ports::{EpistemicScalarPort, InferencePort};
 use maos_eval::halt_replay::{
-    check_consumed, missed_floors, score_class, sidecar, BenchmarkBody, ClassFloors,
+    check_consumed, missed_floors, score_class, sidecar, BenchmarkBody, ClassFloors, FloorRecord,
     BENCHMARK_SCHEMA,
 };
 use maos_eval::onboarding_gate_corpus::{
@@ -275,7 +275,8 @@ pub fn evaluate(req: &EvalRequest, completions: Option<Completions>) -> Result<E
             .map_err(|e| format!("{} [capabilities.required]: {e}", class.name))
     };
 
-    let (rows, verdicts, cassette) = match class.composition {
+    let floors = class_floors(class)?;
+    let (rows, verdicts, cassette, format_errors) = match class.composition {
         Composition::Butler => model_verdicts(
             class,
             lines,
@@ -336,7 +337,12 @@ pub fn evaluate(req: &EvalRequest, completions: Option<Completions>) -> Result<E
                     .is_some();
                 verdicts.insert(row.head.scenario_id.clone(), halted);
             }
-            (rows.into_iter().map(|r| r.head).collect(), verdicts, None)
+            (
+                rows.into_iter().map(|r| r.head).collect(),
+                verdicts,
+                None,
+                Vec::new(),
+            )
         }
     };
 
@@ -345,8 +351,9 @@ pub fn evaluate(req: &EvalRequest, completions: Option<Completions>) -> Result<E
         meta: None,
         scenarios: rows,
     };
-    let score = score_class(&corpus, &corpus_sha256, &verdicts, &class.floors)?;
-    let missed = missed_floors(&score, &class.floors);
+    let mut score = score_class(&corpus, &corpus_sha256, &verdicts, &floors)?;
+    score.format_errors = format_errors.len();
+    let missed = missed_floors(&score, &floors);
     let (seed, signer) = sidecar::producer_seed()?;
     let (cassette, cassette_sha256, provenance, consumed) = match cassette {
         Some(c) => (
@@ -377,13 +384,16 @@ pub fn evaluate(req: &EvalRequest, completions: Option<Completions>) -> Result<E
         model_driven_reason: class.not_model_driven.map(str::to_owned),
         halt_recall_calendar_conflict_basis: class.calendar_conflict_basis.map(str::to_owned),
         score,
-        floors: class.floors,
+        floors,
         missed_floors: missed.clone(),
         pass: missed.is_empty(),
         signer: signer.into(),
     };
     let mut line = serde_json::to_value(&body).map_err(|e| format!("eval line: {e}"))?;
     line["event"] = "eval_halt".into();
+    // Story 28-1 AC4: per-row decisions and the rows with a malformed completion.
+    line["verdicts"] = serde_json::to_value(&verdicts).map_err(|e| format!("eval line: {e}"))?;
+    line["format_errors"] = format_errors.into();
     Ok(Evaluation {
         line: line.to_string(),
         spirit_id: class.name.into(),
@@ -392,6 +402,23 @@ pub fn evaluate(req: &EvalRequest, completions: Option<Completions>) -> Result<E
         sidecar: sidecar::sign(body, &seed)?,
         missed_floors: missed,
     })
+}
+
+/// Story 28-1 (D-28-1-04 A) — the class's floors: its calibrated record
+/// `spirits/<class>/eval/floors.toml` when one exists, else the spec-minimum
+/// constants of the class table. A record that does not parse or does not
+/// apply is an error, never a silent fallback.
+fn class_floors(class: &HaltClass) -> Result<ClassFloors, String> {
+    let path = at_root(&format!("spirits/{}/eval/floors.toml", class.name));
+    let shown = |e: &dyn std::fmt::Display| format!("floor record {}: {e}", path.display());
+    match std::fs::read_to_string(&path) {
+        Ok(text) => toml::from_str::<FloorRecord>(&text)
+            .map_err(|e| shown(&e))?
+            .apply(class.floors)
+            .map_err(|e| shown(&e)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(class.floors),
+        Err(e) => Err(shown(&e)),
+    }
 }
 
 pub(crate) fn required(manifest: &toml::Value) -> Result<String, String> {
@@ -450,9 +477,11 @@ struct CassetteFacts {
 /// The shared model-driven runner (CR-2; D-19-1-13 A): per row a fresh
 /// world, the kernel `InferencePortAdapter` over the class router (counted)
 /// and an audited mint for the class's first declared provider; `pass` runs
-/// the class's real producer and reports whether the kernel halted. A refused
-/// pass, a failed scalar write, or a run that consumed fewer completions than
-/// rows is an error.
+/// the class's real producer and reports whether the kernel halted, or `None`
+/// for a malformed completion (D-28-1-05 A: the row scores as no halt and is
+/// listed in the returned format errors). Any other refused pass, a failed
+/// scalar write, or a run that consumed fewer completions than rows is an
+/// error.
 fn model_verdicts<'a, I: serde::de::DeserializeOwned>(
     class: &HaltClass,
     lines: impl Iterator<Item = &'a str>,
@@ -465,12 +494,13 @@ fn model_verdicts<'a, I: serde::de::DeserializeOwned>(
         String,
         Option<String>,
         InferenceMint,
-    ) -> Result<bool, String>,
+    ) -> Result<Option<bool>, String>,
 ) -> Result<
     (
         Vec<OnbScenario>,
         BTreeMap<String, bool>,
         Option<CassetteFacts>,
+        Vec<String>,
     ),
     String,
 > {
@@ -503,6 +533,7 @@ fn model_verdicts<'a, I: serde::de::DeserializeOwned>(
     };
     let consumed = Arc::new(AtomicUsize::new(0));
     let mut verdicts = BTreeMap::new();
+    let mut format_errors = Vec::new();
     for (index, row) in rows.iter().enumerate() {
         let id = &row.head.scenario_id;
         if row.completion.sequence != index
@@ -532,7 +563,7 @@ fn model_verdicts<'a, I: serde::de::DeserializeOwned>(
                 .map(|token| (token, EVAL_PID))
                 .map_err(|e| format!("token issue failed: {e}"))
         });
-        let halted = pass(
+        let verdict = pass(
             &row.input,
             world,
             port,
@@ -541,7 +572,10 @@ fn model_verdicts<'a, I: serde::de::DeserializeOwned>(
             mint,
         )
         .map_err(|e| format!("row {id}: {e}"))?;
-        verdicts.insert(id.clone(), halted);
+        if verdict.is_none() {
+            format_errors.push(id.clone());
+        }
+        verdicts.insert(id.clone(), verdict.unwrap_or(false));
     }
     check_consumed(consumed.load(Ordering::SeqCst), rows.len())?;
     if let Some(flush) = flush {
@@ -560,11 +594,12 @@ fn model_verdicts<'a, I: serde::de::DeserializeOwned>(
         provenance,
     };
     let heads = rows.into_iter().map(|r| r.head).collect();
-    Ok((heads, verdicts, Some(facts)))
+    Ok((heads, verdicts, Some(facts), format_errors))
 }
 
 /// One bound Butler pass (CR-2): `on_idle` writes the model-driven scalar
-/// through the row's world; the verdict is Butler's halt receipt.
+/// through the row's world; the verdict is Butler's halt receipt, `None` when
+/// the completion is not a Butler proposal (D-28-1-05 A).
 fn butler_pass(
     input: &ScenarioInput,
     world: Arc<World>,
@@ -572,7 +607,7 @@ fn butler_pass(
     (provider_id, model_id): (String, Option<String>),
     mint: InferenceMint,
     policy: &EpistemicPolicySection,
-) -> Result<bool, String> {
+) -> Result<Option<bool>, String> {
     let scalar = Arc::new(ScalarPort {
         world,
         policy: policy.clone(),
@@ -590,18 +625,21 @@ fn butler_pass(
         CapabilityHandle(0),
         MailboxHandle(0),
     ));
-    if let Some(error) = butler.take_pass_error() {
-        return Err(format!("pass refused: {error}"));
+    match butler.take_pass_error() {
+        Some(butler::ButlerError::Proposal(_)) => return Ok(None),
+        Some(error) => return Err(format!("pass refused: {error}")),
+        None => {}
     }
     let written = scalar.outcome.lock().map_err(|e| e.to_string())?.take();
     written.ok_or("the pass wrote no scalar")??;
-    Ok(butler.last_halt_receipt().is_some())
+    Ok(Some(butler.last_halt_receipt().is_some()))
 }
 
 /// One Orchestrator judgement (Story 19-1 AC5, D-19-1-12 A): the row's one
 /// `### Story` section through `judge_ambiguity`, its `dispatch_ambiguity`
 /// scalar through the kernel halt path. The harness writes the scalar itself
-/// (19-4 owns the live port); the verdict is the kernel's receipt.
+/// (19-4 owns the live port); the verdict is the kernel's receipt, `None` when
+/// the completion is not an ambiguity judgement (D-28-1-05 A).
 fn orchestrator_pass(
     epic: &str,
     world: Arc<World>,
@@ -610,7 +648,7 @@ fn orchestrator_pass(
     mint: InferenceMint,
     spirit_id: &str,
     policy: &EpistemicPolicySection,
-) -> Result<bool, String> {
+) -> Result<Option<bool>, String> {
     let section = split_epic(epic, 1)
         .map_err(|e| format!("section: {e}"))?
         .into_iter()
@@ -621,13 +659,19 @@ fn orchestrator_pass(
         model_id,
         mint,
     };
-    let (tag, value, derived_from) = Orchestrator::new(spirit_id)
+    let (tag, value, derived_from) = match Orchestrator::new(spirit_id)
         .with_deferred_inference_port(port, Arc::new(Mutex::new(Some(binding))))
         .judge_ambiguity(&section)
-        .map_err(|e| format!("pass refused: {e}"))?;
-    Ok(world
-        .write(spirit_id, tag, value, &derived_from, policy)?
-        .is_some())
+    {
+        Ok(judged) => judged,
+        Err(orchestrator::OrchestratorInferenceError::Completion(_)) => return Ok(None),
+        Err(e) => return Err(format!("pass refused: {e}")),
+    };
+    Ok(Some(
+        world
+            .write(spirit_id, tag, value, &derived_from, policy)?
+            .is_some(),
+    ))
 }
 
 /// A fresh, isolated kernel world for one row. `scopes` are admitted at

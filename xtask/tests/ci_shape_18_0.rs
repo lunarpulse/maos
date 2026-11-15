@@ -537,14 +537,17 @@ fn epic_18_exit_runs_line_2_verbatim_and_its_drift_blind_twin() {
         &steps(rerecord)[step_index(rerecord, "Re-record the Butler halt-eval cassette (live)")];
     let env = key(record, "env");
     assert_eq!(str_of(env, "MAOS_INFERENCE_MODE"), Some("record"));
-    assert_eq!(
-        str_of(env, "MAOS_REPLAY_CASSETTE"),
-        Some("crates/maos-journey-test/cassettes/j-butler/halt-corpus-v0.3.live.json")
+    assert!(
+        get(env, "MAOS_REPLAY_CASSETTE").is_none(),
+        "each repeat sets its own cassette path in the loop"
     );
-    assert_eq!(
-        str_of(record, "run"),
-        Some("target/debug/maos eval halt --class butler")
-    );
+    let run = str_of(record, "run").expect("butler run");
+    assert!(run.contains(
+        "MAOS_REPLAY_CASSETTE=\"crates/maos-journey-test/cassettes/j-butler/halt-corpus-v0.3.live.$i.json\""
+    ));
+    assert!(run.contains(
+        "target/debug/maos eval halt --class butler >> \"$results/butler.results.jsonl\" || rc=$?"
+    ));
     let upload = &steps(rerecord)[step_index(rerecord, "Upload refreshed cassettes")];
     assert!(
         step_index(rerecord, "Upload refreshed cassettes")
@@ -553,20 +556,21 @@ fn epic_18_exit_runs_line_2_verbatim_and_its_drift_blind_twin() {
     assert_eq!(condition(upload).as_deref(), Some(NOT_CANCELLED));
 
     // Story 18-3 TIA-8 (review R4) — the Researcher re-record step: its
-    // `.live.json` sibling, the shipped verb, `!cancelled()` (it runs after a
+    // `.live.<i>.json` siblings, the shipped verb, `!cancelled()` (it runs after a
     // missed Butler floor), before the upload, whose directory carries the
-    // `.live.verdicts.json` judge sidecar.
+    // `.live.<i>.verdicts.json` judge sidecars.
     const RESEARCHER_STEP: &str = "Re-record the Researcher five-metric cassette and judge (live)";
-    const LIVE: &str =
-        "crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.live.json";
     let researcher = &steps(rerecord)[step_index(rerecord, RESEARCHER_STEP)];
     let env = key(researcher, "env");
     assert_eq!(str_of(env, "MAOS_INFERENCE_MODE"), Some("record"));
-    assert_eq!(str_of(env, "MAOS_REPLAY_CASSETTE"), Some(LIVE));
-    assert_eq!(
-        str_of(researcher, "run"),
-        Some("target/debug/maos eval distill --class researcher")
-    );
+    assert!(get(env, "MAOS_REPLAY_CASSETTE").is_none());
+    let run = str_of(researcher, "run").expect("researcher run");
+    assert!(run.contains(
+        "MAOS_REPLAY_CASSETTE=\"crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.live.$i.json\""
+    ));
+    assert!(run.contains(
+        "target/debug/maos eval distill --class researcher >> \"$results/researcher.results.jsonl\" || rc=$?"
+    ));
     assert_eq!(
         condition(researcher).as_deref(),
         Some(RESEARCHER_CONDITION),
@@ -581,6 +585,68 @@ fn epic_18_exit_runs_line_2_verbatim_and_its_drift_blind_twin() {
             .starts_with(uploaded.trim()),
         "the upload carries the judge sidecar: {uploaded}"
     );
+
+    // Story 28-1 AC5 (D-28-1-02 A) — `repeats` passes per class, every stdout line
+    // appended (exit 1 is a measured verdict and the loop goes on; anything else stops),
+    // then `xtask eval-report` over the lines, uploaded with the cassettes. The
+    // `repeats` input only ever reaches a script through `env:`.
+    for (record, report, class) in [
+        (
+            "Re-record the Butler halt-eval cassette (live)",
+            "Report the Butler live evaluation (k repeats)",
+            "butler",
+        ),
+        (
+            RESEARCHER_STEP,
+            "Report the Researcher live evaluation (k repeats)",
+            "researcher",
+        ),
+    ] {
+        let (record_step, report_step) = (
+            &steps(rerecord)[step_index(rerecord, record)],
+            &steps(rerecord)[step_index(rerecord, report)],
+        );
+        for step in [record_step, report_step] {
+            assert_eq!(
+                str_of(key(step, "env"), "REPEATS"),
+                Some("${{ inputs.repeats }}")
+            );
+            assert!(
+                !str_of(step, "run").expect("run").contains("${{"),
+                "{class}: an input must not be interpolated into a script"
+            );
+        }
+        let run = str_of(record_step, "run").expect("run");
+        assert!(
+            run.contains("for i in $(seq 1 \"$REPEATS\"); do"),
+            "{class}: k invocations"
+        );
+        assert!(
+            run.contains("if [ \"$rc\" -gt 1 ]; then"),
+            "{class}: exit 1 does not stop the loop"
+        );
+        let run = str_of(report_step, "run").expect("run");
+        assert!(run.contains("-p xtask -- eval-report"));
+        assert!(run.contains(&format!("--results \"$results/{class}.results.jsonl\"")));
+        assert!(run.contains("--repeats \"$REPEATS\""));
+        assert!(run.contains(&format!("--out \"$results/{class}.report.json\"")));
+        assert!(step_index(rerecord, report) > step_index(rerecord, record));
+        assert!(step_index(rerecord, "Upload refreshed cassettes") > step_index(rerecord, report));
+    }
+    assert_eq!(
+        condition(
+            &steps(rerecord)[step_index(rerecord, "Report the Butler live evaluation (k repeats)")]
+        )
+        .as_deref(),
+        Some(NOT_CANCELLED)
+    );
+    let validate = &steps(rerecord)[step_index(rerecord, "Validate the repeats input")];
+    assert!(
+        step_index(rerecord, "Validate the repeats input")
+            < step_index(rerecord, "Re-record journey cassettes (live)"),
+        "the bound is checked before anything is spent"
+    );
+    assert!(str_of(validate, "run").expect("run").contains("-gt 10"));
 }
 
 /// The `if:` of the probe job, after normalisation (see [`condition`]).
@@ -626,6 +692,30 @@ fn nightly_on_demand_violations(nightly: &Value) -> Vec<String> {
                 "workflow_dispatch input `{name}` must be a described boolean defaulting to false"
             ));
         }
+    }
+
+    // `repeats` is a choice of 1..=10 defaulting to 5 (D-28-1-02 A, D-28-1-07 A).
+    let repeats_ok = inputs
+        .and_then(|inputs| get(inputs, "repeats"))
+        .is_some_and(|input| {
+            str_of(input, "type") == Some("choice")
+                && str_of(input, "default") == Some("5")
+                && get(input, "options")
+                    .and_then(Value::as_sequence)
+                    .is_some_and(|options| {
+                        !options.is_empty()
+                            && options.iter().all(|o| {
+                                o.as_str()
+                                    .and_then(|o| o.parse::<u32>().ok())
+                                    .is_some_and(|n| (1..=10).contains(&n))
+                            })
+                    })
+        });
+    if !repeats_ok {
+        found.push(
+            "workflow_dispatch input `repeats` must be a choice of 1-10 defaulting to 5"
+                .to_string(),
+        );
     }
 
     let jobs = key(nightly, "jobs");
@@ -712,6 +802,8 @@ fn journey_nightly_paid_rerecord_is_on_demand_only() {
             "",
         ),
         ("      rerecord:\n        description: 'Paid live re-record (tier-2-rerecord); spends API tokens'\n        type: boolean\n        default: false\n", "      rerecord:\n        description: 'Paid live re-record (tier-2-rerecord); spends API tokens'\n        type: boolean\n        default: true\n"),
+        ("        default: '5'\n", "        default: '50'\n"),
+        ("'9', '10']", "'9', '10', '11']"),
         ("'30 4 * * *'", "'30 4 * * *'\n    - cron: '0 15 * * *'"),
         (
             "  j6-real-measurement:\n    runs-on: ubuntu-24.04\n",

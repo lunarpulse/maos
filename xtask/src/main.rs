@@ -6,6 +6,7 @@ mod abi_diff;
 mod bypass_scan;
 mod calibrate;
 mod cassette_age_gate;
+mod eval_report;
 use xtask::clippy_ratchet;
 mod check_a2a_sender_completeness;
 mod check_abi_ratification;
@@ -696,6 +697,11 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 28-1 — Spirit evaluation protocol: aggregate k live `maos eval` result
+    /// lines (`maos.eval.live/v1`), compare a candidate with a reference, or
+    /// calibrate a floor. Not a gate: exit 1 reports the measured verdict.
+    #[command(name = "eval-report")]
+    EvalReport(eval_report::Args),
     /// Story 8.15 — env-contract gate: every MAOS_* env::var read must be registered.
     CheckEnvContract {
         #[arg(long, default_value = "crates/maos-bin")]
@@ -1472,6 +1478,7 @@ fn main() {
             stamp_dir,
             json,
         } => cassette_age_gate::run(&cassette_dir, json, stamp_dir.as_deref()),
+        Commands::EvalReport(args) => eval_report::run(args),
         Commands::CheckEnvContract { maos_bin_dir, json } => {
             check_env_contract::run(&maos_bin_dir, json)
         }

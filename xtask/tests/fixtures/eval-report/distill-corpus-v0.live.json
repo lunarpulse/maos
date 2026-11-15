@@ -1,0 +1,1054 @@
+{
+  "schema_version": "maos.journey.cassette/v1",
+  "provenance": "live-record",
+  "recorded_at": "2026-11-15T00:00:00Z",
+  "model_id": "claude-sonnet-5-5",
+  "spirit_id": "maos",
+  "session": "process-28034",
+  "entries": [
+    {
+      "sequence": 0,
+      "prompt_sha256": "75d15cc2729dee3476c0a991f59548c5e70b678a1383da8b385d6e033e7a4ec6",
+      "prompt_len": 175,
+      "response": {
+        "text": "Retrieval grounding is likely to reduce citation errors in long surveys.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 68,
+          "output_tokens": 27
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 1,
+      "prompt_sha256": "0a0ab5e9d3ff56e2443a68d6eaa1926d154696e7be9a89736dd6f572e3f7951d",
+      "prompt_len": 172,
+      "response": {
+        "text": "The claim itself contains no hedging language, so here is a faithful one-sentence summary: Grounded agents cite primary sources more often than ungrounded ones.\n\nIf you have the original passage or surrounding context, share it and I can check whether any qualifiers (e.g., \"may,\" \"in some cases,\" \"preliminary evidence suggests\") were dropped from this version.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 66,
+          "output_tokens": 116
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 2,
+      "prompt_sha256": "0975d4238cbd3c68a473305874118f656fb89be54811172724182e998cd0a8eb",
+      "prompt_len": 175,
+      "response": {
+        "text": "Parallel tool calls appear to reduce end-to-end latency by roughly a third.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 70,
+          "output_tokens": 30
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 3,
+      "prompt_sha256": "d36189a0d474e657433d2af9093bbf34633463cd5374515693ec75172d046642",
+      "prompt_len": 145,
+      "response": {
+        "text": "Serial tool calls remain simpler to audit.\n\nThat sentence is already a single sentence, so nothing needs compressing, and since the claim carries no hedges, none are preserved or added. If you share a longer passage or the surrounding context, I can write a digest line that captures it.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 59,
+          "output_tokens": 89
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 4,
+      "prompt_sha256": "5d64665d242aa7c4eec8bdeeb72e84c88d0c2b741f2e539029b6d686754afaa3",
+      "prompt_len": 167,
+      "response": {
+        "text": "Longer context windows may improve a model's recall of early instructions.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 60,
+          "output_tokens": 22
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 5,
+      "prompt_sha256": "96d584017631d2997007860283f7b8f8e1823ce1c010361a80bd43337e22db46",
+      "prompt_len": 146,
+      "response": {
+        "text": "I don't see a hedge in the claim as written, and the single sentence you've provided is too brief to condense further without adding detail, so here is it as a digest line: Position bias persists even at 128k tokens.\n\nIf the original source included qualifiers (e.g., \"may persist,\" \"in some models\"), send the fuller text and I'll make sure they carry through.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 58,
+          "output_tokens": 111
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 6,
+      "prompt_sha256": "14bcf707f014682310a64631c0b10e24b0f3019bdd33b33c9ea6ab82bb77e1c1",
+      "prompt_len": 172,
+      "response": {
+        "text": "Preliminary evidence suggests that chunked summaries offset position bias.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 66,
+          "output_tokens": 26
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 7,
+      "prompt_sha256": "47acc38f7bf10e5b1f3c2caa055c11cb7ea9107bdebda0ee2d2b3fcd79ccfc11",
+      "prompt_len": 165,
+      "response": {
+        "text": "Self-critique loops probably improve performance on arithmetic word problems.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 63,
+          "output_tokens": 25
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 8,
+      "prompt_sha256": "8765052c5339f1087ce141e591f6d89741f21f7bd4e1d34328ce6196388f2e53",
+      "prompt_len": 149,
+      "response": {
+        "text": "Self-critique adds a measurable cost per task.\n\nThat sentence contains no hedges and is already a single sentence, so I've kept it as is. If you can share the source passage, I can write a digest line that also captures any qualifiers, such as the size of the cost or the conditions under which it appears.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 59,
+          "output_tokens": 93
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 9,
+      "prompt_sha256": "f47e1bff092b156b928836c0cc8d30f56c3f201276d50d22bc67abcfb2cb2f7b",
+      "prompt_len": 177,
+      "response": {
+        "text": "Ensembles of small judges appear to match a single large judge in terms of agreement.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 66,
+          "output_tokens": 28
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 10,
+      "prompt_sha256": "7d25f3b27d8d7d57c411ef555e4381c34fcde3b90af61b85f81d58c4b4b9a650",
+      "prompt_len": 149,
+      "response": {
+        "text": "The research claim is that using ensembles of judges reduces variance across reruns.\n\nNote that the original is stated without hedges, so none are carried over. If there's more context (e.g., a study, a dataset, or qualifiers like \"may\" or \"in some settings\"), share it and I can reflect those in the summary.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 60,
+          "output_tokens": 97
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 11,
+      "prompt_sha256": "dea07a8964148fa3f7b9f17d2be4ac22c0a82a98a2d97e40da5dddc5bd39a785",
+      "prompt_len": 160,
+      "response": {
+        "text": "Distilled digests may lose rare but load-bearing caveats.\n\nThe claim is already a single hedged sentence, so I've kept it as is; condensing it further would risk dropping the \"may\" or the qualifier \"rare but load-bearing.\"",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 64,
+          "output_tokens": 78
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 12,
+      "prompt_sha256": "b08205762b173119efe1dc959d4e62e4c73bb25194fc7dad5b88c128d0bd40ee",
+      "prompt_len": 155,
+      "response": {
+        "text": "Prompts that are designed to be hedge-aware tend to keep caveats in digests.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 65,
+          "output_tokens": 30
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 13,
+      "prompt_sha256": "1cd3c2992998c8e6a124c609f5b241a3712559bdd0a52aa3a485375a8fa6ba6c",
+      "prompt_len": 182,
+      "response": {
+        "text": "Traversing citation graphs likely surfaces seminal work that keyword search misses.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 70,
+          "output_tokens": 29
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 14,
+      "prompt_sha256": "c23c9ecd1332ead4c1cdcefe542f0272a43cac0b4b434faae6419ca79085bcc3",
+      "prompt_len": 152,
+      "response": {
+        "text": "Keyword search still finds most recent preprints.\n\nThe claim is already a single, concise sentence, and I can't tighten it further without dropping or altering its wording. Note that \"most\" and \"still\" are the key qualifiers here, so I've left them intact.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 58,
+          "output_tokens": 80
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 15,
+      "prompt_sha256": "f80b93989600a369c406faba0e2e2dc719e8f6f5281edb49a96715a6b81c6c95",
+      "prompt_len": 173,
+      "response": {
+        "text": "Repository search could shorten literature reviews for systems topics.\n\nThat claim is already a single sentence with its hedge (\"could\") intact, so I've kept it as written. If you share the surrounding paper or abstract, I can write a fuller digest line that gives the context behind it, though I'd only draw on what the text actually says.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 62,
+          "output_tokens": 102
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 16,
+      "prompt_sha256": "c73c2116f550a687d32b3d84cad930b0f3fdcbd0cc3f05547dc5f7e2242db855",
+      "prompt_len": 138,
+      "response": {
+        "text": "Claims made in README files are often left unverified.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 52,
+          "output_tokens": 16
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 17,
+      "prompt_sha256": "43f51f19e6ee3cf779ac04394f654bb144e378a026f299ddef9498846ee70081",
+      "prompt_len": 166,
+      "response": {
+        "text": "Benchmark scores may drift over time if providers silently update their models.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 61,
+          "output_tokens": 23
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 18,
+      "prompt_sha256": "6ed5803b003b8374ab1e23cb2cd44f57a98d54ea7a12b54f6f0a72d42c033b2f",
+      "prompt_len": 148,
+      "response": {
+        "text": "The claim is that pinning model versions makes reruns comparable.\n\nThe claim as given contains no hedges or qualifiers, so there's nothing further to preserve. If the original source includes caveats (e.g., \"may,\" \"in some cases,\" or a scope limitation), share them and I'll fold them into the summary.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 58,
+          "output_tokens": 98
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 19,
+      "prompt_sha256": "081facfac65cd20946a2e1dc4df0fde7dd5f57baaaca70eb55dcf05ed9a8716f",
+      "prompt_len": 190,
+      "response": {
+        "text": "Annotators reportedly agree more often on hedge labels than on faithfulness labels.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 73,
+          "output_tokens": 30
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 20,
+      "prompt_sha256": "b4651edecc6e4ac473f50e78c89c203cd01a42c88f60c9538bc10726717ef2ab",
+      "prompt_len": 154,
+      "response": {
+        "text": "Having two annotators label the same data catches most labelling slips, according to the claim.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 61,
+          "output_tokens": 27
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 21,
+      "prompt_sha256": "bcb8cb2c88f21fd6fe92396e14be83e41b68c2dd9887866e3288b2713c23bd96",
+      "prompt_len": 171,
+      "response": {
+        "text": "Redacting sensitive data before it is stored is reported to prevent most credential leaks in logs.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 64,
+          "output_tokens": 33
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 22,
+      "prompt_sha256": "c6f3cd39031bc97c18a1c81cabfebe39a56c0a9f584235da7134d58b7dbcec4f",
+      "prompt_len": 164,
+      "response": {
+        "text": "Token-shaped strings are the most common class of leaked secrets.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 62,
+          "output_tokens": 23
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 23,
+      "prompt_sha256": "951ed9dfc536fe2b793d79fc33e84cace11c6bee2f150b0c838d9460f0e85852",
+      "prompt_len": 175,
+      "response": {
+        "text": "The claim suggests that when strong studies reach contradictory conclusions, a survey should pause so a human can decide how to proceed.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 64,
+          "output_tokens": 43
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 24,
+      "prompt_sha256": "a412b269ae5743a1fbbb64f693b448c031b6c5c60ca9066fd2ed4e2a8e3d6fe3",
+      "prompt_len": 161,
+      "response": {
+        "text": "Weak contradicting studies can be noted as open questions.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 61,
+          "output_tokens": 20
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 25,
+      "prompt_sha256": "d23903e0198e5b65dbc68bd77cc13f707f28e0c80c52f5a47587962f998511b2",
+      "prompt_len": 146,
+      "response": {
+        "text": "The claim holds that surveys of agents rarely cite retracted papers.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 60,
+          "output_tokens": 25
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 26,
+      "prompt_sha256": "3f3c700be2a01efe6b300dc5c7918176862f5b9b117582e167ada6e249e6ee3e",
+      "prompt_len": 145,
+      "response": {
+        "text": "Retraction Watch feeds are reportedly updated on a weekly basis. (The claim as stated contains no explicit hedges, so none are carried over.)",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 59,
+          "output_tokens": 52
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 27,
+      "prompt_sha256": "93e217496580704176c30abd4e8b7a0096df0ef3fc1eca4bbc56a164255293c4",
+      "prompt_len": 148,
+      "response": {
+        "text": "The claim you've given is just a short statement with no accompanying hedges or qualifiers, so there's nothing additional to preserve. Here's a one-sentence digest version:\n\nSnowball sampling widens literature coverage.\n\nIf you have the fuller source text (including any hedging like \"may,\" \"in some cases,\" or limits on scope), share it and I can summarize with those qualifiers intact.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 58,
+          "output_tokens": 123
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 28,
+      "prompt_sha256": "ee5ec601dcd76c0dbdd6ed1ea0ddecf02bfca8ac4673419f3bf5db355f92e375",
+      "prompt_len": 153,
+      "response": {
+        "text": "Snowball sampling may over-weight popular authors.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 60,
+          "output_tokens": 19
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 29,
+      "prompt_sha256": "9e6b9e33a1a7ec9d4a3f3e3d7c59554ea4bfa9bef448925cb5fae148feb8660f",
+      "prompt_len": 379,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 134,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 30,
+      "prompt_sha256": "33adc35214349a0c60ab9a22fa0ec07c1bfcaa7c3585ae7a1e15aeffcc1ad221",
+      "prompt_len": 587,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 197,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 31,
+      "prompt_sha256": "626a2871a8c72ea7ab81c117a42ec0ac609b1a64c688b85b115258b41c3a25c8",
+      "prompt_len": 382,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 139,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 32,
+      "prompt_sha256": "229a04776bfdc4b07464811ef6a305f71322628bc4d5007c944c3f03d4bb3780",
+      "prompt_len": 560,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 186,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 33,
+      "prompt_sha256": "4c2cdb3b7fd182af1706ea0eedd5e724b743a38323e34bf48d48377e36614888",
+      "prompt_len": 373,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 121,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 34,
+      "prompt_sha256": "bdddef8d0d97c32f4f722411f33959e12eddf71db550afa1eae98c4b10a77440",
+      "prompt_len": 561,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 184,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 35,
+      "prompt_sha256": "6b258b319a50debbc9b99197f7fdf03f7a791e5f3aad54e4d6ea40901454fa67",
+      "prompt_len": 378,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 131,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 36,
+      "prompt_sha256": "e73b14672ab78245b1eb03eafe3fd4fff3c6b4feab162ec85b3861fa6eb592a8",
+      "prompt_len": 374,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 127,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 37,
+      "prompt_sha256": "95289976e3bc1e9448587571dac0ff27bc3607f69b4fd71861bd84d275bf6e62",
+      "prompt_len": 564,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 186,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 38,
+      "prompt_sha256": "bd19f6be4afe1e3c3079a3520b6dec4c1471e8f51df055408beec54898e1a255",
+      "prompt_len": 394,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 133,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 39,
+      "prompt_sha256": "164a4e836172cba4af43ad8c3584558749dc9e5551faae5b06f97103d8ededc9",
+      "prompt_len": 564,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 188,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 40,
+      "prompt_sha256": "990d51b6edac82d3c67f1786dae78f1318c3600918f0b7df27dbf44ac2a0d35d",
+      "prompt_len": 514,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 181,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 41,
+      "prompt_sha256": "228df6924823d0851e2699efaba6854c3e3c23f37316e2a2de0751035708b4dc",
+      "prompt_len": 363,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 134,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 42,
+      "prompt_sha256": "65872eb13d400673fa32791a6effe85a1bd0b75e0e755b1879934427d9cdbf73",
+      "prompt_len": 397,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 138,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 43,
+      "prompt_sha256": "0e4cf7f5aa9a59ff2d6f435cfacbd134b96b87d7b21a3b979fa499811126f29f",
+      "prompt_len": 540,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 177,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 44,
+      "prompt_sha256": "80a5cd16f19b89a96bb171941b25e772018ca03fa3392157066a5807aa63685d",
+      "prompt_len": 588,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 187,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 45,
+      "prompt_sha256": "4ad8a37620fd0c0af5306a4597c90e92a12bc3fddc688e3b18fc9fe95536822b",
+      "prompt_len": 324,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 107,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 46,
+      "prompt_sha256": "1407c83be116d7a4255f9bf8441439ffa5184a4dbc3365446b383b867e5b9dfa",
+      "prompt_len": 377,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 123,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 47,
+      "prompt_sha256": "27e31cd6fbbd86cae7b93c0a56a4c3ed575d4d00914676c13957609260ccf8e9",
+      "prompt_len": 563,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 190,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 48,
+      "prompt_sha256": "e449db12971bb0b6026cd30fe55eee674c2e9d82d9d3843ff36f43e1c1a600a7",
+      "prompt_len": 405,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 142,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 49,
+      "prompt_sha256": "8822aeac3b248e8d8e53c617a004bf861ac958f3936f67a84689c02d97f531c2",
+      "prompt_len": 381,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 127,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 50,
+      "prompt_sha256": "69f1bdfc70b8a5287823ac0ccd7f6c5691a86c151180345e2a5fd2f419382cd0",
+      "prompt_len": 401,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 136,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 51,
+      "prompt_sha256": "2a31764151b49bdba5d31f32704dbe05454cae6a7857aa3d5dc6e4b23e0449bd",
+      "prompt_len": 361,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 124,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 52,
+      "prompt_sha256": "477f09ea499c656bc972612fd3e7d263b1a1fb1c44627584e9e16a3bdff2ad97",
+      "prompt_len": 443,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 146,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 53,
+      "prompt_sha256": "e866d29d2f941a4493bcba0227048e47ac29b195b888df70a141539ab2b5d51b",
+      "prompt_len": 351,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 120,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 54,
+      "prompt_sha256": "4a10d03c2cd412d9a45667600f821d5665f9962b3b39bf25281bde018833e81e",
+      "prompt_len": 346,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 124,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 55,
+      "prompt_sha256": "98868080247b2946e057c9828331918339c3e64e235f4fff67242db08f90fd0a",
+      "prompt_len": 418,
+      "response": {
+        "text": "unfaithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 150,
+          "output_tokens": 7
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 56,
+      "prompt_sha256": "12bd147f0362df7eafe29a567322b0c8d06da66e8933c3d25a58654e193db8e3",
+      "prompt_len": 563,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 187,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    },
+    {
+      "sequence": 57,
+      "prompt_sha256": "5a14d9acd007fb61ad45226f6c4fd247f422c655858c08250d3c36d5d54b0329",
+      "prompt_len": 335,
+      "response": {
+        "text": "faithful",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 118,
+          "output_tokens": 5
+        },
+        "provider_attribution": {
+          "provider_id": "anthropic",
+          "endpoint_url": "https://api.anthropic.com",
+          "model_id": "claude-sonnet-5-5"
+        }
+      }
+    }
+  ]
+}
