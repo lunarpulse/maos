@@ -144,6 +144,10 @@ This section governs GA tags only. The signed `v0.1.0-alpha.1` pre-release and t
    S2 (usage fixes; its key is filed at story creation). `21-8` is no longer a
    precondition: the one-session witness is the Epic 23 exit (row 1 of
    "Claim boundaries — v1.0.0 scope" above).
+   *Operator ruling 2026-11-15 (`decisions-2026-11-15-spirit-quality.md`):*
+   the GA set adds `28-1-spirit-evaluation-protocol` and
+   `28-2-butler-halt-prompt` (the Butler live evaluation passes its calibrated
+   floor on `claude-haiku-5-5`).
 2. The release notes and this ledger state plainly: **"no external penetration
    test was performed; no ECCN determination was made; assurance is AI-agent
    review plus the hermetic CI proof only"**, and the release does NOT claim
