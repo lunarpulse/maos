@@ -195,7 +195,7 @@ fn the_linux_only_exec_deps_crate_is_cfg_gated_in_source_not_excluded() {
 fn macos_scope_is_a_cheap_linux_job_with_full_history() {
     let discipline = load("discipline.yml");
     let scope = job(&discipline, "macos-scope");
-    assert_eq!(key(scope, "runs-on").as_str(), Some("ubuntu-latest"));
+    assert_eq!(key(scope, "runs-on").as_str(), Some("ubuntu-24.04"));
     assert!(key(scope, "timeout-minutes").as_u64().is_some());
     let checkout = steps(scope)
         .iter()

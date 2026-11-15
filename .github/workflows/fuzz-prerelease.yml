@@ -15,7 +15,7 @@ permissions:
   actions: read
 jobs:
   fuzz-link-1:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
       fail-fast: false
@@ -73,7 +73,7 @@ jobs:
           retention-days: 90
   fuzz-link-2:
     needs: fuzz-link-1
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
       fail-fast: false
@@ -136,7 +136,7 @@ jobs:
           retention-days: 90
   fuzz-link-3:
     needs: fuzz-link-2
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
       fail-fast: false
@@ -199,7 +199,7 @@ jobs:
           retention-days: 90
   fuzz-link-4:
     needs: fuzz-link-3
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
       fail-fast: false
@@ -262,7 +262,7 @@ jobs:
           retention-days: 90
   fuzz-link-5:
     needs: fuzz-link-4
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
       fail-fast: false
@@ -326,7 +326,14 @@ jobs:
   t3-ledger-collect:
     needs: [fuzz-link-1, fuzz-link-2, fuzz-link-3, fuzz-link-4, fuzz-link-5]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Both ledger writers share this group so appends to the `fuzz-ledger`
+    # branch serialize. Job level on purpose: a ~26 h T3 chain must not queue
+    # the nightly fuzz runs themselves, only the short collector.
+    concurrency:
+      group: fuzz-ledger-write
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v5
         with:

@@ -16,7 +16,7 @@ permissions:
   actions: read
 jobs:
   fuzz-run-t2:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
       fail-fast: false
@@ -59,9 +59,15 @@ jobs:
           path: out/
           retention-days: 90
   fuzz-ledger-collect:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: fuzz-run-t2
     if: always()
+    timeout-minutes: 20
+    # Shares its group with fuzz-prerelease's `t3-ledger-collect` so appends to
+    # the `fuzz-ledger` branch serialize (job level: the soak matrix is unaffected).
+    concurrency:
+      group: fuzz-ledger-write
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v5
         with:
@@ -75,9 +81,10 @@ jobs:
       - name: Append records to fuzz-ledger.json
         run: bash scripts/collect-ledger.sh fuzz records
   check-fuzz-floor:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: fuzz-ledger-collect
     if: always()
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
         with:

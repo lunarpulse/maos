@@ -53,10 +53,10 @@ jobs:
         # operator command reopens docs/release/windows-deferral.md.
         include:
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-24.04
             suffix: linux-amd64
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-24.04
             suffix: linux-arm64
           - target: aarch64-apple-darwin
             os: macos-latest
@@ -115,7 +115,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.dry_run != true
     permissions:
       contents: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - run: |
@@ -128,7 +128,7 @@ jobs:
     # ADVISORY — owner: release operator; reason: the `continue-on-error` expressions below are false on a tag push (guards stay fatal) and true only on a dispatch rehearsal, where `Rehearsal verdict` re-fails the job on any guard that did not succeed.
     needs: build
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == true)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: release
     permissions:

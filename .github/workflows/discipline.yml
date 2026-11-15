@@ -58,7 +58,7 @@ env:
 
 jobs:
   reproducible-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 50
     # ADVISORY — owner: Winston; reason: byte identity needs a pinned deterministic build substrate.
     # ADVISORY gate (2026-06-12). Cargo/rustc does not guarantee byte-identical
@@ -170,7 +170,7 @@ jobs:
   # `continue-on-error`, in `aggregate.needs` only (no gate-registry row, the
   # 15-3 enrolment precedent). Policy: `deny.toml`.
   cargo-deny:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -199,7 +199,7 @@ jobs:
   # 20-3b row 11 B: advisory debt lane, deliberately NOT in aggregate.needs.
   # Count both repeated warning occurrences and source-distinct diagnostics.
   clippy-advisory:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     # ADVISORY — owner: 20-3b; reason: hosted baseline is 1383/897 warnings (run 41305010381; 20-3b hosted T0 was 1456/904); ratchet prevents growth without claiming debt closure.
     continue-on-error: true
@@ -225,7 +225,7 @@ jobs:
           path: clippy.jsonl
 
   check-unsafe:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -243,7 +243,7 @@ jobs:
   # baseline. Story 12.2's fmt reflow moved the baseline 23081->23082 and shipped
   # un-caught into 12.3 precisely because there was no fmt gate. Blocking.
   check-fmt:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -258,7 +258,7 @@ jobs:
         run: cargo fmt --all -- --check
 
   kloc-check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     # BLOCKING since 2026-07-25 (founder-ratified ceiling-policy replacement).
     # Was ADVISORY from 2026-06-11 under the "tight measured residual" rule, whose
@@ -296,7 +296,7 @@ jobs:
         run: cargo run -p xtask -- kloc-check --json
 
   abi-diff:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -318,7 +318,7 @@ jobs:
 
 
   gen-abi-docs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -334,7 +334,7 @@ jobs:
         run: cargo run -p xtask -- gen-abi-docs --check
 
   check-empty-kernel:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -348,7 +348,7 @@ jobs:
         run: cargo run -p xtask -- check-empty-kernel --json
 
   check-loom:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -362,7 +362,7 @@ jobs:
         run: cargo run -p xtask -- check-loom --json
 
   check-fr47:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -376,7 +376,7 @@ jobs:
         run: cargo run -p xtask -- check-fr47 --json
 
   check-workspace-count:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -392,7 +392,7 @@ jobs:
   # Story 8.8 AC3 — cross-Host A2A sender-completeness (GREEN-at-HEAD precondition
   # for the fail-closed flip; never flipped-while-red).
   check-a2a-sender-completeness:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -406,7 +406,7 @@ jobs:
         run: cargo run -p xtask -- check-a2a-sender-completeness --json
 
   check-mock-not-in-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: reproducible-build
     timeout-minutes: 15
     steps:
@@ -423,7 +423,7 @@ jobs:
         run: cargo run -p xtask --release -- check-mock-not-in-release --binary target/release/maos --json
 
   check-pub-field-constructors:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -437,7 +437,7 @@ jobs:
         run: cargo run -p xtask -- check-pub-field-constructors --json
 
   check-composition-root-completeness:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -458,7 +458,7 @@ jobs:
           cargo test --locked -p maos-bin --test crypto_real_shell_20_13 --test crypto_real_boot_20_13
 
   check-service-boundary:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -473,7 +473,7 @@ jobs:
 
   # Story 12.6 — blocking registry coverage for maos-bin/src only; Story 12.7 widens this workspace-wide.
   check-env-contract:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -501,7 +501,7 @@ jobs:
   # deliberately: a gate whose reds are never executed is the failure mode this
   # story exists to close.
   check-decision-register:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -526,7 +526,7 @@ jobs:
   # what keep the method-aware AST probe from silently reverting to the
   # `visit_expr_call`-only shape that made the obvious probe a null control.
   check-cert-rotation-trigger:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -549,7 +549,7 @@ jobs:
   # reds are never executed is the failure mode this story exists to close —
   # and because no job runs `cargo test -p xtask` unscoped.
   check-exit-commands:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -582,7 +582,7 @@ jobs:
   # in the same job because a gate whose reds are never executed is the failure
   # mode this lane exists to close.
   check-model-currency:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -607,7 +607,7 @@ jobs:
   # run). Hermetic: it reads committed sources only. Proven-red vectors run in
   # the same job.
   check-test-cost:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -635,7 +635,7 @@ jobs:
   check-test-budget:
     needs: [workspace-test-suite]
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -662,7 +662,7 @@ jobs:
   # fork approval (O7) must be verified before enabling the host. This
   # PR-editable gate is not an immutable runner admission boundary.
   check-perf-runner-policy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -780,7 +780,7 @@ jobs:
   # --write-journal. The flag is the explicit separation between "validate"
   # and "persist" introduced when DF16 was resolved.
   invariant-lock:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       pull-requests: read
@@ -822,7 +822,7 @@ jobs:
         run: cargo run -p xtask -- cassette-age-gate --json
 
   check-corpus:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -836,7 +836,7 @@ jobs:
         run: cargo run -p xtask -- check-corpus --json
 
   maos-audit-read-only:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -856,7 +856,7 @@ jobs:
           echo "maos-audit read-only guard passed."
 
   check-judge-config:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -870,7 +870,7 @@ jobs:
         run: cargo run -p xtask -- check-judge-config --json
 
   check-security-md:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -891,7 +891,7 @@ jobs:
     # arms of main.rs, so row persistence is tested via the one-shot path
     # (which generates cap-audit rows deterministicly), and the server
     # path is structurally validated for drain-block reachability.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -907,7 +907,7 @@ jobs:
         run: bash tests/integration/server_exit_drain.sh
 
   audit-spine-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -921,7 +921,7 @@ jobs:
         run: bash tests/integration/audit_spine_smoke.sh
 
   cap-token-verify-bench:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -935,7 +935,7 @@ jobs:
         run: cargo bench -p maos-kernel-core --bench cap_token_verify_p99 -- --test
 
   cap-registry-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -949,7 +949,7 @@ jobs:
         run: bash tests/integration/cap_registry_smoke.sh
 
   fr4-1000-call-fixture:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -968,7 +968,7 @@ jobs:
     # one-shot hello-Spirit binary, then asserts the FR4 NDJSON schema
     # via jq. Complementary to `fr4-1000-call-fixture` (kernel-side
     # mediation) — this gate exercises the read-side surface.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -989,7 +989,7 @@ jobs:
     # reference `hello-spirit` and asserts each side-effect mechanically
     # (FR58 JSON on run; one Lifecycle Journal NDJSON line per lifecycle
     # verb; exit 2 + zero journal mutation on unknown-spirit).
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1009,7 +1009,7 @@ jobs:
     # the fixture tree under `crates/maos-kernel-core/tests/fixtures/manifest/`
     # and asserts ≥3 cases per (section, field) tuple in the live
     # MANIFEST_FIELDS allowlist; orphan fixtures fail the build.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1026,7 +1026,7 @@ jobs:
     # Story 1b.5c AC4 — composite v0.1 release-tag gate. Runs the full
     # 1b.5a + 1b.5b + 1b.5c evaluator path in one sequential bash
     # script. Blocks the v0.1 release tag per the AC text.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1042,7 +1042,7 @@ jobs:
         run: bash tests/integration/v01_evaluator_path.sh
 
   hello-spirit-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1056,7 +1056,7 @@ jobs:
         run: cargo test -p maos-spirit-hello --locked
 
   hello-spirit-bench:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1070,7 +1070,7 @@ jobs:
         run: cargo bench -p maos-kernel-core --bench hello_spirit_p95 -- --test
 
   example-spirit-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1091,7 +1091,7 @@ jobs:
         run: cargo test -p maos-spirit-sdk --features local_runner --locked
 
   butler-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1110,7 +1110,7 @@ jobs:
         run: cargo test -p butler --locked
 
   researcher-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Story 18-3 AC3.2 / CR-5: 15 -> 30 for the kernel-core envelope tests below.
     timeout-minutes: 30
     steps:
@@ -1136,7 +1136,7 @@ jobs:
         run: cargo test --locked -p maos-kernel-core --test hook_dispatch_paused_time_18_3 --test hook_dispatch_budget_envelope
 
   researcher-bench:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -1150,7 +1150,7 @@ jobs:
         run: cargo bench -p maos-bench --bench section_13_1 -- --test
 
   observer-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -1174,7 +1174,7 @@ jobs:
 
   # Story 8.5 AC9 — Mira (Host A, prod-edge diagnostic) reference Spirit.
   mira-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -1196,7 +1196,7 @@ jobs:
 
   # Story 8.5 AC9 — Nash (Host B, dev-environment architect) reference Spirit.
   nash-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -1214,7 +1214,7 @@ jobs:
         run: cargo test -p nash --locked
 
   orchestrator-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -1235,7 +1235,7 @@ jobs:
         run: cargo test -p orchestrator --locked
 
   worker-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -1256,7 +1256,7 @@ jobs:
         run: cargo test -p worker --locked
 
   architect-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -1275,7 +1275,7 @@ jobs:
         run: cargo test -p architect --locked
 
   reviewer-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -1292,7 +1292,7 @@ jobs:
         run: cargo test -p reviewer --locked
 
   founder-loop-bench:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -1310,7 +1310,7 @@ jobs:
   # Story 8.5 AC3/AC6 — J4 (Mira-Nash) + J6 (Diego) correctness smoke.
   # Timing regression enforcement belongs to 20-7 / ADR-068.
   mira-nash-bench:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -1330,7 +1330,7 @@ jobs:
   # (each maos-eval test target has its own job). There is no single "maos-eval"
   # aggregate job to wire into.
   safety-critical-corpus-8-5:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1344,7 +1344,7 @@ jobs:
         run: cargo test -p maos-eval --test safety_critical_corpus_8_5 --locked
 
   example-spirit-drift:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1358,7 +1358,7 @@ jobs:
         run: cargo run -p xtask -- templates-regen --check --json
 
   example-spirit-ts-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [reproducible-build, check-workspace-count]
     steps:
@@ -1481,7 +1481,7 @@ jobs:
           exit "$rc"
 
   coverage-matrix-nfr-test-3:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [check-corpus]
     steps:
@@ -1507,7 +1507,7 @@ jobs:
   # authoring smoke. Job removed rather than parked `if: false` (no fake-green).
 
   spirit-test-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1521,7 +1521,7 @@ jobs:
         run: cargo test -p maos-spirit-sdk --features spirit_test --test spirit_test_smoke --locked
 
   lcas-corpus-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1535,7 +1535,7 @@ jobs:
         run: cargo test -p maos-spirit-sdk --features spirit_test --test lcas_smoke --locked
 
   isolation-framework-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1549,7 +1549,7 @@ jobs:
         run: cargo test -p maos-spirit-sdk --features spirit_test --test isolation_smoke --locked
 
   onb-nfr2-timing:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1563,7 +1563,7 @@ jobs:
         run: bash tests/integration/onb_nfr2_timing.sh
 
   coverage-matrix:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1577,7 +1577,7 @@ jobs:
         run: cargo run -p xtask -- coverage-matrix --json
 
   corpus-staleness:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1591,7 +1591,7 @@ jobs:
         run: cargo run -p xtask -- corpus-staleness --json
 
   calibrate-per-commit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1615,7 +1615,7 @@ jobs:
 
   # Story 4.4 — NFR-Aud-7 five-metric distillation gate
   nfr-aud-7-distillate-five-metrics-floor:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1660,7 +1660,7 @@ jobs:
 
   # Story 4.5 — NFR-Sec-14 cross-Spirit isolation 200-corpus gate
   nfr-sec-14-cross-spirit-isolation-200:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1674,7 +1674,7 @@ jobs:
         run: cargo test -p maos-kernel-core --test nfr_sec_14_cross_spirit_isolation -- --include-ignored
 
   nfr-rel-3-hsis-95pct:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1689,7 +1689,7 @@ jobs:
 
   # Story 5.3 — NFR-Rel-1 crash detection ≤2s
   nfr-rel-1-crash-detection-2s:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # ⚠ BOUNDED 2026-09-21 (Epic-16 retrospective). This job had NO
     # `timeout-minutes`, so it inherited GitHub's 6-HOUR default — and it has
     # been spending all six of them on every push since Epic 16:
@@ -1746,7 +1746,7 @@ jobs:
 
   # Story 5.3 — NFR-Rel-2 hung-Spirit detection ≤60s
   nfr-rel-2-hang-detection-60s:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1783,7 +1783,7 @@ jobs:
 
   # Story 5.3 — NFR-Rel-4 silent-failure detection
   nfr-rel-4-silent-failure-detection:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1798,7 +1798,7 @@ jobs:
 
   # Story 5.3 — NFR-Rel-10 cold-restart recovery
   nfr-rel-10-cold-restart:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1813,7 +1813,7 @@ jobs:
 
   # Story 5.3 — NFR-Rel-11 halt-receipt production rate ≥99.9%
   nfr-rel-11-halt-receipt-999pct:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
@@ -1914,7 +1914,7 @@ jobs:
 
   # Story 5.4 — NFR-Rel-9 revocation propagation ≤5s p99
   nfr-rel-9-revocation-5s-p99:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1931,7 +1931,7 @@ jobs:
 
   # Story 5.4 — upgrade policy corpus (AC1 + AC2 + AC3 + AC4)
   upgrade-policy-corpus:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1946,7 +1946,7 @@ jobs:
 
   # Story 5.4 — revocation corpus (AC5)
   revocation-corpus:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -1965,7 +1965,7 @@ jobs:
   # outcome is surfaced via the `test_result` job output so the aggregate comment can
   # show "advisory ⚠️" without flipping the overall workflow status to failure.
   determinism-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     # ADVISORY — owner: Winston; reason: DF6 determinism signal is not binding evidence pending NFR-Sec-4.
     outputs:
@@ -2054,7 +2054,7 @@ jobs:
 
   # Story 5.5a — T3 image signature verification corpus
   nfr-sec-1-t3-image-signature:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3096,7 +3096,7 @@ jobs:
 
   # Story 5.5b — multi-provider drift-check tool tests
   multi-provider-drift-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3121,7 +3121,7 @@ jobs:
 
   # Story 6.1 — retract corpus integration tests (AC2)
   retract-corpus-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -3139,7 +3139,7 @@ jobs:
   # (no .unwrap() / no Display-via-anyhow). The xtask exists at
   # `xtask/src/check_serde_error_handling.rs`; this job wires it into CI.
   check-serde-error-handling:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     # HARD-FAIL since Story 7.1.7 (baseline-reset). The 300 pre-existing sites are
     # FROZEN in xtask/serde-error-allowlist.toml; the gate now fails only on NEW
@@ -3160,7 +3160,7 @@ jobs:
   # budget bench. Establishes per-frame routing latency baseline that
   # NFR-Perf-8 (Story 6.2 AC3) reuses.
   nfr-perf-1-iac-routing-budget:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     continue-on-error: true  # ADVISORY — owner: Murat — retired by 20-7 (ADR-068); reason: (Story 8.16 §A5 triage 2026-06-12): perf bench, wall-clock-sensitive on shared GH runners — reports, does not gate. Hard NFR-Perf-1 verification is the maos-bench measurement track, not this CI smoke. Not masking a regression.
     steps:
@@ -3192,7 +3192,7 @@ jobs:
   # a non-empty set BEFORE timing anything — a valid-but-wrong kind would
   # otherwise time an empty scan and report it as a latency measurement.
   bench-audit-query-latency:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -3212,7 +3212,7 @@ jobs:
   # posture to nfr-perf-1/8; hard blocking-regression-vs-committed-baseline is
   # the v1.5 hardening. Catches silent decay below the absolute 10ms budget.
   nfr-perf-j4-latency:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     continue-on-error: true  # ADVISORY — owner: Murat — retired by 20-7 (ADR-068); reason: (review D3): perf bench, wall-clock-sensitive on shared GH runners — reports, does not gate. Mirrors nfr-perf-1/8. Not masking a regression.
     steps:
@@ -3230,7 +3230,7 @@ jobs:
   # load (15 s window). NOT NFR-Perf-8: that is the real-spawn bench
   # (`nfr_perf_8_real_spawn_fanout_20_7`, weekly 1 h on Tier W in perf.yml).
   nfr-perf-8-orchestrator-fanout:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     continue-on-error: true  # ADVISORY — owner: Murat — retired by 20-7 (ADR-068); reason: (Story 8.16 §A5 triage 2026-06-12; supersedes the stale "flip before Epic 6" note): NFR-Perf-8 fan-out bench is wall-clock-sensitive on shared GH runners — reports, does not gate. Hard verification is the maos-bench track. Not masking a regression.
     steps:
@@ -3249,7 +3249,7 @@ jobs:
   # the falsifiability artifact; the gate is HARD-FAIL (no calibration phase
   # for I13).
   nfr-aud-14-intent-lineage-corpus:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -3264,7 +3264,7 @@ jobs:
 
   # Story 6.2 AC7 — smoke-orchestrator-fanout-6-2 end-to-end demo arm.
   smoke-orchestrator-fanout-6-2:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -3283,7 +3283,7 @@ jobs:
 
   # Story 6.3 AC7 — smoke-a2a-loopback-6-3 A2A wedge demo.
   smoke-a2a-loopback-6-3:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -3303,7 +3303,7 @@ jobs:
   # Story 8.7 AC6 — smoke-a2a-consent-vocab-8-7 fine-grained typed-intent consent
   # demo (one fine-grained admit + one fine-grained code-mutation-directive deny).
   smoke-a2a-consent-vocab-8-7:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -3323,7 +3323,7 @@ jobs:
   # Story 8.8 AC4 — smoke-a2a-fail-closed-8-8: fail-closed cross-Host consent
   # demo (classified admit + absent-deny -32009 + non-canonical-deny -32009).
   smoke-a2a-fail-closed-8-8:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -3345,7 +3345,7 @@ jobs:
   # single flake fails the AC; this is the gate that stops this security story
   # becoming §A2-style CI-only-flake debt.
   a2a-tcp-tests-8-6:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -3371,7 +3371,7 @@ jobs:
   # Nash(host_b) advisory over a REAL TCP/mTLS socket (genuine handshake + wire,
   # NOT the in-process loopback shortcut).
   smoke-a2a-tcp-8-6:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -3390,7 +3390,7 @@ jobs:
 
   # Story 6.3 AC2 — FR23a + NFR-Sec-11/12 corpus + cross-Host AC3 + NFR-Rel-6 + chaos + churn
   a2a-loopback-corpus-v0:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -3410,7 +3410,7 @@ jobs:
         run: cargo test -p maos-a2a --test cert_rotation_chaos_3_host --locked
   # Story 6.3 Task 6 — verify Story 6.2's lineage corpus loads the 20 NEW A2A scenarios.
   intent-lineage-a2a-extension-6-3:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
@@ -3426,7 +3426,7 @@ jobs:
   # Story 6.4 AC5 — end-to-end wedge demo: ScheduleWatchdog firing + rate-limit cap +
   # ConsentRupture detection + RateLimited frame emission.
   smoke-schedule-6-4:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -3446,7 +3446,7 @@ jobs:
 
   # Story 6.4 AC2 — FR26 / ADR-025 schedule firing corpus (8 integration tests).
   fr26-schedule-firing-corpus:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
@@ -3461,7 +3461,7 @@ jobs:
 
   # Story 6.4 AC3 — ADR-034 binding-v0.9 ConsentRupture corpus (11 integration tests).
   adr-034-consent-rupture-corpus:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
@@ -3476,7 +3476,7 @@ jobs:
 
   # Story 6.4 AC4 — NFR-Scale-4 per-(provider, credential) bucket isolation (8 integration tests).
   nfr-scale-4-rate-limit-isolation:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
@@ -3492,7 +3492,7 @@ jobs:
   # Story 6.4 Task 6 — lineage corpus extends to 100 scenarios with three
   # new lineage classes (consent_rupture / rate_limited / on_schedule).
   intent-lineage-6-4-extension:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
@@ -3510,7 +3510,7 @@ jobs:
   # comparisons in `maos-manifest` production code. Story 7.5a's ABI
   # Stability Triple consumes these constants directly.
   check-manifest-schema-version:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3527,7 +3527,7 @@ jobs:
   # Verifies N-1 supported floor (v1 manifest loads on v2 kernel) and the
   # constant window invariants at runtime.
   manifest-n-minus-1-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
@@ -3544,7 +3544,7 @@ jobs:
 
   # §A2 FULL flip — split-flip closed in Story 7.1.6; hard-fail since 2026-06-01
   check-review-findings-resolved:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3559,7 +3559,7 @@ jobs:
 
   # §A2 FULL flip — split-flip closed in Story 7.1.6; hard-fail since 2026-06-01
   check-dev-record-completeness:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3593,7 +3593,7 @@ jobs:
   # (epic >= 12) stories must record an allowlisted dev model + a §A6 review
   # artifact. Makes the frontier-allowlist policy mechanical, not just cultural.
   check-dev-model-tier:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3620,7 +3620,7 @@ jobs:
   #     test not run by CI is not a control (AC5.5), so the gate's job is where they
   #     get invoked.
   check-j1-loopback-delegation:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3737,7 +3737,7 @@ jobs:
   # `-p maos-bin` is not enrolled here: it is red under default parallel flags (D16)
   # and this story adds no `maos-bin` test target.
   check-j1-two-host-signed-run:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3793,7 +3793,7 @@ jobs:
   # Story 16-0 — plus a pinned file set and a per-file content hash, so a kernel
   # edit that does not move the line count can no longer pass (drift D2).
   check-kernel-baseline:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3826,7 +3826,7 @@ jobs:
 
   # Epic-13 retro C1 + 20-3b: close-out sources agree and no workflow gate is parked.
   check-epic-close-coherence:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3848,7 +3848,7 @@ jobs:
   # so the JB-7 guards + j0/j1/j4/researcher/butler deterministic floors gate
   # every PR. The secret-gated live re-record stays nightly-only.
   journey-hermetic-tier-1:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -3889,7 +3889,7 @@ jobs:
           grep -q '10 tests run: 10 passed' skill-port-18-7.log
 
   smoke-discipline-7-1-5:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [check-review-findings-resolved, check-dev-record-completeness]
     steps:
@@ -3905,7 +3905,7 @@ jobs:
   # Story 7.2 AC6 — end-to-end v1.0 binding round-trip (publish → search →
   # install → yank → audit → import).
   smoke-registry-7-2:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3923,7 +3923,7 @@ jobs:
 
   # Story 7.2 AC4 — FR59 ≤5min yank-propagation latency gate.
   fr59-yank-propagation-5min:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3937,7 +3937,7 @@ jobs:
 
   # Story 7.2 AC3 — FR60 air-gap import bundle corpus.
   air-gap-import-corpus:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3957,7 +3957,7 @@ jobs:
   # per-class floor ≥27/30, 100/100 context-drift rejected, ±2% cross-validation
   # across 3 reference contexts. NON-continue-on-error: a regression hard-fails CI.
   ccac-n600-ship-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3971,7 +3971,7 @@ jobs:
 
   # Story 7.3 AC6 — Layer-1.5 observability: v1.0 admission-verification demo.
   smoke-compliance-7-3:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -3986,7 +3986,7 @@ jobs:
 
   # Story 18-7 — library-only skill smoke (4 deterministic JSON lines).
   smoke-skill-7-4:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4007,7 +4007,7 @@ jobs:
 
   # Story 7.4 AC6 — maos.skill.v1 schema posture gate
   check-skill-schema:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4022,7 +4022,7 @@ jobs:
 
   # Story 7.5a AC6 — ABI Stability Triple observability smoke (5 deterministic JSON lines)
   smoke-abi-7-5a:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4045,7 +4045,7 @@ jobs:
 
   # Story 7.5a AC3 — STABILITY.md generated-from-workspace; --check fails on drift (NFR-Maint-4)
   check-stability-matrix:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4060,7 +4060,7 @@ jobs:
 
   # Story 7.5a AC3 — BREAKING.md dated-entry + Migration taxonomy CI-grep-enforced (NFR-Maint-7)
   check-breaking-md:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4083,7 +4083,7 @@ jobs:
   # runs after the producers whatever they returned — a RED producer's ledger is
   # the one worth reading.
   check-ship-gate-completeness:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
       - check-cross-region-consensus
@@ -4125,7 +4125,7 @@ jobs:
   # artifacts; FAILs loudly on drift. Verdicts are provisional until Story 8.1's
   # canonical Butler corpus lands (the resolver auto-prefers it).
   nfr-onb-1-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4143,7 +4143,7 @@ jobs:
   # scores it, emits one outcome, evaluates N=1 → provisional. Wiring proof,
   # explicitly NOT the N=12 gate (the test asserts N=1 ∧ provisional).
   smoke-onb-1-7-5b:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4161,7 +4161,7 @@ jobs:
   # When summary.toml exists, parse and assert p0_open == 0 && p1_open == 0.
   # When absent, report ABSENT (not a pass), advisory at v1_5.
   check-pentest-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4176,7 +4176,7 @@ jobs:
 
   # Story 10.1b AC3 — Coverage matrix completeness: no v1.0 NFR has empty gates.
   check-coverage-matrix-completeness:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4193,7 +4193,7 @@ jobs:
   # Hash stored in the invariant-locked registry so any OWASP doc edit requires
   # a registry update, which is auditable and protected by review.
   check-owasp-freeze-hash:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4210,7 +4210,7 @@ jobs:
 
   # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
   check-third-party-trial:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     # Story 15-3 AC2(b): the ship-phase env block that stood here is retired.
     # A GitHub *repository variable* could move this one gate's ship phase with
@@ -4235,7 +4235,7 @@ jobs:
 
   # Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase, advisory-until-engagement).
   check-red-team-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4262,7 +4262,7 @@ jobs:
   # set. One CI run with a Postgres 16 service (job 117059607470, PR #9)
   # measured PROVEN_BLOCKING, partial=false; follow-up recorded in deferred-work.
   check-migration-merkle:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
@@ -4283,7 +4283,7 @@ jobs:
   # Story 10.3 AC-1 (NFR-Comp-1) — export-control classification gate.
   # ECCN doc present + STABILITY.md §Export non-stub + crypto enumeration.
   check-export-control:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4302,7 +4302,7 @@ jobs:
   # in a non-scanned crate" pattern — this is a dedicated baseline for a
   # crate abi-diff never touches).
   check-host-surface:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4324,7 +4324,7 @@ jobs:
   # trees exclude the Postgres/pgvector stack AND the WASM runtime stack
   # (wasmtime/wasmtime-wasi/wit-bindgen, ADR-031/ADR-041 isolation).
   check-dependency-closure:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4942,7 +4942,7 @@ jobs:
 
   # Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — fuzz-target existence gate (mechanics).
   check-fuzz-targets:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4959,7 +4959,7 @@ jobs:
   # The 24h T1/T2/T3 runs are operational (docs/runbooks/fuzz-cadence.md); this
   # gate only asserts the harnesses compile against libfuzzer-sys + nightly.
   fuzz-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -4981,7 +4981,7 @@ jobs:
   # KO_COVERAGE_MIN=100 turns the coverage promise into a mechanical gate;
   # glossary-lock enforces locked-term preservation across all ko files.
   check-ko-coverage:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -5003,7 +5003,7 @@ jobs:
 
   # Story 10.4b (NFR-Sec-13) — live bilateral A2A consent + binding_checked gate.
   check-live-bilateral-consent:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -5020,7 +5020,7 @@ jobs:
   # by 14-2 — the 30s/90s propagation floors are NFR-Sec-13's chaos scope, not
   # NFR-Rel-9's token-validation axis) — rotation real-timing gate.
   check-rotation-real-timing:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -5047,7 +5047,7 @@ jobs:
   # load-bearing falsifier is the mutation test step below. Graduation to
   # v1_5=blocking is a disposition flip in gate-registry.toml.
   check-j4-latency:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -5093,7 +5093,7 @@ jobs:
   # (assertion / binding AC / user-facing claim) appears while the J6 harness is
   # still CUT (not_measured). Blocking — a J6 latency claim requires the harness.
   check-ff-j6:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -5109,7 +5109,7 @@ jobs:
   # Story 10.4b — mobile push fires on Mira halt over the real MobilePushHttp
   # transport (operator-facing halt wire).
   check-mobile-push-on-halt:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -5233,7 +5233,7 @@ jobs:
 
   # Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
   check-skill-conformance:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -5262,7 +5262,7 @@ jobs:
   # standalone-workspace path the harness resolves; the anti-canned leg runs
   # with a ≥1-test guard; the fault-inject feature is excluded from release.
   check-wasm-form-equiv:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -5343,7 +5343,7 @@ jobs:
   # kernel-abi-diff. Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner);
   # blocking at v2.0 (absent/unmeasured → BLOCK).
   check-cross-region-consensus:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     # Story 13.6c — the consensus gate runs the WHOLE cross_region_live
     # binary (32 #[ignore] tests broadcast to 4 legs). It keys on the
@@ -5413,7 +5413,7 @@ jobs:
   # halt-presence, live-read-region-identity (+chokepoint), kernel-abi-diff.
   # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
   check-multi-region-slo:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     # Story 13.6c — the SLO gate filters to the three-region / roundtrip /
     # region-identity legs, all on the REGION axis (pg_conn_for, A/B/C). It
@@ -5482,7 +5482,7 @@ jobs:
   # Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate. ONE gate /
   # Story 12.1 — signed cohort manifest and real N=3/N=8 pairwise mesh.
   check-cohort-mesh:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -5502,7 +5502,7 @@ jobs:
   # one serialized Postgres 16 instance. 13.6a adds no new gate and no new
   # substrate: every one of its legs is hermetic (synthetic frames only).
   check-multi-tenant-loom:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
       postgres:
@@ -5580,7 +5580,7 @@ jobs:
   # Story 13.5d — Reza's mediated production collective route. Hermetic legs
   # bind at HEAD; the live route runs against two databases on Postgres 16.
   check-reza-production-path:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
       postgres:
@@ -5669,7 +5669,7 @@ jobs:
   # Structural (no Postgres): env-consistency (D-4 catcher) + service-block
   # drift. Blocks at every phase — a substrate-config drift is a config defect.
   check-loom-substrate-drift:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -5684,7 +5684,7 @@ jobs:
   # Story 13.4 (FR37 / ADR-056) — vetting-attestation gate. All 7 legs are
   # hermetic (in-process crypto + registry admission path); no live substrate.
   check-vetting-attestation:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -5701,7 +5701,7 @@ jobs:
   # rto, kernel-abi-diff — each reads its OWN `cargo test` oracle). Advisory
   # at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
   check-scale-churn:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -5731,7 +5731,7 @@ jobs:
   # fail-closed, ceiling-and-zero-config, kernel-abi-diff, release-graph-
   # absence). Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
   check-enterprise-pdp:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -5749,7 +5749,7 @@ jobs:
   # Per-leg OIDC/provenance/KMS/SIEM/fail-closed/release-guard oracle.
   # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
   check-enterprise-identity:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -5767,7 +5767,7 @@ jobs:
   # Story 11.5 (AC4/D7) — Frozen-Kernel Conformance Suite infrastructure gate.
   # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
   check-fkcs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -5797,7 +5797,7 @@ jobs:
   # Story 11.7 (AC4/D2) — v2.0 third-party trial attestation producer gate.
   # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
   check-trial-attestation:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -5833,7 +5833,7 @@ jobs:
   # leg builds the forbidden-syscall-probe fixture first (real seccomp SIGSYS
   # substrate). Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
   check-escape-detector:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -6053,7 +6053,7 @@ jobs:
   # regardless, because a diff the filter judged irrelevant can still change
   # what `release.yml` builds.
   macos-scope:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       applicable: ${{ steps.scope.outputs.applicable }}
@@ -6438,7 +6438,7 @@ jobs:
   # so a failure says "the door does not work" rather than being one red line
   # in a 45-minute workspace run.
   one-daemon-one-door:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -6479,7 +6479,7 @@ jobs:
   # the fix; the 16-1 job carries the same latent defect and it is reported
   # to the Epic-16 retrospective rather than inherited here.
   maosctl-load-over-the-door:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -6498,7 +6498,7 @@ jobs:
   # EXPECTED_GATES (16-1's enrolment precedent — the scene's steps also run
   # inside journey-hermetic-tier-1, already aggregated).
   j0-scene:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -6513,7 +6513,7 @@ jobs:
 
   # explicit result checks to prevent skip-propagation false positives.
   v1-0-ship-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
       - ccac-n600-ship-gate
@@ -6664,7 +6664,7 @@ jobs:
           exit 1
 
   aggregate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
       - reproducible-build
@@ -7089,7 +7089,7 @@ jobs:
   # v1.5 cutover is a disposition flip in gate-registry.toml, not an infrastructure
   # fire-drill. Promoted to the top-level aggregate needs once phase == v1.5.
   v1-5-ship-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
       - v1-0-ship-gate

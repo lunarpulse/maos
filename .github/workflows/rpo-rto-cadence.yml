@@ -37,7 +37,8 @@ concurrency:
 jobs:
   # T1 — RTO drill: cold-restore a synthetic TL, time it, verify integrity + RPO.
   rto-drill-t1:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
     # P15 — Postgres service container so the weekly drill exercises the
     # Postgres COLLECTIVE-tier restore path (drill_postgres in check_rto.rs),
     # which only runs when MAOS_TEST_POSTGRES is set. Without this the weekly
@@ -95,6 +96,7 @@ jobs:
   rto-ledger-collect:
     runs-on: ubuntu-24.04
     needs: rto-drill-t1
+    timeout-minutes: 20
     if: always()
     steps:
       # The source checkout supplies the collector; only operators create ledgers.
@@ -113,8 +115,9 @@ jobs:
   # RTO gate — reads the accumulated evidence and gates on the ≤ 4h threshold.
   # ABSENT evidence is not a pass; the gate decides its disposition.
   check-rto-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: rto-ledger-collect
+    timeout-minutes: 20
     if: always()
     steps:
       - uses: actions/checkout@v5

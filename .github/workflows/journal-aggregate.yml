@@ -46,7 +46,8 @@ permissions:
 
 jobs:
   journal-aggregate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v5
@@ -55,11 +56,13 @@ jobs:
         id: list
         env:
           GH_TOKEN: ${{ github.token }}
+          INPUT_MAX_ARTIFACTS: ${{ inputs.max-artifacts || '1000' }}
+          INPUT_SINCE_ISO_DATE: ${{ inputs.since-iso-date }}
         run: |
           # Fetch up to ${MAX} artifacts named journal-entry-*. Sort by
           # creation timestamp ascending (oldest first → SHA-merge order).
-          MAX="${{ inputs.max-artifacts || '1000' }}"
-          SINCE="${{ inputs.since-iso-date }}"
+          MAX="$INPUT_MAX_ARTIFACTS"
+          SINCE="$INPUT_SINCE_ISO_DATE"
 
           # GitHub CLI doesn't have a native artifact-list-by-name filter; we
           # use the REST API via gh api.

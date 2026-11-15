@@ -593,9 +593,9 @@ fn nightly_on_demand_violations(nightly: &Value) -> Vec<String> {
         .iter()
         .filter_map(|entry| str_of(entry, "cron"))
         .collect();
-    if crons != ["0 3 * * *"] {
+    if crons != ["30 4 * * *"] {
         found.push(format!(
-            "schedule crons must be exactly `0 3 * * *`: {crons:?}"
+            "schedule crons must be exactly `30 4 * * *`: {crons:?}"
         ));
     }
 
@@ -699,10 +699,10 @@ fn journey_nightly_paid_rerecord_is_on_demand_only() {
             "",
         ),
         ("      rerecord:\n        description: 'Paid live re-record (tier-2-rerecord); spends API tokens'\n        type: boolean\n        default: false\n", "      rerecord:\n        description: 'Paid live re-record (tier-2-rerecord); spends API tokens'\n        type: boolean\n        default: true\n"),
-        ("'0 3 * * *'", "'0 3 * * *'\n    - cron: '0 15 * * *'"),
+        ("'30 4 * * *'", "'30 4 * * *'\n    - cron: '0 15 * * *'"),
         (
-            "  j6-real-measurement:\n    runs-on: ubuntu-latest\n",
-            "  j6-real-measurement:\n    if: ${{ false }}\n    runs-on: ubuntu-latest\n",
+            "  j6-real-measurement:\n    runs-on: ubuntu-24.04\n",
+            "  j6-real-measurement:\n    if: ${{ false }}\n    runs-on: ubuntu-24.04\n",
         ),
     ] {
         let planted = text.replacen(from, to, 1);

@@ -2,7 +2,7 @@ name: journey-nightly
 
 on:
   schedule:
-    - cron: '0 3 * * *'
+    - cron: '30 4 * * *'
   # Manual dispatch carries the two paid-leg opt-ins. Both default to false and
   # `inputs.*` is empty on `schedule`, so the daily cron can never select them.
   workflow_dispatch:
@@ -18,12 +18,16 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  CARGO_NEXTEST_VERSION: "0.9.89"
   MAOS_SECRETS_BACKEND: env
+
+# Serialize nightly runs: a long manual re-record must not overlap the cron.
+concurrency:
+  group: journey-nightly
+  cancel-in-progress: false
 
 jobs:
   tier-2-journey:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -67,7 +71,8 @@ jobs:
   # trigger it is skipped and `tier-2-rerecord` (which `needs` it) is skipped.
   secret-gate:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.rerecord == true }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     outputs:
       has_anthropic_key: ${{ steps.probe.outputs.present }}
     steps:
@@ -84,9 +89,9 @@ jobs:
   # Tier-2: re-record cassettes against live APIs. ON-DEMAND ONLY (operator
   # ruling 2026-11-12): runs solely for `workflow_dispatch` with
   # `rerecord=true` AND the secret present; NEVER on `schedule`. The cron
-  # (`0 3 * * *`) keeps driving `tier-2-journey` and `j6-real-measurement` only.
+  # (`30 4 * * *`) keeps driving `tier-2-journey` and `j6-real-measurement` only.
   tier-2-rerecord:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [tier-2-journey, secret-gate]
     timeout-minutes: 30
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.rerecord == true && needs.secret-gate.outputs.has_anthropic_key == 'true' }}
@@ -187,9 +192,9 @@ jobs:
       #     commit-message: "chore: refresh journey cassettes"
 
   # J6 real cold-start measurement — migrated from discipline.yml (dead job-level
-  # schedule key). Runs on the workflow-level schedule (0 3 UTC daily).
+  # schedule key). Runs on the workflow-level schedule (04:30 UTC daily).
   j6-real-measurement:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -201,4 +206,4 @@ jobs:
           key: j6-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run J6 real cold-start measurement (kernel_measurement feature)
-        run: cargo bench -p maos-bench --bench section_13_1 --features kernel_measurement
+        run: cargo bench --locked -p maos-bench --bench section_13_1 --features kernel_measurement

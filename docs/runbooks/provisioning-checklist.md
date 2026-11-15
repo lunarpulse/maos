@@ -127,7 +127,7 @@ than inherited from planning prose.
   manual tests"): it is used ONLY by the on-demand `tier-2-rerecord` job of
   `journey-nightly.yml` — manual `workflow_dispatch` with `rerecord=true`;
   `include_researcher=true` additionally runs the Researcher five-metric +
-  Sonnet judge leg. The daily `0 3 * * *` cron still runs `tier-2-journey` and
+  Sonnet judge leg. The daily `30 4 * * *` cron still runs `tier-2-journey` and
   the hermetic cold-start measurement job but can no longer reach `tier-2-rerecord` (nor even the
   `secret-gate` probe); `xtask/tests/ci_shape_18_0.rs`
   `journey_nightly_paid_rerecord_is_on_demand_only` pins that shape. GA
