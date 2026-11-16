@@ -309,12 +309,22 @@ fn optional_plan_path(spirit_id: &str) -> Option<PathBuf> {
     })
 }
 
+/// One lock for EVERY unit-test module of this binary that rewrites
+/// `MAOS_HOME` (or the other `MAOS_*` homes). `tests/support/uninstall_review_20_11.rs`
+/// is compiled into these unit tests via `#[path]` under `all(test, feature = "network")`
+/// and rewrites the same variables from its own long (about 4.5 s) fixtures; two
+/// separate locks over one process-global environment raced on wide runners
+/// (32 threads: 8/8 red; hosted 2-core runners passed by scheduling luck — the
+/// 0.02 s migration tests finished first). Both sides must take THIS lock.
+#[cfg(test)]
+pub(crate) static MAOS_HOME_TEST_LOCK: std::sync::LazyLock<std::sync::Mutex<()>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(()));
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{LazyLock, Mutex};
 
-    static MAOS_HOME_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+    use super::MAOS_HOME_TEST_LOCK as MAOS_HOME_LOCK;
 
     struct RestoreMaosHome(Option<std::ffi::OsString>);
 
@@ -344,7 +354,9 @@ mod tests {
 
     #[test]
     fn plan_is_atomically_persisted_under_maos_home_and_round_trips() {
-        let _guard = MAOS_HOME_LOCK.lock().expect("MAOS_HOME lock");
+        let _guard = MAOS_HOME_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         let temporary_home = tempfile::tempdir().expect("temporary MAOS_HOME");
         let restore = RestoreMaosHome(std::env::var_os("MAOS_HOME"));
         std::env::set_var("MAOS_HOME", temporary_home.path());
@@ -380,7 +392,9 @@ mod tests {
     fn persisted_plan_file_drift_is_refused_after_a_candidate_mutates_on_disk() {
         use maos_cohort::CohortError;
 
-        let _guard = MAOS_HOME_LOCK.lock().expect("MAOS_HOME lock");
+        let _guard = MAOS_HOME_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         let temporary_home = tempfile::tempdir().expect("temporary MAOS_HOME");
         let restore = RestoreMaosHome(std::env::var_os("MAOS_HOME"));
         std::env::set_var("MAOS_HOME", temporary_home.path());

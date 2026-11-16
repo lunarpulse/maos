@@ -1016,6 +1016,12 @@ pub fn run_exact_test_leg(
     }
 
     let sink = sink_path(gate, spec.name);
+    // Progress stream (run 43775115719: the gate timed out at its 1500 s bound
+    // with nothing in the log, so the stalled leg could not be named). STDERR
+    // only — the `--json` stdout contract of every gate is unchanged — and the
+    // harness forwards stderr live (scripts/run_cgroup_ceiling_17_2.py).
+    eprintln!("LEG start {} [{}]", spec.name, gate);
+    let leg_started = std::time::Instant::now();
     let output = match Command::new("cargo")
         .args(spec.args)
         .envs(harness_env(gate, &binding, &sink))
@@ -1044,6 +1050,13 @@ pub fn run_exact_test_leg(
             );
         }
     };
+    eprintln!(
+        "LEG end {} [{}] {}s exit={}",
+        spec.name,
+        gate,
+        leg_started.elapsed().as_secs(),
+        output.status.code().unwrap_or(-1),
+    );
     let transcript = format!(
         "{}\n{}",
         String::from_utf8_lossy(&output.stdout),
