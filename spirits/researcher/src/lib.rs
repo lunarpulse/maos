@@ -584,9 +584,8 @@ const HEDGES_MARKER: &str = "{{hedges}}";
 /// recorded cassette's prompt hash is stable.
 pub fn synthesis_prompt(statement: &str, hedges: &[String]) -> String {
     let hedges_json = serde_json::to_string(hedges).unwrap_or_else(|_| "[]".to_string());
-    let missing = |marker: &str| {
-        panic!("prompt {SYNTHESIS_PROMPT_VERSION} has no `{marker}` marker")
-    };
+    let missing =
+        |marker: &str| panic!("prompt {SYNTHESIS_PROMPT_VERSION} has no `{marker}` marker");
     let (head, rest) = SYNTHESIS_PROMPT_TEMPLATE
         .split_once(STATEMENT_MARKER)
         .unwrap_or_else(|| missing(STATEMENT_MARKER));

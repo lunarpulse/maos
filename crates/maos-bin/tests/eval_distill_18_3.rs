@@ -211,7 +211,16 @@ fn record(
         .iter()
         .map(|e| {
             let text = e["response"]["text"].as_str().unwrap().to_owned();
-            (e["prompt_sha256"].as_str().unwrap().to_owned(), text)
+            // Story 28-3: the v1 prompt's schema is one JSON object
+            // `{"finding": string}`; the stub models a compliant model, so
+            // the recorded cassette replays with zero format errors.
+            // Idempotent: the committed cassette is already v1-shaped.
+            let finding = if text.starts_with("{\"finding\"") {
+                text
+            } else {
+                serde_json::json!({ "finding": text }).to_string()
+            };
+            (e["prompt_sha256"].as_str().unwrap().to_owned(), finding)
         })
         .collect();
     let recorded = dir.join("distill-corpus-v0.live.json");

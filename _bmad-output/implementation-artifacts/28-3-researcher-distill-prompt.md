@@ -72,9 +72,9 @@ Recall 1.0, faithfulness 1.0, traceability 1.0, secret leakage 0.0, **hedge pres
 7. **AC7 — promotion (D-28-3-05 A).** Cassette promoted; corpus frozen surveys and verdicts re-pinned; `tests/corpora/MANIFEST.toml:168` SHA updated; `deferred-work.md:1413`'s Researcher half closed with this key.
 
 - [x] T0 Rulings D-28-3-01…05 recorded (D-28-3-01 RULED B: not a GA precondition, so `RELEASE-HOLDS.md` GA-tag item 1 and the sprint-status GA comment do not change); 28-1 landed.
-- [~] T1 Prompt file v1 + JSON finding parse + train split + prompt pin test (AC3, AC4) — code written 2026-11-16 in branch `e28-3-2026-11-16`, NOT yet compiled or tested (implementer: orchestrator/GLM after the Anthropic coder quota died; see Dev Agent Record).
-- [ ] T2 Judge-only repeat mode and distill floors from the record (D-28-3-03, AC6); format-error count in the distill score.
-- [~] T3 Hermetic dry run on a hand-planted v1 cassette (controls still detected) — generator test written (`spirits/researcher/tests/prompt_28_3.rs::generate`, env-gated `MAOS_GEN_DISTILL_CASSETTE=1`), NOT yet run.
+- [x] T1 Prompt file v1 + JSON finding parse + train split + prompt pin test (AC3, AC4) — done 2026-11-16, commit `4e293036`, all researcher tests green.
+- [~] T2 Judge-only repeat mode and distill floors from the record (D-28-3-03, AC6); format-error count in the distill score — scorer half done (commit `beb63d2e`); judge-only repeat mode remains.
+- [x] T3 Hermetic dry run on a v1 cassette (controls still detected) — done: generators ran, all five controls detected in every hermetic run (`eval_distill_18_3` 6/6).
 - [ ] T4 Paid dispatch; archive; summarise (AC5).
 - [ ] T5 Calibrate, promote, re-pin, `distill_live_baseline_28_3.rs`, `eval_distill_18_3.rs` updates (AC1, AC2, AC6, AC7).
 - [ ] T6 Landing: `cargo fmt --all`; `check-kernel-baseline --json` (expect unchanged; if moved, `scripts/repin.py` + HISTORY row in the same commit); `kloc-check --json`; `RAISED` line if maos-bench breaches; prepush.
@@ -119,6 +119,20 @@ directly, per the session disclosure.
   `generate` runs; `five_metric_live_8_11.rs`, `distillation_i11.rs`, `inference_seam_8_11.rs` and
   `crates/maos-bin/tests/eval_distill_18_3.rs` not yet audited for old-prompt pins.
 
+
+2026-11-16 (commit `beb63d2e`, orchestrator/GLM): `distill_replay.rs` gained `FiveMetrics.format_errors`
+(floor 0 over SURVEY entries only — judge replies excluded), `is_finding_completion`, `DistillFloors`/
+`DistillFloorRecord::apply` (same rule as 28-1; `secret_leakage` stays the compiled zero-tolerance
+ceiling — a Wilson bound has no meaning against 0.0), `missed_floors_with`/`gate_failures_with`;
+`distill_eval.rs` reads `spirits/researcher/eval/floors.toml` when present (spec minimums otherwise;
+parse/apply failure is an error, never a silent fallback) and the line carries `floors`. Seed
+cassettes regenerated via the idempotent generators (distill-corpus-v0's completions are now
+v1-schema `{"finding": <old text>}` — frozen surveys byte-identical; forget-redistill-18-6 and
+skill-authoring-18-7 hash/len rewrites; `journey_forget_18_6.rs` pins updated; the eval_distill
+stub answers as a compliant v1 model). kloc maos-eval 4780 -> 4903 (RAISED line). Verified: 58
+binaries green across researcher/maos-eval/maos-bench/maos-journey-test; maos-bin eval_distill_18_3
+6/6; replay smoke exit 0 with format_errors 0 at spec floors. REMAINING in T2: the judge-only
+repeat mode needs a live router for the judge leg — belongs with the T4 nightly dispatch wiring.
 ### File List
 
 - `spirits/researcher/prompts/synthesis-v1.txt` (new)

@@ -42,10 +42,16 @@ pub fn jsonl(rel: &str) -> Vec<Value> {
 /// Train rows carrying a `scenario_id` (every row after the `_provenance`
 /// header).
 pub fn train_rows() -> Vec<Value> {
-    jsonl(TRAIN).into_iter().filter(|r| r["scenario_id"].is_string()).collect()
+    jsonl(TRAIN)
+        .into_iter()
+        .filter(|r| r["scenario_id"].is_string())
+        .collect()
 }
 
 /// The corpus test scenarios (rd01..rd16).
 pub fn test_rows() -> Vec<Value> {
-    jsonl(TEST).into_iter().filter(|r| r["scenario_id"].is_string()).collect()
+    jsonl(TEST)
+        .into_iter()
+        .filter(|r| r["scenario_id"].is_string())
+        .collect()
 }

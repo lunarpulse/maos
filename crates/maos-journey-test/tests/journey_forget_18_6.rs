@@ -21,10 +21,11 @@ const SEED_STATEMENTS: [&str; 3] = [
     "Self-consistency voting may improve factual recall, though gains appear limited to larger models.",
 ];
 const SEED_PROMPT_HASHES: [&str; 3] = [
-    "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-    "918e4919e4e227521296cb5c2239af44c75c0efac321c105a6e6664b193511a8",
-    "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+    "dd1d32b9c9cdb7d7451042c3a5652af12c1e8ce7ea9fff9b6b530f739de6cb28",
+    "20103b053f84bd8c03a505fa39ff4dfadd325c7569a4881bdb87d1765793eeab",
+    "fc5c451debf6b288aaafe27fc550121564ff42e76ca0659c8aa829233142d01d",
 ];
+const SEED_PROMPT_LENS: [usize; 3] = [2539, 2545, 2590];
 const SEED_SUMMARIES: [&str; 3] = [
     "Retrieval augmentation cuts hallucinated citations in literature surveys.",
     "Over a noisy corpus, retrieval augmentation does not cut hallucinated citations.",
@@ -373,9 +374,9 @@ fn seed_cassette_has_only_real_prompt_hashes() {
             5 => 0,
             _ => [0, 2][(i - 6) % 2],
         };
-        let prompt = format!("Summarize this research claim in one sentence for a digest. Preserve any hedges; add no facts.\n\nClaim: {}", SEED_STATEMENTS[claim]);
+        let prompt_len = SEED_PROMPT_LENS[claim];
         assert_eq!(entry["sequence"], i);
-        assert_eq!(entry["prompt_len"], prompt.len());
+        assert_eq!(entry["prompt_len"], prompt_len);
         assert_eq!(entry["prompt_sha256"], SEED_PROMPT_HASHES[claim]);
         assert_eq!(entry["response"]["text"], SEED_SUMMARIES[claim]);
     }

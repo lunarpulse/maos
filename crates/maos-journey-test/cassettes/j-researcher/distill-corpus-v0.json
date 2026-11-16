@@ -10,7 +10,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that retrieval grounding is likely to reduce citation errors in long surveys.",
+        "text": "{\"finding\":\"The source reports that retrieval grounding is likely to reduce citation errors in long surveys.\"}",
         "usage": {
           "input_tokens": 43,
           "output_tokens": 24
@@ -28,7 +28,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that grounded agents cite primary sources more often than ungrounded ones.",
+        "text": "{\"finding\":\"The source reports that grounded agents cite primary sources more often than ungrounded ones.\"}",
         "usage": {
           "input_tokens": 43,
           "output_tokens": 23
@@ -46,7 +46,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that parallel tool calls appear to cut end-to-end latency by roughly a third.",
+        "text": "{\"finding\":\"The source reports that parallel tool calls appear to cut end-to-end latency by roughly a third.\"}",
         "usage": {
           "input_tokens": 43,
           "output_tokens": 24
@@ -64,7 +64,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that serial tool calls remain simpler to audit.",
+        "text": "{\"finding\":\"The source reports that serial tool calls remain simpler to audit.\"}",
         "usage": {
           "input_tokens": 36,
           "output_tokens": 16
@@ -82,7 +82,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that longer context windows may improve recall of early instructions.",
+        "text": "{\"finding\":\"The source reports that longer context windows may improve recall of early instructions.\"}",
         "usage": {
           "input_tokens": 41,
           "output_tokens": 22
@@ -100,7 +100,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that position bias persists even at 128k tokens.",
+        "text": "{\"finding\":\"The source reports that position bias persists even at 128k tokens.\"}",
         "usage": {
           "input_tokens": 36,
           "output_tokens": 16
@@ -118,7 +118,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that preliminary evidence suggests chunked summaries offset position bias.",
+        "text": "{\"finding\":\"The source reports that preliminary evidence suggests chunked summaries offset position bias.\"}",
         "usage": {
           "input_tokens": 43,
           "output_tokens": 23
@@ -136,7 +136,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that self-critique loops probably help on arithmetic word problems.",
+        "text": "{\"finding\":\"The source reports that self-critique loops probably help on arithmetic word problems.\"}",
         "usage": {
           "input_tokens": 41,
           "output_tokens": 21
@@ -154,7 +154,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that self-critique adds a measurable cost per task.",
+        "text": "{\"finding\":\"The source reports that self-critique adds a measurable cost per task.\"}",
         "usage": {
           "input_tokens": 37,
           "output_tokens": 17
@@ -172,7 +172,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that ensembles of small judges seem to match a single large judge on agreement.",
+        "text": "{\"finding\":\"The source reports that ensembles of small judges seem to match a single large judge on agreement.\"}",
         "usage": {
           "input_tokens": 44,
           "output_tokens": 24
@@ -190,7 +190,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that judge ensembles reduce variance across reruns.",
+        "text": "{\"finding\":\"The source reports that judge ensembles reduce variance across reruns.\"}",
         "usage": {
           "input_tokens": 37,
           "output_tokens": 17
@@ -208,7 +208,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that distilled digests may lose rare but load-bearing caveats.",
+        "text": "{\"finding\":\"The source reports that distilled digests may lose rare but load-bearing caveats.\"}",
         "usage": {
           "input_tokens": 40,
           "output_tokens": 20
@@ -226,7 +226,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that hedge-aware prompts tend to keep caveats in digests.",
+        "text": "{\"finding\":\"The source reports that hedge-aware prompts tend to keep caveats in digests.\"}",
         "usage": {
           "input_tokens": 38,
           "output_tokens": 19
@@ -244,7 +244,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that citation-graph traversal likely surfaces seminal work missed by keyword search.",
+        "text": "{\"finding\":\"The source reports that citation-graph traversal likely surfaces seminal work missed by keyword search.\"}",
         "usage": {
           "input_tokens": 45,
           "output_tokens": 25
@@ -262,7 +262,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that keyword search still finds most recent preprints.",
+        "text": "{\"finding\":\"The source reports that keyword search still finds most recent preprints.\"}",
         "usage": {
           "input_tokens": 38,
           "output_tokens": 18
@@ -280,7 +280,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that repository search could shorten literature reviews for systems topics.",
+        "text": "{\"finding\":\"The source reports that repository search could shorten literature reviews for systems topics.\"}",
         "usage": {
           "input_tokens": 43,
           "output_tokens": 23
@@ -298,7 +298,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that rEADME claims are often unverified.",
+        "text": "{\"finding\":\"The source reports that rEADME claims are often unverified.\"}",
         "usage": {
           "input_tokens": 34,
           "output_tokens": 14
@@ -316,7 +316,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that benchmark scores may drift as providers update models silently.",
+        "text": "{\"finding\":\"The source reports that benchmark scores may drift as providers update models silently.\"}",
         "usage": {
           "input_tokens": 41,
           "output_tokens": 21
@@ -334,7 +334,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that pinned model versions make reruns comparable.",
+        "text": "{\"finding\":\"The source reports that pinned model versions make reruns comparable.\"}",
         "usage": {
           "input_tokens": 37,
           "output_tokens": 17
@@ -352,7 +352,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that annotator agreement is reportedly higher for hedge labels than for faithfulness labels.",
+        "text": "{\"finding\":\"The source reports that annotator agreement is reportedly higher for hedge labels than for faithfulness labels.\"}",
         "usage": {
           "input_tokens": 47,
           "output_tokens": 27
@@ -370,7 +370,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that two-annotator protocols catch most labelling slips.",
+        "text": "{\"finding\":\"The source reports that two-annotator protocols catch most labelling slips.\"}",
         "usage": {
           "input_tokens": 38,
           "output_tokens": 18
@@ -388,7 +388,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that redaction before persistence prevents most credential leaks in logs.",
+        "text": "{\"finding\":\"The source reports that redaction before persistence prevents most credential leaks in logs.\"}",
         "usage": {
           "input_tokens": 42,
           "output_tokens": 23
@@ -406,7 +406,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that token-shaped strings are the most common leaked secret class.",
+        "text": "{\"finding\":\"The source reports that token-shaped strings are the most common leaked secret class.\"}",
         "usage": {
           "input_tokens": 41,
           "output_tokens": 21
@@ -424,7 +424,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that contradictory strong studies should pause a survey for a human decision.",
+        "text": "{\"finding\":\"The source reports that contradictory strong studies should pause a survey for a human decision.\"}",
         "usage": {
           "input_tokens": 43,
           "output_tokens": 24
@@ -442,7 +442,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that weak contradicting studies can be noted as open questions.",
+        "text": "{\"finding\":\"The source reports that weak contradicting studies can be noted as open questions.\"}",
         "usage": {
           "input_tokens": 40,
           "output_tokens": 20
@@ -460,7 +460,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "Fine-tuning on surveys improves hedge recall.",
+        "text": "{\"finding\":\"Fine-tuning on surveys improves hedge recall.\"}",
         "usage": {
           "input_tokens": 40,
           "output_tokens": 11
@@ -478,7 +478,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "Hedge omission is the commonest digest defect.",
+        "text": "{\"finding\":\"Hedge omission is the commonest digest defect.\"}",
         "usage": {
           "input_tokens": 39,
           "output_tokens": 11
@@ -496,7 +496,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that agent surveys rarely cite retracted papers.",
+        "text": "{\"finding\":\"The source reports that agent surveys rarely cite retracted papers.\"}",
         "usage": {
           "input_tokens": 36,
           "output_tokens": 16
@@ -514,7 +514,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that retraction watch feeds are updated weekly.",
+        "text": "{\"finding\":\"The source reports that retraction watch feeds are updated weekly.\"}",
         "usage": {
           "input_tokens": 36,
           "output_tokens": 16
@@ -532,7 +532,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that provider keys belong in the secret store, not in prompts.",
+        "text": "{\"finding\":\"The source reports that provider keys belong in the secret store, not in prompts.\"}",
         "usage": {
           "input_tokens": 40,
           "output_tokens": 20
@@ -550,7 +550,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that leaked keys such as sk-ant-api03-59c8e3e277515a4ee1fbde7cb68810a4 are usually rotated within a day.",
+        "text": "{\"finding\":\"The source reports that leaked keys such as sk-ant-api03-59c8e3e277515a4ee1fbde7cb68810a4 are usually rotated within a day.\"}",
         "usage": {
           "input_tokens": 37,
           "output_tokens": 30
@@ -568,7 +568,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that snowball sampling widens literature coverage.",
+        "text": "{\"finding\":\"The source reports that snowball sampling widens literature coverage.\"}",
         "usage": {
           "input_tokens": 37,
           "output_tokens": 17
@@ -586,7 +586,7 @@
           "provider_id": "replay"
         },
         "stop_reason": "stop_sequence",
-        "text": "The source reports that snowball sampling may over-weight popular authors.",
+        "text": "{\"finding\":\"The source reports that snowball sampling may over-weight popular authors.\"}",
         "usage": {
           "input_tokens": 38,
           "output_tokens": 18

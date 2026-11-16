@@ -27,6 +27,7 @@ use maos_domain::invariants::i1::{IntentClass, Scope};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::ports::{InferencePort, LogRecallPort};
 use maos_eval::distill_replay::{self as scorer, DistillRow, FindingFacts, ScenarioFacts};
+use maos_eval::distill_replay::{DistillFloorRecord, DistillFloors};
 use maos_eval::halt_replay::check_consumed;
 use maos_eval::onboarding_gate_corpus::sha256_hex;
 use maos_kernel_core::capability::cap_tokens::init_monotonic_base;
@@ -344,12 +345,42 @@ pub fn evaluate(
         .map_err(|e| format!("verdicts sidecar {sidecar:?}: {e}"))?;
     }
     let judge_provenance = scorer::judge_provenance(&rows, live);
-    let score = scorer::score(&facts)?;
-    failures.extend(scorer::gate_failures(&score));
+    let floors = distill_floors()?;
+    let mut score = scorer::score(&facts)?;
+    // Story 28-3 (D-28-3-04 C): the run's own SURVEY completions decide the
+    // format-error count (the Spirit falls back to the deterministic summary,
+    // so the count is only visible here, from the cassette). Judge replies
+    // are one word by contract and never count.
     let (bytes, json) = match replayed {
         Some(read) => read,
         None => scorer::read_cassette(&cassette)?,
     };
+    let survey_hashes: std::collections::HashSet<String> = rows
+        .iter()
+        .flat_map(|row| {
+            row.claims
+                .iter()
+                .filter(|c| !row.withheld.contains(&c.claim_id))
+                .map(|c| {
+                    sha256_hex(researcher::synthesis_prompt(&c.statement, &c.hedges).as_bytes())
+                })
+        })
+        .collect();
+    score.metrics.format_errors = json["entries"]
+        .as_array()
+        .map(|entries| {
+            entries
+                .iter()
+                .filter(|e| {
+                    survey_hashes.contains(e["prompt_sha256"].as_str().unwrap_or(""))
+                        && !scorer::is_finding_completion(
+                            e["response"]["text"].as_str().unwrap_or(""),
+                        )
+                })
+                .count()
+        })
+        .unwrap_or_default();
+    failures.extend(scorer::gate_failures_with(&score, &floors));
     let line = serde_json::json!({
         "event": "eval_distill",
         "class": "researcher",
@@ -364,6 +395,7 @@ pub fn evaluate(
         "completions_consumed": calls,
         "judge_calls": judge_calls,
         "judge_tokens_minted": judge_tokens.len(),
+        "floors": floors,
         "score": score,
         "pass": failures.is_empty(),
         "missed_floors": &failures,
@@ -389,4 +421,21 @@ fn minter(capability: &Arc<CapabilityRegistryAdapter>) -> Mint {
             .issue_with_mediation(pid, scope, 60, [0; 32], IntentClass::Standard)
             .map_err(|e| format!("token issue failed: {e}"))
     })
+}
+
+/// Story 28-3 (AC6) — the Researcher's floors: its calibrated record
+/// `spirits/researcher/eval/floors.toml` when one exists, else the NFR-Aud-7
+/// spec minimums. A record that does not parse or does not apply is an
+/// error, never a silent fallback (same rule as Butler's, 28-1).
+fn distill_floors() -> Result<DistillFloors, String> {
+    let path = std::path::Path::new("spirits/researcher/eval/floors.toml");
+    let shown = |e: &dyn std::fmt::Display| format!("floor record {}: {e}", path.display());
+    match std::fs::read_to_string(path) {
+        Ok(text) => toml::from_str::<DistillFloorRecord>(&text)
+            .map_err(|e| shown(&e))?
+            .apply(DistillFloors::spec())
+            .map_err(|e| shown(&e)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(DistillFloors::spec()),
+        Err(e) => Err(shown(&e)),
+    }
 }

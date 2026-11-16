@@ -164,7 +164,10 @@ fn a_bound_pass_mints_once_names_its_provider_and_consumes_one_completion_per_cl
     for (req, claim) in seen.iter().zip(&claims) {
         assert_eq!(req.provider_id.as_deref(), Some("openai"));
         assert_eq!(req.spirit_pid, PID);
-        assert_eq!(req.prompt, synthesis_prompt(&claim.statement, &claim.hedges));
+        assert_eq!(
+            req.prompt,
+            synthesis_prompt(&claim.statement, &claim.hedges)
+        );
     }
     drop(seen);
     idle(&r);

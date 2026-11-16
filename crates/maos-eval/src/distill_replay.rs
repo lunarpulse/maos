@@ -372,6 +372,11 @@ pub struct FiveMetrics {
     pub hedge_preservation: f64,
     pub traceability: f64,
     pub secret_leakage: f64,
+    /// Story 28-3 (D-28-3-04 C): survey completions that were not the one
+    /// JSON object `{"finding": string}`. Counted from the cassette; the
+    /// floor is 0 (see `gate_failures_with`).
+    #[serde(default)]
+    pub format_errors: usize,
 }
 
 /// A negative control's outcome: `detected` iff its metric missed its floor.
@@ -440,6 +445,7 @@ pub fn metrics(scenarios: &[&ScenarioFacts]) -> Result<FiveMetrics, String> {
         } else {
             leaked as f64 / findings as f64
         },
+        format_errors: 0,
     })
 }
 
@@ -491,6 +497,138 @@ pub fn missed_floors(m: &FiveMetrics) -> Vec<String> {
         .collect()
 }
 
+/// Story 28-3 (D-28-3-04 C) — a survey completion that is not the one JSON
+/// object `{"finding": string}` (no code fence, no extra fields, `finding` a
+/// string). Counted from the replayed/recorded cassette; the floor is 0.
+pub fn is_finding_completion(text: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(text)
+        .ok()
+        .and_then(|value| {
+            value
+                .as_object()
+                .map(|object| object.len() == 1 && object["finding"].is_string())
+        })
+        .unwrap_or(false)
+}
+
+/// The distill floors of one run: the four NFR-Aud-7 lower-bound metrics.
+/// `secret_leakage` is a zero-tolerance CEILING, not a floor: it stays the
+/// compiled `SECRET_LEAKAGE_CEILING` and only an operator spec change can
+/// move it (a Wilson bound has no meaning against a 0.0 ceiling).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DistillFloors {
+    pub recall: f64,
+    pub faithfulness: f64,
+    pub hedge_preservation: f64,
+    pub traceability: f64,
+}
+
+impl Default for DistillFloors {
+    fn default() -> Self {
+        Self::spec()
+    }
+}
+
+impl DistillFloors {
+    /// The NFR-Aud-7 spec minimums (`prd/non-functional-requirements.md`).
+    pub fn spec() -> Self {
+        Self {
+            recall: RECALL_FLOOR,
+            faithfulness: FAITHFULNESS_FLOOR,
+            hedge_preservation: HEDGE_PRESERVATION_FLOOR,
+            traceability: TRACEABILITY_FLOOR,
+        }
+    }
+}
+
+/// Story 28-3 (AC6) — the Researcher's calibrated-floor record,
+/// `spirits/researcher/eval/floors.toml`, same shape and rule as Butler's
+/// (28-1 D-28-1-04 A): floor = the larger of the spec minimum, the compiled
+/// floor and the recorded Wilson lower bound rounded down to 0.01; a floor
+/// below that requires an `operator_ruling`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DistillFloorRecord {
+    pub schema: String,
+    pub floor: Vec<crate::halt_replay::FloorEntry>,
+}
+
+impl DistillFloorRecord {
+    /// `base` (the spec minimums) with this record's floors applied. Refused:
+    /// a wrong schema, an unknown or repeated metric, a floor outside [0, 1],
+    /// and, without an `operator_ruling`, a floor below the one its own
+    /// evidence requires.
+    pub fn apply(&self, base: DistillFloors) -> Result<DistillFloors, String> {
+        if self.schema != crate::halt_replay::FLOORS_SCHEMA {
+            return Err(format!("floor record schema is '{}'", self.schema));
+        }
+        let mut floors = base;
+        let mut seen = Vec::new();
+        for e in &self.floor {
+            let (slot, compiled) = match e.metric.as_str() {
+                "recall" => (&mut floors.recall, base.recall),
+                "faithfulness" => (&mut floors.faithfulness, base.faithfulness),
+                "hedge_preservation" => (&mut floors.hedge_preservation, base.hedge_preservation),
+                "traceability" => (&mut floors.traceability, base.traceability),
+                other => return Err(format!("floor record metric '{other}' is not a floor")),
+            };
+            if seen.contains(&e.metric) {
+                return Err(format!("floor record metric '{}' repeats", e.metric));
+            }
+            seen.push(e.metric.clone());
+            if !(0.0..=1.0).contains(&e.floor) {
+                return Err(format!(
+                    "floor record '{}': floor must be in [0, 1]",
+                    e.metric
+                ));
+            }
+            let [lo, _] = e.wilson95;
+            let required = compiled
+                .max(e.spec_minimum)
+                .max(crate::halt_replay::round_down_hundredth(lo));
+            if e.floor < required && e.operator_ruling.is_none() {
+                return Err(format!(
+                    "floor record '{}': floor {} is below the one its evidence requires \
+                     ({required}); an operator ruling is needed to go lower",
+                    e.metric, e.floor
+                ));
+            }
+            *slot = e.floor;
+        }
+        Ok(floors)
+    }
+}
+
+/// `missed_floors` against `floors` instead of the compiled spec minimums.
+pub fn missed_floors_with(m: &FiveMetrics, floors: &DistillFloors) -> Vec<String> {
+    let checks = [
+        ("recall", m.recall, floors.recall, m.recall >= floors.recall),
+        (
+            "faithfulness",
+            m.faithfulness,
+            floors.faithfulness,
+            m.faithfulness >= floors.faithfulness,
+        ),
+        (
+            "hedge_preservation",
+            m.hedge_preservation,
+            floors.hedge_preservation,
+            m.hedge_preservation >= floors.hedge_preservation,
+        ),
+        (
+            "traceability",
+            m.traceability,
+            floors.traceability,
+            m.traceability >= floors.traceability,
+        ),
+    ];
+    checks
+        .into_iter()
+        .filter(|(.., held)| !held)
+        .map(|(name, value, floor, _)| format!("{name} {value:.3} misses its floor {floor}"))
+        .collect()
+}
 /// Score the clean scenarios against the floors, every control row against
 /// the metric it plants, and the control rows' `false` verdicts against the
 /// faithfulness floor (the fifth control). Control rows never enter a floor.
@@ -539,6 +677,25 @@ pub fn score(scenarios: &[ScenarioFacts]) -> Result<DistillScore, String> {
 /// Everything that fails the gate: a missed floor or an undetected control.
 pub fn gate_failures(score: &DistillScore) -> Vec<String> {
     let mut failures = missed_floors(&score.metrics);
+    failures.extend(score.controls.iter().filter(|c| !c.detected).map(|c| {
+        format!(
+            "negative control {} ({:?}) not detected",
+            c.scenario_id, c.control
+        )
+    }));
+    failures
+}
+
+/// `gate_failures` against `floors`; the format-error floor is absolute 0
+/// (D-28-3-04 C: a malformed completion is a format error, never "faithful").
+pub fn gate_failures_with(score: &DistillScore, floors: &DistillFloors) -> Vec<String> {
+    let mut failures = missed_floors_with(&score.metrics, floors);
+    if score.metrics.format_errors > 0 {
+        failures.push(format!(
+            "format_errors {} above floor 0",
+            score.metrics.format_errors
+        ));
+    }
     failures.extend(score.controls.iter().filter(|c| !c.detected).map(|c| {
         format!(
             "negative control {} ({:?}) not detected",
