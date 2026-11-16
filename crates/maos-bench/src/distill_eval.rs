@@ -48,15 +48,20 @@ use crate::halt_eval::{required, Completions, Counted, World, EVAL_PID};
 /// The committed seed cassette `evaluate`'s `committed` driver replays.
 pub use maos_eval::distill_replay::CASSETTE as COMMITTED_CASSETTE;
 
-const USAGE: &str = "usage: maos eval distill --class researcher [--cassette <path>]";
+const USAGE: &str = "usage: maos eval distill --class researcher [--cassette <path>] \
+                     [--judge-repeat <k>]";
 const INTENT: &str = "researcher:corpus_claim";
 
 /// A parsed `maos eval distill` invocation.
 #[derive(Debug)]
 pub struct DistillRequest {
-    cassette: Option<PathBuf>,
+    pub cassette: Option<PathBuf>,
     /// `MAOS_INFERENCE_MODE=record` (D-18-3-07 A).
     pub record: bool,
+    /// Story 28-3 (D-28-3-03 A): judge-only repeat count. `Some(k)` replays
+    /// the recorded survey of `cassette` and asks the live judge k times per
+    /// finding, reporting per-finding agreement and faithfulness mean/min.
+    pub judge_repeat: Option<usize>,
 }
 
 /// Parse `distill --class researcher [--cassette <p>]`; a replay without
@@ -66,15 +71,36 @@ pub fn parse_args(
     mode: Option<&str>,
     env_cassette: Option<PathBuf>,
 ) -> Result<DistillRequest, String> {
+    parse_args_with_repeat(argv, mode, env_cassette, None)
+}
+
+/// Parse with the Story 28-3 judge-only repeat flag (D-28-3-03 A):
+/// `--judge-repeat <k>` replays ONE recorded survey (a `--cassette`
+/// `live-record`) and asks the live judge k times per finding. It needs a
+/// live router, so it is record-mode-only; it needs the recorded cassette,
+/// so the record/`--cassette` refusal is lifted for it alone.
+pub fn parse_args_with_repeat(
+    argv: &[String],
+    mode: Option<&str>,
+    env_cassette: Option<PathBuf>,
+    default_repeat: Option<usize>,
+) -> Result<DistillRequest, String> {
     let mut args = argv.iter().map(String::as_str);
     if args.next() != Some("distill") {
         return Err(USAGE.into());
     }
-    let (mut class, mut cassette) = (None, None);
+    let (mut class, mut cassette, mut judge_repeat) = (None, None, default_repeat);
     while let Some(flag) = args.next() {
         match (flag, args.next()) {
             ("--class", Some(value)) => class = Some(value),
             ("--cassette", Some(value)) => cassette = Some(PathBuf::from(value)),
+            ("--judge-repeat", Some(value)) => {
+                judge_repeat = Some(
+                    value
+                        .parse::<usize>()
+                        .map_err(|_| format!("--judge-repeat wants a count: {value}"))?,
+                );
+            }
             _ => return Err(USAGE.into()),
         }
     }
@@ -83,16 +109,31 @@ pub fn parse_args(
             "the distillation-shipping class is researcher — {USAGE}"
         ));
     }
+    let judge_repeat = judge_repeat.filter(|k| *k > 0);
+    if judge_repeat.is_some() && cassette.is_none() {
+        return Err(format!(
+            "--judge-repeat replays a recorded survey — pass the live-record --cassette ({USAGE})"
+        ));
+    }
     let record = match mode {
         None | Some("replay") => false,
         Some("record") => true,
         Some(other) => return Err(format!("MAOS_INFERENCE_MODE={other} is not an eval mode")),
     };
-    if record && cassette.is_some() {
+    if judge_repeat.is_some() && !record {
+        return Err(format!(
+            "--judge-repeat asks the LIVE judge — set MAOS_INFERENCE_MODE=record ({USAGE})"
+        ));
+    }
+    if record && cassette.is_some() && judge_repeat.is_none() {
         return Err("record writes MAOS_REPLAY_CASSETTE; --cassette is replay-only".into());
     }
-    let cassette = cassette.or(env_cassette.filter(|_| !record));
-    Ok(DistillRequest { cassette, record })
+    let cassette = cassette.or_else(|| env_cassette.filter(|_| !record || judge_repeat.is_some()));
+    Ok(DistillRequest {
+        cassette,
+        record,
+        judge_repeat,
+    })
 }
 
 impl DistillRequest {
@@ -100,8 +141,25 @@ impl DistillRequest {
     /// else the committed one.
     pub fn replay_cassette(&self) -> Option<PathBuf> {
         let committed = || PathBuf::from(scorer::CASSETTE);
-        (!self.record).then(|| self.cassette.clone().unwrap_or_else(committed))
+        (!self.record)
+            .then(|| self.cassette.clone().unwrap_or_else(committed))
+            .or_else(|| {
+                self.judge_repeat
+                    .map(|_| self.cassette.clone().unwrap_or_else(committed))
+            })
     }
+}
+
+/// Story 28-3 (D-28-3-03 A) — one judge-only repeat run: `k` live judge
+/// calls per finding over the survey of a recorded `live-record` cassette.
+#[derive(Clone)]
+pub struct JudgeRepeat {
+    pub k: usize,
+    /// The replay driver over the recorded `live-record` cassette: the
+    /// survey replays through it (zero survey cost; only the judge is live).
+    pub survey: Arc<dyn maos_providers::Provider>,
+    /// The cassette's path, for provenance in the line.
+    pub survey_cassette: std::path::PathBuf,
 }
 
 /// The stdout line and every gate failure (empty = exit 0).
@@ -118,6 +176,15 @@ pub struct DistillRun {
 pub fn evaluate(
     completions: Completions,
     committed: Arc<dyn maos_providers::Provider>,
+) -> Result<DistillRun, String> {
+    evaluate_with_repeat(completions, committed, None)
+}
+
+/// `evaluate` with the judge-only repeat of D-28-3-03 A.
+pub fn evaluate_with_repeat(
+    completions: Completions,
+    committed: Arc<dyn maos_providers::Provider>,
+    judge_repeat: Option<JudgeRepeat>,
 ) -> Result<DistillRun, String> {
     init_monotonic_base();
     let text = std::fs::read_to_string(scorer::CORPUS)
@@ -162,9 +229,17 @@ pub fn evaluate(
         } => (router, cassette, Some(flush)),
     };
     let record = flush.is_some();
-    let replayed = (!record)
-        .then(|| scorer::read_cassette(&cassette))
-        .transpose()?;
+    if judge_repeat.is_some() && !record {
+        return Err("--judge-repeat needs the record mode's live router".into());
+    }
+    let survey_replay_router = judge_repeat
+        .as_ref()
+        .map(|repeat| route(Arc::clone(&repeat.survey)));
+    let replayed = match &judge_repeat {
+        Some(repeat) => Some(scorer::read_cassette(&repeat.survey_cassette)?),
+        None if !record => Some(scorer::read_cassette(&cassette)?),
+        None => None,
+    };
     let live = replayed
         .as_ref()
         .map_or(Ok(true), |(_, json)| scorer::live_layout(json))?;
@@ -292,13 +367,17 @@ pub fn evaluate(
     // Story 18-4 (BH-3, `deferred-work.md:1253`): the distinct tokens the
     // judge was asked with, against the judge calls made.
     let mut judge_tokens = std::collections::HashSet::new();
+    let mut judge_repeat_total = 0usize;
+    // Story 28-3 (D-28-3-03 A): per-finding judge agreement over the repeats.
+    let mut judge_repeat_stats = serde_json::Map::new();
     let mut ask = || -> Result<(), String> {
         let live_rows = rows
             .iter()
             .enumerate()
             .filter(|(_, row)| scorer::served_live(*row));
         for (s, _) in live_rows.clone() {
-            let (fact, failed, n) = survey(s, &router, false)?;
+            let router = survey_replay_router.as_ref().unwrap_or(&router);
+            let (fact, failed, n) = survey(s, router, false)?;
             calls += n;
             failures.extend(failed);
             facts.insert(s, fact);
@@ -309,14 +388,41 @@ pub fn evaluate(
             for f in &facts[&s].findings {
                 let source = row.claims.iter().find(|c| c.claim_id == f.claim_id);
                 let pair = (source.map_or("", |c| c.statement.as_str()), &*f.statement);
-                let token = mint(EVAL_PID, &provider)?;
-                // Story 18-4 (BH-3 witness): one token per judge call, counted.
-                judge_tokens.insert(token.token_id.0);
-                let req = scorer::judge_request(EVAL_PID, token, pair, &provider, &model);
-                let response = judge.complete(req).map_err(|e| format!("judge: {e}"))?;
-                let (scenario, claim) = (row.scenario_id.clone(), f.claim_id.clone());
-                replies.push(scorer::JudgeReply(scenario, claim, response));
-                calls += 1;
+                let repeats = judge_repeat.as_ref().map_or(1, |repeat| repeat.k);
+                let mut first: Option<bool> = None;
+                let mut agree = 0usize;
+                let mut faithful = 0usize;
+
+                for _ in 0..repeats {
+                    let token = mint(EVAL_PID, &provider)?;
+                    // Story 18-4 (BH-3 witness): one token per judge call.
+                    judge_tokens.insert(token.token_id.0);
+                    let req = scorer::judge_request(EVAL_PID, token, pair, &provider, &model);
+                    let response = judge.complete(req).map_err(|e| format!("judge: {e}"))?;
+                    calls += 1;
+                    judge_repeat_total += 1;
+                    let verdict = scorer::judge_verdict(&response.text)?;
+                    faithful += usize::from(verdict);
+                    if first.is_none() {
+                        first = Some(verdict);
+                        let (scenario, claim) = (row.scenario_id.clone(), f.claim_id.clone());
+                        replies.push(scorer::JudgeReply(scenario, claim, response.clone()));
+                    }
+                    if first == Some(verdict) {
+                        agree += 1;
+                    }
+                }
+
+                if let Some(repeat) = &judge_repeat {
+                    judge_repeat_stats.insert(
+                        f.claim_id.clone(),
+                        serde_json::json!({
+                            "k": repeat.k,
+                            "agree_with_first": agree,
+                            "faithful": faithful,
+                        }),
+                    );
+                }
             }
         }
         Ok(())
@@ -333,8 +439,21 @@ pub fn evaluate(
         scorer::fully_consumed(&json, committed_calls).map_err(|e| format!("committed {e}"))?;
     }
     if let Some((_, json)) = &replayed {
-        let served = if live { calls - committed_calls } else { calls };
-        scorer::fully_consumed(json, served).map_err(|e| format!("{cassette:?}: {e}"))?;
+        if let Some(repeat) = &judge_repeat {
+            // Judge-repeat consumes the survey cassette's SURVEY entries only
+            // (its recorded judge replies are re-judged live, never replayed).
+            let surveys = calls - committed_calls - judge_repeat_total;
+            let entries = json["entries"].as_array().map(Vec::len).unwrap_or(0);
+            if entries < surveys {
+                return Err(format!(
+                    "{}: {entries} entries cannot serve {surveys} survey completions",
+                    repeat.survey_cassette.display()
+                ));
+            }
+        } else {
+            let served = if live { calls - committed_calls } else { calls };
+            scorer::fully_consumed(json, served).map_err(|e| format!("{cassette:?}: {e}"))?;
+        }
     }
     if record {
         let sidecar = scorer::verdicts_sidecar(&cassette);
@@ -396,6 +515,30 @@ pub fn evaluate(
         "judge_calls": judge_calls,
         "judge_tokens_minted": judge_tokens.len(),
         "floors": floors,
+        "judge_repeat": judge_repeat.as_ref().map(|repeat| {
+            let findings = judge_repeat_stats.iter().collect::<Vec<_>>();
+            let total: usize = findings
+                .iter()
+                .map(|(_, v)| v["faithful"].as_u64().unwrap_or(0) as usize)
+                .sum();
+            let per: usize = findings
+                .iter()
+                .map(|(_, v)| v["k"].as_u64().unwrap_or(0) as usize)
+                .sum();
+            let min = findings
+                .iter()
+                .map(|(_, v)| v["faithful"].as_u64().unwrap_or(0) as usize)
+                .min()
+                .unwrap_or(0);
+            serde_json::json!({
+                "k": repeat.k,
+                "survey_cassette": repeat.survey_cassette.display().to_string(),
+                "judge_calls": judge_repeat_total,
+                "findings": serde_json::Value::Object(judge_repeat_stats.clone()),
+                "faithfulness_mean": if per == 0 { 0.0 } else { total as f64 / per as f64 },
+                "faithfulness_min": if repeat.k == 0 { 0.0 } else { min as f64 / repeat.k as f64 },
+            })
+        }),
         "score": score,
         "pass": failures.is_empty(),
         "missed_floors": &failures,

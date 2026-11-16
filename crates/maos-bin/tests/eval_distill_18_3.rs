@@ -437,3 +437,192 @@ fn record_refuses_a_judge_reply_attributed_to_another_model_after_flushing() {
         .join("distill-corpus-v0.live.verdicts.json")
         .exists());
 }
+
+/// A judge whose verdict flips every call: faithful, unfaithful, faithful, …
+/// Keyed on a process-wide call counter, so the same prompt is answered
+/// differently across the k repeats of D-28-3-03 A.
+struct FlippingJudge {
+    surveys: Vec<(String, String)>,
+    calls: std::sync::atomic::AtomicUsize,
+}
+
+impl maos_providers::Provider for FlippingJudge {
+    fn complete(
+        &self,
+        req: &InferenceRequest,
+    ) -> Result<InferenceResponse, maos_providers::provider::ProviderError> {
+        let hash = format!("{:x}", Sha256::digest(req.prompt.as_bytes()));
+        let text = match self.surveys.iter().find(|(h, _)| *h == hash) {
+            Some((_, text)) => text.clone(),
+            None if req.prompt.starts_with(JUDGE_PROMPT) => {
+                let n = self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                if n % 2 == 0 {
+                    "faithful"
+                } else {
+                    "**unfaithful**"
+                }
+                .to_owned()
+            }
+            None => panic!("an unseeded prompt: {}", req.prompt),
+        };
+        Ok(InferenceResponse {
+            text,
+            stop_reason: StopReason::StopSequence,
+            usage: TokenUsage {
+                input_tokens: 1,
+                output_tokens: 1,
+            },
+            provider_attribution: ProviderAttribution {
+                provider_id: "anthropic".into(),
+                endpoint_url: "stub://local".into(),
+                model_id: Some(PINNED.to_owned()),
+            },
+        })
+    }
+
+    fn credential_fingerprint(&self) -> u64 {
+        0
+    }
+}
+
+/// Story 28-3 (D-28-3-03 A) — the judge-only repeat: the recorded survey
+/// replays (zero survey calls through the live router), the live judge runs
+/// k times per finding, and the line reports per-finding agreement with the
+/// first verdict plus the faithfulness mean/min. A flipping judge pins both
+/// arms of the agreement count.
+#[test]
+fn a_judge_only_repeat_replays_the_survey_and_reports_per_finding_agreement() {
+    use maos_bench::distill_eval::{evaluate_with_repeat, JudgeRepeat};
+
+    // The parser refuses the repeat without the record mode or a cassette.
+    for (argv, mode) in [
+        (
+            vec![
+                "distill".to_owned(),
+                "--class".to_owned(),
+                "researcher".to_owned(),
+                "--cassette".to_owned(),
+                "x.json".to_owned(),
+                "--judge-repeat".to_owned(),
+                "3".to_owned(),
+            ],
+            Some("replay"),
+        ),
+        (
+            vec![
+                "distill".to_owned(),
+                "--class".to_owned(),
+                "researcher".to_owned(),
+                "--judge-repeat".to_owned(),
+                "3".to_owned(),
+            ],
+            Some("record"),
+        ),
+    ] {
+        assert!(
+            maos_bench::distill_eval::parse_args_with_repeat(&argv, mode, None, None).is_err(),
+            "refused: {argv:?} under {mode:?}"
+        );
+    }
+    let ok = maos_bench::distill_eval::parse_args_with_repeat(
+        &[
+            "distill".to_owned(),
+            "--class".to_owned(),
+            "researcher".to_owned(),
+            "--cassette".to_owned(),
+            "recorded.json".to_owned(),
+            "--judge-repeat".to_owned(),
+            "3".to_owned(),
+        ],
+        Some("record"),
+        None,
+        None,
+    )
+    .expect("record + cassette + judge-repeat parses");
+    assert_eq!((ok.judge_repeat, ok.record), (Some(3), true));
+
+    // One recorded live run supplies the survey cassette.
+    let home = tempfile::tempdir().unwrap();
+    let (_, recorded) = record(home.path(), faithful, None);
+    let answers = committed()["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| {
+            let text = e["response"]["text"].as_str().unwrap().to_owned();
+            let finding = if text.starts_with("{\"finding\"") {
+                text
+            } else {
+                serde_json::json!({ "finding": text }).to_string()
+            };
+            (e["prompt_sha256"].as_str().unwrap().to_owned(), finding)
+        })
+        .collect();
+    let repeat_target = home.path().join("judge-repeat.json");
+    let recorder = Arc::new(CassetteRecorder::new(
+        repeat_target.clone(),
+        "maos".into(),
+        "eval-distill-judge-repeat".into(),
+    ));
+    let stub = Arc::new(FlippingJudge {
+        surveys: answers,
+        calls: std::sync::atomic::AtomicUsize::new(0),
+    });
+    let driver = CassetteRecordProvider::new(stub, recorder.clone());
+    let drivers = [("anthropic".to_owned(), Arc::new(driver) as Arc<_>)].into();
+    let router = Arc::new(MultiProviderRouter::new(drivers, Some("anthropic".into())));
+    let survey = Arc::new(CassetteReplayProvider::from_file(&recorded, true).unwrap());
+    std::env::set_current_dir(root()).unwrap();
+    let run = evaluate_with_repeat(
+        Completions::Record {
+            router,
+            cassette: repeat_target.clone(),
+            flush: Box::new(move || recorder.flush().map(drop)),
+        },
+        Arc::new(CassetteReplayProvider::from_file(&root().join(CASSETTE), true).unwrap()),
+        Some(JudgeRepeat {
+            k: 3,
+            survey,
+            survey_cassette: recorded.clone(),
+        }),
+    )
+    .expect("the judge-repeat run scores");
+    let line: Value = serde_json::from_str(&run.line).unwrap();
+    let repeat = &line["judge_repeat"];
+    assert_eq!(repeat["k"], 3);
+    assert_eq!(repeat["survey_cassette"], recorded.display().to_string());
+    let findings = repeat["findings"].as_object().unwrap();
+    assert!(!findings.is_empty(), "one row per live finding");
+    // The flipping judge: verdicts alternate per call, so over k = 3 the
+    // first verdict repeats 2 of 3 times and faithfulness is 2 of 3 or 1 of 3
+    // depending on the finding's first call parity.
+    for (claim, row) in findings {
+        let (agree, faithful) = (
+            row["agree_with_first"].as_u64().unwrap(),
+            row["faithful"].as_u64().unwrap(),
+        );
+        assert_eq!(row["k"], 3, "{claim}");
+        assert!(
+            agree == 2 && (faithful == 2 || faithful == 1),
+            "{claim}: agree {agree}, faithful {faithful}"
+        );
+    }
+    let mean = repeat["faithfulness_mean"].as_f64().unwrap();
+    assert!(
+        (0.49..=0.52).contains(&mean),
+        "the flipping judge is faithful about half the calls: {mean}"
+    );
+    let judge_calls = repeat["judge_calls"].as_u64().unwrap() as usize;
+    assert_eq!(judge_calls, findings.len() * 3, "k per finding");
+    // The applied verdicts are the FIRST repeat's (one reply per finding);
+    // the surveys replayed from the recorded cassette, so the run consumed
+    // the surveys plus k judge calls per finding.
+    assert_eq!(
+        line["judge_calls"].as_u64().unwrap() as usize,
+        findings.len()
+    );
+    assert!(
+        line["completions_consumed"].as_u64().unwrap() as usize > judge_calls,
+        "surveys plus k-per-finding judge calls were consumed"
+    );
+}

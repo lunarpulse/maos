@@ -779,6 +779,18 @@ fn run_distill(
     replay: Option<std::path::PathBuf>,
     recorded: Option<maos_bench::halt_eval::Completions>,
 ) -> i32 {
+    run_distill_repeat(replay, recorded, None)
+}
+
+/// `run_distill` with the Story 28-3 judge-only repeat (D-28-3-03 A): the
+/// recorded survey replays from the given `live-record` cassette, the judge
+/// leg runs live through the record router k times per finding.
+#[cfg(feature = "network")]
+fn run_distill_repeat(
+    replay: Option<std::path::PathBuf>,
+    recorded: Option<maos_bench::halt_eval::Completions>,
+    judge_repeat: Option<maos_bench::distill_eval::JudgeRepeat>,
+) -> i32 {
     let completions = match (recorded, replay) {
         (Some(recorded), _) => recorded,
         (None, Some(cassette)) => {
@@ -799,7 +811,7 @@ fn run_distill(
         Ok(driver) => Arc::new(driver),
         Err(error) => return eval_failed(error),
     };
-    match maos_bench::distill_eval::evaluate(completions, committed) {
+    match maos_bench::distill_eval::evaluate_with_repeat(completions, committed, judge_repeat) {
         Err(error) => eval_failed(error),
         Ok(run) => {
             println!("{}", run.line);
@@ -1790,7 +1802,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     let mut shell_mode = false;
     let mut plain_flag = false;
-    let (mut eval_record, mut distill_record) = (None, false);
+    let (mut eval_record, mut distill_record, mut distill_judge_repeat) = (None, false, None);
     let verb_args = if std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("registry-server")
         && argv
             .first()
@@ -1920,7 +1932,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             eprintln!("maos eval: {usage}");
                             std::process::exit(2);
                         }
-                        Ok(req) if req.record => distill_record = true,
+                        Ok(req) if req.record => {
+                            distill_record = true;
+                            distill_judge_repeat =
+                                req.judge_repeat.map(|k| (k, req.cassette.clone()));
+                        }
                         Ok(req) => std::process::exit(run_distill(req.replay_cassette(), None)),
                     }
                 } else {
@@ -4086,7 +4102,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         std::process::exit(match &eval_record {
             Some(eval) => run_eval(eval, Some(completions)),
-            None => run_distill(None, Some(completions)),
+            None => {
+                // Story 28-3 (D-28-3-03 A): a judge-only repeat replays the
+                // recorded survey of `--cassette` and judges it live k times.
+                let judge_repeat = distill_judge_repeat.and_then(|(k, path)| {
+                    path.map(|path| {
+                        match cassette_replay::CassetteReplayProvider::from_file(&path, true) {
+                            Ok(driver) => maos_bench::distill_eval::JudgeRepeat {
+                                k,
+                                survey: Arc::new(driver),
+                                survey_cassette: path,
+                            },
+                            Err(error) => {
+                                eprintln!("maos eval: {error}");
+                                std::process::exit(1);
+                            }
+                        }
+                    })
+                });
+                run_distill_repeat(None, Some(completions), judge_repeat)
+            }
         });
     }
     // Story 6.4 / NFR-Scale-4 — per-(provider, credential) rate-limit substrate.

@@ -73,7 +73,7 @@ Recall 1.0, faithfulness 1.0, traceability 1.0, secret leakage 0.0, **hedge pres
 
 - [x] T0 Rulings D-28-3-01…05 recorded (D-28-3-01 RULED B: not a GA precondition, so `RELEASE-HOLDS.md` GA-tag item 1 and the sprint-status GA comment do not change); 28-1 landed.
 - [x] T1 Prompt file v1 + JSON finding parse + train split + prompt pin test (AC3, AC4) — done 2026-11-16, commit `4e293036`, all researcher tests green.
-- [~] T2 Judge-only repeat mode and distill floors from the record (D-28-3-03, AC6); format-error count in the distill score — scorer half done (commit `beb63d2e`); judge-only repeat mode remains.
+- [x] T2 Judge-only repeat mode and distill floors from the record (D-28-3-03, AC6); format-error count in the distill score — done 2026-11-16 (scorer half `beb63d2e`, judge-only repeat `22157f32`).
 - [x] T3 Hermetic dry run on a v1 cassette (controls still detected) — done: generators ran, all five controls detected in every hermetic run (`eval_distill_18_3` 6/6).
 - [ ] T4 Paid dispatch; archive; summarise (AC5).
 - [ ] T5 Calibrate, promote, re-pin, `distill_live_baseline_28_3.rs`, `eval_distill_18_3.rs` updates (AC1, AC2, AC6, AC7).
@@ -131,8 +131,18 @@ v1-schema `{"finding": <old text>}` — frozen surveys byte-identical; forget-re
 skill-authoring-18-7 hash/len rewrites; `journey_forget_18_6.rs` pins updated; the eval_distill
 stub answers as a compliant v1 model). kloc maos-eval 4780 -> 4903 (RAISED line). Verified: 58
 binaries green across researcher/maos-eval/maos-bench/maos-journey-test; maos-bin eval_distill_18_3
-6/6; replay smoke exit 0 with format_errors 0 at spec floors. REMAINING in T2: the judge-only
-repeat mode needs a live router for the judge leg — belongs with the T4 nightly dispatch wiring.
+6/6; replay smoke exit 0 with format_errors 0 at spec floors. (The judge-only repeat mode this
+note still owed landed in `22157f32`, two entries down.)
+
+2026-11-16 (commit `22157f32`, orchestrator/GLM): the judge-only repeat mode of D-28-3-03 A is
+implemented — `--judge-repeat <k>` (record-mode + `--cassette`), pass-2 surveys replay from the
+recorded live cassette, the live judge runs k times per finding, and the line reports per-finding
+agreement-with-first, faithful counts, faithfulness mean/min and total judge calls. Hermetic proof:
+`eval_distill_18_3::a_judge_only_repeat_replays_the_survey_and_reports_per_finding_agreement`
+(FlippingJudge: agreement 2/3, mean ≈ 0.5, judge_calls = 3×findings, first-repeat verdicts applied)
+plus parser-refusal asserts. kloc maos-bench 2875 → 2970 (RAISED). T4 uses
+`--judge-repeat 5` beside the k=5 full repeats of D-28-1-02.
+
 ### File List
 
 - `spirits/researcher/prompts/synthesis-v1.txt` (new)
