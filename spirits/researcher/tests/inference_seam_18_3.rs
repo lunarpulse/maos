@@ -164,7 +164,7 @@ fn a_bound_pass_mints_once_names_its_provider_and_consumes_one_completion_per_cl
     for (req, claim) in seen.iter().zip(&claims) {
         assert_eq!(req.provider_id.as_deref(), Some("openai"));
         assert_eq!(req.spirit_pid, PID);
-        assert_eq!(req.prompt, synthesis_prompt(&claim.statement));
+        assert_eq!(req.prompt, synthesis_prompt(&claim.statement, &claim.hedges));
     }
     drop(seen);
     idle(&r);
@@ -400,7 +400,7 @@ fn the_exit_line_3_cassette_pins_real_prompt_hashes_and_no_wildcard() {
         "survey followed by skill generation"
     );
     for (entry, claim) in entries.iter().zip(&claims) {
-        let prompt = synthesis_prompt(&claim.statement);
+        let prompt = synthesis_prompt(&claim.statement, &claim.hedges);
         let hash = format!("{:x}", Sha256::digest(prompt.as_bytes()));
         assert_ne!(entry["prompt_sha256"], "0".repeat(64), "wildcard hash");
         assert_eq!(entry["prompt_sha256"], hash.as_str(), "{}", claim.claim_id);

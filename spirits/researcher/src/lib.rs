@@ -565,13 +565,43 @@ pub fn seed_claims() -> Vec<ClaimPayload> {
     ]
 }
 
+pub const SYNTHESIS_PROMPT_VERSION: &str = "researcher-synthesis/v1";
+
+/// Story 28-3 — the prompt's fixed sections (ROLE, OBJECTIVE, RULES,
+/// OUTPUT SCHEMA, EXAMPLES, INPUT) as a file. The INPUT section carries the
+/// two markers [`synthesis_prompt`] fills; the EXAMPLES are the `example`
+/// rows of `tests/fixtures/distill-corpus-v0.train.jsonl` verbatim.
+pub const SYNTHESIS_PROMPT_TEMPLATE: &str = include_str!("../prompts/synthesis-v1.txt");
+
+const STATEMENT_MARKER: &str = "{{statement}}";
+const HEDGES_MARKER: &str = "{{hedges}}";
+
 /// Story 8.11 / 18-3 — the finding-synthesis prompt for one source claim
-/// (cassette entries pin its SHA-256 and length).
-pub fn synthesis_prompt(statement: &str) -> String {
-    format!(
-        "Summarize this research claim in one sentence for a digest. \
-         Preserve any hedges; add no facts.\n\nClaim: {statement}"
-    )
+/// (cassette entries pin its SHA-256 and length). Story 28-3: rendered from
+/// [`SYNTHESIS_PROMPT_TEMPLATE`] with the claim's own hedge list
+/// (D-28-3-02 A) in one pass (the statement text is never re-scanned for
+/// markers), so the output is byte-identical for identical input and a
+/// recorded cassette's prompt hash is stable.
+pub fn synthesis_prompt(statement: &str, hedges: &[String]) -> String {
+    let hedges_json = serde_json::to_string(hedges).unwrap_or_else(|_| "[]".to_string());
+    let missing = |marker: &str| {
+        panic!("prompt {SYNTHESIS_PROMPT_VERSION} has no `{marker}` marker")
+    };
+    let (head, rest) = SYNTHESIS_PROMPT_TEMPLATE
+        .split_once(STATEMENT_MARKER)
+        .unwrap_or_else(|| missing(STATEMENT_MARKER));
+    let (middle, tail) = rest
+        .split_once(HEDGES_MARKER)
+        .unwrap_or_else(|| missing(HEDGES_MARKER));
+    let mut prompt = String::with_capacity(
+        head.len() + statement.len() + middle.len() + hedges_json.len() + tail.len(),
+    );
+    prompt.push_str(head);
+    prompt.push_str(statement);
+    prompt.push_str(middle);
+    prompt.push_str(&hedges_json);
+    prompt.push_str(tail);
+    prompt
 }
 
 /// Idle surveys retain fetched MCP frames and resume strictly after the last
@@ -1252,7 +1282,7 @@ impl Researcher {
     /// - **load_bearing_confidence** scalar: the weakest load-bearing confidence.
     /// - **open_questions**: contradictions + claims below the 0.7 floor.
     pub fn survey(&self, frames: &[RecalledFrame]) -> SurveyOutput {
-        match self.survey_with(frames, |statement| {
+        match self.survey_with(frames, |statement, _hedges| {
             Ok::<_, std::convert::Infallible>(summarize(statement))
         }) {
             Ok(output) => output,
@@ -1294,12 +1324,34 @@ impl Researcher {
         pid: u32,
         frames: &[RecalledFrame],
     ) -> Result<SurveyOutput, ResearcherError> {
-        self.survey_with(frames, |statement| {
-            let text =
-                self.complete_bound(live, binding, token, pid, synthesis_prompt(statement), 256)?;
+        self.survey_with(frames, |statement, hedges| {
+            let text = self.complete_bound(
+                live,
+                binding,
+                token,
+                pid,
+                synthesis_prompt(statement, hedges),
+                256,
+            )?;
             live.consumed.fetch_add(1, Ordering::SeqCst);
-            // §9.5: bound the model text so the digest stays smaller than its inputs.
-            Ok(summarize(&text))
+            // Story 28-3 (D-28-3-04 C): the completion is one JSON object
+            // `{"finding": string}`. The finding is used verbatim (still
+            // bounded by `summarize`, §9.5). A completion that is NOT that
+            // object is a format error the eval scorer counts from the raw
+            // completion; the Spirit stays alive and falls back to the
+            // bounded deterministic summary rather than dropping the claim.
+            let finding = serde_json::from_str::<serde_json::Value>(&text)
+                .ok()
+                .and_then(|value| {
+                    value
+                        .get("finding")
+                        .and_then(|finding| finding.as_str())
+                        .map(str::to_owned)
+                });
+            match finding {
+                Some(finding) => Ok(summarize(&finding)),
+                None => Ok(summarize(&text)),
+            }
         })
     }
 
@@ -1466,7 +1518,7 @@ impl Researcher {
     fn survey_with<E>(
         &self,
         frames: &[RecalledFrame],
-        mut synthesize: impl FnMut(&str) -> Result<String, E>,
+        mut synthesize: impl FnMut(&str, &[String]) -> Result<String, E>,
     ) -> Result<SurveyOutput, E> {
         let mut findings = Vec::new();
         let mut bibliography = Vec::new();
@@ -1524,7 +1576,7 @@ impl Researcher {
                         // separately below, so summarizing never drops a hedge.
                         // Story 8.11 / 18-3 — the bound model's text, else the
                         // deterministic bounded summary.
-                        statement: synthesize(&claim.statement)?,
+                        statement: synthesize(&claim.statement, &claim.hedges)?,
                         confidence,
                         hedges: claim.hedges,
                         source_log_ref: hex,

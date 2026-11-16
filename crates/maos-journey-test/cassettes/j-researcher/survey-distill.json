@@ -1,82 +1,82 @@
 {
-  "schema_version": "maos.journey.cassette/v1",
-  "provenance": "seed",
-  "recorded_at": "2026-10-25T00:00:00Z",
-  "model_id": "hand-authored-seed",
-  "spirit_id": "researcher",
-  "session": "survey-distill",
   "entries": [
     {
-      "sequence": 0,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_len": 2539,
+      "prompt_sha256": "dd1d32b9c9cdb7d7451042c3a5652af12c1e8ce7ea9fff9b6b530f739de6cb28",
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "provider_attribution": {
+          "endpoint_url": "cassette://j-researcher/survey-distill",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
         "stop_reason": "stop_sequence",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "usage": {
           "input_tokens": 44,
           "output_tokens": 18
-        },
-        "provider_attribution": {
-          "provider_id": "replay",
-          "endpoint_url": "cassette://j-researcher/survey-distill",
-          "model_id": "hand-authored-seed"
         }
-      }
+      },
+      "sequence": 0
     },
     {
-      "sequence": 1,
-      "prompt_sha256": "918e4919e4e227521296cb5c2239af44c75c0efac321c105a6e6664b193511a8",
-      "prompt_len": 185,
+      "prompt_len": 2545,
+      "prompt_sha256": "20103b053f84bd8c03a505fa39ff4dfadd325c7569a4881bdb87d1765793eeab",
       "response": {
-        "text": "Over a noisy corpus, retrieval augmentation does not cut hallucinated citations.",
+        "provider_attribution": {
+          "endpoint_url": "cassette://j-researcher/survey-distill",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
         "stop_reason": "stop_sequence",
+        "text": "Over a noisy corpus, retrieval augmentation does not cut hallucinated citations.",
         "usage": {
           "input_tokens": 46,
           "output_tokens": 20
-        },
-        "provider_attribution": {
-          "provider_id": "replay",
-          "endpoint_url": "cassette://j-researcher/survey-distill",
-          "model_id": "hand-authored-seed"
         }
-      }
+      },
+      "sequence": 1
     },
     {
-      "sequence": 2,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_len": 2590,
+      "prompt_sha256": "fc5c451debf6b288aaafe27fc550121564ff42e76ca0659c8aa829233142d01d",
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "provider_attribution": {
+          "endpoint_url": "cassette://j-researcher/survey-distill",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
         "stop_reason": "stop_sequence",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "usage": {
           "input_tokens": 50,
           "output_tokens": 23
-        },
-        "provider_attribution": {
-          "provider_id": "replay",
-          "endpoint_url": "cassette://j-researcher/survey-distill",
-          "model_id": "hand-authored-seed"
         }
-      }
+      },
+      "sequence": 2
     },
     {
-      "sequence": 3,
-      "prompt_sha256": "19af179fca4a31d80ea3845cf1264e70d37a0c446f130063a5faf394e18a3814",
       "prompt_len": 716,
+      "prompt_sha256": "19af179fca4a31d80ea3845cf1264e70d37a0c446f130063a5faf394e18a3814",
       "response": {
-        "text": "---\nid = \"researcher.survey-method\"\nversion = \"0.1.0\"\nname = \"Survey method\"\ndescription = \"Preserve conflicting evidence in research surveys\"\nrequired_capabilities = []\n---\n# Survey method\nCompare methodology before combining contradictory findings.\n",
+        "provider_attribution": {
+          "endpoint_url": "cassette://j-researcher/survey-distill",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
         "stop_reason": "stop_sequence",
+        "text": "---\nid = \"researcher.survey-method\"\nversion = \"0.1.0\"\nname = \"Survey method\"\ndescription = \"Preserve conflicting evidence in research surveys\"\nrequired_capabilities = []\n---\n# Survey method\nCompare methodology before combining contradictory findings.\n",
         "usage": {
           "input_tokens": 180,
           "output_tokens": 65
-        },
-        "provider_attribution": {
-          "provider_id": "replay",
-          "endpoint_url": "cassette://j-researcher/survey-distill",
-          "model_id": "hand-authored-seed"
         }
-      }
+      },
+      "sequence": 3
     }
-  ]
+  ],
+  "model_id": "hand-authored-seed",
+  "provenance": "seed",
+  "recorded_at": "2026-10-25T00:00:00Z",
+  "schema_version": "maos.journey.cassette/v1",
+  "session": "survey-distill",
+  "spirit_id": "researcher"
 }

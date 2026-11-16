@@ -71,16 +71,13 @@ Recall 1.0, faithfulness 1.0, traceability 1.0, secret leakage 0.0, **hedge pres
 6. **AC6 — calibration.** Floors per D-28-1-03 from AC5; NFR-Aud-7 minimums (recall 0.90, faithfulness 0.98, hedge 0.95, traceability 1.0, leakage 0.0) are not lowered by this story — a shortfall after tuning opens an operator spec-change D-row with measurement, interval and rationale.
 7. **AC7 — promotion (D-28-3-05 A).** Cassette promoted; corpus frozen surveys and verdicts re-pinned; `tests/corpora/MANIFEST.toml:168` SHA updated; `deferred-work.md:1413`'s Researcher half closed with this key.
 
-## Tasks / Subtasks
-
-- [ ] T0 Rulings D-28-3-01…05 recorded (D-28-3-01 RULED B: not a GA precondition, so `RELEASE-HOLDS.md` GA-tag item 1 and the sprint-status GA comment do not change); 28-1 landed.
-- [ ] T1 Prompt file v1 + JSON finding parse + train split + prompt pin test (AC3, AC4).
+- [x] T0 Rulings D-28-3-01…05 recorded (D-28-3-01 RULED B: not a GA precondition, so `RELEASE-HOLDS.md` GA-tag item 1 and the sprint-status GA comment do not change); 28-1 landed.
+- [~] T1 Prompt file v1 + JSON finding parse + train split + prompt pin test (AC3, AC4) — code written 2026-11-16 in branch `e28-3-2026-11-16`, NOT yet compiled or tested (implementer: orchestrator/GLM after the Anthropic coder quota died; see Dev Agent Record).
 - [ ] T2 Judge-only repeat mode and distill floors from the record (D-28-3-03, AC6); format-error count in the distill score.
-- [ ] T3 Hermetic dry run on a hand-planted v1 cassette (controls still detected).
+- [~] T3 Hermetic dry run on a hand-planted v1 cassette (controls still detected) — generator test written (`spirits/researcher/tests/prompt_28_3.rs::generate`, env-gated `MAOS_GEN_DISTILL_CASSETTE=1`), NOT yet run.
 - [ ] T4 Paid dispatch; archive; summarise (AC5).
 - [ ] T5 Calibrate, promote, re-pin, `distill_live_baseline_28_3.rs`, `eval_distill_18_3.rs` updates (AC1, AC2, AC6, AC7).
 - [ ] T6 Landing: `cargo fmt --all`; `check-kernel-baseline --json` (expect unchanged; if moved, `scripts/repin.py` + HISTORY row in the same commit); `kloc-check --json`; `RAISED` line if maos-bench breaches; prepush.
-
 ## Dev Notes
 
 - **Preserve:** every negative control must still miss its metric (`distill_replay.rs:500-512`); completion-planted controls are served from committed entries in a live replay (`:144-150`, `:225-229`); the judge prompt and its pin are unchanged unless a D-row rules otherwise (a change re-records every verdict).
@@ -95,13 +92,43 @@ Recall 1.0, faithfulness 1.0, traceability 1.0, secret leakage 0.0, **hedge pres
 
 ### Agent Model Used
 
-<set by dev at story start>
+<set by dev at story start> 2026-11-16: Dev283 (coder/claude-sonnet-5-5) was dispatched and died on
+an Anthropic 429 rate limit before any edit; the orchestrator (zai/glm-5.3) wrote the T1 slice
+directly, per the session disclosure.
 
 ### Completion Notes List
 
+- 2026-11-16: Dev283 (coder/claude-sonnet-5-5) died on an Anthropic 429 before any edit; the
+  orchestrator (zai/glm-5.3) wrote the T1 slice directly (disclosed).
+- `spirits/researcher/prompts/synthesis-v1.txt` (sections ROLE, OBJECTIVE, RULES, OUTPUT SCHEMA
+  `{"finding": string}` per D-28-3-04 C, EXAMPLES = the four `example` train rows, INPUT with
+  `{{statement}}`/`{{hedges}}`), pinned `5cf08b16…`.
+- `spirits/researcher/tests/fixtures/distill-corpus-v0.train.jsonl`: provenance header + tr01–tr08;
+  tr02/tr05 are the "seem to"/"appear to" synonym traps; disjoint from rd01–rd16 by id and statement.
+- `spirits/researcher/src/lib.rs`: `SYNTHESIS_PROMPT_VERSION` "researcher-synthesis/v1",
+  `SYNTHESIS_PROMPT_TEMPLATE` include_str, `synthesis_prompt(statement, hedges)` one-pass render,
+  `survey_with` closure receives the claim's hedges (D-28-3-02 A), `survey_bound` parses the
+  completion as the strict JSON object and falls back to the bounded deterministic summary when
+  malformed (the eval scorer, not the Spirit, counts format errors).
+- `spirits/researcher/tests/inference_seam_18_3.rs` call sites updated; new
+  `spirits/researcher/tests/prompt_28_3.rs` + `tests/common/mod.rs` (pin, section order,
+  byte-identical render, train/test disjointness, examples-verbatim, env-gated cassette generator).
+- Generator mapping measured: cassette entries 0..32 are the corpus claims in row order skipping each
+  row's `withheld` ids (33/33 old-prompt hash matches; `rd16-dropped-claim-c3` is the withheld one).
+- UNVERIFIED: nothing compiled or tested; the cassette still pins the OLD prompt hashes until
+  `generate` runs; `five_metric_live_8_11.rs`, `distillation_i11.rs`, `inference_seam_8_11.rs` and
+  `crates/maos-bin/tests/eval_distill_18_3.rs` not yet audited for old-prompt pins.
+
 ### File List
+
+- `spirits/researcher/prompts/synthesis-v1.txt` (new)
+- `spirits/researcher/tests/fixtures/distill-corpus-v0.train.jsonl` (new)
+- `spirits/researcher/src/lib.rs` (SYNTHESIS_PROMPT_VERSION/TEMPLATE, synthesis_prompt(statement, hedges), survey_with/survey_bound)
+- `spirits/researcher/tests/inference_seam_18_3.rs` (call sites)
+- `spirits/researcher/tests/prompt_28_3.rs`, `spirits/researcher/tests/common/mod.rs` (new)
 
 ## Change Log
 
 - 2026-11-15: created (bmad-create-story, anthropic/claude-opus-5-5) at `bf3cba25`; D-28-3-01…05 PROPOSED.
 - 2026-11-15: D-28-3-01 RULED B (operator; not a GA precondition, GA-recommended only); D-28-3-02…05 ACCEPTED (operator: proceed with recommendation). Statuses in the Decisions table above.
+- 2026-11-16: T1 slice + generator written by the orchestrator (Anthropic quota exhausted; disclosed); unverified.

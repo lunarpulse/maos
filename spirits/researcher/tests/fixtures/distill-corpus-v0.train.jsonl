@@ -1,0 +1,9 @@
+{"_provenance":{"corpus":"distill-corpus-v0.train","authored":"2026-11-16","method":"hand-authored","story":"28-3","purpose":"few-shot boundary examples for spirits/researcher/prompts/synthesis-v1.txt (train split; disjoint from the 16 test scenarios rd01-rd16 of distill-corpus-v0.jsonl per 28-1 AC2)","rows":"tr01-tr08","example_rows":"tr01-tr04 are the prompt's EXAMPLES section verbatim"}}
+{"scenario_id":"tr01","boundary":"single_hedge_copied_verbatim","example":true,"statement":"Ensemble methods may improve recall on small datasets.","hedges":["may improve"]}
+{"scenario_id":"tr02","boundary":"synonym_trap_seem_to","example":true,"statement":"Mixed-precision ablations seem to reduce memory use at equal quality.","hedges":["seem to"]}
+{"scenario_id":"tr03","boundary":"two_hedges_no_added_facts","example":true,"statement":"Late chunking might raise retrieval accuracy, though gains appear limited to long documents.","hedges":["might raise","appear limited"]}
+{"scenario_id":"tr04","boundary":"unhedged_plain_sentence","example":true,"statement":"The index rebuild completes in one pass over the corpus.","hedges":[]}
+{"scenario_id":"tr05","boundary":"synonym_trap_appear_to","example":false,"statement":"Retrieval rerankers appear to help most on multi-hop questions.","hedges":["appear to"]}
+{"scenario_id":"tr06","boundary":"synonym_trap_suggests","example":false,"statement":"The ablation suggests that dropout matters less at scale.","hedges":["suggests"]}
+{"scenario_id":"tr07","boundary":"hedge_phrase_of_three_words","example":false,"statement":"Speculative decoding could in principle halve latency without quality loss.","hedges":["could in principle"]}
+{"scenario_id":"tr08","boundary":"two_clauses_two_hedges","example":false,"statement":"Cache-aware scheduling may cut tail latency, though the gains appear strongest under load.","hedges":["may cut","appear strongest"]}
