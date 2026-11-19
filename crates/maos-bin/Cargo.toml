@@ -28,6 +28,7 @@ network = [
     "dep:maos-a2a",
     "dep:maos-sso",
     "dep:maos-siem",
+    "dep:maos-topology",
 ]
 air-gap = []  # Compile-out all networking: reqwest, hyper client, tokio::net, DNS resolvers
 wasm-host = ["dep:maos-wasm-host"]  # Story 11.1a — OFF by default. Gates the vendored `wasmtime` engine + maos-wasm-host/maos-wasm-runner. OFF-by-default is the export-control precondition (5D002.c.1) — see docs/compliance/export-counsel-precondition.md.
@@ -54,6 +55,7 @@ maos-frame-codec = { path = "../maos-frame-codec" }
 maos-manifest = { path = "../maos-manifest" }
 maos-kernel-core = { path = "../maos-kernel-core" }
 maos-orchestrator-buffer = { path = "../maos-orchestrator-buffer" }
+maos-topology = { path = "../maos-topology", optional = true }
 maos-control = { path = "../maos-control" }
 maos-loom-lite = { path = "../maos-loom-lite" }
 maos-pdp = { path = "../maos-pdp" }   # Story 11.4a — enterprise PDP (Cedar) adapter; composed at the root, optional via MAOS_PDP_POLICY

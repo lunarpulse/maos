@@ -63,6 +63,7 @@ const FORBIDDEN_CRATES: &[&str] = &[
     "maos-egress",
     // 21-5: the FR20 buffer crate is composed at the root; the kernel reaches it only through the domain port.
     "maos-orchestrator-buffer",
+    "maos-topology",
 ];
 
 /// Trees whose transitive closure must exclude every FORBIDDEN_CRATES entry.

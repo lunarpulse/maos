@@ -2697,6 +2697,7 @@ dependencies = [
  "maos-spirit-hello",
  "maos-spirit-sdk",
  "maos-sso",
+ "maos-topology",
  "maos-wasm-host",
  "mira",
  "nash",
@@ -3355,6 +3356,17 @@ dependencies = [
  "opentelemetry_sdk",
  "tokio",
  "tonic 0.13.1",
+]
+
+[[package]]
+name = "maos-topology"
+version = "1.0.0-rc.1"
+dependencies = [
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "toml 0.8.23",
 ]
 
 [[package]]

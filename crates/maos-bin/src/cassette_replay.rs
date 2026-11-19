@@ -28,6 +28,10 @@ struct CassetteEntry {
 
 impl CassetteReplayPort {
     pub fn from_file(path: &std::path::Path, strict: bool) -> Result<Self, String> {
+        Self::load(path, strict, false)
+    }
+
+    fn load(path: &std::path::Path, strict: bool, exact: bool) -> Result<Self, String> {
         let data =
             std::fs::read_to_string(path).map_err(|e| format!("cassette read: {path:?}: {e}"))?;
         let root: serde_json::Value =
@@ -65,6 +69,17 @@ impl CassetteReplayPort {
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
+            if exact
+                && (prompt_sha256.len() != 64
+                    || !prompt_sha256
+                        .bytes()
+                        .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+                    || prompt_sha256.bytes().all(|b| b == b'0'))
+            {
+                return Err(format!(
+                    "cassette entry {i}: workflow replay requires an exact prompt hash"
+                ));
+            }
             let prompt_len = e.get("prompt_len").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
             let resp = e
                 .get("response")
@@ -184,6 +199,13 @@ impl CassetteReplayProvider {
     pub fn from_file(path: &std::path::Path, strict: bool) -> Result<Self, String> {
         CassetteReplayPort::from_file(path, strict).map(|replay| Self {
             replay,
+            credential_fingerprint: cassette_fingerprint(path),
+        })
+    }
+
+    pub fn for_workflow(path: &std::path::Path) -> Result<Self, String> {
+        Ok(Self {
+            replay: CassetteReplayPort::load(path, true, true)?,
             credential_fingerprint: cassette_fingerprint(path),
         })
     }

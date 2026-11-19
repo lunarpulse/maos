@@ -1,0 +1,20 @@
+format = 1
+id = "invoice-review"
+entry = "intake"
+
+[steps.intake]
+agent = "invoice-intake"
+[steps.intake.routes]
+ready = { step = "duplicate-check" }
+
+[steps.duplicate-check]
+agent = "duplicate-check"
+[steps.duplicate-check.routes]
+suspect = { finish = "held" }
+clear = { step = "review" }
+
+[steps.review]
+agent = "invoice-reviewer"
+[steps.review.routes]
+complete = { finish = "approval_recommended" }
+incomplete = { finish = "needs_evidence" }

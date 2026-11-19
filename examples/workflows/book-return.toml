@@ -1,0 +1,9 @@
+format = 1
+id = "book-return"
+entry = "inspect"
+
+[steps.inspect]
+agent = "return-inspector"
+[steps.inspect.routes]
+shelf_ready = { finish = "reshelve" }
+needs_attention = { finish = "send_to_repair" }
