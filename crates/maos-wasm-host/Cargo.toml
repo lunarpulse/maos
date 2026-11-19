@@ -47,9 +47,10 @@ maos-spirit-abi = { path = "../maos-spirit-abi" }
 # fixed 48.x (CI repair 2026-10-06, `cargo deny check`). 48.0.7 is the first
 # 48.x fixing RUSTSEC-2026-0378/0379 (2026-10-24, 18-0-green-main-ci-baseline;
 # the native-twin guest lock moves with it).
+# 48.0.9 fixes RUSTSEC-2026-0566 through RUSTSEC-2026-0573.
 # Keep the upstream 48.0.7 defaults except cache: its zstd dependency is
 # vulnerable (landing 40336401565, operator ruling 2026-10-26 A).
-wasmtime = { version = "48.0.7", default-features = false, features = [
+wasmtime = { version = "48.0.9", default-features = false, features = [
     "anyhow",
     "async",
     "backtrace",
@@ -76,7 +77,7 @@ wasmtime = { version = "48.0.7", default-features = false, features = [
     "compile-time-builtins",
     "wit-parser",
 ] }
-wasmtime-wasi = "48.0.7"
+wasmtime-wasi = "48.0.9"
 
 # The runner's ambient runtime for wasmtime-wasi's synchronous stdio bindings (src/runner.rs).
 # Current-thread only: no I/O or time driver, so it needs no syscall the T2 allow-list refuses.
