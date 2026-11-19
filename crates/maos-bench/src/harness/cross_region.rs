@@ -19,17 +19,16 @@
 //! geo-latency figure. Pinning a geo number as a *pass condition* is the 10.2
 //! trap (loopback ~1ms passes trivially). The absolute geo-SLO is authored as
 //! NFR text marked "validated in pilot" — a release-gate artifact, un-gated
-//! here. The budget's teeth come from the [`slo_inject_delay`] falsifier (which
-//! moves p95 through the gate's own comparator), not from a geo claim.
+//! here. The [`slo_inject_delay`] falsifier verifies that additional latency
+//! inside the round-trip appears in the total supplied to the histogram.
 //!
 //! # Fault injection (AC2 / F7 — Arm-1, latency only)
 //!
-//! With the `slo-fault-inject` feature, [`slo_inject_delay`] sleeps a fixed
-//! 15ms INSIDE the measured A→B→A span (between `t0` and `t1`), so a mutation
-//! test asserts `p95_us >= 14_000 && !budget_met` read from the SAME
-//! [`super::build_journey_result`] the gate's `oracle_green` consumes. The
-//! feature is release-guarded ([`compile_error!`]) + checked absent from the
-//! release feature graph by the gate's `cargo tree --release` tripwire.
+//! With `slo-fault-inject`, [`slo_inject_delay`] sleeps at least 15 ms inside
+//! the measured A→B→A span. The mutation test compares the reported total to
+//! the pre-injection elapsed time from the same trip. The feature is
+//! release-guarded ([`compile_error!`]) and checked absent from the release
+//! feature graph by the gate's `cargo tree` tripwire.
 
 // Story 11.2b (F7): slo-fault-inject MUST NOT exist in release binaries. A
 // release build with the fault-inject feature active is a ship-blocker — it
@@ -53,10 +52,8 @@ use std::time::Duration;
 /// ≥1.5× machinery/convergence regression. CI Postgres is co-located, so a real
 /// geo-RTT is physically unobservable; pinning a geo number as a pass condition
 /// is the 10.2 trap (loopback passes trivially). This floor binds **machinery +
-/// convergence + regression** — the round-trip did not regress — and its teeth
-/// come from the `slo-fault-inject` falsifier (a paired clean/injected delta
-/// that must carry ≥14 ms of the 15 ms injection), not from a geo-latency
-/// claim. The absolute geo-SLO
+/// convergence + regression** — the round-trip did not regress. The injected
+/// delay is verified separately within a single trip. The absolute geo-SLO
 /// is a separately-tracked release-gate pilot artifact, NOT this constant.
 ///
 /// Do NOT bump silently: record the measured p95 + rig + build mode in any
@@ -74,10 +71,8 @@ use std::time::Duration;
 /// → 17,656 µs ruled profile; `--release` 16,861 µs. The live test prints the
 /// per-stage p50 so any future breach attributes itself.
 pub const MULTI_REGION_SLO_P95_US: u64 = 30_000;
-/// The fixed delay injected INSIDE the measured A→B→A span when the
-/// `slo-fault-inject` feature is active (F7, Arm-1/latency only). 15ms — large
-/// enough that the mutation test's `p95 >= 14_000µs` assertion is unambiguous
-/// even with sub-ms real latency, mirroring the J4 `bench-fault-inject` budget.
+/// The minimum delay injected inside the measured A→B→A span when the
+/// `slo-fault-inject` feature is active (F7, Arm-1/latency only).
 pub const SLO_FAULT_INJECT_DELAY_US: u64 = 15_000;
 
 /// Sleep the fault-inject delay INSIDE the measured span when the

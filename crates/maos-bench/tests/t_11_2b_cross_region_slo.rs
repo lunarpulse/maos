@@ -23,7 +23,7 @@
 //!     cross_region_roundtrip_live -- --ignored --nocapture
 //! ```
 //!
-//! Mutation (fault-inject — must RED):
+//! Mutation (positive control — fails if the injected delay is not measured):
 //! ```text
 //! MAOS_TEST_POSTGRES_A="..." MAOS_TEST_POSTGRES_B="..." \
 //!   cargo test -p maos-bench --features slo-fault-inject \
@@ -125,6 +125,8 @@ const STAGES: [&str; 5] = [
 /// `t0 → end` on the one region-A clock, unchanged by them.
 struct RoundTrip {
     total_us: u64,
+    #[cfg(feature = "slo-fault-inject")]
+    before_injection_us: u64,
     stages_us: [u64; STAGES.len()],
 }
 
@@ -193,6 +195,8 @@ async fn roundtrip_sample(
     let us = |from: Instant, to: Instant| to.duration_since(from).as_micros() as u64;
     RoundTrip {
         total_us: us(t0, end),
+        #[cfg(feature = "slo-fault-inject")]
+        before_injection_us: us(t0, applied_ba),
         stages_us: [
             us(t0, written),
             us(written, built_a),
@@ -381,24 +385,12 @@ async fn cross_region_roundtrip_live() {
     );
 }
 
-/// AC2 / F7 (Arm-1, latency): The `slo-fault-inject` mutation. With the feature
-/// active, a fixed 15ms is injected INSIDE the measured A→B→A span, so the
-/// number MUST move. This is the "stranger's falsifier" (D4): if anyone
-/// re-stubs the probe to constants, the injection cannot move the number
-/// → the paired delta collapses to ~0 and this test goes red.
-///
-/// Story 13.6e (T5) repaired the old absolute assertion with paired samples.
-/// Clean and injected measurements alternate order within each pair, then the
-/// median per-pair delta must carry at least 14ms of the fixed 15ms injection.
-/// This measures the injected contribution directly instead of subtracting two
-/// sequential batch percentiles that can drift independently.
-///
-/// 21-2 ruling (2026-09-24): the paired delta is the ONLY verdict. The former
-/// `!budget_met` assert ("injected p95 must cross the floor") held only while
-/// the CLEAN round-trip exceeded 30 − 15 = 15 ms, i.e. it depended on the
-/// runner's disk and build, not on the probe: at the ruled profile clean p95 is
-/// ~17.7 ms and injected ~33.6 ms — a 3.6 ms margin a faster disk erases,
-/// turning a working falsifier red. The injected p95 is still printed.
+/// AC2 / F7 (Arm-1, latency): verify the real 15 ms injection is included in
+/// the total passed to the live SLO histogram. Compare two readings from the
+/// same trip, not two database transactions. Database and scheduler latency
+/// before the injection is common to both readings and cancels exactly.
+/// `thread::sleep` may oversleep, so only the requested minimum matters.
+/// The clean live test remains the sole check of the 30 ms p95 budget.
 #[cfg(feature = "slo-fault-inject")]
 #[tokio::test]
 #[ignore = "requires two live Postgres + --features slo-fault-inject"]
@@ -412,125 +404,23 @@ async fn cross_region_roundtrip_mutation() {
     reset('a').await;
     reset('b').await;
 
-    // Warmup with injection active (discarded).
-    let _ = roundtrip_samples(&client_a, &client_b, &store_a, &store_b, 5, true).await;
+    use maos_bench::harness::cross_region::SLO_FAULT_INJECT_DELAY_US;
 
-    const N: usize = 60;
-    let region_a = Region::canonicalize("region-a").unwrap();
-    let region_b = Region::canonicalize("region-b").unwrap();
-    let mut clean_samples = Vec::with_capacity(N);
-    let mut injected_samples = Vec::with_capacity(N);
-
-    // Pair adjacent samples and alternate order. This prevents a systematic
-    // second-batch speedup/slowdown from masquerading as the fixed injection.
-    for pair in 0..N {
-        let sequence = 10 + pair * 2;
-        let (clean_us, injected_us) = if pair % 2 == 0 {
-            let clean = roundtrip_sample(
-                &client_a, &client_b, &store_a, &store_b, &region_a, &region_b, sequence, false,
-            )
-            .await
-            .total_us;
-            let injected = roundtrip_sample(
-                &client_a,
-                &client_b,
-                &store_a,
-                &store_b,
-                &region_a,
-                &region_b,
-                sequence + 1,
-                true,
-            )
-            .await
-            .total_us;
-            (clean, injected)
-        } else {
-            let injected = roundtrip_sample(
-                &client_a, &client_b, &store_a, &store_b, &region_a, &region_b, sequence, true,
-            )
-            .await
-            .total_us;
-            let clean = roundtrip_sample(
-                &client_a,
-                &client_b,
-                &store_a,
-                &store_b,
-                &region_a,
-                &region_b,
-                sequence + 1,
-                false,
-            )
-            .await
-            .total_us;
-            (clean, injected)
-        };
-        clean_samples.push(clean_us);
-        injected_samples.push(injected_us);
+    const N: usize = 3;
+    let trips = roundtrip_samples(&client_a, &client_b, &store_a, &store_b, N, true).await;
+    for (sample, trip) in trips.into_iter().enumerate() {
+        let included_us = trip.total_us.saturating_sub(trip.before_injection_us);
+        eprintln!(
+            "cross-region round-trip MUTATION {sample}: pre-injection={}µs total={}µs included={}µs minimum={}µs",
+            trip.before_injection_us, trip.total_us, included_us, SLO_FAULT_INJECT_DELAY_US
+        );
+        assert!(
+            included_us >= SLO_FAULT_INJECT_DELAY_US,
+            "round-trip sample {sample} omitted the in-span delay: \
+             before={}µs, reported total={}µs, need at least {}µs more",
+            trip.before_injection_us,
+            trip.total_us,
+            SLO_FAULT_INJECT_DELAY_US
+        );
     }
-    let paired_deltas = paired_injection_deltas(&clean_samples, &injected_samples);
-
-    let clean = build_journey_result(
-        "J-crossregion-rt-mutation-clean",
-        N as u64,
-        &clean_samples,
-        MULTI_REGION_SLO_P95_US,
-    );
-    let result = build_journey_result(
-        "J-crossregion-rt-mutation",
-        N as u64,
-        &injected_samples,
-        MULTI_REGION_SLO_P95_US,
-    );
-    let delta = build_journey_result(
-        "J-crossregion-rt-mutation-paired-delta",
-        N as u64,
-        &paired_deltas,
-        u64::MAX,
-    );
-
-    eprintln!(
-        "cross-region round-trip MUTATION: injected p95={}µs, clean p95={}µs, \
-         paired delta p50={}µs p95={}µs (budget={}µs, injected met={}, n={})",
-        result.p95_us,
-        clean.p95_us,
-        delta.p50_us,
-        delta.p95_us,
-        MULTI_REGION_SLO_P95_US,
-        result.budget_met,
-        N
-    );
-
-    assert!(
-        delta.p50_us >= 14_000,
-        "mutation: paired injection delta p50={}µs is below 14 000µs \
-         (p95={}µs). The {}µs injection is not landing inside the measured \
-         span for a majority of adjacent pairs.",
-        delta.p50_us,
-        delta.p95_us,
-        maos_bench::harness::cross_region::SLO_FAULT_INJECT_DELAY_US
-    );
-}
-
-fn paired_injection_deltas(clean: &[u64], injected: &[u64]) -> Vec<u64> {
-    assert_eq!(
-        clean.len(),
-        injected.len(),
-        "paired clean/injected samples must have equal length"
-    );
-    clean
-        .iter()
-        .zip(injected)
-        .map(|(clean, injected)| injected.saturating_sub(*clean))
-        .collect()
-}
-
-#[test]
-fn paired_delta_oracle_requires_the_injection_on_a_majority_of_pairs() {
-    let clean = vec![20_000; 60];
-    let absent = paired_injection_deltas(&clean, &vec![20_000; 60]);
-    let injected = paired_injection_deltas(&clean, &vec![35_000; 60]);
-    let absent_result = build_journey_result("absent", 60, &absent, u64::MAX);
-    let injected_result = build_journey_result("injected", 60, &injected, u64::MAX);
-    assert!(absent_result.p50_us < 14_000);
-    assert!(injected_result.p50_us >= 14_000);
 }

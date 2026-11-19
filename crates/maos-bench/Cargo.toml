@@ -53,12 +53,10 @@ kernel_measurement = ["tokio"]
 # kernel_measurement so injection lands on the real path, not smoke. MUST NOT
 # appear in any release/GA feature set (compile_error! + CI cargo-tree check).
 bench-fault-inject = ["kernel_measurement"]
-# Story 11.2b AC2/F7: cross-region round-trip SLO fault injection (Arm-1,
-# latency ONLY). Injects a fixed 15ms delay INSIDE the measured A→B→A span so a
-# mutation test asserts p95 >= 14_000µs && !budget_met. Arm-1/latency only — it
-# does NOT imply kernel_measurement (the round-trip uses loom-lite, not the
-# kernel). MUST NOT appear in any release/GA feature set (compile_error! +
-# CI cargo-tree --release absence check — SHIP-BLOCKER).
+# Story 11.2b AC2/F7: injects a 15 ms delay inside the measured A→B→A span.
+# The mutation witness checks that the reported total includes the delay in
+# the same trip. It does not imply kernel_measurement (the probe uses
+# loom-lite). Keep out of release builds (compile_error! + CI cargo tree).
 slo-fault-inject = []
 
 [dependencies.tokio]
