@@ -63,6 +63,11 @@ ignore = [
     # advisory-DB drift, not a 20-8 change. Trigger to drop: the rusqlite >= 0.39
     # bump. Ruled 2026-11-10 (hosted cargo-deny finding); tracked in deferred-work.md.
     "RUSTSEC-2026-0459",
+    # Chrono maintenance-only advisory; approved 2026-11-19. Cedar's default
+    # datetime support still requires Chrono, including in Cedar 4.15.0.
+    # Remove when the maos-cli, xtask and Cedar dependency paths no longer
+    # select Chrono. See the RUSTSEC-2026-0543 row in deferred-work.md.
+    "RUSTSEC-2026-0543",
 ]
 
 [licenses]

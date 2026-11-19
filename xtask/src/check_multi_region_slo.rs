@@ -290,9 +290,8 @@ fn run_three_region_convergence_leg(pg: bool, verifier: &EvidenceVerifier) -> Ra
 }
 
 /// Leg 2: roundtrip-slo (live, 2 PG) + the `slo-fault-inject` mutation. GREEN
-/// requires BOTH the clean budget-met path AND the mutation whose paired
-/// clean/injected delta carries the injection (the falsifier must move the
-/// number; 21-2 ruling 2026-09-24). Both are "pass" outcomes.
+/// requires BOTH the clean budget-met path AND a same-trip witness that the
+/// injected delay is included in the reported total. Both are "pass" outcomes.
 fn run_roundtrip_slo_leg(pg: bool, verifier: &EvidenceVerifier) -> RawLeg {
     let label = RAW_LEG_LABELS[1];
     if !pg {
