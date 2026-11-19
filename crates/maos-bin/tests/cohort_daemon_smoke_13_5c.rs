@@ -931,8 +931,9 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 20-9 — 39 → 40: `spawned_lifecycle.rs` joins it.
     // Story 20-9 (round 4) — 40 → 41: `invocation.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 41] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 42] = [
         ("main.rs", include_str!("../src/main.rs")),
+        ("workflow.rs", include_str!("../src/workflow.rs")),
         ("invocation.rs", include_str!("../src/invocation.rs")),
         (
             "spawned_lifecycle.rs",

@@ -32,6 +32,8 @@ CARGO_TARGET_DIR=/mnt/build/cargo-maos-dsa cargo test --locked --offline \
 | `maos-topology` | 없음 | 923 |
 | `xtask` | 46,753 | 46,754 |
 
+[PR #25](https://github.com/lunarpulse/maos/pull/25)가 `main`의 의존성 문제를 해결했다. [해당 `main` 커밋에서 `cargo-deny` 통과](https://github.com/lunarpulse/maos/actions/runs/44553883474/job/135664588686)를 확인했다. [파일럿 PR #24](https://github.com/lunarpulse/maos/pull/24)를 이 기준 위에 올리고, 새 `workflow.rs`를 기존 권한 보호 테스트에 등록했다. 테스트의 권한 금지 규칙은 바꾸지 않았다.
+
 ## 다시 시작할 때
 
 - 위 KLOC 승인은 파일럿에 한정한다. 다음 기능의 비용은 별도로 계측한다.
