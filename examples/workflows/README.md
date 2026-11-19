@@ -71,9 +71,9 @@ The expected outcome is `request_order`. Plan and apply
 outcome with the same excerpt and cassette. The cassettes are synthetic,
 keyless test inputs, not evidence of live model quality.
 
-This proof is experimental: the new topology crate has no approved KLOC budget,
-and the full patch does not fit the current ceilings. No budget, kernel, or
-Spirit ABI changes are part of the proof.
+The pilot uses synthetic data and local, read-only Spirits. Its KLOC grant is
+recorded in [`xtask/kloc.toml`](../../xtask/kloc.toml); it changes neither the
+kernel nor the Spirit ABI.
 
 ## Author and operate
 

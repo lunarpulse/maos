@@ -2,7 +2,7 @@
 
 ## 현재 상태
 
-**기능 검증 완료, 병합 보류.** DSA(Domain-Specific Agent, 도메인 특화 에이전트) 실험은 별도 Git worktree `/mnt/build/wt-maos-dsa`, 브랜치 `dsa-topology`에 있다. 이전 경로 `~/dev_ws-dsa`는 사용하지 않는다. 변경은 미커밋이며 공용 체크아웃이 아니라 이 worktree에서 이어간다. Cargo 빌드 결과도 분리한다: `CARGO_TARGET_DIR=/mnt/build/cargo-maos-dsa`. 커널과 Spirit ABI는 수정하지 않았다.
+DSA(Domain-Specific Agent, 도메인 특화 에이전트) 작업 경로는 별도 Git worktree `/mnt/build/wt-maos-dsa`, 브랜치 `dsa-topology`다. 이전 경로 `~/dev_ws-dsa`와 공용 체크아웃을 사용하지 않는다. 빌드 결과도 분리한다: `CARGO_TARGET_DIR=/mnt/build/cargo-maos-dsa`. 커널과 Spirit ABI는 수정하지 않았다.
 
 ## 무엇을 만들었나
 
@@ -22,20 +22,18 @@ CARGO_TARGET_DIR=/mnt/build/cargo-maos-dsa cargo test --locked --offline \
 
 이번 추론은 **정확한 프롬프트 해시에 묶인 합성 응답 재생(strict replay)** 이다. 실제 모델이나 네트워크 제공자를 호출하지 않았다. 인용이 원문에 존재함을 확인할 뿐, 인용이 결론을 뒷받침하는지까지 판정하지 않는다. 따라서 실제 모델의 정확도·비용·운영 품질을 검증한 결과가 아니다. 기존 추론 감사 경로가 프롬프트에 포함된 발췌문을 기록할 수 있으므로 합성 데이터만 사용한다. 상시 실행 데몬의 배포 API, 원격 에이전트, 반복·병렬 합류, 외부 업무 실행은 이번 범위가 아니다.
 
-## 병합 차단: 코드 크기 제한
+## 파일럿 코드 크기 승인
 
-`kloc-check --json`은 `missing KLOC budget for measured crate 'maos-topology'`로 실패했다. 이후 Tokei로 확인한 전체 패치 규모는 아래와 같다. 현재 세션에서 한도를 올리거나 예외를 추가하지 않았다.
+초기 파일럿의 `kloc-check`는 `maos-topology` 예산이 없어 실패했다. 운영자의 파일럿 KLOC 승인 후 `main` 기준으로 다시 측정하고 기존 예산 원장에 반영했다. 현재 정책은 크레이트별 한도만 차단에 사용한다. 전체 코드 크기 경보와 커널 한도는 변경하지 않았다.
 
-| 항목 | 측정 코드 줄 | 현재 제한 |
+| 항목 | 이전 한도 | 파일럿의 측정 줄 수 및 적용 한도 |
 |---|---:|---:|
-| 전체 | 205,153 | 203,445 이상 실패 |
-| `maos-bin` | 39,552 | 최대 38,767 |
-| `maos-topology` | 923 | 승인된 예산 없음 |
-| `xtask` | 45,463 | 최대 45,462 |
-| `maos-kernel-core` | 20,429 | 최대 20,429 (변경 없음) |
+| `maos-bin` | 39,699 | 39,719 |
+| `maos-topology` | 없음 | 923 |
+| `xtask` | 46,753 | 46,754 |
 
 ## 다시 시작할 때
 
-- **병합이 목표라면 먼저** 코드 정리·통합으로 전체 패치가 제한에 맞는지 측정한다. 별도 예산 승인이 없으면 한도·측정 제외 규칙을 수정하지 말고 실험 상태로 유지한다.
+- 위 KLOC 승인은 파일럿에 한정한다. 다음 기능의 비용은 별도로 계측한다.
 - **다음 기능은 활성화 전 후보 평가다.** 현재 `workflow eval`은 이미 활성화된 계획을 평가한다. 활성 버전을 바꾸지 않고 후보와 기준 계획을 같은 라벨 사례에서 실행하고, 최종 결과가 맞더라도 생성한 증거 필드가 틀리면 실패하도록 한다. 이 기능은 아직 구현하지 않았다.
 - 진입점: [호스트 실행·권한·감사](../../crates/maos-bin/src/workflow.rs), [정확한 재생](../../crates/maos-bin/src/cassette_replay.rs), [계약·라우팅 엔진](../../crates/maos-topology/src/), [증거 전달 CLI 검증](../../crates/maos-bin/tests/workflow_evidence_cli.rs), [같은 스키마에서 실제 출력 해시를 검증하는 테스트](../../crates/maos-topology/tests/infer.rs).
