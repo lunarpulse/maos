@@ -1,0 +1,18 @@
+{
+  "schema_version": "maos.journey.cassette/v1",
+  "provenance": "seed",
+  "model_id": "claude-haiku-4-5-20251001",
+  "spirit_id": "invoice-evidence-extractor",
+  "session": "invoice-evidence-missing",
+  "entries": [{
+    "sequence": 0,
+    "prompt_sha256": "d5ad4a531375aae1fd73e9a262d10ea3c8ed50b8ba99287d7d11f0c437d3122c",
+    "prompt_len": 233,
+    "response": {
+      "text": "{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":false,\"quote\":\"No purchase order was supplied.\"}}",
+      "stop_reason": "stop_sequence",
+      "usage": {"input_tokens": 60, "output_tokens": 32},
+      "provider_attribution": {"provider_id": "anthropic", "model_id": "claude-haiku-4-5-20251001", "endpoint_url": "cassette://invoice-evidence/missing"}
+    }
+  }]
+}

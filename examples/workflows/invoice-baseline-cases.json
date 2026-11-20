@@ -1,0 +1,12 @@
+[
+  {
+    "id": "duplicate",
+    "input": {"number":"INV-204","docs_complete":true,"duplicate":true},
+    "expect": {"outcome":"approval_recommended","path":["intake","review"]}
+  },
+  {
+    "id": "missing-documents",
+    "input": {"number":"INV-205","docs_complete":false,"duplicate":false},
+    "expect": {"outcome":"needs_evidence","path":["intake","review"]}
+  }
+]

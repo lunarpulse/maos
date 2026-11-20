@@ -66,6 +66,7 @@ pub enum VerbName {
     Install,
     Purge,
     Eval,
+    Workflow,
 }
 
 /// One row of the verb table.
@@ -140,6 +141,12 @@ pub const VERBS: &[Verb] = &[
         argv: "eval",
         builds: &[Build::Network],
         summary: "Replay a class's halt corpus and score it (eval halt --class <c>)",
+    },
+    Verb {
+        name: VerbName::Workflow,
+        argv: "workflow",
+        builds: &[Build::Network],
+        summary: "Plan, apply, run or evaluate a business workflow",
     },
 ];
 

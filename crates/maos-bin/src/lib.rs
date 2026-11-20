@@ -136,3 +136,5 @@ pub mod yank_policy;
 /// `crates/maos-bin/tests/` can execute it — an in-`src` test module is
 /// budget-charged and CI-invisible.
 pub mod topology;
+#[cfg(feature = "network")]
+pub mod workflow;

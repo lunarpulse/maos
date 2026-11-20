@@ -1466,9 +1466,10 @@ fn main() {
             verbs::VerbName::Audit => air_gap_audit(&argv[1..]),
             verbs::VerbName::Install => air_gap_install(&argv[1..]),
             verbs::VerbName::Purge => run_purge(&argv[1..]),
-            verbs::VerbName::Shell | verbs::VerbName::Traceback | verbs::VerbName::Eval => {
-                unreachable!("shell, traceback and eval are not rows of the air-gap table")
-            }
+            verbs::VerbName::Shell
+            | verbs::VerbName::Traceback
+            | verbs::VerbName::Eval
+            | verbs::VerbName::Workflow => unreachable!("network-only verb in the air-gap table"),
         },
     }
 }
@@ -1791,6 +1792,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut shell_mode = false;
     let mut plain_flag = false;
     let (mut eval_record, mut distill_record) = (None, false);
+    let mut workflow = None;
     let verb_args = if std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("registry-server")
         && argv
             .first()
@@ -1901,6 +1903,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             verbs::VerbName::Shell => {
                 plain_flag = argv.iter().skip(1).any(|a| a == "--plain");
                 shell_mode = true;
+            }
+            verbs::VerbName::Workflow => {
+                workflow = maos_bin::workflow::prepare(&argv[1..])?;
+                if workflow.is_none() {
+                    return Ok(());
+                }
             }
             // Story 18-2 (CR-1) — replay runs now; `record` needs the
             // root's shared router and runs once it is built (D-18-2-06 A).
@@ -3994,6 +4002,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         live_provider_available,
     )
     .map_err(|error| error.to_string())?;
+    let workflow_replay = workflow.is_some()
+        && matches!(
+            inference_mode,
+            ResolvedInferenceMode::Replay {
+                strict: true,
+                explicit: true,
+                ..
+            }
+        );
 
     // The router's default remains unchanged, and so does its key set except
     // that explicit replay also answers the interned ids (18-1, below). Each
@@ -4006,15 +4023,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             strict,
             explicit: true,
         } => {
-            let replay: Arc<dyn maos_providers::Provider> = Arc::new(
-                cassette_replay::CassetteReplayProvider::from_file(cassette, *strict).map_err(
-                    |error| {
-                        format!(
-                            "MAOS_INFERENCE_MODE=replay cassette initialization failed: {error}"
-                        )
-                    },
-                )?,
-            );
+            let replay = if workflow_replay {
+                cassette_replay::CassetteReplayProvider::for_workflow(cassette)
+            } else {
+                cassette_replay::CassetteReplayProvider::from_file(cassette, *strict)
+            }
+            .map_err(|error| {
+                format!("MAOS_INFERENCE_MODE=replay cassette initialization failed: {error}")
+            })?;
+            let replay: Arc<dyn maos_providers::Provider> = Arc::new(replay);
             for provider in providers_map.values_mut() {
                 *provider = Arc::clone(&replay);
             }
@@ -4369,6 +4386,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ => None,
             },
         });
+    if let Some(workflow) = workflow {
+        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+        let result = workflow
+            .execute(
+                &maos_bin::admission::AdmissionDeps {
+                    providers: provider_catalog.get(),
+                    iac: Some(&iac),
+                    scheduler: &scheduler,
+                    security: &security,
+                    transparency_log: &transparency_log,
+                    journal: &shared_journal,
+                    memory: &memory,
+                    pid_by_spirit_id: &pid_by_spirit_id,
+                    hooks: None,
+                },
+                if workflow_replay {
+                    Some(Arc::new(maos_bin::workflow::ReplayInference {
+                        port: port_builder().ok_or("workflow: inference port unavailable")?,
+                        capability: Arc::clone(&capability),
+                        enterprise: enterprise_runtime.clone(),
+                        pdp: enterprise_pdp_runtime.clone(),
+                        principal: session_principal.clone(),
+                    }))
+                } else {
+                    None
+                },
+                boot_nonce,
+            )
+            .await;
+        hook_pump.shutdown().await;
+        return result;
+    }
     // 20-1a: only serving/shell roots enumerate installs, never diagnostic one-shots.
     let installed_manifests =
         if shell_mode || (run_args.is_none() && std::env::var_os("MAOS_ONE_SHOT").is_none()) {

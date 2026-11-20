@@ -1,0 +1,14 @@
+format = 1
+id = "invoice-evidence"
+entry = "extract"
+
+[steps.extract]
+agent = "invoice-evidence-extractor"
+[steps.extract.routes]
+finding_ready = { step = "review" }
+
+[steps.review]
+agent = "invoice-evidence-reviewer"
+[steps.review.routes]
+documented = { finish = "ready_for_approval" }
+missing_order = { finish = "request_order" }

@@ -235,6 +235,9 @@ maos audit query --spirit <name>   # read a Spirit's Transparency Log trail
                                      #   (calls, halts, operator completions)
 ```
 
+For business-authored, read-only workflows, see the
+[topology authoring and evaluation examples](examples/workflows/README.md).
+
 Operate with `maosctl`:
 
 ```sh
