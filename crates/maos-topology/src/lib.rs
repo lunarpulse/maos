@@ -8,7 +8,7 @@ mod catalog;
 mod plan;
 mod run;
 
-pub use case::{parse_input, Case, CaseExpectation};
+pub use case::{parse_input, ArtifactLabel, Case, CaseExpectation};
 pub use catalog::{Agent, AgentOutput, Catalog, FieldType, Schema};
 pub use plan::{Plan, Route, Step, Topology};
 pub use run::{Run, RunReport, StepReceipt};

@@ -75,6 +75,43 @@ The pilot uses synthetic data and local, read-only Spirits. Its KLOC grant is
 recorded in [`xtask/kloc.toml`](../../xtask/kloc.toml); it changes neither the
 kernel nor the Spirit ABI.
 
+## Compare a candidate before applying it
+
+To try the reroute without applying it, insert this block before the closing
+`)` in the previous example. The comparison uses the same isolated MAOS home
+with `invoice-evidence` still active:
+
+```sh
+"$maos" workflow plan "$examples/invoice-evidence-reroute.toml" "$MAOS_HOME/candidate.json"
+printf 'Candidate digest: '; read -r candidate_digest
+jq '.entries += .entries | .entries[1].sequence = 1' \
+  "$examples/invoice-evidence-missing.cassette.json" > "$MAOS_HOME/compare.cassette.json"
+MAOS_REPLAY_CASSETTE="$MAOS_HOME/compare.cassette.json" "$maos" workflow compare \
+  "$MAOS_HOME/candidate.json" "$candidate_digest" \
+  "$examples/invoice-evidence-compare-cases.json"
+```
+
+The [labeled cases](invoice-evidence-compare-cases.json) set the target
+business outcome and require at least one `step_artifacts` entry per case.
+An entry names a producing step and the exact typed values of the fields to
+grade. A skipped step, missing field, or different value fails the label.
+For the example, the baseline does not meet the new target outcome
+(`request_order`), while the candidate does (`hold_for_procurement`). A
+candidate that reaches the right outcome with the wrong quote still fails.
+
+The active revision must match the candidate's parent. Both plans must
+remain authorized by the current catalog; if testing a new package version,
+keep the baseline entry and register the candidate under a separate key.
+The command runs all cases in file order against the baseline first and then
+against the candidate. A replay cassette must follow that execution order.
+The report identifies both plan digests, the case file hash, the execution
+mode and the cassette hash when applicable. It reports mismatched field
+names, not the input, generated evidence, or gold values. Any candidate
+failure or baseline execution error makes the command exit nonzero. A
+baseline that executes but misses a business label does not block an
+improved candidate. Comparison never changes the active revision and is not
+an approval; `apply` remains a separate step.
+
 ## Author and operate
 
 - **Business author:** Choose a stable workflow ID, name a starting step, select catalog agents, and write a destination for each named outcome: `{ step = "next-role" }` or `{ finish = "business_result" }`. Steps run by declared routes, not declaration order. Cycles, unreachable steps, missing routes, and mismatched schemas are rejected. Each step selects one successor or ends the run; there are no parallel joins.
