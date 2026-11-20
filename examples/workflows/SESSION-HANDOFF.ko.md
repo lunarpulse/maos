@@ -32,10 +32,17 @@ CARGO_TARGET_DIR=/mnt/build/cargo-maos-dsa cargo test --locked --offline \
 | `maos-topology` | 없음 | 923 |
 | `xtask` | 46,753 | 46,754 |
 
-[PR #25](https://github.com/lunarpulse/maos/pull/25)가 `main`의 의존성 문제를 해결했다. [해당 `main` 커밋에서 `cargo-deny` 통과](https://github.com/lunarpulse/maos/actions/runs/44553883474/job/135664588686)를 확인했다. [파일럿 PR #24](https://github.com/lunarpulse/maos/pull/24)를 이 기준 위에 올리고, 새 `workflow.rs`를 기존 권한 보호 테스트에 등록했다. 테스트의 권한 금지 규칙은 바꾸지 않았다.
+[파일럿 PR #24](https://github.com/lunarpulse/maos/pull/24)는 `main`의 `ea8c51b6`에 병합됐다. [PR #25](https://github.com/lunarpulse/maos/pull/25)가 의존성 검사 차단을 해소했고, `workflow.rs`를 기존 권한 보호 테스트의 검사 대상에 추가했다. 파일럿의 [GitHub CI](https://github.com/lunarpulse/maos/actions/runs/44618174893)에서 `cargo-deny`, `workspace-test-suite`, `aggregate`, `release-ready`가 모두 통과했다.
+
+## 활성화 전 후보 평가
+
+`maos workflow compare <후보-plan.json> <후보-digest> <cases.json>`은 현재 활성 계획과 후보를 동일하게 라벨링한 사례로 비교한다. 후보의 부모 해시는 현재 활성 버전과 일치해야 한다. 두 계획 모두 현재 운영자 카탈로그에 등록돼 있어야 한다. 비교는 감사 로그를 남기지만 배포 DB를 바꾸거나 후보를 활성화하지 않는다. 활성화는 별도의 `apply`가 맡는다.
+
+인보이스 실험에서 기준 계획은 `request_order`, 후보는 `hold_for_procurement`였다. 후보의 인용만 바꿔도 최종 결과는 그대로였지만 `extract.quote` 불일치로 비교가 실패했다. 보고서에는 계획·사례·재생 데이터의 해시와 불일치 필드 이름이 남고 증거 원문이나 정답 값은 포함되지 않는다. [후보 평가 실행 가이드](README.md#compare-a-candidate-before-applying-it).
+
+관련 테스트 **14건 통과**. 새 평가 기능에는 파일럿보다 `maos-bin` 190줄(39,909), `maos-topology` 30줄(953)이 더 필요하다. 파일럿 승인에는 이 증가분이 포함되지 않아 평가 코드는 아직 병합하지 않았다.
 
 ## 다시 시작할 때
 
-- 위 KLOC 승인은 파일럿에 한정한다. 다음 기능의 비용은 별도로 계측한다.
-- **다음 기능은 활성화 전 후보 평가다.** 현재 `workflow eval`은 이미 활성화된 계획을 평가한다. 활성 버전을 바꾸지 않고 후보와 기준 계획을 같은 라벨 사례에서 실행하고, 최종 결과가 맞더라도 생성한 증거 필드가 틀리면 실패하도록 한다. 이 기능은 아직 구현하지 않았다.
+- [파일럿 PR #24](https://github.com/lunarpulse/maos/pull/24)와 별도 worktree의 평가 변경을 구분한다. 평가 기능을 병합하려면 위 두 크레이트의 추가 예산이 필요하다.
 - 진입점: [호스트 실행·권한·감사](../../crates/maos-bin/src/workflow.rs), [정확한 재생](../../crates/maos-bin/src/cassette_replay.rs), [계약·라우팅 엔진](../../crates/maos-topology/src/), [증거 전달 CLI 검증](../../crates/maos-bin/tests/workflow_evidence_cli.rs), [같은 스키마에서 실제 출력 해시를 검증하는 테스트](../../crates/maos-topology/tests/infer.rs).

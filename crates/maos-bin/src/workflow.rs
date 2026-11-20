@@ -17,7 +17,9 @@ use maos_kernel_core::scheduler::control_block::ScbLifecycleState;
 use maos_kernel_core::scheduler::{make_spirit_obj, HookOutcome};
 use maos_spirit_abi::ctx::Ctx;
 use maos_spirit_abi::lifecycle::{FramePayload, Spirit};
-use maos_topology::{parse_input, Agent, AgentOutput, Case, Catalog, Plan, RunReport, Topology};
+use maos_topology::{
+    parse_input, Agent, AgentOutput, Case, Catalog, Plan, RunReport, StepReceipt, Topology,
+};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -33,7 +35,7 @@ struct PendingReply {
     result: Option<maos_topology::Result<AgentOutput>>,
 }
 const MAX_FILE_BYTES: usize = 1024 * 1024;
-const USAGE: &str = "Usage:\n  maos workflow plan <topology.toml> <new-plan.json>\n  maos workflow apply <plan.json> <approved-digest>\n  maos workflow run <workflow-id> <input.json>\n  maos workflow eval <workflow-id> <cases.json>";
+const USAGE: &str = "Usage:\n  maos workflow plan <topology.toml> <new-plan.json>\n  maos workflow apply <plan.json> <approved-digest>\n  maos workflow run <workflow-id> <input.json>\n  maos workflow eval <workflow-id> <cases.json>\n  maos workflow compare <candidate-plan.json> <candidate-digest> <cases.json>";
 
 fn read(path: &Path) -> Result<String> {
     let mut options = File::options();
@@ -180,6 +182,7 @@ enum Action {
     Apply { plan: Plan, approved_digest: String },
     Run { id: String, input: Value },
     Eval { id: String, cases: Vec<Case> },
+    Compare(Comparison),
 }
 
 pub fn prepare(args: &[String]) -> Result<Option<Pending>> {
@@ -187,16 +190,24 @@ pub fn prepare(args: &[String]) -> Result<Option<Pending>> {
         println!("{USAGE}");
         return Ok(None);
     }
-    let [verb, first, second] = args else {
-        return Err(USAGE.into());
+    let verb = match args {
+        [verb, _, _] if matches!(verb.as_str(), "plan" | "apply" | "run" | "eval") => verb,
+        [verb, _, _, _] if verb == "compare" => verb,
+        _ => return Err(USAGE.into()),
     };
-    if !matches!(verb.as_str(), "plan" | "apply" | "run" | "eval") {
-        return Err(USAGE.into());
-    }
     if std::env::var_os("MAOS_ONE_SHOT").is_some() {
         return Err("workflow cannot be combined with MAOS_ONE_SHOT".into());
     }
     let home = Home::resolve()?;
+    if let [_, candidate, digest, cases] = args {
+        return Ok(Some(Pending {
+            home,
+            action: Action::Compare(Comparison::read(candidate, digest, cases)?),
+        }));
+    }
+    let [_, first, second] = args else {
+        unreachable!("validated above")
+    };
     if verb == "plan" {
         plan(&home, Path::new(first), Path::new(second))?;
         return Ok(None);
@@ -253,35 +264,31 @@ impl Pending {
                     runtime.stage(&plan, boot_nonce).await?;
                     plan.validate_live(&home.catalog()?)?;
                     runtime.start().await?;
-                    runtime.run(&plan, input).await
+                    runtime.run(&plan, input, |_, _| {}).await
                 }
                 .await;
                 let report = runtime.finish(result).await?;
                 println!("{}", serde_json::to_string(&report)?);
                 Ok(())
             }
-            Action::Eval { id, cases } => {
+            Action::Eval { id, mut cases } => {
                 let plan = load_active(&home, &id)?;
-                let mut runtime = Bindings::new(deps, inference);
-                let result = async {
-                    runtime.stage(&plan, boot_nonce).await?;
-                    plan.validate_live(&home.catalog()?)?;
-                    runtime.start().await?;
-                    let mut results = Vec::with_capacity(cases.len());
-                    let mut passed = 0;
-                    for case in cases {
-                        plan.validate_live(&home.catalog()?)?;
-                        let run = runtime.run(&plan, case.input).await;
-                        let pass = run.as_ref().is_ok_and(|report| case.expect.matches(report));
-                        passed += usize::from(pass);
-                        results.push(match run {
-                            Ok(report) => json!({"id": case.id, "passed": pass, "expected": case.expect, "observed_outcome": report.outcome, "path":report.path, "run_id": report.run_id}),
-                            Err(error) => json!({"id": case.id, "passed": false, "error": error.to_string()}),
-                        });
-                    }
-                    Ok((passed, results))
-                }.await;
-                let (passed, results) = runtime.finish(result).await?;
+                let verdicts = Bindings::new(deps, inference)
+                    .evaluate(&home, &plan, boot_nonce, case_inputs(&mut cases))
+                    .await?;
+                let passed = verdicts.iter().filter(|verdict| verdict.passed).count();
+                let results: Vec<_> = cases
+                    .into_iter()
+                    .zip(verdicts)
+                    .map(|(case, verdict)| {
+                        let mut detail = verdict.detail;
+                        detail["id"] = json!(case.id);
+                        if verdict.ran {
+                            detail["expected"] = json!(case.expect);
+                        }
+                        detail
+                    })
+                    .collect();
                 println!(
                     "{}",
                     json!({"event":"workflow_eval", "revision":plan.digest()?, "passed":passed, "total":results.len(), "cases":results})
@@ -290,6 +297,9 @@ impl Pending {
                     return Err("workflow evaluation did not pass".into());
                 }
                 Ok(())
+            }
+            Action::Compare(comparison) => {
+                comparison.execute(&home, deps, inference, boot_nonce).await
             }
         }
     }
@@ -302,6 +312,120 @@ fn load_active(home: &Home, id: &str) -> Result<Plan> {
     let (_, plan) = active(&db, id)?.ok_or_else(|| format!("workflow '{id}' is not active"))?;
     plan.validate_live(&home.catalog()?)?;
     Ok(plan)
+}
+
+struct Comparison {
+    candidate: Plan,
+    digest: String,
+    cases: Vec<Case>,
+    cases_digest: String,
+}
+
+impl Comparison {
+    fn read(candidate: &str, digest: &str, cases: &str) -> Result<Self> {
+        let candidate: Plan = serde_json::from_str(&read(Path::new(candidate))?)?;
+        let candidate_digest = candidate.digest()?;
+        if digest != candidate_digest {
+            return Err("workflow: supplied digest does not match the candidate plan".into());
+        }
+        let text = read(Path::new(cases))?;
+        let cases = Case::parse(&text)?;
+        if let Some(case) = cases.iter().find(|case| case.step_artifacts.is_empty()) {
+            return Err(format!(
+                "workflow: comparison case '{}' needs step_artifacts",
+                case.id
+            )
+            .into());
+        }
+        Ok(Self {
+            candidate,
+            digest: candidate_digest,
+            cases,
+            cases_digest: hex::encode(Sha256::digest(text.as_bytes())),
+        })
+    }
+
+    async fn execute(
+        mut self,
+        home: &Home,
+        deps: &AdmissionDeps<'_>,
+        inference: Option<Arc<ReplayInference>>,
+        boot_nonce: u64,
+    ) -> Result<()> {
+        let id = &self.candidate.topology.id;
+        let baseline = load_active(home, id)?;
+        let baseline_digest = baseline.digest()?;
+        if self.candidate.previous.as_deref() != Some(baseline_digest.as_str()) {
+            return Err("workflow: active revision changed; replan before comparing".into());
+        }
+        self.candidate.validate_live(&home.catalog()?)?;
+        let cassette_digest = inference
+            .as_ref()
+            .map(|replay| replay.cassette_digest.clone());
+        // One shared replay stream, consumed in suite order, first by the active revision.
+        // Unload its roles before staging the candidate, which may use the same Spirit IDs.
+        let before = Bindings::new(deps, inference.clone())
+            .evaluate(
+                home,
+                &baseline,
+                boot_nonce,
+                self.cases.iter().map(|case| (case, case.input.clone())),
+            )
+            .await?;
+        let after = Bindings::new(deps, inference)
+            .evaluate(
+                home,
+                &self.candidate,
+                boot_nonce,
+                case_inputs(&mut self.cases),
+            )
+            .await?;
+        if load_active(home, id)?.digest()? != baseline_digest {
+            return Err("workflow: active revision changed during comparison; replan".into());
+        }
+        self.candidate.validate_live(&home.catalog()?)?;
+        let baseline_passed = before.iter().filter(|v| v.passed).count();
+        let candidate_passed = after.iter().filter(|v| v.passed).count();
+        let passed = before.iter().all(|v| v.ran) && candidate_passed == self.cases.len();
+        let compared: Vec<_> = self
+            .cases
+            .into_iter()
+            .zip(before.into_iter().zip(after))
+            .map(|(case, (baseline, candidate))| {
+                json!({
+                    "id": case.id, "baseline": baseline.detail, "candidate": candidate.detail,
+                })
+            })
+            .collect();
+        println!(
+            "{}",
+            json!({
+                "event": "workflow_comparison", "format": 1, "workflow": id,
+                "baseline_revision": baseline_digest, "candidate_revision": self.digest,
+                "cases_sha256": self.cases_digest, "cassette_sha256": cassette_digest,
+                "mode": if cassette_digest.is_some() { "strict_replay" } else { "rules" },
+                "passed": passed, "baseline_passed": baseline_passed,
+                "candidate_passed": candidate_passed, "total": compared.len(), "cases": compared,
+            })
+        );
+        if !passed {
+            return Err("workflow candidate comparison did not pass".into());
+        }
+        Ok(())
+    }
+}
+
+fn case_inputs(cases: &mut [Case]) -> impl ExactSizeIterator<Item = (&Case, Value)> {
+    cases.iter_mut().map(|case| {
+        let input = std::mem::take(&mut case.input);
+        (&*case, input)
+    })
+}
+
+struct Verdict {
+    ran: bool,
+    passed: bool,
+    detail: Value,
 }
 
 async fn apply(
@@ -359,6 +483,7 @@ async fn apply(
 /// The composition root provides this only in explicit, exact cassette replay.
 pub struct ReplayInference {
     pub port: Arc<dyn InferencePort + Send + Sync>,
+    pub cassette_digest: String,
     pub capability: Arc<CapabilityRegistryAdapter>,
     pub enterprise: Option<Arc<crate::enterprise_identity::EnterpriseRuntime>>,
     pub pdp: Option<crate::enterprise_pdp_runtime::EnterprisePdpRuntime>,
@@ -582,7 +707,64 @@ tier = "T0"
         Ok(())
     }
 
-    async fn run(&self, plan: &Plan, input: Value) -> Result<RunReport> {
+    async fn evaluate<'b>(
+        mut self,
+        home: &Home,
+        plan: &Plan,
+        boot_nonce: u64,
+        cases: impl ExactSizeIterator<Item = (&'b Case, Value)>,
+    ) -> Result<Vec<Verdict>> {
+        let result = async {
+            plan.validate_live(&home.catalog()?)?;
+            self.stage(plan, boot_nonce).await?;
+            plan.validate_live(&home.catalog()?)?;
+            self.start().await?;
+            let mut verdicts = Vec::with_capacity(cases.len());
+            for (case, input) in cases {
+                plan.validate_live(&home.catalog()?)?;
+                let mut checks: BTreeMap<_, _> = case.step_artifacts.iter()
+                    .map(|label| (label.step.as_str(), (&label.fields, None)))
+                    .collect();
+                let report = self.run(plan, input, |receipt, artifact| {
+                    if let Some((fields, mismatches)) = checks.get_mut(receipt.step.as_str()) {
+                        *mismatches = Some(fields.iter().filter_map(|(field, value)| {
+                            (artifact.get(field) != Some(value)).then_some(field.as_str())
+                        }).collect::<Vec<_>>());
+                    }
+                }).await;
+                let verdict = match report {
+                    Ok(report) => {
+                        let passed = case.expect.matches(&report) && checks.values()
+                            .all(|(_, mismatches)| mismatches.as_ref().is_some_and(Vec::is_empty));
+                        let mut detail = json!({
+                            "passed": passed, "observed_outcome": report.outcome,
+                            "path": report.path, "run_id": report.run_id,
+                        });
+                        if !checks.is_empty() {
+                            detail["artifact_checks"] = checks.into_iter().map(|(step, (_, mismatches))| {
+                                json!({"step": step, "visited": mismatches.is_some(), "mismatched_fields": mismatches})
+                            }).collect::<Value>();
+                        }
+                        Verdict { ran: true, passed, detail }
+                    }
+                    Err(error) => Verdict {
+                        ran: false, passed: false,
+                        detail: json!({"passed": false, "error": error.to_string()}),
+                    },
+                };
+                verdicts.push(verdict);
+            }
+            Ok(verdicts)
+        }.await;
+        self.finish(result).await
+    }
+
+    async fn run(
+        &self,
+        plan: &Plan,
+        input: Value,
+        mut observe: impl FnMut(&StepReceipt, &Value),
+    ) -> Result<RunReport> {
         let run_id = ulid::Ulid::new().to_string();
         let revision = plan.digest()?;
         let mut run = plan.start(input, run_id.clone())?;
@@ -649,6 +831,12 @@ tier = "T0"
                     None => run.last_handoff(),
                 }
                 .expect("an accepted step has a receipt");
+                observe(
+                    receipt,
+                    report
+                        .as_ref()
+                        .map_or_else(|| run.input(), |report| &report.artifact),
+                );
                 let recipient = match &receipt.route {
                     maos_topology::Route::Step { step } => Some(step),
                     maos_topology::Route::Finish { .. } => None,
