@@ -40,9 +40,9 @@ CARGO_TARGET_DIR=/mnt/build/cargo-maos-dsa cargo test --locked --offline \
 
 인보이스 실험에서 기준 계획은 `request_order`, 후보는 `hold_for_procurement`였다. 후보의 인용만 바꿔도 최종 결과는 그대로였지만 `extract.quote` 불일치로 비교가 실패했다. 보고서에는 계획·사례·재생 데이터의 해시와 불일치 필드 이름이 남고 증거 원문이나 정답 값은 포함되지 않는다. [후보 평가 실행 가이드](README.md#compare-a-candidate-before-applying-it).
 
-관련 테스트 **14건 통과**. 새 평가 기능에는 파일럿보다 `maos-bin` 190줄(39,909), `maos-topology` 30줄(953)이 더 필요하다. 파일럿 승인에는 이 증가분이 포함되지 않아 평가 코드는 아직 병합하지 않았다.
+운영자가 별도로 승인한 코드 예산을 `xtask/kloc.toml`에 반영했다. `maos-bin` 39,909줄(+190), `maos-topology` 953줄(+30)로 KLOC 검사를 통과했다. 파일럿과 후보 평가를 함께 검증한 테스트 23건이 통과했고, 별도 PostgreSQL 환경이 필요한 1건은 건너뛰었다.
 
 ## 다시 시작할 때
 
-- [파일럿 PR #24](https://github.com/lunarpulse/maos/pull/24)와 별도 worktree의 평가 변경을 구분한다. 평가 기능을 병합하려면 위 두 크레이트의 추가 예산이 필요하다.
+- 활성화 전 평가 변경은 `dsa-pre-activation-eval` 브랜치에서 파일럿과 별도로 제출한다. 합성 응답의 재생 결과는 실제 모델의 품질·비용 검증으로 간주하지 않는다.
 - 진입점: [호스트 실행·권한·감사](../../crates/maos-bin/src/workflow.rs), [정확한 재생](../../crates/maos-bin/src/cassette_replay.rs), [계약·라우팅 엔진](../../crates/maos-topology/src/), [증거 전달 CLI 검증](../../crates/maos-bin/tests/workflow_evidence_cli.rs), [같은 스키마에서 실제 출력 해시를 검증하는 테스트](../../crates/maos-topology/tests/infer.rs).

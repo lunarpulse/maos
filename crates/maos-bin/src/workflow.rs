@@ -359,9 +359,7 @@ impl Comparison {
             return Err("workflow: active revision changed; replan before comparing".into());
         }
         self.candidate.validate_live(&home.catalog()?)?;
-        let cassette_digest = inference
-            .as_ref()
-            .map(|replay| replay.cassette_digest.clone());
+        let cassette_digest = inference.as_ref().map(|r| r.cassette_digest.clone());
         // One shared replay stream, consumed in suite order, first by the active revision.
         // Unload its roles before staging the candidate, which may use the same Spirit IDs.
         let before = Bindings::new(deps, inference.clone())
@@ -372,6 +370,9 @@ impl Comparison {
                 self.cases.iter().map(|case| (case, case.input.clone())),
             )
             .await?;
+        if load_active(home, id)?.digest()? != baseline_digest {
+            return Err("workflow: active revision changed during comparison; replan".into());
+        }
         let after = Bindings::new(deps, inference)
             .evaluate(
                 home,
@@ -408,10 +409,9 @@ impl Comparison {
                 "candidate_passed": candidate_passed, "total": compared.len(), "cases": compared,
             })
         );
-        if !passed {
-            return Err("workflow candidate comparison did not pass".into());
-        }
-        Ok(())
+        passed
+            .then_some(())
+            .ok_or_else(|| "workflow candidate comparison did not pass".into())
     }
 }
 
