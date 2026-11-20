@@ -307,6 +307,20 @@ fn comparison_grades_intermediate_evidence_without_activating_the_candidate() {
         "hold_for_procurement"
     );
 
+    let expected_response = tape["entries"][0]["response"]["text"].clone();
+    tape["entries"][0]["response"]["text"] = json!("{");
+    write_tape(&tape);
+    let out = compare(candidate_digest, &cases);
+    assert!(!out.status.success(), "{out:?}");
+    let malformed = record(&out, "candidate_revision");
+    assert_eq!(malformed["candidate_passed"], 1);
+    assert_eq!(malformed["passed"], false);
+    assert!(malformed["cases"][0]["baseline"]["error"]
+        .as_str()
+        .unwrap()
+        .contains("malformed evidence JSON"));
+    tape["entries"][0]["response"]["text"] = expected_response;
+
     // The shorter quote is verbatim and passes the runtime contract, but is not the gold label.
     // The reviewer still returns the right final answer.
     let mut finding: Value =
