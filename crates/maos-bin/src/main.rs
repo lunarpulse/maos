@@ -4017,6 +4017,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // key's driver is replaced/wrapped, so capability scopes, fallback, IAC,
     // attribution, and Transparency Log behavior stay in the kernel adapter.
     let mut cassette_recorder: Option<Arc<cassette_replay::CassetteRecorder>> = None;
+    let mut workflow_cassette_digest = None;
     match &inference_mode {
         ResolvedInferenceMode::Replay {
             cassette,
@@ -4024,7 +4025,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             explicit: true,
         } => {
             let replay = if workflow_replay {
-                cassette_replay::CassetteReplayProvider::for_workflow(cassette)
+                cassette_replay::CassetteReplayProvider::for_workflow(cassette).map(
+                    |(replay, digest)| {
+                        workflow_cassette_digest = Some(digest);
+                        replay
+                    },
+                )
             } else {
                 cassette_replay::CassetteReplayProvider::from_file(cassette, *strict)
             }
@@ -4401,9 +4407,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     pid_by_spirit_id: &pid_by_spirit_id,
                     hooks: None,
                 },
-                if workflow_replay {
+                if let Some(cassette_digest) = workflow_cassette_digest {
                     Some(Arc::new(maos_bin::workflow::ReplayInference {
                         port: port_builder().ok_or("workflow: inference port unavailable")?,
+                        cassette_digest,
                         capability: Arc::clone(&capability),
                         enterprise: enterprise_runtime.clone(),
                         pdp: enterprise_pdp_runtime.clone(),

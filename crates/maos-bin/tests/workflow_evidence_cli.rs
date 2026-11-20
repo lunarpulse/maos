@@ -7,6 +7,7 @@ use std::process::{Command, Output};
 
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use tempfile::{tempdir, TempDir};
 
 const ID: &str = "invoice-evidence";
@@ -71,6 +72,11 @@ fn workflow_command(
 #[track_caller]
 fn result(out: Output, field: &str) -> Value {
     assert!(out.status.success(), "{out:?}");
+    record(&out, field)
+}
+
+#[track_caller]
+fn record(out: &Output, field: &str) -> Value {
     std::str::from_utf8(&out.stdout)
         .unwrap()
         .lines()
@@ -237,6 +243,143 @@ fn approved_reroute_changes_only_the_missing_order_terminal() {
     assert_eq!(revised["changes"]["changed"], json!(["review"]));
     assert_finding(dir, &revised, false, "hold_for_procurement");
     assert_finding(dir, &revised, true, "ready_for_approval");
+}
+
+#[test]
+fn comparison_grades_intermediate_evidence_without_activating_the_candidate() {
+    let temp = setup();
+    let dir = temp.path();
+    let base = deploy(dir, "invoice-evidence.toml", "base.json");
+    let candidate = result(
+        workflow(
+            dir,
+            "plan",
+            example("invoice-evidence-reroute.toml"),
+            "candidate.json",
+            None,
+        ),
+        "digest",
+    );
+    let candidate_digest = candidate["digest"].as_str().unwrap();
+    let cases = example("invoice-evidence-compare-cases.json");
+    let cassette = dir.join("comparison.cassette.json");
+    let mut tape: Value =
+        serde_json::from_slice(&fs::read(example(MISSING_TAPE)).unwrap()).unwrap();
+    tape["entries"][0]["sequence"] = json!(0);
+    let mut second = tape["entries"][0].clone();
+    second["sequence"] = json!(1);
+    tape["entries"].as_array_mut().unwrap().push(second);
+    let write_tape = |tape: &Value| {
+        let bytes = serde_json::to_vec(tape).unwrap();
+        fs::write(&cassette, &bytes).unwrap();
+        hex::encode(Sha256::digest(bytes))
+    };
+    let compare = |digest: &str, cases: &Path| {
+        workflow_command(dir, "compare", "candidate.json", digest, Some(&cassette))
+            .arg(cases)
+            .output()
+            .unwrap()
+    };
+
+    let digest = write_tape(&tape);
+    let db = audit(dir);
+    let before = watermark(&db);
+    let deployment_file = dir.join("maos/workflow-deployments.sqlite");
+    let deployment_before = fs::read(&deployment_file).unwrap();
+    let good = result(compare(candidate_digest, &cases), "candidate_revision");
+    assert_eq!(good["baseline_revision"], base["digest"]);
+    assert_eq!(good["candidate_revision"], candidate_digest);
+    assert_eq!(
+        good["cases_sha256"],
+        hex::encode(Sha256::digest(fs::read(&cases).unwrap()))
+    );
+    assert_eq!(good["cassette_sha256"], digest);
+    assert_eq!(good["mode"], "strict_replay");
+    assert_eq!(good["passed"], true);
+    assert_eq!(good["baseline_passed"], 0);
+    assert_eq!(good["candidate_passed"], 1);
+    assert_eq!(
+        good["cases"][0]["baseline"]["observed_outcome"],
+        "request_order"
+    );
+    assert_eq!(
+        good["cases"][0]["candidate"]["observed_outcome"],
+        "hold_for_procurement"
+    );
+
+    let expected_response = tape["entries"][0]["response"]["text"].clone();
+    tape["entries"][0]["response"]["text"] = json!("{");
+    write_tape(&tape);
+    let out = compare(candidate_digest, &cases);
+    assert!(!out.status.success(), "{out:?}");
+    let malformed = record(&out, "candidate_revision");
+    assert_eq!(malformed["candidate_passed"], 1);
+    assert_eq!(malformed["passed"], false);
+    assert!(malformed["cases"][0]["baseline"]["error"]
+        .as_str()
+        .unwrap()
+        .contains("malformed evidence JSON"));
+    tape["entries"][0]["response"]["text"] = expected_response;
+
+    // The shorter quote is verbatim and passes the runtime contract, but is not the gold label.
+    // The reviewer still returns the right final answer.
+    let mut finding: Value =
+        serde_json::from_str(tape["entries"][1]["response"]["text"].as_str().unwrap()).unwrap();
+    finding["artifact"]["quote"] = json!("No purchase order");
+    tape["entries"][1]["response"]["text"] = json!(finding.to_string());
+    write_tape(&tape);
+    let out = compare(candidate_digest, &cases);
+    assert!(!out.status.success(), "{out:?}");
+    let bad = record(&out, "candidate_revision");
+    let row = &bad["cases"][0]["candidate"];
+    assert_eq!(row["observed_outcome"], "hold_for_procurement");
+    assert_eq!(row["passed"], false);
+    assert_eq!(
+        row["artifact_checks"],
+        json!([{
+            "step": "extract", "visited": true, "mismatched_fields": ["quote"],
+        }])
+    );
+    assert!(!String::from_utf8_lossy(&out.stdout).contains("No purchase order"));
+    assert_eq!(fs::read(deployment_file).unwrap(), deployment_before);
+    assert!(trace(&db, before)
+        .iter()
+        .all(|(intent, _)| !intent.starts_with("workflow:activat")));
+    assert_finding(dir, &base, false, "request_order");
+
+    let unlabelled = dir.join("unlabelled.json");
+    let mut labels: Value = serde_json::from_slice(&fs::read(&cases).unwrap()).unwrap();
+    labels[0].as_object_mut().unwrap().remove("step_artifacts");
+    fs::write(&unlabelled, labels.to_string()).unwrap();
+    let before = watermark(&db);
+    for (digest, cases, reason) in [
+        ("wrong-digest", &cases, "does not match the candidate plan"),
+        (candidate_digest, &unlabelled, "needs step_artifacts"),
+    ] {
+        let out = compare(digest, cases);
+        assert!(
+            !out.status.success() && String::from_utf8_lossy(&out.stderr).contains(reason),
+            "{out:?}"
+        );
+    }
+    assert!(trace(&db, before).is_empty());
+
+    let applied = workflow(
+        dir,
+        "apply",
+        "candidate.json",
+        candidate_digest,
+        Some(&example(MISSING_TAPE)),
+    );
+    assert!(applied.status.success(), "{applied:?}");
+    let before = watermark(&db);
+    let out = compare(candidate_digest, &cases);
+    assert!(
+        !out.status.success()
+            && String::from_utf8_lossy(&out.stderr).contains("replan before comparing"),
+        "{out:?}"
+    );
+    assert!(trace(&db, before).is_empty());
 }
 
 #[test]

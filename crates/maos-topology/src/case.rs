@@ -17,6 +17,16 @@ pub struct Case {
     #[serde(deserialize_with = "input_object")]
     pub input: Value,
     pub expect: CaseExpectation,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub step_artifacts: Vec<ArtifactLabel>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ArtifactLabel {
+    pub step: String,
+    #[serde(deserialize_with = "scalar_fields")]
+    pub fields: Map<String, Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,21 +58,30 @@ fn present_path<'de, D: Deserializer<'de>>(
 pub(crate) fn input_object<'de, D: Deserializer<'de>>(
     d: D,
 ) -> std::result::Result<Value, D::Error> {
+    scalar_fields(d).map(Value::Object)
+}
+
+fn scalar_fields<'de, D: Deserializer<'de>>(
+    d: D,
+) -> std::result::Result<Map<String, Value>, D::Error> {
     struct Object;
     impl<'de> Visitor<'de> for Object {
-        type Value = Value;
+        type Value = Map<String, Value>;
 
         fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             f.write_str("a bounded object of string, bool or i64 fields")
         }
 
-        fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> std::result::Result<Value, M::Error> {
+        fn visit_map<M: MapAccess<'de>>(
+            self,
+            mut map: M,
+        ) -> std::result::Result<Self::Value, M::Error> {
             let mut result = Map::new();
             let mut bytes = 0;
             while let Some(key) = map.next_key::<String>()? {
-                name("case input field", &key).map_err(M::Error::custom)?;
+                name("artifact field", &key).map_err(M::Error::custom)?;
                 if result.len() >= MAX_FIELDS || result.contains_key(&key) {
-                    return Err(M::Error::custom("duplicate or excess case input field"));
+                    return Err(M::Error::custom("duplicate or excess artifact field"));
                 }
                 let value: Value = map.next_value()?;
                 bytes += key.len()
@@ -73,11 +92,11 @@ pub(crate) fn input_object<'de, D: Deserializer<'de>>(
                         _ => return Err(M::Error::custom("expected bounded string, bool or i64")),
                     };
                 if bytes > MAX_ARTIFACT {
-                    return Err(M::Error::custom("case input exceeds size limit"));
+                    return Err(M::Error::custom("artifact exceeds size limit"));
                 }
                 result.insert(key, value);
             }
-            Ok(Value::Object(result))
+            Ok(result)
         }
     }
     d.deserialize_map(Object)
@@ -129,6 +148,19 @@ impl Case {
                 }
                 for outcome in outcomes {
                     name("expected step outcome", outcome)?;
+                }
+            }
+            if case.step_artifacts.len() > MAX_STEPS {
+                return Err(format!("{}: too many artifact labels", case.id));
+            }
+            let mut steps = BTreeSet::new();
+            for label in &case.step_artifacts {
+                name("artifact label step", &label.step)?;
+                if !steps.insert(&label.step) || label.fields.is_empty() {
+                    return Err(format!(
+                        "{}: duplicate or empty artifact label for {}",
+                        case.id, label.step
+                    ));
                 }
             }
         }
