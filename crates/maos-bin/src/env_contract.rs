@@ -394,6 +394,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {
+        name: "MAOS_WORKFLOW_MAX_INFERENCE_CALLS",
+        purpose: "Mandatory positive integer bounding the model calls of a live `maos workflow compare` (cases x repeat x 2 x inference steps must not exceed it); unset or malformed is a refusal before any call",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_EPIC_HALT_HOLD_SECS",
         purpose: "Story 19-4 (D-19-4-05 A) — whole seconds an `--epic` run holds a section whose Orchestrator halt is pending, polling every 100 ms for its resolution over the operator door (`maosctl halt resolve`): provided-context resumes the section with the clarification appended to its goal, authorized-override resumes it unchanged, accepted-halt, the bound or shutdown stop dispatch. Unset or 0 ⇒ the 19-1 stop (no hold); malformed ⇒ typed refusal before any entry loads",
         stability: EnvStability::UserFacing,
