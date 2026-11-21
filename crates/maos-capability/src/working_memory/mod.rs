@@ -74,6 +74,9 @@ pub enum SetScalarError {
     EmptyDerivedFrom,
     #[error("slot-persistence overflowed; per-Spirit-per-tag slot map invariant violated")]
     OverflowingPersistence,
+    /// FR13 — the pid is quarantined; its scalar write is refused and publishes no tap.
+    #[error("spirit_pid {spirit_pid} is quarantined; scalar write refused")]
+    Quarantined { spirit_pid: u32 },
 }
 
 #[cfg(test)]

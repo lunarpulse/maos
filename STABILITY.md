@@ -25,8 +25,8 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 | `abi_version` | `1` |
 | `manifest_schema_version` (current) | `7` |
 | supported schema window | `1..=7` |
-| `[cli_wrapper]` `manifest_schema_version` (current; absent means 1) | `1` |
-| supported `[cli_wrapper]` window | `1..=1` |
+| `[cli_wrapper]` `manifest_schema_version` (current; absent means 1) | `2` |
+| supported `[cli_wrapper]` window | `1..=2` |
 | workspace crates | `60` |
 
 | Manifest schema | Kernel behavior |
@@ -36,7 +36,7 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 | `manifest_schema_version < 1` (N-2) | ⛔ hard refusal — typed `SecurityError::EAbiTooOld` at admit |
 | `manifest_schema_version > 7` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
 | `min_substrate_version` > running `kernel_version` | ⛔ hard refusal — typed `SecurityError::ESubstrateTooOld` (FR8) |
-| `[cli_wrapper]` `manifest_schema_version` outside `1..=1` | ⛔ hard refusal before the strict parse — typed `CliWrapperAdmissionError::ECliWrapperSchemaUnsupported` |
+| `[cli_wrapper]` `manifest_schema_version` outside `1..=2` | ⛔ hard refusal before the strict parse — typed `CliWrapperAdmissionError::ECliWrapperSchemaUnsupported` |
 
 The version gate is **fail-closed in both directions**: an out-of-window
 manifest is refused with an actionable typed error, never silently

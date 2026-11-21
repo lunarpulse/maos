@@ -108,6 +108,11 @@ impl EgressHandle {
         Ok((Self(shared), task))
     }
 
+    /// FR13 — a quarantined Worker's bearer never verifies (`fenced` is the sender fence).
+    pub fn fence_senders(&self, fenced: impl Fn(u32) -> bool + Send + Sync + 'static) {
+        self.0.table.set_fence(fenced);
+    }
+
     pub fn is_available(&self) -> bool {
         !self.0.cancel.is_cancelled() && !self.0.state.lock().closed
     }

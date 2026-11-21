@@ -263,6 +263,7 @@ author_self = {granted}
                 hooks: None,
                 providers: None,
                 iac: Some(&iac),
+                quarantine: None,
             },
             &gated,
             obj,

@@ -178,8 +178,10 @@ pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = MANIFEST_SCHEMA_VERSION;
 ///
 /// A counter separate from [`MANIFEST_SCHEMA_VERSION`]: a Worker manifest has no
 /// `[class]`, so it carries no ABI triple. An absent
-/// `[cli_wrapper] manifest_schema_version` means `1` for the whole v1.x line.
-pub const CLI_WRAPPER_SCHEMA_VERSION: u32 = 1;
+/// `[cli_wrapper] manifest_schema_version` means `1`. Schema `2`
+/// (later-registry-quarantine-closure D-LRQC-04 A) requires `class_name` + `class_version`, the
+/// Worker's CRL-addressable identity; schema `1` cannot carry them.
+pub const CLI_WRAPPER_SCHEMA_VERSION: u32 = 2;
 
 /// Oldest `[cli_wrapper]` schema version this kernel accepts.
 pub const MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION: u32 = 1;

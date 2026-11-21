@@ -479,6 +479,7 @@ impl Shared {
                 self.quarantine(pid, entry, &class, &why);
             }
             HookOutcome::SkippedManifest
+            | HookOutcome::SkippedQuarantined
             | HookOutcome::DeferredToNextStory
             | HookOutcome::HaltPending => {}
         }
@@ -566,6 +567,7 @@ impl Shared {
                         &shared.counters.delivered
                     }
                     HookOutcome::SkippedManifest => &shared.counters.skipped_manifest,
+                    HookOutcome::SkippedQuarantined => &shared.counters.ineligible,
                     _ => &shared.counters.failed,
                 };
                 counter.fetch_add(1, Ordering::Relaxed);
@@ -1406,7 +1408,10 @@ async fn consolidate_once(
             if busy {
                 return pid;
             }
-            if !matches!(outcome, HookOutcome::SkippedManifest) {
+            if !matches!(
+                outcome,
+                HookOutcome::SkippedManifest | HookOutcome::SkippedQuarantined
+            ) {
                 if let Some(entry) = shared.registry().get_mut(&pid) {
                     if entry
                         .object

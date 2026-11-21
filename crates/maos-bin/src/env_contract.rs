@@ -13,7 +13,7 @@ pub enum EnvStability {
 pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     EnvVar {
         name: "MAOS_YANK_POLICY",
-        purpose: "Registry yank policy: warn (default), quarantine (capability-mediated per-pid fence on the matched running Spirit; not isolation), auto-revoke",
+        purpose: "Registry yank policy: warn (default), quarantine (a durable (spirit_id, version) hold plus a capability/sender/egress fence on every live Spirit of that identity, re-applied at every admission until `maosctl quarantine-release`; fences memory and scalar writes, native IAC sends, distillate writes, Worker egress and event-driven hooks; memory reads and the Spirit's process or container keep running — not isolation), auto-revoke",
         stability: EnvStability::UserFacing,
     },
     EnvVar {
@@ -651,6 +651,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     EnvVar {
         name: "MAOS_REGISTRY_YANK_CURSOR_PATH",
         purpose: "Override the durable registry yank-cursor file; maos purge enumerates the same path so the cursor is not orphaned (Story 16-4)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_QUARANTINE_STORE_PATH",
+        purpose: "Override the durable FR13 quarantine-hold file (default <MAOS_HOME|HOME/.maos>/quarantine/holds.json; with no home resolved holds are in-memory only and boot prints one line); maos purge enumerates the same path (later-registry-quarantine-closure)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {

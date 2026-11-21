@@ -2309,6 +2309,7 @@ async fn admitted_class_bundle(
         &maos_bin::admission::AdmissionDeps {
             providers: None,
             iac: None,
+            quarantine: None,
             scheduler: &scheduler,
             security: &security,
             transparency_log: &tl,
