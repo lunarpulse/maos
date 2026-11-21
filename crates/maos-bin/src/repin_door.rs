@@ -69,14 +69,14 @@ impl RepinControl {
     /// store is installed in this process (the route answers 404).
     pub fn peer_pins(&self) -> Option<PeerPinStatus> {
         let pins = self.pins.get()?;
-        if pins.is_degraded() {
+        let Some(records) = pins.healthy_records() else {
             return Some(PeerPinStatus::Unhealthy {
                 detail: "the last pin-file write failed; the live pins are ahead of a2a-pins.json \
                          until a later write succeeds"
                     .into(),
             });
-        }
-        let rows = pins.records().into_iter().map(|record| PeerPinRow {
+        };
+        let rows = records.into_iter().map(|record| PeerPinRow {
             peer: record.pin.peer.as_str().to_owned(),
             fingerprint: record.pin.fingerprint.wire(),
             generation: record.generation,
@@ -183,13 +183,12 @@ impl RepinControl {
                     detail: format!("{error}; the pin stays invalidated"),
                 };
             }
-            RePinDecision::PersistFailed { detail } => {
+            RePinDecision::PersistFailed { .. } => {
                 return OperatorOutcome::Failed {
                     code: "pins_unwritable".into(),
-                    detail: format!(
-                        "the pin file could not be written ({detail}); the pin stays \
-                         invalidated and the request stays pending"
-                    ),
+                    detail: "the pin file could not be written; the pin stays invalidated and \
+                             the request stays pending"
+                        .into(),
                 };
             }
             RePinDecision::TimedOut => {

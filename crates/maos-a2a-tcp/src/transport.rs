@@ -449,6 +449,10 @@ impl TcpA2ATransport {
         let local_addr = listener
             .local_addr()
             .map_err(|e| TcpTransportError::Io(format!("local_addr: {e}")))?;
+        // Story 21-3 — durable state is rewritten only after every fallible setup step.
+        pins.flush().map_err(|e| {
+            TcpTransportError::Config(format!("cannot write the durable pin file: {e}"))
+        })?;
 
         let intake_entered = Arc::new(AtomicUsize::new(0));
         let active_connections = Arc::new(AtomicUsize::new(0));

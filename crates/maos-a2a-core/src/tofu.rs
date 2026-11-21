@@ -437,6 +437,13 @@ impl InMemoryTofuPinStore {
         self.records_with(None)
     }
 
+    /// Story 21-3 — the records, or `None` while degraded, read together under
+    /// `window_lock` so a concurrent failing narrowing write cannot split them.
+    pub fn healthy_records(&self) -> Option<Vec<PinRecord>> {
+        let _guard = self.lock_window();
+        (!self.is_degraded()).then(|| self.records_with(None))
+    }
+
     /// Story 21-3 / D-21-3-04 A — a narrowing transition could not be
     /// persisted; stays set until a later write succeeds.
     pub fn is_degraded(&self) -> bool {
@@ -1007,13 +1014,18 @@ impl TofuPinStore for InMemoryTofuPinStore {
         };
         match pending.verdict.take() {
             None => RePinDecision::TimedOut,
-            Some(RepinVerdict::Reject { reason }) => RePinDecision::RejectedByOperator { reason },
+            Some(RepinVerdict::Reject { reason }) => {
+                // The consumed request is dropped durably too: a reboot must not re-arm it.
+                self.persist_narrowed();
+                RePinDecision::RejectedByOperator { reason }
+            }
             Some(RepinVerdict::Approve { approval_id }) => {
                 let awaits_consent = self.pins.get(peer.as_str()).is_some_and(|pin| {
                     pin.fingerprint == pending.request.pinned_fingerprint
                         && matches!(pin.invalidated, Some(Invalidated::SpiritRestarted { .. }))
                 });
                 if pending.rotating || !awaits_consent {
+                    self.persist_narrowed();
                     return RePinDecision::RejectedByStore {
                         error: EPinMismatch::Invalidated {
                             peer: peer.as_str().to_string(),
@@ -1022,6 +1034,7 @@ impl TofuPinStore for InMemoryTofuPinStore {
                     };
                 }
                 if let Some(colliding_peer) = self.colliding_peer(peer, new_observed) {
+                    self.persist_narrowed();
                     return RePinDecision::RejectedByStore {
                         error: EPinMismatch::FingerprintCollision {
                             peer: peer.as_str().to_string(),

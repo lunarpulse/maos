@@ -359,6 +359,59 @@ async fn a_narrowing_write_failure_applies_and_degrades_until_a_write_succeeds()
 }
 
 #[tokio::test]
+async fn a_consumed_request_is_dropped_durably_but_the_pin_stays_invalidated() {
+    let (store, port) = pinned().await;
+    store
+        .invalidate_if_boot_nonce_differs(&peer(), RESTARTED_NONCE)
+        .await
+        .unwrap();
+    store
+        .record_repin_decision(
+            &peer(),
+            RESTARTED_NONCE,
+            RepinVerdict::Reject {
+                reason: "no".into(),
+            },
+        )
+        .unwrap();
+    assert_eq!(port.last()[0].pending_observed, Some(RESTARTED_NONCE));
+    let decision = store
+        .await_repin_consent(&peer(), &fp(1), RESTARTED_NONCE)
+        .await;
+    assert!(matches!(decision, RePinDecision::RejectedByOperator { .. }));
+    assert_eq!(
+        port.count(),
+        3,
+        "first contact, detection, the consumed request"
+    );
+    let record = &port.last()[0];
+    assert_eq!(record.pending_observed, None, "a reboot must not re-arm it");
+    assert!(record.pin.invalidated.is_some());
+
+    // A failing write while consuming only degrades the store.
+    let (store, port) = pinned().await;
+    store
+        .invalidate_if_boot_nonce_differs(&peer(), RESTARTED_NONCE)
+        .await
+        .unwrap();
+    store
+        .record_repin_decision(
+            &peer(),
+            RESTARTED_NONCE,
+            RepinVerdict::Reject {
+                reason: "no".into(),
+            },
+        )
+        .unwrap();
+    port.fail.store(true, Ordering::SeqCst);
+    store
+        .await_repin_consent(&peer(), &fp(1), RESTARTED_NONCE)
+        .await;
+    assert!(store.is_degraded());
+    assert!(store.healthy_records().is_none());
+}
+
+#[tokio::test]
 async fn a_store_without_a_port_behaves_as_before() {
     let store = InMemoryTofuPinStore::new();
     store

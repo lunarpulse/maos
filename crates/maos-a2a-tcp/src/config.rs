@@ -124,14 +124,16 @@ impl TcpA2AConfig {
     }
 
     /// Materialize the TOFU pin store from `peer_pins` (makes ADR-012's
-    /// "pre-paired fingerprints" real), reconciled with the durable record when
-    /// a `persistence` port is given (Story 21-3 / D-21-3-02 anchor rule). Per
-    /// configured peer: no record → seed from config; config equals the record's
-    /// anchor and its fingerprint → restore the record; config equals the anchor
-    /// but the record was promoted at runtime → typed boot refusal; config
-    /// differs from the anchor (the operator re-paired) → config wins. Records
-    /// for peers the config omits are dropped: the file never adds a
-    /// fingerprint the config does not name. The result is written once.
+    /// "pre-paired fingerprints" real), reconciled in memory with the durable
+    /// record when a `persistence` port is given (Story 21-3 / D-21-3-02). Per
+    /// configured peer: no record → seed from config; config names the record's
+    /// current fingerprint → restore its state (nonce, invalidation, generation),
+    /// re-anchoring, except that a nonce-only change against the anchor is an
+    /// explicit repair and wins; config still names the retired anchor while the
+    /// record was promoted → typed boot refusal; any other fingerprint is a
+    /// re-pair and wins. Records for peers the config omits are dropped: the
+    /// file never adds a fingerprint the config does not name. Nothing is
+    /// written here; the transport flushes once its fallible setup succeeded.
     pub async fn build_pin_store(
         &self,
         persistence: Option<Arc<dyn PinPersistence>>,
@@ -164,17 +166,28 @@ impl TcpA2AConfig {
                 .iter()
                 .position(|record| record.pin.peer.as_str() == pin.peer_id.as_str());
             let record = match found.map(|index| records.swap_remove(index)) {
-                Some(old) if old.anchor == anchor && old.pin.fingerprint == pin.fingerprint => old,
-                Some(old) if old.anchor == anchor => {
+                // Config names the record's current fingerprint: keep its state. Only an
+                // explicit nonce repair (same fingerprint as the anchor, new nonce) re-seeds.
+                Some(old) if old.pin.fingerprint == pin.fingerprint => {
+                    if old.anchor.0 == pin.fingerprint && old.anchor.1 != pin.boot_nonce {
+                        seeded(old.generation)
+                    } else {
+                        PinRecord {
+                            anchor: anchor.clone(),
+                            ..old
+                        }
+                    }
+                }
+                // Config still names the retired anchor: the promotion was not carried.
+                Some(old) if old.anchor.0 == pin.fingerprint => {
                     return Err(TcpTransportError::PinPromotionNotCarried {
                         peer: pin.peer_id.as_str().to_string(),
                         configured: pin.fingerprint.wire(),
                         promoted: old.pin.fingerprint.wire(),
                     });
                 }
-                Some(old) => {
-                    seeded(old.generation + u64::from(old.pin.fingerprint != pin.fingerprint))
-                }
+                // A fingerprint neither the anchor nor the record names: a re-pair.
+                Some(old) => seeded(old.generation + 1),
                 None => seeded(0),
             };
             store.restore(record).map_err(|e| {
@@ -184,9 +197,6 @@ impl TcpA2AConfig {
                 ))
             })?;
         }
-        store.flush().map_err(|e| {
-            TcpTransportError::Config(format!("cannot write the durable pin file: {e}"))
-        })?;
         Ok(store)
     }
 }

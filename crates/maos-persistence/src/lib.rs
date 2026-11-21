@@ -177,12 +177,26 @@ fn record(path: &Path, row: &Row) -> Result<PinRecord, PinFileError> {
 }
 
 fn parse(path: &Path, bytes: &[u8]) -> Result<Vec<PinRecord>, PinFileError> {
+    // Value-free diagnostics: serde's messages can quote input, so only the position is kept.
     let schema = |error: serde_json::Error| PinFileError::Schema {
         path: path.to_path_buf(),
-        detail: error.to_string(),
+        detail: format!(
+            "{:?} at line {} column {}",
+            error.classify(),
+            error.line(),
+            error.column()
+        ),
     };
-    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(schema)?;
-    match value.get("version").and_then(serde_json::Value::as_u64) {
+    // A light probe types an unknown version before any field is validated; the strict
+    // structs then read the ORIGINAL bytes, so a duplicated key is refused, never last-wins.
+    #[derive(Deserialize)]
+    struct Probe {
+        version: Option<u64>,
+    }
+    match serde_json::from_slice::<Probe>(bytes)
+        .map_err(schema)?
+        .version
+    {
         Some(SCHEMA_VERSION) => {}
         Some(found) => {
             return Err(PinFileError::Version {
@@ -193,11 +207,11 @@ fn parse(path: &Path, bytes: &[u8]) -> Result<Vec<PinRecord>, PinFileError> {
         None => {
             return Err(PinFileError::Schema {
                 path: path.to_path_buf(),
-                detail: "missing or non-integer `version`".into(),
+                detail: "missing `version`".into(),
             })
         }
     }
-    let doc: FileDoc = serde_json::from_value(value).map_err(schema)?;
+    let doc: FileDoc = serde_json::from_slice(bytes).map_err(schema)?;
     let mut seen = BTreeSet::new();
     doc.pins
         .iter()
@@ -231,15 +245,23 @@ fn write_atomic(path: &Path, body: &[u8]) -> std::io::Result<()> {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(FILE_MODE);
     }
-    let result = (|| {
+    let published = (|| {
         let mut file = options.open(&temp)?;
         file.write_all(body)?;
         file.sync_all()?;
-        std::fs::rename(&temp, path)?;
-        std::fs::File::open(parent)?.sync_all()
+        std::fs::rename(&temp, path)
     })();
     let _ = std::fs::remove_file(&temp);
-    result
+    published?;
+    // Published: a failing directory sync leaves durability of the rename uncertain, not the
+    // write undone, so it must not be reported as a failed (and therefore unapplied) write.
+    if let Err(error) = std::fs::File::open(parent).and_then(|dir| dir.sync_all()) {
+        eprintln!(
+            "maos: pin file {} published; directory sync failed: {error}",
+            path.display()
+        );
+    }
+    Ok(())
 }
 
 /// One non-blocking exclusive `flock` (`File::try_lock` is above the 1.88 MSRV).
@@ -285,12 +307,26 @@ impl FilePinStore {
         {
             use std::os::unix::fs::OpenOptionsExt;
             options.mode(FILE_MODE);
+            // Never follow a planted symlink to the lock.
+            options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
         }
         let lock = options.open(path.with_file_name(lock_name)).map_err(io)?;
+        if !lock.metadata().map_err(io)?.is_file() {
+            return Err(io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "lock is not a regular file",
+            )));
+        }
         if !try_lock(&lock).map_err(io)? {
             return Err(PinFileError::Held {
                 path: path.to_path_buf(),
             });
+        }
+        if std::fs::symlink_metadata(path).is_ok_and(|meta| !meta.is_file()) {
+            return Err(io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "not a regular file",
+            )));
         }
         let loaded = match std::fs::read(path) {
             Ok(bytes) => parse(path, &bytes)?,

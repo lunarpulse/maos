@@ -164,6 +164,24 @@ fn a_duplicate_peer_is_refused() {
 }
 
 #[test]
+fn a_duplicated_key_is_refused_not_last_wins_and_the_diagnostic_is_value_free() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = path_in(&dir);
+    let good = serde_json::to_string(&doc(1, vec![row("peer-a")])).unwrap();
+    let planted = fp(9).wire();
+    let body = good.replacen(
+        "\"peer\":\"peer-a\"",
+        &format!("\"fingerprint\":\"{planted}\",\"peer\":\"peer-a\""),
+        1,
+    );
+    assert_ne!(body, good, "the duplicate key was planted");
+    fs::write(&path, body).unwrap();
+    let error = FilePinStore::open(&path).unwrap_err();
+    assert!(matches!(error, PinFileError::Schema { .. }), "{error:?}");
+    assert!(!error.to_string().contains(&fp(9).hex), "{error}");
+}
+
+#[test]
 fn malformed_fingerprints_are_refused() {
     let upper = fp(1).wire().to_uppercase().replace("SHA256", "sha256");
     for bad in [
