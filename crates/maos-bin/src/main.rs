@@ -2623,6 +2623,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_collective_port(collective_port.clone())
         .with_capabilities(Some(Arc::clone(&capability))),
     );
+    // 21-12: finish any forget interrupted before the last shutdown, before the door serves.
+    let finished = memory.complete_outstanding_forgets();
+    eprintln!("maos: interrupted-forget completion (done, unfinished): {finished:?}");
 
     // Story 4.3 — SelfTelemetryAggregator (FR56).
     let self_telemetry = Arc::new(

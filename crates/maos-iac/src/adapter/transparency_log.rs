@@ -573,6 +573,11 @@ CREATE INDEX IF NOT EXISTS idx_tlog_redistill_outcome
         THEN json_extract(CAST(payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id')
         ELSE X'' END)
     WHERE intent IN ('distillate.redistilled','distillate.redistill.pending');
+-- 21-12: an erasure intent is open until a later principal.forget names it in completed_from_intent.
+CREATE INDEX IF NOT EXISTS idx_tlog_forget_intent
+    ON transparency_log(intent) WHERE intent = 'principal.forget.intent';
+CREATE INDEX IF NOT EXISTS idx_tlog_forget_done
+    ON transparency_log(intent) WHERE intent = 'principal.forget';
 CREATE INDEX IF NOT EXISTS idx_tlog_boot_pid_ts
     ON transparency_log(boot_nonce, spirit_pid, timestamp_ns, frame_id);
 
@@ -1999,7 +2004,7 @@ impl TransparencyLogAdapter {
             "SELECT frame_id,kind,spirit_pid,boot_nonce,payload_redacted,timestamp_ns \
              FROM transparency_log NOT INDEXED WHERE rowid>?2 AND rowid<=?3 \
              AND (kind IN (28,29) OR instr(payload_redacted,CAST(?1 AS BLOB))>0) \
-             AND intent NOT IN ('principal.forget','principal.forget.held','distillate.redacted') \
+             AND intent NOT IN ('principal.forget','principal.forget.held','principal.forget.intent','distillate.redacted') \
              AND intent NOT LIKE 'principal.uninstall.%'"
         };
         self.scan_rowid_range(sql, principal, range, |row| {
@@ -2128,6 +2133,67 @@ impl TransparencyLogAdapter {
         )?;
         found.sort_by_key(|(timestamp, id, _)| (*timestamp, *id));
         Ok(found.into_iter().map(|(_, _, request)| request).collect())
+    }
+
+    /// Colon-grouped hex (16 digits per group): the journal redacts plain 32+ hex runs.
+    pub fn grouped_hex(bytes: &[u8]) -> String {
+        let group = |c: &[u8]| c.iter().map(|b| format!("{b:02x}")).collect::<String>();
+        bytes.chunks(8).map(group).collect::<Vec<_>>().join(":")
+    }
+
+    fn from_grouped_hex(text: &str) -> Option<Vec<u8>> {
+        let digits = text.replace(':', "");
+        (digits.len() % 2 == 0 && digits.bytes().all(|b| b.is_ascii_hexdigit())).then(|| {
+            (0..digits.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&digits[i..i + 2], 16).unwrap_or_default())
+                .collect()
+        })
+    }
+
+    /// 21-12: kernel `principal.forget.intent` frames no kernel `principal.forget` frame
+    /// references via `completed_from_intent`, oldest first (bounded), optionally only
+    /// `only`'s. Each is `(frame id, principal, reason)`; a malformed row has no
+    /// principal and never hides the valid ones.
+    #[allow(clippy::type_complexity)]
+    pub fn outstanding_forget_intents(
+        &self,
+        only: Option<&str>,
+    ) -> Result<Vec<([u8; 16], Option<String>, Option<String>)>, AuditError> {
+        let key = only.map(|p| Self::grouped_hex(p.as_bytes()));
+        let inner = self.inner.lock();
+        let mut stmt = inner
+            .conn
+            .prepare_cached(
+                "SELECT i.frame_id, i.payload_redacted \
+                 FROM transparency_log i INDEXED BY idx_tlog_forget_intent \
+                 WHERE i.intent = 'principal.forget.intent' AND i.origin = ?1 \
+                 AND (?2 IS NULL OR CASE WHEN json_valid(CAST(i.payload_redacted AS TEXT),2) \
+                   THEN json_extract(CAST(i.payload_redacted AS TEXT),'$.principal_hex') END = ?2) \
+                 AND NOT EXISTS (SELECT 1 FROM transparency_log f INDEXED BY idx_tlog_forget_done \
+                   WHERE f.intent = 'principal.forget' AND f.origin = ?1 AND f.rowid > i.rowid \
+                   AND CASE WHEN json_valid(CAST(f.payload_redacted AS TEXT),2) \
+                     THEN json_extract(CAST(f.payload_redacted AS TEXT),'$.completed_from_intent') END \
+                     = substr(lower(hex(i.frame_id)),1,16)||':'||substr(lower(hex(i.frame_id)),17)) \
+                 ORDER BY i.rowid LIMIT 4096",
+            )
+            .map_err(AuditError::SqliteRead)?;
+        let rows = stmt
+            .query_map(rusqlite::params![FrameOrigin::Kernel as i64, key], |row| {
+                Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, Vec<u8>>(1)?))
+            })
+            .map_err(AuditError::SqliteRead)?;
+        let mut found = Vec::new();
+        for row in rows {
+            let (id, body) = row.map_err(AuditError::SqliteRead)?;
+            let body = serde_json::from_slice::<serde_json::Value>(&body).ok();
+            let text = |k: &str| body.as_ref()?[k].as_str().map(str::to_owned);
+            let principal = text("principal_hex")
+                .and_then(|h| Self::from_grouped_hex(&h))
+                .and_then(|b| String::from_utf8(b).ok());
+            found.push((id.try_into().unwrap_or([0; 16]), principal, text("reason")));
+        }
+        Ok(found)
     }
 
     /// Only the exact kernel full-body replacement is an erased source.
