@@ -150,7 +150,8 @@ impl InstalledSpirits {
                             }
                         };
                         if let Err(error) = ran {
-                            eprintln!("maos: installed spirit '{id}' session refused: {error}");
+                            let end = session_end(&error);
+                            eprintln!("maos: installed spirit '{id}' session {end}: {error}");
                         }
                     }));
                     Ok(())
@@ -280,5 +281,29 @@ impl InstalledSpirits {
         for session in self.sessions {
             let _ = session.await;
         }
+    }
+}
+
+/// An orderly supervisor stop (the shell left) is an end, not a refusal.
+#[cfg(feature = "wasm-host")]
+fn session_end(error: &crate::spirit_session::SessionError) -> &'static str {
+    use crate::spirit_session::SessionError::Stopped;
+    if matches!(error, Stopped) {
+        "ended"
+    } else {
+        "refused"
+    }
+}
+
+#[cfg(all(test, feature = "wasm-host"))]
+mod session_end_tests {
+    use super::session_end;
+    use crate::spirit_session::SessionError;
+
+    #[test]
+    fn only_a_supervisor_stop_is_not_a_refusal() {
+        assert_eq!(session_end(&SessionError::Stopped), "ended");
+        assert_eq!(session_end(&SessionError::UnexpectedEof), "refused");
+        assert_eq!(session_end(&SessionError::Deadline("delivery")), "refused");
     }
 }

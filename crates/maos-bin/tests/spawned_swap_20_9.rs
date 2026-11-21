@@ -343,8 +343,10 @@ async fn a_revert_after_the_predecessor_child_retired_ends_the_session_typed() {
         .await
         .expect("the swap commits");
     // A carried halt that leaves the registry inside the window trips the monitor (MAOS_AUTO_REVERT_FAST).
+    // Hosted debug runners are several times slower than a dev box: the bound is generous (x4); the
+    // assertion on how the session ends is unchanged.
     assert_eq!(world.halt.drain_for_spirit(running.pid).len(), 1);
-    let ended = tokio::time::timeout(Duration::from_secs(20), running.session)
+    let ended = tokio::time::timeout(Duration::from_secs(80), running.session)
         .await
         .expect("the session ends")
         .expect("no join failure");
