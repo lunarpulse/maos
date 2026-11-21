@@ -21,7 +21,7 @@ MAOS는 kernel과 Spirit 사이에 기계적으로 검증되는 호환성 계약
 |---|---|---|
 | `kernel_version` | `1.0.0-rc.2` | kernel 바이너리의 의미 버전(`Cargo.toml` 기준) |
 | `abi_version` | `1` | Spirit ABI의 와이어 포맷 버전(`ComplianceClaim` 봉투, vtable 레이아웃) |
-| `manifest_schema_version` | `7` | Spirit manifest TOML 포맷의 스키마 버전 |
+| `manifest_schema_version` | `8`(비준 완료) | Spirit 매니페스트 TOML 포맷의 스키마 버전 |
 
 이 상수들은 `maos-spirit-abi/src/lib.rs`에 있으며 어드미션 검사와 CI 게이트가 소비하는 단일 진실 원천입니다.
 
@@ -32,8 +32,8 @@ kernel은 Spirit 어드미션 시점에 양 방향으로 **fail-closed** 호환�
 | Manifest 스키마 버전 | kernel 동작 |
 |---|---|
 | `= MANIFEST_SCHEMA_VERSION` (현재) | ✅ 엄격한 로드(`deny_unknown_fields`) |
-| `= N-1` (현재보다 하나 아래) | ✅ 지원 — 생략된 섹션에 대해 WARN 수준 저하 노트와 함께 로드 |
-| `< MIN_SUPPORTED` (N-2 이하) | ⛔ 거부 — `SecurityError::EAbiTooOld` |
+| `= N-1` (현재보다 하나 아래) | ✅ 지원 범위 내; 선언은 별도로 검증 |
+| `< MIN_SUPPORTED` | ⛔ 거부 — `SecurityError::EAbiTooOld` |
 | `> MAX_SUPPORTED` (미래) | ⛔ 거부 — `SecurityError::EAbiTooNew` |
 | `min_substrate_version > kernel_version` | ⛔ 거부 — `SecurityError::ESubstrateTooOld` (FR8) |
 
@@ -41,10 +41,12 @@ kernel은 Spirit 어드미션 시점에 양 방향으로 **fail-closed** 호환�
 
 ## N-1 / N-2 정책
 
-- **N-1 지원**: 현재 kernel보다 한 버전 뒤진 manifest도 여전히 로드됩니다. kernel은 구형 manifest가 생략하는 섹션을 식별하는 WARN 수준 노트를 내보냅니다. Spirit은 작동하지만 새 manifest 기능의 혜택을 받지 못합니다.
-- **N-2 거부**: 두 버전 이상 뒤진 manifest는 어드미션 시점에 `SecurityError::EAbiTooOld`로 거부됩니다. 에러 메시지는 선언된 버전과 지원 윈도우를 명시합니다.
+- **N-1 지원**: 지원 범위에는 바로 이전 스키마가 포함됩니다. 매니페스트 하한은 `1`로 유지됩니다.
+- **하한 미만 거부**: `MIN_SUPPORTED` 미만이면 kernel이 `SecurityError::EAbiTooOld`로 거부합니다. 두 버전 뒤라는 이유만으로 거부되지는 않습니다.
 
-이는 Spirit 작성자에게 스키마 범프 이후 마이그레이션할 **한 번의 전체 버전 사이클**을 줍니다.
+구독하지 않는 스키마 1–7은 계속 지원합니다. 스키마 8 미만에서 `on_telemetry_event`를
+명시적으로 나열하거나 `[lifecycle.telemetry]` 테이블을 선언하면 경고만 내고 무시하는 대신
+거부합니다. 자세한 내용은 [스키마 8 계약](../manifest/v8)을 참조하세요.
 
 ## ABI 버전 vs. Manifest 스키마 버전
 
@@ -107,6 +109,7 @@ CI는 파일이 워크스페이스 상태와 일치하는지 검증하기 위해
 ### `xtask/abi-ratifications.toml`
 
 각 manifest 스키마 버전 범프는 `[[ratification]]` 항목으로 기록되어, 버전이 올라간 시기와 이유의 감사 추적을 제공합니다.
+`21-9-manifest-schema-8`은 제안 상태이며 사람의 비준이 필요합니다.
 
 ## 지원 중단 타임라인
 

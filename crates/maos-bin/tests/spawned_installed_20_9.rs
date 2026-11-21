@@ -21,6 +21,8 @@ struct Shell {
     child: Option<Child>,
     /// The shell reads its REPL from here and leaves on EOF: held open for the vector's life.
     stdin: Option<ChildStdin>,
+    /// The registry the component was installed from: a successor is published here too.
+    server: InProcessServer,
 }
 
 impl Shell {
@@ -47,6 +49,66 @@ impl Shell {
     fn stderr(&self) -> String {
         std::fs::read_to_string(self.scratch.0.join("shell.stderr")).unwrap_or_default()
     }
+
+    /// A successor of the installed component, published under the SAME publisher key and
+    /// installed beside the running version: a same-pid swap keeps the Spirit's
+    /// publisher-bound storage identity, so an unsigned or differently-signed successor is
+    /// refused (`swap_publisher_changed`). Returns the installed successor manifest.
+    fn signed_successor(&self, version: &str, extra: &str) -> std::path::PathBuf {
+        let staging = self.scratch.0.join(format!("successor-{version}"));
+        std::fs::create_dir_all(&staging).unwrap();
+        let published = staging.join("manifest.toml");
+        std::fs::write(
+            &published,
+            manifest(ID, version, "dist/lifecycle_probe.wasm", &ALL_HOOKS, extra).replace(
+                "trust_tier = \"local\"",
+                "trust_tier = \"public-untrusted\"",
+            ),
+        )
+        .unwrap();
+        let output = publish_artifact(
+            &self.scratch,
+            &sibling("maos-spirit"),
+            &self.server.addr,
+            &published,
+            &world::fixtures::fixture("lifecycle_probe.wasm"),
+            &self.scratch.0.join("publisher.key"),
+        );
+        assert!(
+            output.status.success(),
+            "publish {version}: {}",
+            text(&output)
+        );
+        let install = self
+            .scratch
+            .command(&sibling("maosctl"))
+            .args([
+                "spirit",
+                "install",
+                &format!("{ID}@{version}"),
+                "--registry-uri",
+                &format!("http://{}/mcp", self.server.addr),
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            install.status.success(),
+            "install {version}: {}",
+            text(&install)
+        );
+        // Installing a version writes a `<version>-<suffix>` generation directory and points
+        // the installed index at it: that index is the only honest way to find the manifest.
+        maos_registry::storage::LocalFsRegistryStorage::at_path(
+            self.scratch.0.join("home/.local/share/maos/registry"),
+        )
+        .unwrap()
+        .installed_manifests()
+        .unwrap()
+        .into_iter()
+        .find(|(name, _)| name == ID)
+        .expect("the successor is in the installed index")
+        .1
+    }
 }
 
 impl Drop for Shell {
@@ -72,9 +134,8 @@ fn text(output: &std::process::Output) -> String {
 }
 
 /// An installed component (`maos spirit install`, then the shell root's boot) at `1.0.0`
-/// whose manifest appends `extra` (further sections); returns the running shell and the
-/// package directory a successor manifest can sit in.
-fn boot_installed(extra: &str) -> (Shell, std::path::PathBuf) {
+/// whose manifest appends `extra` (further sections); returns the running shell.
+fn boot_installed(extra: &str) -> Shell {
     let scratch = Scratch::new();
     let server = InProcessServer::start(&scratch);
     let package = scratch.0.join("package");
@@ -149,6 +210,7 @@ fn boot_installed(extra: &str) -> (Shell, std::path::PathBuf) {
         scratch,
         child: Some(child),
         stdin,
+        server,
     };
     let until = Instant::now() + Duration::from_secs(90);
     while shell.field("lifecycle_state").as_deref() != Some("Running") {
@@ -159,22 +221,18 @@ fn boot_installed(extra: &str) -> (Shell, std::path::PathBuf) {
         );
         std::thread::sleep(Duration::from_millis(200));
     }
-    (shell, package)
+    shell
 }
 
 #[test]
 fn an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run() {
-    let (shell, package) = boot_installed("");
+    let shell = boot_installed("");
     let pid = shell.field("pid").expect("the door reports its pid");
 
-    // The successor's manifest sits beside its artifact; the installed predecessor is a
-    // component the root booted, not one `maos run` started.
-    let v2 = package.join("v2.toml");
-    std::fs::write(
-        &v2,
-        manifest(ID, "1.1.0", "lifecycle_probe.wasm", &ALL_HOOKS, ""),
-    )
-    .unwrap();
+    // The successor is a signed package of the same publisher, installed beside the running
+    // version; the installed predecessor is a component the root booted, not one `maos run`
+    // started.
+    let v2 = shell.signed_successor("1.1.0", "");
     let output = shell.ctl(&[
         "spirit",
         "upgrade",
@@ -201,15 +259,14 @@ fn an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run
 /// and called a dropping successor safe that the coordinator then refuses.
 #[test]
 fn an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invariant() {
-    let (shell, package) =
+    let shell =
         boot_installed("[swap_invariants]\npreserve = [\"open_pr_state\", \"review_queue\"]\n");
     let pid = shell.field("pid").expect("the door reports its pid");
-    let successor = |name: &str, preserve: &str| {
-        let path = package.join(name);
-        let section = format!("[swap_invariants]\npreserve = [{preserve}]\n");
-        let text = manifest(ID, "1.1.0", "lifecycle_probe.wasm", &ALL_HOOKS, &section);
-        std::fs::write(&path, text).unwrap();
-        path
+    let successor = |version: &str, preserve: &str| {
+        shell.signed_successor(
+            version,
+            &format!("[swap_invariants]\npreserve = [{preserve}]\n"),
+        )
     };
     let swap = |path: &Path, policy: &str| {
         shell.ctl(&[
@@ -235,7 +292,7 @@ fn an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invar
         (output.status.code(), report)
     };
 
-    let dropping = successor("v2-drops.toml", "\"open_pr_state\"");
+    let dropping = successor("1.1.0", "\"open_pr_state\"");
     // The premise: this root retained no manifest text for its installed component.
     let cold = swap(&dropping, "cold-swap");
     assert!(
@@ -266,7 +323,7 @@ fn an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invar
         "the predecessor is untouched"
     );
 
-    let superset = successor("v2-superset.toml", "\"review_queue\", \"open_pr_state\"");
+    let superset = successor("1.1.1", "\"review_queue\", \"open_pr_state\"");
     let (exit, report) = precheck(&superset);
     assert_eq!(exit, Some(0), "a superset prechecks safe: {report}");
     assert_eq!(report["safe"], true, "{report}");

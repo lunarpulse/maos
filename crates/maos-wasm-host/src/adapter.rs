@@ -2,8 +2,10 @@
 
 //! `SpiritHostPort` adapter for the WASM component form.
 //!
-//! Resolution performs only bounded metadata checks. Component parsing,
-//! compilation and lifecycle validation execute in the admitted runner process.
+//! Resolution only selects the runner, fuel and wire shape. The component is neither
+//! opened nor named: it reaches the runner as the verified read-only file handed over by
+//! the kernel's dedicated WASM/T2 spawn. Parsing, compilation and lifecycle validation
+//! execute in the admitted runner process.
 
 use std::sync::Arc;
 
@@ -41,44 +43,15 @@ impl SpiritHostPort for WasmHostAdapter {
                 })
             }
             SpiritForm::WasmComponent => {
-                if request.artifact.is_empty() {
-                    return Err(SpiritHostError::InvalidComponent {
-                        reason: "empty artifact path".to_string(),
-                    });
-                }
-
-                let meta = std::fs::metadata(&request.artifact).map_err(|e| {
-                    SpiritHostError::InvalidComponent {
-                        reason: format!("cannot read component: {e}"),
-                    }
-                })?;
-                if !meta.is_file() {
-                    return Err(SpiritHostError::InvalidComponent {
-                        reason: format!("artifact '{}' is not a regular file", request.artifact),
-                    });
-                }
-                const MAX_COMPONENT_BYTES: u64 = 64 * 1024 * 1024;
-                if meta.len() > MAX_COMPONENT_BYTES {
-                    return Err(SpiritHostError::InvalidComponent {
-                        reason: format!(
-                            "component '{}' is {} bytes, exceeds the {MAX_COMPONENT_BYTES}-byte cap",
-                            request.artifact,
-                            meta.len()
-                        ),
-                    });
-                }
-
-                // Extract fuel from form_config, defaulting to config's default.
+                // `request.artifact` is an acquisition origin for admission, never a runner
+                // input: the component reaches the runner only as the verified open file the
+                // kernel's dedicated WASM/T2 spawn hands over, which appends the private
+                // `--held-component-*` flags. No path is checked or emitted here.
                 let fuel = resolve_fuel(&request.form_config, self.config.default_fuel);
 
                 Ok(SpiritLaunchPlan {
                     program: self.config.runner_program.to_string_lossy().to_string(),
-                    argv: vec![
-                        "--component".to_string(),
-                        request.artifact.clone(),
-                        "--fuel".to_string(),
-                        fuel.to_string(),
-                    ],
+                    argv: vec!["--fuel".to_string(), fuel.to_string()],
                     env: vec![],
                     wire: WireShape::ContentLengthCbor,
                 })

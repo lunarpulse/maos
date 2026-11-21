@@ -1,9 +1,9 @@
 #!/usr/bin/make -f
-# Render with xtask render-packages; all four installed files stay byte-identical.
+# Render with xtask render-packages; all five installed files stay byte-identical.
 include /usr/share/dpkg/architecture.mk
 export DH_VERBOSE = 1
 RELEASE_PUBKEY := @PUBKEY@
-BINS := maos maosctl maos-spirit maos-registry-server
+BINS := maos maosctl maos-spirit maos-registry-server maos-wasm-runner
 ifeq ($(DEB_HOST_ARCH),amd64)
 SUFFIX := linux-amd64
 else ifeq ($(DEB_HOST_ARCH),arm64)

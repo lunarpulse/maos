@@ -3,7 +3,7 @@
 //! `maos-wasm-runner` children of the lifecycle-probe guest.
 #![allow(dead_code)]
 
-use maos_bin::admission::{gate_manifest, load_admit_start, AdmissionDeps, StartPolicy};
+use maos_bin::admission::{gate_manifest, load_admit_start_unarchived, AdmissionDeps, StartPolicy};
 use maos_bin::hook_pump::{ConsolidationCadence, ConsolidationWatchdog, HookPump};
 use maos_bin::operator_door::SuccessorManifestSlot;
 use maos_bin::spawned_lifecycle::{spawned_successor, HostedSessions, SwapHandles};
@@ -56,7 +56,8 @@ pub fn manifest(name: &str, version: &str, artifact: &str, hooks: &[&str], extra
     manifest_capped(name, version, artifact, hooks, extra, 30)
 }
 
-/// [`manifest`] with `[budget].time_cap_seconds = cap`.
+/// [`manifest`] with `[budget].time_cap_seconds = cap`. A manifest listing `on_telemetry_event`
+/// declares its `[lifecycle.telemetry]` wall as `min(cap, 5)` seconds (manifest schema 8).
 pub fn manifest_capped(
     name: &str,
     version: &str,
@@ -65,6 +66,25 @@ pub fn manifest_capped(
     extra: &str,
     cap: u32,
 ) -> String {
+    manifest_declared(name, version, artifact, hooks, extra, cap, cap.min(5))
+}
+
+/// [`manifest_capped`] with an explicit `[lifecycle.telemetry].time_cap_seconds = declared`
+/// (written only when `hooks` lists `on_telemetry_event`, as the schema requires).
+pub fn manifest_declared(
+    name: &str,
+    version: &str,
+    artifact: &str,
+    hooks: &[&str],
+    extra: &str,
+    cap: u32,
+    declared: u32,
+) -> String {
+    let telemetry = if hooks.contains(&"on_telemetry_event") {
+        format!("[lifecycle.telemetry]\nscope = \"scalar.tap.*\"\ntime_cap_seconds = {declared}\n")
+    } else {
+        String::new()
+    };
     let hooks = hooks
         .iter()
         .map(|hook| format!("\"{hook}\""))
@@ -76,7 +96,7 @@ name = "{name}"
 description = "lifecycle witness"
 version = "{version}"
 abi = "1.0"
-manifest_schema_version = 7
+manifest_schema_version = 8
 min_substrate_version = "0.1.0-alpha.1"
 forms = ["wasm-component"]
 artifact = "{artifact}"
@@ -98,7 +118,7 @@ priority_weight = 100
 idle_window_ms = 2000
 [lifecycle]
 enabled_hooks = [{hooks}]
-[capabilities.required.iac]
+{telemetry}[capabilities.required.iac]
 send = ["spirit:peer"]
 [capabilities.required.log]
 recall = true
@@ -118,6 +138,15 @@ pub const ALL_HOOKS: [&str; 9] = [
     "migrate",
 ];
 
+/// The `MODE` of a `hostile-MODE.wasm` artifact name.
+fn hostile_mode(artifact: &str) -> Option<&str> {
+    std::path::Path::new(artifact)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(|name| name.strip_prefix("hostile-"))
+        .and_then(|rest| rest.strip_suffix(".wasm"))
+}
+
 struct Host(PathBuf);
 
 impl maos_host::SpiritHostPort for Host {
@@ -127,14 +156,7 @@ impl maos_host::SpiritHostPort for Host {
     ) -> Result<maos_host::SpiritLaunchPlan, maos_host::SpiritHostError> {
         // `hostile-MODE.wasm` stands for a component whose runner misbehaves (a `hostile-twin`
         // mode): the real child, spawned through the real sandboxed path.
-        let named = std::path::Path::new(&request.artifact)
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        if let Some(mode) = named
-            .strip_prefix("hostile-")
-            .and_then(|rest| rest.strip_suffix(".wasm"))
-        {
+        if let Some(mode) = hostile_mode(&request.artifact) {
             return Ok(maos_host::SpiritLaunchPlan {
                 program: fixtures::fixture("hostile-twin")
                     .to_string_lossy()
@@ -144,14 +166,11 @@ impl maos_host::SpiritHostPort for Host {
                 wire: maos_host::WireShape::ContentLengthCbor,
             });
         }
+        // A real component arrives as the held artifact the session hands the runner; the
+        // plan carries the runner and its fuel only.
         Ok(maos_host::SpiritLaunchPlan {
             program: self.0.to_string_lossy().into_owned(),
-            argv: vec![
-                "--component".into(),
-                request.artifact.clone(),
-                "--fuel".into(),
-                "100000000000".into(),
-            ],
+            argv: vec!["--fuel".into(), "100000000000".into()],
             env: vec![],
             wire: maos_host::WireShape::ContentLengthCbor,
         })
@@ -354,6 +373,8 @@ impl World {
             host: Arc::new(Host(fixtures::fixture("maos-wasm-runner"))),
             session,
             hosted: Arc::new(HostedSessions::default()),
+            // Per world: the FR11 archive of one vector is never another's.
+            archive_root: path.join("spirit-archives"),
         });
         let staged = SuccessorManifestSlot::default();
         let coordinator = Arc::new(HotSwapCoordinator::new(
@@ -377,12 +398,38 @@ impl World {
             metrics,
             Arc::new(
                 move |bundle: &maos_kernel_core::scheduler::SpiritManifestBundle| {
+                    let staged_path = factory_staged.peek();
+                    let staged_origin = factory_staged.peek_origin();
+                    // Production stages a held component only for a spawned (`wasm-component`)
+                    // hop; any other form is left unacquired so the successor factory's own
+                    // typed form refusal (`swap_form_mismatch`) is what the caller sees.
+                    let artifact = match staged_path.as_deref() {
+                        Some(path)
+                            if maos_bin::admission::read_manifest(path)
+                                .is_ok_and(|text| maos_bin::admission::is_spawned_form(&text)) =>
+                        {
+                            maos_bin::spirit_session::acquire_staged_artifact(
+                                path,
+                                staged_origin
+                                    .as_deref()
+                                    .unwrap_or_else(|| path.parent().unwrap()),
+                                None,
+                            )
+                            .map_err(|error| {
+                                UpgradeError::SuccessorFactory {
+                                    reason: format!("spawned_swap_launch_failed: {error}"),
+                                }
+                            })?
+                        }
+                        _ => None,
+                    };
                     spawned_successor(
                         &factory_handles,
                         &factory_tl,
                         bundle,
-                        factory_staged.peek(),
-                        factory_staged.peek_origin(),
+                        staged_path,
+                        staged_origin,
+                        artifact,
                     )
                     .map_err(|reason| UpgradeError::SuccessorFactory { reason })
                 },
@@ -451,15 +498,33 @@ impl World {
 
     /// `maos run`'s standalone arm for a component: gate, prepare, admit, start, run.
     pub async fn start(&self, manifest_path: &Path) -> Running {
+        self.start_with_recall_clock(manifest_path, None).await
+    }
+
+    pub async fn start_with_recall_clock(
+        &self,
+        manifest_path: &Path,
+        recall_clock: Option<maos_iac::adapter::log_recall::ConsentClock>,
+    ) -> Running {
         let text = std::fs::read_to_string(manifest_path).unwrap();
         let gated = gate_manifest(&text, &|_| false).unwrap();
-        let launch = manifest_launch(&*self.handles.host, &gated, manifest_path, false).unwrap();
+        let mut launch =
+            manifest_launch(&*self.handles.host, &gated, manifest_path, false).unwrap();
+        if gated
+            .class_section
+            .artifact
+            .as_deref()
+            .is_some_and(|artifact| hostile_mode(artifact).is_some())
+        {
+            // A native hostile twin is not a held component: it takes no handoff.
+            launch.component_artifact = None;
+        }
         let (core, obj) = self
             .supervisor
             .prepare_spawned(&gated.spirit_id, &gated.bundle())
             .unwrap();
         let bound = Arc::clone(&core);
-        let admitted = load_admit_start(
+        let admitted = load_admit_start_unarchived(
             &AdmissionDeps {
                 providers: None,
                 iac: Some(&self.iac),
@@ -476,11 +541,20 @@ impl World {
             NONCE,
             StartPolicy::StartNow,
             &mut |pid| bound.bind_scheduler_pid(pid),
+            &self.handles.archive_root,
         )
         .await
         .unwrap();
+        // The FR11 record of what started, in this world's own archive (never a process-wide one).
+        maos_bin::admission::archive_admitted(&self.handles.archive_root, &gated);
         let pid = admitted.pid;
-        let deps = (self.handles.session)(Arc::clone(&self.supervisor));
+        let mut deps = (self.handles.session)(Arc::clone(&self.supervisor));
+        if let Some(clock) = recall_clock {
+            deps.log_recall = Arc::new(
+                maos_iac::adapter::log_recall::LogRecallAdapter::new(Arc::clone(&self.tl))
+                    .with_consent_clock(clock),
+            );
+        }
         let session = tokio::spawn(run_admitted_session(deps, admitted, core, launch));
         let deadline = Instant::now() + Duration::from_secs(30);
         let target = loop {
@@ -493,9 +567,18 @@ impl World {
                     break target;
                 }
             }
+            if session.is_finished() {
+                // The launch ended before readiness: surface its actual outcome, not a generic wait.
+                let outcome = session.await;
+                panic!(
+                    "session for `{}` ended before it became ready: {outcome:?}",
+                    gated.spirit_id
+                );
+            }
             assert!(
-                Instant::now() < deadline && !session.is_finished(),
-                "session never became ready"
+                Instant::now() < deadline,
+                "session for `{}` never became ready within 30 s",
+                gated.spirit_id
             );
             tokio::time::sleep(Duration::from_millis(20)).await;
         };

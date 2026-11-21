@@ -5,5 +5,7 @@
 !dist/
 !dist/maos-linux-amd64
 !dist/maos-linux-arm64
+!dist/maos-wasm-runner-linux-amd64
+!dist/maos-wasm-runner-linux-arm64
 !dist/SHA256SUMS
 !dist/SHA256SUMS.sig

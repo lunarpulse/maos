@@ -161,6 +161,7 @@ impl TestKernel {
                     "on_swap_out".into(),
                     "on_swap_in".into(),
                 ],
+                telemetry: None,
             },
             ..Default::default()
         };
@@ -185,6 +186,7 @@ impl TestKernel {
             scheduling: SchedulingSection::default(),
             lifecycle: LifecycleSection {
                 enabled_hooks: vec!["on_swap_in".into()],
+                telemetry: None,
             },
             ..Default::default()
         };

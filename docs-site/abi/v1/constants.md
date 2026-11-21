@@ -9,7 +9,7 @@
 - [v2 → v3 Migration](/migrate/v2-to-v3) — what changed at manifest schema version 3
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 7*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 8*
 
 
 ## Constants {#maos-spirit-abi-constants}
@@ -74,6 +74,10 @@ for `[capabilities.required.skill].author_self`. Below schema 6 the
 declaration degrades away; the supported floor remains 1.
 Bumped to `7` in Story 20-8 for FR8 contract declarations; below schema 7
 these declarations degrade away.
+Bumped to `8` in Story 21-9 (D-21-9-02 A) for the `[lifecycle.telemetry]`
+subscription. It does not degrade away: below schema 8 an
+`on_telemetry_event` listing or a `[lifecycle.telemetry]` table is refused
+at load, and schemas 1–7 that do neither stay supported.
 
 
 This constant is the single authoritative source consumed by
@@ -87,12 +91,12 @@ constant directly.
 ```rust
 use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 
-assert_eq!(MANIFEST_SCHEMA_VERSION, 7);
+assert_eq!(MANIFEST_SCHEMA_VERSION, 8);
 ```
 
 
 ```rust
-pub const MANIFEST_SCHEMA_VERSION: u32 = 7u32;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 8u32;
 ```
 
 ### `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` {#maos-spirit-abi-min-supported-manifest-schema-version}
@@ -146,14 +150,14 @@ fn is_version_supported(v: u32) -> bool {
 assert!(is_version_supported(1));  // Oldest supported
 assert!(is_version_supported(2));  // Supported
 assert!(is_version_supported(3));  // Supported
-assert!(is_version_supported(4));  // N-1 — supported
-assert!(is_version_supported(5));  // Current — supported
+assert!(is_version_supported(7));  // N-1 — supported
+assert!(is_version_supported(8));  // Current — supported
 assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
 ```
 
 
 ```rust
-pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 7u32;
+pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 8u32;
 ```
 
 ### `CLI_WRAPPER_SCHEMA_VERSION` {#maos-spirit-abi-cli-wrapper-schema-version}

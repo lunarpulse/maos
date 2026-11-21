@@ -112,7 +112,7 @@ if [ "$actual_intro" != "$expected_intro" ]; then
     exit 1
 fi
 
-# Step 5: Binary size gate — stripped maos-bin ≤34MiB (AC4) — blocking, deterministic
+# Step 5: Binary size gate — stripped release maos (AC4) — blocking, deterministic
 echo "--- Checking binary size ---"
 strip target/release/maos
 bin_size=$(stat -c%s target/release/maos)
@@ -177,7 +177,7 @@ bin_size=$(stat -c%s target/release/maos)
 # The binary grew +119,808 B past 33,554,432 since 89b64566 (unattributed by `nm`/`size` here;
 # attribution stays an open deferred row), so the 2026-09-20 "attribute before re-basing" rule is
 # recorded as waived by the operator for this one raise, not met.
-max_size=35651584  # 34 MiB — operator ruling `size`, 2026-11-12
+max_size=39069022  # 21-9 D-21-9-04 A: measured 37,208,592 B +5%, rounded up
 echo "maos-bin stripped size: ${bin_size} bytes (limit: ${max_size})"
 if [ "$bin_size" -gt "$max_size" ]; then
     echo "ERROR: AC4 binary size violation: ${bin_size} bytes > ${max_size} bytes limit"

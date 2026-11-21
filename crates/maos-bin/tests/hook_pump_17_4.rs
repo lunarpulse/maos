@@ -36,6 +36,32 @@ use maos_spirit_abi::lifecycle::{ConsolidatePayload, Spirit, TelemetryEventPaylo
 use observer::{ActivitySink, ObservedActivity, Observer};
 
 const OBSERVER_MANIFEST: &str = include_str!("../../../spirits/observer/manifest.toml");
+
+/// The Observer manifest with its overall hook cap AND its `[lifecycle.telemetry]` wall both set
+/// to `secs` (the declaration may not exceed the overall cap, so lowering one alone is refused).
+fn observer_with_cap(secs: u32) -> String {
+    OBSERVER_MANIFEST
+        .replace(
+            "time_cap_seconds = 10",
+            &format!("time_cap_seconds = {secs}"),
+        )
+        .replace(
+            "time_cap_seconds = 5",
+            &format!("time_cap_seconds = {secs}"),
+        )
+}
+
+/// `manifest` with its `[lifecycle]` (and the telemetry declaration that needs the listing)
+/// replaced by an explicit hook list that does NOT list `on_telemetry_event`.
+fn without_telemetry(manifest: &str, hooks: &str) -> String {
+    let start = manifest.find("[lifecycle]").unwrap();
+    let end = manifest.find("[budget]").unwrap();
+    format!(
+        "{}[lifecycle]\nenabled_hooks = [{hooks}]\n\n{}",
+        &manifest[..start],
+        &manifest[end..]
+    )
+}
 const NONCE: u64 = 0x17_04;
 const EMITTER_PID: u32 = 990_001;
 
@@ -212,9 +238,8 @@ impl World {
         scb.replace_runtime(runtime);
     }
 
-    /// `(pid, granted, reason)` for every subscription row, in write order;
-    /// each row's TL pid, intent and payload must agree.
-    fn subscription_rows(&self) -> Vec<(u32, bool, String)> {
+    /// Read subscription payloads in write order; the TL pid, intent and payload must agree.
+    fn subscription_events(&self) -> Vec<maos_domain::governance::TelemetrySubscriptionPayload> {
         self.tl
             .query_frames(FrameFilter {
                 kind: Some(FrameKind::GovernanceEvent),
@@ -238,8 +263,15 @@ impl World {
                     SUBSCRIPTION_REVOKED
                 };
                 assert_eq!(row.intent, expected);
-                (sub.subscriber_pid, sub.granted, sub.reason)
+                sub
             })
+            .collect()
+    }
+
+    fn subscription_rows(&self) -> Vec<(u32, bool, String)> {
+        self.subscription_events()
+            .into_iter()
+            .map(|sub| (sub.subscriber_pid, sub.granted, sub.reason))
             .collect()
     }
 }
@@ -316,7 +348,7 @@ impl Spirit for NearBudgetOnTelemetry {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn repeated_budget_warnings_quarantine_the_subscriber() {
     let world = World::new();
-    let manifest = OBSERVER_MANIFEST.replace("time_cap_seconds = 10", "time_cap_seconds = 2");
+    let manifest = observer_with_cap(2);
     let pid = world
         .admit(
             &manifest,
@@ -369,10 +401,7 @@ impl Spirit for AlternatingTelemetry {
 async fn three_slow_telemetry_deliveries_of_the_last_five_quarantine_whatever_runs_between() {
     let world = World::new();
     let consolidations = Arc::new(AtomicU32::new(0));
-    let manifest = with_window(
-        &OBSERVER_MANIFEST.replace("time_cap_seconds = 10", "time_cap_seconds = 2"),
-        100,
-    );
+    let manifest = with_window(&observer_with_cap(2), 100);
     let pid = world
         .admit(
             &manifest,
@@ -421,6 +450,24 @@ impl Spirit for PanicsOnStart {
     fn on_start(&self, _ctx: &mut Ctx) {
         panic!("start fault");
     }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn subscription_grant_journals_the_effective_wall_not_the_declared_cap() {
+    let world = World::new();
+    let pid = world
+        .admit(
+            &observer_with_cap(1),
+            observer_with(&Arc::new(Recorded::default())),
+            StartPolicy::LeaveLoaded,
+        )
+        .await
+        .unwrap();
+    let records = world.subscription_events();
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].subscriber_pid, pid);
+    assert!(records[0].granted);
+    assert_eq!(records[0].effective_wall_ms, Some(950));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -542,7 +589,7 @@ async fn a_panicking_subscriber_is_quarantined_until_a_successor_replaces_it() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn one_budget_overrun_quarantines_the_subscriber() {
     let world = World::new();
-    let manifest = OBSERVER_MANIFEST.replace("time_cap_seconds = 10", "time_cap_seconds = 1");
+    let manifest = observer_with_cap(1);
     let pid = world
         .admit(
             &manifest,
@@ -629,7 +676,9 @@ async fn a_spawned_form_registers_but_telemetry_needs_an_explicit_listing() {
     let mut gated =
         gate_manifest(OBSERVER_MANIFEST, &|name| KNOWN_CLASS_NAMES.contains(&name)).unwrap();
     gated.class_section.forms = vec!["wasm-component".into()];
-    assert!(gated.lifecycle.enabled_hooks.is_empty());
+    // A declaration without the listing subscribes nothing on a spawned form.
+    gated.lifecycle.enabled_hooks.clear();
+    assert!(gated.lifecycle.telemetry.is_some());
     let sink = Arc::new(Recorded::default());
     let pid = silent
         .admit_gated(&gated, observer_with(&sink), StartPolicy::StartNow)
@@ -655,6 +704,79 @@ async fn a_spawned_form_registers_but_telemetry_needs_an_explicit_listing() {
     assert_eq!(listing.subscription_rows(), [row(pid, true, "admitted")]);
     let delivered = listing.emit(0.2).await;
     assert_eq!(sink.scalar_seqs(), [delivered]);
+
+    // A listing without the validated declaration subscribes nothing either.
+    let undeclared = World::new();
+    gated.lifecycle.telemetry = None;
+    let sink = Arc::new(Recorded::default());
+    undeclared
+        .admit_gated(&gated, observer_with(&sink), StartPolicy::StartNow)
+        .await
+        .expect("the spawned-form admission is granted");
+    assert!(undeclared.subscription_rows().is_empty());
+    undeclared.emit(0.3).await;
+    assert!(sink.scalar_seqs().is_empty());
+}
+
+/// D-21-9-02 A: a listing without a valid `[lifecycle.telemetry]` declaration is refused at
+/// admission, before any pid, grant or dispatch; the exact boundary is admitted.
+#[test]
+fn a_telemetry_listing_needs_a_valid_declaration_at_admission() {
+    let known = |name: &str| KNOWN_CLASS_NAMES.contains(&name);
+    let refused_lifecycle = |manifest: &str| {
+        matches!(
+            gate_manifest(manifest, &known),
+            Err(AdmissionRefusal::SectionParse {
+                section: "lifecycle",
+                ..
+            })
+        )
+    };
+    // Listing only (table removed), schema 8. The bounds are line-anchored: the file header
+    // comment also mentions `[lifecycle.telemetry]`, which a bare `find` would match first.
+    let start = OBSERVER_MANIFEST.find("\n[lifecycle.telemetry]").unwrap() + 1;
+    let end = OBSERVER_MANIFEST.find("\n[budget]").unwrap() + 1;
+    assert!(start < end);
+    let listing_only = format!(
+        "{}{}",
+        &OBSERVER_MANIFEST[..start],
+        &OBSERVER_MANIFEST[end..]
+    );
+    assert!(
+        listing_only.contains("on_telemetry_event")
+            && !listing_only.contains("time_cap_seconds = 5")
+    );
+    toml::from_str::<toml::Value>(&listing_only).expect("the fixture is well-formed TOML");
+    match gate_manifest(&listing_only, &known) {
+        Err(AdmissionRefusal::SectionParse {
+            section: "lifecycle",
+            detail,
+        }) => assert!(
+            detail.contains("requires a [lifecycle.telemetry] declaration"),
+            "{detail}"
+        ),
+        other => panic!("expected the lifecycle declaration refusal, got {other:?}"),
+    }
+    // A listing under an older schema is refused, not degraded.
+    assert!(refused_lifecycle(&listing_only.replace(
+        "manifest_schema_version = 8",
+        "manifest_schema_version = 7"
+    )));
+    // Above the 5 s ceiling, zero, and above the overall cap.
+    assert!(refused_lifecycle(
+        &OBSERVER_MANIFEST.replace("time_cap_seconds = 5", "time_cap_seconds = 6")
+    ));
+    assert!(refused_lifecycle(
+        &OBSERVER_MANIFEST.replace("time_cap_seconds = 5", "time_cap_seconds = 0")
+    ));
+    assert!(refused_lifecycle(
+        &OBSERVER_MANIFEST.replace("time_cap_seconds = 10", "time_cap_seconds = 4")
+    ));
+    // Exactly the overall cap, and exactly the ceiling, are admitted.
+    let gated = gate_manifest(&observer_with_cap(2), &known).expect("equal to the overall cap");
+    assert_eq!(gated.lifecycle.telemetry.unwrap().time_cap_seconds(), 2);
+    let gated = gate_manifest(OBSERVER_MANIFEST, &known).expect("the shipped declaration");
+    assert_eq!(gated.lifecycle.telemetry.unwrap().time_cap_seconds(), 5);
 }
 
 #[derive(Debug)]
@@ -938,9 +1060,9 @@ async fn fresh_inbound_frames_hold_consolidation_off() {
 async fn a_manifest_without_on_consolidate_is_skipped_and_never_stamped() {
     let world = World::new();
     let counts = Arc::new(Consolidations::default());
-    let manifest = format!(
-        "{}\n[lifecycle]\nenabled_hooks = [\"on_load\", \"on_start\", \"on_idle\"]\n",
-        with_window(OBSERVER_MANIFEST, 1_000)
+    let manifest = without_telemetry(
+        &with_window(OBSERVER_MANIFEST, 1_000),
+        "\"on_load\", \"on_start\", \"on_idle\"",
     );
     let pid = world
         .admit(
@@ -1298,7 +1420,7 @@ async fn finished_wall_overruns_are_not_kept_for_the_life_of_the_pump() {
     let world = World::new();
     world
         .admit(
-            &OBSERVER_MANIFEST.replace("time_cap_seconds = 10", "time_cap_seconds = 2"),
+            &observer_with_cap(2),
             make_spirit_obj(OverrunsEveryNotice),
             StartPolicy::StartNow,
         )
@@ -1933,7 +2055,7 @@ async fn retry_after_distillate_scrub_reemits_the_orphan_request_and_scrubbed_id
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn undelivered_purges_are_typed_and_post_erasure_errors_are_pending() {
     let world = World::new();
-    let manifest = format!("{OBSERVER_MANIFEST}\n[lifecycle]\nenabled_hooks = [\"on_start\"]\n");
+    let manifest = without_telemetry(OBSERVER_MANIFEST, "\"on_start\"");
     // An explicitly disabled hook is a typed undelivered purge, not a silent skip.
     let pid = world
         .admit(
@@ -2149,7 +2271,7 @@ async fn a_late_hook_result_appends_its_eventual_redistilled_receipt() {
         pid_slot.clone(),
         source_slot.clone(),
     );
-    let manifest = OBSERVER_MANIFEST.replace("time_cap_seconds = 10", "time_cap_seconds = 1");
+    let manifest = observer_with_cap(1);
     let pid = world
         .admit(
             &manifest,
@@ -2350,7 +2472,7 @@ async fn missing_skill_is_journaled_before_pid() {
     let world = World::new();
     let manifest = format!(
         "{}\n[skills]\nuses = [\"missing-20-8-witness\"]\n",
-        OBSERVER_MANIFEST.replace("manifest_schema_version = 2", "manifest_schema_version = 7")
+        OBSERVER_MANIFEST
     );
     let gated = gate_manifest(&manifest, &|name| KNOWN_CLASS_NAMES.contains(&name)).unwrap();
     let deps = AdmissionDeps {

@@ -1,73 +1,51 @@
-# Export Counsel Precondition — Story 11.1a
+# Export Counsel — Release Claim Boundary (formerly a Story 11.1a merge precondition)
 
-**Date:** 2026-06-30
-**Status:** OPEN — merge precondition, not a note
-**Blocks:** Merge of Story 11.1a to the shippable line (any release branch / `main` post-freeze)
+**Date:** 2026-06-30 (original); superseded 2026-11-12
+**Status:** SUPERSEDED as a merge precondition — now a **release claim boundary**.
+No export-compliance counsel review was performed; no ECCN determination was made.
+**Blocks:** nothing. Merge and the GA tag are not gated on counsel
+(operator ruling 2026-11-12; `RELEASE-HOLDS.md` Boundary 2).
 
-## The precondition
+## Current position
 
-Merging Story 11.1a to the **shippable line** is **GATED** on export-compliance
-counsel clearing the **5D002.c.1** classification question raised by the WASM
-hosting surface. This is a **named merge precondition**, not an advisory note:
-until counsel signs off (and records the disposition in
-`docs/compliance/eccn-classification.md`), 11.1a stays on the development line
-behind the `wasm-host` feature flag and MUST NOT be promoted to a distributable
-build.
+The operator ruled on 2026-11-12 that NFR-Comp-1 (ECCN classification) is not
+being pursued: there is no counsel, no firm and no budget; only AI agents.
+Consequences:
 
-## The open question
+- Counsel clearance is **not** a merge precondition for Story 11.1a or any
+  other change to the shippable line, and not a GA-tag precondition.
+- The release **may not claim** NFR-Comp-1 is met, may not claim any ECCN or
+  EAR99 classification, and may not claim counsel cleared the WASM hosting
+  surface. The release notes say so (`RELEASE-HOLDS.md` GA-tag procedure,
+  item 2).
+- The operator ruled the WASM host **ON** in the default build (story
+  `21-9-wasm-host-default-on`). The default `maos` build includes the Wasmtime
+  engine; an explicit engine-free build
+  (`--no-default-features --features network`) remains supported. Neither build
+  is classified, and nothing here is permission to distribute in any
+  jurisdiction. Operators and distributors must obtain their own advice.
+- `STABILITY.md` §Export states exactly: "No ECCN determination was made; the
+  surface is not classified."
 
-The classification trigger is undecided. Two candidate triggers are on the
-table, and they have very different blast radii:
+## Historical rationale (retained; not a current gate)
+
+Originally (2026-06-30) merging Story 11.1a to the shippable line was gated on
+counsel clearing the **5D002.c.1** question raised by the WASM hosting surface,
+with the feature held OFF by default so the development line carried it only.
+The open question was never answered. Two candidate triggers were identified:
 
 1. **The vendored `wasmtime` engine.** If 5D002.c.1 is triggered by the
    in-repo, compiler-bearing `wasmtime` dependency itself, then the
-   classification event is the moment the dependency enters `Cargo.toml` /
-   `Cargo.lock` of a crate on the shippable line — *regardless of whether the
-   feature is enabled in any shipped build*. Under this reading the dependency
-   add is itself the controlled event and counsel must clear it before the dep
-   touches a distributable manifest.
+   classification event is the moment the dependency enters a shippable
+   crate's `Cargo.toml` / `Cargo.lock`, regardless of feature state.
+2. **The user-shipped WASM Spirit.** If 5D002.c.1 is triggered only by runtime
+   execution of user-supplied WASM code, the engine source is not the trigger
+   and the event is the first distributable runtime that invokes `wasmtime`.
 
-2. **The user-shipped WASM Spirit.** If 5D002.c.1 is triggered only by the
-   runtime execution of user-supplied WASM code (the Spirit payload), then the
-   vendored engine source behind a dev-only feature is not the trigger, and the
-   classification event is the first *distributable runtime* that actually
-   invokes `wasmtime`.
-
-Counsel must determine which reading applies. The answer determines whether the
-`maos-bin` `wasm-host` dependency wiring can land on `main` at all before
-clearance, or only on a feature-gated development line.
-
-## Preflight position (MAOS engineering, pending counsel)
-
-While the question is open, MAOS engineering holds the following preflight
-position, which is deliberately conservative and is *not* a legal determination:
-
-- **In-tree source behind a dev feature ≠ a distributable runtime.** The
-  `wasm-host` feature is **OFF by default** in `crates/maos-bin/Cargo.toml`.
-  The vendored `wasmtime` engine, `maos-wasm-host`, and `maos-wasm-runner` are
-  gated behind that feature and do NOT appear in the default `maos` build
-  artifact. The `xtask` gate
-  `check_export_control::check_wasm_host_absent_from_default` (Story 11.1a
-  negative AC) asserts this absence and goes RED if the feature leaks into the
-  default build.
-- This keeps the WASM surface on the **development line** only. It does **not**
-  constitute a distributable runtime and is asserted to be non-distributable
-  precisely *because* the classification question is open.
-- This position is **provisional and reversible**: if counsel rules that the
-  trigger is reading (1) above, the dependency add itself must be withdrawn from
-  any shippable manifest until cleared, regardless of feature-gating.
-
-## Resolution criteria
-
-This precondition is satisfied when **all** of the following hold:
-
-1. Export-compliance counsel has issued a written determination on whether the
-   5D002.c.1 trigger is the vendored engine (reading 1) or the user-shipped
-   Spirit runtime (reading 2).
-2. The resulting ECCN classification for the WASM hosting surface is recorded
-   in `docs/compliance/eccn-classification.md` (the doc enumerated by the
-   `check-export-control` ship-gate).
-3. STABILITY.md `<!-- PRESERVED:export -->` fence reflects the determination.
-
-Until then, the `wasm-host` feature remains OFF by default and the
-`check_wasm_host_absent_from_default` gate guards the default build.
+Which reading applies remains undecided. The former engineering preflight
+(off-by-default feature plus the `check_export_control` absence gate) was a
+conservative engineering position, never a legal determination, and the
+default-on ruling retires it. If anyone later obtains a counsel determination,
+it is recorded in `docs/compliance/eccn-classification.md` and reflected in the
+`STABILITY.md` `<!-- PRESERVED:export -->` fence; until then the open question
+stands as a claim boundary.

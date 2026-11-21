@@ -1300,6 +1300,32 @@ impl TransparencyLogAdapter {
         payload: &[u8],
         recipients: &[FrameRecipient],
     ) -> LogBeforeDeliver<FrameRowWrite> {
+        self.insert_routed_frame_correlated(
+            frame,
+            kind,
+            spirit_pid,
+            capability_token,
+            intent,
+            payload,
+            recipients,
+            None,
+        )
+    }
+
+    /// [`Self::insert_routed_frame`] that also records the host-derived
+    /// `correlation_id` on the base row (scoped shell replies only).
+    #[allow(clippy::too_many_arguments)]
+    pub fn insert_routed_frame_correlated(
+        &self,
+        frame: &maos_domain::frame::IacFrame,
+        kind: FrameKind,
+        spirit_pid: u32,
+        capability_token: Option<&[u8; 32]>,
+        intent: &str,
+        payload: &[u8],
+        recipients: &[FrameRecipient],
+        correlation_id: Option<&str>,
+    ) -> LogBeforeDeliver<FrameRowWrite> {
         assert!(
             kind != FrameKind::Distillate,
             "MAOS I11 enforcement (Story 8.10 AC2): FrameKind::Distillate rows may only be \
@@ -1312,7 +1338,7 @@ impl TransparencyLogAdapter {
             frame.from.spirit_id.as_str(),
             frame.to.first().map_or("", |a| a.spirit_id.as_str()),
             capability_token,
-            None,
+            correlation_id,
             intent,
             payload,
             frame.auto_marker,

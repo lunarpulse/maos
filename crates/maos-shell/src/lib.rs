@@ -281,8 +281,9 @@ pub trait ShellHost: Send + Sync {
     /// The scheduler-assigned pid of the loaded hello-spirit.
     fn spirit_pid(&self) -> u32;
 
-    /// Route an installed name, including a typed boot refusal; None means unknown.
-    fn dispatch_installed(&self, _name: &str, _message: &str) -> Option<String> {
+    /// Route an installed name to its guest; `None` means unknown. `Ok` is the
+    /// guest's genuine answer, `Err` the already-formatted typed refusal/failure.
+    fn dispatch_installed(&self, _name: &str, _message: &str) -> Option<Result<String, String>> {
         None
     }
 
@@ -545,9 +546,17 @@ fn handle_line(
         return Ok(());
     }
     if spirit_name != "hello-spirit" {
-        if let Some(response) = host.dispatch_installed(spirit_name, msg) {
-            print_line(output, color_choice, &response)?;
-            return Ok(());
+        match host.dispatch_installed(spirit_name, msg) {
+            Some(Ok(answer)) => {
+                let line = format!("{spirit_name}: {}", escape_guest_text(&answer));
+                print_line(output, color_choice, &line)?;
+                return Ok(());
+            }
+            // The typed error is already formatted; it is NOT printed here. The returned
+            // error is the single diagnostic (main's result), and `run_shell` adds
+            // `maos: shell exiting` and the existing deferred teardown / non-zero exit.
+            Some(Err(typed)) => return Err(typed.into()),
+            None => {}
         }
         print_line(
             output,
@@ -888,6 +897,23 @@ fn print_line(
         ColorChoice::Never | ColorChoice::Auto => writeln!(output, "{text}"),
         ColorChoice::Always => writeln!(output, "\x1b[1m{text}\x1b[0m"),
     }
+}
+
+/// Escape control and invisible/bidirectional-format characters of guest text
+/// as `\u{..}`; printable Unicode passes through unchanged.
+fn escape_guest_text(text: &str) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        let hidden = matches!(c, '\u{61c}' | '\u{180e}' | '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}')
+            || matches!(c, '\u{2060}'..='\u{206f}' | '\u{feff}' | '\u{e0000}'..='\u{e007f}');
+        if c.is_control() || hidden {
+            let _ = write!(out, "\\u{{{:x}}}", c as u32);
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {

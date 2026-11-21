@@ -353,7 +353,9 @@ async fn run(dir: &Path, forbidden: bool) -> Run {
         core,
         SessionLaunch {
             plan,
-            component_artifact: Some(artifact),
+            component_artifact: Some(
+                maos_bin::spirit_session::LaunchArtifact::acquire_local_file(&artifact).unwrap(),
+            ),
             turn_budget: Duration::from_secs(30),
             once: false,
             context_window: Default::default(),

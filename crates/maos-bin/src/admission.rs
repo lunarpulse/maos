@@ -301,8 +301,8 @@ pub fn emit_model_provenance_event(
 /// admits at `SandboxTier::DEFAULT_FLOOR`), but it must honestly name the
 /// form's boundary: `rust-inproc` declares `T0`; `wasm-component` declares
 /// `T2`. The latter is parsed through every remaining section before a
-/// compile-time engine/launch refusal. A spawned component is launched only by
-/// 17-3c; the default binary keeps the WASM engine off for export Hold 2.
+/// compile-time engine refusal. The default build launches a supported component
+/// through the T2 runner; an explicitly engine-free build refuses it.
 #[derive(Debug, Clone)]
 pub enum AdmissionRefusal {
     /// Gate 1 — the manifest file could not be read.
@@ -330,6 +330,9 @@ pub enum AdmissionRefusal {
     },
     /// Last gate — the published default build omits the WASM engine.
     WasmEngineOff,
+    /// A WASM-capable build on a platform with no held-artifact handoff to the sandboxed runner.
+    /// Distinct from [`Self::WasmEngineOff`]: the engine is compiled in, the transport is absent.
+    WasmTransportUnsupported { detail: String },
     /// The selected composition surface has no spawned-session implementation.
     SpawnedSurfaceUnsupported { surface: &'static str },
     /// Gates 6 and 7 — a declared section did not parse.
@@ -376,9 +379,24 @@ pub enum AdmissionRefusal {
     SkillUnavailable { skill: String },
     /// A declared skill requires an undeclared action.
     SkillEscalation { skill: String },
+    /// `[[schedule]]` declares more entries than the per-manifest cap (AC8.7).
+    ScheduleEntryLimit { limit: usize, actual: usize },
+    /// `[[schedule]]` payloads decode to more than the per-manifest total cap (AC8.7).
+    ScheduleDecodedBytesLimit { limit: usize, actual: usize },
 }
 
 impl AdmissionRefusal {
+    /// A registry verification failure: a platform with no held-component handoff is its own
+    /// typed refusal, any other failure a plain admission refusal.
+    pub fn from_registry_error(error: &(dyn std::error::Error + Send + Sync + 'static)) -> Self {
+        let detail = error.to_string();
+        if error.is::<maos_registry::install::HeldComponentUnsupported>() {
+            Self::WasmTransportUnsupported { detail }
+        } else {
+            Self::Admission { detail }
+        }
+    }
+
     /// The stable machine code the door reports and the operator greps for.
     pub fn code(&self) -> &'static str {
         match self {
@@ -391,6 +409,7 @@ impl AdmissionRefusal {
             Self::RustInprocRequiresT0 { .. } => "rust_inproc_requires_t0",
             Self::WasmComponentRequiresT2 { .. } => "wasm_component_requires_t2",
             Self::WasmEngineOff => "wasm_engine_off",
+            Self::WasmTransportUnsupported { .. } => "wasm_transport_unsupported",
             Self::SpawnedSurfaceUnsupported { .. } => "spawned_surface_unsupported",
             Self::SectionParse { .. } => "manifest_section_invalid",
             Self::ModelProvenance { .. } => "model_provenance_refused",
@@ -407,6 +426,8 @@ impl AdmissionRefusal {
             Self::FallbackUnsupported => "fallback_unsupported",
             Self::SkillUnavailable { .. } => "skill_unavailable",
             Self::SkillEscalation { .. } => "skill_escalation",
+            Self::ScheduleEntryLimit { .. } => "schedule_entry_limit",
+            Self::ScheduleDecodedBytesLimit { .. } => "schedule_decoded_bytes_limit",
         }
     }
 
@@ -447,9 +468,12 @@ impl std::fmt::Display for AdmissionRefusal {
                 )
             }
             Self::WasmEngineOff => f.write_str(
-                "wasm_engine_off: WASM engine disabled while Export Hold 2 is open; \
-                 `wasm-host` is the 5D002.c.1 export-control precondition",
+                "wasm_engine_off: this MAOS build omits the WASM engine; \
+                 use the default MAOS build on a supported host",
             ),
+            Self::WasmTransportUnsupported { detail } => {
+                write!(f, "wasm_transport_unsupported: {detail}")
+            }
             Self::SpawnedSurfaceUnsupported { surface } => write!(
                 f,
                 "spawned_surface_unsupported: {surface} supports only rust-inproc Spirits",
@@ -485,6 +509,14 @@ impl std::fmt::Display for AdmissionRefusal {
             Self::FallbackUnsupported => f.write_str("fallback_unsupported: a primary token cannot authorise fallback providers"),
             Self::SkillUnavailable { skill } => write!(f, "skill_unavailable: {skill}"),
             Self::SkillEscalation { skill } => write!(f, "skill_escalation: {skill}"),
+            Self::ScheduleEntryLimit { limit, actual } => write!(
+                f,
+                "schedule_entry_limit: {actual} [[schedule]] entries declared, at most {limit} allowed"
+            ),
+            Self::ScheduleDecodedBytesLimit { limit, actual } => write!(
+                f,
+                "schedule_decoded_bytes_limit: [[schedule]] payloads decode to {actual} bytes in total, at most {limit} allowed"
+            ),
         }
     }
 }
@@ -846,14 +878,24 @@ pub fn gate_manifest(
             .map_err(|e| parse_err("scheduling")(e.to_string()))?,
         None => SchedulingSection::default(),
     };
-    let lifecycle = match section("lifecycle") {
-        Some(s) => LifecycleSection::from_toml_str(&s)
-            .map_err(|e| parse_err("lifecycle")(e.to_string()))?,
-        None => LifecycleSection::default(),
-    };
     let budget = section("budget")
         .map(|s| Budget::from_toml_str(&s).map_err(|e| parse_err("budget")(e.to_string())))
         .transpose()?;
+    let lifecycle_toml = section("lifecycle");
+    let mut lifecycle = match &lifecycle_toml {
+        Some(s) => {
+            LifecycleSection::from_toml_str(s).map_err(|e| parse_err("lifecycle")(e.to_string()))?
+        }
+        None => LifecycleSection::default(),
+    };
+    // D-21-9-02 A — the explicit, version-governed `[lifecycle.telemetry]` declaration, refused
+    // here (before any pid, grant or dispatch) when a listing lacks or misstates it.
+    lifecycle.telemetry = maos_manifest::validate_telemetry_subscription(
+        class_section.manifest_schema_version,
+        lifecycle_toml.as_deref(),
+        budget.as_ref(),
+    )
+    .map_err(|e| parse_err("lifecycle")(e.to_string()))?;
     // Story 19-5 (D-19-5-06 A + r19_x1) — parsed here, carried by `bundle()`.
     let hot_swap = optional_section(&root, "hot_swap", HotSwapManifestSection::from_toml_str)?;
     let migrates_from =
@@ -930,9 +972,19 @@ pub fn gate_manifest(
             let mut wrapper = toml::value::Table::new();
             wrapper.insert("schedule".into(), value.clone());
             toml::to_string(&wrapper)
-                .map_err(|error| error.to_string())
-                .and_then(|text| SchedulesSection::from_toml_str(&text).map_err(|e| e.to_string()))
-                .map_err(parse_err("schedule"))?
+                .map_err(|error| parse_err("schedule")(error.to_string()))
+                .and_then(|text| {
+                    SchedulesSection::from_toml_str(&text).map_err(|error| match error {
+                        maos_manifest::ManifestError::ScheduleEntryLimit { limit, actual } => {
+                            AdmissionRefusal::ScheduleEntryLimit { limit, actual }
+                        }
+                        maos_manifest::ManifestError::ScheduleDecodedBytesLimit {
+                            limit,
+                            actual,
+                        } => AdmissionRefusal::ScheduleDecodedBytesLimit { limit, actual },
+                        other => parse_err("schedule")(other.to_string()),
+                    })
+                })?
         }
         None => SchedulesSection::default(),
     };
@@ -942,6 +994,14 @@ pub fn gate_manifest(
     #[cfg(not(feature = "wasm-host"))]
     if wasm {
         return Err(AdmissionRefusal::WasmEngineOff);
+    }
+    // The engine is present but the held-artifact handoff exists on Linux only: a typed
+    // refusal of its own, after every structural gate, never `wasm_engine_off`.
+    #[cfg(all(feature = "wasm-host", not(target_os = "linux")))]
+    if wasm {
+        return Err(AdmissionRefusal::WasmTransportUnsupported {
+            detail: "no held-artifact handoff on this platform".into(),
+        });
     }
 
     Ok(GatedManifest {
@@ -1344,14 +1404,27 @@ pub async fn load_admit_start(
     start: StartPolicy,
     on_loaded: &mut (dyn FnMut(u32) + Send),
 ) -> Result<Admitted, AdmissionRefusal> {
-    admit_inner(deps, gated, spirit_obj, boot_nonce, start, on_loaded, true).await
+    let archive_root = maos_audit::default_archive_dir();
+    admit_inner(
+        deps,
+        gated,
+        spirit_obj,
+        boot_nonce,
+        start,
+        on_loaded,
+        &archive_root,
+        true,
+    )
+    .await
 }
 
 /// [`load_admit_start`] without the FR11 archive record (Story 20-9): a spawned component's start
 /// completes asynchronously, so the caller writes the record itself, with [`archive_provisional`]
 /// before the start (a death inside the window then cannot leave a started version unrecorded) and
 /// [`withdraw_provisional`] when it never starts: the restore of the predecessor is then judged
-/// against the predecessor's record, not against a version that never ran.
+/// against the predecessor's record, not against a version that never ran. The FR11 archive it
+/// checks the cross-major gate against is `archive_root`, the caller's (the root's), not the
+/// ambient default.
 pub async fn load_admit_start_unarchived(
     deps: &AdmissionDeps<'_>,
     gated: &GatedManifest,
@@ -1359,8 +1432,19 @@ pub async fn load_admit_start_unarchived(
     boot_nonce: u64,
     start: StartPolicy,
     on_loaded: &mut (dyn FnMut(u32) + Send),
+    archive_root: &std::path::Path,
 ) -> Result<Admitted, AdmissionRefusal> {
-    admit_inner(deps, gated, spirit_obj, boot_nonce, start, on_loaded, false).await
+    admit_inner(
+        deps,
+        gated,
+        spirit_obj,
+        boot_nonce,
+        start,
+        on_loaded,
+        archive_root,
+        false,
+    )
+    .await
 }
 
 async fn admit_inner(
@@ -1370,6 +1454,7 @@ async fn admit_inner(
     boot_nonce: u64,
     start: StartPolicy,
     on_loaded: &mut (dyn FnMut(u32) + Send),
+    archive_root: &std::path::Path,
     archive_now: bool,
 ) -> Result<Admitted, AdmissionRefusal> {
     let early_gates = (|| {
@@ -1387,12 +1472,12 @@ async fn admit_inner(
         return Err(refusal);
     }
     let spirit_id = gated.spirit_id.clone();
-    let archive_root = maos_audit::default_archive_dir();
+    // `archive_root` is the caller's: the FR11 archive of this root, never an ambient global.
 
     // Story 19-5 (D-19-5-05 A) — FR11, BEFORE a pid is allocated: a
     // cross-major successor of an archived predecessor must declare a
     // migrator for it.
-    if let Err(refusal) = refuse_without_migrator(&archive_root, gated) {
+    if let Err(refusal) = refuse_without_migrator(archive_root, gated) {
         emit_structural_rejection(deps.transparency_log, &gated.manifest_toml, &refusal);
         return Err(refusal);
     }
@@ -1525,7 +1610,7 @@ async fn admit_inner(
     // Story 19-5 (D-19-5-03 A) — only a GRANTED admission leaves the FR11
     // identity record a later cross-major load is checked against.
     if archive_now {
-        archive_admitted(&archive_root, gated);
+        archive_admitted(archive_root, gated);
     }
 
     deps.pid_by_spirit_id
@@ -1536,8 +1621,9 @@ async fn admit_inner(
         })
         .insert(spirit_id.clone(), pid);
     if let Some(iac) = deps.iac {
-        iac.register_promotion_set(
+        iac.register_promotion_set_for_pid(
             &spirit_id,
+            pid,
             gated
                 .intent_promotion_set
                 .as_ref()
@@ -1575,9 +1661,9 @@ async fn admit_inner(
                 // teardown after a panicked hook. A lost race can only lose
                 // crash classification, never corrupt scheduler state.
                 if let Some(iac) = deps.iac {
-                    iac.unregister_promotion_set(&spirit_id);
+                    iac.unregister_promotion_set_for_pid(&spirit_id, pid);
                 }
-                remove_pid_by_spirit_id(deps, &spirit_id);
+                remove_pid_by_spirit_id(deps, &spirit_id, pid);
             } else {
                 rollback(deps, pid, &spirit_id).await;
             }
@@ -1626,9 +1712,9 @@ async fn rollback(deps: &AdmissionDeps<'_>, pid: u32, spirit_id: &str) {
         );
     }
     if let Some(iac) = deps.iac {
-        iac.unregister_promotion_set(spirit_id);
+        iac.unregister_promotion_set_for_pid(spirit_id, pid);
     }
-    remove_pid_by_spirit_id(deps, spirit_id);
+    remove_pid_by_spirit_id(deps, spirit_id, pid);
 }
 
 /// Undo an admission whose component never started (Story 20-9): its session has ended, which
@@ -1643,9 +1729,9 @@ pub(crate) async fn unwind_admitted(deps: &AdmissionDeps<'_>, pid: u32, spirit_i
         rollback(deps, pid, spirit_id).await;
     } else {
         if let Some(iac) = deps.iac {
-            iac.unregister_promotion_set(spirit_id);
+            iac.unregister_promotion_set_for_pid(spirit_id, pid);
         }
-        remove_pid_by_spirit_id(deps, spirit_id);
+        remove_pid_by_spirit_id(deps, spirit_id, pid);
     }
 }
 
@@ -1800,13 +1886,15 @@ fn is_path_component(text: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'+' | b'_'))
 }
 
-/// Remove the door's lookup only; panic teardown retains scheduler ownership.
-fn remove_pid_by_spirit_id(deps: &AdmissionDeps<'_>, spirit_id: &str) {
-    deps.pid_by_spirit_id
-        .write()
-        .unwrap_or_else(|error| {
-            eprintln!("maos: CRITICAL — pid_by_spirit_id RwLock poisoned (admission removal)");
-            error.into_inner()
-        })
-        .remove(spirit_id);
+/// Remove the door's lookup only (panic teardown retains scheduler ownership), and only while
+/// `spirit_id` is still bound to `pid`, so a delayed cleanup of a predecessor cannot erase a
+/// newer admission's binding.
+fn remove_pid_by_spirit_id(deps: &AdmissionDeps<'_>, spirit_id: &str, pid: u32) {
+    let mut map = deps.pid_by_spirit_id.write().unwrap_or_else(|error| {
+        eprintln!("maos: CRITICAL — pid_by_spirit_id RwLock poisoned (admission removal)");
+        error.into_inner()
+    });
+    if map.get(spirit_id) == Some(&pid) {
+        map.remove(spirit_id);
+    }
 }

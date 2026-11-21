@@ -159,9 +159,6 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         pread: Option<Arc<String>>,
     ) -> Result<crate::admission::Admitted, crate::admission::AdmissionRefusal>;
 
-    /// Withdraw any I13 recipient policy after a successful unload.
-    fn forget_promotion_set(&self, _spirit_id: &str) {}
-
     /// Recovery uses precisely the same structural gate and constructor as load.
     #[cfg(feature = "network")]
     fn prepare_spirit(
@@ -183,13 +180,16 @@ pub trait BinPrivateOps: Send + Sync + 'static {
     /// Story 20-9 (D-12 A) — the spawned admission path a cold swap re-admits a component
     /// through (`prepare_spawned` → `load_admit_start` → the spawned session), at a new pid.
     /// `origin` is the directory the manifest's relative `artifact` resolves against: the
-    /// door passes a private snapshot of the manifest bytes. `maosctl load` of a component
-    /// stays refused: only a cold swap reaches this.
+    /// door passes a private snapshot of the manifest bytes. `held` is the component the door
+    /// acquired in its preflight ([`Self::acquire_spawned_artifact`]); the launch uses exactly
+    /// that file and never reopens a pathname. `maosctl load` of a component stays refused:
+    /// only a cold swap reaches this.
     #[cfg(feature = "network")]
     async fn load_spawned(
         &self,
         _manifest: &Path,
         _origin: &Path,
+        _held: HeldLaunch,
     ) -> Result<crate::admission::Admitted, crate::admission::AdmissionRefusal> {
         Err(
             crate::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
@@ -198,8 +198,65 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         )
     }
 
-    /// A spawned predecessor's retained manifest passes the same structural gates, and its
-    /// artifact is still where it was admitted from, so this root's runner can launch it.
+    /// Acquire, once and before any unload, the component `manifest` declares under `origin`.
+    /// `source` is the original path the manifest was read from (never its private snapshot):
+    /// a signed package there is verified and its component handed off open; an unsigned
+    /// source falls to a plain local acquire. `pin` is the digest the bytes must have. The door
+    /// carries the result through the matching [`Self::load_spawned`]; dropping it closes the
+    /// file.
+    #[cfg(feature = "network")]
+    fn acquire_spawned_artifact(
+        &self,
+        _manifest: &Path,
+        _text: &str,
+        _origin: &Path,
+        _source: Option<&Path>,
+        _pin: Option<[u8; 32]>,
+    ) -> Result<HeldLaunch, crate::admission::AdmissionRefusal> {
+        Err(
+            crate::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
+                surface: "operator door",
+            },
+        )
+    }
+
+    /// SHA-256 of the component bytes the live spawned session of `spirit_id` was launched
+    /// with: what a restore must reacquire.
+    #[cfg(feature = "network")]
+    fn spawned_artifact_sha256(&self, _spirit_id: &str) -> Option<[u8; 32]> {
+        None
+    }
+
+    /// The publisher key verified when the live spawned session of `spirit_id` was launched
+    /// from a signed package (`SwapContext.verified_publisher`); `None` for a local source.
+    /// A restore carries it so the predecessor re-admits under its publisher-bound storage
+    /// identity, never the bare id namespace.
+    #[cfg(feature = "network")]
+    fn spawned_publisher(&self, _spirit_id: &str) -> Option<[u8; 32]> {
+        None
+    }
+
+    /// Reacquire a spawned predecessor for restore: exactly the bytes whose digest is `pin`
+    /// (mandatory), opened locally under `origin`, carrying the previously verified
+    /// `publisher` unchanged. Never discovers provenance from the staged filename.
+    #[cfg(feature = "network")]
+    fn acquire_spawned_restore(
+        &self,
+        _manifest: &Path,
+        _text: &str,
+        _origin: &Path,
+        _pin: [u8; 32],
+        _publisher: Option<[u8; 32]>,
+    ) -> Result<HeldLaunch, crate::admission::AdmissionRefusal> {
+        Err(
+            crate::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
+                surface: "operator door",
+            },
+        )
+    }
+
+    /// A spawned predecessor's retained manifest passes the same structural gates, so this
+    /// root's runner can launch it.
     #[cfg(feature = "network")]
     fn prepare_spawned_restore(
         &self,
@@ -242,6 +299,13 @@ pub trait BinPrivateOps: Send + Sync + 'static {
     /// Plans are hot-swap/migrator hops, so a cold swap refuses on `true`.
     #[cfg(feature = "network")]
     fn migration_plan_pending(&self, spirit_id: &str) -> bool;
+
+    /// A cold-swap successor `text` that would drop or widen the promotion set registered for
+    /// `spirit_id`: a swap may only keep or narrow authority.
+    #[cfg(feature = "network")]
+    fn widens_promotion(&self, _spirit_id: &str, _text: &str) -> bool {
+        false
+    }
 
     /// Story 19-2 (D-19-2-08 A) — the principal bound at boot for a serving
     /// Butler (`MAOS_BUTLER_PRINCIPAL` or the scene header). `None` ⇒ a pick
@@ -456,7 +520,14 @@ pub struct SuccessorManifestSlot {
     /// Story 20-9 — where a staged component's relative `artifact` resolves (the door stages
     /// manifest bytes in a private file; the artifact stays in the operator's directory).
     origin: Arc<Mutex<Option<PathBuf>>>,
+    /// The component the exact hop staged here was verified against, held open: one-shot,
+    /// consumed by the successor factory, dropped (closed) by the next `stage`/`take`.
+    artifact: Arc<Mutex<Option<HeldLaunch>>>,
 }
+
+/// A held, one-shot component file in transit (a `spirit_session::LaunchArtifact`), typed
+/// opaquely so the door compiles without the WASM host.
+pub type HeldLaunch = Box<dyn std::any::Any + Send>;
 
 const POISONED: &str =
     "successor manifest slot: poisoned — a prior panic left upgrade staging inconsistent";
@@ -465,17 +536,27 @@ impl SuccessorManifestSlot {
     pub fn stage(&self, path: PathBuf) {
         *self.path.lock().expect(POISONED) = Some(path);
         *self.origin.lock().expect(POISONED) = None;
+        *self.artifact.lock().expect(POISONED) = None;
     }
 
-    /// Stage `path` whose relative `artifact` resolves against `origin`.
-    pub fn stage_at(&self, path: PathBuf, origin: PathBuf) {
+    /// Stage `path` whose relative `artifact` resolves against `origin`; `held` is the
+    /// component acquired for exactly this hop (none for an in-process successor).
+    pub fn stage_at(&self, path: PathBuf, origin: PathBuf, held: Option<HeldLaunch>) {
         *self.path.lock().expect(POISONED) = Some(path);
         *self.origin.lock().expect(POISONED) = Some(origin);
+        *self.artifact.lock().expect(POISONED) = held;
     }
 
     pub fn take(&self) -> Option<PathBuf> {
         self.origin.lock().expect(POISONED).take();
+        self.artifact.lock().expect(POISONED).take();
         self.path.lock().expect(POISONED).take()
+    }
+
+    /// The staged hop's held component, once: a second call (or a later hop that staged none)
+    /// finds nothing, so a launch can never reuse a file that was not verified for it.
+    pub fn take_artifact(&self) -> Option<HeldLaunch> {
+        self.artifact.lock().expect(POISONED).take()
     }
 
     /// Read WITHOUT clearing: the factory may be consulted per hop while the
@@ -742,6 +823,19 @@ impl DoorInner {
             code: code.to_string(),
             detail,
         }
+    }
+
+    #[cfg(feature = "network")]
+    fn conflict(code: &str, detail: impl Into<String>) -> OperatorOutcome {
+        OperatorOutcome::Conflict {
+            code: code.into(),
+            detail: detail.into(),
+        }
+    }
+
+    #[cfg(feature = "network")]
+    fn unrestorable(detail: impl Into<String>) -> OperatorOutcome {
+        Self::conflict("cold_swap_unrestorable", detail)
     }
 
     fn spirit_not_loaded(spirit_id: &str) -> OperatorOutcome {
@@ -1013,9 +1107,6 @@ impl DoorInner {
                     detail: other.to_string(),
                 },
             };
-        }
-        if verb == "unload" {
-            self.private_ops.forget_promotion_set(spirit_id);
         }
 
         if let Err(error) = self
@@ -1435,8 +1526,13 @@ impl DoorInner {
                     .cold_swap(
                         spirit_id,
                         &snapshot.0,
-                        target_path.parent().unwrap_or(Path::new(".")),
+                        &target_path,
                         &target_version,
+                        package.as_ref().map(|package| {
+                            <[u8; 32]>::from(<sha2::Sha256 as sha2::Digest>::digest(
+                                &package.artifact_bytes,
+                            ))
+                        }),
                     )
                     .await
             }
@@ -1487,11 +1583,13 @@ impl DoorInner {
         &self,
         spirit_id: &str,
         target: &Path,
-        target_origin: &Path,
+        target_source: &Path,
         successor_version: &str,
+        artifact_pin: Option<[u8; 32]>,
     ) -> OperatorOutcome {
         use maos_domain::invariants::i10::LifecycleEvent;
 
+        let target_origin = target_source.parent().unwrap_or(Path::new("."));
         let started_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
         let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
             return Self::spirit_not_loaded(spirit_id);
@@ -1564,11 +1662,18 @@ impl DoorInner {
                 ),
             };
         }
-        let restore_origin = if spawned {
-            self.private_ops.spawned_origin(spirit_id)
-        } else {
-            None
-        };
+        if self.private_ops.widens_promotion(spirit_id, &target_text) {
+            return Self::conflict(
+                "swap_promotion_widened",
+                format!(
+                    "the successor's intent_promotion_set is absent or wider than the one \
+                     '{spirit_id}' holds; refused before unload"
+                ),
+            );
+        }
+        let restore_origin = spawned
+            .then(|| self.private_ops.spawned_origin(spirit_id))
+            .flatten();
         let restorable = match (spawned, restore_origin.as_deref()) {
             (true, Some(origin)) => self.private_ops.prepare_spawned_restore(
                 &restore_manifest.0,
@@ -1592,9 +1697,48 @@ impl DoorInner {
             }
         });
         if let Err(detail) = restorable {
-            return OperatorOutcome::Conflict {
-                code: "cold_swap_unrestorable".into(),
-                detail,
+            return Self::unrestorable(detail);
+        }
+        // Spawned: take custody of both components now, before the unload. The predecessor is
+        // reacquired against the digest of the bytes it actually launched with, so a restore
+        // is that exact source even if its pathname is replaced or removed meanwhile; the
+        // target is held from here through its launch, not reopened after the unload.
+        let (mut restore_held, mut target_held) = (None, None);
+        if let Some(origin) = restore_origin.as_deref() {
+            // The predecessor is restored only from the exact bytes it launched with.
+            let Some(restore_pin) = self.private_ops.spawned_artifact_sha256(spirit_id) else {
+                return Self::unrestorable("the live component session records no launch digest");
+            };
+            restore_held = match self.private_ops.acquire_spawned_restore(
+                &restore_manifest.0,
+                &predecessor_manifest,
+                origin,
+                restore_pin,
+                self.private_ops.spawned_publisher(spirit_id),
+            ) {
+                Ok(held) => Some(held),
+                Err(error) => return Self::unrestorable(format!("{}: {error}", error.code())),
+            };
+            // The target is acquired from its own original source: a signed package there is
+            // verified and its component handed off held, never a verify-then-reopen.
+            target_held = match self.private_ops.acquire_spawned_artifact(
+                target,
+                &target_text,
+                target_origin,
+                Some(target_source),
+                artifact_pin,
+            ) {
+                Ok(held) => Some(held),
+                Err(error) => {
+                    let code = match error.code() {
+                        code @ "wasm_transport_unsupported" => code,
+                        _ => "cold_swap_target_artifact_refused",
+                    };
+                    return Self::conflict(
+                        code,
+                        format!("{}: {error}; refused before unload", error.code()),
+                    );
+                }
             };
         }
         // A spawned predecessor's session ends with its unload; the root stays up across the
@@ -1610,39 +1754,48 @@ impl DoorInner {
                 detail: error.to_string(),
             };
         }
-        self.private_ops.forget_promotion_set(spirit_id);
         let target_origin = spawned.then_some(target_origin);
-        let (outcome, journal, result) =
-            match self.admit_and_start(spirit_id, target, target_origin).await {
-                Ok(new_pid) => ("completed", Some(LifecycleEvent::Upgrade), Ok(new_pid)),
-                Err(refused) => match self
-                    .admit_and_start(spirit_id, &restore_manifest.0, restore_origin.as_deref())
-                    .await
-                {
-                    Ok(restored) => (
-                        "reverted",
-                        None,
-                        Err(OperatorOutcome::Conflict {
-                            code: "cold_swap_reverted".into(),
-                            detail: format!(
-                                "successor refused: {refused}; predecessor {predecessor_version} \
+        let (outcome, journal, result) = match self
+            .admit_and_start(
+                spirit_id,
+                target,
+                target_origin.map(|o| (o, target_held.take())),
+            )
+            .await
+        {
+            Ok(new_pid) => ("completed", Some(LifecycleEvent::Upgrade), Ok(new_pid)),
+            Err(refused) => match self
+                .admit_and_start(
+                    spirit_id,
+                    &restore_manifest.0,
+                    restore_origin.as_deref().map(|o| (o, restore_held.take())),
+                )
+                .await
+            {
+                Ok(restored) => (
+                    "reverted",
+                    None,
+                    Err(OperatorOutcome::Conflict {
+                        code: "cold_swap_reverted".into(),
+                        detail: format!(
+                            "successor refused: {refused}; predecessor {predecessor_version} \
                              restored at pid {restored}"
-                            ),
-                        }),
-                    ),
-                    Err(restore) => (
-                        "failed",
-                        Some(LifecycleEvent::Unload),
-                        Err(OperatorOutcome::Failed {
-                            code: "cold_swap_failed".into(),
-                            detail: format!(
-                                "successor refused: {refused}; restore refused: {restore}; spirit \
+                        ),
+                    }),
+                ),
+                Err(restore) => (
+                    "failed",
+                    Some(LifecycleEvent::Unload),
+                    Err(OperatorOutcome::Failed {
+                        code: "cold_swap_failed".into(),
+                        detail: format!(
+                            "successor refused: {refused}; restore refused: {restore}; spirit \
                              '{spirit_id}' is not loaded"
-                            ),
-                        }),
-                    ),
-                },
-            };
+                        ),
+                    }),
+                ),
+            },
+        };
         // The row the kernel orchestrator writes for hot swap, same shape.
         let payload = serde_json::json!({
             "spirit_id": spirit_id,
@@ -1696,20 +1849,24 @@ impl DoorInner {
         &self,
         spirit_id: &str,
         manifest: &Path,
-        component_origin: Option<&Path>,
+        component: Option<(&Path, Option<HeldLaunch>)>,
     ) -> Result<u32, String> {
         // Story 20-9 (D-12 A) — a component is admitted, and started, through the spawned
-        // admission path (its session is the Spirit's start), relative to its own directory.
-        let admitted = match component_origin {
-            Some(origin) => self.private_ops.load_spawned(manifest, origin).await,
+        // admission path (its session is the Spirit's start), relative to its own directory,
+        // from the file the preflight acquired.
+        let component_origin = component.as_ref().map(|(origin, _)| *origin);
+        let admitted = match component {
+            Some((origin, Some(held))) => {
+                self.private_ops.load_spawned(manifest, origin, held).await
+            }
+            Some((_, None)) => {
+                return Err("held_component_missing: no acquired component for this launch".into())
+            }
             None => self.private_ops.load_spirit(manifest, None).await,
         }
         .map_err(|refusal| format!("{}: {refusal}", refusal.code()))?;
         if admitted.spirit_id != spirit_id {
             let unwound = self.scheduler.unload(admitted.pid).await;
-            if unwound.is_ok() {
-                self.private_ops.forget_promotion_set(&admitted.spirit_id);
-            }
             return Err(format!(
                 "target_manifest_mismatch: admitted {}; unwind: {unwound:?}",
                 admitted.spirit_id
@@ -1721,9 +1878,6 @@ impl DoorInner {
         }
         if let Err(error) = self.scheduler.start(admitted.pid).await {
             let unwound = self.scheduler.unload(admitted.pid).await;
-            if unwound.is_ok() {
-                self.private_ops.forget_promotion_set(&admitted.spirit_id);
-            }
             return Err(match unwound {
                 Ok(_) => format!("start_failed: {error}"),
                 Err(unwind) => format!("start_failed: {error}; unwind unload failed: {unwind}"),
@@ -1864,7 +2018,6 @@ impl DoorInner {
                 detail: error.to_string(),
             };
         }
-        self.private_ops.forget_promotion_set(spirit_id);
         let halts_after = self
             .halt_registry
             .halt_metadata_for_spirit(pid, 0)

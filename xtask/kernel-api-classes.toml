@@ -707,3 +707,21 @@
 "maos_kernel_core::memory::MemoryManagerAdapter::bind_storage_identity" = "data-movement" # delegates the admitted storage binding
 # 20-3b landing 2 review corrections, operator ruling w8: stable-owner discovery.
 "maos_kernel_core::memory::MemoryManagerAdapter::principal_ids_for_spirit" = "data-movement" # durable index discovery by full admitted identity
+
+# Story 21-9 (default-on WASM component host; D-21-9-KB-01 keeps every public rollback API).
+# Held-component transport and child-stop custody are sandbox/supervision family; the
+# scheduler/hot-swap rows re-hash after private fields and defaulted trait methods were
+# added (no public symbol removed), so their unchanged names are classified here.
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::spawn_wasm_t2_and_bridge" = "supervision"   # governed WASM T2 launch primitive: spawns the runner with the verified open component
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::ChildStopHandle"          = "supervision"   # sole owned pidfd moved to the host owner to stop one child
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::ChildStopRefusal"         = "supervision"   # typed reason no stop handle is granted; never a claim the child stopped
+"maos_kernel_core::security::sandbox::HeldWasmComponent"                      = "supervision"   # verified open component file carried into the T2 runner child; never a path
+"maos_kernel_core::security::sandbox::HeldComponentError"                     = "supervision"   # typed refusal to carry a handle into the governed runner
+"maos_kernel_core::scheduler::control_block::SpiritControlBlock"              = "supervision"   # per-Spirit lifecycle control block (runtime generation added)
+"maos_kernel_core::scheduler::control_block::AnySpiritObj"                    = "supervision"   # object-safe Spirit lifecycle seam (deadline-carrying idle/schedule firing, finalize)
+"maos_kernel_core::scheduler::control_block::make_spirit_obj_with_host_hooks" = "supervision"   # builds the lifecycle object with typed host finalizer and firing hooks
+"maos_kernel_core::scheduler::control_block::FiringHooks"                     = "supervision"   # typed host callbacks for kernel idle/schedule firings
+"maos_kernel_core::scheduler::control_block::HostLifecycleEvent"              = "supervision"   # coordinator-published lifecycle event delivered to a spawned Spirit's host owner
+"maos_kernel_core::scheduler::idle_watchdog::IdleWatchdog"                    = "supervision"   # idle firing watchdog (in-flight slot set added)
+"maos_kernel_core::scheduler::schedule_watchdog::ScheduleWatchdog"            = "supervision"   # schedule firing watchdog (in-flight slot set added)
+"maos_kernel_core::hot_swap::coordinator::HotSwapCoordinator"                 = "supervision"   # swap commit authority (monitor window ownership reshaped)

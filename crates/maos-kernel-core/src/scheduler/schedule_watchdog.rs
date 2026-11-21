@@ -20,13 +20,13 @@
 //! `FrameKind::CapabilityInvocation` carrying the schedule_id, the
 //! ComplianceClaim envelope hash (when present), and the narrowed scope.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use dashmap::DashMap;
-use tokio::task::JoinHandle;
+use tokio::task::{JoinHandle, JoinSet};
 use tokio_util::sync::CancellationToken;
 
 use crate::capability::CapabilityRegistryAdapter;
@@ -38,6 +38,19 @@ use crate::security::manifest::ScheduleEntry;
 use maos_domain::invariants::i1::{IntentClass, TokenId};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::ports::capability::CapabilityRegistryPort;
+
+use super::FiringReservation;
+
+/// Story 21-9 AC8 — most schedule firings in flight at once. Each is already
+/// keyed by `(pid, schedule_id)` and capped at 30 s; this bounds the total.
+const MAX_IN_FLIGHT_FIRINGS: usize = 256;
+
+/// Outcome of admitting one due candidate.
+enum Admission {
+    Skip,
+    Outcome(PollOutcome),
+    Fire(u64),
+}
 
 /// Per-schedule rate-limit bucket. Fractional refill is encoded as
 /// f64 token-balance; on consume we top up by elapsed_ns × refill_per_sec.
@@ -102,6 +115,9 @@ pub struct ScheduleWatchdog {
     last_fire_ns: DashMap<(u32, String), u64>,
     /// Story 20-11 — one candidate admission-to-stamp at a time; `forget_spirit` waits on it.
     fence: tokio::sync::Mutex<()>,
+    /// Story 21-9 AC8 — `(spirit_pid, schedule_id)` firings reserved or in
+    /// flight; bounds concurrency and forbids a duplicate concurrent firing.
+    in_flight: Arc<parking_lot::Mutex<HashSet<(u32, String)>>>,
 }
 
 impl ScheduleWatchdog {
@@ -118,6 +134,7 @@ impl ScheduleWatchdog {
             rate_limits: DashMap::new(),
             last_fire_ns: DashMap::new(),
             fence: tokio::sync::Mutex::new(()),
+            in_flight: Arc::new(parking_lot::Mutex::new(HashSet::new())),
         }
     }
 
@@ -158,6 +175,10 @@ impl ScheduleWatchdog {
             let fast_mode = std::env::var_os("MAOS_SCHEDULE_FAST").is_some();
             let poll_ms = if fast_mode { 40u64 } else { 1000u64 };
             let mut interval = tokio::time::interval(Duration::from_millis(poll_ms));
+            // Owned in-flight firings. Each is bounded by the dispatcher's
+            // `min(cap, 30 s)` wall and by `MAX_IN_FLIGHT_FIRINGS`, so a slow
+            // hook never holds back a later poll and nothing accumulates.
+            let mut in_flight = JoinSet::new();
 
             loop {
                 tokio::select! {
@@ -165,154 +186,242 @@ impl ScheduleWatchdog {
                         break;
                     }
                     _ = interval.tick() => {
-                        self.poll_once(fast_mode).await;
+                        Self::reap_finished(&mut in_flight);
+                        self.dispatch_due(fast_mode, &mut in_flight).await;
                     }
                 }
+            }
+            // Shutdown joins every firing still running; each ends within its wall.
+            while let Some(joined) = in_flight.join_next().await {
+                Self::note_join(joined);
             }
         })
     }
 
+    fn reap_finished(in_flight: &mut JoinSet<()>) {
+        while let Some(joined) = in_flight.try_join_next() {
+            Self::note_join(joined);
+        }
+    }
+
+    fn note_join(joined: Result<(), tokio::task::JoinError>) {
+        if let Err(e) = joined {
+            eprintln!("schedule-watchdog: in-flight firing task ended abnormally: {e}");
+        }
+    }
+
+    /// Number of schedule firings currently reserved in flight.
+    pub fn in_flight_len(&self) -> usize {
+        self.in_flight.lock().len()
+    }
+
+    /// Poll once: admit every due entry (gate, rate, mint, TL row) and hand
+    /// each admitted hook to `in_flight` without awaiting it.
+    async fn dispatch_due(self: &Arc<Self>, fast_mode: bool, in_flight: &mut JoinSet<()>) {
+        for (scb, entry, reservation) in self.collect_due(fast_mode) {
+            if let Admission::Fire(fired_at_ns) = self.admit(&scb, &entry).await {
+                let watchdog = Arc::clone(self);
+                in_flight.spawn(async move {
+                    watchdog
+                        .run_admitted(&scb, &entry, fired_at_ns, Arc::new(reservation))
+                        .await;
+                });
+            }
+        }
+    }
+
     /// One poll cycle. 20-9 PF-04: returns every due entry's outcome, so a
     /// test drives polls as a barrier instead of waiting on wall-clock.
+    /// Admitted hooks run inline here (each under its capped wall); the
+    /// `spawn` loop instead owns them in flight.
     pub async fn poll_once(&self, fast_mode: bool) -> Vec<PollOutcome> {
         let mut outcomes = Vec::new();
-        // Collect candidates outside the lock to avoid holding RwLock across
-        // await points (Story 5.1 review-backfill lesson).
-        let candidates: Vec<(Arc<SpiritControlBlock>, ScheduleEntry)> = {
-            let scbs = self.scbs.read().unwrap();
-            let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
-            let mut out = Vec::new();
-            for (_, scb) in scbs.iter() {
-                if scb.current_state() != ScbLifecycleState::Running {
-                    continue;
-                }
-                let runtime = scb.runtime_snapshot();
-                if runtime.manifest.schedules.entries.is_empty() {
-                    continue;
-                }
-                // Step 1 — lifecycle gate.
-                if !Self::on_schedule_allowed(&runtime) {
-                    continue;
-                }
-                for entry in &runtime.manifest.schedules.entries {
-                    let last = self
-                        .last_fire_ns
-                        .get(&(scb.pid, entry.id.clone()))
-                        .map(|r| *r.value())
-                        .unwrap_or(0);
-                    let cadence_ns = Self::cadence_window_ns(entry.cadence_secs, fast_mode);
-                    let elapsed = now_ns.saturating_sub(last);
-                    if last != 0 && elapsed < cadence_ns {
-                        continue;
-                    }
-                    out.push((Arc::clone(scb), entry.clone()));
+        for (scb, entry, reservation) in self.collect_due(fast_mode) {
+            match self.admit(&scb, &entry).await {
+                Admission::Skip => {}
+                Admission::Outcome(outcome) => outcomes.push(outcome),
+                Admission::Fire(fired_at_ns) => {
+                    outcomes.push(
+                        self.run_admitted(&scb, &entry, fired_at_ns, Arc::new(reservation))
+                            .await,
+                    );
                 }
             }
-            out
-        };
+        }
+        outcomes
+    }
 
-        for (scb, entry) in candidates {
-            let fence = self.fence.lock().await;
+    /// Due candidates, each holding an in-flight reservation so one due
+    /// firing is never dispatched twice concurrently. An entry still in
+    /// flight, or past `MAX_IN_FLIGHT_FIRINGS`, waits for a later poll
+    /// without consuming rate.
+    fn collect_due(
+        &self,
+        fast_mode: bool,
+    ) -> Vec<(
+        Arc<SpiritControlBlock>,
+        ScheduleEntry,
+        FiringReservation<(u32, String)>,
+    )> {
+        // Collect candidates outside the lock to avoid holding RwLock across
+        // await points (Story 5.1 review-backfill lesson).
+        let scbs = self.scbs.read().unwrap();
+        let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+        let mut out = Vec::new();
+        for (_, scb) in scbs.iter() {
             if scb.current_state() != ScbLifecycleState::Running {
                 continue;
             }
-            // Step 2 — principal-revocability proxy: at v0.5 the per-Spirit
-            // revocation status is the proxy for principal revocation
-            // (Story 9.2 wires the cascade). If the Spirit's tokens are
-            // wholesale revoked, skip the firing.
-            if entry.principal_revocability && self.is_principal_revoked(&scb) {
-                outcomes.push(PollOutcome::PrincipalRevoked(scb.pid, entry.id));
+            let runtime = scb.runtime_snapshot();
+            if runtime.manifest.schedules.entries.is_empty() {
                 continue;
             }
-
-            // Step 3 — consume admission before minting or serializing the row.
-            // Serialization of this fixed record is not expected to fail.
-            let bucket_key = (scb.spirit_id.clone(), entry.id.clone());
-            let bucket = self
-                .rate_limits
-                .entry(bucket_key)
-                .or_insert_with(|| Arc::new(ScheduleBucket::new(entry.rate_limit_per_hour)))
-                .value()
-                .clone();
-            if !bucket.try_consume() {
-                outcomes.push(PollOutcome::RateRefused(scb.pid, entry.id));
+            // Step 1 — lifecycle gate.
+            if !Self::on_schedule_allowed(&runtime) {
                 continue;
             }
-
-            // Step 4 — mint only after admission (one token per Scope at v0.5).
-            // D07 A: a refused declared scope suppresses the fire; the scopes
-            // already minted for it are revoked and the suppression is journaled.
-            let token_id = match self.issue_narrowed_token(&scb, &entry) {
-                Ok(token_id) => token_id,
-                Err((refused_scope, reason)) => {
-                    crate::iac::payload::journal_schedule_suppressed(
-                        &self.transparency_log,
-                        scb.pid,
-                        &scb.spirit_id,
-                        &entry.id,
-                        refused_scope,
-                        reason,
-                    );
-                    let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
-                    self.last_fire_ns
-                        .insert((scb.pid, entry.id.clone()), now_ns);
-                    outcomes.push(PollOutcome::Suppressed(scb.pid, entry.id));
+            for entry in &runtime.manifest.schedules.entries {
+                let last = self
+                    .last_fire_ns
+                    .get(&(scb.pid, entry.id.clone()))
+                    .map(|r| *r.value())
+                    .unwrap_or(0);
+                let cadence_ns = Self::cadence_window_ns(entry.cadence_secs, fast_mode);
+                let elapsed = now_ns.saturating_sub(last);
+                if last != 0 && elapsed < cadence_ns {
                     continue;
                 }
-            };
-            let fired_at_ns = crate::capability::cap_tokens::monotonic_now_ns();
-
-            // Write TL row BEFORE firing the hook (I2 log-before-deliver).
-            let record = crate::iac::payload::ScheduleFireRecord {
-                spirit_id: scb.spirit_id.clone(),
-                schedule_id: entry.id.clone(),
-                fired_at_ns,
-                compliance_claim_ref: entry.compliance_claim_ref,
-                side_effect_token_id: token_id.unwrap_or(TokenId::ZERO),
-                principal_revocability: entry.principal_revocability,
-            };
-            let payload_json = match serde_json::to_vec(&record) {
-                Ok(v) => v,
-                Err(e) => {
-                    eprintln!(
-                        "maos: WARN schedule.fire TL row payload serialize failed for {}/{}: {}",
-                        scb.spirit_id, entry.id, e
-                    );
-                    // Skip TL write rather than write malformed bytes (I2 still
-                    // honored — the dispatch decision logs structurally).
+                let Some(reservation) = FiringReservation::try_reserve(
+                    &self.in_flight,
+                    (scb.pid, entry.id.clone()),
+                    MAX_IN_FLIGHT_FIRINGS,
+                ) else {
                     continue;
-                }
-            };
-
-            let intent_str = format!("schedule.fire:{}", entry.id);
-            let _ = self.transparency_log.insert_frame_event(
-                TlFrameKind::CapabilityInvocation,
-                scb.pid,
-                None,
-                &intent_str,
-                &payload_json,
-                FrameOrigin::Kernel,
-            );
-
-            // The fence never spans the (untrusted, up to `time_cap_seconds`) hook.
-            drop(fence);
-            // Fire the hook with the manifest's payload_bytes.
-            let _outcome = self
-                .dispatcher
-                .fire_on_schedule(&scb, &entry.payload_bytes)
-                .await;
-
-            // Update last-fire timestamp regardless of hook outcome — the
-            // dispatch decision (gate passes, rate-limit consumed) is the
-            // firing event for cadence purposes.
-            let _fence = self.fence.lock().await;
-            if scb.current_state() == ScbLifecycleState::Running {
-                self.last_fire_ns
-                    .insert((scb.pid, entry.id.clone()), fired_at_ns);
+                };
+                out.push((Arc::clone(scb), entry.clone(), reservation));
             }
-            outcomes.push(PollOutcome::Fired(scb.pid, entry.id));
         }
-        outcomes
+        out
+    }
+
+    /// Steps 2–4 under the candidate fence: revocation, rate admission,
+    /// narrowed mint, and the TL row written BEFORE the hook is delivered.
+    async fn admit(&self, scb: &Arc<SpiritControlBlock>, entry: &ScheduleEntry) -> Admission {
+        let fence = self.fence.lock().await;
+        if scb.current_state() != ScbLifecycleState::Running {
+            return Admission::Skip;
+        }
+        // Step 2 — principal-revocability proxy: at v0.5 the per-Spirit
+        // revocation status is the proxy for principal revocation
+        // (Story 9.2 wires the cascade). If the Spirit's tokens are
+        // wholesale revoked, skip the firing.
+        if entry.principal_revocability && self.is_principal_revoked(scb) {
+            return Admission::Outcome(PollOutcome::PrincipalRevoked(scb.pid, entry.id.clone()));
+        }
+
+        // Step 3 — consume admission before minting or serializing the row.
+        // Serialization of this fixed record is not expected to fail.
+        let bucket_key = (scb.spirit_id.clone(), entry.id.clone());
+        let bucket = self
+            .rate_limits
+            .entry(bucket_key)
+            .or_insert_with(|| Arc::new(ScheduleBucket::new(entry.rate_limit_per_hour)))
+            .value()
+            .clone();
+        if !bucket.try_consume() {
+            return Admission::Outcome(PollOutcome::RateRefused(scb.pid, entry.id.clone()));
+        }
+
+        // Step 4 — mint only after admission (one token per Scope at v0.5).
+        // D07 A: a refused declared scope suppresses the fire; the scopes
+        // already minted for it are revoked and the suppression is journaled.
+        let token_id = match self.issue_narrowed_token(scb, entry) {
+            Ok(token_id) => token_id,
+            Err((refused_scope, reason)) => {
+                crate::iac::payload::journal_schedule_suppressed(
+                    &self.transparency_log,
+                    scb.pid,
+                    &scb.spirit_id,
+                    &entry.id,
+                    refused_scope,
+                    reason,
+                );
+                let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+                self.last_fire_ns
+                    .insert((scb.pid, entry.id.clone()), now_ns);
+                return Admission::Outcome(PollOutcome::Suppressed(scb.pid, entry.id.clone()));
+            }
+        };
+        let fired_at_ns = crate::capability::cap_tokens::monotonic_now_ns();
+
+        // Write TL row BEFORE firing the hook (I2 log-before-deliver).
+        let record = crate::iac::payload::ScheduleFireRecord {
+            spirit_id: scb.spirit_id.clone(),
+            schedule_id: entry.id.clone(),
+            fired_at_ns,
+            compliance_claim_ref: entry.compliance_claim_ref,
+            side_effect_token_id: token_id.unwrap_or(TokenId::ZERO),
+            principal_revocability: entry.principal_revocability,
+        };
+        let payload_json = match serde_json::to_vec(&record) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!(
+                    "maos: WARN schedule.fire TL row payload serialize failed for {}/{}: {}",
+                    scb.spirit_id, entry.id, e
+                );
+                // Skip TL write rather than write malformed bytes (I2 still
+                // honored — the dispatch decision logs structurally).
+                return Admission::Skip;
+            }
+        };
+
+        let intent_str = format!("schedule.fire:{}", entry.id);
+        let _ = self.transparency_log.insert_frame_event(
+            TlFrameKind::CapabilityInvocation,
+            scb.pid,
+            None,
+            &intent_str,
+            &payload_json,
+            FrameOrigin::Kernel,
+        );
+        drop(fence);
+        Admission::Fire(fired_at_ns)
+    }
+
+    /// Deliver an admitted firing. The fence never spans the (untrusted,
+    /// at most `min(time_cap_seconds, 30 s)`) hook wait.
+    ///
+    /// The in-flight slot is shared: one handle moves into the blocking
+    /// native closure and is released only when the native callable returns
+    /// (a timed-out call is detached, not preempted, and keeps its slot), the
+    /// other is held here until the last-fire stamp is written. So the key is
+    /// never free while native work runs, nor before its stamp lands.
+    async fn run_admitted(
+        &self,
+        scb: &Arc<SpiritControlBlock>,
+        entry: &ScheduleEntry,
+        fired_at_ns: u64,
+        reservation: Arc<FiringReservation<(u32, String)>>,
+    ) -> PollOutcome {
+        // Fire the hook with the manifest's payload_bytes.
+        let _outcome = self
+            .dispatcher
+            .fire_on_schedule_guarded(scb, &entry.payload_bytes, Arc::clone(&reservation))
+            .await;
+
+        // Update last-fire timestamp regardless of hook outcome — the
+        // dispatch decision (gate passes, rate-limit consumed) is the
+        // firing event for cadence purposes. The stamp is the admission
+        // time, not a completion time: while the native hook still runs the
+        // slot, not the stamp, blocks a duplicate.
+        let _fence = self.fence.lock().await;
+        if scb.current_state() == ScbLifecycleState::Running {
+            self.last_fire_ns
+                .insert((scb.pid, entry.id.clone()), fired_at_ns);
+        }
+        drop(reservation);
+        PollOutcome::Fired(scb.pid, entry.id.clone())
     }
 
     fn on_schedule_allowed(runtime: &crate::scheduler::control_block::ScbRuntimeSnapshot) -> bool {
@@ -432,5 +541,20 @@ mod tests {
         assert!(bucket.try_consume());
         assert!(bucket.try_consume());
         assert!(!bucket.try_consume(), "third consume MUST fail");
+    }
+
+    #[test]
+    fn shared_reservation_holds_key_until_last_handle_drops() {
+        let set = Arc::new(parking_lot::Mutex::new(HashSet::new()));
+        let key = (7_u32, "daily".to_string());
+        let task_handle = Arc::new(FiringReservation::try_reserve(&set, key.clone(), 4).unwrap());
+        let native_handle = Arc::clone(&task_handle);
+        assert!(FiringReservation::try_reserve(&set, key.clone(), 4).is_none());
+        // The dispatch side finishing (timeout + stamp) must not free the key.
+        drop(task_handle);
+        assert!(FiringReservation::try_reserve(&set, key.clone(), 4).is_none());
+        // The native callable returning is what frees it.
+        drop(native_handle);
+        assert!(FiringReservation::try_reserve(&set, key, 4).is_some());
     }
 }

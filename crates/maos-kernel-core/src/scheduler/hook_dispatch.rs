@@ -65,6 +65,11 @@ pub struct HookDispatcher {
     spirits: Option<Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>>,
     /// Injectable time cap for testing (default = 30s).
     pub time_cap_seconds: u64,
+    /// Narrowing-only override of the wall of a kernel-triggered `on_idle` / `on_schedule`
+    /// firing (Story 21-9 AC8). The dispatcher enforces a fixed 30 s ceiling
+    /// (`DEFAULT_TIME_CAP_SECONDS`): a value above it is ignored; a lower one shortens the
+    /// wall (for testing a short absolute deadline under a long manifest cap).
+    pub firing_ceiling_seconds: u64,
 }
 
 impl HookDispatcher {
@@ -81,6 +86,7 @@ impl HookDispatcher {
             self_telemetry: None,
             spirits: None,
             time_cap_seconds: Self::DEFAULT_TIME_CAP_SECONDS,
+            firing_ceiling_seconds: Self::DEFAULT_TIME_CAP_SECONDS,
         }
     }
 
@@ -279,13 +285,27 @@ impl HookDispatcher {
     }
 
     pub async fn fire_on_idle(&self, scb: &SpiritControlBlock) -> HookOutcome {
+        self.fire_on_idle_guarded(scb, ()).await
+    }
+
+    /// `fire_on_idle` with an execution guard. `guard` moves into the
+    /// blocking closure and drops only when the native hook actually returns
+    /// (or immediately when the hook is not dispatched). The dispatch wait is
+    /// still bounded by the hook wall; the guard is not released by it.
+    pub(crate) async fn fire_on_idle_guarded<G: Send + 'static>(
+        &self,
+        scb: &SpiritControlBlock,
+        guard: G,
+    ) -> HookOutcome {
         if let Some(halts) = &self.halt_registry {
             if !halts.drain_for_spirit_dry_run(scb.pid).is_empty() {
                 return HookOutcome::HaltPending;
             }
         }
-        self.fire_no_payload_hook(scb, "on_idle", |obj, ctx| obj.on_idle(ctx))
-            .await
+        self.fire_payload_hook_guarded(scb, "on_idle", &[], guard, |obj, ctx, _, deadline| {
+            obj.on_idle_until(ctx, deadline)
+        })
+        .await
     }
 
     pub async fn fire_on_pause(&self, scb: &SpiritControlBlock) -> HookOutcome {
@@ -320,9 +340,23 @@ impl HookDispatcher {
     }
 
     pub async fn fire_on_schedule(&self, scb: &SpiritControlBlock, payload: &[u8]) -> HookOutcome {
-        self.fire_payload_hook(scb, "on_schedule", payload, |obj, ctx, p| {
-            obj.on_schedule(ctx, p)
-        })
+        self.fire_on_schedule_guarded(scb, payload, ()).await
+    }
+
+    /// `fire_on_schedule` with an execution guard; see `fire_on_idle_guarded`.
+    pub(crate) async fn fire_on_schedule_guarded<G: Send + 'static>(
+        &self,
+        scb: &SpiritControlBlock,
+        payload: &[u8],
+        guard: G,
+    ) -> HookOutcome {
+        self.fire_payload_hook_guarded(
+            scb,
+            "on_schedule",
+            payload,
+            guard,
+            |obj, ctx, p, deadline| obj.on_schedule_until(ctx, p, deadline),
+        )
         .await
     }
 
@@ -350,6 +384,38 @@ impl HookDispatcher {
             .await
     }
 
+    /// Auto-revert's on_swap_out: delivered only if the runtime still is exactly the
+    /// publication `(expected, generation)` when the blocking task reads it; otherwise
+    /// nothing runs and the outcome is `SkippedManifest`, never a counted firing.
+    pub(crate) async fn fire_on_swap_out_exact(
+        &self,
+        scb: &Arc<SpiritControlBlock>,
+        expected: &Arc<dyn crate::scheduler::control_block::AnySpiritObj>,
+        generation: u64,
+    ) -> HookOutcome {
+        let (expected, live) = (Arc::clone(expected), Arc::clone(scb));
+        let ran = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let ran_in = Arc::clone(&ran);
+        let outcome = self
+            .fire_no_payload_hook(scb, "on_swap_out", move |obj, ctx| {
+                if std::ptr::addr_eq(Arc::as_ptr(obj), Arc::as_ptr(&expected))
+                    && live.runtime_generation() == generation
+                {
+                    ran_in.store(true, std::sync::atomic::Ordering::Release);
+                    obj.on_swap_out(ctx);
+                }
+            })
+            .await;
+        match outcome {
+            HookOutcome::Fired { .. } | HookOutcome::BudgetWarning80 { .. }
+                if !ran.load(std::sync::atomic::Ordering::Acquire) =>
+            {
+                HookOutcome::SkippedManifest
+            }
+            other => other,
+        }
+    }
+
     /// Story 8.11 / AC3 — the effective hook time cap for a Spirit: its declared
     /// `[budget].time_cap_seconds` when present, else the dispatcher default
     /// (`DEFAULT_TIME_CAP_SECONDS`). The kernel never learns what the budget
@@ -361,6 +427,24 @@ impl HookDispatcher {
             .as_ref()
             .map(|budget| budget.time_cap_seconds as u64)
             .unwrap_or(self.time_cap_seconds)
+    }
+
+    /// Story 21-9 AC8 — the wall a hook runs under. The kernel-triggered
+    /// `on_schedule` / `on_idle` firings are held to
+    /// `min(effective cap, firing_ceiling_seconds)` (30 s by default)
+    /// so a long declared `[budget].time_cap_seconds` cannot keep one in
+    /// flight past the ceiling; every other hook keeps its effective cap.
+    fn hook_cap_seconds(&self, scb: &SpiritControlBlock, hook_name: &str) -> u64 {
+        let cap_seconds = self.effective_cap_seconds(scb);
+        if matches!(hook_name, "on_schedule" | "on_idle") {
+            // The public override only narrows; the 30 s ceiling is never raised.
+            cap_seconds.min(
+                self.firing_ceiling_seconds
+                    .min(Self::DEFAULT_TIME_CAP_SECONDS),
+            )
+        } else {
+            cap_seconds
+        }
     }
 
     /// Story 5.2 — Fire the snapshot hook on the predecessor.
@@ -556,31 +640,71 @@ impl HookDispatcher {
             + Sync
             + 'static,
     {
+        self.fire_payload_hook_guarded(scb, hook_name, payload, (), move |obj, ctx, p, _| {
+            fire_fn(obj, ctx, p)
+        })
+        .await
+    }
+
+    /// `guard` is owned by the blocking closure: it drops when the native
+    /// callable returns or unwinds, not when the dispatch wait times out
+    /// (a timed-out native call is detached, not preempted). Paths that do
+    /// not dispatch drop it on return.
+    async fn fire_payload_hook_guarded<G, F>(
+        &self,
+        scb: &SpiritControlBlock,
+        hook_name: &'static str,
+        payload: &[u8],
+        guard: G,
+        fire_fn: F,
+    ) -> HookOutcome
+    where
+        G: Send + 'static,
+        F: Fn(
+                &Arc<dyn crate::scheduler::control_block::AnySpiritObj>,
+                &mut KernelCtx,
+                &[u8],
+                std::time::Instant,
+            ) + Send
+            + Sync
+            + 'static,
+    {
         if !Self::hook_allowed(scb, hook_name) {
             return HookOutcome::SkippedManifest;
         }
 
-        let cap_seconds = self.effective_cap_seconds(scb);
+        let cap_seconds = self.hook_cap_seconds(scb, hook_name);
         let wall_start = crate::capability::cap_tokens::monotonic_now_ns();
+        // The one absolute wall of this firing, captured before it is queued. The async
+        // dispatch wait runs on Tokio's clock (so a paused/advanced test clock moves it
+        // consistently with the warning timer); the real monotonic twin, captured at the
+        // same moment, is handed only to the host callbacks of the kernel-triggered
+        // `on_idle` / `on_schedule` firings so the owning spawned session ends its export
+        // at the same computed wall, never at a relative cap recomputed after queuing.
+        let cap = Duration::from_secs(cap_seconds);
+        let async_deadline = tokio::time::Instant::now() + cap;
+        let real_deadline = std::time::Instant::now() + cap;
 
         let runtime = scb.runtime_cell();
         let payload = payload.to_vec(); // clone for 'static closure
 
         let spirit_pid = scb.pid;
         let spirits = self.spirits.clone();
-        let hook_future = timeout(
-            Duration::from_secs(cap_seconds),
+        let hook_future = tokio::time::timeout_at(
+            async_deadline,
             tokio::task::spawn_blocking(move || {
+                // Held until the hook returns or unwinds.
+                let _guard = guard;
                 let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook(
                     maos_spirit_abi::ctx::CapabilityHandle(0),
                     maos_spirit_abi::ctx::MailboxHandle(0),
                 );
                 let mut kernel_ctx = KernelCtx::new(&mut ctx).with_spirit_pid(spirit_pid);
-                if let Some(ref s) = spirits {
+                if let Some(s) = &spirits {
                     kernel_ctx = kernel_ctx.with_spirits(Arc::clone(s));
                 }
                 let spirit_obj = runtime.read().spirit_obj.clone();
-                fire_fn(&spirit_obj, &mut kernel_ctx, &payload);
+                fire_fn(&spirit_obj, &mut kernel_ctx, &payload, real_deadline)
             }),
         );
 

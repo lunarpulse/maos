@@ -32,6 +32,7 @@
 //! | `deprecation` | Story 7.1 | Empty-present deprecation channel |
 //! | `MANIFEST_SCHEMA_VERSION = 6` | Story 18-7 | Runtime `[capabilities.required.skill]` |
 //! | `MANIFEST_SCHEMA_VERSION = 7` | Story 20-8 | FR8 contract declarations |
+//! | `MANIFEST_SCHEMA_VERSION = 8` | Story 21-9 | `[lifecycle.telemetry]` subscription (D-21-9-02 A; schema ratified) |
 //!
 //! ## Modules
 //! | Module | Description | Introduced |
@@ -108,6 +109,10 @@ pub const ABI_VERSION: u32 = 1;
 /// declaration degrades away; the supported floor remains 1.
 /// Bumped to `7` in Story 20-8 for FR8 contract declarations; below schema 7
 /// these declarations degrade away.
+/// Bumped to `8` in Story 21-9 (D-21-9-02 A) for the `[lifecycle.telemetry]`
+/// subscription. It does not degrade away: below schema 8 an
+/// `on_telemetry_event` listing or a `[lifecycle.telemetry]` table is refused
+/// at load, and schemas 1–7 that do neither stay supported.
 ///
 ///
 /// This constant is the single authoritative source consumed by
@@ -121,9 +126,9 @@ pub const ABI_VERSION: u32 = 1;
 /// ```rust
 /// use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 ///
-/// assert_eq!(MANIFEST_SCHEMA_VERSION, 7);
+/// assert_eq!(MANIFEST_SCHEMA_VERSION, 8);
 /// ```
-pub const MANIFEST_SCHEMA_VERSION: u32 = 7;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 8;
 
 /// Lowest manifest schema version this kernel accepts at admission.
 ///
@@ -168,8 +173,8 @@ pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1;
 /// assert!(is_version_supported(1));  // Oldest supported
 /// assert!(is_version_supported(2));  // Supported
 /// assert!(is_version_supported(3));  // Supported
-/// assert!(is_version_supported(4));  // N-1 — supported
-/// assert!(is_version_supported(5));  // Current — supported
+/// assert!(is_version_supported(7));  // N-1 — supported
+/// assert!(is_version_supported(8));  // Current — supported
 /// assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
 /// ```
 pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = MANIFEST_SCHEMA_VERSION;

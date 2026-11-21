@@ -1,7 +1,10 @@
 # Install and remove MAOS
 
 Choose a release tag from <https://github.com/lunarpulse/maos/releases>.
-The binary set is `maos`, `maosctl`, `maos-spirit`, `maos-registry-server`.
+The binary set for new releases is `maos`, `maosctl`, `maos-spirit`,
+`maos-registry-server`, `maos-wasm-runner` (five executables). Historical rc.2
+artifacts predate the runner and carry the original four entries; verify them
+against their own `SHA256SUMS`, not this five-entry set.
 Linux release binaries require **glibc 2.39 or newer** (Ubuntu 24.04 / Debian 13
 class systems); older distributions need a compatible build or the container.
 Linux amd64/arm64 and macOS arm64 are the release artifact targets. macOS formula
@@ -9,7 +12,7 @@ execution is not part of the Linux discipline matrix.
 
 ## Signed binary
 
-Download all four binaries for one suffix (`linux-amd64`, `linux-arm64`, or
+Download all five binaries for one suffix (`linux-amd64`, `linux-arm64`, or
 `darwin-arm64`), `SHA256SUMS` and `SHA256SUMS.sig`. Obtain the release public key
 through the trusted release-key channel. Bootstrap verification from an
 **already trusted source checkout**, not a verifier downloaded beside the
@@ -17,10 +20,11 @@ untrusted release. With Python 3 and `cryptography` installed:
 
 ```bash
 python3 /path/to/trusted-maos-checkout/packaging/verify-release.py --directory ./dist --pubkey "$RELEASE_PUBKEY" \
-  maos-linux-amd64 maosctl-linux-amd64 maos-spirit-linux-amd64 maos-registry-server-linux-amd64
+  maos-linux-amd64 maosctl-linux-amd64 maos-spirit-linux-amd64 maos-registry-server-linux-amd64 \
+  maos-wasm-runner-linux-amd64
 chmod +x dist/*-linux-amd64
 ./dist/maosctl-linux-amd64 install --from-local ./dist --verify-only
-for bin in maos maosctl maos-spirit maos-registry-server; do
+for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do
   install -Dm755 "dist/$bin-linux-amd64" "$HOME/.local/bin/$bin"
 done
 ```
@@ -58,12 +62,12 @@ Tap/AUR publication is operator-owned and remains unavailable until
 A local Homebrew tap can place `maos.rb` in `Formula/`, then
 `brew install --build-from-source <owner>/<tap>/maos`; AUR's rendered `PKGBUILD`
 runs with `makepkg -si` as a non-root user. Both verify the signed original
-manifest using Python `cryptography` before installing all four exact binaries.
+manifest using Python `cryptography` before installing all five exact binaries.
 The formula depends on actual `python@3.14` and `cryptography` formulae; the
 PKGBUILD needs `python-cryptography`, not a Rust compiler. Homebrew byte
 preservation is **claimed, not verified**: targeted `skip_clean` is configured,
 but no hosted install/relocation/installed-hash proof has run. The authored
-Linux witness compares all four installed binaries; it remains unverified.
+Linux witness compares all five installed binaries; it remains unverified.
 
 ## Cargo source route
 
@@ -110,7 +114,7 @@ Then use the installer that owns the binaries:
 | AUR / Arch | `sudo pacman -R maos` |
 | Homebrew | `brew uninstall maos` |
 | Cargo | `cargo uninstall maos-bin maos-cli maos-spirit-cli maos-registry` |
-| Direct binary | remove the four files from the prefix you chose |
+| Direct binary | remove the five files from the prefix you chose |
 | Container | remove the image/container and explicitly manage its MAOS data volume |
 
 `maos purge` never removes package-owned executables. See

@@ -7,7 +7,7 @@
 //! coordinator.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Snapshot of invariants taken at swap commit.
 #[derive(Debug, Clone)]
@@ -57,7 +57,8 @@ impl PostSwapMonitor {
     }
 
     /// Spawn the monitor task. Returns a JoinHandle.
-    /// The task polls at `tick_cadence` until the window expires or a violation is detected.
+    /// The task polls at `tick_cadence` until the window expires or a violation is detected,
+    /// then calls the coordinator's public `auto_revert`.
     ///
     /// In production (30s window), cadence is 1s — 30 invariant checks per swap.
     /// In `MAOS_AUTO_REVERT_FAST=1` mode (300ms window), cadence shrinks to
@@ -65,37 +66,61 @@ impl PostSwapMonitor {
     /// expires. Story 5.2 review backfill: the original 1s cadence made FAST mode
     /// silently no-op because the first real check tick came AFTER the 300ms deadline.
     pub fn spawn(self) -> tokio::task::JoinHandle<()> {
-        let coordinator = Arc::clone(&self.coordinator);
-        let spirit_pid = self.spirit_pid;
-        let window = self.window;
-        let invariant_snapshot = Arc::clone(&self.invariant_snapshot);
+        // The window closes on the Tokio clock at a deadline fixed HERE, at spawn,
+        // so a delayed first poll never extends it and a paused test clock governs it.
+        let deadline = tokio::time::Instant::now() + self.window;
+        self.spawn_until(deadline, false)
+    }
+
+    /// Spawn against an exact, caller-fixed `deadline`. A `scoped` task is the
+    /// coordinator's own window task: it reverts and closes only the registry window
+    /// whose task identity is its own, so it can never consume a newer window.
+    pub(super) fn spawn_until(
+        self,
+        deadline: tokio::time::Instant,
+        scoped: bool,
+    ) -> tokio::task::JoinHandle<()> {
         // Choose a cadence small enough that at least a few ticks fit inside
         // the window. 50ms in fast mode, 1s in production.
-        let tick_cadence = if window <= Duration::from_secs(1) {
+        let tick_cadence = if self.window <= Duration::from_secs(1) {
             Duration::from_millis(50)
         } else {
             Duration::from_secs(1)
         };
 
         tokio::spawn(async move {
-            let deadline = Instant::now() + window;
+            let task = scoped.then(tokio::task::id);
+            // The first tick completes immediately, so the invariants are checked at
+            // the task's first poll whenever the window is still open, however little
+            // of it is left; later ticks follow at the cadence until `deadline`.
             let mut interval = tokio::time::interval(tick_cadence);
-            // Skip the first immediate tick (tokio::time::interval fires immediately).
-            interval.tick().await;
-
-            while Instant::now() < deadline {
-                interval.tick().await;
-                // Use the instance method so we can access the coordinator's adapters.
-                let monitor = PostSwapMonitor {
-                    coordinator: Arc::clone(&coordinator),
-                    spirit_pid,
-                    invariant_snapshot: Arc::clone(&invariant_snapshot),
-                    window,
-                };
-                if let Some(violation) = monitor.check_invariants() {
-                    let _ = coordinator.auto_revert(spirit_pid, violation).await;
-                    return;
+            let expiry = tokio::time::sleep_until(deadline);
+            tokio::pin!(expiry);
+            loop {
+                // Expiry wins over a coincident tick: no check or revert may fire
+                // once the window has closed.
+                tokio::select! {
+                    biased;
+                    () = &mut expiry => break,
+                    _ = interval.tick() => {}
                 }
+                if tokio::time::Instant::now() >= deadline {
+                    break;
+                }
+                if let Some(violation) = self.check_invariants() {
+                    let _ = self
+                        .coordinator
+                        .revert_window(self.spirit_pid, task, violation)
+                        .await;
+                    // A revert that another caller holds leaves the window (and this
+                    // monitor) in place: keep checking until it is decided or expires.
+                    if task.is_none_or(|id| !self.coordinator.owns_window(self.spirit_pid, id)) {
+                        return;
+                    }
+                }
+            }
+            if let Some(task) = task {
+                let _ = self.coordinator.take_window(self.spirit_pid, task);
             }
         })
     }
