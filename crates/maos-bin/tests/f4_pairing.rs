@@ -354,8 +354,15 @@ fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
 fn daemon_command_random_nonce(config: &Path, audit_db: &Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
     // Story 21-3 — one HOME per daemon: `$HOME/.maos/a2a-pins-*.json` has a single writer,
-    // and the tests in this binary run concurrently.
-    let home = audit_db.with_extension("home");
+    // and the tests in this binary run concurrently. The path is kept SHORT on purpose: the
+    // Worker egress socket `<home>/.maos/egress/<8 hex>/<pid>/egress.sock` must fit the
+    // 108-byte `sun_path`, and a longer home silently disables the Worker's egress.
+    let home = {
+        use std::hash::{Hash as _, Hasher as _};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        audit_db.hash(&mut hasher);
+        std::env::temp_dir().join(format!("f4h-{:016x}", hasher.finish()))
+    };
     command
         .env_clear()
         .env("HOME", t3_substrate::isolated_runtime_home(&home))
