@@ -29,6 +29,7 @@ network = [
     "dep:maos-sso",
     "dep:maos-siem",
     "dep:maos-topology",
+    "dep:maos-persistence",
 ]
 air-gap = []  # Compile-out all networking: reqwest, hyper client, tokio::net, DNS resolvers
 wasm-host = ["dep:maos-wasm-host"]  # Story 11.1a — OFF by default. Gates the vendored `wasmtime` engine + maos-wasm-host/maos-wasm-runner. OFF-by-default is the export-control precondition (5D002.c.1) — see docs/compliance/export-counsel-precondition.md.
@@ -79,6 +80,7 @@ maos-iac = { path = "../maos-iac" }              # Story 12.1 — daemon-owned T
 maos-a2a-core = { path = "../maos-a2a-core" }  # Story 8.6 — protocol substrate (config/pin types for the daemon binding)
 maos-a2a-tcp = { path = "../maos-a2a-tcp", optional = true }    # Story 8.6 — live cross-Host TCP/mTLS transport + smoke-a2a-tcp-8-6
 maos-cohort = { path = "../maos-cohort", optional = true }      # Story 12.1 — signed cohort manifest state + distribution
+maos-persistence = { path = "../maos-persistence", optional = true }  # Story 21-3 — durable TOFU pin file (`FilePinStore`), opened only by the cohort-a2a-daemon root
 rcgen = { version = "0.13", optional = true }  # Story 8.6 — runtime self-signed cert gen for the smoke-a2a-tcp-8-6 demo
 maos-compliance = { path = "../maos-compliance" }   # Story 7.3 — v0.9-binding evaluator (smoke-compliance-7-3)
 maos-spirit-cli = { path = "../maos-spirit-cli", default-features = false }   # Story 7.3 — REAL producer round-trip in the smoke arm

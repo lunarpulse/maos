@@ -265,7 +265,9 @@ fn maos_command(fixture: &Fixture) -> Command {
     // MAOS_AUDIT_DB below and must not move.
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_maos"));
     cmd.current_dir(workspace_root)
-        .env("HOME", doorless_home::doorless_home())
+        // Story 21-3 — a per-fixture HOME: the daemon's `$HOME/.maos/a2a-pins.json` is
+        // single-writer, and legs in this binary run concurrently.
+        .env("HOME", &fixture.dir)
         .env("XDG_DATA_HOME", doorless_home::doorless_xdg_data_home())
         .env("MAOS_AUDIT_DB", &fixture.audit_db)
         // The daemon runs the full primary root (D24); skip the live LLM probe

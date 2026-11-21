@@ -22,11 +22,13 @@ use std::sync::{Arc, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use maos_a2a_core::tofu::{
-    InMemoryTofuPinStore, RePinDecision, RepinDecisionError, RepinRequest, RepinSink, RepinVerdict,
-    TofuPinStore as _,
+    InMemoryTofuPinStore, Invalidated, RePinDecision, RepinDecisionError, RepinRequest, RepinSink,
+    RepinVerdict, TofuPinStore as _,
 };
 use maos_a2a_core::PeerId;
-use maos_control::{OperatorOutcome, RepinRequestRow};
+use maos_control::{
+    OperatorOutcome, PeerPinInvalidation, PeerPinRow, PeerPinStatus, RepinRequestRow,
+};
 use maos_domain::invariants::i4::ApprovalDecision;
 
 /// The I4 capability every re-pin decision row carries.
@@ -60,6 +62,37 @@ impl RepinControl {
     #[must_use]
     pub fn install(&self, pins: Arc<InMemoryTofuPinStore>) -> bool {
         self.pins.set(pins).is_ok()
+    }
+
+    /// Story 21-3 — every pin as its durable record reads, sorted by peer;
+    /// `Unhealthy` while a narrowing transition is unpersisted. `None` when no
+    /// store is installed in this process (the route answers 404).
+    pub fn peer_pins(&self) -> Option<PeerPinStatus> {
+        let pins = self.pins.get()?;
+        if pins.is_degraded() {
+            return Some(PeerPinStatus::Unhealthy {
+                detail: "the last pin-file write failed; the live pins are ahead of a2a-pins.json \
+                         until a later write succeeds"
+                    .into(),
+            });
+        }
+        let rows = pins.records().into_iter().map(|record| PeerPinRow {
+            peer: record.pin.peer.as_str().to_owned(),
+            fingerprint: record.pin.fingerprint.wire(),
+            generation: record.generation,
+            boot_nonce: record.pin.boot_nonce,
+            invalidated: record.pin.invalidated.map(|invalidated| match invalidated {
+                Invalidated::SpiritRestarted { prior_boot_nonce } => PeerPinInvalidation {
+                    reason: "spirit_restarted".into(),
+                    prior_boot_nonce: Some(prior_boot_nonce),
+                },
+                Invalidated::Manual => PeerPinInvalidation {
+                    reason: "manual".into(),
+                    prior_boot_nonce: None,
+                },
+            }),
+        });
+        Some(PeerPinStatus::Healthy(rows.collect()))
     }
 
     /// Every pending request, sorted by peer. `None` when no store is
@@ -148,6 +181,15 @@ impl RepinControl {
                 return OperatorOutcome::Conflict {
                     code: "repin_refused_by_store".into(),
                     detail: format!("{error}; the pin stays invalidated"),
+                };
+            }
+            RePinDecision::PersistFailed { detail } => {
+                return OperatorOutcome::Failed {
+                    code: "pins_unwritable".into(),
+                    detail: format!(
+                        "the pin file could not be written ({detail}); the pin stays \
+                         invalidated and the request stays pending"
+                    ),
                 };
             }
             RePinDecision::TimedOut => {

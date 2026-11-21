@@ -2686,6 +2686,7 @@ dependencies = [
  "maos-notify-push",
  "maos-orchestrator-buffer",
  "maos-pdp",
+ "maos-persistence",
  "maos-providers",
  "maos-registry",
  "maos-secrets",
@@ -3152,6 +3153,16 @@ dependencies = [
 [[package]]
 name = "maos-persistence"
 version = "1.0.0-rc.2"
+dependencies = [
+ "getrandom 0.3.4",
+ "hex",
+ "maos-a2a-core",
+ "rustix",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+]
 
 [[package]]
 name = "maos-providers"
