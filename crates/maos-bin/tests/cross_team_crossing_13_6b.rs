@@ -1619,6 +1619,9 @@ fn daemon_command(
             "MAOS_AUDIT_DB",
             dir.join(format!("{tag}.transparency.sqlite")),
         )
+        // Story 21-3 — one HOME per daemon (the pin file has a single writer; the legs
+        // that share a `MAOS_HOME` are separated by the per-host pin file name instead).
+        .env("HOME", dir.join(format!("{tag}.home")))
         .env("MAOS_OLLAMA_URL", "skip")
         .stdout(Stdio::null())
         .stderr(Stdio::piped());

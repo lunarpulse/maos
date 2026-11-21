@@ -353,12 +353,12 @@ fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
 /// Host B with its own per-process random boot nonce (no debug override).
 fn daemon_command_random_nonce(config: &Path, audit_db: &Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
+    // Story 21-3 — one HOME per daemon: `$HOME/.maos/a2a-pins-*.json` has a single writer,
+    // and the tests in this binary run concurrently.
+    let home = audit_db.with_extension("home");
     command
         .env_clear()
-        .env(
-            "HOME",
-            t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
-        )
+        .env("HOME", t3_substrate::isolated_runtime_home(&home))
         .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
         .env("MAOS_ONE_SHOT", "cohort-a2a-daemon")
         .env("MAOS_COHORT_DAEMON_CONFIG", config)

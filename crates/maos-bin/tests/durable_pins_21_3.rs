@@ -54,6 +54,12 @@ fn pins(operator_port: u16) -> Value {
     serde_json::from_str(body).unwrap_or_else(|error| panic!("pins JSON ({error}): {body}"))
 }
 
+/// The daemon's pin file: `$HOME/.maos/a2a-pins-<hex(local_host)>.json` (the fixture's host is `host-a`).
+fn daemon_pin_file(fixture: &Fixture) -> std::path::PathBuf {
+    let name = format!("a2a-pins-{}.json", hex::encode("host-a"));
+    fixture.dir.join(".maos").join(name)
+}
+
 fn host_b(rows: &Value) -> &Value {
     rows.as_array()
         .expect("a JSON array")
@@ -107,12 +113,7 @@ async fn promoted_then_stopped(tag: &str) -> Rotation {
         tokio::time::sleep(Duration::from_millis(250)).await;
     }
     assert!(
-        rotation
-            .fixture
-            .dir
-            .join(".maos")
-            .join(PIN_FILE_NAME)
-            .exists(),
+        daemon_pin_file(&rotation.fixture).exists(),
         "the promotion must be on disk before the daemon stops"
     );
     sigterm_and_wait(&mut rotation.daemon);
@@ -156,8 +157,7 @@ async fn t_21_3_a_promotion_carried_into_config_survives_a_restart() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn t_21_3_deleting_the_pin_file_reverts_the_row_to_the_config_seed() {
     let rotation = promoted_then_stopped("21-3-deleted").await;
-    std::fs::remove_file(rotation.fixture.dir.join(".maos").join(PIN_FILE_NAME))
-        .expect("delete the pin file");
+    std::fs::remove_file(daemon_pin_file(&rotation.fixture)).expect("delete the pin file");
 
     let (child, _a2a_port, operator_port, log) = boot_daemon(&rotation.fixture)
         .unwrap_or_else(|error| panic!("the restart must boot: {error}"));
@@ -176,7 +176,7 @@ async fn t_21_3_deleting_the_pin_file_reverts_the_row_to_the_config_seed() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn t_21_3_a_promotion_not_carried_into_config_refuses_to_boot() {
     let rotation = promoted_then_stopped("21-3-refused").await;
-    let file = rotation.fixture.dir.join(".maos").join(PIN_FILE_NAME);
+    let file = daemon_pin_file(&rotation.fixture);
     let before = std::fs::read(&file).expect("read the pin file");
 
     let error = boot_daemon(&rotation.fixture)

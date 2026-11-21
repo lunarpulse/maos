@@ -12919,9 +12919,15 @@ async fn run_cohort_a2a_daemon(
     // typed error, preserved.
     let mut bootstrap = bootstrap.ok_or("MAOS_COHORT_DAEMON_CONFIG must name the daemon TOML")?;
     // Story 21-3 — only this root opens the durable pin file (one writer per file).
+    // One file per local host identity: several daemons may share a `MAOS_HOME` (the
+    // multi-team scene), but each pin file keeps its single writer. Hex keeps the config
+    // string out of the path grammar.
     let pin_file = maos_domain::operator_door::maos_home()?
-        .ok_or("cohort daemon: neither MAOS_HOME nor HOME is set; no home for a2a-pins.json")?
-        .join(maos_persistence::PIN_FILE_NAME);
+        .ok_or("cohort daemon: neither MAOS_HOME nor HOME is set; no home for the pin file")?
+        .join(format!(
+            "a2a-pins-{}.json",
+            hex::encode(bootstrap.local_host.as_str())
+        ));
     bootstrap.pin_persistence = Some(Arc::new(maos_persistence::FilePinStore::open(&pin_file)?));
     validate_enterprise_daemon_wiring(enterprise_posture_required, &enterprise_daemon_governance)?;
     // Story 13.5a — the SIEM export consumer previously never ran in daemon
