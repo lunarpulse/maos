@@ -271,6 +271,8 @@ coverage:
       Story 1a.1 freezes the InvariantI1 marker type. Story 1b.2 lands the runtime
       enforcement: CapabilityRegistryAdapter composite with cap_tokens (issue/verify),
       cap_policy (evaluate), cap_audit (MPSC writer), cap_quota (budget tracker).
+      Story 21-10: the invariant-ledger-proofs job runs the I1-I14 property tests and
+      adversarial corpora (`docs/invariants/I*.md` ledger).
   I10:
     gates:
       - journal_survives_cold_restart

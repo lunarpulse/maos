@@ -86,8 +86,6 @@ use maos_kernel_core::iac::Mailbox;
 #[cfg(feature = "network")]
 use maos_kernel_core::inference::InferencePortAdapter;
 #[cfg(feature = "network")]
-use maos_kernel_core::security::approval::ApprovalManager;
-#[cfg(feature = "network")]
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 #[cfg(feature = "network")]
 use maos_providers::AnthropicProvider;
@@ -3419,10 +3417,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // integration tests (nfr_sec_14_cross_spirit_isolation.rs,
     // iac_bus_intent_lineage.rs) as needed.  Production builds carry
     // ZERO runtime cost (spirit_test feature is dev-time only).
-
-    // Story 3.1 — Approval Manager (v0.3-β auto-allow).
-    let _approval = ApprovalManager::new(Arc::clone(&transparency_log));
-    eprintln!("maos: Approval Manager initialized (v0.3-β auto-allow)");
 
     // Spawn the audit writer task (Story 1b.2). Held by name so the one-shot
     // exit path (Story 1b.5b) can drain the cap-audit channel deterministically

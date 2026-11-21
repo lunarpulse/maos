@@ -175,11 +175,11 @@ fn committed_ledger_covers_all_fourteen_and_keeps_requirement_ownership() -> Res
     let memory = claims.get("I5").ok_or("I5 missing")?;
     assert_eq!(
         memory.requirement_claims.get("FR13").map(String::as_str),
-        Some("asserted, owner 20-1b-vetting-yank-policy-and-quarantine")
+        Some("asserted, owner later-registry-quarantine-closure")
     );
     assert_eq!(
         memory.requirement_claims.get("FR31").map(String::as_str),
-        Some("proven by 20-3b")
+        Some("proven by 21-10")
     );
     assert!(matches!(memory.claim, ClaimState::Asserted));
     Ok(())
@@ -277,13 +277,7 @@ fn routed_witness_binaries_and_labelled_red_owners_remain_enrolled() -> Result<(
         .ok_or("workspace")?;
     let claims = read_claims(root)?;
     let continuity = claims.get("I14").ok_or("I14")?;
-    assert!(matches!(continuity.claim, ClaimState::Asserted));
-    assert_eq!(
-        continuity.owner.as_deref(),
-        Some("20-9-spawned-form-lifecycle-hooks")
-    );
-    assert!(continuity.requirement_claims["FR53"]
-        .contains("asserted, owner 20-9-spawned-form-lifecycle-hooks"));
+    assert!(matches!(continuity.claim, ClaimState::Guaranteed));
     assert!(continuity.requirement_claims["FR53"]
         .contains("witnessed by routed_halt_swap_20_3b (green"));
     let ledger = include_str!("../../docs/invariants/README.md");

@@ -1287,15 +1287,7 @@ fn authorize_and_deliver(
     } else {
         frame.frame_id = ulid::Ulid::new().to_bytes();
         frame.timestamp_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
-        frame.from = FrameAddress {
-            spirit_id: SpiritId::from(spirit_id),
-            host_id: None,
-            role: None,
-        };
-        frame.intent = IntentClass::Standard;
-        frame.auto_marker = FrameOrigin::SpiritAuto;
-        frame.intent_lineage = turn.lineage.clone();
-        frame.consent_envelope = None;
+        frame.stamp_as_spirit(spirit_id, &turn.lineage);
         turn.clock = turn.clock.max(turn.inbound_clock) + 1;
         frame.logical_clock = turn.clock;
         deliver_bounded(

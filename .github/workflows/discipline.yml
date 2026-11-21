@@ -947,8 +947,12 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Bind guaranteed claims to executing tests and corpus evidence
         run: cargo test --locked -p xtask --test invariant_claims_20_3b
-      - name: Detect changed files
-        run: git diff --name-only HEAD~1 > /tmp/changed-files.txt
+      - name: Detect changed files (full event range)
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          case "$base" in ""|0000000000000000000000000000000000000000) base=HEAD~1 ;; esac
+          echo "INVARIANT_LOCK_BASE=$base" >> "$GITHUB_ENV"
+          git diff --name-only "$base" HEAD > /tmp/changed-files.txt
       - name: Run invariant-lock (validate-only; journal persistence is in journal-append.yml)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -971,6 +975,77 @@ jobs:
         # crates/maos-journey-test/cassettes; passing the path positionally is a clap
         # `unexpected argument` error. Rely on the default (or use --cassette-dir).
         run: cargo run -p xtask -- cassette-age-gate --json
+
+  # Story 21-10 (D-21-10-04 A) — one direct `cargo test -p <pkg> --test <bin> <name> -- --exact`
+  # step per invariant ledger proof, with the corpus path in the step env: the only step shape
+  # `invariant-lock`'s claim gate accepts for `claim: guaranteed`.
+  invariant-ledger-proofs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: I1 registry mediation (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i1_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i1_registry i1_no_effect_without_a_verified_in_scope_token -- --exact
+      - name: I2 log before deliver (non-claiming witness)
+        env:
+          CORPUS: crates/maos-iac/tests/fixtures/invariants/i2_adversarial.jsonl
+        run: cargo test --locked -p maos-iac --test invariant_i2_log_before_deliver i2_every_delivered_frame_has_a_log_row_and_a_failed_write_delivers_nothing -- --exact
+      - name: I3 auto-sent origin (non-claiming witness)
+        env:
+          CORPUS: crates/maos-bin/tests/fixtures/invariants/i3_adversarial.jsonl
+        run: cargo test --locked -p maos-bin --test invariant_i3_origin i3_spirit_frames_are_auto_sent_and_the_stamp_agrees_on_both_sides -- --exact
+      - name: I4 approval log (non-claiming witness)
+        env:
+          CORPUS: crates/maos-cli/tests/fixtures/invariants/i4_adversarial.jsonl
+        run: cargo test --locked -p maos-cli --test invariant_i4_approval_log i4_every_approval_has_a_complete_row_and_a_grant_without_a_row_is_refused -- --exact
+      - name: I5 memory scopes (FR31 half; ledger stays asserted) (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i5_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i5_memory i5_private_memory_never_crosses_spirits_and_writes_stay_in_their_namespace -- --exact
+      - name: I6 hot swap (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i6_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i6_hot_swap i6_a_swap_keeps_tokens_and_frames_and_accepts_only_a_compatible_schema -- --exact
+      - name: I7 telemetry (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i7_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i7_telemetry i7_telemetry_reaches_only_subscribed_topics_and_a_halt_run_up_is_observable -- --exact
+      - name: I8 cross-host consent (non-claiming witness)
+        env:
+          CORPUS: crates/maos-a2a-core/tests/fixtures/invariants/i8_adversarial.jsonl
+        run: cargo test --locked -p maos-a2a-core --test invariant_i8_consent i8_a_frame_crosses_hosts_only_with_sender_policy_and_receiver_acceptance -- --exact
+      - name: I9 empty kernel (non-claiming witness)
+        env:
+          CORPUS: xtask/tests/fixtures/invariants/i9_adversarial.jsonl
+        run: cargo test --locked -p xtask --test invariant_i9_empty_kernel i9_the_kernel_holds_no_stray_state_secret_or_statistic_and_planted_ones_are_caught -- --exact
+      - name: I10 journal (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i10_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i10_journal i10_transitions_are_journaled_rehydrated_and_crashes_are_detected_in_budget -- --exact
+      - name: I11 digest chain (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i11_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i11_digest_chain i11_a_persisted_digest_carries_a_flattened_chain_and_a_chainless_one_is_refused -- --exact
+      - name: I12 decision refs (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i12_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i12_decision_refs i12_a_decision_frame_carries_every_declared_digest_and_inbound_raw_frame -- --exact
+      - name: I13 intent lineage (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i13_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i13_lineage i13_lineage_is_the_union_of_source_intents_and_admission_respects_the_allowed_set -- --exact
+      - name: I14 halt continuity
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i14_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i14_halt_continuity i14_a_swap_carries_every_halt_and_needs_a_declared_compatible_successor -- --exact
 
   check-corpus:
     runs-on: ubuntu-24.04
@@ -4019,6 +4094,12 @@ jobs:
         run: cargo +nightly fuzz build --fuzz-dir crates/maos-domain/fuzz frame_deser
       - name: Build exec-deps ELF parser fuzz target
         run: cargo +nightly fuzz build --fuzz-dir crates/maos-exec-deps/fuzz fuzz_exec_deps_parse_elf
+      - name: Build capability-token fuzz target (I1)
+        run: cargo +nightly fuzz build --fuzz-dir crates/maos-kernel-core/fuzz cap_token_verify
+      - name: Build digest-chain fuzz target (I11)
+        run: cargo +nightly fuzz build --fuzz-dir crates/maos-kernel-core/fuzz i11_digest_chain
+      - name: Build cross-host consent fuzz target (I8)
+        run: cargo +nightly fuzz build --fuzz-dir crates/maos-a2a-core/fuzz i8_consent_intent
 
   # Story 10.3 AC-4 (NFR-Doc-6) — Korean localization ship gate.
   # KO_COVERAGE_MIN=100 turns the coverage promise into a mechanical gate;
@@ -5634,6 +5715,7 @@ jobs:
       - check-workspace-count
       - check-composition-root-completeness
       - invariant-lock
+      - invariant-ledger-proofs
       - check-corpus
       - maos-audit-read-only
       - cap-token-verify-bench
@@ -5986,6 +6068,7 @@ jobs:
       - check-workspace-count
       - check-composition-root-completeness
       - invariant-lock
+      - invariant-ledger-proofs
       - check-corpus
       - maos-audit-read-only
       - cap-token-verify-bench

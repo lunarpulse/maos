@@ -24,6 +24,7 @@ jobs = [
     "check-workspace-count",
     "check-composition-root-completeness",
     "invariant-lock",
+    "invariant-ledger-proofs",
     "check-corpus",
     "maos-audit-read-only",
     "cap-token-verify-bench",

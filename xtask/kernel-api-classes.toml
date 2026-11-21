@@ -340,11 +340,6 @@
 "maos_kernel_core::iac::IacBusAdapter::mailbox"            = "data-movement"
 "maos_kernel_core::iac::IacBusAdapter::transparency_log"   = "data-movement"
 
-# ── Story 3.1 — Security / Approval Manager ──
-"maos_kernel_core::security::approval::ApprovalManager"    = "supervision"
-"maos_kernel_core::security::approval::ApprovalManager::new" = "supervision"
-"maos_kernel_core::security::approval::ApprovalManager::prompt" = "supervision"
-
 # ── Story 3.1 — IacRtMetrics extended (new methods) ──
 "maos_kernel_core::telemetry::iac_rt::IacRtMetrics::inc_pending"   = "data-movement"
 "maos_kernel_core::telemetry::iac_rt::IacRtMetrics::dec_pending"   = "data-movement"

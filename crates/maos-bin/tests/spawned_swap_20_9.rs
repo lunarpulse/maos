@@ -21,6 +21,8 @@ use world::{manifest, manifest_capped, Running, World, ALL_HOOKS, ID};
 
 const MIGRATING: &str = "[hot_swap]\nstate_schema_uri = \"urn:probe\"\nstate_schema_version = 131073\n[migrates_from]\nversions = [\"1.0.x\"]\n";
 // (v1 of the migrator vector declares no [hot_swap]: schema 1, major 0; MIGRATING is major 2.)
+// I14 (D-21-10-05 A): a swap that carries a halt needs a successor that declares compatibility.
+const HALT_V1: &str = "[halt_protocol_compatibility]\nversion = 1\n";
 
 fn v(world: &World, name: &str, version: &str, artifact: &str, extra: &str) -> PathBuf {
     world.write(name, &manifest(ID, version, artifact, &ALL_HOOKS, extra))
@@ -105,8 +107,8 @@ async fn admit(
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_hot_swap_keeps_the_pid_tokens_memory_and_state_and_waits_for_the_active_turn() {
     let mut world = World::new().await;
-    let v1 = v(&world, "v1.toml", "1.0.0", "lifecycle_probe.wasm", "");
-    let v2 = v(&world, "v2.toml", "2.0.0", "lifecycle_probe.wasm", "");
+    let v1 = v(&world, "v1.toml", "1.0.0", "lifecycle_probe.wasm", HALT_V1);
+    let v2 = v(&world, "v2.toml", "2.0.0", "lifecycle_probe.wasm", HALT_V1);
     let running = world.start(&v1).await;
     for _ in 0..3 {
         world.turn(ID, "").await;
@@ -325,8 +327,8 @@ async fn a_predecessor_without_the_lifecycle_export_is_refused_typed() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_revert_after_the_predecessor_child_retired_ends_the_session_typed() {
     let mut world = World::new().await;
-    let v1 = v(&world, "v1.toml", "1.0.0", "lifecycle_probe.wasm", "");
-    let v2 = v(&world, "v2.toml", "2.0.0", "lifecycle_probe.wasm", "");
+    let v1 = v(&world, "v1.toml", "1.0.0", "lifecycle_probe.wasm", HALT_V1);
+    let v2 = v(&world, "v2.toml", "2.0.0", "lifecycle_probe.wasm", HALT_V1);
     let running = world.start(&v1).await;
     world.turn(ID, "").await;
     halted(&world, running.pid).await;

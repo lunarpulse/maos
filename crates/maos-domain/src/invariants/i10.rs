@@ -228,6 +228,73 @@ impl<'de> serde::Deserialize<'de> for JournalEntry {
     }
 }
 
+/// Crash detection budget (NFR-Rel-1) and `task.orphaned` budget (FR12).
+pub const MAX_CRASH_DETECT_MS: u64 = 2_000;
+pub const MAX_TASK_ORPHANED_MS: u64 = 5_000;
+
+/// A lifecycle transition and whether the journal holds it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Transition {
+    pub event: String,
+    pub journaled: bool,
+}
+
+/// A cold boot: entries journaled before it and entries rehydrated by it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Boot {
+    pub journaled: u32,
+    pub rehydrated: u32,
+}
+
+/// A `task.orphaned` row: emission latency and the cause it carries.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Orphan {
+    pub latency_ms: u64,
+    pub cause: Option<String>,
+}
+
+/// I10 observation: journaled transitions, cold boots, crash detections and orphan rows.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub transitions: Vec<Transition>,
+    pub boots: Vec<Boot>,
+    pub crash_detect_ms: Vec<u64>,
+    pub orphans: Vec<Orphan>,
+}
+
+/// I10 predicate: every transition is journaled, a cold boot rehydrates everything journaled,
+/// a crash is detected within 2 s, and `task.orphaned` arrives within 5 s carrying its cause.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    for t in &obs.transitions {
+        ensure(t.journaled, "I10", "lifecycle transition not journaled")?;
+    }
+    for b in &obs.boots {
+        ensure(
+            b.rehydrated == b.journaled,
+            "I10",
+            "cold boot did not rehydrate the journal",
+        )?;
+    }
+    for ms in &obs.crash_detect_ms {
+        ensure(
+            *ms <= MAX_CRASH_DETECT_MS,
+            "I10",
+            "crash detected after 2 s",
+        )?;
+    }
+    for o in &obs.orphans {
+        ensure(
+            o.latency_ms <= MAX_TASK_ORPHANED_MS,
+            "I10",
+            "task.orphaned emitted after 5 s",
+        )?;
+        let caused = o.cause.as_ref().is_some_and(|c| !c.trim().is_empty());
+        ensure(caused, "I10", "task.orphaned carries no cause")?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

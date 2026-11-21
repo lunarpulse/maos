@@ -99,6 +99,7 @@ pub fn validate_claim(root: &std::path::Path, src: &str) -> Result<InvariantClai
     Ok(claim)
 }
 
+// Corpus use is a BINDING check (the test loads the file), not a proof of rejection.
 // Fail closed on conditional/ignored Rust witnesses and shell shapes whose execution
 // cannot be established here. Guaranteed claims use a direct cargo test invocation.
 fn executing_witness(
@@ -401,13 +402,13 @@ fn invariant_lock(
             touched_invariants.push(inv_id.clone());
         }
     }
-    // Also check maos-domain invariant types (post-1a.1) and lock.toml itself.
+    // Also check the maos-domain invariant modules and lock.toml itself.
     if changed.contains("xtask/invariants/lock.toml") {
         touched_invariants.push("lock.toml".into());
     }
     if changed
         .iter()
-        .any(|p| p.contains("crates/maos-domain/src/invariants.rs"))
+        .any(|p| p.starts_with("crates/maos-domain/src/invariants"))
     {
         touched_invariants.push("maos-domain-invariants".into());
     }
@@ -426,38 +427,41 @@ fn invariant_lock(
         });
     }
 
+    let base = base_ref();
+    let spec = format!("{base}^{{commit}}");
+    if !Command::new("git")
+        .args(["rev-parse", "--verify", "--quiet", &spec])
+        .current_dir(&root)
+        .output()
+        .is_ok_and(|o| o.status.success())
+    {
+        return Err(format!("invariant-lock: base ref {base} is unreadable"));
+    }
     // Requirement (a): diff itself is present by construction.
 
     // Requirement (b): corpus delta — file touched check at v0.1-α.
     let missing_corpus_delta = !changed.contains("tests/coverage-matrix.yaml");
 
-    // Requirement (c): phase-commitment update.
+    // Requirement (c) and the forward-only cadence check: both read the register frontmatter
+    // at the base and on disk.
     let mut missing_phase_commitment = true;
-    for inv_id in &touched_invariants {
-        if claims.contains_key(inv_id) {
-            let path = root.join(format!("docs/invariants/{inv_id}.md"));
-            let rel_path = format!("docs/invariants/{inv_id}.md");
-            if changed.contains(&rel_path) {
-                if has_cadence_change(&path)? {
-                    missing_phase_commitment = false;
-                }
-            }
+    let mut regression_detected = Vec::new();
+    for inv_id in touched_invariants
+        .iter()
+        .filter(|i| claims.contains_key(*i))
+    {
+        let rel_path = format!("docs/invariants/{inv_id}.md");
+        let new_src =
+            fs::read_to_string(root.join(&rel_path)).map_err(|e| format!("{rel_path}: {e}"))?;
+        let old_src = git_show_old(&root, &rel_path).unwrap_or_default();
+        if changed.contains(&rel_path) && phase_commitment(&old_src, &new_src)? {
+            missing_phase_commitment = false;
         }
+        regression_detected.extend(cadence_problem(inv_id, &old_src, &new_src)?);
     }
 
     // Reviewer check via gh CLI.
     let (review_count, insufficient_reviews) = check_reviews(pr_number)?;
-
-    // Regression check: forward-only progression.
-    let mut regression_detected = Vec::new();
-    for inv_id in &touched_invariants {
-        if claims.contains_key(inv_id) {
-            let path = root.join(format!("docs/invariants/{inv_id}.md"));
-            if let Some(reg) = check_regression(&path, inv_id)? {
-                regression_detected.push(reg);
-            }
-        }
-    }
 
     let passed = !missing_corpus_delta
         && !missing_phase_commitment
@@ -487,7 +491,7 @@ fn invariant_lock(
 
 fn detect_changed_files_git(root: &std::path::Path) -> Result<BTreeSet<String>, String> {
     let output = Command::new("git")
-        .args(["diff", "--name-only", "HEAD~1"])
+        .args(["diff", "--name-only", &base_ref()])
         .current_dir(root)
         .output()
         .map_err(|e| format!("git diff failed: {e}"))?;
@@ -502,14 +506,39 @@ fn detect_changed_files_git(root: &std::path::Path) -> Result<BTreeSet<String>, 
         .collect())
 }
 
-fn has_cadence_change(path: &std::path::Path) -> Result<bool, String> {
-    // Check if the diff against HEAD~ touches the enforcement_cadence section.
-    let output = Command::new("git")
-        .args(["diff", "HEAD~1", "--", path.to_str().unwrap()])
+/// The event's base commit (`INVARIANT_LOCK_BASE`: PR base or push-before sha); `HEAD~1` locally.
+fn base_ref() -> String {
+    std::env::var("INVARIANT_LOCK_BASE").unwrap_or_else(|_| "HEAD~1".into())
+}
+
+/// The register file at the base, or `None` when it did not exist there.
+fn git_show_old(root: &std::path::Path, rel: &str) -> Option<String> {
+    let spec = format!("{}:{rel}", base_ref());
+    let out = Command::new("git")
+        .args(["show", &spec])
+        .current_dir(root)
         .output()
-        .map_err(|e| format!("git diff failed: {e}"))?;
-    let diff = String::from_utf8_lossy(&output.stdout);
-    Ok(diff.contains("enforcement_cadence"))
+        .ok()?;
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// Both frontmatters parsed as YAML: the claim enum and the cadence map. Body text never counts.
+fn front(src: &str) -> Result<serde_yaml::Value, String> {
+    let head = src
+        .strip_prefix("---\n")
+        .and_then(|s| s.split_once("\n---"))
+        .map(|h| h.0);
+    serde_yaml::from_str(head.unwrap_or_default()).map_err(|e| e.to_string())
+}
+
+/// ADR-037 requirement (c): a changed cadence cell, or a validated `asserted -> guaranteed` flip.
+fn phase_commitment(old_src: &str, new_src: &str) -> Result<bool, String> {
+    let claim = |src: &str| front(src).map(|f| f["claim"].as_str().map(str::to_string));
+    let flip = claim(old_src)?.as_deref() == Some("asserted")
+        && claim(new_src)?.as_deref() == Some("guaranteed");
+    Ok(flip || parse_cadence(old_src)? != parse_cadence(new_src)?)
 }
 
 fn check_reviews(pr_number: Option<u64>) -> Result<(usize, bool), String> {
@@ -561,64 +590,38 @@ fn check_reviews(pr_number: Option<u64>) -> Result<(usize, bool), String> {
     }
 }
 
-fn check_regression(path: &std::path::Path, inv_id: &str) -> Result<Option<String>, String> {
-    let output = Command::new("git")
-        .args(["show", &format!("HEAD~1:{}", path.to_str().unwrap())])
-        .output();
-
-    let old_src = match output {
-        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
-        _ => return Ok(None), // no prior version to compare
-    };
-
-    let new_src = fs::read_to_string(path).unwrap_or_default();
-
-    let old_cadence = parse_cadence(&old_src)?;
-    let new_cadence = parse_cadence(&new_src)?;
-
+fn cadence_problem(inv_id: &str, old_src: &str, new_src: &str) -> Result<Option<String>, String> {
+    let new_cadence = parse_cadence(new_src)?;
     let order = ["—", "CI", "runtime", "fuzz"];
-    let rank = |s: &str| order.iter().position(|&x| x == s).unwrap_or(0);
-
-    for (phase, old_val) in &old_cadence {
-        if let Some(new_val) = new_cadence.get(phase) {
-            if rank(new_val) < rank(old_val) {
-                return Ok(Some(format!(
-                    "ADR-037 violation: enforcement cadence cannot regress for {inv_id} (was={old_val}, now={new_val})"
-                )));
-            }
-        }
+    let rank = |s: &str| order.iter().position(|&x| x == s);
+    for (phase, old_val) in &parse_cadence(old_src)? {
+        let problem = match new_cadence.get(phase) {
+            None => "removed".to_string(),
+            Some(n) if rank(n).is_none() => format!("invalid value {n}"),
+            Some(n) if rank(n) < rank(old_val) => format!("regressed (was={old_val}, now={n})"),
+            Some(_) => continue,
+        };
+        return Ok(Some(format!(
+            "ADR-037 violation: {inv_id} cadence {phase} {problem}"
+        )));
     }
-
     Ok(None)
 }
 
 fn parse_cadence(src: &str) -> Result<BTreeMap<String, String>, String> {
-    let mut map = BTreeMap::new();
-    // Simple parser: look for lines like `v0.1: runtime` in frontmatter.
-    let mut in_cadence = false;
-    for line in src.lines() {
-        if line.contains("enforcement_cadence:") {
-            in_cadence = true;
-            continue;
-        }
-        if in_cadence {
-            let trimmed = line.trim();
-            if trimmed.contains(':') && !trimmed.starts_with('#') {
-                let parts: Vec<_> = trimmed.splitn(2, ':').collect();
-                if parts.len() == 2 {
-                    let key = parts[0].trim().to_string();
-                    let val = parts[1].trim().to_string();
-                    // Only accept known phase keys to avoid parsing noise.
-                    if key.starts_with('v') && key.contains('.') {
-                        map.insert(key, val);
-                    }
-                }
-            } else if !trimmed.is_empty() && !line.starts_with(' ') && !line.starts_with('\t') {
-                break;
-            }
-        }
-    }
-    Ok(map)
+    let cells = front(src)?["enforcement_cadence"]
+        .as_mapping()
+        .cloned()
+        .unwrap_or_default();
+    Ok(cells
+        .iter()
+        .map(|(k, v)| {
+            (
+                k.as_str().unwrap_or("?").into(),
+                v.as_str().unwrap_or("?").into(),
+            )
+        })
+        .collect())
 }
 
 fn append_journal(

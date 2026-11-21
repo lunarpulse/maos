@@ -859,11 +859,6 @@
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::security::approval::ApprovalManager",
-      "signature_hash": "3c18f6073906018162d4535b2084caac1e0406cbe5024cbc931d77e569498a11"
-    },
-    {
-      "kind": "struct",
       "path": "maos_kernel_core::security::crypto::RingCryptoProvider",
       "signature_hash": "b628913cb54299d09fb98d5755d182781646642d8dfe89b1d9bf45b0354cbe0b"
     },

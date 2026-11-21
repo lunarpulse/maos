@@ -20,10 +20,21 @@ fn parse_cadence_works() {
 }
 
 #[test]
-fn parse_cadence_handles_tabs() {
-    let src = "---\nenforcement_cadence:\n\tv0.1: CI\n\tv0.3: runtime\n---\n";
-    let map = parse_cadence(src).unwrap();
-    assert_eq!(map.get("v0.1"), Some(&"CI".to_string()));
+fn body_only_claim_and_removed_or_invalid_cadence_cells_are_refused() {
+    let doc = |claim: &str, cells: &str, body: &str| {
+        format!("---\nid: I1\nclaim: {claim}\nenforcement_cadence:\n{cells}---\n{body}")
+    };
+    let old = doc("asserted", "  v1.0: fuzz\n  v1.5: fuzz\n", "");
+    // Planted red: `claim: guaranteed` only in the body is no flip.
+    let body_only = doc("asserted", "  v1.0: fuzz\n  v1.5: fuzz\n", "\nclaim: guaranteed\n");
+    assert!(!phase_commitment(&old, &body_only).unwrap());
+    let removed = doc("asserted", "  v1.0: fuzz\n", "");
+    assert!(cadence_problem("I1", &old, &removed).unwrap().unwrap().contains("removed"));
+    let invalid = doc("asserted", "  v1.0: fuzz\n  v1.5: bogus\n", "");
+    assert!(cadence_problem("I1", &old, &invalid).unwrap().unwrap().contains("invalid"));
+    let regressed = doc("asserted", "  v1.0: CI\n  v1.5: fuzz\n", "");
+    assert!(cadence_problem("I1", &old, &regressed).unwrap().unwrap().contains("regressed"));
+    assert!(cadence_problem("I1", &old, &old).unwrap().is_none());
 }
 
 #[test]
@@ -318,4 +329,29 @@ fn multi_invariant_with_corpus_delta_clears_that_leg() {
     );
 
     std::fs::remove_file(tmpfile).ok();
+}
+
+#[test]
+fn domain_invariant_modules_are_lock_gated() {
+    let list = "/tmp/i21_10_domain_changed.txt";
+    std::fs::write(list, "crates/maos-domain/src/invariants/i1.rs\n").unwrap();
+    let report = invariant_lock(Some(list), None, None).unwrap();
+    assert_eq!(report.touched_invariants, vec!["maos-domain-invariants".to_string()]);
+    assert!(!report.passed, "a domain edit without corpus delta or commitment must fail");
+    std::fs::remove_file(list).ok();
+}
+
+#[test]
+fn phase_commitment_ignores_context_and_accepts_cadence_or_validated_flip() {
+    let doc = |claim: &str, v10: &str| {
+        format!("---\nid: I1\nclaim: {claim}\nowner: x\nenforcement_cadence:\n  v1.0: {v10}\n---\nbody\n")
+    };
+    // Planted red: only the claim basis / body moved, so `enforcement_cadence` can appear
+    // as diff context but no cell changed and nothing flipped.
+    let (a, b) = (doc("asserted", "fuzz"), doc("asserted", "fuzz").replace("body", "other body"));
+    assert!(!phase_commitment(&a, &b).unwrap());
+    assert!(!phase_commitment(&doc("guaranteed", "fuzz"), &doc("guaranteed", "fuzz")).unwrap());
+    assert!(phase_commitment(&doc("asserted", "runtime"), &doc("asserted", "fuzz")).unwrap());
+    assert!(phase_commitment(&doc("asserted", "fuzz"), &doc("guaranteed", "fuzz")).unwrap());
+    assert!(!phase_commitment(&doc("guaranteed", "fuzz"), &doc("asserted", "fuzz")).unwrap());
 }

@@ -249,8 +249,8 @@ fn real_tree_release_ready_is_aggregate_minus_twelve_documented_exclusions() {
         String::from_utf8_lossy(&output.stderr)
     );
     let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    // aggregate.needs (74) with v1-0-ship-gate expanded to its 44 needs is 107 jobs; nine are excluded jobs.
-    assert_eq!(report["release_ready_needs"], 98);
+    // aggregate.needs (75) with v1-0-ship-gate expanded to its 44 needs is 108 jobs; nine are excluded jobs.
+    assert_eq!(report["release_ready_needs"], 99);
     assert_eq!(
         report["release_ready_excluded"].as_array().unwrap().len(),
         12

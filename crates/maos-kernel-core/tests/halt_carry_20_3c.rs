@@ -353,6 +353,58 @@ async fn an_incompatible_successor_refuses_the_swap_with_the_halt_intact() {
     assert_eq!(metadata(&rig), before, "identity, owner, fire time, replay");
 }
 
+/// D-21-10-05 A (I14): a successor that declares no `halt_protocol_compatibility` is refused
+/// while the predecessor carries a halt (the pre-fix gate read the omission as version 1).
+#[tokio::test]
+async fn a_successor_declaring_no_compatibility_is_refused_while_a_halt_is_carried() {
+    let rig = rig(false);
+    let before = metadata(&rig);
+
+    let error = rig
+        .coordinator
+        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .await
+        .expect_err("an undeclared successor cannot be shown to carry the halt");
+    assert!(
+        matches!(
+            error,
+            HotSwapError::HaltContinuityViolation(
+                HaltContinuityError::MissingHaltProtocolCompatibility
+            )
+        ),
+        "{error:?}"
+    );
+    assert_eq!(
+        rig.registry.lookup_state(&rig.halt_id),
+        Some(HaltState::PendingResolution)
+    );
+    assert_eq!(metadata(&rig), before, "identity, owner, fire time, replay");
+}
+
+/// `precheck` judges the successor's own declaration with the swap gate's validator.
+#[tokio::test]
+async fn precheck_refuses_an_undeclared_or_mismatched_successor_and_admits_a_matching_one() {
+    let rig = rig(false);
+    let dir = tempfile::tempdir().unwrap();
+    for (compat, expected) in [
+        (None, PrecheckOutcome::HaltContinuityViolation),
+        (Some(2), PrecheckOutcome::HaltContinuityViolation),
+        (Some(1), PrecheckOutcome::SafeMigrated),
+    ] {
+        let mut text = "[class]\nname = \"s\"\nversion = \"0.2.0\"\nabi = \"1.0\"\nmin_substrate_version = \"0.1.0\"\nmanifest_schema_version = 1\ntrust_tier = \"local\"\nforms = [\"rust-inproc\"]\ndescription = \"d\"\n".to_string();
+        if let Some(v) = compat {
+            text += &format!("[halt_protocol_compatibility]\nversion = {v}\n");
+        }
+        let path = dir.path().join(format!("successor-{compat:?}.toml"));
+        std::fs::write(&path, text).unwrap();
+        let verdict = rig
+            .coordinator
+            .precheck(SPIRIT_ID, path.to_str().unwrap(), "0.2.0")
+            .unwrap();
+        assert_eq!(verdict.verdict, expected, "successor declaring {compat:?}");
+    }
+}
+
 #[tokio::test]
 async fn a_swap_compensated_after_the_i14_gate_leaves_the_halt_pending_with_its_metadata() {
     let _window = monitor_window(false).await;
@@ -361,7 +413,7 @@ async fn a_swap_compensated_after_the_i14_gate_leaves_the_halt_pending_with_its_
 
     let error = rig
         .coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect_err("the predecessor's swap-out panics, after the gate has passed");
     assert!(
@@ -383,7 +435,7 @@ async fn a_halt_resolved_after_the_swap_writes_exactly_one_approval_row() {
     let rig = rig(false);
     let before = metadata(&rig);
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect("a same-major swap carries the halt");
     assert_eq!(
@@ -481,7 +533,7 @@ async fn resolving_the_carried_halt_inside_the_monitor_window_is_not_a_loss() {
     let _window = monitor_window(true).await;
     let rig = rig(false);
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect("a same-major swap carries the halt");
     rig.registry
@@ -499,7 +551,7 @@ async fn a_carried_halt_that_leaves_the_registry_inside_the_window_is_still_a_lo
     let _window = monitor_window(true).await;
     let rig = rig(false);
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect("a same-major swap carries the halt");
     assert_eq!(rig.registry.drain_for_spirit(PID).len(), 1);

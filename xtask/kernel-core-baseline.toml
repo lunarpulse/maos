@@ -502,7 +502,8 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26061
+src_lines = 25764
+# HISTORY: 21-10-invariant-ledger-proofs -> exact formatted physical 26061 -> 25764 (-297), tokei 20429 -> 20187 (-242), 90 -> 89 files (security/approval.rs deleted, D-21-10-04 ruled), changed files: hot_swap/coordinator.rs (I14 fix at origin, D-21-10-05 A; precheck), security/mod.rs; digests and set_hash adopted from --emit-pin.
 # HISTORY: 27-1-manifest-model-pin-to-wire -> exact formatted physical 26062 -> 26061 (-1),
 # tokei 20428, 90 files, none added or removed; changed files: inference/mod.rs; digests and
 # set_hash adopted from `--emit-pin`. S1: the inference TL serves the manifest model pin on the
@@ -1120,7 +1121,7 @@ src_lines = 26061
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "97af61f5e61077fc1be810f9bb0786115dbccb29cb4e571e3ecc6e4abc847a74"
+set_hash = "866144535b6c3cf8a66ee481a08b85b749242beda99b771219ef8cda48f079ff"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -1139,7 +1140,7 @@ set_hash = "97af61f5e61077fc1be810f9bb0786115dbccb29cb4e571e3ecc6e4abc847a74"
 "halt/resolver.rs" = "3756181d4a06e121fdd3b63818b45d20205e6acb9b43cc18fb5ad82c93ac6b1f"
 "halt/termination.rs" = "ad56de586651f8f69a9c860374a0a0c0b7242501a25792a54423cfb9ec278097"
 "hot_swap/archive.rs" = "74a62f9ad89402df2fca011a31c15579226732b7ad3bae968327f518394cfd21"
-"hot_swap/coordinator.rs" = "e72c468d28b96809191d19c0656bab65e8b73483470428e108fed6dddc3146bb"
+"hot_swap/coordinator.rs" = "fe64a3c4c335fa07e4a33dca3e16afde429666e9e9bcc76b3db1e706aad030df"
 "hot_swap/migrator.rs" = "1c72d4b472310fcc36f80521d25ab3da72691fc99b79c1b258bdd75ab5a53b88"
 "hot_swap/mod.rs" = "d378c979b9338914bdb50d507ddc7826c0f5852a4364e4736fde3a7d9e35e5a6"
 "hot_swap/post_swap_monitor.rs" = "5f1ef159078b114c29e220651a7b37fcf266921bdbead7f358d2b9dec67b3ac0"
@@ -1184,11 +1185,10 @@ set_hash = "97af61f5e61077fc1be810f9bb0786115dbccb29cb4e571e3ecc6e4abc847a74"
 "scheduler/schedule_watchdog.rs" = "8cb0ef2426135bed623fb7bed54506416a069047bdd0de0666fdd54fa8389405"
 "scheduler/scheduler_loop.rs" = "0eeb7b79c3a91d5371fae9280bd540418351f0fa2cf0d8a08328967f7d942914"
 "scheduler/verb_resolver.rs" = "114fe959e9f7b4126464b63ad51f57a374646c95dbb72c0f3d8c19dbc363ab16"
-"security/approval.rs" = "d9847e9ffbd4ef4b5f21410a7a1c24e0dbb3f57bb98eeee20ae6b2f27e670ea3"
 "security/crypto.rs" = "0301d5d0b574791bd314cdef5c9ec9c80adec58248e49dc6731e9abc5b4e38c8"
 "security/drift.rs" = "875b2c652bc10ca1aa2f4dc1f4b6bd410e5c91ef37750b98fceb6058fb926328"
 "security/manifest.rs" = "d2e02fe45059446d55437e9d9e03893c96945741ec7d9ca4b13882d2bc5a4e85"
-"security/mod.rs" = "56bf678eb903318ecb5fae169ae52c2e6408f2570f733bdaafb634e5c920df43"
+"security/mod.rs" = "3dacf6173e6669574b2317600ba3ccc175c28c183d84b89f7399ff6cccf37550"
 "security/operator_config.rs" = "513a8bb167fa2180893ac27877dc95e858ac2d8dadc5b7e88c5039ab68ca5fff"
 "security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
 "security/sandbox/linux.rs" = "54d0125650e886fe6dc3aee42cbc8575c8c9ab36d5f8604ed486438e01ce1096"

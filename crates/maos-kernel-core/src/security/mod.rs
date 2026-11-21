@@ -10,7 +10,6 @@
 //! (replacing the hardcoded injection in `maos-bin::main`),
 //! `OutputShapePredicate` scaffold, and a `DriftEvent` channel.
 
-pub mod approval;
 pub mod crypto;
 pub mod drift;
 pub mod manifest;
@@ -506,18 +505,6 @@ impl SecurityManagerPort for SecurityManagerAdapter {
             self.policy
                 .effective_sandbox_tier(spirit_pid, trust_tier, &inner),
         )
-    }
-
-    fn approval_class(&self, _capability: &str) -> maos_domain::invariants::i4::ApprovalDecision {
-        // v0.1-β placeholder: auto-approve.
-        maos_domain::invariants::i4::ApprovalDecision {
-            actor: "kernel".into(),
-            target: "spirit".into(),
-            capability: _capability.into(),
-            intent: "default".into(),
-            decision: true,
-            reasoning: Some("v0.1-β placeholder approval".into()),
-        }
     }
 }
 

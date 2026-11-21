@@ -181,6 +181,50 @@ impl Default for IntentAllowlist {
     }
 }
 
+/// One cross-host frame offered with a typed intent: what each side's policy says about that
+/// intent and whether the frame was delivered.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Crossing {
+    pub intent: Option<String>,
+    pub sender_allows: bool,
+    pub receiver_accepts: bool,
+    pub delivered: bool,
+}
+
+/// I8 observation: the cross-host frames offered and their fates.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub crossings: Vec<Crossing>,
+}
+
+/// I8 predicate: a frame crosses hosts only with a canonical typed intent that the sender's
+/// policy allows to be sent and the receiver's policy accepts.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    for c in obs.crossings.iter().filter(|c| c.delivered) {
+        let typed = c
+            .intent
+            .as_ref()
+            .is_some_and(|i| A2AIntent::new(i.as_str()).is_canonical());
+        ensure(
+            typed,
+            "I8",
+            "frame crossed hosts without a canonical typed intent",
+        )?;
+        ensure(
+            c.sender_allows,
+            "I8",
+            "frame crossed hosts without sender policy",
+        )?;
+        ensure(
+            c.receiver_accepts,
+            "I8",
+            "frame crossed hosts without receiver acceptance",
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

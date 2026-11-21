@@ -1,0 +1,4 @@
+{"frames":[{"logged":false,"log_write_failed":false,"delivered":true}]}
+{"frames":[{"logged":false,"log_write_failed":true,"delivered":true}]}
+{"frames":[{"logged":true,"log_write_failed":true,"delivered":true}]}
+{"frames":[{"logged":true,"log_write_failed":false,"delivered":true},{"logged":false,"log_write_failed":false,"delivered":true}]}

@@ -2,52 +2,20 @@
 //!
 //! Covers issue/verify/revoke/expire/TOCTOU/cross-Spirit isolation.
 
-use maos_kernel_core::telemetry::TelemetryStreamAdapter;
-use std::sync::Arc;
-
 use maos_domain::invariants::i1::{IntentClass, Scope};
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::capability::CapError;
-use maos_domain::ports::crypto::CryptoProvider;
-use maos_kernel_core::capability::{
-    cap_audit, cap_policy, cap_quota, cap_tokens, CapabilityRegistryAdapter, CapabilityRegistryPort,
-};
+use maos_kernel_core::capability::{cap_tokens, CapabilityRegistryAdapter, CapabilityRegistryPort};
 
-use crate::common::MockCryptoProvider;
+mod common;
 
 fn make_adapter() -> CapabilityRegistryAdapter {
-    let crypto: Arc<dyn CryptoProvider> = Arc::new(MockCryptoProvider);
-    let signing_key = cap_tokens::Ed25519SigningKey::new([0u8; 32]);
-    let policy = cap_policy::PolicyTable::new();
-    {
-        let mut inner = cap_policy::PolicyTableInner::default();
-        inner.manifest_scopes.insert(
-            7,
-            cap_policy::ManifestCapabilityScope {
-                scopes: vec![Scope::FsRead {
-                    subtree: "/tmp".into(),
-                }],
-                declared_tier: SandboxTier(0),
-                trust_tier: cap_policy::decision::TrustTier::Verified,
-            },
-        );
-        policy.update(inner);
-    }
-    let (audit_tx, mut audit_rx) = cap_audit::channel();
-    std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
-    let quota = cap_quota::CapQuotaTracker::new();
-    let working_memory = Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new());
-    let telemetry = Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default());
-    CapabilityRegistryAdapter::new(
-        crypto,
-        signing_key,
-        0xDEAD_BEEF,
-        Arc::new(policy),
-        audit_tx,
-        quota,
-        working_memory,
-        telemetry,
-    )
+    common::registry::adapter(&[(
+        7,
+        vec![Scope::FsRead {
+            subtree: "/tmp".into(),
+        }],
+    )])
 }
 
 #[test]
@@ -145,41 +113,4 @@ fn integration_high_privilege_ttl_capped() {
         )
         .unwrap();
     assert!(token.expiry_ns <= cap_tokens::monotonic_now_ns() + 60 * 1_000_000_000 + 1_000_000);
-}
-
-mod common {
-    use maos_domain::ports::crypto::{CryptoError, CryptoProvider};
-
-    pub struct MockCryptoProvider;
-
-    impl CryptoProvider for MockCryptoProvider {
-        fn verify_signature(
-            &self,
-            _pk: &[u8],
-            _msg: &[u8],
-            _sig: &[u8],
-        ) -> Result<(), CryptoError> {
-            Ok(())
-        }
-        fn seal_for_export(
-            &self,
-            _k: &[u8],
-            _n: &[u8],
-            _a: &[u8],
-            p: &[u8],
-        ) -> Result<Vec<u8>, CryptoError> {
-            Ok(p.to_vec())
-        }
-        fn sign_capability_token(
-            &self,
-            _sk: &[u8],
-            token_bytes: &[u8],
-        ) -> Result<Vec<u8>, CryptoError> {
-            let mut sig = [0u8; 64];
-            for (i, b) in token_bytes.iter().enumerate() {
-                sig[i % 64] ^= *b;
-            }
-            Ok(sig.to_vec())
-        }
-    }
 }

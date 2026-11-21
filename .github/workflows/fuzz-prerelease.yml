@@ -30,6 +30,15 @@ jobs:
           - target: fuzz_exec_deps_parse_elf
             fuzz_dir: crates/maos-exec-deps/fuzz
             rss_flag: ''
+          - target: cap_token_verify
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i11_digest_chain
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i8_consent_intent
+            fuzz_dir: crates/maos-a2a-core/fuzz
+            rss_flag: ''
     steps:
       - uses: actions/checkout@v5
       - name: Install nightly and cargo-fuzz
@@ -87,6 +96,15 @@ jobs:
             rss_flag: '-rss_limit_mb=0'
           - target: fuzz_exec_deps_parse_elf
             fuzz_dir: crates/maos-exec-deps/fuzz
+            rss_flag: ''
+          - target: cap_token_verify
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i11_digest_chain
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i8_consent_intent
+            fuzz_dir: crates/maos-a2a-core/fuzz
             rss_flag: ''
     steps:
       - uses: actions/checkout@v5
@@ -151,6 +169,15 @@ jobs:
           - target: fuzz_exec_deps_parse_elf
             fuzz_dir: crates/maos-exec-deps/fuzz
             rss_flag: ''
+          - target: cap_token_verify
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i11_digest_chain
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i8_consent_intent
+            fuzz_dir: crates/maos-a2a-core/fuzz
+            rss_flag: ''
     steps:
       - uses: actions/checkout@v5
       - name: Resume previous link corpus
@@ -214,6 +241,15 @@ jobs:
           - target: fuzz_exec_deps_parse_elf
             fuzz_dir: crates/maos-exec-deps/fuzz
             rss_flag: ''
+          - target: cap_token_verify
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i11_digest_chain
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i8_consent_intent
+            fuzz_dir: crates/maos-a2a-core/fuzz
+            rss_flag: ''
     steps:
       - uses: actions/checkout@v5
       - name: Resume previous link corpus
@@ -276,6 +312,15 @@ jobs:
             rss_flag: '-rss_limit_mb=0'
           - target: fuzz_exec_deps_parse_elf
             fuzz_dir: crates/maos-exec-deps/fuzz
+            rss_flag: ''
+          - target: cap_token_verify
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i11_digest_chain
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i8_consent_intent
+            fuzz_dir: crates/maos-a2a-core/fuzz
             rss_flag: ''
     steps:
       - uses: actions/checkout@v5

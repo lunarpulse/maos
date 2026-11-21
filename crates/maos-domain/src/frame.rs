@@ -21,6 +21,22 @@ use crate::invariants::i3::FrameOrigin;
 use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
 use smallvec::SmallVec;
 
+impl IacFrame {
+    /// The kernel's stamp on a Spirit-sent frame: the Spirit cannot choose its frame's origin
+    /// (I3, always `SpiritAuto`), sender, intent class, lineage or consent envelope.
+    pub fn stamp_as_spirit(&mut self, spirit_id: &str, lineage: &IntentLineage) {
+        self.from = FrameAddress {
+            spirit_id: SpiritId::from(spirit_id),
+            host_id: None,
+            role: None,
+        };
+        self.intent = IntentClass::Standard;
+        self.auto_marker = FrameOrigin::SpiritAuto;
+        self.intent_lineage = lineage.clone();
+        self.consent_envelope = None;
+    }
+}
+
 /// The universal IAC frame envelope per architecture §7.1.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct IacFrame {

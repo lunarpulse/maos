@@ -2600,9 +2600,20 @@ impl TransparencyLogAdapter {
     /// schema. The independence is verified by the
     /// `approval_log_is_distinct_table` unit test.
     ///
-    /// At v0.1-β the Approval Manager does not yet emit approval-decision
-    /// events; the runtime body ships in Story 1b.3.
+    /// Every producer writes through here, so a row missing its actor, target,
+    /// capability or intent is refused rather than journaled (I4).
     pub fn insert_approval_decision(&self, decision: ApprovalDecision) -> Result<(), AuditError> {
+        let fields = [
+            &decision.actor,
+            &decision.target,
+            &decision.capability,
+            &decision.intent,
+        ];
+        if fields.iter().any(|f| f.trim().is_empty()) {
+            return Err(AuditError::Serialization(
+                "approval row missing actor, target, capability or intent".into(),
+            ));
+        }
         let inner = self.inner.lock();
         let timestamp_ns = wall_clock_now_ns();
         inner

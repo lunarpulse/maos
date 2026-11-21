@@ -1,0 +1,5 @@
+{"crossings":[{"intent":"code-mutation-directive","sender_allows":true,"receiver_accepts":false,"delivered":true}]}
+{"crossings":[{"intent":"code-mutation-directive","sender_allows":false,"receiver_accepts":true,"delivered":true}]}
+{"crossings":[{"intent":null,"sender_allows":true,"receiver_accepts":true,"delivered":true}]}
+{"crossings":[{"intent":"Not Canonical","sender_allows":true,"receiver_accepts":true,"delivered":true}]}
+{"crossings":[{"intent":"readonly","sender_allows":false,"receiver_accepts":false,"delivered":true}]}

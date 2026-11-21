@@ -1,0 +1,4 @@
+{"decisions":[{"declared":["frame-aaa","frame-bbb"],"refs":["frame-aaa"]}]}
+{"decisions":[{"declared":["frame-aaa"],"refs":[]}]}
+{"decisions":[{"declared":["digest-1","raw-inbound-9"],"refs":["digest-1"]}]}
+{"decisions":[{"declared":["frame-aaa"],"refs":["frame-zzz"]}]}

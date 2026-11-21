@@ -18,24 +18,10 @@ use maos_kernel_core::iac::decision_logger::{
     decorate_decision_frame, frame_carries_i12_refs, memory_backed_digest_provider,
     WORKING_MEMORY_DIGEST_KEY_PREFIX,
 };
-use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
-use maos_kernel_core::memory::{
-    MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
-};
+mod common;
+use common::memory::make_memory;
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
 use smallvec::smallvec;
-
-fn make_memory() -> (Arc<MemoryManagerAdapter>, tempfile::TempDir) {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let memory_root = tmp.path().join("memory");
-    let db_path = tmp.path().join("audit.db");
-    let private = Arc::new(PrivateMemoryStore::new(memory_root, 4 * 1024));
-    let shared = Arc::new(SharedMemoryStore::open(&db_path).unwrap());
-    let principal = Arc::new(PrincipalNamespaceIndex::open(&db_path).unwrap());
-    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xD1235));
-    let adapter = Arc::new(MemoryManagerAdapter::new(private, shared, principal, tl));
-    (adapter, tmp)
-}
 
 fn decision_frame(spirit: &str) -> IacFrame {
     IacFrame {

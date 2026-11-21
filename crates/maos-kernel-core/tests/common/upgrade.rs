@@ -46,6 +46,9 @@ pub struct UpgradeHarness {
     /// and its policy table, so a witness can mint at a pid and read back.
     pub capability: Arc<CapabilityRegistryAdapter>,
     pub policy: Arc<PolicyTable>,
+    /// The halt registry and IAC bus the scheduler and hot swap share (I6/I14 ledger proofs).
+    pub halt_registry: Arc<maos_kernel_core::halt::HaltRegistry>,
+    pub iac: Arc<IacBusAdapter>,
     _tmp: tempfile::TempDir,
 }
 
@@ -108,9 +111,9 @@ impl UpgradeHarness {
             scheduler.scbs(),
             Arc::clone(&journal),
             Arc::clone(&transparency_log),
-            halt_registry,
+            Arc::clone(&halt_registry),
             Arc::clone(&capability),
-            iac,
+            Arc::clone(&iac),
             dispatcher,
             Arc::clone(&telemetry),
             tmp.path().join("archives"),
@@ -130,6 +133,8 @@ impl UpgradeHarness {
             transparency_log,
             capability,
             policy,
+            halt_registry,
+            iac,
             _tmp: tmp,
         }
     }

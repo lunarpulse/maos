@@ -1,0 +1,4 @@
+{"digests":[{"source_intents":["consult"],"lineage":["consult","delegate"],"consumer_allowed":["consult","delegate"],"admitted":true}]}
+{"digests":[{"source_intents":["consult","delegate"],"lineage":["consult"],"consumer_allowed":["consult"],"admitted":true}]}
+{"digests":[{"source_intents":["delegate"],"lineage":["delegate"],"consumer_allowed":["consult"],"admitted":true}]}
+{"digests":[{"source_intents":[],"lineage":["consult"],"consumer_allowed":["consult"],"admitted":false}]}

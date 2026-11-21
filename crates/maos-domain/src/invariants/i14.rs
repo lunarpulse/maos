@@ -36,6 +36,54 @@ pub enum HaltContinuityCheck {
     MigratedSchemaCompatibleVN(u32),
 }
 
+/// One swap attempted while the predecessor held pending halts.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Swap {
+    pub halts_before: u32,
+    pub halts_after: u32,
+    pub resolution_state_kept: bool,
+    pub receipted_drains: u32,
+    pub accepted: bool,
+    pub predecessor_version: u32,
+    pub successor_version: Option<u32>,
+}
+
+/// I14 observation: the swaps attempted against Spirits with pending halts.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub swaps: Vec<Swap>,
+}
+
+/// I14 predicate: with a non-empty halt set, an accepted swap needs a successor declaring the
+/// predecessor's halt-protocol version and either carries every halt with its resolution state
+/// or drains every halt with a receipt; a refused swap leaves every halt intact.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    for s in obs.swaps.iter().filter(|s| s.halts_before > 0) {
+        let carried = s.halts_after == s.halts_before && s.resolution_state_kept;
+        let drained = s.halts_after == 0 && s.receipted_drains == s.halts_before;
+        if s.accepted {
+            ensure(
+                s.successor_version == Some(s.predecessor_version),
+                "I14",
+                "successor declares no matching halt-protocol compatibility",
+            )?;
+            ensure(
+                carried || drained,
+                "I14",
+                "swap neither carried nor drained every halt",
+            )?;
+        } else {
+            ensure(
+                carried,
+                "I14",
+                "refused swap altered the predecessor's halts",
+            )?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
