@@ -1,0 +1,74 @@
+[
+  {
+    "id": "direct-assigned",
+    "input": {"excerpt": "Vendor: Example Gears. The buyer issued purchase order PO-731 for this invoice."},
+    "expect": {"outcome": "ready_for_approval", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "documented"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": true, "quote": "The buyer issued purchase order PO-731 for this invoice."}}]
+  },
+  {
+    "id": "direct-missing",
+    "input": {"excerpt": "Due date: 14 May. Procurement confirms that no purchase order was issued for this invoice."},
+    "expect": {"outcome": "hold_for_procurement", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "missing_order"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": false, "quote": "Procurement confirms that no purchase order was issued for this invoice."}}]
+  },
+  {
+    "id": "abbreviation-assigned",
+    "input": {"excerpt": "Bill to: Sample Fabrication. Buyer PO: 6F-83 (issued for this invoice)."},
+    "expect": {"outcome": "ready_for_approval", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "documented"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": true, "quote": "Buyer PO: 6F-83 (issued for this invoice)."}}]
+  },
+  {
+    "id": "abbreviation-unassigned",
+    "input": {"excerpt": "PO field: N/A (not issued). Vendor sales order: SO-626."},
+    "expect": {"outcome": "hold_for_procurement", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "missing_order"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": false, "quote": "PO field: N/A (not issued)."}}]
+  },
+  {
+    "id": "scope-separate-invoice",
+    "input": {"excerpt": "PO-604 covers the February invoice only; no purchase order is attached to this March invoice. Terms: net 30."},
+    "expect": {"outcome": "hold_for_procurement", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "missing_order"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": false, "quote": "PO-604 covers the February invoice only; no purchase order is attached to this March invoice."}}]
+  },
+  {
+    "id": "scope-present-despite-distractor",
+    "input": {"excerpt": "No PO was issued for a separate service call. This invoice is covered by buyer purchase order PO-822. Tax: zero."},
+    "expect": {"outcome": "ready_for_approval", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "documented"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": true, "quote": "This invoice is covered by buyer purchase order PO-822."}}]
+  },
+  {
+    "id": "status-void-and-replaced",
+    "input": {"excerpt": "Reference: sample delivery. The cancelled PO-710 was replaced by issued PO-711 for this invoice."},
+    "expect": {"outcome": "ready_for_approval", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "documented"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": true, "quote": "The cancelled PO-710 was replaced by issued PO-711 for this invoice."}}]
+  },
+  {
+    "id": "status-void-without-replacement",
+    "input": {"excerpt": "Amount: 240. PO-756 was voided and has no replacement for this invoice."},
+    "expect": {"outcome": "hold_for_procurement", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "missing_order"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": false, "quote": "PO-756 was voided and has no replacement for this invoice."}}]
+  },
+  {
+    "id": "status-issued-not-received",
+    "input": {"excerpt": "The buyer issued PO-914 for this invoice. The shipment has not arrived."},
+    "expect": {"outcome": "ready_for_approval", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "documented"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": true, "quote": "The buyer issued PO-914 for this invoice."}}]
+  },
+  {
+    "id": "status-draft-only",
+    "input": {"excerpt": "Draft purchase order PO-908 is awaiting authorization and has not been issued. Invoice currency: USD."},
+    "expect": {"outcome": "hold_for_procurement", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "missing_order"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": false, "quote": "Draft purchase order PO-908 is awaiting authorization and has not been issued."}}]
+  },
+  {
+    "id": "field-multiline-reference",
+    "input": {"excerpt": "Invoice: DEMO-812\nIssued buyer purchase order: P-44-A\nDelivery note: P-44-B"},
+    "expect": {"outcome": "ready_for_approval", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "documented"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": true, "quote": "Issued buyer purchase order: P-44-A"}}]
+  },
+  {
+    "id": "field-confusable-reference",
+    "input": {"excerpt": "Reference 'PO-404' is the vendor's packing code, not a buyer purchase order. No buyer PO was provided for this invoice."},
+    "expect": {"outcome": "hold_for_procurement", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "missing_order"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": false, "quote": "No buyer PO was provided for this invoice."}}]
+  }
+]
