@@ -4284,6 +4284,52 @@ impl SwapInvariantsSection {
     }
 }
 
+/// Story 21-7 (D-21-7-01 A) — `[consent.recall]`: the recall restriction a sending Spirit grants
+/// each LOCAL recipient spirit id. A technical delivery/recall control, not legal consent.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ConsentSection {
+    pub recall: std::collections::BTreeMap<String, maos_domain::frame::ConsentRecall>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawConsentSection {
+    recall: std::collections::BTreeMap<String, String>,
+}
+
+impl ConsentSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        use maos_domain::frame::ConsentRecall;
+        let raw: RawConsentSection = parse_raw(s)?;
+        let refuse = |msg: String| ManifestError::Toml(validation_msg("consent.recall", &msg));
+        if raw.recall.is_empty() || raw.recall.len() > 32 {
+            return Err(refuse(format!(
+                "needs 1..=32 entries, got {}",
+                raw.recall.len()
+            )));
+        }
+        let mut recall = std::collections::BTreeMap::new();
+        for (id, policy) in raw.recall {
+            let excerpt: String = id.chars().take(64).collect();
+            let valid_id = (1..=128).contains(&id.len())
+                && id
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+            if !valid_id {
+                return Err(refuse(format!("invalid spirit id {excerpt:?}")));
+            }
+            let policy = match policy.as_str() {
+                "full" => ConsentRecall::Full,
+                "header_only" => ConsentRecall::HeaderOnly,
+                "withheld" => ConsentRecall::Withheld,
+                _ => return Err(refuse(format!("unknown recall policy for {excerpt:?}"))),
+            };
+            recall.insert(id, policy);
+        }
+        Ok(Self { recall })
+    }
+}
+
 #[cfg(test)]
 mod hot_swap_manifest_tests {
     use super::*;

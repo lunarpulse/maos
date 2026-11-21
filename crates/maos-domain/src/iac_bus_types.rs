@@ -21,6 +21,10 @@ pub enum IacBusError {
     PromotionDistillateStorage(String),
     #[error("spirit {0} is not registered — call register_spirit first")]
     UnknownSpirit(String),
+    /// Story 21-7 (D-21-7-04 C) — the unbound port journals at pid 0 and carries only the
+    /// kernel's frames; a Spirit's frame is never attributed to the root.
+    #[error("sender {0} cannot send through the unbound IAC port")]
+    UnattributedSender(String),
     #[error(
         "epistemic halt queue overflow for spirit {0} — kernel MUST raise watchdog (Story 3.3)"
     )]

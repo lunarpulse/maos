@@ -862,6 +862,17 @@ pub fn spawned_successor(
             "swap_capability_widened: the successor declares {scope:?}, which this pid was not admitted for"
         ));
     }
+    // Story 21-7: a swap keeps or narrows consent; the successor's declaration replaces the
+    // predecessor's only at the committed handover.
+    let policy = Arc::clone(
+        (handles.session)(Arc::clone(&supervisor))
+            .iac
+            .consent_policy(),
+    );
+    let grants = gated.consent.as_ref().map(|c| c.recall.clone());
+    if let Some(change) = policy.widened_by(&class.name, grants.as_ref()) {
+        return Err(format!("swap_consent_widened: the successor {change}"));
+    }
     let launch_origin = origin.unwrap_or_else(|| {
         path.parent()
             .map_or_else(|| ".".into(), std::path::Path::to_path_buf)
@@ -912,8 +923,12 @@ pub fn spawned_successor(
         sandbox: context.sandbox,
         origin: launch_origin,
     });
+    let (name, pid) = (class.name.clone(), target.spirit_pid());
     core.lifecycle()
         .attach_successor(prewarm, target.lifecycle(), move |committed| {
+            if committed {
+                policy.register(&name, pid, grants);
+            }
             let outcome = if committed { "admitted" } else { "refused" };
             emit_manifest_declaration_outcome(&tl, &attempt, outcome);
         });

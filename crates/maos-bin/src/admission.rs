@@ -564,6 +564,8 @@ pub struct GatedManifest {
     pub explanation_shape: Option<maos_manifest::ExplanationShapeSection>,
     pub intent_promotion_set: Option<maos_manifest::IntentPromotionSetSection>,
     pub swap_invariants: Option<maos_manifest::SwapInvariantsSection>,
+    /// Story 21-7 — the `[consent.recall]` grants this Spirit declares to local recipients.
+    pub consent: Option<maos_manifest::ConsentSection>,
     pub publisher: Option<[u8; 32]>,
     /// The raw text, kept for the model-provenance gate, which parses its own
     /// section out of the whole document, and for the FR11 archive record.
@@ -702,6 +704,22 @@ fn declared_swap_invariants(text: &str) -> Option<Vec<String>> {
 /// `successor` does not declare (the cold swap's restore source is that text).
 pub fn dropped_swap_invariant(predecessor: &str, successor: &str) -> Option<String> {
     first_unkept_swap_invariant(&declared_swap_invariants(predecessor)?, successor)
+}
+
+/// Story 21-7 — what the successor's `[consent.recall]` widens over the retained predecessor's
+/// (`None`: nothing, or a text the admission gate will refuse itself).
+pub fn widened_consent(predecessor: &str, successor: &str) -> Option<String> {
+    let declared = |text: &str| {
+        let root: toml::Value = toml::from_str(text).ok()?;
+        let parse = maos_manifest::ConsentSection::from_toml_str;
+        Some(
+            optional_section(&root, "consent", parse)
+                .ok()?
+                .map(|c| c.recall),
+        )
+    };
+    let (old, new) = (declared(predecessor)?, declared(successor)?);
+    maos_iac::adapter::ConsentPolicy::widening(old.as_ref(), new.as_ref())
 }
 
 /// The first of `preserve` — a predecessor's LIVE declaration, the one the kernel's swap
@@ -923,6 +941,11 @@ pub fn gate_manifest(
         }
         (None, None, None, None)
     };
+    let consent = optional_section(
+        &root,
+        "consent",
+        maos_manifest::ConsentSection::from_toml_str,
+    )?;
     // Story 20-9 — the array-of-tables, wrapped as the kernel's successor parser wraps it
     // (`lifecycle/upgrade.rs`), so an admitted Spirit's schedule fires, not only a swapped one's.
     let schedules = match root.get("schedule") {
@@ -969,6 +992,7 @@ pub fn gate_manifest(
         explanation_shape,
         intent_promotion_set,
         swap_invariants,
+        consent,
         publisher: None,
         manifest_toml: manifest_toml.to_owned(),
     })
@@ -1543,6 +1567,10 @@ async fn admit_inner(
                 .as_ref()
                 .map(|s| s.to_allowed_set()),
         );
+        // Story 21-7 — the incarnation's own declaration, bound to its pid (a swap successor
+        // replaces its predecessor's); withdrawn with the promotion set at every removal site.
+        let grants = gated.consent.as_ref().map(|c| c.recall.clone());
+        iac.consent_policy().register(&spirit_id, pid, grants);
     }
 
     // Story 17-4 / 20-9 — register only after the granted admission and before `start`. A
@@ -1575,7 +1603,7 @@ async fn admit_inner(
                 // teardown after a panicked hook. A lost race can only lose
                 // crash classification, never corrupt scheduler state.
                 if let Some(iac) = deps.iac {
-                    iac.unregister_promotion_set(&spirit_id);
+                    iac.withdraw_spirit(&spirit_id, pid);
                 }
                 remove_pid_by_spirit_id(deps, &spirit_id);
             } else {
@@ -1626,7 +1654,7 @@ async fn rollback(deps: &AdmissionDeps<'_>, pid: u32, spirit_id: &str) {
         );
     }
     if let Some(iac) = deps.iac {
-        iac.unregister_promotion_set(spirit_id);
+        iac.withdraw_spirit(spirit_id, pid);
     }
     remove_pid_by_spirit_id(deps, spirit_id);
 }
@@ -1643,7 +1671,7 @@ pub(crate) async fn unwind_admitted(deps: &AdmissionDeps<'_>, pid: u32, spirit_i
         rollback(deps, pid, spirit_id).await;
     } else {
         if let Some(iac) = deps.iac {
-            iac.unregister_promotion_set(spirit_id);
+            iac.withdraw_spirit(spirit_id, pid);
         }
         remove_pid_by_spirit_id(deps, spirit_id);
     }

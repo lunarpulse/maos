@@ -3107,6 +3107,33 @@ impl TransparencyLogAdapter {
         }))
     }
 
+    /// Story 21-7 (D-21-7-03 A) — the local incarnations recorded as having received `frame_id`
+    /// (the routed writer's side table), by pid. Empty for a frame nobody local received.
+    pub fn recorded_recipients(
+        &self,
+        frame_id: [u8; 16],
+    ) -> Result<Vec<FrameRecipient>, AuditError> {
+        let inner = self.inner.lock();
+        let mut stmt = inner
+            .conn
+            .prepare(
+                "SELECT recipient_pid, recipient_spirit_id FROM transparency_log_recipients
+                 WHERE frame_id = ?1 ORDER BY recipient_pid",
+            )
+            .map_err(AuditError::SqliteRead)?;
+        let rows = stmt
+            .query_map(rusqlite::params![&frame_id[..]], |row| {
+                Ok(FrameRecipient {
+                    pid: row.get::<_, i64>(0)? as u32,
+                    spirit_id: row.get(1)?,
+                    role: None,
+                })
+            })
+            .map_err(AuditError::SqliteRead)?;
+        let recorded: Result<Vec<_>, _> = rows.collect();
+        recorded.map_err(AuditError::SqliteRead)
+    }
+
     /// Get a reference to the mailbox stub (for testing).
     pub fn mailbox(&self) -> &MailboxStub {
         &self.mailbox

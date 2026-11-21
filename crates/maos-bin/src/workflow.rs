@@ -884,7 +884,7 @@ tier = "T0"
                 }
             }
             if let Some(iac) = self.deps.iac {
-                iac.unregister_promotion_set(&binding.spirit_id);
+                iac.withdraw_spirit(&binding.spirit_id, binding.pid);
             }
             self.deps
                 .pid_by_spirit_id

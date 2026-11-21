@@ -12,6 +12,7 @@
 //! stub.
 
 pub mod channels;
+pub mod consent_policy; // Story 21-7 production consent granter + gate policy
 pub mod context_signal; // Story 18-5 ADR-016 context-budget reporter
 pub mod decision_logger;
 pub mod distillate;
@@ -29,6 +30,7 @@ pub mod transparency_log; // NEW — Story 4.4 DistillateWriter
 pub use maos_domain::ports::IacBusPort;
 
 pub use channels::*;
+pub use consent_policy::ConsentPolicy;
 pub use drr_scheduler::{BudgetWarningEvent, DrrScheduler};
 pub use frame::*;
 pub use mailbox::Mailbox;
@@ -73,6 +75,7 @@ pub struct IacBusAdapter {
         std::sync::Arc<dashmap::DashMap<[u8; 16], maos_domain::invariants::i13::IntentLineage>>,
     promotion_sets:
         std::sync::Arc<dashmap::DashMap<String, maos_domain::invariants::i13::AllowedPromotionSet>>,
+    consent_policy: std::sync::Arc<ConsentPolicy>,
     promotion_audit_last: std::sync::Arc<std::sync::Mutex<Option<std::time::Instant>>>,
     /// Story 9.5b — optional OTel trace sink for IAC-frame span emission.
     /// `None` = off (no-op branch; zero allocation). Wired from
@@ -108,6 +111,7 @@ impl IacBusAdapter {
             }),
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
             promotion_sets: std::sync::Arc::new(dashmap::DashMap::new()),
+            consent_policy: std::sync::Arc::default(),
             promotion_audit_last: std::sync::Arc::new(std::sync::Mutex::new(None)),
             trace_sink: None,
             #[cfg(feature = "spirit_test")]
@@ -216,9 +220,22 @@ impl IacBusAdapter {
         }
     }
 
-    /// Withdraw a recipient's set when it is unloaded.
+    /// Withdraw a recipient's promotion set when it is unloaded.
     pub fn unregister_promotion_set(&self, spirit_id: &str) {
         self.promotion_sets.remove(spirit_id);
+    }
+
+    /// Withdraw everything admission registered for incarnation `pid` of `spirit_id`: its
+    /// promotion set and its consent declaration (the latter only while still `pid`'s).
+    pub fn withdraw_spirit(&self, spirit_id: &str, pid: u32) {
+        self.promotion_sets.remove(spirit_id);
+        self.consent_policy.unregister(spirit_id, pid);
+    }
+
+    /// Story 21-7 — the one production consent policy (granter and gate), over this bus's
+    /// admitted Spirits' declarations.
+    pub fn consent_policy(&self) -> &std::sync::Arc<ConsentPolicy> {
+        &self.consent_policy
     }
 
     fn check_promotion(
@@ -781,7 +798,16 @@ impl IacBusAdapter {
                 },
             );
         }
-        if original_sender != retracting_spirit.as_str() {
+        // Story 21-7 — within this boot the authenticated sender must still be the incarnation
+        // that sent the frame, and only a same-boot audience is notified (pids restart per boot;
+        // the window between the resolver reads here and the enqueue is closed by the mailbox's
+        // per-destination incarnation recheck).
+        let same_boot = original_entry.boot_nonce == self.transparency_log.boot_nonce();
+        let resolver = self.transparency_log.recipient_resolver();
+        let live = |id: &str| resolver.map(|r| r.resolve(&[id])[0]);
+        let retired = same_boot
+            && live(original_sender).is_some_and(|pid| pid != Some(original_entry.spirit_pid));
+        if original_sender != retracting_spirit.as_str() || retired {
             return Err(
                 maos_domain::iac_bus_types::IacBusError::RetractAuthorityViolation {
                     caller: retracting_spirit.as_str().to_string(),
@@ -868,13 +894,33 @@ impl IacBusAdapter {
                     });
                     v.into()
                 } else {
-                    let mut v = Vec::new();
-                    v.push(maos_domain::frame::FrameAddress {
-                        spirit_id: maos_spirit_abi::identity::SpiritId::from(recipient_id.as_str()),
-                        host_id: None,
-                        role: None,
-                    });
-                    v.into()
+                    // Story 21-7 (D-21-7-03 A) — every recorded recipient that is still the
+                    // admitted incarnation; remote and gate-rejected addressees never received it.
+                    let recorded = self
+                        .transparency_log
+                        .recorded_recipients(original_frame_id)
+                        .map_err(|e| {
+                            maos_domain::iac_bus_types::IacBusError::SerializationFailed(
+                                e.to_string(),
+                            )
+                        })?;
+                    let ids: Vec<&str> = recorded.iter().map(|r| r.spirit_id.as_str()).collect();
+                    let live = self
+                        .transparency_log
+                        .recipient_resolver()
+                        .map_or_else(Vec::new, |resolver| resolver.resolve(&ids));
+                    recorded
+                        .iter()
+                        .zip(live)
+                        .filter(|(recipient, pid)| same_boot && *pid == Some(recipient.pid))
+                        .map(|(recipient, _)| maos_domain::frame::FrameAddress {
+                            spirit_id: maos_spirit_abi::identity::SpiritId::from(
+                                recipient.spirit_id.as_str(),
+                            ),
+                            host_id: None,
+                            role: None,
+                        })
+                        .collect()
                 }
             },
             kind: maos_spirit_abi::identity::FrameKind::Retract,
@@ -962,6 +1008,7 @@ impl Default for IacBusAdapter {
             }),
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
             promotion_sets: std::sync::Arc::new(dashmap::DashMap::new()),
+            consent_policy: std::sync::Arc::default(),
             promotion_audit_last: std::sync::Arc::new(std::sync::Mutex::new(None)),
             trace_sink: None,
             #[cfg(feature = "spirit_test")]
