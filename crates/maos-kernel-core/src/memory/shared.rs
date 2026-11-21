@@ -11,7 +11,10 @@
 use std::path::Path;
 use std::sync::Mutex;
 
-use maos_domain::memory::{MemoryEntry, MemoryError, MemoryNamespace, MemoryValue, ValueKind};
+use super::{self as quota, TierLimit, Usage};
+use maos_domain::memory::{
+    MemoryEntry, MemoryError, MemoryNamespace, MemoryTier, MemoryValue, ValueKind,
+};
 use rusqlite::{params, Connection};
 
 const CREATE_TABLE_SQL: &str = "
@@ -22,17 +25,26 @@ CREATE TABLE IF NOT EXISTS shared_memory (
     value BLOB NOT NULL,
     kind TEXT NOT NULL,
     timestamp_ns INTEGER NOT NULL,
-    PRIMARY KEY (writer_spirit_pid, namespace, key)
+    writer_owner TEXT
 );
 CREATE INDEX IF NOT EXISTS shared_memory_namespace_idx ON shared_memory(namespace);
 ";
 
+/// Uniqueness follows the writer identity, not the boot-local pid: an owned row
+/// is keyed by its stable owner, an ownerless legacy row by its pid. Created
+/// after the owner-column and pid-key migrations in `open`.
+const IDENTITY_INDEX_SQL: &str = "
+CREATE UNIQUE INDEX IF NOT EXISTS shared_memory_identity_uidx
+    ON shared_memory(COALESCE(writer_owner, 'pid:' || writer_spirit_pid), namespace, key);
+";
+
 /// Host-wide SQLite-backed shared memory store.
 #[maos_attrs::i9_exempt(
-    reason = "memory manager shared tier — Host-wide SQLite-backed kv with namespace prefix per writer for cross-Spirit coordination; bounded by Spirit lifetime + namespace ownership; kernel writer_spirit_pid is kernel-set, not Spirit-supplied"
+    reason = "memory manager shared tier — Host-wide SQLite-backed kv with namespace prefix per writer for cross-Spirit coordination; bounded by the per-identity tier quota (bytes + entries, refused with MemoryError::QuotaExceeded; FR28) + namespace ownership; kernel writer_spirit_pid is kernel-set, not Spirit-supplied"
 )]
 pub struct SharedMemoryStore {
     conn: Mutex<Connection>,
+    limit: TierLimit,
 }
 
 impl SharedMemoryStore {
@@ -44,9 +56,38 @@ impl SharedMemoryStore {
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
         conn.execute_batch(CREATE_TABLE_SQL)
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        // Every pre-21.6 table keys rows by (pid, namespace, key), so a different
+        // Spirit reusing a pid would overwrite the row: rebuild without that key
+        // (the rows stay readable, ownerless and uncharged, and gain the owner column).
+        let pid_keyed: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM pragma_table_info('shared_memory') WHERE pk != 0)",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        if pid_keyed {
+            conn.execute_batch(&format!(
+                "BEGIN; ALTER TABLE shared_memory RENAME TO shared_memory_pid_keyed;
+                 DROP INDEX IF EXISTS shared_memory_namespace_idx; {CREATE_TABLE_SQL}
+                 INSERT INTO shared_memory SELECT writer_spirit_pid, namespace, key, value, kind,
+                        timestamp_ns, NULL FROM shared_memory_pid_keyed;
+                 DROP TABLE shared_memory_pid_keyed; COMMIT;"
+            ))
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        }
+        conn.execute_batch(IDENTITY_INDEX_SQL)
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
         Ok(Self {
             conn: Mutex::new(conn),
+            limit: quota::DEFAULT_SHARED_LIMIT,
         })
+    }
+
+    /// Apply the operator-resolved per-identity quota (FR28).
+    pub fn with_quota(mut self, limit: TierLimit) -> Self {
+        self.limit = limit;
+        self
     }
 
     fn kind_to_str(kind: ValueKind) -> &'static str {
@@ -118,23 +159,40 @@ impl SharedMemoryStore {
     // public API
     // ------------------------------------------------------------------
 
-    /// Write a value for the given writer spirit.  The `writer_spirit_pid`
-    /// is kernel-set from the calling context.
+    /// Write a value for the given writer spirit.  `writer_spirit_pid` is
+    /// kernel-set from the calling context; `writer_owner` is its stable
+    /// storage identity, which owns the row and the quota charge. A write
+    /// replaces that owner's row for `(namespace, key)` whatever pid wrote it.
+    /// `enforce = false` charges without refusing (kernel-authored writes).
     pub(in crate::memory) fn write(
         &self,
         writer_spirit_pid: u32,
+        writer_owner: &str,
         namespace: &MemoryNamespace,
         key: &str,
         value: MemoryValue,
+        enforce: bool,
     ) -> Result<(), MemoryError> {
         let (bytes, kind_str) = Self::value_bytes(&value)?;
         let ns_str = Self::ns_to_str(namespace)?;
         let ts = Self::now_ns();
+        let db = |e: rusqlite::Error| MemoryError::Storage(e.to_string());
 
+        // The check, the replace and the insert share one transaction under
+        // the connection mutex, so concurrent writers cannot both pass.
         let conn = self.conn.lock().expect("SharedMemoryStore lock poisoned");
-        conn.execute(
-            "INSERT OR REPLACE INTO shared_memory (writer_spirit_pid, namespace, key, value, kind, timestamp_ns)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        let tx = conn.unchecked_transaction().map_err(db)?;
+        if enforce {
+            let (used, old) = Self::usage(&tx, writer_owner, &ns_str, key)?;
+            let new_len = quota::entry_len(key, bytes.len() as u64);
+            quota::check(MemoryTier::Shared, self.limit, used, old, new_len)?;
+        }
+        // `INSERT OR REPLACE` replaces on the identity index: the same owner's row
+        // for (namespace, key) whatever pid wrote it, never another owner's.
+        tx.execute(
+            "INSERT OR REPLACE INTO shared_memory
+                (writer_spirit_pid, namespace, key, value, kind, timestamp_ns, writer_owner)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 writer_spirit_pid as i64,
                 ns_str,
@@ -142,10 +200,54 @@ impl SharedMemoryStore {
                 bytes,
                 kind_str,
                 ts as i64,
+                writer_owner,
             ],
         )
-        .map_err(|e| MemoryError::Storage(e.to_string()))?;
-        Ok(())
+        .map_err(db)?;
+        tx.commit().map_err(db)
+    }
+
+    /// One owner's charge and the existing charge of `(namespace, key)`, summed
+    /// from its rows: no ledger, so restarts and failed writes cannot drift.
+    fn usage(
+        conn: &Connection,
+        owner: &str,
+        ns: &str,
+        key: &str,
+    ) -> Result<(Usage, Option<u64>), MemoryError> {
+        conn.query_row(
+            "SELECT COALESCE(SUM(len), 0), COUNT(*),
+                    SUM(CASE WHEN namespace = ?2 AND key = ?3 THEN len END)
+             FROM (SELECT namespace, key, length(CAST(key AS BLOB)) + length(value) AS len
+                   FROM shared_memory WHERE writer_owner = ?1)",
+            params![owner, ns, key],
+            |row| {
+                let used = Usage {
+                    bytes: row.get(0)?,
+                    entries: row.get(1)?,
+                };
+                Ok((used, row.get(2)?))
+            },
+        )
+        .map_err(|e| MemoryError::Storage(e.to_string()))
+    }
+
+    /// Delete the caller's own row for `(namespace, key)`; other writers' and
+    /// legacy ownerless rows are untouched. Returns whether a row existed.
+    pub(in crate::memory) fn delete(
+        &self,
+        writer_owner: &str,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<bool, MemoryError> {
+        let ns_str = Self::ns_to_str(namespace)?;
+        let conn = self.conn.lock().expect("SharedMemoryStore lock poisoned");
+        conn.execute(
+            "DELETE FROM shared_memory WHERE writer_owner = ?1 AND namespace = ?2 AND key = ?3",
+            params![writer_owner, ns_str, key],
+        )
+        .map(|rows| rows > 0)
+        .map_err(|e| MemoryError::Storage(e.to_string()))
     }
 
     /// Read a value from the shared store.  Queries by `(namespace, key)`
@@ -258,13 +360,17 @@ mod tests {
         (store, tmp)
     }
 
+    fn put(store: &SharedMemoryStore, pid: u32, ns: &MemoryNamespace, key: &str, v: MemoryValue) {
+        store
+            .write(pid, &pid.to_string(), ns, key, v, true)
+            .unwrap();
+    }
+
     #[test]
     fn write_and_read_same_writer() {
         let (store, _tmp) = make_store();
         let val = MemoryValue::Text("shared data".into());
-        store
-            .write(1, &MemoryNamespace::Coordination, "k1", val.clone())
-            .unwrap();
+        put(&store, 1, &MemoryNamespace::Coordination, "k1", val.clone());
         let got = store.read(1, &MemoryNamespace::Coordination, "k1").unwrap();
         assert_eq!(got, Some(val));
     }
@@ -273,14 +379,13 @@ mod tests {
     fn cross_writer_read() {
         let (store, _tmp) = make_store();
         let val = MemoryValue::Text("spirit-a data".into());
-        store
-            .write(
-                10,
-                &MemoryNamespace::Coordination,
-                "shared-key",
-                val.clone(),
-            )
-            .unwrap();
+        put(
+            &store,
+            10,
+            &MemoryNamespace::Coordination,
+            "shared-key",
+            val.clone(),
+        );
         // Spirit-B reads the same key — shared-tier semantics.
         let got = store
             .read(20, &MemoryNamespace::Coordination, "shared-key")
@@ -291,22 +396,15 @@ mod tests {
     #[test]
     fn insert_or_replace_semantics() {
         let (store, _tmp) = make_store();
-        store
-            .write(
+        for text in ["first", "second"] {
+            put(
+                &store,
                 1,
                 &MemoryNamespace::Default,
                 "k",
-                MemoryValue::Text("first".into()),
-            )
-            .unwrap();
-        store
-            .write(
-                1,
-                &MemoryNamespace::Default,
-                "k",
-                MemoryValue::Text("second".into()),
-            )
-            .unwrap();
+                MemoryValue::Text(text.into()),
+            );
+        }
         let got = store.read(1, &MemoryNamespace::Default, "k").unwrap();
         assert_eq!(got, Some(MemoryValue::Text("second".into())));
     }
@@ -314,30 +412,15 @@ mod tests {
     #[test]
     fn scan_returns_deterministic_order() {
         let (store, _tmp) = make_store();
-        store
-            .write(
-                1,
+        for (pid, key, text) in [(1, "alpha", "a"), (0, "beta", "b"), (1, "gamma", "c")] {
+            put(
+                &store,
+                pid,
                 &MemoryNamespace::Coordination,
-                "alpha",
-                MemoryValue::Text("a".into()),
-            )
-            .unwrap();
-        store
-            .write(
-                0,
-                &MemoryNamespace::Coordination,
-                "beta",
-                MemoryValue::Text("b".into()),
-            )
-            .unwrap();
-        store
-            .write(
-                1,
-                &MemoryNamespace::Coordination,
-                "gamma",
-                MemoryValue::Text("c".into()),
-            )
-            .unwrap();
+                key,
+                MemoryValue::Text(text.into()),
+            );
+        }
         let results = store
             .scan(0, &MemoryNamespace::Coordination, "", 10)
             .unwrap();
@@ -350,9 +433,13 @@ mod tests {
     fn json_roundtrip_via_kind_column() {
         let (store, _tmp) = make_store();
         let val = MemoryValue::Json(serde_json::json!({"nested": [1, 2, 3]}));
-        store
-            .write(1, &MemoryNamespace::Default, "json-key", val.clone())
-            .unwrap();
+        put(
+            &store,
+            1,
+            &MemoryNamespace::Default,
+            "json-key",
+            val.clone(),
+        );
         let got = store
             .read(1, &MemoryNamespace::Default, "json-key")
             .unwrap();

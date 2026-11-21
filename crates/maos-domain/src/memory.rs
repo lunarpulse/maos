@@ -272,6 +272,15 @@ pub enum CollectiveErrorKind {
     /// Any other collective-tier failure (e.g. a forwarded `MemoryError`).
     Other,
 }
+/// The quota resource a refused write would have exhausted (FR28).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuotaResource {
+    /// Key bytes plus [`MemoryValue::approximate_len`].
+    Bytes,
+    /// Logical keys.
+    Entries,
+}
+
 /// Typed error taxonomy for Memory Manager operations.
 #[derive(Debug, thiserror::Error)]
 pub enum MemoryError {
@@ -305,6 +314,15 @@ pub enum MemoryError {
     ValueTooLarge { len: usize, max: usize },
     #[error("principal namespace write unauthorized: spirit_pid {spirit_pid} not authorized")]
     PrincipalWriteUnauthorized { spirit_pid: u32 },
+    /// FR28 — the write would take the Spirit past its per-tier quota.
+    #[error("{tier:?} tier memory quota exceeded: {resource:?} used {used} + requested {requested} > limit {limit}")]
+    QuotaExceeded {
+        tier: MemoryTier,
+        resource: QuotaResource,
+        used: u64,
+        requested: u64,
+        limit: u64,
+    },
 }
 
 // ---------------------------------------------------------------------------

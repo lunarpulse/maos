@@ -2127,14 +2127,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err(format!("memory-root create failed: {e}").into());
     }
 
-    let private_store = Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
-        memory_root,
-        4 * 1024,
-    ));
-    let shared_store = Arc::new(
-        maos_kernel_core::memory::shared::SharedMemoryStore::open(&memory_db_path)
-            .map_err(|e| format!("failed to open shared memory store: {e}"))?,
-    );
+    // FR28: both stores carry the operator-resolved quota.
+    let (private_store, shared_store) =
+        maos_kernel_core::memory::open_stores(memory_root, 4 * 1024, &memory_db_path)
+            .map_err(|e| format!("failed to open shared memory store: {e}"))?;
     let principal_index = Arc::new(
         maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&memory_db_path)
             .map_err(|e| format!("failed to open principal index: {e}"))?,

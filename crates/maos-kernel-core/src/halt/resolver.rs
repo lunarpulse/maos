@@ -24,7 +24,6 @@ use crate::memory::MemoryManagerAdapter;
 use maos_domain::halt::{HaltId, HaltResolver, HaltState, OutputMarker, Resolution, ResolveError};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
-use maos_domain::ports::MemoryManagerPort;
 use std::sync::{Arc, Mutex};
 
 /// Captures every `resolve` call for unit-test assertion. Story 3.3
@@ -170,13 +169,16 @@ impl HaltResolver for KernelHaltResolver {
                     .ok_or_else(|| ResolveError::UnknownHalt(halt_id.as_str().into()))?;
 
                 // 2. Write the supplied context to the Spirit's private tier.
+                //    Charged to the Spirit but never refused on quota grounds
+                //    (D-21-6-06): the Spirit's next growing write is refused.
                 self.memory
-                    .write(
+                    .write_inner(
                         pending.spirit_pid,
                         MemoryTier::Private,
                         &MemoryNamespace::Default,
                         &format!("halt_context::{}", halt_id.as_str()),
                         MemoryValue::Text(text.clone()),
+                        false, // charge, never refuse (D-21-6-06)
                     )
                     .map_err(|e| ResolveError::Internal(format!("memory.write failed: {e}")))?;
 
