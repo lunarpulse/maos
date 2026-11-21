@@ -1,0 +1,83 @@
+format = 1
+environment = "local-finance"
+
+[schemas."invoice@1".fields]
+number = "string"
+docs_complete = "bool"
+duplicate = "bool"
+
+[agents.invoice-intake]
+version = "1.0.0"
+input = "invoice@1"
+output = "invoice@1"
+[agents.invoice-intake.rule]
+kind = "emit"
+outcome = "ready"
+
+[agents.invoice-reviewer]
+version = "1.0.0"
+input = "invoice@1"
+output = "invoice@1"
+[agents.invoice-reviewer.rule]
+kind = "equals"
+field = "docs_complete"
+value = true
+matched = "complete"
+otherwise = "incomplete"
+
+[agents.duplicate-check]
+version = "1.0.0"
+input = "invoice@1"
+output = "invoice@1"
+[agents.duplicate-check.rule]
+kind = "equals"
+field = "duplicate"
+value = true
+matched = "suspect"
+otherwise = "clear"
+
+[schemas."book-return@1".fields]
+barcode = "string"
+condition = "string"
+
+[agents.return-inspector]
+version = "1.0.0"
+input = "book-return@1"
+output = "book-return@1"
+[agents.return-inspector.rule]
+kind = "equals"
+field = "condition"
+value = "intact"
+matched = "shelf_ready"
+otherwise = "needs_attention"
+
+[schemas."invoice-excerpt@1".fields]
+excerpt = "string"
+
+[schemas."invoice-finding@1".fields]
+purchase_order_present = "bool"
+quote = "string"
+
+[agents.invoice-evidence-extractor]
+version = "1.0.0"
+input = "invoice-excerpt@1"
+output = "invoice-finding@1"
+[agents.invoice-evidence-extractor.rule]
+kind = "infer"
+provider = "ollama"
+model = "llama3.1:8b"
+prompt = "Read the invoice excerpt. Return only JSON with outcome finding_ready and artifact fields purchase_order_present (boolean) and quote (exact supporting substring)."
+source_field = "excerpt"
+citation_field = "quote"
+outcome = "finding_ready"
+
+[agents.invoice-evidence-reviewer]
+version = "1.0.0"
+input = "invoice-finding@1"
+output = "invoice-finding@1"
+[agents.invoice-evidence-reviewer.rule]
+kind = "equals"
+field = "purchase_order_present"
+value = true
+matched = "documented"
+otherwise = "missing_order"
