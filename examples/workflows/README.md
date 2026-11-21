@@ -112,6 +112,60 @@ baseline that executes but misses a business label does not block an
 improved candidate. Comparison never changes the active revision and is not
 an approval; `apply` remains a separate step.
 
+### Run the holdout scoring control
+
+The [v1 holdout](invoice-evidence-holdout-v1.json) contains 12 synthetic
+excerpts not used in the pilot prompt: six with an issued buyer PO for this
+invoice and six without one. Cases cover unrelated references, voided or
+draft orders, and multiline fields. The label is about what the excerpt
+supports, not whether a PO exists in an external system. `quote` is graded by
+exact string equality: a different but valid supporting span can score as
+wrong. The set has no abstention label and is too small to establish a
+production quality floor.
+
+The [seed cassette](invoice-evidence-holdout-v1.cassette.json) has 12 pinned,
+synthetic completions written from the labels. Replay it twice in case
+order to check scoring and routing, **not** model quality. From the repo root:
+
+```sh
+(
+set -eu
+maos="${MAOS_BIN:-target/debug/maos}"
+examples="$PWD/examples/workflows"
+scratch=$(mktemp -d)
+trap 'rm -rf -- "$scratch"' EXIT
+export HOME="$scratch"
+export MAOS_HOME="$HOME/maos" MAOS_SECRETS_BACKEND=env
+export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+export XDG_STATE_HOME="$HOME/state" XDG_CACHE_HOME="$HOME/cache"
+mkdir "$MAOS_HOME"
+cp "$examples/catalog.toml" "$MAOS_HOME/workflow-catalog.toml"
+export MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1
+export MAOS_REPLAY_CASSETTE="$HOME/holdout.cassette.json"
+jq '.entries += .entries | .entries |= to_entries | .entries |= map(.value + {sequence: .key})' \
+  "$examples/invoice-evidence-holdout-v1.cassette.json" > "$MAOS_REPLAY_CASSETTE"
+baseline=$("$maos" workflow plan "$examples/invoice-evidence.toml" \
+  "$HOME/baseline.json" | jq -er 'select(.digest) | .digest')
+"$maos" workflow apply "$HOME/baseline.json" "$baseline" >/dev/null
+candidate=$("$maos" workflow plan "$examples/invoice-evidence-reroute.toml" \
+  "$HOME/candidate.json" | jq -er 'select(.digest) | .digest')
+"$maos" workflow compare "$HOME/candidate.json" "$candidate" \
+  "$examples/invoice-evidence-holdout-v1.json" > "$HOME/report.json"
+jq -e 'select(.event == "workflow_comparison") |
+  select(.passed and .baseline_passed == 6 and .candidate_passed == 12 and .total == 12) |
+  {mode, baseline_passed, candidate_passed, total, cases_sha256}' "$HOME/report.json"
+)
+```
+
+Only the temporary baseline is applied. To measure live quality later,
+freeze the corpus hash, exclude these excerpts and labels from prompt tuning,
+and collect fresh repeated responses per plan using the
+[Spirit evaluation protocol](../../docs/research/spirit-evaluation-protocol.md).
+Report extraction, supporting evidence, and routing separately from malformed
+responses, latency, and cost. This public synthetic set is a development
+benchmark; use a separately kept, unseen set for a release-quality estimate.
+`workflow compare` does not currently collect live responses.
+
 ## Author and operate
 
 - **Business author:** Choose a stable workflow ID, name a starting step, select catalog agents, and write a destination for each named outcome: `{ step = "next-role" }` or `{ finish = "business_result" }`. Steps run by declared routes, not declaration order. Cycles, unreachable steps, missing routes, and mismatched schemas are rejected. Each step selects one successor or ends the run; there are no parallel joins.

@@ -2,7 +2,7 @@
 
 ## 현재 상태
 
-DSA(Domain-Specific Agent, 도메인 특화 에이전트) 작업 경로는 별도 Git worktree `/mnt/build/wt-maos-dsa`, 브랜치 `dsa-topology`다. 이전 경로 `~/dev_ws-dsa`와 공용 체크아웃을 사용하지 않는다. 빌드 결과도 분리한다: `CARGO_TARGET_DIR=/mnt/build/cargo-maos-dsa`. 커널과 Spirit ABI는 수정하지 않았다.
+DSA(Domain-Specific Agent, 도메인 특화 에이전트) 작업 경로는 별도 Git worktree `/mnt/build/wt-maos-dsa`다. 현재 작업 브랜치는 `dsa-heldout-evidence`다. 이전 경로 `~/dev_ws-dsa`와 공용 체크아웃을 사용하지 않는다. 빌드 결과도 분리한다: `CARGO_TARGET_DIR=/mnt/build/cargo-maos-dsa`. 커널과 Spirit ABI는 수정하지 않았다.
 
 ## 무엇을 만들었나
 
@@ -42,7 +42,16 @@ CARGO_TARGET_DIR=/mnt/build/cargo-maos-dsa cargo test --locked --offline \
 
 운영자가 별도로 승인한 코드 예산을 `xtask/kloc.toml`에 반영했다. `maos-bin` 39,909줄(+190), `maos-topology` 953줄(+30)로 KLOC 검사를 통과했다. 파일럿과 후보 평가를 함께 검증한 테스트 23건이 통과했고, 별도 PostgreSQL 환경이 필요한 1건은 건너뛰었다.
 
+`wasmtime-wasi` 보안 수정 [PR #27](https://github.com/lunarpulse/maos/pull/27)이 포함된 `main`에서 [PR #26의 CI](https://github.com/lunarpulse/maos/actions/runs/44904813136)가 통과했다. [PR #26](https://github.com/lunarpulse/maos/pull/26)은 `25536dec`로 병합됐다.
+
+## 인보이스 홀드아웃 평가
+
+[합성 사례 12건](invoice-evidence-holdout-v1.json)에 주문서가 있는 경우와 없는 경우를 각각 6건씩 넣었다. 다른 인보이스의 주문서, 취소·초안 주문서, 여러 줄로 된 필드 등에서 주문서 존재 여부·원문 인용·에이전트 경로·최종 결과를 구분해 채점한다. [실행 가이드](README.md#run-the-holdout-scoring-control)의 합성 재생에서 기준 계획 6/12, 후보 계획 12/12를 확인했다. 정답을 바탕으로 만든 재생 응답이므로 이 차이는 라우팅 변경을 검증하며, 모델 품질 차이를 뜻하지 않는다.
+
+후보의 인용문만 원문의 무관한 문장으로 바꾼 대조 실험에서는 최종 결과 `ready_for_approval`가 맞아도 `extract.quote` 불일치로 11/12 및 비교 실패가 보고됐다. 비교 전후 배포 DB 해시는 같았다.
+
+다음 실측은 별도의 미공개 평가 세트와 새로 수집한 모델 응답을 사용한다. 이 공개 세트는 프롬프트 튜닝과 분리된 개발용 평가 기준이다. `workflow compare`에는 아직 실시간 모델 응답 수집 기능이 없다.
+
 ## 다시 시작할 때
 
-- 활성화 전 평가 변경은 `dsa-pre-activation-eval` 브랜치에서 파일럿과 별도로 제출한다. 합성 응답의 재생 결과는 실제 모델의 품질·비용 검증으로 간주하지 않는다.
 - 진입점: [호스트 실행·권한·감사](../../crates/maos-bin/src/workflow.rs), [정확한 재생](../../crates/maos-bin/src/cassette_replay.rs), [계약·라우팅 엔진](../../crates/maos-topology/src/), [증거 전달 CLI 검증](../../crates/maos-bin/tests/workflow_evidence_cli.rs), [같은 스키마에서 실제 출력 해시를 검증하는 테스트](../../crates/maos-topology/tests/infer.rs).
