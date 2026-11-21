@@ -141,11 +141,22 @@ impl Daemon {
         None
     }
 
+    /// The door answers `spawned_swap_not_ready ... retry` until the running guest has started
+    /// (a debug runner compiles its component slowly on a hosted core); the typed refusal says
+    /// to retry, so the witness retries it within one bound and judges only the settled answer.
     fn ctl(&self, args: &[&str]) -> std::process::Output {
-        self.command(&beside("maosctl"))
-            .args(args)
-            .output()
-            .expect("maosctl")
+        let until = Instant::now() + Duration::from_secs(90);
+        loop {
+            let output = self
+                .command(&beside("maosctl"))
+                .args(args)
+                .output()
+                .expect("maosctl");
+            if !text(&output).contains("spawned_swap_not_ready") || Instant::now() >= until {
+                return output;
+            }
+            std::thread::sleep(Duration::from_millis(500));
+        }
     }
 
     fn upgrade(&self, target: &Path, policy: &str) -> std::process::Output {

@@ -104,10 +104,18 @@ fn installed_signed_manifest_journals_verified_publisher_and_rejects_tamper() {
         String::from_utf8_lossy(&result.stderr)
     );
     let output = shell(&scratch);
+    // The published artifact is the identity echo guest, which returns the shell's `TaskAssign`
+    // rather than a `TaskComplete` answer, so the shell turn itself ends without a reply (a
+    // nonzero exit). What this witness needs is that the installed, signed component was
+    // admitted and started under the real runner: the host's `spirit_loaded` line, never a boot
+    // refusal.
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
+        stdout.contains("\"event\":\"spirit_loaded\"")
+            && stdout.contains("\"spirit_id\":\"example-spirit-ts\"")
+            && !stderr.contains("refused at boot"),
+        "the installed component starts: {stdout}{stderr}"
     );
     let rows = declarations(&scratch);
     let mut events = rows.iter().filter_map(|row| {

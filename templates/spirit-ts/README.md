@@ -84,6 +84,8 @@ wall for one swap attempt (hosted: Ready after ~220 s), while at 100% start
 plus hot swap took 49.5 s.
 Current kernel scope policy compares scope kinds, not MCP server/tool selectors.
 
+A request from the operator shell (`@maos-shell`, `task-assign`, success criteria "Answer the operator's shell message") is answered with one `task-complete` addressed back to the shell and reading `echo: <goal>`; the host, not the guest, stamps the sender and routes the reply. Every other frame is echoed unchanged.
+
 `handleFrame` echoes the inbound frame only after `onStart`. Before startup it
 throws `{ tag: "fault", val: "..." }`, which is the generated guest binding's
 halt shape. Guest WASI stdout/stderr (including `console.log`) is routed to the

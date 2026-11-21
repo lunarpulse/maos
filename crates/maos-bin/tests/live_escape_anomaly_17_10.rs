@@ -334,10 +334,8 @@ async fn run(dir: &Path, forbidden: bool) -> Run {
     .unwrap();
     let pid = admitted.pid;
     tail.declare(pid, gated.sandbox_cfg.tier);
-    let mut argv = vec![
-        "--component".into(),
-        artifact.to_string_lossy().into_owned(),
-    ];
+    // The component rides the held artifact below (`runner_args`); generic argv may not name it.
+    let mut argv: Vec<String> = Vec::new();
     if forbidden {
         argv.push("--test-forbidden-syscall-after-ready".into());
     }

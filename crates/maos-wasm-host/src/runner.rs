@@ -268,7 +268,7 @@ fn parse_sha256_hex(value: &str) -> Result<[u8; 32], String> {
 /// left the shared offset at EOF.
 fn read_component(
     mut file: std::fs::File,
-    identity: Option<(u64, u64)>,
+    #[cfg_attr(not(unix), allow(unused_variables))] identity: Option<(u64, u64)>,
     expected_sha256: Option<[u8; 32]>,
 ) -> Result<Vec<u8>, RunError> {
     use std::io::{Seek, SeekFrom};
@@ -289,8 +289,6 @@ fn read_component(
             ));
         }
     }
-    #[cfg(not(unix))]
-    let _ = identity;
     if metadata.len() > MAX_COMPONENT_BYTES {
         return Err(RunError::InvalidComponent(
             "component exceeds 64 MiB cap".into(),
@@ -348,7 +346,11 @@ fn read_held_component(handoff: &HeldHandoff) -> Result<Vec<u8>, RunError> {
                 "held component descriptor is not open".into(),
             ));
         }
-        if status & libc::O_ACCMODE != libc::O_RDONLY || status & libc::O_PATH != 0 {
+        #[cfg(target_os = "linux")]
+        let o_path = libc::O_PATH;
+        #[cfg(not(target_os = "linux"))]
+        let o_path = 0;
+        if status & libc::O_ACCMODE != libc::O_RDONLY || status & o_path != 0 {
             return Err(RunError::InvalidComponent(
                 "held component descriptor is not read-only".into(),
             ));

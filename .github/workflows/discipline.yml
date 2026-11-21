@@ -1224,7 +1224,10 @@ jobs:
         shell: bash
         run: |
           set +e
-          cargo test --locked -p maos-bin --test wasm_form_admission_17_3b --test wasm_skill_authoring_20_8 --test installed_spirit_dispatch_20_1 -- --nocapture 2>&1 | tee wasm-admission-default.log
+          # The runner places an installed component in a delegated cgroup v2 subtree and refuses
+          # without one (17-3c; the example declares `cpu_max_pct`), so the suite runs inside the
+          # harness's dedicated Delegate=yes unit, never an undelegated job shell.
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-example-spirit-ts --timeout 1500 -- cargo test --locked -p maos-bin --test wasm_form_admission_17_3b --test wasm_skill_authoring_20_8 --test installed_spirit_dispatch_20_1 -- --nocapture 2>&1 | tee wasm-admission-default.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -eq 0 ]; then
             for name in gate_manifest_enforces_wasm_component_form_and_tier_before_engine_refusal \
@@ -4653,6 +4656,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
+          # Story 21-9: the whole-package leg runs the default-on WASM suites; the fixture
+          # builder compiles their guests for wasm32-wasip2.
+          targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@v2
         with:
           key: check-multi-tenant-loom-${{ hashFiles('**/Cargo.lock') }}
@@ -4670,8 +4676,14 @@ jobs:
       - uses: ./.github/actions/provision-t3-test-substrate
       # Whole-package tests consume cross-package executables through the
       # fixture manifest, never presence-only paths or cargo spawned by tests.
-      - name: Build registered debug siblings for the maos-bin whole-package leg
-        run: cargo run --locked -p xtask -- build-test-fixtures --only maosctl,worker-cli-fixture,maos-registry-server,maos-spirit,maos-crypto-recording
+      # Story 21-9: maos-bin builds the WASM host by default, so the whole package also runs the
+      # runner, fault-inject runner and guest suites; every fixture they resolve is built here
+      # (the single `build-test-fixtures` command, as workspace-test-suite), plus the pinned
+      # assembler `spawned_scope_17_3c` shells out to.
+      - name: Install pinned WASM fixture assembler
+        run: cargo install --locked wasm-tools --version 1.259.0
+      - name: Build every fixture for the maos-bin whole-package leg
+        run: cargo run --locked -p xtask -- build-test-fixtures --only maosctl,maos-registry-server,maos-spirit,worker-cli-fixture,maos-crypto-recording,forbidden-syscall-probe,escape-forbidden-syscall-probe,maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,recall_probe.wasm,lifecycle_probe.wasm,compat_echo_2_0.wasm,equiv-native-twin
       # Operator ruling 2026-09-24: the DEDICATED CI-only evidence audit key.
       # Without it the required `reza-three-team-three-region-journey` leg is
       # ABSENT (xtask/src/check_multi_tenant_loom.rs:192) and this gate — and
@@ -5465,6 +5477,10 @@ jobs:
         run: |
           cargo fetch --locked
           cargo run --locked -p xtask -- build-test-fixtures
+      # `spawned_scope_17_3c` assembles its hostile components with the real `wasm-tools`
+      # (the same pin the 17-3c archive producer installs); the runner image ships none.
+      - name: Install pinned WASM fixture assembler
+        run: cargo install --locked wasm-tools --version 1.259.0
       - name: Provision the declared offline erasure and two-host Ed25519 backend
         uses: ./.github/actions/provision-erasure-verifier
       - name: Install tokei
