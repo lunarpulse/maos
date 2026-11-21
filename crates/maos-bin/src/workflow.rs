@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use maos_domain::invariants::i1::{IntentClass, Scope};
 use maos_domain::ports::capability::CapabilityRegistryPort;
 use maos_domain::ports::inference::{
-    InferenceOptions, InferencePort, InferenceRequest, StopReason,
+    InferenceError, InferenceOptions, InferencePort, InferenceRequest, StopReason,
 };
 use maos_kernel_core::capability::CapabilityRegistryAdapter;
 use maos_kernel_core::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
@@ -35,7 +35,7 @@ struct PendingReply {
     result: Option<maos_topology::Result<AgentOutput>>,
 }
 const MAX_FILE_BYTES: usize = 1024 * 1024;
-const USAGE: &str = "Usage:\n  maos workflow plan <topology.toml> <new-plan.json>\n  maos workflow apply <plan.json> <approved-digest>\n  maos workflow run <workflow-id> <input.json>\n  maos workflow eval <workflow-id> <cases.json>\n  maos workflow compare <candidate-plan.json> <candidate-digest> <cases.json>";
+const USAGE: &str = "Usage:\n  maos workflow plan <topology.toml> <new-plan.json>\n  maos workflow apply <plan.json> <approved-digest>\n  maos workflow run <workflow-id> <input.json>\n  maos workflow eval <workflow-id> <cases.json>\n  maos workflow compare <candidate-plan.json> <candidate-digest> <cases.json> [--repeat <1-20>]";
 
 fn read(path: &Path) -> Result<String> {
     let mut options = File::options();
@@ -178,6 +178,13 @@ pub struct Pending {
     action: Action,
 }
 
+impl Pending {
+    /// Only `workflow compare` may use live inference.
+    pub fn is_compare(&self) -> bool {
+        matches!(self.action, Action::Compare(_))
+    }
+}
+
 enum Action {
     Apply { plan: Plan, approved_digest: String },
     Run { id: String, input: Value },
@@ -193,16 +200,22 @@ pub fn prepare(args: &[String]) -> Result<Option<Pending>> {
     let verb = match args {
         [verb, _, _] if matches!(verb.as_str(), "plan" | "apply" | "run" | "eval") => verb,
         [verb, _, _, _] if verb == "compare" => verb,
+        [verb, _, _, _, flag, _] if verb == "compare" && flag == "--repeat" => verb,
         _ => return Err(USAGE.into()),
     };
     if std::env::var_os("MAOS_ONE_SHOT").is_some() {
         return Err("workflow cannot be combined with MAOS_ONE_SHOT".into());
     }
     let home = Home::resolve()?;
-    if let [_, candidate, digest, cases] = args {
+    if let [_, candidate, digest, cases, rest @ ..] = args {
+        let repeat = match rest {
+            [_, count] => count.parse().ok().filter(|count| (1..=20).contains(count)),
+            _ => Some(1),
+        }
+        .ok_or("workflow: --repeat must be an integer from 1 to 20")?;
         return Ok(Some(Pending {
             home,
-            action: Action::Compare(Comparison::read(candidate, digest, cases)?),
+            action: Action::Compare(Comparison::read(candidate, digest, cases, repeat)?),
         }));
     }
     let [_, first, second] = args else {
@@ -234,7 +247,7 @@ impl Pending {
     pub async fn execute(
         self,
         deps: &AdmissionDeps<'_>,
-        inference: Option<Arc<ReplayInference>>,
+        inference: Option<Arc<GovernedInference>>,
         boot_nonce: u64,
     ) -> Result<()> {
         let Self { home, action } = self;
@@ -319,10 +332,11 @@ struct Comparison {
     digest: String,
     cases: Vec<Case>,
     cases_digest: String,
+    repeat: usize,
 }
 
 impl Comparison {
-    fn read(candidate: &str, digest: &str, cases: &str) -> Result<Self> {
+    fn read(candidate: &str, digest: &str, cases: &str, repeat: usize) -> Result<Self> {
         let candidate: Plan = serde_json::from_str(&read(Path::new(candidate))?)?;
         let candidate_digest = candidate.digest()?;
         if digest != candidate_digest {
@@ -342,16 +356,23 @@ impl Comparison {
             digest: candidate_digest,
             cases,
             cases_digest: hex::encode(Sha256::digest(text.as_bytes())),
+            repeat,
         })
     }
 
     async fn execute(
-        mut self,
+        self,
         home: &Home,
         deps: &AdmissionDeps<'_>,
-        inference: Option<Arc<ReplayInference>>,
+        inference: Option<Arc<GovernedInference>>,
         boot_nonce: u64,
     ) -> Result<()> {
+        let live = inference.as_deref().and_then(GovernedInference::live_limit);
+        if live.is_none() && self.repeat > 1 {
+            return Err(
+                "workflow: --repeat greater than 1 requires MAOS_INFERENCE_MODE=live".into(),
+            );
+        }
         let id = &self.candidate.topology.id;
         let baseline = load_active(home, id)?;
         let baseline_digest = baseline.digest()?;
@@ -359,32 +380,124 @@ impl Comparison {
             return Err("workflow: active revision changed; replan before comparing".into());
         }
         self.candidate.validate_live(&home.catalog()?)?;
-        let cassette_digest = inference.as_ref().map(|r| r.cassette_digest.clone());
+        if let Some(InferenceMode::Live { providers, .. }) = inference.as_deref().map(|i| &i.mode) {
+            for plan in [&baseline, &self.candidate] {
+                for node in plan.topology.steps.values() {
+                    let pinned = plan.agents[&node.agent]
+                        .inference()
+                        .map(|(provider, _)| provider);
+                    if let Some(provider) = pinned.filter(|p| !providers.iter().any(|r| r == p)) {
+                        return Err(format!(
+                            "workflow: pinned provider '{provider}' is not registered"
+                        )
+                        .into());
+                    }
+                }
+            }
+        }
+        if let Some(limit) = live {
+            let steps = |plan: &Plan| {
+                (plan.topology.steps.values())
+                    .filter(|node| plan.agents[&node.agent].inference().is_some())
+                    .count()
+            };
+            let bound = self.cases.len().checked_mul(self.repeat).and_then(|runs| {
+                runs.checked_mul(2 * steps(&baseline).max(steps(&self.candidate)))
+            });
+            if !bound.is_some_and(|bound| bound <= limit) {
+                return Err(format!("workflow: live comparison may need more inference calls than MAOS_WORKFLOW_MAX_INFERENCE_CALLS={limit}").into());
+            }
+        }
+        let cassette_digest = inference
+            .as_deref()
+            .and_then(GovernedInference::cassette_digest)
+            .map(str::to_owned);
         // One shared replay stream, consumed in suite order, first by the active revision.
         // Unload its roles before staging the candidate, which may use the same Spirit IDs.
         let before = Bindings::new(deps, inference.clone())
-            .evaluate(
-                home,
-                &baseline,
-                boot_nonce,
-                self.cases.iter().map(|case| (case, case.input.clone())),
-            )
+            .evaluate(home, &baseline, boot_nonce, runs(&self.cases, self.repeat))
             .await?;
+        let before_stats = inference.as_deref().map(GovernedInference::take_stats);
         if load_active(home, id)?.digest()? != baseline_digest {
             return Err("workflow: active revision changed during comparison; replan".into());
         }
-        let after = Bindings::new(deps, inference)
+        let after = Bindings::new(deps, inference.clone())
             .evaluate(
                 home,
                 &self.candidate,
                 boot_nonce,
-                case_inputs(&mut self.cases),
+                runs(&self.cases, self.repeat),
             )
             .await?;
+        let after_stats = inference.as_deref().map(GovernedInference::take_stats);
         if load_active(home, id)?.digest()? != baseline_digest {
             return Err("workflow: active revision changed during comparison; replan".into());
         }
         self.candidate.validate_live(&home.catalog()?)?;
+        if let Some(limit) = live {
+            let (before_stats, after_stats) = (
+                before_stats.unwrap_or_default(),
+                after_stats.unwrap_or_default(),
+            );
+            let summary = |verdicts: &[Verdict], stats: &Stats| {
+                let runs = verdicts.len();
+                let ran = verdicts.iter().filter(|v| v.ran).count();
+                let passed = verdicts.iter().filter(|v| v.passed).count();
+                let rate = |count: usize| count as f64 / runs.max(1) as f64;
+                json!({
+                    "runs": runs, "ran": ran, "passed": passed, "abstained": runs - ran,
+                    "failed": ran - passed, "pass_rate": rate(passed), "ran_rate": rate(ran),
+                    "calls": stats.calls, "input_tokens": stats.input_tokens,
+                    "output_tokens": stats.output_tokens,
+                    "latency_ms_total": stats.latency_ms_total,
+                    "latency_ms_max": stats.latency_ms_max,
+                })
+            };
+            let per_case = |verdicts: &[Verdict]| {
+                json!({
+                    "runs": verdicts.len(),
+                    "ran": verdicts.iter().filter(|v| v.ran).count(),
+                    "passed": verdicts.iter().filter(|v| v.passed).count(),
+                    "details": verdicts.iter().map(|v| &v.detail).collect::<Vec<_>>(),
+                })
+            };
+            let compared: Vec<_> = self
+                .cases
+                .iter()
+                .zip(before.chunks(self.repeat).zip(after.chunks(self.repeat)))
+                .map(|(case, (baseline, candidate))| {
+                    json!({"id": case.id, "baseline": per_case(baseline), "candidate": per_case(candidate)})
+                })
+                .collect();
+            audit(
+                deps.transparency_log,
+                0,
+                "workflow:evaluation",
+                json!({
+                    "workflow": id, "baseline_revision": baseline_digest,
+                    "candidate_revision": self.digest, "cases_sha256": self.cases_digest,
+                    "repeat": self.repeat,
+                    "calls": before_stats.calls + after_stats.calls,
+                    "input_tokens": before_stats.input_tokens + after_stats.input_tokens,
+                    "output_tokens": before_stats.output_tokens + after_stats.output_tokens,
+                }),
+            );
+            println!(
+                "{}",
+                json!({
+                    "event": "workflow_comparison", "format": 2, "mode": "live", "workflow": id,
+                    "baseline_revision": baseline_digest, "candidate_revision": self.digest,
+                    "cases_sha256": self.cases_digest, "repeat": self.repeat,
+                    "max_inference_calls": limit,
+                    "plans": {
+                        "baseline": summary(&before, &before_stats),
+                        "candidate": summary(&after, &after_stats),
+                    },
+                    "cases": compared,
+                })
+            );
+            return Ok(());
+        }
         let baseline_passed = before.iter().filter(|v| v.passed).count();
         let candidate_passed = after.iter().filter(|v| v.passed).count();
         let passed = before.iter().all(|v| v.ran) && candidate_passed == self.cases.len();
@@ -415,6 +528,14 @@ impl Comparison {
     }
 }
 
+/// Each case `repeat` times in suite order, so one staged plan serves every run.
+fn runs(cases: &[Case], repeat: usize) -> impl ExactSizeIterator<Item = (&Case, Value)> {
+    (0..cases.len() * repeat).map(move |run| {
+        let case = &cases[run / repeat];
+        (case, case.input.clone())
+    })
+}
+
 fn case_inputs(cases: &mut [Case]) -> impl ExactSizeIterator<Item = (&Case, Value)> {
     cases.iter_mut().map(|case| {
         let input = std::mem::take(&mut case.input);
@@ -433,7 +554,7 @@ async fn apply(
     plan: &Plan,
     approved: &str,
     deps: &AdmissionDeps<'_>,
-    inference: Option<Arc<ReplayInference>>,
+    inference: Option<Arc<GovernedInference>>,
     boot_nonce: u64,
 ) -> Result<()> {
     let digest = plan.digest()?;
@@ -480,20 +601,179 @@ async fn apply(
     Ok(())
 }
 
-/// The composition root provides this only in explicit, exact cassette replay.
-pub struct ReplayInference {
+/// How governed workflow inference is sourced. Only the composition root can pick one.
+pub enum InferenceMode {
+    /// Exact cassette replay.
+    Replay { cassette_digest: String },
+    /// Real providers, bounded by a hard call budget; only `workflow compare` may use it.
+    Live {
+        max_calls: usize,
+        providers: Vec<String>,
+    },
+}
+
+/// Per-plan usage; reset by `take_stats`.
+#[derive(Default)]
+struct Stats {
+    calls: u64,
+    input_tokens: u64,
+    output_tokens: u64,
+    latency_ms_total: u64,
+    latency_ms_max: u64,
+}
+
+/// Call accounting. `made` is never reset; `fault` is the first live governance failure.
+#[derive(Default)]
+pub struct Meter {
+    made: usize,
+    in_flight: usize,
+    generation: u64,
+    stats: Stats,
+    fault: Option<String>,
+}
+
+/// Keeps a live call counted as in flight until it has fully settled, on every return path.
+struct InFlight<'a>(&'a Mutex<Meter>);
+
+impl Drop for InFlight<'_> {
+    fn drop(&mut self) {
+        self.0.lock().unwrap().in_flight -= 1;
+    }
+}
+
+/// Live reports carry only fixed text: the catalog's outcome rejections become `unknown outcome`
+/// and the dispatcher's hook outcome (which is debug-formatted) is reduced to its fixed cause.
+fn report_error(message: String) -> String {
+    if message.contains("hook did not complete") {
+        "hook did not complete".into()
+    } else if matches!(
+        message.as_str(),
+        "reported outcome disagrees with catalog rule" | "unrouted package outcome"
+    ) {
+        "unknown outcome".into()
+    } else {
+        message
+    }
+}
+
+/// The composition root provides this only in explicit replay or explicit live compare.
+pub struct GovernedInference {
     pub port: Arc<dyn InferencePort + Send + Sync>,
-    pub cassette_digest: String,
+    pub mode: InferenceMode,
     pub capability: Arc<CapabilityRegistryAdapter>,
     pub enterprise: Option<Arc<crate::enterprise_identity::EnterpriseRuntime>>,
     pub pdp: Option<crate::enterprise_pdp_runtime::EnterprisePdpRuntime>,
     pub principal: Option<String>,
+    pub meter: Mutex<Meter>,
 }
 
-impl ReplayInference {
+/// `MAOS_WORKFLOW_MAX_INFERENCE_CALLS`: the mandatory positive call budget of a live comparison.
+pub fn live_call_limit() -> Result<usize> {
+    std::env::var("MAOS_WORKFLOW_MAX_INFERENCE_CALLS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|limit| *limit > 0)
+        .ok_or_else(|| "workflow: live comparison requires MAOS_WORKFLOW_MAX_INFERENCE_CALLS=<positive integer>".into())
+}
+
+impl GovernedInference {
+    fn live_limit(&self) -> Option<usize> {
+        match &self.mode {
+            InferenceMode::Live { max_calls, .. } => Some(*max_calls),
+            InferenceMode::Replay { .. } => None,
+        }
+    }
+
+    fn cassette_digest(&self) -> Option<&str> {
+        match &self.mode {
+            InferenceMode::Replay { cassette_digest } => Some(cassette_digest),
+            InferenceMode::Live { .. } => None,
+        }
+    }
+
+    /// A live governance failure aborts the comparison; replay keeps per-case verdicts.
+    fn fail(&self, message: String) -> String {
+        if self.live_limit().is_some() {
+            self.meter
+                .lock()
+                .unwrap()
+                .fault
+                .get_or_insert_with(|| message.clone());
+        }
+        message
+    }
+
+    /// Ends a run: waits for hooks the dispatcher timed out but did not join, then bumps the
+    /// generation so none can start a call for it. Returns the governance fault, if any.
+    async fn end_run(&self) -> Option<String> {
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+        loop {
+            {
+                let mut meter = self.meter.lock().unwrap();
+                if meter.in_flight == 0 {
+                    meter.generation += 1;
+                    return meter.fault.clone();
+                }
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return Some(self.fail("workflow: an inference call did not settle".into()));
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    }
+
+    fn take_stats(&self) -> Stats {
+        std::mem::take(&mut self.meter.lock().unwrap().stats)
+    }
+
+    /// Maps a port failure to report text. Live reports carry only fixed text, never a vendor
+    /// body; capability/provider failures are also recorded as governance faults.
+    fn reject(&self, error: &InferenceError) -> String {
+        let message = match error {
+            _ if self.live_limit().is_none() => format!("workflow inference failed: {error}"),
+            InferenceError::ProviderRejected { status, .. } => {
+                format!("provider rejected (status {status})")
+            }
+            InferenceError::ProviderTransport(_) => "provider transport error".into(),
+            InferenceError::Timeout => "inference timeout".into(),
+            InferenceError::MalformedResponse(_) => "provider response malformed".into(),
+            InferenceError::RateLimited { .. } => "rate limited".into(),
+            InferenceError::CapabilityDenied => "workflow inference capability denied".into(),
+            InferenceError::Unconfigured => {
+                "workflow provider not registered or unconfigured".into()
+            }
+        };
+        match error {
+            InferenceError::CapabilityDenied | InferenceError::Unconfigured => self.fail(message),
+            _ => message,
+        }
+    }
+
     fn complete(&self, pid: u32, agent: &Agent, task: &Task) -> maos_topology::Result<AgentOutput> {
+        let generation = self.meter.lock().unwrap().generation;
         let (provider, model) = agent.inference().ok_or("expected an inference package")?;
         let prompt = agent.inference_prompt(&task.input)?;
+        let live = self.live_limit();
+        // Live: refuse a call whose run already ended; count it and keep it in flight until
+        // every path below has revoked its token and recorded its stats.
+        let _in_flight = match live {
+            None => None,
+            Some(limit) => {
+                let mut meter = self.meter.lock().unwrap();
+                if meter.generation != generation {
+                    return Err("hook did not complete".into());
+                }
+                if meter.made >= limit {
+                    drop(meter);
+                    return Err(self.fail(format!(
+                        "workflow inference calls exhausted: bound {limit} reached"
+                    )));
+                }
+                meter.made += 1;
+                meter.in_flight += 1;
+                Some(InFlight(&self.meter))
+            }
+        };
         let token = crate::worker_spawn::issue_enterprise_governed_capability(
             &self.capability,
             self.enterprise.as_deref(),
@@ -506,7 +786,7 @@ impl ReplayInference {
             [0; 32],
             IntentClass::Standard,
         )
-        .map_err(|error| format!("workflow inference denied: {error}"))?;
+        .map_err(|error| self.fail(format!("workflow inference denied: {error}")))?;
         self.capability.bind_cost_scope(
             &token.token_id,
             maos_domain::cost::CostScope {
@@ -515,6 +795,7 @@ impl ReplayInference {
             },
         );
         let token_id = token.token_id;
+        let started = std::time::Instant::now();
         let response = self.port.complete(InferenceRequest::new(
             pid,
             token,
@@ -527,31 +808,53 @@ impl ReplayInference {
             Some(provider.to_owned()),
             Vec::new(),
         ));
+        let latency = started.elapsed().as_millis() as u64;
+        {
+            let stats = &mut self.meter.lock().unwrap().stats;
+            stats.calls += 1;
+            stats.latency_ms_total += latency;
+            stats.latency_ms_max = stats.latency_ms_max.max(latency);
+            if let Ok(response) = &response {
+                stats.input_tokens += u64::from(response.usage.input_tokens);
+                stats.output_tokens += u64::from(response.usage.output_tokens);
+            }
+        }
+        // Classify before the revoke so a revoke failure cannot mask a governance fault.
+        let response = response.map_err(|error| self.reject(&error));
         self.capability
             .revoke(token_id)
             .map_err(|error| format!("workflow inference token revoke failed: {error}"))?;
-        let response = response.map_err(|error| format!("workflow inference failed: {error}"))?;
+        let response = response?;
         if response.provider_attribution.provider_id != provider
             || response.provider_attribution.model_id.as_deref() != Some(model)
         {
-            return Err(
+            return Err(self.fail(
                 "workflow inference attribution differs from the approved provider and model"
                     .into(),
-            );
+            ));
         }
         if response.stop_reason != StopReason::StopSequence || response.text.len() > MAX_FILE_BYTES
         {
-            return Err("workflow inference did not produce a complete bounded response".into());
+            return Err(if live.is_some() {
+                "incomplete response".into()
+            } else {
+                "workflow inference did not produce a complete bounded response".into()
+            });
         }
-        serde_json::from_str::<AgentOutput>(&response.text)
-            .map_err(|_| "workflow inference returned malformed evidence JSON".into())
+        serde_json::from_str::<AgentOutput>(&response.text).map_err(|_| {
+            if live.is_some() {
+                "malformed evidence JSON".into()
+            } else {
+                "workflow inference returned malformed evidence JSON".into()
+            }
+        })
     }
 }
 
 struct WorkflowSpirit {
     agent: Agent,
     reply: Reply,
-    inference: Option<Arc<ReplayInference>>,
+    inference: Option<Arc<GovernedInference>>,
     pid: Arc<OnceLock<u32>>,
 }
 
@@ -613,12 +916,12 @@ struct Binding {
 
 struct Bindings<'a> {
     deps: &'a AdmissionDeps<'a>,
-    inference: Option<Arc<ReplayInference>>,
+    inference: Option<Arc<GovernedInference>>,
     steps: BTreeMap<String, Binding>,
 }
 
 impl<'a> Bindings<'a> {
-    fn new(deps: &'a AdmissionDeps<'a>, inference: Option<Arc<ReplayInference>>) -> Self {
+    fn new(deps: &'a AdmissionDeps<'a>, inference: Option<Arc<GovernedInference>>) -> Self {
         Self {
             deps,
             inference,
@@ -630,7 +933,7 @@ impl<'a> Bindings<'a> {
         for (step, node) in &plan.topology.steps {
             let agent = &plan.agents[&node.agent];
             let inference = agent.inference().map(|_| {
-                self.inference.clone().ok_or("workflow inference requires MAOS_INFERENCE_MODE=replay and MAOS_REPLAY_STRICT=1")
+                self.inference.clone().ok_or("workflow inference requires MAOS_INFERENCE_MODE=replay and MAOS_REPLAY_STRICT=1 (or MAOS_INFERENCE_MODE=live for workflow compare)")
             }).transpose()?;
             let scopes = agent
                 .inference()
@@ -732,6 +1035,12 @@ tier = "T0"
                         }).collect::<Vec<_>>());
                     }
                 }).await;
+                if let Some(fault) = match &self.inference {
+                    Some(inference) => inference.end_run().await,
+                    None => None,
+                } {
+                    return Err(fault.into());
+                }
                 let verdict = match report {
                     Ok(report) => {
                         let passed = case.expect.matches(&report) && checks.values()
@@ -747,10 +1056,14 @@ tier = "T0"
                         }
                         Verdict { ran: true, passed, detail }
                     }
-                    Err(error) => Verdict {
-                        ran: false, passed: false,
-                        detail: json!({"passed": false, "error": error.to_string()}),
-                    },
+                    Err(error) => {
+                        let live = self.inference.as_ref().is_some_and(|i| i.live_limit().is_some());
+                        let error = error.to_string();
+                        Verdict {
+                            ran: false, passed: false,
+                            detail: json!({"passed": false, "error": if live { report_error(error) } else { error }}),
+                        }
+                    }
                 };
                 verdicts.push(verdict);
             }
@@ -903,7 +1216,15 @@ tier = "T0"
 fn audit(tl: &TransparencyLogAdapter, pid: u32, intent: &str, mut payload: Value) {
     // Bare hex digests resemble capability tokens to the redactor. Encode only
     // our known digest fields; leave the redaction policy itself unchanged.
-    for field in ["revision", "previous", "requested_digest", "input_digest"] {
+    for field in [
+        "revision",
+        "previous",
+        "requested_digest",
+        "input_digest",
+        "baseline_revision",
+        "candidate_revision",
+        "cases_sha256",
+    ] {
         if let Some(value) = payload.get_mut(field) {
             encode_digest(value);
         }

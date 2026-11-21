@@ -62,6 +62,7 @@ use maos_domain::memory::{
     CollectiveErrorKind, ExportEntry, ExportPayload, ForgetOutcome, ForgetReceipt, LegalHoldRecord,
     MemoryEntry, MemoryError, MemoryNamespace, MemoryTier, MemoryValue, PrincipalIndexRow,
 };
+use maos_iac::adapter::transparency_log::AuditError;
 
 // Re-exports above make PrivateMemoryStore, SharedMemoryStore,
 // PrincipalNamespaceIndex available in this module scope.
@@ -477,6 +478,16 @@ impl MemoryManagerAdapter {
                 lower == "legal-hold" || lower.starts_with("legal-hold:")
             })
             .unwrap_or(false);
+        // 21-12: finish interrupted forgets first. A hold request completes its own
+        // principal's earlier erasure (any batch) and records nothing if that fails;
+        // a forget leaves its own open intent to its live run, which reuses it.
+        let (_, unfinished) = self.complete_locked(principal_id, is_legal_hold)?;
+        if is_legal_hold && !unfinished.is_empty() {
+            return Err(MemoryError::Storage(format!(
+                "hold not recorded, erasure unfinished: {}",
+                unfinished.join("; ")
+            )));
+        }
 
         if is_legal_hold {
             // Review 2026-09-17: a hold requested over a principal a
@@ -566,19 +577,57 @@ impl MemoryManagerAdapter {
             hook();
         }
 
+        let open = self
+            .transparency_log
+            .outstanding_forget_intents(Some(principal_id))
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        let (intent, old) = match open.into_iter().next() {
+            Some((id, _, old)) => (id, old),
+            None => {
+                let key = TransparencyLogAdapter::grouped_hex(principal_id.as_bytes());
+                let body = serde_json::json!({ "principal_hex": key, "reason": reason });
+                let id = self.transparency_log.insert_kernel_event_returning_id(
+                    0,
+                    maos_iac::adapter::transparency_log::FrameKind::Decision,
+                    None,
+                    "principal.forget.intent",
+                    body.to_string().as_bytes(),
+                );
+                (id, None)
+            }
+        };
+        self.erase_principal(principal_id, reason.or(old.as_deref()), intent)?
+            .ok_or_else(|| MemoryError::Storage(AuditError::ErasurePending.to_string()))
+    }
+
+    /// Scrub → private delete → index delete → `principal.forget` journal. Every
+    /// step is re-runnable; `intent` names the interrupted forget being completed,
+    /// and the counts are only what this run deleted. `None`: the scrub is still
+    /// `ErasurePending`, nothing was deleted.
+    fn erase_principal(
+        &self,
+        principal_id: &str,
+        reason: Option<&str>,
+        intent: [u8; 16],
+    ) -> Result<Option<ForgetOutcome>, MemoryError> {
         let (
             redacted_distillate_frame_ids,
             redacted_principal_frame_ids,
             redistill,
             held,
             malformed,
-        ) = self
-            .transparency_log
-            .scrub_forget_frames(principal_id)
-            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        ) = match self.transparency_log.scrub_forget_frames(principal_id) {
+            Ok(swept) => swept,
+            Err(AuditError::ErasurePending) => return Ok(None),
+            Err(e) => return Err(MemoryError::Storage(e.to_string())),
+        };
 
         // 3. Delete private-tier entries + principal_index rows (existing cascade).
         let deleted_entries = self.private.forget_principal(principal_id)?;
+        #[cfg(any(test, debug_assertions))]
+        spill_test_faults::fail_if_armed(
+            spill_test_faults::FailurePoint::ForgetAfterPrivateDelete,
+        )?;
         let deleted_index_rows = self.principal_index.forget(principal_id)?;
 
         // 4. Journal the cascade with the redaction set and reason.  P7: the
@@ -590,6 +639,7 @@ impl MemoryManagerAdapter {
             "redacted_distillate_frame_ids": redacted_distillate_frame_ids,
             "redacted_principal_frame_ids": redacted_principal_frame_ids,
             "reason": reason,
+            "completed_from_intent": TransparencyLogAdapter::grouped_hex(&intent),
         });
         let frame_id = self.transparency_log.insert_kernel_event_returning_id(
             0,
@@ -620,12 +670,49 @@ impl MemoryManagerAdapter {
                 break;
             }
         }
-        Ok(ForgetOutcome::Erased {
+        Ok(Some(ForgetOutcome::Erased {
             receipt,
             redacted_distillate_frame_ids,
             redacted_principal_frame_ids,
             redistill,
-        })
+        }))
+    }
+
+    /// 21-12: complete every forget that journaled an intent but no outcome.
+    /// Returns `(completed, unfinished)`; an intent whose scrub is `ErasurePending`, whose
+    /// completion fails, or that is malformed stays open, is described (id and cause
+    /// only) and does not block the others. Not retried within one call.
+    pub fn complete_outstanding_forgets(&self) -> Result<(usize, Vec<String>), MemoryError> {
+        let _forget_guard = self
+            .forget_serialization
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        self.complete_locked("", false)
+    }
+
+    /// `hold`: only `who`'s intents. Otherwise all but `who`'s own (its live run reuses it).
+    fn complete_locked(&self, who: &str, hold: bool) -> Result<(usize, Vec<String>), MemoryError> {
+        let (mut done, mut unfinished) = (0, Vec::new());
+        let open = self
+            .transparency_log
+            .outstanding_forget_intents(hold.then_some(who))
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        for (intent, principal, reason) in open {
+            let Some(p) = principal else {
+                let id = TransparencyLogAdapter::grouped_hex(&intent);
+                unfinished.push(format!("malformed intent {id}"));
+                continue;
+            };
+            if !hold && p == who {
+                continue;
+            }
+            match self.erase_principal(&p, reason.as_deref(), intent) {
+                Ok(Some(_)) => done += 1,
+                Ok(None) => unfinished.push(format!("{p}: erasure pending")),
+                Err(e) => unfinished.push(format!("{p}: {e}")),
+            }
+        }
+        Ok((done, unfinished))
     }
 
     /// Story 9.2 (P29) — release a durable legal hold so the principal may be

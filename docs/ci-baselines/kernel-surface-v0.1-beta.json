@@ -710,7 +710,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::io::IoSubsystemAdapter",
-      "signature_hash": "48293107fcbe446968bbd6b9d2a0c6389838507e9a5a4e40852e73764818d78a"
+      "signature_hash": "afd7bdc4c5038f200eb1b03e8a134fff410514013f2ba30ef651a71c4fd65f67"
     },
     {
       "kind": "struct",
