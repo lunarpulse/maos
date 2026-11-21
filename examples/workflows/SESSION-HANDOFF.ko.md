@@ -32,10 +32,17 @@ CARGO_TARGET_DIR=/mnt/build/cargo-maos-dsa cargo test --locked --offline \
 | `maos-topology` | 없음 | 923 |
 | `xtask` | 46,753 | 46,754 |
 
-[PR #25](https://github.com/lunarpulse/maos/pull/25)가 `main`의 의존성 문제를 해결했다. [해당 `main` 커밋에서 `cargo-deny` 통과](https://github.com/lunarpulse/maos/actions/runs/44553883474/job/135664588686)를 확인했다. [파일럿 PR #24](https://github.com/lunarpulse/maos/pull/24)를 이 기준 위에 올리고, 새 `workflow.rs`를 기존 권한 보호 테스트에 등록했다. 테스트의 권한 금지 규칙은 바꾸지 않았다.
+[파일럿 PR #24](https://github.com/lunarpulse/maos/pull/24)는 `main`의 `ea8c51b6`에 병합됐다. [PR #25](https://github.com/lunarpulse/maos/pull/25)가 의존성 검사 차단을 해소했고, `workflow.rs`를 기존 권한 보호 테스트의 검사 대상에 추가했다. 파일럿의 [GitHub CI](https://github.com/lunarpulse/maos/actions/runs/44618174893)에서 `cargo-deny`, `workspace-test-suite`, `aggregate`, `release-ready`가 모두 통과했다.
+
+## 활성화 전 후보 평가
+
+`maos workflow compare <후보-plan.json> <후보-digest> <cases.json>`은 현재 활성 계획과 후보를 동일하게 라벨링한 사례로 비교한다. 후보의 부모 해시는 현재 활성 버전과 일치해야 한다. 두 계획 모두 현재 운영자 카탈로그에 등록돼 있어야 한다. 비교는 감사 로그를 남기지만 배포 DB를 바꾸거나 후보를 활성화하지 않는다. 활성화는 별도의 `apply`가 맡는다.
+
+인보이스 실험에서 기준 계획은 `request_order`, 후보는 `hold_for_procurement`였다. 후보의 인용만 바꿔도 최종 결과는 그대로였지만 `extract.quote` 불일치로 비교가 실패했다. 보고서에는 계획·사례·재생 데이터의 해시와 불일치 필드 이름이 남고 증거 원문이나 정답 값은 포함되지 않는다. [후보 평가 실행 가이드](README.md#compare-a-candidate-before-applying-it).
+
+운영자가 별도로 승인한 코드 예산을 `xtask/kloc.toml`에 반영했다. `maos-bin` 39,909줄(+190), `maos-topology` 953줄(+30)로 KLOC 검사를 통과했다. 파일럿과 후보 평가를 함께 검증한 테스트 23건이 통과했고, 별도 PostgreSQL 환경이 필요한 1건은 건너뛰었다.
 
 ## 다시 시작할 때
 
-- 위 KLOC 승인은 파일럿에 한정한다. 다음 기능의 비용은 별도로 계측한다.
-- **다음 기능은 활성화 전 후보 평가다.** 현재 `workflow eval`은 이미 활성화된 계획을 평가한다. 활성 버전을 바꾸지 않고 후보와 기준 계획을 같은 라벨 사례에서 실행하고, 최종 결과가 맞더라도 생성한 증거 필드가 틀리면 실패하도록 한다. 이 기능은 아직 구현하지 않았다.
+- 활성화 전 평가 변경은 `dsa-pre-activation-eval` 브랜치에서 파일럿과 별도로 제출한다. 합성 응답의 재생 결과는 실제 모델의 품질·비용 검증으로 간주하지 않는다.
 - 진입점: [호스트 실행·권한·감사](../../crates/maos-bin/src/workflow.rs), [정확한 재생](../../crates/maos-bin/src/cassette_replay.rs), [계약·라우팅 엔진](../../crates/maos-topology/src/), [증거 전달 CLI 검증](../../crates/maos-bin/tests/workflow_evidence_cli.rs), [같은 스키마에서 실제 출력 해시를 검증하는 테스트](../../crates/maos-topology/tests/infer.rs).

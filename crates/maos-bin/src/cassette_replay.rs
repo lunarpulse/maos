@@ -28,14 +28,14 @@ struct CassetteEntry {
 
 impl CassetteReplayPort {
     pub fn from_file(path: &std::path::Path, strict: bool) -> Result<Self, String> {
-        Self::load(path, strict, false)
-    }
-
-    fn load(path: &std::path::Path, strict: bool, exact: bool) -> Result<Self, String> {
         let data =
             std::fs::read_to_string(path).map_err(|e| format!("cassette read: {path:?}: {e}"))?;
+        Self::parse(&data, strict, false)
+    }
+
+    fn parse(data: &str, strict: bool, exact: bool) -> Result<Self, String> {
         let root: serde_json::Value =
-            serde_json::from_str(&data).map_err(|e| format!("cassette parse: {e}"))?;
+            serde_json::from_str(data).map_err(|e| format!("cassette parse: {e}"))?;
 
         let schema = root
             .get("schema_version")
@@ -203,11 +203,14 @@ impl CassetteReplayProvider {
         })
     }
 
-    pub fn for_workflow(path: &std::path::Path) -> Result<Self, String> {
-        Ok(Self {
-            replay: CassetteReplayPort::load(path, true, true)?,
+    pub fn for_workflow(path: &std::path::Path) -> Result<(Self, String), String> {
+        let data =
+            std::fs::read_to_string(path).map_err(|e| format!("cassette read: {path:?}: {e}"))?;
+        let replay = Self {
+            replay: CassetteReplayPort::parse(&data, true, true)?,
             credential_fingerprint: cassette_fingerprint(path),
-        })
+        };
+        Ok((replay, hex::encode(Sha256::digest(data.as_bytes()))))
     }
 }
 

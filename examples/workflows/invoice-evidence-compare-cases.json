@@ -1,0 +1,22 @@
+[
+  {
+    "id": "missing-order",
+    "input": {
+      "excerpt": "Invoice 41. No purchase order was supplied."
+    },
+    "expect": {
+      "outcome": "hold_for_procurement",
+      "path": ["extract", "review"],
+      "step_outcomes": ["finding_ready", "missing_order"]
+    },
+    "step_artifacts": [
+      {
+        "step": "extract",
+        "fields": {
+          "purchase_order_present": false,
+          "quote": "No purchase order was supplied."
+        }
+      }
+    ]
+  }
+]
