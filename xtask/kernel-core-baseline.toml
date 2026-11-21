@@ -502,7 +502,10 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26690
+src_lines = 26807
+# HISTORY: 21-6-memory-tier-quota-enforcement -> exact formatted physical 26690 -> 26807 (+117),
+# tokei 21038, 90 files, none added or removed; changed files: none (set hash only); digests and
+# set_hash adopted from `--emit-pin`. 21-6 merged with main after 21-12: combined kernel pin
 # HISTORY: 21-6-memory-tier-quota-enforcement -> exact formatted physical 26547 -> 26690 (+143),
 # tokei 20949, 90 files, none added or removed; changed files: memory/mod.rs,
 # memory/principal.rs, memory/private.rs, memory/shared.rs, security/operator_config.rs; digests
@@ -513,6 +516,17 @@ src_lines = 26690
 # memory/for_spirit.rs, memory/mod.rs, memory/private.rs, memory/shared.rs,
 # security/operator_config.rs; digests and set_hash adopted from `--emit-pin`. 21-6 memory tier
 # quotas; kernel 20429 -> 20834 tokei
+# HISTORY: 21-12-attestation-and-credential-defects -> exact formatted physical 26145 -> 26178
+# (+33), tokei 20517, 90 files, none added or removed; changed files: io/mod.rs, memory/mod.rs;
+# digests and set_hash adopted from `--emit-pin`. 21-12 review fixes; kernel tokei 20517
+# HISTORY: 21-12-attestation-and-credential-defects -> exact formatted physical 26144 -> 26145
+# (+1), tokei 20486, 90 files, none added or removed; changed files: memory/mod.rs; digests and
+# set_hash adopted from `--emit-pin`. 21-12 forget completion call placement; kernel tokei 20486
+# HISTORY: 21-12-attestation-and-credential-defects -> exact formatted physical 26061 -> 26144
+# (+83), tokei 20486, 90 files, none added or removed; changed files: io/mod.rs, memory/mod.rs,
+# memory/spill_test_faults.rs; digests and set_hash adopted from `--emit-pin`. 21-12 forward
+# completion of interrupted forget (principal.forget.intent) and ureq redirect refusal; kernel
+# 20429 -> 20486 tokei
 # HISTORY: 27-1-manifest-model-pin-to-wire -> exact formatted physical 26062 -> 26061 (-1),
 # tokei 20428, 90 files, none added or removed; changed files: inference/mod.rs; digests and
 # set_hash adopted from `--emit-pin`. S1: the inference TL serves the manifest model pin on the
@@ -1130,7 +1144,7 @@ src_lines = 26690
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "1b4cb2039a09df4fd5f62f5586007c3c058fc7188e1752fddb573fb7571f6c05"
+set_hash = "cf37625c7c9e113bc77ef031bea1aa11dea4726251b6268fe9b0c1bbe7223cdf"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -1159,7 +1173,7 @@ set_hash = "1b4cb2039a09df4fd5f62f5586007c3c058fc7188e1752fddb573fb7571f6c05"
 "iac.rs" = "18c0b4e562376fd5b6170fac0544bb3465c4fc452b46c702a8bc1c070d7a08bf"
 "inference/mod.rs" = "864778ae4df25be04404c707b81fb73147e22af98d2dc2ac16d74ea3eaea21d0"
 "inference/router.rs" = "82135d50d4187cc946044802c9adb5d378e023440d790c8fd1e6ebe51cceee29"
-"io/mod.rs" = "57d2b794bb4cbae5deb1fbf3332132fe4a2e6b239b12a95fe5b9f48eb195619b"
+"io/mod.rs" = "3f9c15a28c65f6b3b123dd829e1037ae9ca74642db5030f560a5cd90bd38eea5"
 "isolation/mod.rs" = "e6c54ed505f5f6fc9e07fe28ca239504dcdc02abae039f021dfaf17ecf047b24"
 "isolation/runner.rs" = "3b4890261b2116d91efe15a9e0369ad8e1544b056a5286826ab7ee87ead593ff"
 "journal/mod.rs" = "ec7fa9c2b4508a5d339b6ffd6d0aac0030956c7c504ef9042582cc95f14c51bf"
@@ -1172,13 +1186,13 @@ set_hash = "1b4cb2039a09df4fd5f62f5586007c3c058fc7188e1752fddb573fb7571f6c05"
 "lifecycle/upgrade.rs" = "7edee0b9070cd163e858155add6570d3c0c2844c4435eab15195c19904ee7982"
 "mcp/mod.rs" = "12604548a8daa78a2786b820733f4639f06759f893856745027c8083c8a42bfd"
 "memory/for_spirit.rs" = "cc0ed13874a5aebbf9886783df56d5f7dc86126580547c825bab51b5bae30b9c"
-"memory/mod.rs" = "98fe271e41fb86fedfb6fa9a425fa898060766dd8b9dde37b1190abb265eb0ab"
+"memory/mod.rs" = "56505e61fce2a6d86ea7c60e399d1f2965c833201b7de484ee11a46ccefe48ce"
 "memory/principal.rs" = "587e4282a36c13d1ea4de000c0cab6ff368c7fb755cefe0fc3531f2d98de18d8"
 "memory/private.rs" = "343b1043d1f0f05662d2829bb85eec76a0ef5f6b19ece91911a378275ca73721"
 "memory/read_entry_point.rs" = "0528ce87453ef4a10b4bbe4a360f557769be412fc091df4734495482d551dda1"
 "memory/self_telemetry.rs" = "c562094354fe64784e49de7e37754badce6637802f12c17ce3e6d2873e2adcef"
 "memory/shared.rs" = "8eb503904d4e30e396644a35f69a6e0933e77816d4127cfb768c1e977c439625"
-"memory/spill_test_faults.rs" = "362db050c60d58246eb3795ca5ca3647ea13d6fb8a1a1e0ed04a567c8162b74b"
+"memory/spill_test_faults.rs" = "cdfb963d4105e0fd378cd164711d0ee95cac0474cb9e6d57eea1af052116db88"
 "memory/write_entry_point.rs" = "e43e8c2957d0042a13b75e4972c7417b72388316b1c56091f6b417f06509f224"
 "revocation/applier.rs" = "fc8377245ce4fa4d6cd78a452faf24e78fef6cca881af7dcad3eff65794a9705"
 "revocation/mod.rs" = "272ba459ed2095beff6d7497c62ab0fa47bbe3d2ffb0b47ba2045c406a49998e"

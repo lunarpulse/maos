@@ -27,6 +27,7 @@ pub enum FailurePoint {
     IdentityTempSync,
     IdentityPublish,
     IdentityLockBadFd,
+    ForgetAfterPrivateDelete,
 }
 
 #[derive(Debug, PartialEq, Eq)]

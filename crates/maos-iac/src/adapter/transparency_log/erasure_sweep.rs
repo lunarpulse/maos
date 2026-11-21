@@ -297,7 +297,10 @@ impl TransparencyLogAdapter {
             if intent.starts_with("principal.uninstall.")
                 || matches!(
                     intent.as_str(),
-                    "principal.forget" | "principal.forget.held" | "distillate.redacted"
+                    "principal.forget"
+                        | "principal.forget.held"
+                        | "principal.forget.intent"
+                        | "distillate.redacted"
                 )
             {
                 continue;

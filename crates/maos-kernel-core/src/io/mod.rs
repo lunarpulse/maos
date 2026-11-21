@@ -22,6 +22,13 @@
 //! `http_get` URL is recorded in a thread-local journal. Use
 //! [`take_io_journal`] to drain it. This is used by Story 5.5b AC4 for
 //! air-gapped Ollama validation (asserting zero outbound non-Ollama calls).
+//!
+//! # Redirects
+//!
+//! The adapter never follows an HTTP redirect (Story 21-12). A 3xx from
+//! `http_get`/`http_post` is a typed `IoError::Transport` naming the status;
+//! `http_post_exchange` returns it as data. Provider and MCP requests therefore
+//! reach only the URL the caller pinned.
 
 pub use maos_domain::ports::IoSubsystemPort;
 
@@ -53,12 +60,18 @@ pub fn take_io_journal() -> Vec<String> {
     Vec::new()
 }
 
+/// Holds one `ureq::Agent` built with `.redirects(0)`: a request, with its headers,
+/// goes only to the URL the caller pinned; a 3xx is a refusal, never followed.
 #[derive(Debug, Clone)]
-pub struct IoSubsystemAdapter;
+pub struct IoSubsystemAdapter {
+    agent: ureq::Agent,
+}
 
 impl IoSubsystemAdapter {
     pub fn new() -> Self {
-        Self
+        Self {
+            agent: ureq::AgentBuilder::new().redirects(0).build(),
+        }
     }
 }
 
@@ -92,9 +105,16 @@ impl IoSubsystemPort for IoSubsystemAdapter {
         #[cfg(feature = "io_call_journal")]
         journal_record("GET", url);
 
-        let response = ureq::get(url)
+        let response = self
+            .agent
+            .get(url)
             .call()
             .map_err(|e| IoError::Transport(format!("ureq GET {url}: {e}")))?;
+        // `redirects(0)` hands a 3xx back as a response; only 2xx is a result.
+        if !(200..=299).contains(&response.status()) {
+            let s = response.status();
+            return Err(IoError::Transport(format!("ureq GET {url}: status {s}")));
+        }
         read_capped(response, "GET", false)
     }
 
@@ -120,7 +140,7 @@ impl IoSubsystemPort for IoSubsystemAdapter {
     ) -> Result<HttpExchange, IoError> {
         #[cfg(feature = "io_call_journal")]
         journal_record("POST", url);
-        let mut req = ureq::post(url);
+        let mut req = self.agent.post(url);
         for (k, v) in headers {
             req = req.set(k, v);
         }
@@ -135,8 +155,17 @@ impl IoSubsystemPort for IoSubsystemAdapter {
             }
             Err(e) => return Err(IoError::Transport(format!("ureq POST {url}: {e}"))),
         };
-        let header = response.header(response_header).map(str::to_owned);
         let status = response.status();
+        // A redirect is a refusal: status only, so a body failure cannot lose it and no
+        // `Location` text or body can reach an error.
+        if (300..400).contains(&status) {
+            return Ok(HttpExchange {
+                status,
+                body: Vec::new(),
+                header: None,
+            });
+        }
+        let header = response.header(response_header).map(str::to_owned);
         let body = read_capped(response, "POST", !(200..=299).contains(&status))?;
         Ok(HttpExchange {
             status,
