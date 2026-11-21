@@ -4,6 +4,10 @@ version = "0.0.0"
 publish = false
 edition = "2021"
 
+# Standalone cargo-fuzz workspace root (keeps this fuzz project out of the repository root
+# workspace — the standard cargo-fuzz convention for in-tree crates).
+[workspace]
+
 [package.metadata]
 cargo-fuzz = true
 
