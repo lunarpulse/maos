@@ -50,8 +50,23 @@ CARGO_TARGET_DIR=/mnt/build/cargo-maos-dsa cargo test --locked --offline \
 
 후보의 인용문만 원문의 무관한 문장으로 바꾼 대조 실험에서는 최종 결과 `ready_for_approval`가 맞아도 `extract.quote` 불일치로 11/12 및 비교 실패가 보고됐다. 비교 전후 배포 DB 해시는 같았다.
 
-다음 실측은 별도의 미공개 평가 세트와 새로 수집한 모델 응답을 사용한다. 이 공개 세트는 프롬프트 튜닝과 분리된 개발용 평가 기준이다. `workflow compare`에는 아직 실시간 모델 응답 수집 기능이 없다.
+다음 실측은 별도의 미공개 평가 세트와 새로 수집한 모델 응답을 사용한다. 이 공개 세트는 프롬프트 튜닝과 분리된 개발용 평가 기준이다. 실시간 추론은 `MAOS_INFERENCE_MODE=live`를 명시한 `workflow compare`에서만 사용할 수 있다. `run`, `eval`, `apply`는 이 모드를 허용하지 않는다.
 
 ## 다시 시작할 때
 
 - 진입점: [호스트 실행·권한·감사](../../crates/maos-bin/src/workflow.rs), [정확한 재생](../../crates/maos-bin/src/cassette_replay.rs), [계약·라우팅 엔진](../../crates/maos-topology/src/), [증거 전달 CLI 검증](../../crates/maos-bin/tests/workflow_evidence_cli.rs), [같은 스키마에서 실제 출력 해시를 검증하는 테스트](../../crates/maos-topology/tests/infer.rs).
+
+### 실시간 모델로 후보 비교
+
+앞 절의 합성 재생은 채점과 라우팅만 검증했다. 이제
+[`workflow compare`의 실시간 측정 모드](README.md#measure-a-candidate-with-a-live-model-explicit-bounded)에서
+`MAOS_INFERENCE_MODE=live`와 `MAOS_WORKFLOW_MAX_INFERENCE_CALLS`를 명시하고,
+등록된 제공자와 모델을 카탈로그에 고정한 뒤 `--repeat`로 활성 계획과 후보를
+같은 사례에서 반복 측정할 수 있다. 비교는 후보를 활성화하지 않는다. 보고서는
+라벨 불일치와 응답 오류 등으로 실행을 마치지 못한 경우를 구분하고, 토큰과
+추론 호출 지연 시간을 집계한다. 비용은 감사 로그에서 별도로 대사한다.
+
+실제 모델의 정확도·응답 오류율·지연 시간·토큰 사용량·비용은 이 인수인계에
+실측 결과가 없다. 공개 합성 사례 12건은 개발용 벤치마크이며, 적은 사례와
+반복 횟수로는 운영 합격 기준을 정할 수 없다. 출시 품질을 추정하려면 별도로
+보관한 미공개 사례에서 새 응답을 수집해야 한다.
