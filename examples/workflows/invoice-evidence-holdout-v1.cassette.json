@@ -1,0 +1,81 @@
+{
+  "schema_version": "maos.journey.cassette/v1",
+  "provenance": "seed",
+  "model_id": "claude-haiku-4-5-20251001",
+  "spirit_id": "invoice-evidence-extractor",
+  "session": "invoice-evidence-holdout-v1",
+  "entries": [
+    {
+      "sequence": 0,
+      "prompt_sha256": "e597589ea3af8795e0b477f22ddd92e257d09aab4a3b4ab1843d6d4415504e71",
+      "prompt_len": 269,
+      "response": {"text":"{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":true,\"quote\":\"The buyer issued purchase order PO-731 for this invoice.\"}}","stop_reason":"stop_sequence","provider_attribution":{"provider_id":"anthropic","model_id":"claude-haiku-4-5-20251001","endpoint_url":"cassette://invoice-evidence/holdout-v1"}}
+    },
+    {
+      "sequence": 1,
+      "prompt_sha256": "35e69f75256cbb70a7074698380e9b6c18e06b1de1eb5ee62845a03768780cd4",
+      "prompt_len": 280,
+      "response": {"text":"{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":false,\"quote\":\"Procurement confirms that no purchase order was issued for this invoice.\"}}","stop_reason":"stop_sequence","provider_attribution":{"provider_id":"anthropic","model_id":"claude-haiku-4-5-20251001","endpoint_url":"cassette://invoice-evidence/holdout-v1"}}
+    },
+    {
+      "sequence": 2,
+      "prompt_sha256": "4a0ddd87f241a49c84b5431fe0af8e88be01ff7a1f5737c161310216d175a906",
+      "prompt_len": 261,
+      "response": {"text":"{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":true,\"quote\":\"Buyer PO: 6F-83 (issued for this invoice).\"}}","stop_reason":"stop_sequence","provider_attribution":{"provider_id":"anthropic","model_id":"claude-haiku-4-5-20251001","endpoint_url":"cassette://invoice-evidence/holdout-v1"}}
+    },
+    {
+      "sequence": 3,
+      "prompt_sha256": "413618b6ccccf48fd494125f5707a8fee1e39a754a1298354b559239bb7d344e",
+      "prompt_len": 245,
+      "response": {"text":"{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":false,\"quote\":\"PO field: N/A (not issued).\"}}","stop_reason":"stop_sequence","provider_attribution":{"provider_id":"anthropic","model_id":"claude-haiku-4-5-20251001","endpoint_url":"cassette://invoice-evidence/holdout-v1"}}
+    },
+    {
+      "sequence": 4,
+      "prompt_sha256": "f62081b5cb97f1087b7f983968e6e7485eaf5fe750b49e55e168d140c325f7c7",
+      "prompt_len": 298,
+      "response": {"text":"{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":false,\"quote\":\"PO-604 covers the February invoice only; no purchase order is attached to this March invoice.\"}}","stop_reason":"stop_sequence","provider_attribution":{"provider_id":"anthropic","model_id":"claude-haiku-4-5-20251001","endpoint_url":"cassette://invoice-evidence/holdout-v1"}}
+    },
+    {
+      "sequence": 5,
+      "prompt_sha256": "6709282feca81d0872d08cd8fd49174dc43c4053d84427274ef9c8c2c8eae2b9",
+      "prompt_len": 302,
+      "response": {"text":"{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":true,\"quote\":\"This invoice is covered by buyer purchase order PO-822.\"}}","stop_reason":"stop_sequence","provider_attribution":{"provider_id":"anthropic","model_id":"claude-haiku-4-5-20251001","endpoint_url":"cassette://invoice-evidence/holdout-v1"}}
+    },
+    {
+      "sequence": 6,
+      "prompt_sha256": "9ef9d8dcc1644fb090b89a63bbc0863250ac9ba94dce04bf7cb0890f88994ac5",
+      "prompt_len": 286,
+      "response": {"text":"{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":true,\"quote\":\"The cancelled PO-710 was replaced by issued PO-711 for this invoice.\"}}","stop_reason":"stop_sequence","provider_attribution":{"provider_id":"anthropic","model_id":"claude-haiku-4-5-20251001","endpoint_url":"cassette://invoice-evidence/holdout-v1"}}
+    },
+    {
+      "sequence": 7,
+      "prompt_sha256": "4a8bc5095326889059715169e1e08e97ce0dcfe7b315a4893306dfbf9cb80a18",
+      "prompt_len": 261,
+      "response": {"text":"{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":false,\"quote\":\"PO-756 was voided and has no replacement for this invoice.\"}}","stop_reason":"stop_sequence","provider_attribution":{"provider_id":"anthropic","model_id":"claude-haiku-4-5-20251001","endpoint_url":"cassette://invoice-evidence/holdout-v1"}}
+    },
+    {
+      "sequence": 8,
+      "prompt_sha256": "43b2ba91e11ed376672819a34d6885421b4609df5e8bd19e8985316eaf583829",
+      "prompt_len": 261,
+      "response": {"text":"{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":true,\"quote\":\"The buyer issued PO-914 for this invoice.\"}}","stop_reason":"stop_sequence","provider_attribution":{"provider_id":"anthropic","model_id":"claude-haiku-4-5-20251001","endpoint_url":"cassette://invoice-evidence/holdout-v1"}}
+    },
+    {
+      "sequence": 9,
+      "prompt_sha256": "07840f6135168f46e65aee77794b9712c2db2c7710fdef8124634eee108de464",
+      "prompt_len": 291,
+      "response": {"text":"{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":false,\"quote\":\"Draft purchase order PO-908 is awaiting authorization and has not been issued.\"}}","stop_reason":"stop_sequence","provider_attribution":{"provider_id":"anthropic","model_id":"claude-haiku-4-5-20251001","endpoint_url":"cassette://invoice-evidence/holdout-v1"}}
+    },
+    {
+      "sequence": 10,
+      "prompt_sha256": "f0b8a09e228560a5b1eea9a5de879c9cb5e260c938af79afc4cb0a51cf0f5a59",
+      "prompt_len": 267,
+      "response": {"text":"{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":true,\"quote\":\"Issued buyer purchase order: P-44-A\"}}","stop_reason":"stop_sequence","provider_attribution":{"provider_id":"anthropic","model_id":"claude-haiku-4-5-20251001","endpoint_url":"cassette://invoice-evidence/holdout-v1"}}
+    },
+    {
+      "sequence": 11,
+      "prompt_sha256": "4ba9247a9c5a673e56ebef205ca3c6f2e89ccf74b2082b0826d0ebc1ec532d36",
+      "prompt_len": 309,
+      "response": {"text":"{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":false,\"quote\":\"No buyer PO was provided for this invoice.\"}}","stop_reason":"stop_sequence","provider_attribution":{"provider_id":"anthropic","model_id":"claude-haiku-4-5-20251001","endpoint_url":"cassette://invoice-evidence/holdout-v1"}}
+    }
+  ]
+}

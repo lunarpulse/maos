@@ -2346,8 +2346,8 @@ impl DoorInner {
         reason: Option<&str>,
     ) -> Result<Option<serde_json::Value>, String> {
         use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind};
-        let Some(row) = self
-            .transparency_log
+        let log = &self.transparency_log;
+        let Some(row) = log
             .query_frames(FrameFilter {
                 correlation_id: Some(Self::forget_replay_key(principal, reason)),
                 descending: true,
@@ -2371,11 +2371,7 @@ impl DoorInner {
             .map_err(|error| format!("invalid completed forget snapshot: {error}"))?;
         if row.origin != maos_domain::invariants::i3::FrameOrigin::Kernel
             || row.kind != FrameKind::TelemetryEvent
-            || row
-                .intent
-                .strip_prefix("operator.forget.")
-                .and_then(|intent| intent.strip_suffix(":completed"))
-                != Some(saved.operation_id.as_str())
+            || row.intent != format!("operator.forget.{}:completed", saved.operation_id)
             || saved.outcome != "completed"
             || report["operation_id"] != saved.operation_id
             || report["principal_id"] != principal
@@ -2385,21 +2381,17 @@ impl DoorInner {
         {
             return Err("durable forget report is not a completed kernel receipt".into());
         }
-        let marker = &report["frame_sweep_completion"];
         let mut marker_id = [0_u8; 16];
-        hex::decode_to_slice(
-            marker["frame_id"]
-                .as_str()
-                .ok_or("completed forget has no frame marker")?,
-            &mut marker_id,
-        )
-        .map_err(|error| format!("invalid completed forget marker: {error}"))?;
-        let through = marker["through_rowid"]
+        let frame = report["frame_sweep_completion"]["frame_id"]
+            .as_str()
+            .ok_or("completed forget has no frame marker")?;
+        hex::decode_to_slice(frame, &mut marker_id)
+            .map_err(|error| format!("invalid completed forget marker: {error}"))?;
+        let through = report["frame_sweep_completion"]["through_rowid"]
             .as_u64()
             .and_then(|rowid| i64::try_from(rowid).ok())
             .ok_or("completed forget has no valid high-water")?;
-        let certified = self
-            .transparency_log
+        let certified = log
             .query_frame_by_id(marker_id)
             .map_err(|error| error.to_string())?
             .ok_or("completed forget marker is missing")?;
@@ -2415,15 +2407,18 @@ impl DoorInner {
         {
             return Err("durable forget report does not match its certified marker".into());
         }
-        if self
-            .transparency_log
+        // A later open intent (a forget interrupted after this report) must be recovered.
+        if log
             .is_under_legal_hold(principal)
             .map_err(|error| error.to_string())?
+            || !log
+                .outstanding_forget_intents(Some(principal))
+                .map_err(|error| error.to_string())?
+                .is_empty()
         {
             return Ok(None);
         }
-        let tail = self
-            .transparency_log
+        let tail = log
             .query_frames(FrameFilter {
                 cursor_insertion_id: Some(through),
                 order_by_insertion: true,
@@ -2439,7 +2434,10 @@ impl DoorInner {
                         || frame.intent.starts_with("principal.uninstall.")
                         || matches!(
                             frame.intent.as_str(),
-                            "principal.forget" | "principal.forget.held" | "distillate.redacted"
+                            "principal.forget"
+                                | "principal.forget.held"
+                                | "principal.forget.intent"
+                                | "distillate.redacted"
                         ));
                 !retained
                     && (frame.kind == FrameKind::Distillate
@@ -2466,21 +2464,17 @@ impl DoorInner {
                 detail: "principal must not be empty".into(),
             };
         }
+        let fail = |detail: String| OperatorOutcome::Failed {
+            code: "forget_failed".into(),
+            detail,
+        };
         match tokio::task::block_in_place(|| self.completed_forget(principal, reason)) {
             Ok(Some(report)) => return OperatorOutcome::Completed(report),
             Ok(None) => {}
-            Err(detail) => {
-                return OperatorOutcome::Failed {
-                    code: "forget_failed".into(),
-                    detail,
-                };
-            }
+            Err(detail) => return fail(detail),
         }
         match tokio::task::block_in_place(|| self.memory.forget_with_reason(principal, reason)) {
-            Err(error) => OperatorOutcome::Failed {
-                code: "forget_failed".into(),
-                detail: error.to_string(),
-            },
+            Err(error) => fail(error.to_string()),
             Ok(outcome @ maos_domain::memory::ForgetOutcome::Erased { .. }) => {
                 let pump = self
                     .forget_pump
@@ -2506,9 +2500,9 @@ impl DoorInner {
                 body["terminal_code"] = serde_json::json!(if complete { 0 } else { 5 });
                 OperatorOutcome::Completed(body)
             }
+            // P29-cli: a legal-hold suspension is NOT a success — the
+            // preserved terminal code 3 rides in the body.
             Ok(outcome @ maos_domain::memory::ForgetOutcome::Suspended { .. }) => {
-                // P29-cli: a legal-hold suspension is NOT a success — the
-                // preserved terminal code 3 rides in the body.
                 OperatorOutcome::Completed(serde_json::json!({
                     "principal_id": principal,
                     "outcome": "held",

@@ -105,6 +105,9 @@ const TRANSPORT_BODY_CAP: usize = 10 * 1024 * 1024;
 /// [`ProviderError::ProviderRejected`] carrying a bounded (512-byte) excerpt of
 /// the vendor's own error body (see [`rejection_excerpt`]), so its reason
 /// survives and 4xx is never mistaken for a (retryable) transport fault.
+///
+/// The kernel IO adapter never follows a redirect (21-12): a 3xx is a rejection
+/// carrying its status, so a request and its credential reach only the pinned URL.
 pub(crate) fn post_json(
     transport: &dyn maos_domain::ports::IoSubsystemPort,
     url: &str,

@@ -112,6 +112,189 @@ baseline that executes but misses a business label does not block an
 improved candidate. Comparison never changes the active revision and is not
 an approval; `apply` remains a separate step.
 
+## Measure a candidate with a live model (explicit, bounded)
+
+Live workflow inference is available only for `workflow compare`. Set
+`MAOS_INFERENCE_MODE=live` on
+`maos workflow compare <candidate-plan.json> <candidate-digest> <cases.json> [--repeat <k>]`.
+No cassette is used. `run`, `eval`, and `apply` refuse live mode. Both plans must
+still be authorized by the operator's current catalog, and the candidate's
+parent must match the active revision. Comparison never changes the deployment;
+applying a candidate is a separate operation.
+
+Register the provider explicitly, for example with `MAOS_OLLAMA_URL` for
+Ollama or a vendor key through the [normal secret backend](../../docs/maos.dev/run-maos.md).
+The catalog must pin the exact provider and model for each inference agent.
+An unpinned or unregistered provider is refused; there is no fallback to
+another provider or model. Live calls use the same governed inference port
+with scoped capability tokens, policy checks, and cost attribution checked
+against those pins.
+
+`--repeat` takes an integer from 1 to 20 and defaults to 1. Values above 1
+are refused outside live mode before any work. The comparison runs each case
+`k` times in sequence for the active baseline, then does the same for the
+candidate, in case-file order. Live mode requires the positive integer
+`MAOS_WORKFLOW_MAX_INFERENCE_CALLS`. Before running, MAOS checks
+`case count × k × 2 × max(baseline inference steps, candidate inference steps)`,
+counting steps that use an inference agent regardless of routing. A missing,
+invalid, or too-low cap is refused before any inference, and a runtime counter
+prevents calls beyond the cap.
+
+The example below assumes a running local Ollama server with `llama3.1:8b`
+available, a built `maos`, and `jq`. Run it from the repository root. It pins
+Ollama in an isolated copy of the catalog, applies only the temporary baseline
+under strict replay (admission only, no inference call), then compares the
+unapplied candidate in live mode.
+
+```sh
+(
+set -eu
+maos="${MAOS_BIN:-target/debug/maos}"
+examples="$PWD/examples/workflows"
+export HOME="$(mktemp -d)" MAOS_SECRETS_BACKEND=env
+export MAOS_HOME="$HOME/maos"
+export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+export XDG_STATE_HOME="$HOME/state" XDG_CACHE_HOME="$HOME/cache"
+mkdir "$MAOS_HOME"
+printf 'Measurement home (kept for audit): %s\n' "$MAOS_HOME" >&2
+unset MAOS_INFERENCE_MODE MAOS_REPLAY_CASSETTE MAOS_REPLAY_STRICT
+awk '
+  /^provider = "anthropic"$/ { $0 = "provider = \"ollama\"" }
+  /^model = "claude-haiku-4-5-20251001"$/ { $0 = "model = \"llama3.1:8b\"" }
+  { print }
+' "$examples/catalog.toml" > "$MAOS_HOME/workflow-catalog.toml"
+baseline=$("$maos" workflow plan "$examples/invoice-evidence.toml" \
+  "$HOME/baseline.json" | jq -er 'select(.digest) | .digest')
+MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 \
+  MAOS_REPLAY_CASSETTE="$examples/invoice-evidence-missing.cassette.json" \
+  "$maos" workflow apply "$HOME/baseline.json" "$baseline" >/dev/null
+candidate=$("$maos" workflow plan "$examples/invoice-evidence-reroute.toml" \
+  "$HOME/candidate.json" | jq -er 'select(.digest) | .digest')
+MAOS_INFERENCE_MODE=live MAOS_OLLAMA_URL=http://localhost:11434 \
+  MAOS_WORKFLOW_MAX_INFERENCE_CALLS=200 \
+  "$maos" workflow compare "$HOME/candidate.json" "$candidate" \
+  "$examples/invoice-evidence-holdout-v1.json" --repeat 3 > "$HOME/report.json"
+jq -e 'select(.event == "workflow_comparison" and .format == 2 and .mode == "live") |
+  {repeat, max_inference_calls, cases_sha256, plans}' "$HOME/report.json"
+)
+```
+
+Live comparison writes one JSON line with `event: "workflow_comparison"`,
+`format: 2`, and `mode: "live"`. It identifies `workflow`,
+`baseline_revision`, `candidate_revision`, `cases_sha256`, `repeat`, and
+`max_inference_calls`. Replay and rules-mode output remain format 1.
+
+- `plans.baseline` and `plans.candidate` each summarize `runs` (case count
+  times `repeat`), `ran` (runs that completed), and `passed` (completed runs
+  that matched every label). `pass_rate` is `passed / runs`, while `ran_rate`
+  is `ran / runs`; both use all scheduled runs as the denominator.
+- `abstained` counts runs that did not complete (`ran: false`), such as a
+  provider transport error, malformed JSON, an incomplete or oversized
+  response, or an unknown outcome. `failed` counts completed runs that missed
+  a label. These are different failure modes.
+- Each plan also reports `calls`, `input_tokens`, `output_tokens`,
+  `latency_ms_total`, and `latency_ms_max`. Tokens come from provider-reported
+  response usage. Latency is wall time around each inference port call, not
+  total workflow runtime.
+- Each `cases` entry has an `id` and `baseline`/`candidate` summaries with
+  `runs`, `ran`, `passed`, and ordered `details` using the existing per-run
+  verdict detail format.
+
+Live comparison exits zero when it produces the report without a governance
+failure, even if some runs abstain or no run passes. Capability or policy denial
+(`workflow inference denied`), attribution mismatch, an unregistered pinned
+provider, or a call-bound violation aborts the comparison with a nonzero exit
+and no report.
+
+The report line and the single `workflow:evaluation` event at the end of a
+completed comparison record counts and digests, not prompts, case inputs,
+or model text. The report also records evaluation metadata such as case IDs
+and scoring details. It uses only these fixed error labels: `provider rejected (status N)`,
+`provider transport error`, `inference timeout`, `provider response malformed`,
+`rate limited`, `incomplete response`, `malformed evidence JSON`, `unknown outcome`,
+and `hook did not complete`. The evaluation event records only revisions,
+the case hash, repeat count, calls, and tokens.
+
+Every real call still goes through the standard kernel inference audit path.
+Its `infer:` audit rows may contain the prompt text, including the case excerpt.
+Use only synthetic or already-shareable data for live runs.
+
+The comparison report does not compute monetary cost. Reconcile costs for
+the measurement month against the same MAOS home with
+`maosctl audit cost-reconcile --month YYYY-MM`. The default price book
+(`xtask/provider-pricing.toml`) has no `ollama/llama3.1:8b` entry. To price
+this example, pass `--pricing <file>` with an operator-supplied price book
+containing that exact provider/model pair.
+
+Limitations:
+
+- Each inference hook has the dispatcher's default 30-second deadline. A
+  slower provider answer becomes an abstention (`hook did not complete`).
+- Ollama attributes the response to the model named in the request, ignoring
+  a different response `model`. It also treats a missing `done_reason` as
+  complete. The Ollama model pin therefore guarantees only the request-side
+  model, not which model served the response.
+- The committed [12-case holdout](invoice-evidence-holdout-v1.json) is a public
+  development benchmark. The repeat count (`k`) and case count (`N`) here are
+  for wiring and cost checks, not for setting an operational pass threshold.
+  Use a separately kept, unseen set for release-quality estimates. The
+  synthetic cassette control below checks scoring and routing only, not
+  live model quality.
+
+### Run the holdout scoring control
+
+The [v1 holdout](invoice-evidence-holdout-v1.json) contains 12 synthetic
+excerpts not used in the pilot prompt: six with an issued buyer PO for this
+invoice and six without one. Cases cover unrelated references, voided or
+draft orders, and multiline fields. The label is about what the excerpt
+supports, not whether a PO exists in an external system. `quote` is graded by
+exact string equality: a different but valid supporting span can score as
+wrong. The set has no abstention label and is too small to establish a
+production quality floor.
+
+The [seed cassette](invoice-evidence-holdout-v1.cassette.json) has 12 pinned,
+synthetic completions written from the labels. Replay it twice in case
+order to check scoring and routing, **not** model quality. From the repo root:
+
+```sh
+(
+set -eu
+maos="${MAOS_BIN:-target/debug/maos}"
+examples="$PWD/examples/workflows"
+scratch=$(mktemp -d)
+trap 'rm -rf -- "$scratch"' EXIT
+export HOME="$scratch"
+export MAOS_HOME="$HOME/maos" MAOS_SECRETS_BACKEND=env
+export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+export XDG_STATE_HOME="$HOME/state" XDG_CACHE_HOME="$HOME/cache"
+mkdir "$MAOS_HOME"
+cp "$examples/catalog.toml" "$MAOS_HOME/workflow-catalog.toml"
+export MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1
+export MAOS_REPLAY_CASSETTE="$HOME/holdout.cassette.json"
+jq '.entries += .entries | .entries |= to_entries | .entries |= map(.value + {sequence: .key})' \
+  "$examples/invoice-evidence-holdout-v1.cassette.json" > "$MAOS_REPLAY_CASSETTE"
+baseline=$("$maos" workflow plan "$examples/invoice-evidence.toml" \
+  "$HOME/baseline.json" | jq -er 'select(.digest) | .digest')
+"$maos" workflow apply "$HOME/baseline.json" "$baseline" >/dev/null
+candidate=$("$maos" workflow plan "$examples/invoice-evidence-reroute.toml" \
+  "$HOME/candidate.json" | jq -er 'select(.digest) | .digest')
+"$maos" workflow compare "$HOME/candidate.json" "$candidate" \
+  "$examples/invoice-evidence-holdout-v1.json" > "$HOME/report.json"
+jq -e 'select(.event == "workflow_comparison") |
+  select(.passed and .baseline_passed == 6 and .candidate_passed == 12 and .total == 12) |
+  {mode, baseline_passed, candidate_passed, total, cases_sha256}' "$HOME/report.json"
+)
+```
+
+Only the temporary baseline is applied. To measure live quality later,
+freeze the corpus hash, exclude these excerpts and labels from prompt tuning,
+and collect fresh repeated responses per plan using the
+[Spirit evaluation protocol](../../docs/research/spirit-evaluation-protocol.md).
+Report extraction, supporting evidence, and routing separately from malformed
+responses, latency, and cost. This public synthetic set is a development
+benchmark; use a separately kept, unseen set for a release-quality estimate.
+`workflow compare` does not currently collect live responses.
+
 ## Author and operate
 
 - **Business author:** Choose a stable workflow ID, name a starting step, select catalog agents, and write a destination for each named outcome: `{ step = "next-role" }` or `{ finish = "business_result" }`. Steps run by declared routes, not declaration order. Cycles, unreachable steps, missing routes, and mismatched schemas are rejected. Each step selects one successor or ends the run; there are no parallel joins.
