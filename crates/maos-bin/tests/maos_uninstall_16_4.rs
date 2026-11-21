@@ -1235,21 +1235,33 @@ fn purge_refuses_live_store_without_changing_filesystem_identity() {
         .expect("run init");
     assert!(init.status.success());
 
+    // Keep the capture outside the filesystem identity sample.
+    let shell_stdout = tempfile::NamedTempFile::new().expect("capture shell readiness");
     let mut live_root = maos_command(root)
         .args(["shell", "--plain"])
         .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
+        .stdout(shell_stdout.reopen().expect("open shell stdout"))
         .stderr(Stdio::piped())
         .spawn()
         .expect("start live MAOS root");
-    let audit = root.join("maos-home/audit/transparency.sqlite");
-    let journal = root.join("maos-home/journal/lifecycle.ndjson");
+    // Store files appear before boot has finished publishing the control lease.
+    // The REPL banner is emitted after both, so startup writes cannot race the snapshot.
     let deadline = Instant::now() + Duration::from_secs(10);
-    while !audit.exists() || !journal.exists() {
-        assert!(
-            Instant::now() < deadline,
-            "live root did not finish materializing its locked stores"
-        );
+    loop {
+        let stdout = std::fs::read(shell_stdout.path()).expect("read shell stdout");
+        if String::from_utf8_lossy(&stdout).contains("maos shell — type @hello-spirit") {
+            break;
+        }
+        if live_root.try_wait().expect("check shell status").is_some() || Instant::now() >= deadline
+        {
+            let _ = live_root.kill();
+            let output = live_root.wait_with_output().expect("reap unready shell");
+            panic!(
+                "live root did not reach the REPL: status={} stderr={}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
         std::thread::sleep(Duration::from_millis(20));
     }
 
