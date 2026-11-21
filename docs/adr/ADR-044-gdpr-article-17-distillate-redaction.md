@@ -81,9 +81,18 @@ Sentence-final punctuation is a boundary; a longer email suffix is not.
 An id glued directly to CJK text without spaces may therefore not match.
 Content copied without the id, escaped/transformed ids, external re-ingestion,
 and non-principal Shared/Loom coordination data remain explicit limits.
-Cross-store atomicity remains `v25-erasure-crash-reconciliation`: scrubs precede
-deletions, and a retry recovers outstanding requests as well as remaining
-scrubs, but mutation and audit still do not form a cross-store transaction.
+The cascade converges by forward completion (21-12); it is not atomic. A
+durable `principal.forget.intent` frame (principal as colon-grouped hex, so journal
+redaction cannot alter it) precedes the scrub; the `principal.forget` outcome
+frame names it in `completed_from_intent`. An open intent is retried at daemon
+boot and on the next forget (a forget of the same principal reuses its intent and
+its reason), and can remain pending when the erase does not succeed; a legal-hold
+request is refused unrecorded while that principal's intent is still open.
+Scrubs precede deletions, a retry recovers outstanding requests as well as
+remaining scrubs, and the completion frame counts only what it deleted. A crash
+between a mutation and its audit append stays `v25-erasure-crash-reconciliation`
+and the private tier's general non-atomicity stays
+`v25-private-tier-erase-atomicity`.
 Large-log locking/paging is owned by `20-11-erasure-inventory-closure`.
 
 ## Story 20-11 landing 1 — Spirit inventory
@@ -131,7 +140,8 @@ A signed provisional gap receipt precedes irreversible scrubs. A later failure
 retains a truthful partial proof path with installed-package retention/recovery
 status, never deletes the sole available receipt, and does not report Erased.
 The final proof is published after lifecycle completion and immediately precedes
-accepting the recoverable deletion. Cross-store crash atomicity remains outside L1.
+accepting the recoverable deletion. Cross-store crash atomicity remains outside L1;
+an interrupted principal forget converges by forward completion (21-12; not atomic).
 The provisional artifact normally remains beside the terminal inventory. Readers
 select the returned terminal `proof_path`, not directory/filename order, and may
 authenticate both. If final publication fails, the earlier gap receipt remains
@@ -202,6 +212,8 @@ frozen kernel's later private/index deletion still lacks this shared cross-store
 hold lease: `kernel_private_index_hold_lease` is an explicit L1 gap requiring
 separate measurement and a grant at the final kernel preflight; the existing
 KS/O4 allowance is not extended. No private/index lease or AC3 repair is claimed here.
+An interrupted forget converges by forward completion (21-12); cross-store
+atomicity remains `v25-erasure-crash-reconciliation`.
 Durable `principal.uninstall.scope` audit metadata preserves stable subject
 bindings across a partial uninstall, even after the live index was deleted.
 Private retained counts and held-namespace attribution share one metadata-only

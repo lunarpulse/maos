@@ -2621,6 +2621,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_collective_port(collective_port.clone())
         .with_capabilities(Some(Arc::clone(&capability))),
     );
+    // 21-12: finish any forget interrupted before the last shutdown, before the door serves.
+    let finished = memory.complete_outstanding_forgets();
+    eprintln!("maos: interrupted-forget completion (done, unfinished): {finished:?}");
 
     // Story 4.3 — SelfTelemetryAggregator (FR56).
     let self_telemetry = Arc::new(
@@ -3962,7 +3965,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-
+    // Live workflow comparison fails closed on a pinned provider outside this set; the
+    // `UnconfiguredProvider` placeholder below is not a registered driver.
+    let workflow_providers: Vec<String> = providers_map.keys().cloned().collect();
     if providers_map.is_empty() {
         providers_map.insert("anthropic".into(), Arc::new(UnconfiguredProvider));
         let _ = default_id.insert("anthropic".into());
@@ -4005,6 +4010,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ..
             }
         );
+    // Only `workflow compare` may use explicit live inference: no cassette, providers untouched.
+    let workflow_live = workflow.is_some()
+        && matches!(
+            inference_mode,
+            ResolvedInferenceMode::Live { explicit: true }
+        );
+    if workflow_live
+        && !workflow
+            .as_ref()
+            .is_some_and(maos_bin::workflow::Pending::is_compare)
+    {
+        return Err(
+            "workflow: MAOS_INFERENCE_MODE=live is supported only by `workflow compare`".into(),
+        );
+    }
 
     // The router's default remains unchanged, and so does its key set except
     // that explicit replay also answers the interned ids (18-1, below). Each
@@ -4387,6 +4407,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         });
     if let Some(workflow) = workflow {
+        let workflow_mode = match workflow_cassette_digest {
+            Some(cassette_digest) => {
+                Some(maos_bin::workflow::InferenceMode::Replay { cassette_digest })
+            }
+            None if workflow_live => Some(maos_bin::workflow::InferenceMode::Live {
+                max_calls: maos_bin::workflow::live_call_limit()?,
+                providers: workflow_providers,
+            }),
+            None => None,
+        };
         maos_kernel_core::capability::cap_tokens::init_monotonic_base();
         let result = workflow
             .execute(
@@ -4401,14 +4431,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     pid_by_spirit_id: &pid_by_spirit_id,
                     hooks: None,
                 },
-                if let Some(cassette_digest) = workflow_cassette_digest {
-                    Some(Arc::new(maos_bin::workflow::ReplayInference {
+                if let Some(mode) = workflow_mode {
+                    Some(Arc::new(maos_bin::workflow::GovernedInference {
                         port: port_builder().ok_or("workflow: inference port unavailable")?,
-                        cassette_digest,
+                        mode,
                         capability: Arc::clone(&capability),
                         enterprise: enterprise_runtime.clone(),
                         pdp: enterprise_pdp_runtime.clone(),
                         principal: session_principal.clone(),
+                        meter: Default::default(),
                     }))
                 } else {
                     None
@@ -4416,6 +4447,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 boot_nonce,
             )
             .await;
+        // A call that never settled still holds a blocking thread; dropping the runtime would wait on it.
+        if let Err(error) = &result {
+            if error.to_string().contains("did not settle") {
+                eprintln!("maos: {error}");
+                std::process::exit(1);
+            }
+        }
         hook_pump.shutdown().await;
         return result;
     }
