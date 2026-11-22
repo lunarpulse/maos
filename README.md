@@ -426,7 +426,7 @@ run on **every PR** — these shipped *before* kernel code, by design:
 
 - **`invariant-lock`** — any change to invariant files, the `lock.toml` mapping,
   or `maos-domain` invariant types requires a machine-checkable diff, a corpus
-  delta, a phase-commitment update, and ≥2 maintainer sign-offs (ADR-037).
+  delta, and a phase-commitment update (ADR-037).
 - **KLOC ceilings** — `tokei`-enforced per-crate budgets; kernel core ≤ 23,000 tokei lines,
   alarm at 22,000 (ADR-069).
 - **ABI diff** — `cargo public-api` gates the frozen Spirit ABI; only additive

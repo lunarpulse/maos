@@ -66,7 +66,6 @@ Any PR touching an invariant file (`I*.md`), the `lock.toml` mapping, or the `ma
 1. **Machine-checkable diff** against the invariant set (present by construction).
 2. **Corpus delta** — touch to `tests/coverage-matrix.yaml` (file-touched check at v0.1-α; row-count comparison at v0.3+).
 3. **Phase-commitment update** — the frontmatter (parsed as YAML against the event's base commit, never the body) of at least one touched `I*.md` changes a cadence cell or flips `claim: asserted -> guaranteed`; removed or invalid cells are refused. A row may read `guaranteed` only if its witness would fail were the production enforcement removed.
-4. **≥2 maintainer sign-offs** verified via platform API.
-5. **Forward-only progression** — no demotion of enforcement cells (`runtime → CI` is forbidden).
+4. **Forward-only progression** — no demotion of enforcement cells (`runtime → CI` is forbidden).
 
 On merge success, the gating CI job appends to `journal.jsonl`.

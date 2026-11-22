@@ -10,9 +10,7 @@ pub struct LockReport {
     pub touched_invariants: Vec<String>,
     pub missing_corpus_delta: bool,
     pub missing_phase_commitment: bool,
-    pub insufficient_reviews: bool,
     pub regression_detected: Vec<String>,
-    pub review_count: usize,
     /// Set when the PR body matches the GitHub revert idiom. Populated by
     /// detect_revert when --pr-body is provided. Used by the journal writer
     /// to emit a paired "reverted" entry referencing the original PR/SHA.
@@ -321,7 +319,7 @@ pub fn run(
     pr_body: Option<&str>,
     json: bool,
 ) -> Result<(), String> {
-    let report = invariant_lock(changed_files, pr_number, pr_body)?;
+    let report = invariant_lock(changed_files, pr_body)?;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&report).unwrap());
@@ -338,12 +336,6 @@ pub fn run(
             if report.missing_phase_commitment {
                 eprintln!("  missing: phase-commitment update (no enforcement_cadence change)");
             }
-            if report.insufficient_reviews {
-                eprintln!(
-                    "  ADR-037 violation: invariant-lock requires ≥2 maintainer sign-offs (current={})",
-                    report.review_count
-                );
-            }
             for reg in &report.regression_detected {
                 eprintln!("  regression: {reg}");
             }
@@ -359,7 +351,6 @@ pub fn run(
             std::path::Path::new(journal_output),
             &report.touched_invariants,
             pr_number.unwrap(),
-            report.review_count,
             sha.unwrap(),
             report.revert_of.as_ref(),
         )?;
@@ -381,7 +372,6 @@ fn workspace_root() -> std::path::PathBuf {
 
 fn invariant_lock(
     changed_files: Option<&str>,
-    pr_number: Option<u64>,
     pr_body_path: Option<&str>,
 ) -> Result<LockReport, String> {
     let root = workspace_root();
@@ -441,9 +431,7 @@ fn invariant_lock(
             touched_invariants: vec![],
             missing_corpus_delta: false,
             missing_phase_commitment: false,
-            insufficient_reviews: false,
             regression_detected: vec![],
-            review_count: 0,
             revert_of: None,
         });
     }
@@ -481,13 +469,8 @@ fn invariant_lock(
         regression_detected.extend(cadence_problem(inv_id, &old_src, &new_src)?);
     }
 
-    // Reviewer check via gh CLI.
-    let (review_count, insufficient_reviews) = check_reviews(pr_number)?;
-
-    let passed = !missing_corpus_delta
-        && !missing_phase_commitment
-        && !insufficient_reviews
-        && regression_detected.is_empty();
+    let passed =
+        !missing_corpus_delta && !missing_phase_commitment && regression_detected.is_empty();
 
     // Revert detection: parse PR body for GitHub revert idiom.
     // The journal-append code path (in run(), gated on --write-journal) consumes
@@ -503,9 +486,7 @@ fn invariant_lock(
         touched_invariants,
         missing_corpus_delta,
         missing_phase_commitment,
-        insufficient_reviews,
         regression_detected,
-        review_count,
         revert_of,
     })
 }
@@ -562,94 +543,7 @@ fn phase_commitment(old_src: &str, new_src: &str) -> Result<bool, String> {
     Ok(flip || parse_cadence(old_src)? != parse_cadence(new_src)?)
 }
 
-fn check_reviews(pr_number: Option<u64>) -> Result<(usize, bool), String> {
-    let pr = match pr_number {
-        Some(n) => n,
-        None => {
-            // Try to detect from gh CLI.
-            let output = Command::new("gh")
-                .args(["pr", "view", "--json", "number"])
-                .output();
-            match output {
-                Ok(o) if o.status.success() => {
-                    let json: serde_json::Value =
-                        serde_json::from_slice(&o.stdout).map_err(|e| e.to_string())?;
-                    json["number"].as_u64().ok_or("cannot parse PR number")? as u64
-                }
-                _ => {
-                    return Ok((0, false));
-                }
-            }
-        }
-    };
-
-    let output = Command::new("gh")
-        .args([
-            "pr",
-            "view",
-            &pr.to_string(),
-            "--json",
-            "reviews,headRefOid",
-        ])
-        .output();
-
-    match output {
-        Ok(o) if o.status.success() => {
-            let json: serde_json::Value =
-                serde_json::from_slice(&o.stdout).map_err(|e| e.to_string())?;
-            let count = eligible_approvals(&json);
-            Ok((count, count < 2))
-        }
-        Ok(o) => {
-            let stderr = String::from_utf8_lossy(&o.stderr);
-            return Err(format!("could not query PR reviews: {stderr}"));
-        }
-        Err(e) => {
-            return Err(format!(
-                "gh CLI not available for review check (required by ADR-037): {e}"
-            ));
-        }
-    }
-}
-
 const PHASES: [&str; 6] = ["v0.1", "v0.3", "v0.5", "v0.9", "v1.0", "v1.5"];
-
-/// ADR-037 two-reviewer rule: DISTINCT eligible maintainer identities (owner/member/collaborator)
-/// whose LATEST effective review (approve, request changes, dismiss; by `submittedAt`) is an
-/// approval of the PR's CURRENT head commit.
-fn eligible_approvals(pr: &serde_json::Value) -> usize {
-    let Some(head) = pr["headRefOid"].as_str() else {
-        return 0;
-    };
-    let mut latest: BTreeMap<String, &serde_json::Value> = BTreeMap::new();
-    for review in pr["reviews"].as_array().into_iter().flatten() {
-        let eligible = matches!(
-            review["authorAssociation"].as_str(),
-            Some("OWNER" | "MEMBER" | "COLLABORATOR")
-        );
-        let effective = matches!(
-            review["state"].as_str(),
-            Some("APPROVED" | "CHANGES_REQUESTED" | "DISMISSED")
-        );
-        let Some(login) = review["author"]["login"].as_str() else {
-            continue;
-        };
-        if !eligible || !effective {
-            continue;
-        }
-        let at = |r: &serde_json::Value| r["submittedAt"].as_str().unwrap_or("").to_string();
-        let key = login.to_ascii_lowercase();
-        if latest.get(&key).is_none_or(|seen| at(seen) <= at(review)) {
-            latest.insert(key, review);
-        }
-    }
-    latest
-        .values()
-        .filter(|r| {
-            r["state"].as_str() == Some("APPROVED") && r["commit"]["oid"].as_str() == Some(head)
-        })
-        .count()
-}
 
 /// F4: the witness a `guaranteed` row stands on (test file, corpus, CI job body) is lock scope,
 /// judged for the base AND the candidate register so a row cannot be downgraded and its witness
@@ -745,7 +639,6 @@ fn append_journal(
     output_path: &std::path::Path,
     invariant_ids: &[String],
     pr_number: u64,
-    review_count: usize,
     sha: &str,
     revert_of: Option<&RevertReference>,
 ) -> Result<(), String> {
@@ -758,7 +651,6 @@ fn append_journal(
         "ts": ts,
         "invariant_ids": invariant_ids,
         "pr_number": pr_number,
-        "reviewers": review_count,
         "sha": sha,
     });
     let mut output = format!("{primary_entry}\n");

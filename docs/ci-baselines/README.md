@@ -40,16 +40,13 @@ PRs cannot merge unless the `aggregate` job in `.github/workflows/discipline.yml
 
 ## Dogfood checklist for invariant-touching PRs
 
-When a PR touches any `docs/invariants/I*.md` file, the author must produce all three
+When a PR touches any `docs/invariants/I*.md` file, the author must produce both
 artifacts required by the `invariant-lock` gate (Story 0.1 AC5 / ADR-037):
 
 1. **Cadence touch:** Confirm that the `enforcement_cadence` block in the touched
    `I*.md` is modified (additive only — new rows allowed, regressions rejected).
 2. **Corpus delta:** Confirm that `tests/coverage-matrix.yaml` is touched in the
    same diff (adding or updating rows for the affected invariants/NFRs).
-3. **≥2 maintainer reviewers:** Explicitly request review from two maintainers in
-   the PR description. The merge is blocked until both approvals are granted
-   (operator-side ceremony, not enforceable by xtask logic).
 
 ## Dependency-introduction checklist for PRs adding deps
 

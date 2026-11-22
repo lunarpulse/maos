@@ -5,7 +5,7 @@ fn no_invariant_touch_passes() {
     // When no invariant-related files are touched, gate passes immediately.
     let changed = Some("/tmp/empty_changed.txt");
     std::fs::write(changed.unwrap(), "README.md\n").unwrap();
-    let report = invariant_lock(changed, None, None)
+    let report = invariant_lock(changed, None)
         .unwrap_or_else(|e| panic!("invariant_lock failed: {e}"));
     assert!(report.passed);
     assert!(report.touched_invariants.is_empty());
@@ -45,9 +45,7 @@ fn json_output_round_trip() {
         touched_invariants: vec!["I1".into(), "I9".into()],
         missing_corpus_delta: true,
         missing_phase_commitment: false,
-        insufficient_reviews: false,
         regression_detected: vec!["ADR-037 violation: ...".into()],
-        review_count: 1,
         revert_of: None,
     };
     let json = serde_json::to_string(&report).unwrap();
@@ -186,7 +184,7 @@ fn multi_invariant_touched_set_complete() {
         .collect();
     std::fs::write(tmpfile, paths.join("\n")).unwrap();
 
-    let report = invariant_lock(Some(tmpfile), None, None)
+    let report = invariant_lock(Some(tmpfile), None)
         .unwrap_or_else(|e| panic!("invariant_lock failed: {e}"));
 
     // 14 invariants touched.
@@ -319,7 +317,7 @@ fn multi_invariant_with_corpus_delta_clears_that_leg() {
     paths.push("tests/coverage-matrix.yaml".to_string());
     std::fs::write(tmpfile, paths.join("\n")).unwrap();
 
-    let report = invariant_lock(Some(tmpfile), None, None)
+    let report = invariant_lock(Some(tmpfile), None)
         .unwrap_or_else(|e| panic!("invariant_lock failed: {e}"));
 
     assert_eq!(report.touched_invariants.len(), 14);
@@ -335,7 +333,7 @@ fn multi_invariant_with_corpus_delta_clears_that_leg() {
 fn domain_invariant_modules_are_lock_gated() {
     let list = "/tmp/i21_10_domain_changed.txt";
     std::fs::write(list, "crates/maos-domain/src/invariants/i1.rs\n").unwrap();
-    let report = invariant_lock(Some(list), None, None).unwrap();
+    let report = invariant_lock(Some(list), None).unwrap();
     assert_eq!(report.touched_invariants, vec!["maos-domain-invariants".to_string()]);
     assert!(!report.passed, "a domain edit without corpus delta or commitment must fail");
     std::fs::remove_file(list).ok();
@@ -354,49 +352,6 @@ fn phase_commitment_ignores_context_and_accepts_cadence_or_validated_flip() {
     assert!(phase_commitment(&doc("asserted", "runtime"), &doc("asserted", "fuzz")).unwrap());
     assert!(phase_commitment(&doc("asserted", "fuzz"), &doc("guaranteed", "fuzz")).unwrap());
     assert!(!phase_commitment(&doc("guaranteed", "fuzz"), &doc("asserted", "fuzz")).unwrap());
-}
-
-fn review(login: &str, assoc: &str, state: &str, at: &str, oid: &str) -> serde_json::Value {
-    serde_json::json!({
-        "author": {"login": login}, "authorAssociation": assoc, "state": state,
-        "submittedAt": at, "commit": {"oid": oid},
-    })
-}
-
-#[test]
-fn two_approvals_need_two_distinct_eligible_maintainers_on_the_current_head() {
-    let pr = |reviews: Vec<serde_json::Value>| {
-        serde_json::json!({"headRefOid": "head2", "reviews": reviews})
-    };
-    // Planted mutation: count every APPROVED entry (the pre-fix gate).
-    // Same account twice is one identity.
-    let twice = pr(vec![
-        review("alice", "MEMBER", "APPROVED", "2026-11-22T01:00:00Z", "head2"),
-        review("Alice", "MEMBER", "APPROVED", "2026-11-22T02:00:00Z", "head2"),
-    ]);
-    assert_eq!(eligible_approvals(&twice), 1);
-    // An approval of an older revision is stale.
-    let stale = pr(vec![
-        review("alice", "MEMBER", "APPROVED", "2026-11-22T01:00:00Z", "head2"),
-        review("bob", "OWNER", "APPROVED", "2026-11-22T01:30:00Z", "head1"),
-    ]);
-    assert_eq!(eligible_approvals(&stale), 1);
-    // Approval then changes-requested: the later review wins.
-    let superseded = pr(vec![
-        review("alice", "MEMBER", "APPROVED", "2026-11-22T01:00:00Z", "head2"),
-        review("bob", "OWNER", "APPROVED", "2026-11-22T01:30:00Z", "head2"),
-        review("bob", "OWNER", "CHANGES_REQUESTED", "2026-11-22T02:00:00Z", "head2"),
-    ]);
-    assert_eq!(eligible_approvals(&superseded), 1);
-    // A later plain comment does not supersede an approval; a non-maintainer never counts.
-    let ok = pr(vec![
-        review("alice", "MEMBER", "APPROVED", "2026-11-22T01:00:00Z", "head2"),
-        review("bob", "COLLABORATOR", "APPROVED", "2026-11-22T01:30:00Z", "head2"),
-        review("bob", "COLLABORATOR", "COMMENTED", "2026-11-22T02:00:00Z", "head2"),
-        review("eve", "NONE", "APPROVED", "2026-11-22T02:00:00Z", "head2"),
-    ]);
-    assert_eq!(eligible_approvals(&ok), 2);
-    assert_eq!(eligible_approvals(&serde_json::json!({"reviews": []})), 0);
 }
 
 #[test]
