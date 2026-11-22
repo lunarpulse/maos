@@ -177,7 +177,25 @@ async fn a_looping_idle_exceeds_its_budget_and_ends_the_session_with_a_journaled
     let mut world = World::new().await;
     let text = manifest_capped(ID, "1.0.0", "lifecycle_probe.wasm", &ALL_HOOKS, "", 1);
     let path = world.write("loop.toml", &text);
-    let running = world.start(&path).await;
+    // The 1 s `[budget]` cap is what is under test: it is the dispatcher's wall for the idle firing.
+    // The child's startup and probe are not, and a manifest cap would hand them the same 1 s, which
+    // a loaded runner cannot always meet; the session's own walls get the usual 30 s.
+    let running = world
+        .start_with_turn_budget(&path, Duration::from_secs(30))
+        .await;
+    // The IdleWatchdog fires once per quiet period, and a Spirit never sent a frame fires one idle
+    // window after load. That first firing must be over (its stamp is what ends the period) before
+    // the quiet period below is begun, or its late stamp would end the new period unfired.
+    let scb = world.scb(ID);
+    let first = Instant::now() + Duration::from_secs(20);
+    while scb
+        .last_idle_fire_ns
+        .load(std::sync::atomic::Ordering::Acquire)
+        == 0
+    {
+        assert!(Instant::now() < first, "the first idle firing never ended");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
     // The next idle sleeps well past the 1 s cap.
     world.turn(ID, "sleep-idle 20").await;
     world.quiet(ID);

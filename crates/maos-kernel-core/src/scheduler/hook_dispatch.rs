@@ -774,6 +774,12 @@ impl HookDispatcher {
             wall_ns / 1000,
         );
 
+        // A hook the session ended at its own wall (the spawned session kills its export at
+        // the same computed deadline) can have its join result ready before the dispatcher's
+        // `timeout_at` is polled; such a firing exceeded its budget however it ended.
+        let over_wall =
+            matches!(result, Ok(Err(_))) && tokio::time::Instant::now() >= async_deadline;
+
         match result {
             Ok(Ok(())) => {
                 if warned {
@@ -786,7 +792,7 @@ impl HookDispatcher {
                     HookOutcome::Fired { wall_ns }
                 }
             }
-            Ok(Err(join_err)) => {
+            Ok(Err(join_err)) if !over_wall => {
                 let msg = if let Ok(panic_msg) = join_err.try_into_panic() {
                     if let Some(s) = panic_msg.downcast_ref::<String>() {
                         s.clone()
@@ -802,7 +808,7 @@ impl HookDispatcher {
                     panic_payload_preview: msg,
                 }
             }
-            Err(_elapsed) => {
+            _ => {
                 if !warned {
                     // Emit BudgetWarning if we haven't already.
                     self.emit_budget_frame(

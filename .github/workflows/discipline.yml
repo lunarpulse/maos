@@ -4671,7 +4671,7 @@ jobs:
   # substrate: every one of its legs is hermetic (synthetic frames only).
   check-multi-tenant-loom:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     services:
       postgres:
         image: pgvector/pgvector:pg16

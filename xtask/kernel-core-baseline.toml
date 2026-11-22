@@ -1,12 +1,12 @@
 # Exact kernel pin: src_lines (physical, formatted), per-file digests and set_hash of crates/maos-kernel-core/src.
 # Regenerate with `xtask check-kernel-baseline --emit-pin` and `scripts/repin.py`; history is `git log -p`, not prose here.
-src_lines = 28605
+src_lines = 28611
 
 
 
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "9f7b23bb0c737eac5688b1124f741be5b4a0fd62f6f89d90ea3480f1f2e96c86"
+set_hash = "42a36b2f45663f8c11bfd2d40390ae6487c0244856c906b378da2d2d811bffa8"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -63,7 +63,7 @@ set_hash = "9f7b23bb0c737eac5688b1124f741be5b4a0fd62f6f89d90ea3480f1f2e96c86"
 "revocation/rules.rs" = "2fc7a7dd7690e55596ebd6ddd8e51b35dbc7c733479023f931ea1a931016b8c1"
 "revocation/version_match.rs" = "b225bac84b6e2529cab18b4dadbc271f0c0ff487eaca4f11e23a49ea0ccf5046"
 "scheduler/control_block.rs" = "506e5ea17def8429881eeb6e8677674df61cf7cadc55621f9b5ca102a468908f"
-"scheduler/hook_dispatch.rs" = "63d4bc5fccdbc790a66c485ba45c00be2290a668c790d23098287a876a591b77"
+"scheduler/hook_dispatch.rs" = "e2d32e8ff2933e6fc79df645b4ea81945403fdb69aba3c16ff56acb58a1a2acf"
 "scheduler/idle_watchdog.rs" = "d796869a73aebd44c563c9d5aca1edac1288970f846a1ff45695ea502e24fd06"
 "scheduler/kernel_ctx.rs" = "4fb780685c375ddf4115da9d9712dbafea52d8b2c4bd7b15a77059907127f807"
 "scheduler/mod.rs" = "cbc09fd52007ba5b07d544f52622e531b316071255792d31c06ad6204e160631"
