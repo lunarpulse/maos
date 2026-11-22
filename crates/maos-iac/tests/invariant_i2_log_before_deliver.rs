@@ -16,7 +16,7 @@ use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i2::{check, FrameTrace, Observation};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::ports::IacBusPort;
-use maos_iac::adapter::mailbox::Mailbox;
+use maos_iac::adapter::mailbox::{Mailbox, KERNEL_SENDER_SPIRIT_ID};
 use maos_iac::adapter::transparency_log::{FrameFilter, TransparencyLogAdapter};
 use maos_iac::adapter::{IacBusAdapter, IacRtMetrics};
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
@@ -46,7 +46,8 @@ fn frame(next: &mut impl FnMut() -> u64) -> IacFrame {
         frame_id: [next() as u8; 16],
         timestamp_ns: 0,
         logical_clock: 0,
-        from: address("director"),
+        // Story 21-7: the port `deliver` is the kernel's own path and refuses any other sender.
+        from: address(KERNEL_SENDER_SPIRIT_ID),
         to: smallvec![address("test-spirit")],
         kind: FrameKind::TaskAssign,
         intent: intents[(next() % 3) as usize],
