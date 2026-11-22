@@ -35,6 +35,11 @@ struct PendingReply {
     result: Option<maos_topology::Result<AgentOutput>>,
 }
 const MAX_FILE_BYTES: usize = 1024 * 1024;
+/// The dispatcher abandons an inference hook after 30 s; `end_run` then waits this long for it.
+const DRAIN_SECS: u64 = 120;
+/// A call token must outlive every call the run still waits for. The kernel rechecks the token
+/// after the provider answers, so a shorter TTL turns a slow answer into a governance abort.
+const TOKEN_TTL_SECS: u32 = 30 + DRAIN_SECS as u32;
 const USAGE: &str = "Usage:\n  maos workflow plan <topology.toml> <new-plan.json>\n  maos workflow apply <plan.json> <approved-digest>\n  maos workflow run <workflow-id> <input.json>\n  maos workflow eval <workflow-id> <cases.json>\n  maos workflow compare <candidate-plan.json> <candidate-digest> <cases.json> [--repeat <1-20>]";
 
 fn read(path: &Path) -> Result<String> {
@@ -723,7 +728,7 @@ impl GovernedInference {
     /// Ends a run: waits for hooks the dispatcher timed out but did not join, then bumps the
     /// generation so none can start a call for it. Returns the governance fault, if any.
     async fn end_run(&self) -> Option<String> {
-        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(DRAIN_SECS);
         loop {
             {
                 let mut meter = self.meter.lock().unwrap();
@@ -799,7 +804,7 @@ impl GovernedInference {
             Scope::ProviderInfer {
                 provider: provider.to_owned(),
             },
-            60,
+            TOKEN_TTL_SECS,
             [0; 32],
             IntentClass::Standard,
         )
