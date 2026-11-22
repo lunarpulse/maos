@@ -340,10 +340,16 @@ impl Mailbox {
         // so ConsentRupture/RateLimited frames the kernel emits don't enter
         // the gate (recursion floor). The gate is also bypassed at
         // `rupture_depth ≥ 2` to prevent rupture-on-rupture cycles per
-        // Story 6.4 AC3 test 3.8. Telemetry is broadcast and never gated.
+        // Story 6.4 AC3 test 3.8. Telemetry is broadcast and never gated. Story 21-7: a
+        // kernel-minted Retract goes only to recorded recipients, so a policy change between
+        // send and retract can never silence it.
         let is_kernel_sender = frame.from.spirit_id.as_str() == KERNEL_SENDER_SPIRIT_ID;
-        let gate_enabled =
-            frame.kind != FrameKind::TelemetryEvent && !is_kernel_sender && rupture_depth < 2;
+        let kernel_retract =
+            frame.kind == FrameKind::Retract && frame.auto_marker == FrameOrigin::Kernel;
+        let gate_enabled = frame.kind != FrameKind::TelemetryEvent
+            && !is_kernel_sender
+            && !kernel_retract
+            && rupture_depth < 2;
         let mut prepared = PreparedDelivery::default();
         match (self.consent_gate.get(), gate_enabled) {
             (Some(gate), true) => {
@@ -359,6 +365,9 @@ impl Mailbox {
             }
             _ => prepared.accepted = frame.to.iter().cloned().collect(),
         }
+        // Story 21-7 — telemetry is broadcast and ungated, so it never creates directed
+        // participant records: a gate-exempt frame cannot make an uncovered addressee a recipient.
+        let resolver = resolver.filter(|_| frame.kind != FrameKind::TelemetryEvent);
         let Some(resolver) = resolver else {
             return prepared;
         };
@@ -438,21 +447,6 @@ impl Mailbox {
                 return Ok(LogBeforeDeliver::new(()));
             }
 
-            // Phase 1: Partition recipients into same-host and cross-host.
-            // Story 6.3 — cross-host frames route via the installed A2ARouter;
-            // when no router is installed, fire `CrossHostNotConfigured`.
-            let mut cross_host_targets: Vec<maos_spirit_abi::identity::HostId> = Vec::new();
-            for addr in &frame.to {
-                let spirit_id = addr.spirit_id.as_str().to_string();
-                if let Some(host_id) = &addr.host_id {
-                    cross_host_targets.push(host_id.clone());
-                    continue; // same-host validation skipped for cross-host addresses
-                }
-                if !self.mpsc_senders.contains_key(&(spirit_id.clone(), kind)) {
-                    return Err(IacBusError::UnknownSpirit(spirit_id));
-                }
-            }
-
             let resolver = self
                 .transparency_log
                 .get()
@@ -461,7 +455,7 @@ impl Mailbox {
                 accepted: accepted_recipients,
                 rejected: rejected_recipients,
                 rejected_pids,
-                ..
+                recipients,
             } = prepared.unwrap_or_else(|| self.prepare_at(&frame, rupture_depth, resolver));
 
             if !rejected_recipients.is_empty() {
@@ -556,6 +550,18 @@ impl Mailbox {
                 }
             }
 
+            // Only an ACCEPTED destination must be a registered mailbox: a gate-rejected or
+            // unloaded addressee never suppresses the quarantine row or the typed rupture above.
+            let unknown = accepted_recipients.iter().find(|a| {
+                let key = (a.spirit_id.as_str().to_string(), kind);
+                a.host_id.is_none() && !self.mpsc_senders.contains_key(&key)
+            });
+            if let Some(unknown) = unknown {
+                return Err(IacBusError::UnknownSpirit(
+                    unknown.spirit_id.as_str().to_string(),
+                ));
+            }
+
             // Replace the frame's `to` slice with the accepted set so Phase 2/3
             // delivery only fires for accepted recipients.
             let mut frame = frame;
@@ -586,6 +592,7 @@ impl Mailbox {
                 }
             }
 
+            let mut same_host_err: Option<IacBusError> = None;
             for addr in &frame.to {
                 // Story 6.3 — cross-host addresses are routed in Phase 3; skip
                 // the same-host mailbox path for those.
@@ -593,10 +600,31 @@ impl Mailbox {
                     continue;
                 }
                 let spirit_id = addr.spirit_id.as_str().to_string();
+                // Story 21-7 — the incarnation the journal recorded must still be the admitted
+                // one at the enqueue: a reload since the verdict never reaches the replacement.
+                let recorded = recipients.iter().find(|r| r.spirit_id == spirit_id);
                 let sender = match self.mpsc_senders.get(&(spirit_id.clone(), kind)) {
                     Some(entry) => entry.value().clone(),
-                    None => return Err(IacBusError::UnknownSpirit(spirit_id)),
+                    None => {
+                        same_host_err.get_or_insert(IacBusError::UnknownSpirit(spirit_id));
+                        continue;
+                    }
                 };
+                // The channel is taken first, then the incarnation is rechecked: a replacement
+                // registered after this lookup can never receive on the old incarnation's
+                // channel. A kernel Retract with no recorded recipient has no incarnation to
+                // notify, so it is never enqueued by name alone.
+                if let Some(live) = resolver {
+                    let admitted = match recorded {
+                        Some(recorded) => {
+                            live.resolve(&[spirit_id.as_str()])[0] == Some(recorded.pid)
+                        }
+                        None => kind != FrameKind::Retract,
+                    };
+                    if !admitted {
+                        continue;
+                    }
+                }
 
                 // Update last_inbound_frame_ns for the recipient via the activity
                 // tracker trait. Mutex guard is scoped to this block so the future
@@ -617,10 +645,13 @@ impl Mailbox {
                         self.metrics.inc_pending(&spirit_id, kind);
                     }
                     Err(_) => {
-                        if kind == FrameKind::EpistemicHalt {
-                            return Err(IacBusError::HaltQueueOverflow(spirit_id));
-                        }
-                        return Err(IacBusError::ChannelClosed(spirit_id, kind));
+                        // One closed recipient never strands the later ones (all eligible
+                        // recipients are attempted; the first failure is reported after).
+                        same_host_err.get_or_insert(if kind == FrameKind::EpistemicHalt {
+                            IacBusError::HaltQueueOverflow(spirit_id)
+                        } else {
+                            IacBusError::ChannelClosed(spirit_id, kind)
+                        });
                     }
                 }
             }
@@ -654,6 +685,9 @@ impl Mailbox {
                 }
             }
 
+            if let Some(e) = same_host_err {
+                return Err(e);
+            }
             Ok(LogBeforeDeliver::new(()))
         }) // close Box::pin async move
     }
@@ -795,6 +829,15 @@ impl IacBusPort for super::IacBusAdapter {
         // that depended on the halt as its duplicate signal must move to
         // `deliver_typed`. Kernel-minted-id writers keep their halt via
         // `halt_on_duplicate` inside the TL adapter.
+        //
+        // Story 21-7 (D-21-7-04 C) — pid 0 is the root's. Only the kernel's own frames may take
+        // this path; compiled-in Spirits have no bus-send primitive at GA, so a Spirit's frame
+        // is refused typed rather than journaled as the root.
+        if frame.from.spirit_id.as_str() != KERNEL_SENDER_SPIRIT_ID {
+            return Err(IacBusError::UnattributedSender(
+                frame.from.spirit_id.as_str().to_owned(),
+            ));
+        }
         self.deliver_typed(frame, 0, None).await.map(|logged| {
             let _ = logged.into_inner();
             LogBeforeDeliver::new(())

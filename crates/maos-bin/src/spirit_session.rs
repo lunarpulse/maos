@@ -263,6 +263,7 @@ impl Drop for Recipient {
 }
 
 struct IdentityOwner {
+    iac: Arc<maos_iac::adapter::IacBusAdapter>,
     lookup: Arc<RwLock<BTreeMap<String, u32>>>,
     id: String,
     pid: u32,
@@ -270,6 +271,9 @@ struct IdentityOwner {
 
 impl Drop for IdentityOwner {
     fn drop(&mut self) {
+        // The declaration goes with the identity, owner-checked like the lookup below: a
+        // replacement incarnation's declaration survives this teardown.
+        self.iac.consent_policy().unregister(&self.id, self.pid);
         let mut lookup = self
             .lookup
             .write()
@@ -375,6 +379,7 @@ pub async fn run_admitted_session(
     launch: SessionLaunch,
 ) -> Result<SessionReport, SessionError> {
     let owner = IdentityOwner {
+        iac: Arc::clone(&deps.iac),
         lookup: Arc::clone(&deps.pid_by_spirit_id),
         id: admitted.spirit_id.clone(),
         pid: admitted.pid,
@@ -1046,7 +1051,7 @@ fn mint<'a>(
 /// is a broadcast; an addressed frame reaches Spirit peers.
 fn send_scope(frame: &IacFrame) -> Scope {
     Scope::IacSend {
-        peer_class: if frame.to.is_empty() {
+        peer_class: if frame.to.is_empty() && frame.kind != FrameKind::Retract {
             "broadcast"
         } else {
             "spirit:peer"
@@ -1276,6 +1281,7 @@ fn authorize_and_deliver(
         revoke(&deps.capability, &mut issued)?;
         return Ok(false);
     }
+    let mut all_refused = false;
     let delivery = if let FramePayload::Retract(retract) = &frame.payload {
         deliver_bounded(
             deps,
@@ -1300,16 +1306,23 @@ fn authorize_and_deliver(
         frame.intent = IntentClass::Standard;
         frame.auto_marker = FrameOrigin::SpiritAuto;
         frame.intent_lineage = turn.lineage.clone();
-        frame.consent_envelope = None;
+        // Story 21-7 — a guest-supplied envelope is discarded; the granter stamps the one the
+        // authenticated sender's declaration implies, pinned to this frame for the gate, so it
+        // commits in the routed transaction. Telemetry is ungated: never "all refused".
+        let policy = deps.iac.consent_policy();
+        all_refused = policy.stamp(&mut frame, pid) && frame.kind != FrameKind::TelemetryEvent;
+        let frame_id = frame.frame_id;
         turn.clock = turn.clock.max(turn.inbound_clock) + 1;
         frame.logical_clock = turn.clock;
-        deliver_bounded(
+        let delivered = deliver_bounded(
             deps,
             runtime,
             deadline,
             deps.iac.deliver_typed(frame, pid, send_token),
         )
-        .map(drop)
+        .map(drop);
+        policy.release(frame_id);
+        delivered
     };
     if matches!(delivery, Err(SessionError::IntentPromotionDenied)) {
         revoke(&deps.capability, &mut issued)?;
@@ -1323,5 +1336,5 @@ fn authorize_and_deliver(
     } else {
         leases.extend(issued);
     }
-    Ok(true)
+    Ok(!all_refused)
 }
