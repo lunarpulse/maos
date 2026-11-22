@@ -748,8 +748,9 @@ async fn gate_runs_once_per_address_and_never_for_exempt_frames() {
     let kernel = frame(27, "__kernel", &[addr("c", None)], None, "K");
     world.send(kernel, 0).await;
     assert_eq!(world.gate.calls.load(Ordering::SeqCst), 2);
-    // Exempt from the gate, still recorded: the addressee resolved.
-    assert_eq!(world.recipients([26; 16]), vec![(7, "c".into(), None)]);
+    // Telemetry is broadcast: exempt from the gate AND never a directed participant record
+    // (Story 21-7); a kernel-sent frame is exempt from the gate but still recorded.
+    assert!(world.recipients([26; 16]).is_empty());
     assert_eq!(world.recipients([27; 16]), vec![(7, "c".into(), None)]);
 }
 

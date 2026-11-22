@@ -1503,6 +1503,7 @@ const PRODUCER_FAMILIES: [(&str, &[&str], &str); 7] = [
             "recall_17_3d",
             "participant_recall_17_8",
             "smoke_cli_wrapper_8_12",
+            "consent_gate_21_7",
         ],
         "maos-bin-network-wasm",
     ),

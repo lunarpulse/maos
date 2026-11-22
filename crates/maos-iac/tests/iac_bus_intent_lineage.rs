@@ -66,7 +66,7 @@ async fn human_authored_cross_spirit_auto_populates_lineage() {
         .unwrap();
 
     let frame = make_frame("spirit-a", &["spirit-b"], FrameOrigin::HumanAuthored);
-    let result = adapter.deliver(frame).await;
+    let result = adapter.deliver_typed(frame, 7, None).await;
     assert!(result.is_ok(), "human-authored cross-spirit should succeed");
 }
 
@@ -80,7 +80,7 @@ async fn spirit_auto_cross_spirit_empty_lineage_rejected() {
         .unwrap();
 
     let frame = make_frame("spirit-a", &["spirit-b"], FrameOrigin::SpiritAuto);
-    let result = adapter.deliver(frame).await;
+    let result = adapter.deliver_typed(frame, 7, None).await;
     assert!(result.is_err());
     match result.unwrap_err() {
         IacBusError::EIntentLineageBroken { from, to, origin } => {
@@ -104,7 +104,7 @@ async fn spirit_auto_cross_spirit_with_lineage_succeeds() {
 
     let mut frame = make_frame("spirit-a", &["spirit-b"], FrameOrigin::SpiritAuto);
     frame.intent_lineage = IntentLineage::new(vec![A2AIntent::new("standard")]);
-    let result = adapter.deliver(frame).await;
+    let result = adapter.deliver_typed(frame, 7, None).await;
     assert!(result.is_ok(), "spirit-auto with lineage should succeed");
 }
 
@@ -119,7 +119,7 @@ async fn same_spirit_empty_lineage_succeeds() {
         .unwrap();
 
     let frame = make_frame("spirit-a", &["spirit-a"], FrameOrigin::SpiritAuto);
-    let result = adapter.deliver(frame).await;
+    let result = adapter.deliver_typed(frame, 7, None).await;
     assert!(result.is_ok(), "same-spirit should bypass lineage check");
 }
 
@@ -131,7 +131,7 @@ async fn broadcast_empty_to_succeeds() {
     let adapter = IacBusAdapter::new(mailbox.clone(), log);
 
     let frame = make_frame("spirit-a", &[], FrameOrigin::SpiritAuto);
-    let result = adapter.deliver(frame).await;
+    let result = adapter.deliver_typed(frame, 7, None).await;
     assert!(result.is_ok(), "broadcast should bypass lineage check");
 }
 
@@ -148,7 +148,7 @@ async fn re_emission_preserves_lineage() {
     let mut frame = make_frame("spirit-a", &["spirit-b"], FrameOrigin::SpiritAuto);
     frame.intent_lineage =
         IntentLineage::new(vec![A2AIntent::new("standard"), A2AIntent::new("consult")]);
-    let result = adapter.deliver(frame).await;
+    let result = adapter.deliver_typed(frame, 7, None).await;
     assert!(
         result.is_ok(),
         "spirit-auto with lineage should succeed (re-emission case)"

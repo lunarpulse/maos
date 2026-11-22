@@ -341,6 +341,16 @@
 "maos_kernel_core::iac::IacBusAdapter::mailbox"            = "data-movement"
 "maos_kernel_core::iac::IacBusAdapter::transparency_log"   = "data-movement"
 
+# ── Story 21-7 — production consent policy (granter + gate) over the shared IAC surface ──
+# `pub use maos_iac::*` carries these into `maos-kernel-core`'s public API; documentation of the
+# declared surface, like the `install_a2a_router` row above (no gate follows the re-export).
+"maos_kernel_core::iac::IacBusAdapter::consent_policy"                = "data-movement"
+"maos_kernel_core::iac::consent_policy::ConsentPolicy"                = "data-movement"
+"maos_kernel_core::iac::consent_policy::ConsentPolicy::register"      = "data-movement"
+"maos_kernel_core::iac::consent_policy::ConsentPolicy::unregister"    = "data-movement"
+"maos_kernel_core::iac::consent_policy::ConsentPolicy::stamp"         = "data-movement"
+"maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::recorded_recipients" = "supervision"
+
 # ── Story 3.1 — Security / Approval Manager ──
 "maos_kernel_core::security::approval::ApprovalManager"    = "supervision"
 "maos_kernel_core::security::approval::ApprovalManager::new" = "supervision"

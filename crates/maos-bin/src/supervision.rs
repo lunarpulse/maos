@@ -2714,7 +2714,7 @@ mod worker {
                 }
                 Some(Ok(_)) => {
                     if let Some(core) = core {
-                        self.iac.unregister_promotion_set(core.spirit_id());
+                        self.iac.withdraw_spirit(core.spirit_id(), spirit_pid);
                     }
                 }
                 None => eprintln!("maos run: worker unload thread panicked for pid {spirit_pid}"),

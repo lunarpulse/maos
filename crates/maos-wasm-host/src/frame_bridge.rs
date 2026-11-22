@@ -213,6 +213,9 @@ fn rupture_reason_to_wit(r: domain::RuptureReason) -> Result<wit::RuptureReason,
         PrincipalRevoked => wit::RuptureReason::PrincipalRevoked,
         RecipientUnloaded => wit::RuptureReason::RecipientUnloaded,
         PeerIdentityUnverified => wit::RuptureReason::PeerIdentityUnverified,
+        // The WIT 2.x enum predates `ConsentNotGranted` (Story 21-7): a guest sees the nearest
+        // refusal; the journal and every native reader keep the typed reason.
+        ConsentNotGranted => wit::RuptureReason::IntentAllowlistMismatch,
         _ => {
             return Err(BridgeError::Unrepresentable {
                 ty: "RuptureReason",
