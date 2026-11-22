@@ -502,7 +502,7 @@ fn run_host_a_once(
         .env_clear()
         .env(
             "HOME",
-            t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
+            t3_substrate::isolated_runtime_home(&doorless_home::fresh_home()),
         )
         .args([
             "run",
@@ -558,7 +558,7 @@ fn spawn_host_a_holding(
         .env_clear()
         .env(
             "HOME",
-            t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
+            t3_substrate::isolated_runtime_home(&doorless_home::fresh_home()),
         )
         .args([
             "run",

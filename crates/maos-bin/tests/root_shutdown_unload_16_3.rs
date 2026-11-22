@@ -2065,21 +2065,8 @@ mod cohort {
         )
     }
 
-    /// A fresh empty `HOME` per spawned root. The A2A pin store takes an exclusive lock on
-    /// `<HOME>/.maos/a2a-pins-<local host>.json` (Story 21-3), so two roots of the same host
-    /// name in one binary must not share the binary-wide doorless home when tests run on threads.
-    fn fresh_home() -> PathBuf {
-        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-        let path = doorless_home::doorless_home().join(format!(
-            "cohort-root-{}",
-            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-        ));
-        std::fs::create_dir_all(&path).expect("fresh HOME for one cohort root");
-        path
-    }
-
     fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
-        let home = fresh_home();
+        let home = doorless_home::fresh_home();
         let mut command = Command::new(maos());
         command
             .current_dir(workspace_root())
@@ -2109,7 +2096,10 @@ mod cohort {
             .env("MAOS_AUDIT_DB", audit_db)
             .env("MAOS_OLLAMA_URL", "skip")
             .env("MAOS_TEST_BOOT_NONCE", NONCE_A.to_string())
-            .env("HOME", t3_substrate::isolated_runtime_home(&fresh_home()))
+            .env(
+                "HOME",
+                t3_substrate::isolated_runtime_home(&doorless_home::fresh_home()),
+            )
             // Required on every cross-host arm: the goal is operator-supplied
             // and the fixture asserts the MECHANISM, not the goal's content.
             .env(
