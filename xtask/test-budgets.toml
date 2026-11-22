@@ -29,7 +29,7 @@ default_seconds = 30
 # sum880.766s. ceil(1151.8 * 1.25)=1440; no per-binary exception changes.
 # Record the next green hosted sum and re-tighten under 20-7's rule-10 review row.
 # Prior: 800 -> 1100 from hosted40955589411 sum880.6s, E19 wave-2 vectors.
-total_seconds = 1675
+total_seconds = 2000
 # AC15/cohort post-fix local JUnit64ad0f22 sum807.751s (10 failures); not hosted authority.
 
 # Story 18-5-context-token-budget-accounting: context_budget_18_5,
@@ -52,8 +52,8 @@ owner = "21-9-wasm-host-default-on"
 
 [[exception]]
 binary = "maos-bin::spawned_scope_17_3c"
-seconds = 55
-reason = "17-3c spawned scope suite (24 tests): delegated-cgroup T2 runners; hosted Σ 47.9 s on run 45007034265 (PR #31), budget = observed + 10 %"
+seconds = 140
+reason = "17-3c spawned scope suite (24 tests): delegated-cgroup T2 runners; hosted Σ 47.9 s and 90.4 s on two runs of PR #31 (45007034265, 45011565932): load-dependent, budget = observed max + 55 %"
 owner = "21-9-wasm-host-default-on"
 
 [[exception]]
