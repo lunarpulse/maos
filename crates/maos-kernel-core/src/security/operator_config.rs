@@ -1,9 +1,11 @@
-//! Operator configuration — operator-policy sections for [registry] and [region].
+//! Operator configuration — operator-policy sections for [registry], [region]
+//! and [memory_quota].
 //!
 //! Resolved at composition root in this priority order:
-//! env-vars (MAOS_REGISTRY_* / MAOS_REGION_*) → ~/.config/maos/operator.toml →
-//! built-in defaults.
+//! env-vars (MAOS_REGISTRY_* / MAOS_REGION_* / MAOS_MEMORY_QUOTA_*) →
+//! ~/.config/maos/operator.toml → built-in defaults.
 
+use crate::memory::{TierLimit, DEFAULT_PRIVATE_LIMIT, DEFAULT_SHARED_LIMIT};
 use crate::security::manifest::Posture;
 use maos_domain::region::Region;
 use maos_spirit_abi::compliance::TrustTier;
@@ -219,6 +221,67 @@ impl RegionSection {
     }
 }
 
+/// Story 21.6 (FR28) — per-identity memory-tier quota (the `[memory_quota]`
+/// section, keys `private_bytes`, `private_entries`, `shared_bytes`,
+/// `shared_entries`; env `MAOS_MEMORY_QUOTA_<KEY>` overrides). One limit per
+/// tier applies to every Spirit; a Spirit cannot raise its own. An invalid
+/// value warns and keeps the lower-precedence value (never unbounded).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MemoryQuotaSection {
+    pub private: TierLimit,
+    pub shared: TierLimit,
+}
+
+impl MemoryQuotaSection {
+    /// Resolve env → `~/.config/maos/operator.toml` → built-in defaults.
+    pub fn resolve_from_env_and_disk() -> Self {
+        let table = std::env::var("HOME")
+            .ok()
+            .and_then(|home| {
+                let path = std::path::PathBuf::from(home).join(".config/maos/operator.toml");
+                let parsed = match std::fs::read_to_string(path) {
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+                    Err(_) => Err("unreadable"),
+                    Ok(text) => text.parse::<toml::Value>().map_err(|_| "not valid TOML"),
+                };
+                parsed
+                    .map_err(|why| eprintln!("maos: warning: operator.toml {why}; quota ignored"))
+                    .ok()
+            })
+            .and_then(|value| value.get("memory_quota").cloned());
+        let pick = |name: &str, default: u64| {
+            let env = std::env::var(format!("MAOS_MEMORY_QUOTA_{}", name.to_ascii_uppercase()));
+            let toml_value = table.as_ref().and_then(|table| table.get(name));
+            [
+                toml_value.map(|v| v.as_integer().and_then(|n| u64::try_from(n).ok())),
+                env.map_or_else(
+                    |e| matches!(e, std::env::VarError::NotUnicode(_)).then_some(None),
+                    |raw| Some(raw.trim().parse::<u64>().ok()),
+                ),
+            ]
+            .into_iter()
+            .flatten()
+            .fold(default, |value, parsed| {
+                parsed.unwrap_or_else(|| {
+                    eprintln!("maos: warning: invalid memory_quota {name}; ignored");
+                    value
+                })
+            })
+        };
+        let (private, shared) = (DEFAULT_PRIVATE_LIMIT, DEFAULT_SHARED_LIMIT);
+        Self {
+            private: TierLimit {
+                bytes: pick("private_bytes", private.bytes),
+                entries: pick("private_entries", private.entries),
+            },
+            shared: TierLimit {
+                bytes: pick("shared_bytes", shared.bytes),
+                entries: pick("shared_entries", shared.entries),
+            },
+        }
+    }
+}
+
 /// Story 16-6 — operator posture ceiling resolver. It is a namespace rather
 /// than persisted configuration because the sole effective value is optional.
 pub struct PostureSection;
@@ -426,5 +489,62 @@ mod tests {
             assert_eq!(PostureSection::resolve_from_env_and_disk(), None);
         }
         std::env::remove_var("MAOS_POSTURE_CEILING");
+    }
+
+    #[test]
+    fn memory_quota_defaults_and_env_override() {
+        let _guard = ENV_LOCK.lock();
+        let defaults = MemoryQuotaSection::resolve_from_env_and_disk();
+        assert_eq!(defaults.private, DEFAULT_PRIVATE_LIMIT);
+        assert_eq!(defaults.shared, DEFAULT_SHARED_LIMIT);
+        std::env::set_var("MAOS_MEMORY_QUOTA_SHARED_BYTES", "123");
+        std::env::set_var("MAOS_MEMORY_QUOTA_PRIVATE_ENTRIES", "not-a-number");
+        let section = MemoryQuotaSection::resolve_from_env_and_disk();
+        assert_eq!(section.shared.bytes, 123);
+        assert_eq!(section.private.entries, DEFAULT_PRIVATE_LIMIT.entries);
+        std::env::remove_var("MAOS_MEMORY_QUOTA_SHARED_BYTES");
+        std::env::remove_var("MAOS_MEMORY_QUOTA_PRIVATE_ENTRIES");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn memory_quota_survives_a_malformed_file_and_non_unicode_env() {
+        use std::os::unix::ffi::OsStringExt;
+        let _guard = ENV_LOCK.lock();
+        let home = std::env::var_os("HOME");
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::env::set_var("HOME", tmp.path());
+        let file = tmp.path().join(".config/maos/operator.toml");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        // A valid file is honoured, including a restrictive zero.
+        std::fs::write(&file, "[memory_quota]\nshared_entries = 0\n").unwrap();
+        assert_eq!(
+            MemoryQuotaSection::resolve_from_env_and_disk()
+                .shared
+                .entries,
+            0
+        );
+        // A file that does not parse (oversized integer) is reported and the
+        // defaults apply, rather than a partial or silent result.
+        std::fs::write(
+            &file,
+            "[memory_quota]\nprivate_bytes = 99999999999999999999\n",
+        )
+        .unwrap();
+        let section = MemoryQuotaSection::resolve_from_env_and_disk();
+        assert_eq!(section.private, DEFAULT_PRIVATE_LIMIT);
+        // A non-Unicode override is reported (never printed) and not applied.
+        std::fs::write(&file, "[memory_quota]\nshared_bytes = 7\n").unwrap();
+        let name = "MAOS_MEMORY_QUOTA_SHARED_BYTES";
+        std::env::set_var(name, std::ffi::OsString::from_vec(vec![0xff, 0xfe]));
+        assert_eq!(
+            MemoryQuotaSection::resolve_from_env_and_disk().shared.bytes,
+            7
+        );
+        std::env::remove_var(name);
+        match home {
+            Some(home) => std::env::set_var("HOME", home),
+            None => std::env::remove_var("HOME"),
+        }
     }
 }

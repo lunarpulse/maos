@@ -33,8 +33,14 @@ use rustix::fs::{
 #[cfg(unix)]
 use rustix::io::Errno;
 
-use maos_domain::memory::{MemoryEntry, MemoryError, MemoryNamespace, MemoryValue, ValueKind};
+use super::{self as quota, TierLimit, Usage};
+use maos_domain::memory::{
+    MemoryEntry, MemoryError, MemoryNamespace, MemoryTier, MemoryValue, ValueKind,
+};
 use sha2::{Digest, Sha256};
+
+/// Erased logical entries: `(owner dir, key) -> (ledger owner, charged length)`.
+type Freed = HashMap<(String, String), (String, u64)>;
 
 const MAX_KEY_LEN: usize = 1024;
 
@@ -56,14 +62,18 @@ struct SpillBackup {
 
 /// Per-Spirit in-memory + filesystem-backed key-value store.
 #[maos_attrs::i9_exempt(
-    reason = "memory manager private tier — per-Spirit-keyed in-memory map + per-Spirit-namespaced filesystem area for ADR-026 + I5 isolation; bounded by principal forget-cascade and per-Spirit memory budget"
+    reason = "memory manager private tier — per-Spirit-keyed in-memory map + per-Spirit-namespaced filesystem area for ADR-026 + I5 isolation; bounded by the per-identity tier quota (bytes + entries, refused with MemoryError::QuotaExceeded; FR28) and the principal forget-cascade"
 )]
 pub struct PrivateMemoryStore {
-    in_mem: RwLock<HashMap<(u32, MemoryNamespace, String), MemoryValue>>,
+    in_mem: RwLock<HashMap<(String, MemoryNamespace, String), MemoryValue>>,
     owners: RwLock<HashMap<u32, String>>,
     fs_root: PathBuf,
     inline_threshold: usize,
     io_lock: Mutex<()>,
+    /// Per-owner usage; only touched while `io_lock` is held, so a check and
+    /// its charge are atomic.
+    usage: Mutex<HashMap<String, Usage>>,
+    limit: TierLimit,
 }
 
 impl PrivateMemoryStore {
@@ -74,7 +84,95 @@ impl PrivateMemoryStore {
             fs_root,
             inline_threshold,
             io_lock: Mutex::new(()),
+            usage: Mutex::new(HashMap::new()),
+            limit: quota::DEFAULT_PRIVATE_LIMIT,
         }
+    }
+
+    /// Apply the operator-resolved per-identity quota (FR28).
+    pub fn with_quota(mut self, limit: TierLimit) -> Self {
+        self.limit = limit;
+        self
+    }
+
+    fn ledger(&self) -> std::sync::MutexGuard<'_, HashMap<String, Usage>> {
+        self.usage
+            .lock()
+            .expect("PrivateMemoryStore usage poisoned")
+    }
+
+    /// Usage for `owner`, rebuilt from the durable spills on first use in this
+    /// process. Caller holds `io_lock`. Memory-only entries count for the life
+    /// of the process.
+    fn usage_of(&self, owner: &str) -> Result<Usage, MemoryError> {
+        let mut usage = self.ledger();
+        if let Some(known) = usage.get(owner) {
+            return Ok(*known);
+        }
+        let rebuilt = self.rebuild_usage(owner)?;
+        Ok(*usage.entry(owner.to_string()).or_insert(rebuilt))
+    }
+
+    #[cfg(unix)]
+    fn rebuild_usage(&self, owner: &str) -> Result<Usage, MemoryError> {
+        let mut usage = Usage::default();
+        let Some(root) = self.open_root(false)? else {
+            return Ok(usage);
+        };
+        let Some(owner_dir) = Self::open_identity_dir(&root, owner, false)? else {
+            return Ok(usage);
+        };
+        for ns_name in Self::list_names(&owner_dir)? {
+            let Some(dir) = Self::open_dir_component(&owner_dir, &ns_name, false)
+                .ok()
+                .flatten()
+            else {
+                continue;
+            };
+            let identity = if ns_name.starts_with("h-") {
+                match Self::open_candidate(&dir, ".identity", ValueKind::Text)? {
+                    Some(DiskCandidate {
+                        value: MemoryValue::Text(identity),
+                        ..
+                    }) => identity,
+                    _ => continue,
+                }
+            } else {
+                ns_name
+            };
+            let principal = hex::decode(identity)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<MemoryNamespace>(&bytes).ok())
+                .is_some_and(|ns| matches!(ns, MemoryNamespace::Principal { .. }));
+            // The newest version wins, exactly as `select_disk_value` reads it.
+            let mut newest: HashMap<String, (i128, i128, String, u64)> = HashMap::new();
+            for name in Self::list_names(&dir)? {
+                if let Some((key, _)) = Self::spill_name_parts(&name) {
+                    let stat =
+                        statat(&dir, &name, AtFlags::SYMLINK_NOFOLLOW).map_err(Self::errno)?;
+                    let len = u64::try_from(stat.st_size).unwrap_or(0);
+                    let seen = newest.entry(key.to_string()).or_default();
+                    let rank = (stat.st_mtime as i128, stat.st_mtime_nsec as i128, name, len);
+                    if rank > *seen {
+                        *seen = rank;
+                    }
+                }
+            }
+            for (disk_key, (.., len)) in newest {
+                let key = if principal {
+                    Self::decode_principal_key(&dir, &disk_key)?
+                } else {
+                    disk_key
+                };
+                usage.charge(None, quota::entry_len(&key, len));
+            }
+        }
+        Ok(usage)
+    }
+
+    #[cfg(not(unix))]
+    fn rebuild_usage(&self, _owner: &str) -> Result<Usage, MemoryError> {
+        Ok(Usage::default())
     }
 
     /// Bind an admitted pid before memory access; a binding cannot be changed.
@@ -114,6 +212,12 @@ impl PrivateMemoryStore {
             .get(&spirit_pid)
             .cloned()
             .unwrap_or_else(|| spirit_pid.to_string())
+    }
+
+    /// Ledger and cache key: the stable owner (bounded like its directory), so
+    /// every pid bound to one identity shares one size source.
+    fn owner_key(&self, spirit_pid: u32) -> String {
+        Self::bounded_component(&self.owner_dirname(spirit_pid))
     }
 
     // ------------------------------------------------------------------
@@ -845,10 +949,13 @@ impl PrivateMemoryStore {
             #[cfg(any(test, debug_assertions))]
             spill_test_faults::pause(PausePoint::BeforeRename);
             #[cfg(any(test, debug_assertions))]
-            spill_test_faults::fail_if_armed(FailurePoint::Rename)?;
-            if let Err(error) = renameat(directory, temp_name, directory, final_name) {
+            let injected = spill_test_faults::fail_if_armed(FailurePoint::Rename);
+            #[cfg(not(any(test, debug_assertions)))]
+            let injected = Ok(());
+            let rename = || renameat(directory, temp_name, directory, final_name);
+            if let Err(error) = injected.and_then(|()| rename().map_err(Self::errno)) {
                 return Err(Self::combined_error(
-                    Self::errno(error),
+                    error,
                     Self::cleanup_transaction_files(directory, Some(temp_name), &backups),
                     "spill transaction cleanup failed",
                 ));
@@ -868,10 +975,12 @@ impl PrivateMemoryStore {
             }
         }
         #[cfg(any(test, debug_assertions))]
-        spill_test_faults::fail_if_armed(FailurePoint::CommitDirectorySync)?;
-        if let Err(error) = fsync(directory) {
+        let injected = spill_test_faults::fail_if_armed(FailurePoint::CommitDirectorySync);
+        #[cfg(not(any(test, debug_assertions)))]
+        let injected = Ok(());
+        if let Err(error) = injected.and_then(|()| fsync(directory).map_err(Self::errno)) {
             return Err(Self::combined_error(
-                Self::errno(error),
+                error,
                 Self::rollback_spills(directory, final_name.as_deref(), &backups),
                 "spill rollback failed",
             ));
@@ -893,15 +1002,32 @@ impl PrivateMemoryStore {
         namespace: &MemoryNamespace,
         key: &str,
         value: MemoryValue,
+        enforce: bool,
     ) -> Result<(), MemoryError> {
         Self::sanitize_key(key)?;
         let _io_guard = self
             .io_lock
             .lock()
             .expect("PrivateMemoryStore I/O lock poisoned");
+        let value_len = value.approximate_len()?;
         let needs_spill = matches!(namespace, MemoryNamespace::Principal { .. })
             || matches!(value, MemoryValue::Markdown(_))
-            || value.approximate_len()? > self.inline_threshold;
+            || value_len > self.inline_threshold;
+
+        // FR28: check against the identity's usage, charge only after commit.
+        // An unreadable prior value is treated as absent (conservative).
+        let owner = self.owner_key(spirit_pid);
+        let new_len = quota::entry_len(key, value_len as u64);
+        let old = self
+            .read_locked(spirit_pid, namespace, key)
+            .ok()
+            .flatten()
+            .and_then(|prior| prior.approximate_len().ok())
+            .map(|len| quota::entry_len(key, len as u64));
+        let used = self.usage_of(&owner)?;
+        if enforce {
+            quota::check(MemoryTier::Private, self.limit, used, old, new_len)?;
+        }
 
         #[cfg(unix)]
         {
@@ -928,7 +1054,7 @@ impl PrivateMemoryStore {
             )));
         }
 
-        let key_tuple = (spirit_pid, namespace.clone(), key.to_string());
+        let key_tuple = (owner.clone(), namespace.clone(), key.to_string());
         let mut map = self
             .in_mem
             .write()
@@ -938,7 +1064,47 @@ impl PrivateMemoryStore {
         } else {
             map.insert(key_tuple, value);
         }
+        self.ledger().entry(owner).or_default().charge(old, new_len);
         Ok(())
+    }
+
+    /// Delete one of the Spirit's own entries (spills and map) and credit its
+    /// owner (FR28 compaction). Principal entries are erased only by the
+    /// forget cascade, which honors legal holds and writes the receipt.
+    pub(in crate::memory) fn delete(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<bool, MemoryError> {
+        if matches!(namespace, MemoryNamespace::Principal { .. }) {
+            return Err(MemoryError::NamespaceViolation(
+                "Principal entries are erased only by the forget cascade".into(),
+            ));
+        }
+        Self::sanitize_key(key)?;
+        let _io_guard = self
+            .io_lock
+            .lock()
+            .expect("PrivateMemoryStore I/O lock poisoned");
+        let owner = self.owner_key(spirit_pid);
+        self.usage_of(&owner)?;
+        let Some(prior) = self.read_locked(spirit_pid, namespace, key)? else {
+            return Ok(false);
+        };
+        let len = quota::entry_len(key, prior.approximate_len()? as u64);
+        #[cfg(unix)]
+        if let Some(directory) = self.open_namespace_dir(spirit_pid, namespace, false)? {
+            Self::replace_spills(&directory, key, None)?;
+        }
+        self.in_mem
+            .write()
+            .expect("PrivateMemoryStore lock poisoned")
+            .remove(&(owner.clone(), namespace.clone(), key.to_string()));
+        if let Some(usage) = self.ledger().get_mut(&owner) {
+            usage.credit(len, 1);
+        }
+        Ok(true)
     }
 
     pub(in crate::memory) fn read(
@@ -952,7 +1118,21 @@ impl PrivateMemoryStore {
             .io_lock
             .lock()
             .expect("PrivateMemoryStore I/O lock poisoned");
-        let key_tuple = (spirit_pid, namespace.clone(), key.to_string());
+        self.read_locked(spirit_pid, namespace, key)
+    }
+
+    /// `read` for callers already holding `io_lock`.
+    fn read_locked(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<Option<MemoryValue>, MemoryError> {
+        let key_tuple = (
+            self.owner_key(spirit_pid),
+            namespace.clone(),
+            key.to_string(),
+        );
         if let Some(value) = self
             .in_mem
             .read()
@@ -1060,6 +1240,7 @@ impl PrivateMemoryStore {
             .io_lock
             .lock()
             .expect("PrivateMemoryStore I/O lock poisoned");
+        let owner = self.owner_key(spirit_pid);
         let mut entries = Vec::new();
         let mut cached = std::collections::HashSet::new();
         {
@@ -1067,8 +1248,8 @@ impl PrivateMemoryStore {
                 .in_mem
                 .read()
                 .expect("PrivateMemoryStore lock poisoned");
-            for ((pid, candidate_namespace, key), value) in map.iter() {
-                if *pid != spirit_pid
+            for ((candidate_owner, candidate_namespace, key), value) in map.iter() {
+                if *candidate_owner != owner
                     || candidate_namespace != namespace
                     || !key.starts_with(prefix)
                 {
@@ -1133,21 +1314,29 @@ impl PrivateMemoryStore {
             .io_lock
             .lock()
             .expect("PrivateMemoryStore I/O lock poisoned");
+        let mut freed = Freed::new();
         #[cfg(unix)]
-        {
-            self.forget_principal_unix(principal_id)
-        }
+        let result = self.forget_principal_unix(principal_id, &mut freed);
         #[cfg(not(unix))]
-        {
-            self.forget_principal_nonunix(principal_id)
+        let result = self.forget_principal_nonunix(principal_id, &mut freed);
+        // Credit every owner for what was really removed, even after a partial
+        // failure: inline entries keep their charge and the ledger is never reset.
+        let mut usage = self.ledger();
+        for (owner, len) in freed.into_values() {
+            if let Some(usage) = usage.get_mut(&owner) {
+                usage.credit(len, 1);
+            }
         }
+        result
     }
 
     #[cfg(unix)]
-    fn forget_principal_unix(&self, principal_id: &str) -> Result<u64, MemoryError> {
-        let mut erased: std::collections::HashSet<(String, String)> =
-            std::collections::HashSet::new();
-        let to_remove: Vec<(u32, MemoryNamespace, String)> = self
+    fn forget_principal_unix(
+        &self,
+        principal_id: &str,
+        erased: &mut Freed,
+    ) -> Result<u64, MemoryError> {
+        let to_remove: Vec<(String, MemoryNamespace, String)> = self
             .in_mem
             .read()
             .expect("PrivateMemoryStore lock poisoned")
@@ -1161,7 +1350,9 @@ impl PrivateMemoryStore {
                     } if candidate == principal_id
                 )
             })
-            .map(|((pid, namespace, key), _value)| (*pid, namespace.clone(), key.clone()))
+            .map(|((owner, namespace, key), _value)| {
+                (owner.clone(), namespace.clone(), key.clone())
+            })
             .collect();
 
         if let Some(root) = self.open_root(false)? {
@@ -1237,16 +1428,29 @@ impl PrivateMemoryStore {
                     for file_name in Self::list_names(&namespace_dir)? {
                         let stat = statat(&namespace_dir, &file_name, AtFlags::SYMLINK_NOFOLLOW)
                             .map_err(Self::errno)?;
+                        let mut removed = None;
                         if FileType::from_raw_mode(stat.st_mode).is_file() {
                             if let Some(key) = Self::key_from_spill_name(&file_name) {
-                                erased.insert((
-                                    logical_dir.clone(),
-                                    Self::decode_principal_key(&namespace_dir, key)?,
-                                ));
+                                let key = Self::decode_principal_key(&namespace_dir, key)?;
+                                let size = u64::try_from(stat.st_size).unwrap_or(0);
+                                removed = Some((quota::entry_len(&key, size), key));
                             }
                         }
                         if !file_name.starts_with(".key-") && file_name != ".identity" {
                             Self::remove_tree(&namespace_dir, &file_name)?;
+                        }
+                        // Account an entry only once its spill is really gone, and
+                        // drop its cache so a retry cannot credit it twice.
+                        if let (Some((len, key)), Some(namespace)) = (removed, &decoded) {
+                            let cached = (pid_name.clone(), namespace.clone(), key.clone());
+                            self.in_mem
+                                .write()
+                                .expect("PrivateMemoryStore lock poisoned")
+                                .remove(&cached);
+                            erased
+                                .entry((logical_dir.clone(), key))
+                                .and_modify(|seen| seen.1 = seen.1.max(len))
+                                .or_insert((pid_name.clone(), len));
                         }
                     }
                     for metadata in Self::list_names(&namespace_dir)? {
@@ -1278,23 +1482,25 @@ impl PrivateMemoryStore {
             .in_mem
             .write()
             .expect("PrivateMemoryStore lock poisoned");
-        for (pid, namespace, key) in to_remove {
-            if map.remove(&(pid, namespace.clone(), key.clone())).is_some() {
-                erased.insert((
-                    format!(
-                        "{}/{}",
-                        Self::bounded_component(&self.owner_dirname(pid)),
-                        Self::bounded_component(&Self::namespace_to_dirname(&namespace)?)
-                    ),
-                    key,
-                ));
+        for (owner, namespace, key) in to_remove {
+            if let Some(value) = map.remove(&(owner.clone(), namespace.clone(), key.clone())) {
+                let dir = format!(
+                    "{owner}/{}",
+                    Self::bounded_component(&Self::namespace_to_dirname(&namespace)?)
+                );
+                let len = quota::entry_len(&key, value.approximate_len()? as u64);
+                erased.entry((dir, key)).or_insert((owner, len));
             }
         }
         Ok(erased.len() as u64)
     }
 
     #[cfg(not(unix))]
-    fn forget_principal_nonunix(&self, principal_id: &str) -> Result<u64, MemoryError> {
+    fn forget_principal_nonunix(
+        &self,
+        principal_id: &str,
+        freed: &mut Freed,
+    ) -> Result<u64, MemoryError> {
         if self.fs_root.exists() {
             return Err(MemoryError::Io(std::io::Error::new(
                 std::io::ErrorKind::Unsupported,
@@ -1306,14 +1512,19 @@ impl PrivateMemoryStore {
             .write()
             .expect("PrivateMemoryStore lock poisoned");
         let before = map.len();
-        map.retain(|(_pid, namespace, _key), _value| {
-            !matches!(
+        map.retain(|(pid, namespace, key), value| {
+            let hit = matches!(
                 namespace,
                 MemoryNamespace::Principal {
                     principal_id: candidate,
                     ..
                 } if candidate == principal_id
-            )
+            );
+            if let (true, Ok(len)) = (hit, value.approximate_len()) {
+                let len = quota::entry_len(key, len as u64);
+                freed.insert((pid.clone(), key.clone()), (pid.clone(), len));
+            }
+            !hit
         });
         Ok((before - map.len()) as u64)
     }

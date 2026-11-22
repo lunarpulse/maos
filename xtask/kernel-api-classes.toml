@@ -708,3 +708,10 @@
 "maos_kernel_core::memory::MemoryManagerAdapter::bind_storage_identity" = "data-movement" # delegates the admitted storage binding
 # 20-3b landing 2 review corrections, operator ruling w8: stable-owner discovery.
 "maos_kernel_core::memory::MemoryManagerAdapter::principal_ids_for_spirit" = "data-movement" # durable index discovery by full admitted identity
+# 21-6 memory-tier quota (FR28): per-identity limits, refused with MemoryError::QuotaExceeded.
+"maos_kernel_core::memory::TierLimit" = "data-movement"
+"maos_kernel_core::memory::DEFAULT_PRIVATE_LIMIT" = "data-movement"
+"maos_kernel_core::memory::DEFAULT_SHARED_LIMIT" = "data-movement"
+"maos_kernel_core::memory::open_stores" = "data-movement" # both tier stores with the operator quota
+"maos_kernel_core::security::operator_config::MemoryQuotaSection" = "supervision"
+"maos_kernel_core::security::operator_config::MemoryQuotaSection::resolve_from_env_and_disk" = "supervision"

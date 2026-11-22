@@ -169,6 +169,8 @@ impl HaltResolver for KernelHaltResolver {
                     .ok_or_else(|| ResolveError::UnknownHalt(halt_id.as_str().into()))?;
 
                 // 2. Write the supplied context to the Spirit's private tier.
+                //    Charged to the Spirit but never refused on quota grounds
+                //    (D-21-6-06): the Spirit's next growing write is refused.
                 self.memory
                     .write_kernel_origin(
                         pending.spirit_pid,
@@ -176,6 +178,7 @@ impl HaltResolver for KernelHaltResolver {
                         &MemoryNamespace::Default,
                         &format!("halt_context::{}", halt_id.as_str()),
                         MemoryValue::Text(text.clone()),
+                        false, // charge, never refuse (D-21-6-06)
                     )
                     .map_err(|e| ResolveError::Internal(format!("memory.write failed: {e}")))?;
 
