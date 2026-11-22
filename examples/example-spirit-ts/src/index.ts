@@ -69,7 +69,35 @@ Follow the example procedure.
     }
   }
 
-  return [frame];
+  return isShellRequest(frame) ? [shellReply(frame)] : [frame];
+}
+
+// The local shell is a host-only pseudo-address, outside the `[class].name`
+// lowercase/digit/hyphen grammar, so no installed Spirit (including a real
+// `operator`) can hold it. These checks only select this Spirit's echo behavior;
+// they grant no authority and do not choose the host's reply route.
+const SHELL_SOURCE = "@maos-shell";
+const SHELL_SUCCESS_CRITERIA = "Answer the operator's shell message";
+
+function isShellRequest(frame: IacFrame): boolean {
+  return frame.autoMarker === "human-authored" &&
+    frame.kind === "task-assign" &&
+    frame.frameFrom?.spiritId === SHELL_SOURCE &&
+    frame.frameFrom.hostId == null &&
+    frame.frameFrom.role == null &&
+    frame.payload?.tag === "task-assign" &&
+    frame.payload.val.successCriteria === SHELL_SUCCESS_CRITERIA;
+}
+
+/** One ordinary `TaskComplete` addressed to the inbound sender, echoing the goal. */
+function shellReply(frame: IacFrame): IacFrame {
+  const goal = frame.payload.tag === "task-assign" ? frame.payload.val.goal : "";
+  return {
+    ...frame,
+    to: [frame.frameFrom],
+    kind: "task-complete",
+    payload: { tag: "task-complete", val: { resultText: `echo: ${goal}` } },
+  };
 }
 
 export function onStart(): void {

@@ -219,10 +219,12 @@ fn address(spirit_id: &str, host: Option<&str>) -> FrameAddress {
     }
 }
 
+// A swap successor is spawned with the runner's private `--held-component-*` handoff flags
+// appended; this twin stands in for a runner without a component and ignores exactly those.
 fn parse_mode() -> Result<String, String> {
-    let mut args = std::env::args().skip(1);
-    match (args.next().as_deref(), args.next(), args.next()) {
-        (Some("--mode"), Some(mode), None) => Ok(mode),
-        _ => Err("usage: hostile-twin --mode <mode>".into()),
+    let held = |r: &[String]| r.iter().step_by(2).all(|k| k.starts_with("--held-component-"));
+    match std::env::args().skip(1).collect::<Vec<_>>().as_slice() {
+        [f, m, r @ ..] if f == "--mode" && held(r) => Ok(m.clone()),
+        _ => Err("usage: hostile-twin --mode <mode> [--held-component-* <value>]...".into()),
     }
 }

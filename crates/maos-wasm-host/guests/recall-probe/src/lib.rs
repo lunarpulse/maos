@@ -33,7 +33,9 @@
 //! `unavailable`; those calls must produce no transport records.
 wit_bindgen::generate!({ path: "../../../../wit/spirit.wit", world: "spirit" });
 
-use maos::spirit::frames::{FrameKind, FrameOrigin, FramePayload, TelemetryEventBody};
+use maos::spirit::frames::{
+    FrameKind, FrameOrigin, FramePayload, TaskCompleteBody, TelemetryEventBody,
+};
 use maos::spirit::recall::{self, RecallCursor, RecallError, RecallFilter};
 use maos::spirit::skills::{self, SkillError};
 use std::fmt::Write;
@@ -150,6 +152,13 @@ fn filter<'a>(
 impl Guest for RecallProbe {
     fn handle_frame(mut frame: IacFrame) -> Result<Vec<IacFrame>, Halt> {
         let mut report = String::new();
+        // The local shell is the host-only `@maos-shell` pseudo-address; this only selects
+        // the probe's reply behaviour, the host binds the actual reply route.
+        let shell_request = frame.auto_marker == FrameOrigin::HumanAuthored
+            && frame.kind == FrameKind::TaskAssign
+            && frame.frame_from.spirit_id == "@maos-shell"
+            && frame.frame_from.host_id.is_none()
+            && frame.frame_from.role.is_none();
         if let FramePayload::ContextPressure(e) | FramePayload::ContextLimit(e) = &frame.payload {
             let kind = if frame.kind == FrameKind::ContextPressure { "pressure" } else { "limit" };
             let (pid, used, size, permille) =
@@ -297,12 +306,28 @@ impl Guest for RecallProbe {
                 Some(sent)
             })
             .collect();
+        // A host-queued shell request (the operator's `@id line`) is answered with one
+        // `TaskComplete` to the shell, after the probe's own frames: the shell waits for it.
+        let shell_reply = shell_request.then(|| {
+            let mut reply = frame.clone();
+            reply.to = vec![reply.frame_from.clone()];
+            reply.kind = FrameKind::TaskComplete;
+            reply.payload = FramePayload::TaskComplete(TaskCompleteBody {
+                result_text: "recall-probe ok".into(),
+            });
+            reply
+        });
         frame.kind = FrameKind::TelemetryEvent;
         frame.payload = FramePayload::TelemetryEvent(TelemetryEventBody {
             event_type: "recall.probe".into(),
             data: report,
         });
-        Ok(sent.into_iter().chain(task).chain(std::iter::once(frame)).collect())
+        Ok(sent
+            .into_iter()
+            .chain(task)
+            .chain(std::iter::once(frame))
+            .chain(shell_reply)
+            .collect())
     }
     fn on_start() -> Result<(), Halt> {
         assert!(matches!(skills::author("outside-export"), Err(SkillError::Unavailable)));

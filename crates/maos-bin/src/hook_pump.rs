@@ -15,8 +15,11 @@
 //!
 //! `load_admit_start` registers a pid after the granted admission of a
 //! compiled-in class and before `start`. Eligibility is decided at every
-//! delivery from live state: the SCB is present, `Running`, and its CURRENT
-//! manifest class is `observer`. A hot-swap that changes the class under a pid
+//! delivery from live state: the SCB is present, `Running`, its CURRENT manifest carries a
+//! validated `[lifecycle.telemetry]` declaration, and the form/class policy holds (class
+//! `observer`, or a spawned form that lists the hook). Each delivery is held to the
+//! declaration's wall, `min(declared cap, 95% of the overall cap)` ([`telemetry_wall`]).
+//! A hot-swap that changes the class or declaration under a pid
 //! therefore stops (or starts) delivery at the next event. The right to receive
 //! comes from the operator admitting the compiled-in class; each grant and
 //! revoke is a `governance:telemetry-subscription:*` row at the subscriber's
@@ -82,10 +85,11 @@ pub const QUARANTINE_AFTER_CONSECUTIVE_PANICS: u32 = 3;
 /// it is quarantined. Counted over telemetry only, and a fast delivery does not erase them.
 pub const QUARANTINE_AFTER_SLOW_OF_LAST_FIVE: u32 = 3;
 const SLOW_MASK: u8 = 0b1_1111;
-/// The longest the pump waits for one subscriber's telemetry hook, however large its manifest
-/// budget: a notification not handled in this time (or in 95% of the hook's own cap, when that
-/// is smaller) is an overrun, so one subscriber can never stall the pump for its whole cap.
-pub const TELEMETRY_WALL: Duration = Duration::from_secs(5);
+// The manifest schema caps `[lifecycle.telemetry].time_cap_seconds` at 5, so no declared
+// telemetry wall (`telemetry_wall`) exceeds 5 s: a notification not handled within the
+// snapshot's declared wall is an overrun, so one subscriber can never stall the pump for its
+// whole overall cap. There is no default wall: a manifest without a validated declaration
+// receives no telemetry.
 /// The same bound for one subscriber's `on_consolidate` (the watchdog's pass and the privacy
 /// notices of a forget): a subscriber cannot stall either for its whole manifest budget.
 pub const CONSOLIDATE_WALL: Duration = Duration::from_secs(30);
@@ -172,6 +176,9 @@ struct Subscriber {
     granted: bool,
     /// The class the outstanding grant was issued under.
     class: String,
+    /// The effective telemetry wall the outstanding grant was issued under (`None` when no
+    /// grant is outstanding): `min(declared cap, 95% of the overall cap)`.
+    wall: Option<Duration>,
     /// Monotonic ns of the last consolidation that was not `SkippedManifest`
     /// (seeded at registration).
     last_consolidate_ns: u64,
@@ -240,34 +247,76 @@ fn same_object(weak: &Weak<dyn AnySpiritObj>, live: &Arc<dyn AnySpiritObj>) -> b
 }
 
 fn class_of(snapshot: &ScbRuntimeSnapshot) -> &str {
-    snapshot
-        .manifest
+    class_name(&snapshot.manifest)
+}
+
+fn class_name(manifest: &maos_kernel_core::scheduler::control_block::SpiritManifestBundle) -> &str {
+    manifest
         .class
         .as_ref()
         .map_or("", |class| class.name.as_str())
 }
 
-/// Who receives `scalar.tap` writes: an Observer-class compiled-in Spirit, and (Story 20-9,
-/// D-20-9-07) a spawned form whose manifest lists `on_telemetry_event` explicitly. An empty
-/// `enabled_hooks` is the kernel's default-allow for every other hook, and subscribes
-/// nothing here; a component's class NAME confers nothing (only the operator admitting the
-/// compiled-in class grants the Observer right).
-fn receives_telemetry(snapshot: &ScbRuntimeSnapshot) -> bool {
-    let spawned = snapshot
-        .manifest
+/// The validated declaration a snapshot's telemetry delivery is held to: the overall hook cap
+/// in whole seconds and the declared `[lifecycle.telemetry]` wall (D-21-9-02 A).
+struct TelemetryBudget {
+    overall_secs: u64,
+    declared: Duration,
+}
+
+impl TelemetryBudget {
+    /// `min(declared, 95% of the overall cap)`, exactly as [`fire_walled`] applies it
+    /// (unrounded, to the millisecond).
+    fn wall(&self) -> Duration {
+        bounded_hook_wall(self.overall_secs, self.declared)
+    }
+}
+
+fn bounded_hook_wall(overall_secs: u64, limit: Duration) -> Duration {
+    Duration::from_millis(overall_secs.saturating_mul(950)).min(limit)
+}
+
+/// Who receives `scalar.tap` writes, and under what bound. Authority is the validated typed
+/// declaration carried in the snapshot (`LifecycleSection::telemetry`, set only by
+/// admission or the successor loader) AND the existing form/class policy: an Observer-class
+/// compiled-in Spirit, or (Story 20-9, D-20-9-07) a spawned form whose manifest also lists
+/// `on_telemetry_event` explicitly. A declaration confers nothing on any other compiled-in
+/// class, and a component's class NAME confers nothing (only the operator admitting the
+/// compiled-in class grants the Observer right). No declaration, no delivery: a manifest that
+/// merely lists the hook, or an empty `enabled_hooks`, subscribes nothing here.
+fn telemetry_budget(
+    manifest: &maos_kernel_core::scheduler::control_block::SpiritManifestBundle,
+) -> Option<TelemetryBudget> {
+    let declared = manifest.lifecycle.telemetry?.time_cap();
+    let spawned = manifest
         .class
         .as_ref()
         .is_some_and(|class| class.forms == ["wasm-component"]);
-    if spawned {
-        snapshot
-            .manifest
+    let eligible = if spawned {
+        manifest
             .lifecycle
             .enabled_hooks
             .iter()
             .any(|hook| hook.as_str() == "on_telemetry_event")
     } else {
-        class_of(snapshot) == OBSERVER_CLASS
-    }
+        class_name(manifest) == OBSERVER_CLASS
+    };
+    let overall_secs = manifest.budget.as_ref().map_or(
+        u64::from(maos_manifest::DEFAULT_OVERALL_TIME_CAP_SECONDS),
+        |budget| u64::from(budget.time_cap_seconds),
+    );
+    eligible.then_some(TelemetryBudget {
+        overall_secs,
+        declared,
+    })
+}
+
+/// The effective telemetry wall of a manifest (`None` when it receives no telemetry): the one
+/// value every telemetry reader (pump, spawned link) must hold a delivery to.
+pub fn telemetry_wall(
+    manifest: &maos_kernel_core::scheduler::control_block::SpiritManifestBundle,
+) -> Option<Duration> {
+    telemetry_budget(manifest).map(|budget| budget.wall())
 }
 
 impl Shared {
@@ -317,9 +366,10 @@ impl Shared {
         pid: u32,
         spirit_id: &str,
         class: &str,
-        granted: bool,
+        grant_wall: Option<Duration>,
         reason: &str,
     ) {
+        let granted = grant_wall.is_some();
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -334,6 +384,7 @@ impl Shared {
                     class: class.to_owned(),
                     scope: SUBSCRIPTION_SCOPE.to_owned(),
                     granted,
+                    effective_wall_ms: grant_wall.map(|wall| wall.as_millis() as u64),
                     reason: reason.to_owned(),
                 },
             ),
@@ -371,14 +422,33 @@ impl Shared {
             entry.quarantined = false;
         }
         let class = class_of(snapshot);
-        let eligible = receives_telemetry(snapshot) && !entry.quarantined;
-        if eligible && !entry.granted {
-            entry.granted = true;
-            entry.class = class.to_owned();
-            self.subscription_row(pid, &entry.spirit_id, class, true, "eligible");
-        } else if !eligible && entry.granted {
-            entry.granted = false;
-            self.subscription_row(pid, &entry.spirit_id, class, false, "class-changed");
+        let live = if entry.quarantined {
+            None
+        } else {
+            telemetry_wall(&snapshot.manifest)
+        };
+        match (live, entry.granted) {
+            (Some(wall), false) => {
+                entry.granted = true;
+                entry.wall = Some(wall);
+                entry.class = class.to_owned();
+                self.subscription_row(pid, &entry.spirit_id, class, Some(wall), "eligible");
+            }
+            (None, true) => {
+                entry.granted = false;
+                entry.wall = None;
+                self.subscription_row(pid, &entry.spirit_id, class, None, "class-changed");
+            }
+            (Some(wall), true) if entry.wall != Some(wall) => {
+                // A committed change of the declared or overall budget: the old grant ends and
+                // the new one is the one published (never a silent change of the wall).
+                let held = entry.class.clone();
+                self.subscription_row(pid, &entry.spirit_id, &held, None, "wall-changed");
+                entry.wall = Some(wall);
+                entry.class = class.to_owned();
+                self.subscription_row(pid, &entry.spirit_id, class, Some(wall), "eligible");
+            }
+            _ => {}
         }
     }
 
@@ -387,7 +457,7 @@ impl Shared {
             return;
         };
         if entry.granted {
-            self.subscription_row(pid, &entry.spirit_id, &entry.class, false, reason);
+            self.subscription_row(pid, &entry.spirit_id, &entry.class, None, reason);
         }
     }
 
@@ -403,7 +473,7 @@ impl Shared {
                 pid,
                 &entry.spirit_id,
                 class,
-                false,
+                None,
                 &format!("quarantined: {why}"),
             );
         }
@@ -486,7 +556,7 @@ impl Shared {
     }
 
     /// Deliver one event to every eligible subscriber. The dispatches run side by side, each
-    /// held to a wall budget strictly inside its own cap ([`TELEMETRY_WALL`]); an overrun is
+    /// held to its manifest's effective wall ([`telemetry_wall`]); an overrun is
     /// accounted as the budget overrun it is, so a slow subscriber stalls neither the others
     /// nor the events behind this one.
     async fn deliver(self: &Arc<Self>, event: &ScalarTapEvent) {
@@ -513,13 +583,7 @@ impl Shared {
             };
             let snapshot = scb.runtime_snapshot();
             let object = Arc::clone(&snapshot.spirit_obj);
-            let cap = snapshot
-                .manifest
-                .budget
-                .as_ref()
-                .map_or(TELEMETRY_WALL.as_secs(), |budget| {
-                    u64::from(budget.time_cap_seconds)
-                });
+            let budget = telemetry_budget(&snapshot.manifest);
             let target = {
                 let mut registry = self.registry();
                 let Some(entry) = registry.get_mut(&pid) else {
@@ -527,9 +591,11 @@ impl Shared {
                 };
                 self.sync(pid, entry, &snapshot);
                 (entry.granted && scb.current_state() == ScbLifecycleState::Running)
-                    .then(|| entry.dispatch_target(&scb, snapshot))
+                    .then_some(budget.as_ref())
+                    .flatten()
+                    .map(|budget| (entry.dispatch_target(&scb, snapshot), budget))
             };
-            let Some(target) = target else {
+            let Some((target, budget)) = target else {
                 self.counters.ineligible.fetch_add(1, Ordering::Relaxed);
                 continue;
             };
@@ -537,6 +603,7 @@ impl Shared {
                 self.counters.ineligible.fetch_add(1, Ordering::Relaxed);
                 continue;
             };
+            let wall = budget.wall();
             let (shared, payload, tag) =
                 (Arc::clone(self), Arc::clone(&payload), event.tag.clone());
             let seq = event.seq;
@@ -551,8 +618,7 @@ impl Shared {
                     Dispatch {
                         hook: Hook::Telemetry,
                         seq,
-                        cap,
-                        limit: TELEMETRY_WALL,
+                        wall,
                     },
                 )
                 .await;
@@ -884,8 +950,7 @@ impl HookPump {
                             Dispatch {
                                 hook: Hook::Consolidate,
                                 seq: 0,
-                                cap,
-                                limit: CONSOLIDATE_WALL,
+                                wall: bounded_hook_wall(cap, CONSOLIDATE_WALL),
                             },
                         )
                         .await;
@@ -1024,8 +1089,7 @@ impl HookPump {
                                     Dispatch {
                                         hook: Hook::Consolidate,
                                         seq: 0,
-                                        cap,
-                                        limit: CONSOLIDATE_WALL,
+                                        wall: bounded_hook_wall(cap, CONSOLIDATE_WALL),
                                     },
                                 )
                                 .await;
@@ -1116,17 +1180,24 @@ impl HookPump {
             slow_history: 0,
             quarantined: false,
             granted: false,
+            wall: None,
             class: String::new(),
             last_consolidate_ns: monotonic_now_ns(),
         };
         let snapshot = self.shared.scb(pid).map(|scb| scb.runtime_snapshot());
         if let Some(snapshot) = &snapshot {
             entry.object = Some(Arc::downgrade(&snapshot.spirit_obj));
-            if receives_telemetry(snapshot) {
+            if let Some(wall) = telemetry_wall(&snapshot.manifest) {
                 entry.granted = true;
+                entry.wall = Some(wall);
                 entry.class = class_of(snapshot).to_owned();
-                self.shared
-                    .subscription_row(pid, spirit_id, class_of(snapshot), true, "admitted");
+                self.shared.subscription_row(
+                    pid,
+                    spirit_id,
+                    class_of(snapshot),
+                    Some(wall),
+                    "admitted",
+                );
             }
         }
         self.shared.registry().insert(pid, entry);
@@ -1400,8 +1471,7 @@ async fn consolidate_once(
                 Dispatch {
                     hook: Hook::Consolidate,
                     seq: 0,
-                    cap,
-                    limit: CONSOLIDATE_WALL,
+                    wall: bounded_hook_wall(cap, CONSOLIDATE_WALL),
                 },
             )
             .await;
@@ -1439,13 +1509,12 @@ fn cap_of(snapshot: &ScbRuntimeSnapshot, default: Duration) -> u64 {
         })
 }
 
-/// How one walled dispatch is asked for: the hook, the event's `seq` (a consolidation is
-/// identified by its batch instead), the hook's budget in seconds and the pump's own limit.
+/// One walled dispatch: hook, event sequence (or batch), and the already
+/// resolved delivery wall used by admission receipts and the spawned link.
 struct Dispatch {
     hook: Hook,
     seq: u64,
-    cap: u64,
-    limit: Duration,
+    wall: Duration,
 }
 
 /// How often a walled dispatch looks at its clock.
@@ -1465,13 +1534,7 @@ async fn fire_walled(
     payload: Arc<[u8]>,
     dispatch: Dispatch,
 ) -> (HookOutcome, bool) {
-    let Dispatch {
-        hook,
-        seq,
-        cap,
-        limit,
-    } = dispatch;
-    let wall = Duration::from_millis(cap.saturating_mul(950)).min(limit);
+    let Dispatch { hook, seq, wall } = dispatch;
     let (kind, tag) = match hook {
         Hook::Telemetry => (invocation::TELEMETRY, seq),
         Hook::Consolidate => (invocation::CONSOLIDATE, invocation::digest(&payload)),

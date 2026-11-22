@@ -67,6 +67,31 @@ pub enum StateTransitionError {
     },
 }
 
+/// Host-only lifecycle finalization event delivered to a spirit object by the
+/// kernel AFTER the coordinator has published it as the live runtime.
+///
+/// This is not a guest hook and has no WIT / guest-ABI representation: it is a
+/// type-erased host callback (see [`make_spirit_obj_with_host_hooks`]) letting a
+/// host-side owner of a staged candidate (e.g. a spawned-session link) learn that
+/// the coordinator's outcome is the single commit authority. A candidate that is
+/// refused, stale, or never published never receives it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostLifecycleEvent {
+    /// The hot-swap coordinator accepted the outer swap-in outcome and published
+    /// this object into the original SCB (same `Arc<SpiritControlBlock>`, nonterminal
+    /// state, predecessor object still current). `pid`/`boot_nonce` identify that SCB.
+    SwapCommitted { pid: u32, boot_nonce: u64 },
+}
+
+/// Why [`SpiritControlBlock::publish_runtime_if_current`] refused to publish.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RuntimePublishError {
+    /// The SCB is `Unloaded`.
+    Terminal,
+    /// The live runtime's object is no longer the expected one.
+    ObjectChanged,
+}
+
 /// Object-safe trait bundling all Spirit lifecycle hooks for type-erased dispatch.
 ///
 /// Each method dispatches to the corresponding `Spirit` trait method
@@ -94,12 +119,45 @@ pub trait AnySpiritObj: Send + Sync {
         ctx: &mut KernelCtx,
         predecessor_state: &[u8],
     ) -> Result<Vec<u8>, maos_spirit_abi::lifecycle::MigratorError>;
+    /// Host-only finalization callback (not a guest hook, no ABI). Default: ignored.
+    /// Delivered by the hot-swap coordinator only after it published this object.
+    fn finalize_lifecycle(&self, _event: HostLifecycleEvent) {}
+    /// Host-only (not a guest hook, no ABI): the kernel's `on_idle` firing, with the real
+    /// monotonic `deadline` it captured before queuing. Default: the deadline is not
+    /// surfaced and this is `on_idle`.
+    fn on_idle_until(&self, ctx: &mut KernelCtx, _deadline: std::time::Instant) {
+        self.on_idle(ctx);
+    }
+    /// Host-only counterpart of [`Self::on_idle_until`] for `on_schedule`.
+    fn on_schedule_until(
+        &self,
+        ctx: &mut KernelCtx,
+        payload: &[u8],
+        _deadline: std::time::Instant,
+    ) {
+        self.on_schedule(ctx, payload);
+    }
+}
+
+/// Typed host callbacks of a spawned Spirit for kernel `on_idle` / `on_schedule` firings.
+pub struct FiringHooks<T> {
+    pub idle: fn(&T, &mut maos_spirit_abi::ctx::Ctx, std::time::Instant),
+    pub schedule: fn(
+        &T,
+        &mut maos_spirit_abi::ctx::Ctx,
+        &maos_spirit_abi::lifecycle::SchedulePayload<'_>,
+        std::time::Instant,
+    ),
 }
 
 /// Wraps a concrete `T: Spirit` with its `SpiritVtable` into an `AnySpiritObj`.
 struct VtableSpiritObj<T: Spirit + Send + Sync + 'static> {
     spirit: T,
     vtable: maos_spirit_abi::lifecycle::SpiritVtable<T>,
+    /// Optional typed host finalizer; see [`make_spirit_obj_with_host_hooks`].
+    finalizer: Option<fn(&T, HostLifecycleEvent)>,
+    /// Optional typed host callbacks for a kernel firing's absolute deadline.
+    firing: Option<FiringHooks<T>>,
 }
 
 impl<T: Spirit + Send + Sync + 'static> AnySpiritObj for VtableSpiritObj<T> {
@@ -184,12 +242,77 @@ impl<T: Spirit + Send + Sync + 'static> AnySpiritObj for VtableSpiritObj<T> {
     ) -> Result<Vec<u8>, maos_spirit_abi::lifecycle::MigratorError> {
         (self.vtable.migrate)(&self.spirit, kctx.ctx, predecessor_state)
     }
+    fn finalize_lifecycle(&self, event: HostLifecycleEvent) {
+        if let Some(finalizer) = self.finalizer {
+            finalizer(&self.spirit, event);
+        }
+    }
+    fn on_idle_until(&self, kctx: &mut KernelCtx, deadline: std::time::Instant) {
+        match &self.firing {
+            Some(firing) => (firing.idle)(&self.spirit, kctx.ctx, deadline),
+            None => self.on_idle(kctx),
+        }
+    }
+    fn on_schedule_until(
+        &self,
+        kctx: &mut KernelCtx,
+        payload: &[u8],
+        deadline: std::time::Instant,
+    ) {
+        match &self.firing {
+            Some(firing) => (firing.schedule)(
+                &self.spirit,
+                kctx.ctx,
+                &maos_spirit_abi::lifecycle::SchedulePayload {
+                    schedule_data: payload,
+                    schedule_len: payload.len(),
+                },
+                deadline,
+            ),
+            None => self.on_schedule(kctx, payload),
+        }
+    }
 }
 
 /// Construct an `Arc<dyn AnySpiritObj>` from a concrete Spirit and its vtable.
 pub fn make_spirit_obj<T: Spirit + Send + Sync + 'static>(spirit: T) -> Arc<dyn AnySpiritObj> {
     let vtable = maos_spirit_abi::lifecycle::SpiritVtable::<T>::from_spirit();
-    Arc::new(VtableSpiritObj { spirit, vtable })
+    Arc::new(VtableSpiritObj {
+        spirit,
+        vtable,
+        finalizer: None,
+        firing: None,
+    })
+}
+
+/// Like [`make_spirit_obj`], plus the typed host-only callbacks of a spawned Spirit.
+///
+/// BINDING API for the bin (spawned/staged successor factory): build the staged
+/// candidate object with `finalizer = |t: &T, event| ...` where `T` holds the
+/// host-side lifecycle link. The hot-swap coordinator invokes it exactly once,
+/// synchronously, with [`HostLifecycleEvent::SwapCommitted`] only AFTER it
+/// published the candidate into the original SCB; refused/stale/reverted
+/// candidates never receive it. The callback must be fast and non-blocking
+/// (signal the session, release the guest-`Done` publication gate): it runs on
+/// the coordinator's task. The inner guest `SwapIn::Done` must not publish
+/// handover or authority itself; it only reports the swap-in result, and the
+/// link publishes `Handover` from this callback instead.
+///
+/// `firing` carries the typed host callbacks for a kernel `on_idle` / `on_schedule`
+/// firing; each receives the real monotonic deadline the kernel captured before it
+/// queued the firing (see [`AnySpiritObj::on_idle_until`]). No TLS, no ABI change.
+pub fn make_spirit_obj_with_host_hooks<T: Spirit + Send + Sync + 'static>(
+    spirit: T,
+    finalizer: fn(&T, HostLifecycleEvent),
+    firing: FiringHooks<T>,
+) -> Arc<dyn AnySpiritObj> {
+    let vtable = maos_spirit_abi::lifecycle::SpiritVtable::<T>::from_spirit();
+    Arc::new(VtableSpiritObj {
+        spirit,
+        vtable,
+        finalizer: Some(finalizer),
+        firing: Some(firing),
+    })
 }
 
 /// Bundled manifest sections held in the SCB's swappable runtime cell.
@@ -287,6 +410,10 @@ pub struct SpiritControlBlock {
     sandbox_report: RwLock<Option<SandboxInspectReport>>,
     /// The only hot-swappable portion of a control block.
     runtime: Arc<RwLock<ScbRuntimeSnapshot>>,
+    /// Publication identity: bumped (under the runtime write lock) by every runtime
+    /// replacement, so a record of one publication can never act on a later one even
+    /// when both install the same `Arc` object.
+    runtime_generation: AtomicU64,
 }
 
 impl std::fmt::Debug for SpiritControlBlock {
@@ -356,6 +483,7 @@ impl SpiritControlBlock {
             task_assignments_in_flight: Mutex::new(Vec::new()),
             boot_nonce,
             sandbox_report: RwLock::new(None),
+            runtime_generation: AtomicU64::new(0),
             runtime: Arc::new(RwLock::new(ScbRuntimeSnapshot {
                 manifest,
                 spirit_obj,
@@ -382,16 +510,59 @@ impl SpiritControlBlock {
         self.runtime.read().clone()
     }
 
+    /// The runtime and the publication generation that identifies it, read together
+    /// under the runtime lock (the generation only changes under its write lock).
+    pub(crate) fn runtime_snapshot_with_generation(&self) -> (ScbRuntimeSnapshot, u64) {
+        let runtime = self.runtime.read();
+        (runtime.clone(), self.runtime_generation())
+    }
+
     /// Clone the runtime cell for a dispatch task that must resolve the active
     /// object at execution time rather than retaining a predecessor snapshot.
     pub(crate) fn runtime_cell(&self) -> Arc<RwLock<ScbRuntimeSnapshot>> {
         Arc::clone(&self.runtime)
     }
 
+    /// The private staging block relinquishes its runtime after the swap-in hook joins.
+    pub(crate) fn into_staged_runtime(self) -> Option<ScbRuntimeSnapshot> {
+        Arc::try_unwrap(self.runtime).ok().map(RwLock::into_inner)
+    }
+
     /// Replace only runtime-owned state and return the exact prior snapshot
     pub fn replace_runtime(&self, runtime: ScbRuntimeSnapshot) -> ScbRuntimeSnapshot {
         let mut current = self.runtime.write();
+        self.runtime_generation.fetch_add(1, Ordering::AcqRel);
         std::mem::replace(&mut *current, runtime)
+    }
+
+    /// The identity of the currently published runtime (see `runtime_generation`).
+    pub(crate) fn runtime_generation(&self) -> u64 {
+        self.runtime_generation.load(Ordering::Acquire)
+    }
+
+    /// Atomically (under the runtime write lock) replace the runtime only while
+    /// the SCB is nonterminal, its live object is still `expected` and, when
+    /// `generation` is given, it is still that exact publication. Returns the
+    /// exact prior snapshot and the new publication's generation. Used for
+    /// coordinator commit and matching auto-revert so a stale attempt can never
+    /// overwrite a changed runtime.
+    pub(crate) fn publish_runtime_if_current(
+        &self,
+        expected: &Arc<dyn AnySpiritObj>,
+        generation: Option<u64>,
+        runtime: ScbRuntimeSnapshot,
+    ) -> Result<(ScbRuntimeSnapshot, u64), RuntimePublishError> {
+        let mut current = self.runtime.write();
+        if self.current_state() == ScbLifecycleState::Unloaded {
+            return Err(RuntimePublishError::Terminal);
+        }
+        if !std::ptr::addr_eq(Arc::as_ptr(&current.spirit_obj), Arc::as_ptr(expected))
+            || generation.is_some_and(|g| g != self.runtime_generation())
+        {
+            return Err(RuntimePublishError::ObjectChanged);
+        }
+        let published = self.runtime_generation.fetch_add(1, Ordering::AcqRel) + 1;
+        Ok((std::mem::replace(&mut *current, runtime), published))
     }
 
     /// Read the current lifecycle state.
@@ -412,6 +583,10 @@ impl SpiritControlBlock {
         expected: ScbLifecycleState,
         next: ScbLifecycleState,
     ) -> Result<ScbLifecycleState, StateTransitionError> {
+        // Entering `Unloaded` is serialized with runtime publication: a publish holds
+        // the runtime write lock while it checks the state and replaces the runtime,
+        // so it either lands before this CAS or sees the terminal state.
+        let _publish_fence = (next == ScbLifecycleState::Unloaded).then(|| self.runtime.write());
         let old = self.state.compare_exchange(
             expected as u8,
             next as u8,
@@ -504,255 +679,5 @@ impl SpiritControlBlock {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use maos_spirit_abi::lifecycle::SpiritVtable;
-
-    struct TestSpirit;
-    impl maos_spirit_abi::lifecycle::Spirit for TestSpirit {}
-    // TestSpirit is a unit struct — automatically Send + Sync + 'static.
-
-    fn make_scb(state: ScbLifecycleState) -> SpiritControlBlock {
-        let spirit_obj = make_spirit_obj(TestSpirit);
-        let scb = SpiritControlBlock::new(
-            42,
-            "test-spirit".into(),
-            SpiritManifestBundle::default(),
-            spirit_obj,
-            0xCAFE,
-        );
-        scb.state.store(state as u8, Ordering::Release);
-        scb
-    }
-
-    #[test]
-    fn loaded_to_running_allowed() {
-        let scb = make_scb(ScbLifecycleState::Loaded);
-        assert!(SpiritControlBlock::is_transition_allowed(
-            scb.current_state(),
-            ScbLifecycleState::Running
-        ));
-        let result = scb.try_transition(ScbLifecycleState::Loaded, ScbLifecycleState::Running);
-        assert!(result.is_ok());
-        assert_eq!(scb.current_state(), ScbLifecycleState::Running);
-    }
-
-    #[test]
-    fn running_to_paused_allowed() {
-        let scb = make_scb(ScbLifecycleState::Running);
-        let result = scb.try_transition(ScbLifecycleState::Running, ScbLifecycleState::Paused);
-        assert!(result.is_ok());
-        assert_eq!(scb.current_state(), ScbLifecycleState::Paused);
-    }
-
-    #[test]
-    fn paused_to_running_allowed() {
-        let scb = make_scb(ScbLifecycleState::Paused);
-        let result = scb.try_transition(ScbLifecycleState::Paused, ScbLifecycleState::Running);
-        assert!(result.is_ok());
-        assert_eq!(scb.current_state(), ScbLifecycleState::Running);
-    }
-
-    #[test]
-    fn running_to_unloaded_allowed() {
-        let scb = make_scb(ScbLifecycleState::Running);
-        let result = scb.try_transition(ScbLifecycleState::Running, ScbLifecycleState::Unloaded);
-        assert!(result.is_ok());
-        assert_eq!(scb.current_state(), ScbLifecycleState::Unloaded);
-    }
-
-    #[test]
-    fn paused_to_unloaded_allowed() {
-        let scb = make_scb(ScbLifecycleState::Paused);
-        let result = scb.try_transition(ScbLifecycleState::Paused, ScbLifecycleState::Unloaded);
-        assert!(result.is_ok());
-        assert_eq!(scb.current_state(), ScbLifecycleState::Unloaded);
-    }
-
-    #[test]
-    fn loaded_to_paused_rejected() {
-        assert!(!SpiritControlBlock::is_transition_allowed(
-            ScbLifecycleState::Loaded,
-            ScbLifecycleState::Paused
-        ));
-    }
-
-    /// Story 16-6 — this test asserted the OPPOSITE until the
-    /// `(Loaded, Unloaded)` arm landed. Rewritten in the shape of its five
-    /// allowed siblings: it now drives a real CAS, so deleting the arm reds
-    /// it on `is_transition_allowed` and deleting the CAS reds it on state.
-    #[test]
-    fn loaded_to_unloaded_allowed() {
-        let scb = make_scb(ScbLifecycleState::Loaded);
-        assert!(SpiritControlBlock::is_transition_allowed(
-            scb.current_state(),
-            ScbLifecycleState::Unloaded
-        ));
-        let result = scb.try_transition(ScbLifecycleState::Loaded, ScbLifecycleState::Unloaded);
-        assert!(result.is_ok());
-        assert_eq!(scb.current_state(), ScbLifecycleState::Unloaded);
-    }
-
-    #[test]
-    fn unload_idempotent() {
-        let scb = make_scb(ScbLifecycleState::Unloaded);
-        let result = scb.transition(
-            ScbLifecycleState::Unloaded,
-            maos_domain::lifecycle::LifecycleVerb::Unload,
-        );
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn cas_race_tolerance() {
-        let scb = make_scb(ScbLifecycleState::Loaded);
-        let r1 = scb.try_transition(ScbLifecycleState::Loaded, ScbLifecycleState::Running);
-        assert!(r1.is_ok());
-        let r2 = scb.try_transition(ScbLifecycleState::Loaded, ScbLifecycleState::Running);
-        assert!(r2.is_err());
-        assert!(matches!(
-            r2.unwrap_err(),
-            StateTransitionError::RaceLost { .. }
-        ));
-    }
-
-    // ---- Story 5.3 — SCB extension tests ----
-
-    #[test]
-    fn scb_default_supervision_fields() {
-        let scb = make_scb(ScbLifecycleState::Loaded);
-        let now = crate::capability::cap_tokens::monotonic_now_ns();
-        assert!(scb.last_progress_iac_ns.load(Ordering::Relaxed) > 0);
-        assert!(scb.last_heartbeat_ns.load(Ordering::Relaxed) > 0);
-        assert!(scb.last_progress_iac_ns.load(Ordering::Relaxed) <= now);
-        assert!(scb.last_heartbeat_ns.load(Ordering::Relaxed) <= now);
-        assert_eq!(scb.last_stall_emit_ns.load(Ordering::Relaxed), 0);
-        assert_eq!(scb.last_silent_failure_emit_ns.load(Ordering::Relaxed), 0);
-        assert_eq!(scb.runtime_snapshot().on_crash_action, OnCrashAction::Nack);
-        assert!(scb.task_assignments_in_flight.lock().unwrap().is_empty());
-    }
-
-    #[test]
-    fn scb_on_crash_action_from_manifest() {
-        let mut bundle = SpiritManifestBundle::default();
-        bundle.on_crash = Some(OnCrashSection {
-            action: OnCrashAction::EscalateToOperator,
-        });
-        let spirit_obj = make_spirit_obj(TestSpirit);
-        let scb = SpiritControlBlock::new(42, "test-spirit".into(), bundle, spirit_obj, 0xCAFE);
-        assert_eq!(
-            scb.runtime_snapshot().on_crash_action,
-            OnCrashAction::EscalateToOperator
-        );
-    }
-
-    #[test]
-    fn scb_on_revocation_action_default() {
-        let bundle = SpiritManifestBundle::default();
-        let spirit_obj = make_spirit_obj(TestSpirit);
-        let scb = SpiritControlBlock::new(42, "test-spirit".into(), bundle, spirit_obj, 0xCAFE);
-        assert_eq!(
-            scb.runtime_snapshot().on_revocation_action,
-            RevocationAction::TerminateImmediately
-        );
-    }
-
-    #[test]
-    fn scb_on_revocation_action_from_manifest() {
-        use crate::security::manifest::OnRevocationSection;
-        let mut bundle = SpiritManifestBundle::default();
-        bundle.on_revocation = Some(OnRevocationSection {
-            action: RevocationAction::Quarantine,
-        });
-        let spirit_obj = make_spirit_obj(TestSpirit);
-        let scb = SpiritControlBlock::new(42, "test-spirit".into(), bundle, spirit_obj, 0xCAFE);
-        assert_eq!(
-            scb.runtime_snapshot().on_revocation_action,
-            RevocationAction::Quarantine
-        );
-    }
-
-    #[test]
-    fn runtime_replacement_preserves_stable_identity_and_rolls_back_for_stale_clones() {
-        let scb = Arc::new(make_scb(ScbLifecycleState::Running));
-        let stale_clone = Arc::clone(&scb);
-        scb.deficit_counter.store(17, Ordering::Release);
-        scb.last_progress_iac_ns.store(91, Ordering::Release);
-        scb.task_assignments_in_flight
-            .lock()
-            .unwrap()
-            .push(TaskAssignmentRecord {
-                task_id: "in-flight".into(),
-                capability_token: Some(maos_domain::invariants::i1::TokenId([0; 16])),
-                ttl_deadline_ns: 1,
-                intent_class: maos_domain::invariants::i1::IntentClass::Standard,
-                originator_spirit_id: "origin".into(),
-            });
-
-        let predecessor = scb.runtime_snapshot();
-        let successor = ScbRuntimeSnapshot {
-            manifest: predecessor.manifest.clone(),
-            spirit_obj: make_spirit_obj(TestSpirit),
-            priority_weight: predecessor.priority_weight.saturating_add(1),
-            on_crash_action: predecessor.on_crash_action.clone(),
-            on_revocation_action: predecessor.on_revocation_action,
-            sandbox_tier: predecessor.sandbox_tier,
-        };
-        let rollback = scb.replace_runtime(successor);
-
-        assert!(Arc::ptr_eq(&scb, &stale_clone));
-        assert_eq!(stale_clone.pid, 42);
-        assert_eq!(stale_clone.boot_nonce, 0xCAFE);
-        assert_eq!(stale_clone.current_state(), ScbLifecycleState::Running);
-        assert_eq!(stale_clone.deficit_counter.load(Ordering::Acquire), 17);
-        assert_eq!(stale_clone.last_progress_iac_ns.load(Ordering::Acquire), 91);
-        assert_eq!(
-            stale_clone.task_assignments_in_flight.lock().unwrap().len(),
-            1
-        );
-        assert!(!Arc::ptr_eq(
-            &predecessor.spirit_obj,
-            &stale_clone.runtime_snapshot().spirit_obj,
-        ));
-
-        stale_clone.replace_runtime(rollback);
-        assert!(Arc::ptr_eq(
-            &predecessor.spirit_obj,
-            &scb.runtime_snapshot().spirit_obj,
-        ));
-    }
-
-    #[test]
-    fn scb_task_assignments_push_and_drain() {
-        let scb = make_scb(ScbLifecycleState::Running);
-        {
-            let mut tasks = scb.task_assignments_in_flight.lock().unwrap();
-            tasks.push(TaskAssignmentRecord {
-                task_id: "task-1".into(),
-                capability_token: Some(maos_domain::invariants::i1::TokenId([0u8; 16])),
-                ttl_deadline_ns: 1_000_000,
-                intent_class: maos_domain::invariants::i1::IntentClass::Standard,
-                originator_spirit_id: "origin-1".into(),
-            });
-        }
-        {
-            let mut tasks = scb.task_assignments_in_flight.lock().unwrap();
-            assert_eq!(tasks.len(), 1);
-            let drained: Vec<_> = tasks.drain(..).collect();
-            assert_eq!(drained.len(), 1);
-        }
-        assert!(scb.task_assignments_in_flight.lock().unwrap().is_empty());
-    }
-
-    #[test]
-    fn scb_last_stall_emit_cas() {
-        let scb = make_scb(ScbLifecycleState::Running);
-        let old = scb.last_stall_emit_ns.load(Ordering::Relaxed);
-        let new = 12345u64;
-        let cas =
-            scb.last_stall_emit_ns
-                .compare_exchange(old, new, Ordering::AcqRel, Ordering::Relaxed);
-        assert!(cas.is_ok());
-        assert_eq!(scb.last_stall_emit_ns.load(Ordering::Relaxed), new);
-    }
-}
+#[path = "../../tests/unit/control_block_state.rs"]
+mod tests;

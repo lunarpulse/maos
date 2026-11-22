@@ -79,6 +79,9 @@ declared is refused (`409 swap_invariant_dropped`) before the swap or unload,
 and the predecessor keeps serving. The check is structural and does not prove
 that state survived.
 
+This schema v5 example does not subscribe to telemetry. To use the `telemetry`
+lifecycle export, follow the [schema v8 subscription contract](/manifest/v8).
+
 The additive `maos:spirit/skills@2.4.0` import offers `author(document)` and
 `propose(target-id, target-version, diff)` only inside `handle-frame`.
 `capability-denied` means authority was refused; `refused(code)` is a stable
@@ -154,13 +157,13 @@ An in-band protocol violation writes `recall.channel.closed:protocol-violation` 
 
 ## Lifecycle triggers and hot swap (`maos:spirit@2.4.0`)
 
-The `spirit-lifecycle` world adds one optional export, `maos:spirit/lifecycle`, to the frame exports above. Implement it to receive the kernel's budgeted triggers (`idle`, `consolidate`, `telemetry`, `schedule`, `pause`, `resume`) and to be swappable in place: `maosctl spirit upgrade <name> --to <manifest>` keeps the pid, the capability tokens the pid holds and its working memory, and hands the state your `snapshot` returns to the successor's `swap-in` (`migrate` first under `--policy migrator`). A guest built against world `spirit`, or any 2.0–2.3 component, runs unchanged and is never called; it is then refused a swap as `spawned_swap_unsupported` before anything is replaced. The generated scaffold exports `lifecycle` (`idle`, `snapshot`, `swap-in`) so a published version can be upgraded the same way.
+The `spirit-lifecycle` world adds the optional `maos:spirit/lifecycle` export for budgeted triggers (`idle`, `consolidate`, `telemetry`, `schedule`, `pause`, `resume`) and in-place swaps. `maosctl spirit upgrade <name> --to <manifest>` keeps the PID and working memory and hands `snapshot` state to the successor's `swap-in` (`migrate` first under `--policy migrator`). Tokens remain usable only if the successor's admitted scopes still entitle them. Components without the export, including 2.0–2.3 components, can run but get `spawned_swap_unsupported` before anything is replaced. The generated scaffold exports `idle`, `snapshot` and `swap-in`.
 
 Every lifecycle export returns `result<_, lifecycle-error>` and emits no frames. `idle`, `consolidate`, `telemetry` and `schedule` may use the `recall`, `context` and `skills` imports; `pause`, `resume`, `snapshot`, `swap-in` and `migrate` may not. Each runs under `[budget].time_cap_seconds`. See [Lifecycle Hooks](./lifecycle-hooks#spawned-wasm-component-spirits) for the trigger table, the typed swap refusals, cold swap and the post-swap revert behaviour.
 
 ## Discussion
 
-The manifest validates every section before its form-specific result. A published/default MAOS build refuses this form as `wasm_engine_off` while Hold 2 keeps the `wasm-host` engine disabled. A build made with `--features wasm-host` launches the component through `maos run` inside the contained T2 runner (`maos-wasm-runner`, installed next to `maos`). In-process surfaces the contained runner does not provide — `maosctl load` of a component and topology — are refused as `spawned_surface_unsupported`; a component is swapped, upgraded and cold-swapped through `maosctl spirit upgrade` (below). These are intentional typed refusals, not an unknown class or unknown form.
+The manifest validates every section before its form-specific result. The default build includes the engine. On Linux, `maos run` launches the component in the contained T2 runner (`maos-wasm-runner`, installed beside `maos`). Build with `--no-default-features --features network` to omit the engine; that build reports `wasm_engine_off`. `maosctl spirit load` and topology require `rust-inproc` and report `spawned_surface_unsupported` for components. Use `maosctl spirit upgrade` for supported component swaps.
 
 The generated TypeScript guest implements the world's `onStart`, `handleFrame`, and `onShutdown` exports. To halt from guest code, throw the value `throw { tag: "fault", val: "<reason>" }`; the host maps that shape to `Halt::Fault`. Guest WASI stdout/stderr (including `console.log`) is routed to the runner's stderr and journaled as `spirit.diagnostic` rows. Treat them as untrusted guest text: they are bounded per session (256 rows / 64 KiB, overflow counted in `dropped_diagnostics`), over-long lines are truncated with a marker, and they never become frames.
 

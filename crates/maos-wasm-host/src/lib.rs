@@ -20,12 +20,11 @@
 //! cargo-deny dependency-closure containment. `maos-bin` depends on both;
 //! `wasmtime`/`wasmtime-wasi`/`wit-bindgen` are confined to this crate.
 //!
-//! # Export control (AC6)
+//! # Export control
 //!
-//! This crate is behind `--features wasm-host` (OFF by default) in `maos-bin`.
-//! A CI gate asserts it is ABSENT from the shippable artifact set. The
-//! distributable form must NOT be finalized before export counsel clears
-//! the 5D002.c.1 classification question.
+//! This crate is included by the default `maos-bin` features. The export
+//! gate checks the default dependency closure and the release artifact shape.
+//! No ECCN determination or counsel review is implied by that gate.
 
 pub mod adapter;
 pub mod codec;

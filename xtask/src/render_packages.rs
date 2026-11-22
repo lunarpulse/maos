@@ -3,7 +3,13 @@ use std::{collections::BTreeMap, fs, path::Path, process::Command};
 
 use maos_audit::release_verify::{parse_sha256sums, sha256_hex, verify_release};
 
-const BINS: [&str; 4] = ["maos", "maosctl", "maos-spirit", "maos-registry-server"];
+const BINS: [&str; 5] = [
+    "maos",
+    "maosctl",
+    "maos-spirit",
+    "maos-registry-server",
+    "maos-wasm-runner",
+];
 
 pub fn versions(version: &str) -> Result<(String, String), String> {
     let (core, pre) = version.split_once('-').unwrap_or((version, ""));
@@ -153,7 +159,7 @@ pub fn run(dist: &str, output: &str, maosctl: &str, base_url: Option<&str>) -> R
             continue;
         }
         if present != BINS.len() {
-            return Err(format!("incomplete four-binary set: {suffix}"));
+            return Err(format!("incomplete five-binary set: {suffix}"));
         }
         let hs: Vec<_> = BINS
             .iter()

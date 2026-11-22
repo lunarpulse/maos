@@ -421,16 +421,13 @@ fn launch(frame: IacFrame) -> SessionLaunch {
     SessionLaunch {
         plan: maos_host::SpiritLaunchPlan {
             program: FIXTURES.0.to_string_lossy().into_owned(),
-            argv: vec![
-                "--component".into(),
-                artifact().to_string_lossy().into_owned(),
-                "--fuel".into(),
-                "100000000".into(),
-            ],
+            argv: vec!["--fuel".into(), "100000000".into()],
             env: vec![],
             wire: maos_host::WireShape::ContentLengthCbor,
         },
-        component_artifact: Some(artifact()),
+        component_artifact: Some(
+            maos_bin::spirit_session::LaunchArtifact::acquire_local_file(&artifact()).unwrap(),
+        ),
         turn_budget: Duration::from_secs(30),
         once: false,
         context_window: Default::default(),

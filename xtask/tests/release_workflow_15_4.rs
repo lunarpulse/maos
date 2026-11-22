@@ -192,7 +192,7 @@ fn release_workflow_flattens_and_publishes_the_explicit_artifact_set() {
         .expect("manifest command");
     assert!(manifest_command.contains("release-dry-run --manifest-only"));
     // Without the explicit target set the verb falls back to the host target and
-    // refuses the four staged arm64 artifacts as uncovered — the tag dies before signing.
+    // refuses the five staged arm64 artifacts as uncovered — the tag dies before signing.
     assert!(
         manifest_command.contains(&format!("--targets {RELEASE_TARGETS}")),
         "manifest command must name all three targets: {manifest_command}"

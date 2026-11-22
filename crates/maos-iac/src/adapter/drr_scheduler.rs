@@ -57,6 +57,8 @@ struct Submission {
     /// Story 17-8 AC2.4 — recipients resolved BEFORE enqueue (CR-1): a name
     /// reused while the frame waits never captures it.
     recipients: Vec<FrameRecipient>,
+    /// Host-derived scoped shell reply correlation (`None` for every other frame).
+    correlation_id: Option<String>,
     /// j1-crosshost-2b AC3.2 — carries the typed row-write outcome so the
     /// duplicate-`frame_id` verdict survives the scheduler hop instead of being
     /// flattened back into `()` (which would re-hide the peer replay this repair
@@ -89,6 +91,32 @@ impl DrrScheduler {
         capability_token: Option<[u8; 32]>,
         recipients: Vec<FrameRecipient>,
     ) -> Result<LogBeforeDeliver<FrameRowWrite>, IacBusError> {
+        self.submit_correlated(
+            frame,
+            payload_bytes,
+            tl_kind,
+            spirit_pid,
+            intent_str,
+            capability_token,
+            recipients,
+            None,
+        )
+        .await
+    }
+
+    /// [`Self::submit`] that records a host-derived `correlation_id` on the row.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn submit_correlated(
+        &self,
+        frame: IacFrame,
+        payload_bytes: Vec<u8>,
+        tl_kind: FrameKind,
+        spirit_pid: u32,
+        intent_str: String,
+        capability_token: Option<[u8; 32]>,
+        recipients: Vec<FrameRecipient>,
+        correlation_id: Option<String>,
+    ) -> Result<LogBeforeDeliver<FrameRowWrite>, IacBusError> {
         let (done_tx, done_rx) = oneshot::channel();
         let sub = Submission {
             frame,
@@ -98,6 +126,7 @@ impl DrrScheduler {
             intent_str,
             capability_token,
             recipients,
+            correlation_id,
             done: done_tx,
         };
         self.tx
@@ -293,7 +322,7 @@ fn drain_drr(
 async fn flush_batch(tl: &Arc<TransparencyLogAdapter>, batch: &mut Vec<Submission>) {
     for sub in batch.drain(..) {
         let result = tokio::task::block_in_place(|| {
-            tl.insert_routed_frame(
+            tl.insert_routed_frame_correlated(
                 &sub.frame,
                 sub.tl_kind,
                 sub.spirit_pid,
@@ -301,6 +330,7 @@ async fn flush_batch(tl: &Arc<TransparencyLogAdapter>, batch: &mut Vec<Submissio
                 &sub.intent_str,
                 &sub.payload_bytes,
                 &sub.recipients,
+                sub.correlation_id.as_deref(),
             )
         });
         if let Err(_e) = sub.done.send(Ok(result)) {

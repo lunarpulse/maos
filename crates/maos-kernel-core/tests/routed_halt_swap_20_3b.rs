@@ -76,6 +76,7 @@ async fn active_halt_keeps_identity_and_replay_context_across_hot_swap() {
     let manifest = SpiritManifestBundle {
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["snapshot".into(), "on_swap_out".into(), "on_swap_in".into()],
+            telemetry: None,
         },
         ..Default::default()
     };

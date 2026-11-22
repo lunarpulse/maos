@@ -4,7 +4,7 @@ import hashlib
 import pathlib
 import sys
 
-BINS = ("maos", "maosctl", "maos-spirit", "maos-registry-server")
+BINS = ("maos", "maosctl", "maos-spirit", "maos-registry-server", "maos-wasm-runner")
 dist, prefix, suffix = map(pathlib.Path, sys.argv[1:])
 entries = {}
 for line in (dist / "SHA256SUMS").read_text().splitlines():

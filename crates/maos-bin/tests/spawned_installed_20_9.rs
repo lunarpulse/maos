@@ -17,27 +17,29 @@ use std::path::Path;
 use world::{manifest, ALL_HOOKS, ID};
 
 /// An installed component (`maos spirit install`, then the shell root's boot) at `1.0.0`
-/// whose manifest appends `extra` (further sections); returns the running shell and the
-/// package directory a successor manifest can sit in.
-fn boot_installed(extra: &str) -> (Shell, std::path::PathBuf) {
+/// whose manifest appends `extra` (further sections); returns the running shell.
+fn boot_installed(extra: &str) -> Shell {
     let component = manifest(ID, "1.0.0", "dist/lifecycle_probe.wasm", &ALL_HOOKS, extra);
-    let (shell, mut packages) = shell::boot_installed(&[(ID, component)], "lifecycle_probe.wasm");
-    (shell, packages.remove(0))
+    shell::boot_installed(&[(ID, component)], "lifecycle_probe.wasm").0
+}
+
+/// A successor of the installed component: a signed package of the SAME publisher (a same-pid
+/// swap keeps the Spirit's publisher-bound storage identity), installed beside the running
+/// version. Returns the installed successor manifest.
+fn signed_successor(shell: &Shell, version: &str, extra: &str) -> std::path::PathBuf {
+    let text = manifest(ID, version, "dist/lifecycle_probe.wasm", &ALL_HOOKS, extra);
+    shell.signed_successor(ID, version, &text, "lifecycle_probe.wasm")
 }
 
 #[test]
 fn an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run() {
-    let (shell, package) = boot_installed("");
+    let shell = boot_installed("");
     let pid = shell.field(ID, "pid").expect("the door reports its pid");
 
-    // The successor's manifest sits beside its artifact; the installed predecessor is a
-    // component the root booted, not one `maos run` started.
-    let v2 = package.join("v2.toml");
-    std::fs::write(
-        &v2,
-        manifest(ID, "1.1.0", "lifecycle_probe.wasm", &ALL_HOOKS, ""),
-    )
-    .unwrap();
+    // The successor is a signed package of the same publisher, installed beside the running
+    // version; the installed predecessor is a component the root booted, not one `maos run`
+    // started.
+    let v2 = signed_successor(&shell, "1.1.0", "");
     let output = shell.ctl(&[
         "spirit",
         "upgrade",
@@ -67,15 +69,15 @@ fn an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run
 /// and called a dropping successor safe that the coordinator then refuses.
 #[test]
 fn an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invariant() {
-    let (shell, package) =
+    let shell =
         boot_installed("[swap_invariants]\npreserve = [\"open_pr_state\", \"review_queue\"]\n");
     let pid = shell.field(ID, "pid").expect("the door reports its pid");
-    let successor = |name: &str, preserve: &str| {
-        let path = package.join(name);
-        let section = format!("[swap_invariants]\npreserve = [{preserve}]\n");
-        let text = manifest(ID, "1.1.0", "lifecycle_probe.wasm", &ALL_HOOKS, &section);
-        std::fs::write(&path, text).unwrap();
-        path
+    let successor = |version: &str, preserve: &str| {
+        signed_successor(
+            &shell,
+            version,
+            &format!("[swap_invariants]\npreserve = [{preserve}]\n"),
+        )
     };
     let swap = |path: &Path, policy: &str| {
         shell.ctl(&[
@@ -101,7 +103,7 @@ fn an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invar
         (output.status.code(), report)
     };
 
-    let dropping = successor("v2-drops.toml", "\"open_pr_state\"");
+    let dropping = successor("1.1.0", "\"open_pr_state\"");
     // The premise: this root retained no manifest text for its installed component.
     let cold = swap(&dropping, "cold-swap");
     assert!(
@@ -132,7 +134,7 @@ fn an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invar
         "the predecessor is untouched"
     );
 
-    let superset = successor("v2-superset.toml", "\"review_queue\", \"open_pr_state\"");
+    let superset = successor("1.1.1", "\"review_queue\", \"open_pr_state\"");
     let (exit, report) = precheck(&superset);
     assert_eq!(exit, Some(0), "a superset prechecks safe: {report}");
     assert_eq!(report["safe"], true, "{report}");

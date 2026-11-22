@@ -135,12 +135,17 @@
     {
       "kind": "enum",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeError",
-      "signature_hash": "238ad704c794d5c07570e544e72c48be124abd153fa0dfea6a70a55b031d5f71"
+      "signature_hash": "05afb73dac6c4c7472cf60dd770c4cb28cd4a28012a01f55a3b756a85f7841a4"
     },
     {
       "kind": "enum",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgePoll",
       "signature_hash": "8ccb34956bec32e5dc7f8984e13e02fe37b5af0b3445e74d81f9244aacaf9b6f"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::ChildStopRefusal",
+      "signature_hash": "247dda5e8ee707f3e33c22b8af12da70b8f54aef75622a430079bf355e38c674"
     },
     {
       "kind": "enum",
@@ -184,6 +189,11 @@
     },
     {
       "kind": "enum",
+      "path": "maos_kernel_core::scheduler::control_block::HostLifecycleEvent",
+      "signature_hash": "fe558308b2ad786238993cf2cb0ca01e1ef5f941f70adcba974aea6cb35b2ec5"
+    },
+    {
+      "kind": "enum",
       "path": "maos_kernel_core::scheduler::control_block::ScbLifecycleState",
       "signature_hash": "e8ceb78823bfde16b1dbd744cddf8cec241a8bf8545cd83a08a842087c73938f"
     },
@@ -211,6 +221,11 @@
       "kind": "enum",
       "path": "maos_kernel_core::security::posture::PostureError",
       "signature_hash": "0376cd4487c87fa5d19fd9d58a3f8d3d5ad39dd81d7acbfc83d3ed42435b898e"
+    },
+    {
+      "kind": "enum",
+      "path": "maos_kernel_core::security::sandbox::HeldComponentError",
+      "signature_hash": "ba843ae2602ac281706b55024100ff8757db0ce21584de9c74f8d685269283ef"
     },
     {
       "kind": "enum",
@@ -359,6 +374,11 @@
     },
     {
       "kind": "fn",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::spawn_wasm_t2_and_bridge",
+      "signature_hash": "da10268d4f2b32e13f9ea3a1dc54bc59433bf1db61b9f7c34ae522a327edd0a7"
+    },
+    {
+      "kind": "fn",
       "path": "maos_kernel_core::memory::read_entry_point::enforce_region",
       "signature_hash": "cc7481d1bc7cdeca669d2772cc9cd3f4d65ec48ad22b7043a8e4cff7d772e8ed"
     },
@@ -376,6 +396,11 @@
       "kind": "fn",
       "path": "maos_kernel_core::scheduler::control_block::make_spirit_obj",
       "signature_hash": "cbfc79febb6589f17c57b092944bd8e0f1c6548bdc8abefee0801e77581cf4db"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::scheduler::control_block::make_spirit_obj_with_host_hooks",
+      "signature_hash": "005d194cd973ce1b4cebff6d497e7b7fbf0e97f68d06015be4d7b70647bc3b29"
     },
     {
       "kind": "fn",
@@ -630,7 +655,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::hot_swap::coordinator::HotSwapCoordinator",
-      "signature_hash": "889afc5c26bff718a4e357b011a51089ba0e5c769a6e50243bea36e112a2bd2a"
+      "signature_hash": "5049a6b3ef4f10073417d8b1aa67f2eac3a2e5e84683bf6e0e1d2574ec8ceb1e"
     },
     {
       "kind": "struct",
@@ -724,8 +749,13 @@
     },
     {
       "kind": "struct",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::ChildStopHandle",
+      "signature_hash": "661c932315a0007b99990e05375edb912654c6e2df67f938e182f4d2de239b0d"
+    },
+    {
+      "kind": "struct",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::FrameWriter",
-      "signature_hash": "a01851a0d3a00bf1f92c998fdb511bb297676e883962933dd6c7e047762a4a99"
+      "signature_hash": "635af9e79f96ca7692f55fc31c8de229e73c0f185dd6e2377df60c3cf3bb29ec"
     },
     {
       "kind": "struct",
@@ -735,7 +765,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge",
-      "signature_hash": "080da93e2cd4245c3021d61b5eb939d3466bc548f3b9c4a25508da43b6da8008"
+      "signature_hash": "aa2b1c53c4c188e95c31722d74a2ba2ca2436fb7bca191316a964b5cd743fb3e"
     },
     {
       "kind": "struct",
@@ -804,13 +834,18 @@
     },
     {
       "kind": "struct",
+      "path": "maos_kernel_core::scheduler::control_block::FiringHooks",
+      "signature_hash": "e63a0b6a4a2c08857651362ef3836bd71721557ba06cfb89253464a52447868d"
+    },
+    {
+      "kind": "struct",
       "path": "maos_kernel_core::scheduler::control_block::ScbRuntimeSnapshot",
       "signature_hash": "56d4e501f4defbac5838de9f6bcf3d490d498e1b66bfa2f5d0ef5b0073050889"
     },
     {
       "kind": "struct",
       "path": "maos_kernel_core::scheduler::control_block::SpiritControlBlock",
-      "signature_hash": "f9c34e1e02fc97676db362a4d81e89affcafe81fad57ececa147a61ba0d82b93"
+      "signature_hash": "0a76ea75538291229aea99ed2071367115d7d96b073156e3d358284338e60945"
     },
     {
       "kind": "struct",
@@ -820,12 +855,12 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::scheduler::hook_dispatch::HookDispatcher",
-      "signature_hash": "05a400449937b5ff91a410582b67202a5a8b6f7f9eeb0871a33cfb59fe1c4053"
+      "signature_hash": "922dcd5fb3387134f1cb8abc30b117461dead51f38605081e885940fc2fef721"
     },
     {
       "kind": "struct",
       "path": "maos_kernel_core::scheduler::idle_watchdog::IdleWatchdog",
-      "signature_hash": "a8be7bb15a8f824fdd917778824af159902c6bd2e5a991d94f2f2ceaf702bfc8"
+      "signature_hash": "9598f6f4d5658313e5de503dc518cdc02d85a046bc9ffc067c220bb9acf402b5"
     },
     {
       "kind": "struct",
@@ -835,12 +870,12 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::scheduler::schedule_watchdog::ScheduleWatchdog",
-      "signature_hash": "5e58c7d5ef9f066eb5976dacbad215e221d80aa88a29f1d0f0448d36ee35c55d"
+      "signature_hash": "30ec67fb540a64bb95d4a498204a3e274e6d6d3762719b1b7fe8042818c9b719"
     },
     {
       "kind": "struct",
       "path": "maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter",
-      "signature_hash": "d2170d389c72d69275cbad202942db89f6d5295bb63104fee3f86c30d7896bf1"
+      "signature_hash": "71d94d10fc3a2bbdcac5e554a236a371d5866478eff3c593cddfa56b7cc4a02c"
     },
     {
       "kind": "struct",
@@ -886,6 +921,11 @@
       "kind": "struct",
       "path": "maos_kernel_core::security::posture::PostureState",
       "signature_hash": "64424f20155c1f093c4d3a652b83b5f18efad556d20e478b171eebabdf525c70"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::security::sandbox::HeldWasmComponent",
+      "signature_hash": "b451bc6859b3f6afcc7a38b19f8f5365a090070cebf9e407d35a60a5ae330c26"
     },
     {
       "kind": "struct",
@@ -955,7 +995,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::supervision::crash_detector::CrashDetector",
-      "signature_hash": "750c9d1e4115c5890c68821513e056808bc86bcb60ddfae010ef1dc791fbb15e"
+      "signature_hash": "615895a0a297e763e14a3f7aaa447a8226e8f6952271e73e4421d7909a9619f4"
     },
     {
       "kind": "struct",
@@ -985,7 +1025,7 @@
     {
       "kind": "trait",
       "path": "maos_kernel_core::scheduler::control_block::AnySpiritObj",
-      "signature_hash": "3a4643203f2c807bd00c871aa0eb5ea2a5c0c86ff67dc90569ee6b067846381e"
+      "signature_hash": "79145673a119e556cc917b55743e3a0cf89844ac22554438c9b9dde75d843f0d"
     },
     {
       "kind": "use",

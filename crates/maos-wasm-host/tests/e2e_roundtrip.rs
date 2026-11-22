@@ -115,13 +115,9 @@ fn resolve_launch_wasm_component_produces_runner_plan() {
     );
     assert_eq!(
         plan.argv,
-        [
-            "--component".to_string(),
-            component_fixture_path(),
-            "--fuel".to_string(),
-            "1000000".to_string(),
-        ],
-        "an empty form_config must use the configured default fuel"
+        ["--fuel".to_string(), "1000000".to_string()],
+        "an empty form_config must use the configured default fuel; the component is never \
+         a plan argv entry — the kernel hands it over as a verified held file (`--held-component-*`)"
     );
     assert_eq!(plan.wire, WireShape::ContentLengthCbor);
 }

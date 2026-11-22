@@ -16,9 +16,9 @@ class Maos < Formula
   depends_on "cryptography" => :build
   depends_on "python@3.14" => :build
   # Preserve the signed binaries; :all is deprecated and does not match paths.
-  skip_clean "bin/maos", "bin/maosctl", "bin/maos-spirit", "bin/maos-registry-server"
+  skip_clean "bin/maos", "bin/maosctl", "bin/maos-spirit", "bin/maos-registry-server", "bin/maos-wasm-runner"
 
-  %w[maosctl maos-spirit maos-registry-server].each_with_index do |binary, index|
+  %w[maosctl maos-spirit maos-registry-server maos-wasm-runner].each_with_index do |binary, index|
     resource binary do
       url "@BASE_URL@/#{binary}-#{suffix}", using: :nounzip
       sha256 hashes.fetch(index + 1)
@@ -47,7 +47,7 @@ class Maos < Formula
     end
     # Homebrew's cryptography and cffi formulae link into this site-packages.
     ENV.prepend_path "PYTHONPATH", HOMEBREW_PREFIX/"lib/python3.14/site-packages"
-    names = %w[maos maosctl maos-spirit maos-registry-server]
+    names = %w[maos maosctl maos-spirit maos-registry-server maos-wasm-runner]
     pubkey = "@PUBKEY@"
     system formula_opt_bin("python@3.14")/"python3.14", "verify-release.py",
            "--pubkey", pubkey, *names.map { |name| "#{name}-#{suffix}" }

@@ -74,6 +74,109 @@ pub enum SpawnError {
     T3ReportCommit { reason: String },
 }
 
+/// Largest component the governed WASM route accepts (matches the runner's own cap).
+const MAX_HELD_COMPONENT_BYTES: u64 = 64 * 1024 * 1024;
+
+/// Why a handle cannot be carried into the governed WASM runner.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum HeldComponentError {
+    /// This platform has no governed WASM artifact handoff; nothing was launched.
+    #[error("governed WASM held-artifact transport is unsupported on this platform")]
+    TransportUnsupported,
+    #[error("held component is not a regular file")]
+    NotRegular,
+    #[error("held component handle is not a read-only descriptor")]
+    NotReadOnly,
+    #[error("held component is {len} bytes, exceeds the {MAX_HELD_COMPONENT_BYTES}-byte cap")]
+    TooLarge { len: u64 },
+    #[error("held component handle inspection failed: {0}")]
+    Inspect(String),
+}
+
+/// One-shot, non-cloneable custody of the read-only regular component file an admission
+/// step already verified. The only consumer is the dedicated WASM/T2 spawn: the intended
+/// child receives this exact open file, never a path. The parent's copy stays
+/// close-on-exec and is closed when this value drops (after the spawn resolves).
+#[derive(Debug)]
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub struct HeldWasmComponent {
+    file: std::fs::File,
+    /// The descriptor number this open file already holds. The intended child keeps this
+    /// exact number (close-on-exec cleared in that child only); no number is reassigned.
+    fd: i32,
+    device: u64,
+    inode: u64,
+    sha256: [u8; 32],
+}
+
+impl HeldWasmComponent {
+    /// Take custody of `file`. `sha256` is the digest of the exact compilation bytes; the
+    /// runner refuses a launch whose bytes differ, so it is required for every held launch.
+    /// The handle must be a read-only regular file of at most 64 MiB.
+    pub fn new(file: std::fs::File, sha256: [u8; 32]) -> Result<Self, HeldComponentError> {
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::unix::fs::MetadataExt;
+            linux::prepare_held_component(&file)?;
+            let metadata = file
+                .metadata()
+                .map_err(|e| HeldComponentError::Inspect(e.to_string()))?;
+            if !metadata.is_file() {
+                return Err(HeldComponentError::NotRegular);
+            }
+            if metadata.len() > MAX_HELD_COMPONENT_BYTES {
+                return Err(HeldComponentError::TooLarge {
+                    len: metadata.len(),
+                });
+            }
+            Ok(Self {
+                fd: std::os::fd::AsRawFd::as_raw_fd(&file),
+                file,
+                device: metadata.dev(),
+                inode: metadata.ino(),
+                sha256,
+            })
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = (file, sha256);
+            Err(HeldComponentError::TransportUnsupported)
+        }
+    }
+
+    /// The private runner handoff flags this value contributes to the child's argv.
+    pub(crate) fn runner_args(&self) -> Vec<String> {
+        vec![
+            "--held-component-fd".to_owned(),
+            self.fd.to_string(),
+            "--held-component-device".to_owned(),
+            self.device.to_string(),
+            "--held-component-inode".to_owned(),
+            self.inode.to_string(),
+            "--held-component-sha256".to_owned(),
+            hex::encode(self.sha256),
+        ]
+    }
+}
+
+/// Spawn the runner under Linux T2 with `held` kept open (close-on-exec cleared) in the
+/// intended child only, on the descriptor number it already holds. Any other tier fails closed.
+#[cfg(target_os = "linux")]
+pub(crate) fn spawn_sandboxed_with_held_component(
+    spec: &SandboxSpec,
+    command: &mut Command,
+    held: &HeldWasmComponent,
+) -> Result<SandboxedChild, SpawnError> {
+    if spec.tier != SandboxTier::T2 {
+        return Err(SpawnError::SandboxSetup(format!(
+            "held component handoff requires tier T2, got {:?}",
+            spec.tier
+        )));
+    }
+    linux::spawn_sandboxed_with_held_component(spec, command, held)
+}
+
 /// A sandbox violation detected from child exit status.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SandboxViolation {

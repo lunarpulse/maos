@@ -14,16 +14,29 @@ pub struct Shell {
     child: Option<Child>,
     /// The shell reads its REPL from here and leaves on EOF: held open for the vector's life.
     pub stdin: Option<ChildStdin>,
+    /// The registry the components were installed from: a successor is published here too.
+    server: InProcessServer,
 }
 
 impl Shell {
+    /// The door answers `spawned_swap_not_ready ... retry` until the running guest has started
+    /// (a debug runner compiles its component slowly on a hosted core); the typed refusal says
+    /// to retry, so the witness retries it within one bound and judges only the settled answer.
     pub fn ctl(&self, args: &[&str]) -> std::process::Output {
-        self.scratch
-            .command(&sibling("maosctl"))
-            .env("MAOS_NOTIFY_DISABLE", "1")
-            .args(args)
-            .output()
-            .expect("maosctl")
+        let until = Instant::now() + Duration::from_secs(90);
+        loop {
+            let output = self
+                .scratch
+                .command(&sibling("maosctl"))
+                .env("MAOS_NOTIFY_DISABLE", "1")
+                .args(args)
+                .output()
+                .expect("maosctl");
+            if !text(&output).contains("spawned_swap_not_ready") || Instant::now() >= until {
+                return output;
+            }
+            std::thread::sleep(Duration::from_millis(500));
+        }
     }
 
     /// One `key: value` line of `maosctl spirit inspect <id>`.
@@ -40,6 +53,73 @@ impl Shell {
 
     pub fn stderr(&self) -> String {
         std::fs::read_to_string(self.scratch.0.join("shell.stderr")).unwrap_or_default()
+    }
+
+    /// A successor of the installed component `id` (`manifest` names `dist/<fixture>`),
+    /// published under the SAME publisher key and installed beside the running version: a
+    /// same-pid swap keeps the Spirit's publisher-bound storage identity, so an unsigned or
+    /// differently-signed successor is refused (`swap_publisher_changed`). Returns the
+    /// installed successor manifest.
+    pub fn signed_successor(
+        &self,
+        id: &str,
+        version: &str,
+        manifest: &str,
+        fixture: &str,
+    ) -> PathBuf {
+        let staging = self.scratch.0.join(format!("successor-{id}-{version}"));
+        std::fs::create_dir_all(&staging).unwrap();
+        let published = staging.join("manifest.toml");
+        std::fs::write(
+            &published,
+            manifest.replace(
+                "trust_tier = \"local\"",
+                "trust_tier = \"public-untrusted\"",
+            ),
+        )
+        .unwrap();
+        let output = publish_artifact(
+            &self.scratch,
+            &sibling("maos-spirit"),
+            &self.server.addr,
+            &published,
+            &sibling(fixture),
+            &self.scratch.0.join("publisher.key"),
+        );
+        assert!(
+            output.status.success(),
+            "publish {version}: {}",
+            text(&output)
+        );
+        let install = self
+            .scratch
+            .command(&sibling("maosctl"))
+            .args([
+                "spirit",
+                "install",
+                &format!("{id}@{version}"),
+                "--registry-uri",
+                &format!("http://{}/mcp", self.server.addr),
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            install.status.success(),
+            "install {version}: {}",
+            text(&install)
+        );
+        // Installing a version writes a `<version>-<suffix>` generation directory and points
+        // the installed index at it: that index is the only honest way to find the manifest.
+        maos_registry::storage::LocalFsRegistryStorage::at_path(
+            self.scratch.0.join("home/.local/share/maos/registry"),
+        )
+        .unwrap()
+        .installed_manifests()
+        .unwrap()
+        .into_iter()
+        .find(|(name, _)| name == id)
+        .expect("the successor is in the installed index")
+        .1
     }
 }
 
@@ -151,6 +231,7 @@ pub fn boot_installed(components: &[(&str, String)], fixture: &str) -> (Shell, V
         scratch,
         child: Some(child),
         stdin,
+        server,
     };
     let until = Instant::now() + Duration::from_secs(90);
     for (id, _) in components {

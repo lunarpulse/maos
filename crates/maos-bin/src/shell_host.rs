@@ -174,7 +174,7 @@ pub fn parse_session_principal(raw: Option<std::ffi::OsString>) -> Result<Option
 
 impl maos_shell::ShellHost for ShellHost {
     #[cfg(feature = "network")]
-    fn dispatch_installed(&self, name: &str, message: &str) -> Option<String> {
+    fn dispatch_installed(&self, name: &str, message: &str) -> Option<Result<String, String>> {
         let (installed, iac) = self.installed.as_ref()?;
         installed.dispatch(name, message, iac)
     }

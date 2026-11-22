@@ -17,7 +17,7 @@ use maos_kernel_core::iac::transparency_log::FrameKind as TlKind;
 use maos_kernel_core::lifecycle::UpgradePolicy;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use world::{manifest, manifest_capped, Running, World, ALL_HOOKS, ID};
+use world::{manifest, manifest_capped, manifest_declared, Running, World, ALL_HOOKS, ID};
 
 const MIGRATING: &str = "[hot_swap]\nstate_schema_uri = \"urn:probe\"\nstate_schema_version = 131073\n[migrates_from]\nversions = [\"1.0.x\"]\n";
 // (v1 of the migrator vector declares no [hot_swap]: schema 1, major 0; MIGRATING is major 2.)
@@ -80,6 +80,14 @@ async fn admit(
 ) -> Result<maos_bin::admission::Admitted, maos_bin::admission::AdmissionRefusal> {
     let text = std::fs::read_to_string(&path).unwrap();
     let gated = maos_bin::admission::gate_manifest(&text, &|_| false).unwrap();
+    let artifact = maos_bin::spirit_session::LaunchArtifact::acquire_local(
+        path.parent().unwrap(),
+        gated.class_section.artifact.as_deref().unwrap(),
+        None,
+    )
+    .map_err(|error| maos_bin::admission::AdmissionRefusal::ClassBuild {
+        detail: error.to_string(),
+    })?;
     world
         .handles
         .admit_spawned(
@@ -99,6 +107,7 @@ async fn admit(
             &gated,
             &path,
             path.parent().unwrap(),
+            artifact,
         )
         .await
 }
@@ -220,9 +229,8 @@ async fn a_hot_swap_keeps_the_pid_tokens_memory_and_state_and_waits_for_the_acti
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn the_migrator_policy_hands_the_successor_the_predecessors_state() {
     let mut world = World::new().await;
-    // The FR11 archive is per MAOS_HOME (this process); another vector's default-schema record
-    // of this id would make v1 look cross-major to it.
-    let _ = std::fs::remove_dir_all(maos_audit::default_archive_dir());
+    // The FR11 archive is this world's own (`handles.archive_root`): no other vector's record of
+    // this id can make v1 look cross-major to it.
     let v1 = v(
         &world,
         "v1.toml",
@@ -336,8 +344,10 @@ async fn a_revert_after_the_predecessor_child_retired_ends_the_session_typed() {
         .await
         .expect("the swap commits");
     // A carried halt that leaves the registry inside the window trips the monitor (MAOS_AUTO_REVERT_FAST).
+    // Hosted debug runners are several times slower than a dev box: the bound is generous (x4); the
+    // assertion on how the session ends is unchanged.
     assert_eq!(world.halt.drain_for_spirit(running.pid).len(), 1);
-    let ended = tokio::time::timeout(Duration::from_secs(20), running.session)
+    let ended = tokio::time::timeout(Duration::from_secs(80), running.session)
         .await
         .expect("the session ends")
         .expect("no join failure");
@@ -539,12 +549,143 @@ async fn a_swap_refused_after_snapshot_releases_the_predecessor_which_keeps_serv
     );
     settle(world, running).await;
 }
+
+// 21-9 T5 (AC11 row "A hot-swapped spawned successor writes no FR11 archive record") — a
+// committed hot swap records the successor's own version identity; a refused successor records
+// nothing, and the predecessor's version is never recorded as the successor.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_committed_hot_swap_records_the_successors_fr11_identity_and_a_refused_one_does_not() {
+    let mut world = World::new().await;
+    let archive = world.handles.archive_root.clone();
+    let record = |version: &str| archive.join(ID).join(version).join("manifest.toml");
+    let v1 = v(&world, "v1.toml", "1.0.0", "lifecycle_probe.wasm", "");
+    let refused = v(
+        &world,
+        "refused.toml",
+        "2.9.0",
+        "lifecycle_probe.wasm",
+        MIGRATING,
+    );
+    let v2 = v(&world, "v2.toml", "1.7.3", "lifecycle_probe.wasm", "");
+    let running = world.start(&v1).await;
+    world.turn(ID, "").await;
+    world
+        .upgrade(&refused, UpgradePolicy::HotSwap)
+        .await
+        .expect_err("the envelope refuses the cross-major successor");
+    assert!(
+        !record("2.9.0").exists(),
+        "a refused successor never ran and leaves no FR11 record"
+    );
+    assert!(!record("1.7.3").exists(), "nothing committed yet");
+    world
+        .upgrade(&v2, UpgradePolicy::HotSwap)
+        .await
+        .expect("the compatible hot swap commits");
+    let archived = std::fs::read_to_string(record("1.7.3"))
+        .expect("the committed successor's FR11 record exists");
+    assert_eq!(
+        archived,
+        std::fs::read_to_string(&v2).unwrap(),
+        "the record is the admitted successor's manifest text"
+    );
+    assert!(
+        archived.contains("version = \"1.7.3\""),
+        "the record names the successor's version, not the predecessor's:\n{archived}"
+    );
+    assert!(
+        !record("2.9.0").exists(),
+        "the refused version stays unrecorded after the commit"
+    );
+    settle(world, running).await;
+}
+
 /// A manifest of `ID` at `version` for `artifact`, under a `cap` second budget.
 fn capped(world: &World, version: &str, artifact: &str, cap: u32) -> PathBuf {
     world.write(
         &format!("{artifact}-{version}.toml"),
         &manifest_capped(ID, version, artifact, &ALL_HOOKS, "", cap),
     )
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_firing_deadline_after_handover_stops_and_reaps_the_successor() {
+    use maos_bin::spirit_session::SessionError;
+    use maos_bin::supervision::BindingPhase;
+    use rustix::process::{waitid, WaitId, WaitIdOptions};
+    use std::sync::Arc;
+
+    let mut world = World::bare().await;
+    let v1 = capped(&world, "1.0.0", "lifecycle_probe.wasm", 60);
+    let v2 = capped(&world, "1.1.0", "lifecycle_probe.wasm", 60);
+    let running = world.start(&v1).await;
+    let predecessor = world
+        .supervisor
+        .bindings()
+        .into_iter()
+        .find_map(|binding| binding.child_pid)
+        .expect("predecessor has a child");
+    world.turn(ID, "").await;
+    world.upgrade(&v2, UpgradePolicy::HotSwap).await.unwrap();
+    let report = world.turn(ID, "sleep-in idle 40").await;
+    assert_eq!(World::count(&report, "swap-in"), 1, "{report}");
+    let successor = world
+        .supervisor
+        .bindings()
+        .into_iter()
+        .find(|binding| binding.spirit_pid == running.pid && binding.child.is_some())
+        .expect("the adopted successor owns a child");
+    let pid = successor.child_pid.unwrap();
+    assert_ne!(predecessor, pid);
+    let child = successor.child.unwrap();
+
+    let mut dispatcher = maos_kernel_core::scheduler::HookDispatcher::new(
+        Arc::clone(&world.tl),
+        Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new()),
+    )
+    .with_spirits(world.scheduler.scbs());
+    dispatcher.firing_ceiling_seconds = 2;
+    let _ = dispatcher.fire_on_idle(&world.scb(ID)).await;
+    let result = tokio::time::timeout(Duration::from_secs(20), running.session)
+        .await
+        .expect("the successor's session ends before its declared 60 s budget")
+        .unwrap();
+    assert!(
+        matches!(result, Err(SessionError::Deadline("lifecycle export"))),
+        "{result:?}"
+    );
+    assert!(world.supervisor.bindings().iter().any(|binding| {
+        binding.child_pid == Some(pid) && matches!(binding.phase, BindingPhase::PlannedStop)
+    }));
+    assert!(matches!(
+        waitid(
+            WaitId::PidFd(child.pidfd()),
+            WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
+        ),
+        Err(rustix::io::Errno::CHILD)
+    ));
+    world.finish().await;
+}
+
+/// One holder at a time per hostile mode. `twins` names children by mode over the whole process,
+/// and every vector of this binary shares it: a child another vector spawned in the same mode
+/// (the 90 s attempt-wall vectors keep theirs that long) is not this vector's leak. Holding this
+/// from the swap until the child's absence is judged makes "no `--mode M` process" a statement
+/// about this vector's own child.
+async fn hostile_mode(mode: &str) -> tokio::sync::OwnedMutexGuard<()> {
+    static LOCKS: std::sync::Mutex<
+        Option<std::collections::HashMap<String, std::sync::Arc<tokio::sync::Mutex<()>>>>,
+    > = std::sync::Mutex::new(None);
+    let lock = {
+        let mut locks = LOCKS.lock().unwrap_or_else(|error| error.into_inner());
+        std::sync::Arc::clone(
+            locks
+                .get_or_insert_with(Default::default)
+                .entry(mode.to_owned())
+                .or_default(),
+        )
+    };
+    lock.lock_owned().await
 }
 
 /// Live processes whose command line names `mode` as a `hostile-twin` mode.
@@ -638,6 +779,7 @@ async fn a_prewarm_guest_that_never_stops_writing_diagnostics_is_refused_at_its_
         .await;
     world.turn(ID, "").await;
     for mode in ["stderr-flood", "probe-flood"] {
+        let _exclusive = hostile_mode(mode).await;
         let successor = capped(&world, "2.0.0", &format!("hostile-{mode}.wasm"), 2);
         let (orchestrator, staged, handle) = (
             std::sync::Arc::clone(&world.orchestrator),
@@ -906,7 +1048,9 @@ async fn a_predecessor_that_exits_after_its_snapshot_still_completes_its_swap() 
 async fn a_cold_swap_successors_fr11_record_precedes_its_start_and_a_failed_start_withdraws_it() {
     let world = World::bare().await;
     let slow = capped(&world, "3.0.0", "hostile-slow-ready.wasm", 3);
-    let record = maos_audit::default_archive_dir()
+    let record = world
+        .handles
+        .archive_root
         .join(ID)
         .join("3.0.0")
         .join("manifest.toml");
@@ -1017,7 +1161,20 @@ async fn refused_at_the_attempt_wall(mode: &str) {
         .start(&capped(&world, "1.0.0", "lifecycle_probe.wasm", 2))
         .await;
     world.turn(ID, "").await;
-    let successor = capped(&world, "2.0.0", &format!("hostile-{mode}.wasm"), 600);
+    let _exclusive = hostile_mode(mode).await;
+    // Its telemetry wall stays at the predecessor's 2 s: a swap may not enlarge a declaration.
+    let successor = world.write(
+        &format!("hostile-{mode}-2.0.0.toml"),
+        &manifest_declared(
+            ID,
+            "2.0.0",
+            &format!("hostile-{mode}.wasm"),
+            &ALL_HOOKS,
+            "",
+            600,
+            2,
+        ),
+    );
     let (orchestrator, staged, handle) = (
         std::sync::Arc::clone(&world.orchestrator),
         world.staged.clone(),

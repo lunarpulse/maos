@@ -302,47 +302,48 @@ impl SecurityManagerAdapter {
         let _degraded = maos_manifest::warn_n_minus_1_degradations(class.manifest_schema_version);
 
         {
-            let declared_scopes = capabilities_required_to_scopes(caps_required);
-            let inner = self.policy.inner().load_full();
+            // Retry-safe RCU: every input (trust tier, effective tier,
+            // operator ceiling) is recomputed from the CURRENT snapshot on
+            // each attempt, so admission can't undo a concurrent same-PID
+            // scope narrowing or posture change. The closure is pure.
+            self.policy.mutate(|next| {
+                let trust_tier = next
+                    .manifest_scopes
+                    .get(&spirit_pid)
+                    .map(|m| m.trust_tier)
+                    .unwrap_or(TrustTier::Verified);
 
-            let trust_tier = inner
-                .manifest_scopes
-                .get(&spirit_pid)
-                .map(|m| m.trust_tier)
-                .unwrap_or(TrustTier::Verified);
+                let effective = self
+                    .policy
+                    .effective_sandbox_tier(spirit_pid, trust_tier, next);
 
-            let effective = self
-                .policy
-                .effective_sandbox_tier(spirit_pid, trust_tier, &inner);
-
-            let mut new_inner = (*inner).clone();
-            new_inner.manifest_scopes.insert(
-                spirit_pid,
-                ManifestCapabilityScope {
-                    scopes: declared_scopes,
-                    declared_tier: effective,
-                    trust_tier,
-                },
-            );
-            // Story 16-6 (§16a R3, §17 R10) — clamp BOTH fields, not just
-            // the ceiling. `RawPostureSection::validate` enforces only
-            // `allowed_max >= default`, so clamping `allowed_max` alone
-            // stores `current > allowed_max` for any class whose declared
-            // default outranks the operator ceiling. `Posture: Ord` is
-            // least-privilege-first, so `min()` is the clamp.
-            let mut posture_state = crate::security::posture::PostureState {
-                current: posture_section.default,
-                allowed_max: posture_section.allowed_max,
-                epistemic_policy: epistemic_policy
-                    .cloned()
-                    .unwrap_or_else(EpistemicPolicySection::default_open_fail),
-            };
-            clamp_posture_state(
-                &mut posture_state,
-                inner.operator_policy.operator_posture_ceiling,
-            );
-            new_inner.spirit_postures.insert(spirit_pid, posture_state);
-            self.policy.update(new_inner);
+                next.manifest_scopes.insert(
+                    spirit_pid,
+                    ManifestCapabilityScope {
+                        scopes: capabilities_required_to_scopes(caps_required),
+                        declared_tier: effective,
+                        trust_tier,
+                    },
+                );
+                // Story 16-6 (§16a R3, §17 R10) — clamp BOTH fields, not just
+                // the ceiling. `RawPostureSection::validate` enforces only
+                // `allowed_max >= default`, so clamping `allowed_max` alone
+                // stores `current > allowed_max` for any class whose declared
+                // default outranks the operator ceiling. `Posture: Ord` is
+                // least-privilege-first, so `min()` is the clamp.
+                let mut posture_state = crate::security::posture::PostureState {
+                    current: posture_section.default,
+                    allowed_max: posture_section.allowed_max,
+                    epistemic_policy: epistemic_policy
+                        .cloned()
+                        .unwrap_or_else(EpistemicPolicySection::default_open_fail),
+                };
+                clamp_posture_state(
+                    &mut posture_state,
+                    next.operator_policy.operator_posture_ceiling,
+                );
+                next.spirit_postures.insert(spirit_pid, posture_state);
+            });
         }
 
         let inner = self.policy.inner().load_full();

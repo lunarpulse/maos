@@ -5,17 +5,23 @@
 //!
 //! Architecture §4.1 + Story 5.1 Task 6.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use tokio::task::JoinHandle;
+use parking_lot::Mutex;
+use tokio::task::{JoinHandle, JoinSet};
 use tokio_util::sync::CancellationToken;
 
+use super::FiringReservation;
 use crate::scheduler::control_block::{ScbLifecycleState, SpiritControlBlock};
 use crate::scheduler::hook_dispatch::HookDispatcher;
 use crate::scheduler::kernel_ctx::KernelCtx;
+
+/// Story 21-9 AC8 — most `on_idle` firings in flight at once; one per Spirit
+/// already, each capped at 30 s.
+const MAX_IN_FLIGHT_FIRINGS: usize = 256;
 
 /// Per-Spirit idle watchdog — fires `on_idle` when the Spirit is
 /// Running AND (now - last_inbound_frame_ns) > idle_window_ms.
@@ -25,6 +31,8 @@ use crate::scheduler::kernel_ctx::KernelCtx;
 pub struct IdleWatchdog {
     scbs: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
     dispatcher: Arc<HookDispatcher>,
+    /// Story 21-9 AC8 — Spirits with an `on_idle` reserved or in flight.
+    in_flight: Arc<Mutex<HashSet<u32>>>,
 }
 
 impl IdleWatchdog {
@@ -32,7 +40,11 @@ impl IdleWatchdog {
         scbs: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
         dispatcher: Arc<HookDispatcher>,
     ) -> Self {
-        Self { scbs, dispatcher }
+        Self {
+            scbs,
+            dispatcher,
+            in_flight: Arc::new(Mutex::new(HashSet::new())),
+        }
     }
 
     /// Spawn the watchdog background task.
@@ -48,6 +60,9 @@ impl IdleWatchdog {
             let fast_mode = std::env::var_os("MAOS_IDLE_FAST").is_some();
             let poll_ms = if fast_mode { 40u64 } else { 3000u64 };
             let mut interval = tokio::time::interval(Duration::from_millis(poll_ms));
+            // Owned in-flight `on_idle` firings, each bounded by the
+            // dispatcher's `min(cap, 30 s)` wall.
+            let mut fires = JoinSet::new();
 
             loop {
                 tokio::select! {
@@ -55,66 +70,89 @@ impl IdleWatchdog {
                         break;
                     }
                     _ = interval.tick() => {
-                        self.check_and_fire(fast_mode).await;
+                        while let Some(joined) = fires.try_join_next() {
+                            Self::note_join(joined);
+                        }
+                        self.dispatch_due(fast_mode, &mut fires).await;
                     }
                 }
+            }
+            // Shutdown joins every `on_idle` still in flight.
+            while let Some(joined) = fires.join_next().await {
+                Self::note_join(joined);
             }
         })
     }
 
-    async fn check_and_fire(&self, fast_mode: bool) {
+    fn note_join(joined: Result<(), tokio::task::JoinError>) {
+        if let Err(e) = joined {
+            eprintln!("idle-watchdog: in-flight on_idle task ended abnormally: {e}");
+        }
+    }
+
+    /// Admit every due Spirit and hand its `on_idle` to `fires` without
+    /// awaiting it, so a slow hook never holds back a later poll. A Spirit
+    /// whose `on_idle` is still in flight is never dispatched twice, and the
+    /// total in flight is bounded by `MAX_IN_FLIGHT_FIRINGS`.
+    async fn dispatch_due(self: &Arc<Self>, fast_mode: bool, fires: &mut JoinSet<()>) {
         // Collect SCBs to process (clone Arcs outside the lock to avoid
         // holding RwLockReadGuard across await points).
-        let candidates: Vec<Arc<SpiritControlBlock>> = {
+        let candidates: Vec<(Arc<SpiritControlBlock>, FiringReservation<u32>)> = {
             let scbs = self.scbs.read().unwrap();
             let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
-            scbs.iter()
-                .filter(|(_, scb)| {
-                    if scb.current_state() != ScbLifecycleState::Running {
-                        return false;
-                    }
-                    let last_inbound = scb.last_inbound_frame_ns.load(Ordering::Relaxed);
-                    let idle_window_ms =
-                        scb.runtime_snapshot().manifest.scheduling.idle_window_ms as u64;
-                    let idle_window_ms = if fast_mode {
-                        idle_window_ms / 100
-                    } else {
-                        idle_window_ms
-                    };
-                    let idle_window_ns = idle_window_ms * 1_000_000;
-                    // Story 5.1 review backfill — removed `last_inbound == 0`
-                    // short-circuit. SCB constructor now seeds last_inbound to
-                    // creation time so this check is purely temporal. A
-                    // never-frame-received Spirit fires on_idle one
-                    // idle_window after load, matching AC4 scenario 1.
-                    if now_ns.saturating_sub(last_inbound) < idle_window_ns {
-                        return false;
-                    }
-                    let last_fire = scb.last_idle_fire_ns.load(Ordering::Relaxed);
-                    if last_fire >= last_inbound && last_fire > 0 {
-                        return false;
-                    }
-                    true
-                })
-                .map(|(_, scb)| Arc::clone(scb))
-                .collect()
+            let mut out = Vec::new();
+            for (_, scb) in scbs.iter() {
+                if scb.current_state() != ScbLifecycleState::Running {
+                    continue;
+                }
+                let last_inbound = scb.last_inbound_frame_ns.load(Ordering::Relaxed);
+                let idle_window_ms =
+                    scb.runtime_snapshot().manifest.scheduling.idle_window_ms as u64;
+                let idle_window_ms = if fast_mode {
+                    idle_window_ms / 100
+                } else {
+                    idle_window_ms
+                };
+                let idle_window_ns = idle_window_ms * 1_000_000;
+                // Story 5.1 review backfill — removed `last_inbound == 0`
+                // short-circuit. SCB constructor now seeds last_inbound to
+                // creation time so this check is purely temporal. A
+                // never-frame-received Spirit fires on_idle one
+                // idle_window after load, matching AC4 scenario 1.
+                if now_ns.saturating_sub(last_inbound) < idle_window_ns {
+                    continue;
+                }
+                let last_fire = scb.last_idle_fire_ns.load(Ordering::Relaxed);
+                if last_fire >= last_inbound && last_fire > 0 {
+                    continue;
+                }
+                let Some(reservation) =
+                    FiringReservation::try_reserve(&self.in_flight, scb.pid, MAX_IN_FLIGHT_FIRINGS)
+                else {
+                    continue;
+                };
+                out.push((Arc::clone(scb), reservation));
+            }
+            out
         };
 
-        // 20-9: every due Spirit fires side by side, so one Spirit's long
-        // `on_idle` no longer holds back the others' triggers in this poll. The
-        // tick still awaits them all, so shutdown (which joins this task)
-        // keeps seeing every in-flight `on_idle` finish.
-        let mut fires = tokio::task::JoinSet::new();
-        for scb in candidates {
+        for (scb, reservation) in candidates {
             let dispatcher = Arc::clone(&self.dispatcher);
             fires.spawn(async move {
+                // One handle moves into the native closure and drops only
+                // when `on_idle` actually returns (a timed-out call is
+                // detached, not preempted); this one lives until the stamp
+                // below, so the Spirit is never free before its stamp lands.
+                let reservation = Arc::new(reservation);
                 // Story 5.1 review backfill — fire FIRST then store
                 // last_idle_fire_ns only when the outcome reflects an actual
                 // dispatch (Fired / BudgetWarning80 / BudgetExceeded).  Storing
                 // unconditionally hid SkippedManifest cases (the previous test
                 // `idle_watchdog_skips_manifest_disabled_hook` passed for the
                 // wrong reason — see test comment for context).
-                let outcome = dispatcher.fire_on_idle(&scb).await;
+                let outcome = dispatcher
+                    .fire_on_idle_guarded(&scb, Arc::clone(&reservation))
+                    .await;
                 use crate::scheduler::hook_dispatch::HookOutcome;
                 let actually_fired = !matches!(
                     outcome,
@@ -124,9 +162,9 @@ impl IdleWatchdog {
                     let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
                     scb.last_idle_fire_ns.store(now_ns, Ordering::Release);
                 }
+                drop(reservation);
             });
         }
-        while fires.join_next().await.is_some() {}
     }
 }
 

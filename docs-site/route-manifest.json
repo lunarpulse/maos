@@ -29,6 +29,10 @@
       "content_floor": "link list"
     },
     {
+      "path": "/manifest/v8",
+      "label": "Manifest v8 Reference"
+    },
+    {
       "path": "/manifest/v7",
       "label": "Manifest v7 Reference"
     },

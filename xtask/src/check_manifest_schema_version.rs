@@ -34,6 +34,9 @@ use std::path::Path;
 
 const SPIRIT_ABI_LIB: &str = "crates/maos-spirit-abi/src/lib.rs";
 const MANIFEST_VALIDATION: &str = "crates/maos-manifest/src/manifest.rs";
+// Only declarations eligible for WARN-level degradation belong here. The
+// proposed schema-8 telemetry declaration is refused below its schema, not
+// ignored, so it belongs in neither this roster nor POST_V1_SCHEMA_SECTIONS.
 const RATIFIED_POST_V1_SCHEMA_SECTIONS: &[&str] = &[
     "cli_wrapper",
     "schedule",
@@ -197,8 +200,7 @@ pub fn run(json: bool) -> Result<(), String> {
     }
 
     // Step 5 — POST_V1_SCHEMA_SECTIONS must exactly match the independently
-    // ratified post-v1 inventory. Merely searching manifest.rs is vacuous:
-    // every entry necessarily appears in the constant being checked.
+    // ratified degradation inventory. This is not a schema ratification check.
     if current >= 2 {
         let manifest_src = fs::read_to_string(MANIFEST_VALIDATION)
             .map_err(|e| format!("read {MANIFEST_VALIDATION}: {e}"))?;
@@ -213,7 +215,7 @@ pub fn run(json: bool) -> Result<(), String> {
             Some(entries) if entries.is_empty() => {
                 violations.push(format!(
                     "{MANIFEST_VALIDATION}: POST_V1_SCHEMA_SECTIONS is empty but MANIFEST_SCHEMA_VERSION={current} >= 2 — \
-                     every section added after schema v1 must be listed"
+                     sections eligible for WARN degradation must be listed"
                 ));
             }
             Some(entries) => {

@@ -377,7 +377,7 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         // fired_at_ns, compliance_claim_ref (Option<[u8;32]> → array|null),
         // side_effect_token_id (TokenId([u8;16]) → array),
         // principal_revocability (bool).
-        site: ("schedule_watchdog.rs", "poll_once", 0),
+        site: ("schedule_watchdog.rs", "admit", 0),
         kind: 7,
         token: TokenColumn::Absent,
         intent: WriterIntent::Prefix("schedule.fire:"),
@@ -549,22 +549,13 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     // the smoke distillate write — a smoke seed, never a production row.
     WriterShapeEntry::call("main.rs", "smoke_orchestrator_fanout_6_2", 0),
     // ── maos-iac — NonCall (kind-1 FR50 dispositions, D-16-3-J (4)) ────────
+    // `emit_task_complete` is the single writer behind the nack and escalate
+    // helpers; its subject is `task.nacked` or `task.escalated`.
     WriterShapeEntry {
-        site: ("adapter.rs", "emit_task_complete_nack", 0),
+        site: ("adapter.rs", "emit_task_complete", 0),
         kind: 1,
         token: TokenColumn::Absent,
-        intent: WriterIntent::Exact("task.nacked"),
-        shape: Some(&[
-            ("task_id", PayloadType::Str),
-            ("originator_spirit_id", PayloadType::Str),
-            ("capability_token", PayloadType::NumArrayOrNull),
-        ]),
-    },
-    WriterShapeEntry {
-        site: ("adapter.rs", "emit_task_complete_escalated", 0),
-        kind: 1,
-        token: TokenColumn::Absent,
-        intent: WriterIntent::Exact("task.escalated"),
+        intent: WriterIntent::Prefix("task."),
         shape: Some(&[
             ("task_id", PayloadType::Str),
             ("originator_spirit_id", PayloadType::Str),

@@ -231,7 +231,8 @@ fn hosted_1_rpm_artifact_macro_does_not_redefine_reserved_suffix() {
     assert!(!spec.contains("%{suffix}"));
     assert!(spec.contains("%global maos_artifact_suffix linux-amd64"));
     assert!(spec.contains("%global maos_artifact_suffix linux-arm64"));
-    assert_eq!(spec.matches("%{maos_artifact_suffix}").count(), 9);
+    // 11 = 5 Source lines (maos-wasm-runner added by 21-9) + 5 verify-release args + 1 install loop.
+    assert_eq!(spec.matches("%{maos_artifact_suffix}").count(), 11);
 }
 
 #[test]

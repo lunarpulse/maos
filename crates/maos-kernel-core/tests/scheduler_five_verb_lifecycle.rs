@@ -117,6 +117,7 @@ async fn five_verb_lifecycle_routes_through_scheduler() {
                 "on_resume".into(),
                 "on_unload".into(),
             ],
+            telemetry: None,
         },
         ..Default::default()
     };

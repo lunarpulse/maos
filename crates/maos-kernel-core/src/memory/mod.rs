@@ -631,6 +631,18 @@ impl MemoryManagerAdapter {
         }
     }
 
+    /// Withdraw a spirit pid's `Principal` write grant. Called only by the
+    /// terminal release owners (scheduler unload, crash handler) once the
+    /// pid's SCB is gone; never by predecessor child retirement. Idempotent;
+    /// no-op when enforcement is disabled. Does not erase stored data.
+    pub fn deauthorize_principal_writes(&self, pid: u32) {
+        if let Some(ref lock) = self.principal_write_enforcement {
+            lock.write()
+                .expect("principal_write_enforcement RwLock poisoned")
+                .remove(&pid);
+        }
+    }
+
     /// Bind the admitted stable identity before any Spirit memory access (FR31).
     pub fn bind_storage_identity(&self, pid: u32, identity: &str) -> Result<(), MemoryError> {
         self.private.bind_storage_identity(pid, identity)
@@ -1296,6 +1308,42 @@ mod tests {
 
     fn make_adapter() -> (Arc<MemoryManagerAdapter>, TempDir) {
         make_adapter_with_hook(None)
+    }
+
+    #[test]
+    fn deauthorize_principal_writes_is_pid_scoped_and_idempotent() {
+        let tmp = TempDir::new().unwrap();
+        let db_path = tmp.path().join("audit.db");
+        let adapter = MemoryManagerAdapter::new(
+            Arc::new(PrivateMemoryStore::new(tmp.path().join("memory"), 4 * 1024)),
+            Arc::new(SharedMemoryStore::open(&db_path).unwrap()),
+            Arc::new(PrincipalNamespaceIndex::open(&db_path).unwrap()),
+            Arc::new(TransparencyLogAdapter::open_in_memory(1)),
+        )
+        .with_principal_write_enforcement();
+        let ns = MemoryNamespace::Principal {
+            principal_id: "p".into(),
+            schema: "s".into(),
+        };
+        let write = |pid: u32| {
+            adapter.write(
+                pid,
+                MemoryTier::Private,
+                &ns,
+                "k",
+                MemoryValue::Text("v".into()),
+            )
+        };
+        adapter.authorize_principal_writes(1);
+        adapter.authorize_principal_writes(2);
+        write(1).unwrap();
+        adapter.deauthorize_principal_writes(1);
+        adapter.deauthorize_principal_writes(1);
+        assert!(matches!(
+            write(1),
+            Err(MemoryError::PrincipalWriteUnauthorized { spirit_pid: 1 })
+        ));
+        write(2).expect("other pid's grant is untouched");
     }
 
     #[test]

@@ -146,24 +146,15 @@ fn render(workspace_root: &Path) -> Result<String, String> {
     let cw_max = parse_const(&abi_src, "MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION")
         .ok_or_else(|| "MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION not found".to_string())?;
 
-    // N-1 / N-2 rows derived from the live window. N-1 exists only when the
-    // current schema is at least 2 (CURRENT-1 ≥ MIN); below that it is N/A.
-    let n_minus_1 = if current_schema >= 2 {
+    // N-1 exists in the version window only if the preceding version meets the floor.
+    // A version in the window does not guarantee that every declaration is valid.
+    let n_minus_1 = if current_schema > min_schema {
         format!(
-            "| `manifest_schema_version = {}` (N-1) | ✅ supported (loads with WARN-level degradation notes) |",
+            "| `manifest_schema_version = {}` (N-1) | ✅ within the supported version window (subject to declaration validation) |",
             current_schema - 1
         )
     } else {
         "| `manifest_schema_version` N-1 | N/A (current schema is the floor) |".to_string()
-    };
-    let n_minus_2 = if current_schema >= 2 {
-        format!(
-            "| `manifest_schema_version < {min_schema}` (N-2) | ⛔ hard refusal — typed `SecurityError::EAbiTooOld` at admit |"
-        )
-    } else {
-        format!(
-            "| `manifest_schema_version < {min_schema}` | ⛔ hard refusal — typed `SecurityError::EAbiTooOld` at admit |"
-        )
     };
 
     let export_content = extract_preserved_export(workspace_root)?;
@@ -203,7 +194,7 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 |---|---|
 | `manifest_schema_version = {current_schema}` (current) | ✅ strict load (`deny_unknown_fields`) |
 {n_minus_1}
-{n_minus_2}
+| `manifest_schema_version < {min_schema}` | ⛔ hard refusal — typed `SecurityError::EAbiTooOld` at admit |
 | `manifest_schema_version > {max_schema}` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
 | `min_substrate_version` > running `kernel_version` | ⛔ hard refusal — typed `SecurityError::ESubstrateTooOld` (FR8) |
 | `[cli_wrapper]` `manifest_schema_version` outside `{cw_min}..={cw_max}` | ⛔ hard refusal before the strict parse — typed `CliWrapperAdmissionError::ECliWrapperSchemaUnsupported` |
@@ -212,6 +203,13 @@ The version gate is **fail-closed in both directions**: an out-of-window
 manifest is refused with an actionable typed error, never silently
 warned-and-admitted (a manifest is a security artifact; a silent ignore would be
 fail-open).
+
+Schema 8 was ratified for Story 21-9 as `21-9-manifest-schema-8`.
+The `abi_version` and supported manifest floor remain `1`. Schemas 1–7 still
+support non-listeners, but an explicit `on_telemetry_event` listing or a
+`[lifecycle.telemetry]` table below schema 8 is refused, not degraded away.
+Schema 8 requires both declarations together for a listener.
+This change does not alter the guest wire contract.
 
 ## Deprecations
 

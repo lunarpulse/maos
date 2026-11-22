@@ -66,7 +66,10 @@ use crate::security::sandbox::t3::{
 };
 use crate::security::sandbox::SandboxSpec;
 #[cfg(target_os = "linux")]
-use crate::security::sandbox::{spawn_sandboxed, SandboxedChild};
+use crate::security::sandbox::{
+    spawn_sandboxed, spawn_sandboxed_with_held_component, SandboxedChild,
+};
+use crate::security::sandbox::{HeldComponentError, HeldWasmComponent};
 #[cfg(unix)]
 use maos_iac::adapter::{CorpusBackedRedactionPolicy, RedactionPolicy};
 
@@ -206,6 +209,14 @@ pub enum BridgeError {
     /// spawn, or a tier no spawn path applies). Never a bare fallback.
     #[error("cli bridge sandbox refused: {0}")]
     SandboxRefused(String),
+    /// The governed WASM route has no artifact handoff on this platform. Nothing was
+    /// launched and no path fallback exists; distinct from engine-off, invalid component
+    /// and generic spawn failure.
+    #[error("cli bridge governed WASM held-artifact transport unsupported: {0}")]
+    WasmTransportUnsupported(String),
+    /// The held component handle or its runner handoff was refused before launch.
+    #[error("cli bridge held component refused: {0}")]
+    HeldComponent(String),
 }
 
 /// Spec for a single subprocess spawn through the bridge (AC1).
@@ -308,6 +319,8 @@ pub struct SpawnedBridge {
     sandbox_tier: SandboxTier,
     /// Stdout reached EOF: the stream is closed to `poll_frame` callers.
     stdout_eof: bool,
+    /// Exact stop capability opened at spawn (see [`Self::take_child_stop_handle`]).
+    stop: Result<ChildStopHandle, ChildStopRefusal>,
 }
 
 /// Outcome of draining the child's streams to the journal.
@@ -328,12 +341,118 @@ pub struct PumpOutcome {
 )]
 pub struct FrameWriter {
     stdin: ChildStdin,
+    /// Set once a deadline write may have left a partial frame on the stream.
+    poisoned: bool,
 }
 
 impl FrameWriter {
     pub fn write_frame(&mut self, body: &[u8]) -> std::io::Result<()> {
+        if self.poisoned {
+            return Err(poisoned_stream_error());
+        }
         maos_frame_codec::write_frame(&mut self.stdin, body)
     }
+
+    /// Write one frame, giving up at the absolute monotonic `deadline`.
+    ///
+    /// `TimedOut` (before or during the write) is terminal for this stream: a
+    /// partial frame may be on the pipe, so every later write fails. On success
+    /// the writer is unchanged and reusable. Supported on Linux only.
+    pub fn write_frame_until(
+        &mut self,
+        body: &[u8],
+        deadline: std::time::Instant,
+    ) -> std::io::Result<()> {
+        if self.poisoned {
+            return Err(poisoned_stream_error());
+        }
+        let result = write_frame_until_impl(&mut self.stdin, body, deadline);
+        if let Err(err) = &result {
+            // Oversize bodies are rejected before any byte is written.
+            if err.kind() != std::io::ErrorKind::InvalidData {
+                self.poisoned = true;
+            }
+        }
+        result
+    }
+}
+
+fn poisoned_stream_error() -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::BrokenPipe,
+        "frame stream is terminal after a failed deadline write",
+    )
+}
+
+#[cfg(not(target_os = "linux"))]
+fn write_frame_until_impl(
+    _stdin: &mut ChildStdin,
+    _body: &[u8],
+    _deadline: std::time::Instant,
+) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "deadline frame writes are supported on Linux only",
+    ))
+}
+
+#[cfg(target_os = "linux")]
+fn write_frame_until_impl(
+    stdin: &mut ChildStdin,
+    body: &[u8],
+    deadline: std::time::Instant,
+) -> std::io::Result<()> {
+    use rustix::fs::{fcntl_getfl, fcntl_setfl, OFlags};
+    use std::os::fd::AsFd;
+
+    /// Borrowed `Write` adapter: nonblocking write plus cooperative poll, with
+    /// the same absolute wall checked before every write and poll.
+    struct DeadlineWrite<'a> {
+        fd: std::os::fd::BorrowedFd<'a>,
+        deadline: std::time::Instant,
+    }
+    impl Write for DeadlineWrite<'_> {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            use rustix::event::{poll, PollFd, PollFlags, Timespec};
+            loop {
+                if std::time::Instant::now() >= self.deadline {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "frame write deadline elapsed",
+                    ));
+                }
+                match rustix::io::write(self.fd, buf) {
+                    Ok(n) => return Ok(n),
+                    Err(rustix::io::Errno::INTR) => continue,
+                    Err(rustix::io::Errno::AGAIN) => {}
+                    Err(errno) => return Err(errno.into()),
+                }
+                let remaining = self
+                    .deadline
+                    .saturating_duration_since(std::time::Instant::now());
+                let timeout = Timespec {
+                    tv_sec: i64::try_from(remaining.as_secs()).unwrap_or(i64::MAX),
+                    tv_nsec: i64::from(remaining.subsec_nanos()),
+                };
+                let mut fds = [PollFd::new(&self.fd, PollFlags::OUT)];
+                match poll(&mut fds, Some(&timeout)) {
+                    Ok(_) | Err(rustix::io::Errno::INTR) => {}
+                    Err(errno) => return Err(errno.into()),
+                }
+            }
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let fd = stdin.as_fd();
+    let original = fcntl_getfl(fd)?;
+    fcntl_setfl(fd, original | OFlags::NONBLOCK)?;
+    let write = maos_frame_codec::write_frame(&mut DeadlineWrite { fd, deadline }, body);
+    let restore = fcntl_setfl(fd, original);
+    write.and(restore.map_err(Into::into))
 }
 
 /// Transport facts only; the composition root owns deadlines and protocol state.
@@ -590,13 +709,7 @@ fn spawn_child(spec: &mut BridgeSpawnSpec, argv: &[String]) -> Result<BridgeChil
             )))
         }
     }
-    let mut cmd = Command::new(program);
-    cmd.env_clear()
-        .args(argv)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .envs(spec.env.iter().map(|(name, value)| (name, value)));
+    let mut cmd = base_command(spec, argv);
     #[cfg(target_os = "linux")]
     if spec.sandbox.tier == SandboxTier::T2 {
         return spawn_sandboxed(&spec.sandbox, &mut cmd)
@@ -606,6 +719,17 @@ fn spawn_child(spec: &mut BridgeSpawnSpec, argv: &[String]) -> Result<BridgeChil
     cmd.spawn()
         .map(BridgeChild::Plain)
         .map_err(|e| BridgeError::Spawn(format!("{program}: {e}")))
+}
+
+fn base_command(spec: &BridgeSpawnSpec, argv: &[String]) -> Command {
+    let mut cmd = Command::new(&spec.program);
+    cmd.env_clear()
+        .args(argv)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .envs(spec.env.iter().map(|(name, value)| (name, value)));
+    cmd
 }
 
 /// Spawn a subprocess under its admitted sandbox and start its reader threads.
@@ -621,6 +745,64 @@ pub fn spawn_and_bridge(mut spec: BridgeSpawnSpec) -> Result<SpawnedBridge, Brid
     argv.extend(std::mem::take(&mut spec.task_args));
     let mut child = spawn_child(&mut spec, &argv)?;
     assemble_bridge(spec, child)
+}
+
+/// Dedicated governed WASM entry: spawn the runner under Linux T2 and hand it `held`, the
+/// exact open read-only component file admission verified, as its private
+/// `--held-component-*` handoff. The cap-prefix check runs first. T0, T3 and every other
+/// tier are refused (never bypassed), as is any generic argv that names a component path
+/// or carries its own handoff flag; non-Linux platforms return
+/// [`BridgeError::WasmTransportUnsupported`] before launch. The parent's copy of the file is
+/// closed when this call returns, whether or not the spawn succeeded.
+pub fn spawn_wasm_t2_and_bridge(
+    spec: BridgeSpawnSpec,
+    held: HeldWasmComponent,
+) -> Result<SpawnedBridge, BridgeError> {
+    if argv_prefix_hash(&spec.argv_prefix) != spec.expected_argv_prefix_hash {
+        return Err(BridgeError::CapBindingMismatch);
+    }
+    if spec.sandbox.tier != SandboxTier::T2 {
+        return Err(BridgeError::SandboxRefused(format!(
+            "{}: held component handoff requires tier T2, got {:?}",
+            spec.program, spec.sandbox.tier
+        )));
+    }
+    if spec.t3.is_some() {
+        return Err(BridgeError::SandboxRefused(
+            "held component handoff cannot carry a T3 launch context".into(),
+        ));
+    }
+    if let Some(flag) = spec
+        .argv_prefix
+        .iter()
+        .chain(&spec.task_args)
+        .find(|arg| *arg == "--component" || arg.starts_with("--held-component"))
+    {
+        return Err(BridgeError::HeldComponent(format!(
+            "generic argv may not carry a component path or handoff flag: {flag}"
+        )));
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        drop(held);
+        Err(BridgeError::WasmTransportUnsupported(format!(
+            "{}: no held-artifact handoff on this platform",
+            spec.program
+        )))
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let mut spec = spec;
+        let mut argv = std::mem::take(&mut spec.argv_prefix);
+        argv.extend(std::mem::take(&mut spec.task_args));
+        argv.extend(held.runner_args());
+        let mut cmd = base_command(&spec, &argv);
+        let child = spawn_sandboxed_with_held_component(&spec.sandbox, &mut cmd, &held)
+            .map(BridgeChild::Sandboxed)
+            .map_err(|e| BridgeError::SandboxRefused(format!("{}: {e}", spec.program)))?;
+        drop(held);
+        assemble_bridge(spec, child)
+    }
 }
 
 /// Attach a real T3-owned child to the production bridge/finalizer path.
@@ -682,6 +864,8 @@ fn assemble_bridge(
         .take()
         .ok_or_else(|| BridgeError::Spawn("stderr not captured".into()))?;
 
+    // Exact identity is taken while this bridge still owns the unreaped child.
+    let stop = open_child_stop(&child, child_pid);
     let (tx, rx) = std::sync::mpsc::sync_channel::<ReaderMsg>(spec.channel_capacity.max(1));
     let dropped = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
 
@@ -737,6 +921,7 @@ fn assemble_bridge(
         dropped,
         sandbox_tier: spec.sandbox.tier,
         stdout_eof: false,
+        stop,
     })
 }
 
@@ -753,11 +938,92 @@ impl SpawnedBridge {
     }
 }
 
+/// Why [`SpawnedBridge::take_child_stop_handle`] grants no stop handle. A refusal
+/// is never a claim that the child stopped.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ChildStopRefusal {
+    /// T3 containers terminate only through the shared container teardown.
+    #[error("T3 container child is stopped only by container teardown")]
+    Container,
+    /// The bridge already reaped and released its child.
+    #[error("bridge child already finalized")]
+    Finalized,
+    /// The one handle was already transferred to its host owner.
+    #[error("child stop handle already transferred")]
+    Transferred,
+    /// This platform has no exact-child-identity stop (Linux pidfd only).
+    #[error("exact child stop handle unsupported on this platform")]
+    UnsupportedPlatform,
+    /// The exact identity could not be opened.
+    #[error("exact child stop handle unavailable: {0}")]
+    Unavailable(String),
+}
+
+/// Exact stop capability for one spawned child: the sole owned pidfd, moved
+/// from the bridge to the host owner. It holds no reference to the bridge.
+#[derive(Debug)]
+pub struct ChildStopHandle {
+    #[cfg(target_os = "linux")]
+    pidfd: std::os::fd::OwnedFd,
+}
+
+impl ChildStopHandle {
+    /// SIGKILL the exact child. `ESRCH` means the exact child is no longer
+    /// signalable; it is never proof of reap, which the bridge still owns.
+    pub fn stop(&self) -> std::io::Result<()> {
+        #[cfg(target_os = "linux")]
+        {
+            rustix::process::pidfd_send_signal(&self.pidfd, rustix::process::Signal::KILL)
+                .map_err(Into::into)
+        }
+        #[cfg(not(target_os = "linux"))]
+        Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
+    }
+}
+
+/// Open the exact stop identity for a freshly spawned, still-unreaped child.
+fn open_child_stop(
+    child: &BridgeChild,
+    child_pid: u32,
+) -> Result<ChildStopHandle, ChildStopRefusal> {
+    if matches!(child, BridgeChild::Container(_, _)) {
+        return Err(ChildStopRefusal::Container);
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let pid = i32::try_from(child_pid)
+            .ok()
+            .and_then(rustix::process::Pid::from_raw)
+            .ok_or_else(|| ChildStopRefusal::Unavailable("invalid child pid".into()))?;
+        let pidfd = rustix::process::pidfd_open(pid, rustix::process::PidfdFlags::empty())
+            .map_err(|errno| ChildStopRefusal::Unavailable(format!("pidfd_open: {errno}")))?;
+        Ok(ChildStopHandle { pidfd })
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = child_pid;
+        Err(ChildStopRefusal::UnsupportedPlatform)
+    }
+}
+
 #[cfg(target_os = "linux")]
 impl SpawnedBridge {
     /// Consume the native child's one-shot cgroup resource downgrade, if any.
     pub fn take_resource_downgrade(&mut self) -> Option<String> {
         self.child.as_mut()?.take_resource_downgrade()
+    }
+}
+
+impl SpawnedBridge {
+    /// Move the stop handle out of this bridge, once, to the live-session owner.
+    ///
+    /// The handle is a pidfd opened by `assemble_bridge` while the child was
+    /// still unreaped and owned here, so it names that exact process and can
+    /// never retarget a recycled PID. A stop attempt never reaps, tears down a
+    /// T3 container, or consumes bridge custody. Refused for T3 containers,
+    /// after finalization or a prior transfer, and wherever exact pidfd identity is unavailable.
+    pub fn take_child_stop_handle(&mut self) -> Result<ChildStopHandle, ChildStopRefusal> {
+        std::mem::replace(&mut self.stop, Err(ChildStopRefusal::Transferred))
     }
 }
 
@@ -839,7 +1105,10 @@ impl SpawnedBridge {
     pub fn take_frame_writer(&mut self) -> Result<FrameWriter, BridgeError> {
         self.stdin
             .take()
-            .map(|stdin| FrameWriter { stdin })
+            .map(|stdin| FrameWriter {
+                stdin,
+                poisoned: false,
+            })
             .ok_or_else(|| BridgeError::Io("bridge framed stdin already closed or taken".into()))
     }
 
@@ -1020,6 +1289,7 @@ impl SpawnedBridge {
         // The child is now reaped (wait consumed it). Mark consumed so Drop does
         // not double-wait.
         self.child = None;
+        self.stop = Err(ChildStopRefusal::Finalized);
 
         #[cfg(unix)]
         if self.sandbox_tier == SandboxTier::T2
@@ -1466,6 +1736,7 @@ mod tests {
             shutdown_signal: None,
             dropped,
             sandbox_tier: SandboxTier::T0,
+            stop: Err(ChildStopRefusal::Unavailable("test bridge".into())),
             stdout_eof: false,
         };
 

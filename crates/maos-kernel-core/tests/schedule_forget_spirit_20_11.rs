@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, RwLock};
 
+use maos_kernel_core::iac::payload::PollOutcome;
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use maos_kernel_core::scheduler::{
     control_block::{make_spirit_obj, ScbLifecycleState, SpiritControlBlock, SpiritManifestBundle},
@@ -38,6 +39,7 @@ fn scb_of(
     let manifest = SpiritManifestBundle {
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["on_schedule".into()],
+            telemetry: None,
         },
         schedules: SchedulesSection {
             entries: vec![ScheduleEntry {
@@ -206,8 +208,13 @@ async fn a_candidate_captured_before_the_uninstall_never_fires_after_it() {
         dispatcher,
         Arc::clone(&tl),
     ));
-    let cancel = tokio_util::sync::CancellationToken::new();
-    let handle = Arc::clone(&watchdog).spawn(cancel.child_token());
+    // One `poll_once` is the barrier: it collects A, B and C up front, then
+    // admits and runs them serially, so B is admitted only after A's hook
+    // returns. No dependence on the spawn loop's concurrent execution order.
+    let polling = {
+        let watchdog = Arc::clone(&watchdog);
+        tokio::spawn(async move { watchdog.poll_once(true).await })
+    };
     entered_rx
         .recv_timeout(std::time::Duration::from_secs(10))
         .expect("the poll is inside A's hook, so B and C are already captured");
@@ -221,15 +228,20 @@ async fn a_candidate_captured_before_the_uninstall_never_fires_after_it() {
     };
     release_tx.send(()).expect("release A");
     forgetting.await.expect("forget task");
-    let observed = tokio::time::timeout(std::time::Duration::from_secs(10), async {
-        while fires(&tl, 3) == 0 {
-            tokio::task::yield_now().await;
-        }
-    })
-    .await;
-    cancel.cancel();
-    handle.await.expect("watchdog shuts down cleanly");
-    observed.expect("C, captured after B in the same poll, fires");
+    let outcomes = tokio::time::timeout(std::time::Duration::from_secs(10), polling)
+        .await
+        .expect("the poll finishes once A is released")
+        .expect("poll task");
+    assert_eq!(
+        outcomes,
+        vec![
+            PollOutcome::Fired(1, "daily".into()),
+            PollOutcome::Fired(3, "daily".into()),
+        ],
+        "A fires, the stale B candidate yields no outcome, C (captured after B) fires"
+    );
+    assert_eq!(fires(&tl, 1), 1, "A's fire row");
+    assert_eq!(fires(&tl, 3), 1, "C's fire row");
     assert_eq!(fires(&tl, 2), 0, "a retired Spirit wrote a fire row");
     assert_eq!(
         b_calls.load(Ordering::SeqCst),

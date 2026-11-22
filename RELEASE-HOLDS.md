@@ -51,21 +51,18 @@
 | 2 | Export-control classification | **NFR-Comp-1** — ECCN classification letter on file; EAR99 vs 5D002 determination published in `STABILITY.md §Export`; dual-use review for kernel crypto primitives. | Export counsel + security owner | ⛔ No ECCN determination made (no counsel); NOT claimable | none (boundary) |
 | 3 | Hot-path performance budgets | **PRD success criterion** (`_bmad-output/planning-artifacts/prd/success-criteria.md:40-46`) — `iac/send` <10 µs P99, capability issuance <5 µs P99, dispatch <5 µs P99, `memory/read` <50 µs / <5 ms P99, hot-swap <50 ms / <500 ms P99, telemetry broadcast <1 µs; "enforced as CI gates by v1.0". **NOT met as stated.** | Owner: none (the stable perf runner is dropped as work, dedrift ruling 5) | ⛔ Perf verdicts ABSENT; the verdict command and its fixture-ledger tests exist (20-7 L1); no stable-runner timing was measured | none (boundary): the release notes say `Perf verdicts: ABSENT` (operator ruling 2026-11-12, third set, B1; `release.yml` enforces the line for GA); the release may NOT claim any NFR-Perf timing figure |
 
-## Standing mitigations (in force now, not a GA precondition)
+## WASM engine in the default build (claim boundary; not a GA precondition)
 
-- **WASM engine is OFF by default.** The `wasm-host` feature
-  (`crates/maos-bin/Cargo.toml`) is off-by-default and gates the vendored
-  `wasmtime` engine. Off-by-default is the **export-control precondition for
-  5D002.c.1** — the shipped default artifact carries no controlled crypto/WASM
-  engine, so internal builds and non-WASM distribution proceed while Boundary 2
-  (no ECCN determination) stands. See `docs/compliance/export-counsel-precondition.md` and
-  `docs/compliance/eccn-classification.md`.
-
-  **Operator ruling 2026-11-12 (`wasm` = on):** the operator ruled the engine ON
-  in the default artifact. Story `21-9-wasm-host-default-on` retires this
-  mitigation; until it lands, OFF is still the fact of the tree and
-  `check-export-control` still enforces it. Boundary 2 does not change: no ECCN
-  determination was made and NFR-Comp-1 is not claimed. Record:
+- **Operator ruling 2026-11-12 (`wasm` = on):** the default `maos` build
+  includes the Wasmtime engine (`wasm-host` is in the default feature set;
+  story `21-9-wasm-host-default-on`). An explicit engine-free build
+  (`--no-default-features --features network`) remains supported. The former
+  standing mitigation — engine OFF by default as the export-control
+  precondition for 5D002.c.1 — is retired. Counsel clearance was never
+  obtained and is not a precondition: Boundary 2 stands (no ECCN
+  determination was made; the surface is not classified; NFR-Comp-1 is not
+  claimed). See `docs/compliance/export-counsel-precondition.md` and
+  `docs/compliance/eccn-classification.md`. Record:
   `_bmad-output/planning-artifacts/decisions-2026-11-12-dedrift.md`.
 
 ## Claim boundaries — v2.2 Reza line (in force now, not a GA precondition)
@@ -152,9 +149,10 @@ This section governs GA tags only. The signed `v0.1.0-alpha.1` pre-release and t
    test was performed; no ECCN determination was made; assurance is AI-agent
    review plus the hermetic CI proof only"**, and the release does NOT claim
    NFR-Sec-7 or NFR-Comp-1 is met.
-3. The WASM-engine-off-by-default standing mitigation is in force until story
-   `21-9-wasm-host-default-on` lands (operator ruling `wasm` = on, 2026-11-12);
-   from then on the default artifact carries the engine and the notes say so.
+3. The default artifact carries the Wasmtime engine (story
+   `21-9-wasm-host-default-on`; operator ruling `wasm` = on, 2026-11-12) and the
+   notes say so; an explicit engine-free build remains supported. This is not
+   classified or counsel-cleared (item 2).
 4. The tag is an ordinary `git tag` pushed with the operator's authorisation; CI
    signs the artifacts with the repository secret `RELEASE_SIGNING_KEY`
    (`docs/release/tag-procedure.md`). No operator-held key is involved (SCP

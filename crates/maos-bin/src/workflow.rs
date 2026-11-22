@@ -1221,11 +1221,12 @@ tier = "T0"
             if let Some(iac) = self.deps.iac {
                 iac.withdraw_spirit(&binding.spirit_id, binding.pid);
             }
-            self.deps
-                .pid_by_spirit_id
-                .write()
-                .unwrap()
-                .remove(&binding.spirit_id);
+            {
+                let mut map = self.deps.pid_by_spirit_id.write().unwrap();
+                if map.get(&binding.spirit_id) == Some(&binding.pid) {
+                    map.remove(&binding.spirit_id);
+                }
+            }
         }
         match (result, cleanup) {
             (Ok(_), Some(error)) => Err(error.into()),

@@ -60,6 +60,12 @@ jobs:
           docker run --rm maos:tag --version
           docker run --rm maos:tag --help
           docker run --rm maos:tag init --plain
+          # The runner must sit beside maos as an executable regular file. The distroless
+          # image has no shell, so inspect the filesystem entry itself; this never runs it.
+          cid="$(docker create maos:tag)"
+          trap 'docker rm -f "$cid" >/dev/null' EXIT
+          docker cp "$cid:/usr/local/bin/maos" - | tar -tv | grep -E '^-r[w-]x'
+          docker cp "$cid:/usr/local/bin/maos-wasm-runner" - | tar -tv | grep -E '^-r[w-]x'
       - name: Publication unavailable
         if: env.PUBLISH != 'true'
         run: |

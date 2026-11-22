@@ -112,7 +112,7 @@ if [ "$actual_intro" != "$expected_intro" ]; then
     exit 1
 fi
 
-# Step 5: Binary size gate — stripped maos-bin ≤34MiB (AC4) — blocking, deterministic
+# Step 5: Binary size gate — stripped release maos (AC4) — blocking, deterministic
 echo "--- Checking binary size ---"
 strip target/release/maos
 bin_size=$(stat -c%s target/release/maos)

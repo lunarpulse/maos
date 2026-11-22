@@ -218,6 +218,9 @@ pub struct TelemetrySubscriptionPayload {
     pub scope: String,
     /// `true` for a grant, `false` for a revoke.
     pub granted: bool,
+    /// Enforced delivery wall in milliseconds for a new grant. Older rows and revokes omit it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effective_wall_ms: Option<u64>,
     /// Why the subscription began or ended.
     pub reason: String,
 }
@@ -439,6 +442,21 @@ mod tests {
                 "AC-6: forbidden claim-instance id field {k:?}"
             );
         }
+    }
+
+    #[test]
+    fn historical_telemetry_subscription_keeps_its_record_shape() {
+        let legacy = serde_json::json!({
+            "subscriber_pid": 7,
+            "spirit_id": "observer",
+            "class": "observer",
+            "scope": "scalar.tap.*",
+            "granted": false,
+            "reason": "unloaded"
+        });
+        let old: TelemetrySubscriptionPayload = serde_json::from_value(legacy.clone()).unwrap();
+        assert_eq!(old.effective_wall_ms, None);
+        assert_eq!(serde_json::to_value(old).unwrap(), legacy);
     }
 
     /// Erasure-class lineage ids cover the full set (Art.17 / legal-hold / retention).
