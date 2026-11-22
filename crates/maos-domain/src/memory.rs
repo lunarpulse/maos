@@ -305,6 +305,9 @@ pub enum MemoryError {
     ValueTooLarge { len: usize, max: usize },
     #[error("principal namespace write unauthorized: spirit_pid {spirit_pid} not authorized")]
     PrincipalWriteUnauthorized { spirit_pid: u32 },
+    /// FR13 — a quarantined pid's own write is refused at the single store chokepoint.
+    #[error("spirit_pid {spirit_pid} is quarantined; memory write refused")]
+    Quarantined { spirit_pid: u32 },
 }
 
 // ---------------------------------------------------------------------------

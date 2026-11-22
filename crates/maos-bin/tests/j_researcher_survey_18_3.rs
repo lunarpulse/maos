@@ -950,6 +950,7 @@ async fn mcp_response_only_principal_is_purged_without_cached_claim_resurrection
         &AdmissionDeps {
             providers: None,
             iac: None,
+            quarantine: None,
             scheduler: &scheduler,
             security: &security,
             transparency_log: &tl,

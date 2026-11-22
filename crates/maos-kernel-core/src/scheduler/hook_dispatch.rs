@@ -20,6 +20,16 @@ use maos_domain::invariants::i3::FrameOrigin;
 use std::collections::BTreeMap;
 use std::sync::RwLock;
 
+/// FR13 (D-LRQC-07 A): the event-driven hooks a quarantined pid is refused. Operator lifecycle
+/// hooks (load/start/pause/resume/unload/snapshot/swap) still fire.
+const FENCED_HOOKS: [&str; 5] = [
+    "on_frame",
+    "on_telemetry_event",
+    "on_schedule",
+    "on_idle",
+    "on_consolidate",
+];
+
 /// Outcome of a hook fire.
 #[derive(Debug, Clone, PartialEq)]
 pub enum HookOutcome {
@@ -27,6 +37,8 @@ pub enum HookOutcome {
         wall_ns: u64,
     },
     SkippedManifest,
+    /// FR13: the pid is quarantined; an event-driven hook was refused. Never a strike or crash.
+    SkippedQuarantined,
     BudgetExceeded {
         wall_ns: u64,
         cap_seconds: u64,
@@ -671,6 +683,14 @@ impl HookDispatcher {
     {
         if !Self::hook_allowed(scb, hook_name) {
             return HookOutcome::SkippedManifest;
+        }
+        if FENCED_HOOKS.contains(&hook_name)
+            && self
+                .capability
+                .as_ref()
+                .is_some_and(|caps| caps.is_quarantined(scb.pid))
+        {
+            return HookOutcome::SkippedQuarantined;
         }
 
         let cap_seconds = self.hook_cap_seconds(scb, hook_name);

@@ -2,7 +2,7 @@
 #![forbid(unsafe_code)]
 
 //! Story 20-5 AC3 — a Worker manifest's `[cli_wrapper]` table carries a schema version
-//! (`manifest_schema_version`, absent means 1, window `1..=1`) that is read and checked
+//! (`manifest_schema_version`, absent means 1, window `1..=2`) that is read and checked
 //! BEFORE the strict parse, through the real `maos run` composition root.
 //!
 //! "Admitted" is observed as the run reaching the stage after the `[cli_wrapper]` parse
@@ -105,8 +105,8 @@ fn assert_refused_as_unsupported(outcome: &Outcome, declared: &str) {
     // `maos run` prints its error through `{:?}`, which escapes the quotes of a string value.
     let shown = outcome.stderr.replace("\\\"", "\"");
     assert!(
-        shown.contains(&needle) && shown.contains("1..=1"),
-        "expected the typed refusal naming 1..=1 ({needle}); stderr:\n{}",
+        shown.contains(&needle) && shown.contains("1..=2"),
+        "expected the typed refusal naming 1..=2 ({needle}); stderr:\n{}",
         outcome.stderr
     );
     assert!(
@@ -139,10 +139,44 @@ fn version_one_is_admitted() {
 #[test]
 fn a_newer_manifest_with_an_unknown_key_is_refused_as_too_new_not_as_an_unknown_field() {
     let outcome = run(
-        &worker_manifest("manifest_schema_version = 2\nfrobnicate = true"),
-        "two",
+        &worker_manifest("manifest_schema_version = 3\nfrobnicate = true"),
+        "three",
     );
-    assert_refused_as_unsupported(&outcome, "2");
+    assert_refused_as_unsupported(&outcome, "3");
+}
+
+const IDENTITY: &str = "class_name = \"worker-x\"\nclass_version = \"1.0.0\"";
+
+/// D-LRQC-04 A: schema 2 with its CRL-addressable identity reaches the tier gate.
+#[test]
+fn version_two_with_the_identity_is_admitted() {
+    let manifest = worker_manifest(&format!("manifest_schema_version = 2\n{IDENTITY}"));
+    assert_admitted(&run(&manifest, "two-ok"));
+}
+
+/// D-LRQC-04 A: schema 2 requires the identity; schema 1 cannot carry it. Both refuse before
+/// the tier gate.
+#[test]
+fn the_worker_identity_is_required_at_version_two_and_refused_at_version_one() {
+    let bare = run(&worker_manifest("manifest_schema_version = 2"), "two-bare");
+    assert!(
+        bare.stderr.contains("required string at schema 2"),
+        "stderr:\n{}",
+        bare.stderr
+    );
+    assert!(!bare.stderr.contains("tier not granted"), "{}", bare.stderr);
+    let manifest = worker_manifest(&format!("manifest_schema_version = 1\n{IDENTITY}"));
+    let carried = run(&manifest, "one-identity");
+    assert!(
+        carried.stderr.contains("need manifest_schema_version = 2"),
+        "stderr:\n{}",
+        carried.stderr
+    );
+    assert!(
+        !carried.stderr.contains("tier not granted"),
+        "{}",
+        carried.stderr
+    );
 }
 
 #[test]
@@ -198,8 +232,13 @@ fn every_shipped_worker_manifest_declares_the_version_explicitly() {
             .and_then(toml::Value::as_integer);
         assert_eq!(
             declared,
-            Some(1),
-            "{name} must declare manifest_schema_version = 1"
+            Some(2),
+            "{name} must declare manifest_schema_version = 2"
+        );
+        let table = &root["cli_wrapper"];
+        assert!(
+            table.get("class_name").is_some() && table.get("class_version").is_some(),
+            "{name} must declare its CRL-addressable identity"
         );
         seen += 1;
     }

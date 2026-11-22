@@ -528,6 +528,7 @@ impl World {
             &AdmissionDeps {
                 providers: None,
                 iac: Some(&self.iac),
+                quarantine: None,
                 scheduler: &self.scheduler,
                 security: &self.security,
                 transparency_log: &self.tl,

@@ -631,6 +631,9 @@ struct DoorInner {
     /// Story 19-7 — the set-once re-pin control. Empty (every route 404) in
     /// every root but `cohort-a2a-daemon`, which installs its live pin store.
     repin: Arc<crate::repin_door::RepinControl>,
+    /// FR13 — the durable quarantine holds; set once by the composition root (absent in tests
+    /// that do not exercise them).
+    quarantine: Mutex<Option<Arc<crate::quarantine::QuarantineGate>>>,
 }
 
 /// `maosctl`-visible director identity on every approval-log row (FR42 keeps
@@ -699,11 +702,17 @@ impl OperatorDoor {
             worker_revoke_stop: Mutex::new(None),
             forget_pump: Mutex::default(),
             repin: Arc::new(crate::repin_door::RepinControl::new()),
+            quarantine: Mutex::default(),
         }))
     }
 
     pub fn set_forget_pump(&self, pump: &Arc<crate::hook_pump::HookPump>) {
         *self.0.forget_pump.lock().unwrap_or_else(|e| e.into_inner()) = Some(Arc::downgrade(pump));
+    }
+
+    /// FR13 — install the daemon's quarantine gate (the release verb and the swap refusal).
+    pub fn set_quarantine(&self, gate: Arc<crate::quarantine::QuarantineGate>) {
+        *self.0.quarantine.lock().unwrap_or_else(|e| e.into_inner()) = Some(gate);
     }
 
     /// The per-Spirit serialization lock (D-16-1-R). Exposed so the in-process
@@ -891,6 +900,9 @@ impl DoorInner {
                     &spirit_id,
                 )
                 .await
+            }
+            OperatorCommand::QuarantineRelease { spirit_id } => {
+                self.quarantine_release_command(&spirit_id).await
             }
             OperatorCommand::Posture { spirit_id, posture } => {
                 self.posture_command(&spirit_id, &posture).await
@@ -1143,6 +1155,8 @@ impl DoorInner {
         if matches!(verb, "pause" | "resume") {
             // AC7.4 — the capability fence, read back rather than assumed.
             body["fenced"] = self.capability.is_paused(pid).into();
+            body["quarantined"] = self.capability.is_quarantined(pid).into();
+            body["director_paused"] = self.capability.is_director_paused(pid).into();
         }
         if let Some(frozen) = frozen {
             body["frozen"] = frozen.into();
@@ -1393,9 +1407,22 @@ impl DoorInner {
                 ),
             };
         }
-        let Some(_pid) = self.scheduler.resolve_pid(spirit_id) else {
+        let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
             return Self::spirit_not_loaded(spirit_id);
         };
+        // D-LRQC-08 A: a quarantined Spirit is not swapped (hot, cold or migrator) until the
+        // operator releases it; a swap never lifts the hold.
+        let held =
+            installed(&self.quarantine).is_some_and(|gate| !gate.holds_for(spirit_id).is_empty());
+        if held || self.capability.is_quarantined(pid) {
+            return OperatorOutcome::Conflict {
+                code: "quarantined_swap_refused".into(),
+                detail: format!(
+                    "spirit '{spirit_id}' is quarantined; run `maosctl quarantine-release \
+                     {spirit_id}` before upgrading it"
+                ),
+            };
+        }
         // Forward-only comparison uses SemVer, including prerelease ordering.
         let target_semver = match semver::Version::parse(&target_version) {
             Ok(version) => version,
@@ -2737,6 +2764,83 @@ impl DoorInner {
         guard.get(&pid).map(|scb| scb.current_state())
     }
 
+    /// FR13 (D-LRQC-03 A) — door-only release: refused while an applied CRL still matches the
+    /// identity; journals the approval row, then clears the fences and the durable holds. A
+    /// director pause is not lifted.
+    async fn quarantine_release_command(&self, spirit_id: &str) -> OperatorOutcome {
+        let Some(gate) = installed(&self.quarantine) else {
+            return OperatorOutcome::Failed {
+                code: "quarantine_unavailable".into(),
+                detail: "this daemon has no quarantine store".into(),
+            };
+        };
+        let pid = self.scheduler.resolve_pid(spirit_id);
+        let holds = gate.holds_for(spirit_id);
+        let fenced = pid.is_some_and(|pid| self.capability.is_quarantined(pid));
+        if holds.is_empty() && !fenced {
+            let detail = format!("spirit '{spirit_id}' is not quarantined");
+            return match pid {
+                Some(_) => OperatorOutcome::Conflict {
+                    code: "spirit_not_quarantined".into(),
+                    detail,
+                },
+                None => Self::not_found("spirit_not_quarantined", detail),
+            };
+        }
+        // A hold names its class identity; a loaded Worker's instance id (`worker-2`) is not its
+        // declared class name, so the loaded SCB's own `(class.name, class.version)` is checked.
+        let mut identities: Vec<(String, String)> = holds
+            .into_iter()
+            .map(|hold| (hold.spirit_id, hold.version))
+            .collect();
+        let loaded = pid.and_then(|pid| {
+            let scbs = self.scheduler.scbs();
+            let guard = scbs.read().unwrap_or_else(|error| error.into_inner());
+            let scb = guard.get(&pid)?;
+            let class = scb.runtime_snapshot().manifest.class.clone();
+            class.map(|class| (class.name, class.version))
+        });
+        identities.extend(loaded);
+        let crls: Vec<String> = identities
+            .iter()
+            .flat_map(|(name, version)| self.revocation_applier.matching_crls(name, version))
+            .map(|id| hex::encode(id.0))
+            .collect();
+        if !crls.is_empty() {
+            return OperatorOutcome::Conflict {
+                code: "quarantine_crl_applies".into(),
+                detail: format!(
+                    "applied CRL(s) {} still match '{spirit_id}'; forget them before releasing",
+                    crls.join(",")
+                ),
+            };
+        }
+        if let Err(outcome) = self.approval_row(
+            spirit_id,
+            "quarantine-release",
+            "release",
+            format!("director released the FR13 quarantine of '{spirit_id}'"),
+        ) {
+            return outcome;
+        }
+        let removed = match gate.release(spirit_id, pid) {
+            Ok(removed) => removed,
+            Err(error) => {
+                return OperatorOutcome::Failed {
+                    code: "quarantine_release_failed".into(),
+                    detail: error.to_string(),
+                }
+            }
+        };
+        OperatorOutcome::Completed(serde_json::json!({
+            "spirit_id": spirit_id,
+            "released": true,
+            "holds_removed": removed,
+            "quarantined": pid.is_some_and(|pid| self.capability.is_quarantined(pid)),
+            "director_paused": pid.is_some_and(|pid| self.capability.is_director_paused(pid)),
+        }))
+    }
+
     /// The loaded `[class]` version from the SCB's runtime snapshot — the
     /// version the daemon actually RUNS, not a manifest on disk.
     fn loaded_version(&self, spirit_id: &str) -> Option<String> {
@@ -3083,6 +3187,7 @@ fn command_verb(command: &OperatorCommand) -> &'static str {
         OperatorCommand::Pause { .. } => "pause",
         OperatorCommand::Resume { .. } => "resume",
         OperatorCommand::Unload { .. } => "unload",
+        OperatorCommand::QuarantineRelease { .. } => "quarantine-release",
         OperatorCommand::Posture { .. } => "posture",
         OperatorCommand::Upgrade { .. } => "upgrade",
         OperatorCommand::HotSwapPrecheck { .. } => "hot-swap-precheck",

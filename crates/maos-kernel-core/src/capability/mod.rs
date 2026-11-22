@@ -299,6 +299,21 @@ impl CapabilityRegistryAdapter {
         value: f64,
         derived_from: &str,
     ) -> Result<maos_domain::invariants::i7::ScalarTapEvent, SetScalarError> {
+        if self.is_quarantined(spirit_pid) {
+            return Err(SetScalarError::Quarantined { spirit_pid });
+        }
+        self.set_scalar_kernel_origin(spirit_pid, spirit_id, tag, value, derived_from)
+    }
+
+    /// Kernel-originated scalar write (the operator halt-context marker): not fenced.
+    pub(crate) fn set_scalar_kernel_origin(
+        &self,
+        spirit_pid: u32,
+        spirit_id: &str,
+        tag: &str,
+        value: f64,
+        derived_from: &str,
+    ) -> Result<maos_domain::invariants::i7::ScalarTapEvent, SetScalarError> {
         let event =
             self.working_memory
                 .set_scalar(spirit_pid, spirit_id, tag, value, derived_from)?;
@@ -378,12 +393,7 @@ impl CapabilityRegistryAdapter {
 
     /// Whether `spirit_pid` is fenced by a director pause or a quarantine.
     pub fn is_paused(&self, spirit_pid: u32) -> bool {
-        self.is_quarantined(spirit_pid)
-            || self
-                .paused
-                .read()
-                .unwrap_or_else(|e| e.into_inner())
-                .contains(&spirit_pid)
+        self.is_quarantined(spirit_pid) || self.is_director_paused(spirit_pid)
     }
 
     /// FR13 (20-1) — quarantine (`true`) or release (`false`) `spirit_pid`.
@@ -433,6 +443,14 @@ impl CapabilityRegistryAdapter {
         install: &cap_policy::ScopeInstall,
     ) -> bool {
         self.policy.restore_scopes(spirit_pid, install)
+    }
+
+    /// Whether `spirit_pid` is paused by the director alone (readback, AC6).
+    pub fn is_director_paused(&self, spirit_pid: u32) -> bool {
+        self.paused
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains(&spirit_pid)
     }
 }
 

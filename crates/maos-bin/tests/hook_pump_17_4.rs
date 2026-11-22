@@ -179,6 +179,7 @@ impl World {
             &AdmissionDeps {
                 providers: None,
                 iac: None,
+                quarantine: None,
                 scheduler: &self.scheduler,
                 security: &self.security,
                 transparency_log: &self.tl,
@@ -2432,6 +2433,7 @@ async fn admission_storage_binding_refusal_is_typed_and_unloads_the_spirit() {
         &AdmissionDeps {
             providers: None,
             iac: None,
+            quarantine: None,
             scheduler: &world.scheduler,
             security: &world.security,
             transparency_log: &world.tl,
@@ -2478,6 +2480,7 @@ async fn missing_skill_is_journaled_before_pid() {
     let deps = AdmissionDeps {
         providers: None,
         iac: Some(&world.iac),
+        quarantine: None,
         scheduler: &world.scheduler,
         security: &world.security,
         transparency_log: &world.tl,
@@ -2515,6 +2518,7 @@ async fn manifest_declaration_precedes_pid_and_refusal_is_distinct() {
     let deps = AdmissionDeps {
         providers: None,
         iac: Some(&world.iac),
+        quarantine: None,
         scheduler: &world.scheduler,
         security: &world.security,
         transparency_log: &world.tl,
@@ -2643,6 +2647,7 @@ async fn declaration_storage_failure_stops_before_pid_issuance() {
     let deps = AdmissionDeps {
         providers: None,
         iac: Some(&world.iac),
+        quarantine: None,
         scheduler: &world.scheduler,
         security: &world.security,
         transparency_log: &world.tl,

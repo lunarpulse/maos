@@ -69,6 +69,8 @@ pub mod operator_door;
 pub mod orchestrator_root;
 /// Story 16-4 — authoritative MAOS footprint and offline purge implementation.
 pub mod purge;
+/// FR13 — the durable quarantine hold store and the fences it applies (not isolation).
+pub mod quarantine;
 #[cfg(feature = "network")]
 pub mod recall_mediation;
 /// Story 19-7 — the re-pin consent door (the set-once control the operator

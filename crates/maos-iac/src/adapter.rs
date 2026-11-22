@@ -44,6 +44,10 @@ pub use transparency_log::{
     TeamTransparencyLogEntry, TransparencyLogAdapter, TransparencyLogEntry,
 };
 
+/// FR13 (KQ2) — the pids whose own sends are refused. Shared by reference with
+/// [`distillate::DistillateWriter`] so one set fences every send path.
+pub type SenderFence = std::sync::Arc<dashmap::DashSet<u32>>;
+
 /// Adapter for the IAC Bus port trait.
 ///
 /// Story 3.1 wires the real Mailbox + NotificationDispatcher.
@@ -80,6 +84,8 @@ pub struct IacBusAdapter {
         std::sync::Arc<dashmap::DashMap<[u8; 16], maos_domain::invariants::i13::IntentLineage>>,
     promotion_sets: std::sync::Arc<dashmap::DashMap<String, PromotionRegistration>>,
     promotion_audit_last: std::sync::Arc<std::sync::Mutex<Option<std::time::Instant>>>,
+    /// FR13 (KQ2) — pids a quarantine fenced: `deliver_typed` refuses them before the log append.
+    fenced_senders: SenderFence,
     /// Story 9.5b — optional OTel trace sink for IAC-frame span emission.
     /// `None` = off (no-op branch; zero allocation). Wired from
     /// composition root via [`IacBusAdapter::with_trace_sink`].
@@ -115,6 +121,7 @@ impl IacBusAdapter {
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
             promotion_sets: std::sync::Arc::new(dashmap::DashMap::new()),
             promotion_audit_last: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            fenced_senders: SenderFence::default(),
             trace_sink: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
@@ -202,6 +209,25 @@ impl IacBusAdapter {
     /// Access the underlying mailbox (for composition root wiring).
     pub fn mailbox(&self) -> &std::sync::Arc<Mailbox> {
         &self.mailbox
+    }
+
+    /// The shared sender fence (handed to the distillate writer).
+    pub fn sender_fence(&self) -> SenderFence {
+        SenderFence::clone(&self.fenced_senders)
+    }
+
+    /// Fence (`true`) or release (`false`) every send of `spirit_pid`.
+    pub fn set_sender_fenced(&self, spirit_pid: u32, fenced: bool) {
+        if fenced {
+            self.fenced_senders.insert(spirit_pid);
+        } else {
+            self.fenced_senders.remove(&spirit_pid);
+        }
+    }
+
+    /// Whether `spirit_pid`'s sends are fenced by a quarantine.
+    pub fn is_sender_fenced(&self, spirit_pid: u32) -> bool {
+        self.fenced_senders.contains(&spirit_pid)
     }
 
     /// Access the underlying transparency log.
@@ -526,6 +552,11 @@ impl IacBusAdapter {
                     addr.spirit_id.as_str().to_string(),
                 ));
             }
+        }
+        // FR13 (KQ2): refuse before the I12 decoration and the log append — a fenced
+        // sender's frame is neither logged nor delivered.
+        if self.is_sender_fenced(spirit_pid) {
+            return Err(maos_domain::iac_bus_types::IacBusError::SenderQuarantined { spirit_pid });
         }
         // 0. I12 decorate decision frames BEFORE serialization (Story 3.3 AC5)
         // so the logged payload already carries working_memory_digest_refs.
@@ -1109,6 +1140,7 @@ impl Default for IacBusAdapter {
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
             promotion_sets: std::sync::Arc::new(dashmap::DashMap::new()),
             promotion_audit_last: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            fenced_senders: SenderFence::default(),
             trace_sink: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,

@@ -1,5 +1,7 @@
-//! Yank decisions and running-promotion observation. The quarantine policy fences a
-//! matched running Spirit through the kernel's sticky FR13 fence (20-1b KQ1).
+//! Yank decisions and running-promotion observation. The quarantine policy records a durable
+//! hold for the yanked identity and fences every live Spirit of it through the kernel's sticky
+//! FR13 fence (20-1b KQ1; later-registry-quarantine-closure D-LRQC-01/02).
+use crate::quarantine::{Hold, QuarantineGate};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::ports::registry::{RegistryError, SignedPackage, YankEntry, YankOrigin};
 use maos_kernel_core::capability::CapabilityRegistryAdapter;
@@ -15,11 +17,12 @@ pub struct YankRuntime {
     scheduler: Arc<SpiritSchedulerAdapter>,
     applier: Arc<maos_kernel_core::revocation::RevocationApplier>,
     policy: YankPolicy,
-    observed: Mutex<BTreeMap<(u32, String, String), bool>>,
+    observed: Mutex<BTreeMap<(String, String, String), bool>>,
     /// sequence -> hash of the last journaled rejection reason (bounded).
     rejected: Mutex<BTreeMap<u64, u64>>,
     registry_uri: String,
     clock: fn() -> Result<u64, String>,
+    gate: Option<Arc<QuarantineGate>>,
 }
 impl YankRuntime {
     pub fn new(
@@ -37,10 +40,16 @@ impl YankRuntime {
             applier,
             policy,
             observed: Mutex::new(BTreeMap::new()),
+            gate: None,
             rejected: Mutex::new(BTreeMap::new()),
             registry_uri,
             clock: maos_registry::yank_auth::now_unix_ms,
         }
+    }
+    /// Durable holds: a quarantine outcome persists `(spirit_id, version)` before it fences.
+    pub fn with_quarantine(mut self, gate: Arc<QuarantineGate>) -> Self {
+        self.gate = Some(gate);
+        self
     }
     pub fn with_clock(mut self, clock: fn() -> Result<u64, String>) -> Self {
         self.clock = clock;
@@ -61,20 +70,22 @@ impl YankRuntime {
     }
     fn policy_request(
         &self,
-        name: &str,
-        version: &str,
+        pkg: &SignedPackage,
         origin: YankOrigin,
         cause: &str,
         pid: Option<u32>,
     ) -> Result<YankPolicyOutcome, RegistryError> {
+        let (name, version) = (pkg.spirit_id.as_str(), pkg.version.as_str());
+        let publisher = hex::encode(pkg.publisher_pubkey);
         let outcome = self.policy.outcome();
         // This durable record precedes the effect.
         self.record(
             "registry-yank-policy",
             &serde_json::json!({
-                "spirit_id": name, "version": version, "origin": origin,
+                "spirit_id": name, "version": version, "origin": origin, "publisher": publisher,
                 "cause": cause, "outcome": outcome,
-                "quarantine_effect": "sticky-fence-on-matched-running-spirit",
+                "artifact_sha256": hex::encode(<sha2::Sha256 as sha2::Digest>::digest(&pkg.artifact_bytes)),
+                "quarantine_effect": "durable-hold-and-sticky-fence-on-matched-live-spirit",
             }),
         )?;
         if outcome == YankPolicyOutcome::AutoRevokeRequested {
@@ -87,20 +98,41 @@ impl YankRuntime {
                 Err(error) => return Err(RegistryError::Transport(error.to_string())),
             }
         }
-        if let (YankPolicyOutcome::QuarantineRequested, Some(pid)) = (outcome, pid) {
-            self.capability.set_quarantined(pid, true);
-            let receipt = serde_json::to_vec(&serde_json::json!({
-                "spirit_id": name, "spirit_pid": pid, "quarantined": true,
-            }))
-            .map_err(|e| RegistryError::Transport(e.to_string()))?;
-            let _logged = self.tl.insert_frame_event(
-                FrameKind::CapabilityInvocation,
-                pid,
-                None,
-                "spirit.quarantined",
-                &receipt,
-                FrameOrigin::Kernel,
-            );
+        if outcome == YankPolicyOutcome::QuarantineRequested {
+            // The durable hold precedes the fence and the receipt; a failed write still fences.
+            let held = match &self.gate {
+                Some(gate) => gate.quarantine(
+                    pid,
+                    Hold {
+                        spirit_id: name.to_owned(),
+                        version: version.to_owned(),
+                        origin: format!("{origin:?}"),
+                        cause: cause.to_owned(),
+                        publisher: Some(publisher),
+                    },
+                ),
+                None => {
+                    if let Some(pid) = pid {
+                        self.capability.set_quarantined(pid, true);
+                    }
+                    Ok(())
+                }
+            };
+            if let Some(pid) = pid {
+                let receipt = serde_json::to_vec(&serde_json::json!({
+                    "spirit_id": name, "spirit_pid": pid, "quarantined": true,
+                }))
+                .map_err(|e| RegistryError::Transport(e.to_string()))?;
+                let _logged = self.tl.insert_frame_event(
+                    FrameKind::CapabilityInvocation,
+                    pid,
+                    None,
+                    "spirit.quarantined",
+                    &receipt,
+                    FrameOrigin::Kernel,
+                );
+            }
+            held.map_err(|e| RegistryError::Transport(e.to_string()))?;
         }
         Ok(outcome)
     }
@@ -137,7 +169,11 @@ impl YankRuntime {
         inputs: &maos_compliance::TerminalInputs,
         now: u64,
     ) -> Result<(), RegistryError> {
-        let key = (spirit.pid, pkg.version.clone(), cause.to_owned());
+        let key = (
+            spirit.spirit_id.clone(),
+            pkg.version.clone(),
+            cause.to_owned(),
+        );
         {
             let mut observed = self
                 .observed
@@ -161,13 +197,7 @@ impl YankRuntime {
         }
         // Journal dedupe precedes effects; retry failed effects without holding
         // this mutex across the applier's asynchronous boundary.
-        self.policy_request(
-            pkg.spirit_id.as_str(),
-            &pkg.version,
-            origin,
-            cause,
-            Some(spirit.pid),
-        )?;
+        self.policy_request(pkg, origin, cause, Some(spirit.pid))?;
         self.observed
             .lock()
             .map_err(|e| RegistryError::Transport(e.to_string()))?
@@ -187,7 +217,7 @@ impl YankRuntime {
         let mut first_error = None;
         for spirit in spirits {
             let result = (|| {
-                if spirit.current_state() != ScbLifecycleState::Running {
+                if spirit.current_state() == ScbLifecycleState::Unloaded {
                     return Ok(());
                 }
                 let Some((pkg, directory)) = Self::installed(&spirit.spirit_id)? else {
@@ -366,7 +396,7 @@ impl YankObserver for YankRuntime {
             .values()
             .filter(|spirit| {
                 spirit.spirit_id == entry.spirit_id.as_str()
-                    && spirit.current_state() == ScbLifecycleState::Running
+                    && spirit.current_state() != ScbLifecycleState::Unloaded
                     && spirit
                         .runtime_snapshot()
                         .manifest
@@ -377,13 +407,7 @@ impl YankObserver for YankRuntime {
             .cloned()
             .collect();
         if spirits.is_empty() {
-            self.policy_request(
-                pkg.spirit_id.as_str(),
-                &pkg.version,
-                origin,
-                &entry.reason,
-                None,
-            )?;
+            self.policy_request(&pkg, origin, &entry.reason, None)?;
         } else {
             for spirit in spirits {
                 self.request_for_running(

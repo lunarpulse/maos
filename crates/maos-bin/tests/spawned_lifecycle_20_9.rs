@@ -962,6 +962,7 @@ async fn start_after_retiring_authored_path(
             memory: &world.memory,
             pid_by_spirit_id: &world.lookup,
             hooks: Some(&world.pump),
+            quarantine: None,
         },
         &gated,
         obj,

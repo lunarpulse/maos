@@ -154,7 +154,10 @@ impl IdleWatchdog {
                     .fire_on_idle_guarded(&scb, Arc::clone(&reservation))
                     .await;
                 use crate::scheduler::hook_dispatch::HookOutcome;
-                let actually_fired = !matches!(outcome, HookOutcome::SkippedManifest);
+                let actually_fired = !matches!(
+                    outcome,
+                    HookOutcome::SkippedManifest | HookOutcome::SkippedQuarantined
+                );
                 if actually_fired {
                     let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
                     scb.last_idle_fire_ns.store(now_ns, Ordering::Release);

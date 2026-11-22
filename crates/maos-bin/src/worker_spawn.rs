@@ -612,7 +612,11 @@ pub fn run_cli_wrapper_manifest(
         .get("cli_wrapper")
         .ok_or("maos run: missing [cli_wrapper] section")?
         .clone();
-    CliWrapperConfig::take_schema_version(&mut cw_section).map_err(|e| format!("maos run: {e}"))?;
+    let schema = CliWrapperConfig::take_schema_version(&mut cw_section)
+        .map_err(|e| format!("maos run: {e}"))?;
+    // D-LRQC-04 A: the schema-2 Worker identity a CRL can name (removed before the strict parse).
+    let worker_identity = CliWrapperConfig::take_worker_identity(&mut cw_section, schema)
+        .map_err(|e| format!("maos run: {e}"))?;
     // Parse and resolve resources before probes, host binding, or token minting.
     let resolved_caps = resolve_worker_caps(manifest_root, policy.as_ref())?;
 
@@ -650,6 +654,19 @@ pub fn run_cli_wrapper_manifest(
             Some(
                 maos_kernel_core::security::manifest::SupervisionSection::from_toml_str(&text)
                     .map_err(|e| format!("maos run: [supervision] parse: {e}"))?,
+            )
+        }
+        None => None,
+    };
+    // D-LRQC-05 A: a Worker's `[on_revocation]` is parsed by the shared parser; the default
+    // stays `TerminateImmediately`.
+    let on_revocation_section = match manifest_root.get("on_revocation") {
+        Some(value) => {
+            let text = toml::to_string(value)
+                .map_err(|e| format!("maos run: serialize [on_revocation]: {e}"))?;
+            Some(
+                maos_kernel_core::security::manifest::OnRevocationSection::from_toml_str(&text)
+                    .map_err(|e| format!("maos run: [on_revocation] parse: {e}"))?,
             )
         }
         None => None,
@@ -919,6 +936,9 @@ pub fn run_cli_wrapper_manifest(
     let bundle = maos_kernel_core::scheduler::control_block::SpiritManifestBundle {
         on_crash: on_crash_section,
         supervision: supervision_section,
+        class: worker_identity
+            .map(|(name, version)| maos_manifest::ClassSection::for_worker(name, version)),
+        on_revocation: on_revocation_section,
         ..Default::default()
     };
     let binding = supervision.bind(&task, bundle).map_err(|e| e.to_string())?;
