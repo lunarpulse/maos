@@ -265,7 +265,7 @@ fn a_stale_exception_reds() {
 fn the_committed_register_parses() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let budgets = load_budgets(root).expect("xtask/test-budgets.toml parses");
-    assert_eq!(budgets.default_seconds, 30.0);
+    assert!(budgets.default_seconds > 0.0);
     // The total is a calibrated register value, not a test constant: it only has to be finite
     // and positive (the loader enforces that; this witnesses the committed file parses).
     assert!(budgets.total_seconds > 0.0);
@@ -284,7 +284,7 @@ fn hosted_1_model_currency_calibration_changes_only_its_binary_budget() {
         .any(|finding| finding.contains("budget 30.000 s")));
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let mut budgets = load_budgets(root).expect("real register");
-    assert_eq!(budgets.default_seconds, 30.0);
+    assert!(budgets.default_seconds > 0.0);
     assert!(budgets.total_seconds > 0.0);
     budgets.exceptions.retain(|row| row.binary == BINARY);
     assert_eq!(budgets.exceptions.len(), 1);

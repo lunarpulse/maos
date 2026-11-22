@@ -2897,6 +2897,13 @@ async fn admitted_t2_echo_enforces_exact_live_caps_in_delegated_mode() {
         CgroupTestMode::Delegated => {
             let mut launch = echo_launch(spirit_id);
             launch.once = false;
+            // The runner is cgroup-throttled to `cpu_max_pct = 10` (asserted below) from its first
+            // instruction, so its component compile and `Ready` take ten times the CPU time they
+            // need unthrottled: on a loaded hosted runner that outlasts the 30 s default. The
+            // session's `startup` wall is this same `turn_budget`; no assertion here reads it, so
+            // only the startup slack widens (the cap, the limits and the completed turn are
+            // still asserted exactly).
+            launch.turn_budget = Duration::from_secs(120);
             let turn_budget = launch.turn_budget;
             let session = tokio::spawn(run_admitted_session(
                 world.session(),
