@@ -99,4 +99,18 @@ pub trait MemoryManagerPort {
         principal_id: &str,
         include_principal: bool,
     ) -> Result<Vec<ExportEntry>, MemoryError>;
+
+    /// Class: data-movement
+    ///
+    /// Delete one of the calling Spirit's own entries (FR28 — Spirit-authored
+    /// compaction) and credit its quota.  Returns whether an entry existed.
+    /// The shared tier removes only rows written by the caller's identity;
+    /// `Collective` returns the same typed errors as `write`.
+    fn delete(
+        &self,
+        spirit_pid: u32,
+        tier: MemoryTier,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<bool, MemoryError>;
 }
