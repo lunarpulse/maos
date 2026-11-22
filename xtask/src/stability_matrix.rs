@@ -629,7 +629,7 @@ mod tests {
     fn render_publishes_the_cli_wrapper_schema_window() {
         let (_guard, tmp) = isolated_workspace();
         let rendered = render(&tmp).expect("render");
-        assert!(rendered.contains("supported `[cli_wrapper]` window | `1..=1` |"));
+        assert!(rendered.contains("supported `[cli_wrapper]` window | `1..=2` |"));
         assert!(rendered.contains("ECliWrapperSchemaUnsupported"));
     }
 

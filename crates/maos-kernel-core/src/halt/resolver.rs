@@ -24,7 +24,6 @@ use crate::memory::MemoryManagerAdapter;
 use maos_domain::halt::{HaltId, HaltResolver, HaltState, OutputMarker, Resolution, ResolveError};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
-use maos_domain::ports::MemoryManagerPort;
 use std::sync::{Arc, Mutex};
 
 /// Captures every `resolve` call for unit-test assertion. Story 3.3
@@ -171,7 +170,7 @@ impl HaltResolver for KernelHaltResolver {
 
                 // 2. Write the supplied context to the Spirit's private tier.
                 self.memory
-                    .write(
+                    .write_kernel_origin(
                         pending.spirit_pid,
                         MemoryTier::Private,
                         &MemoryNamespace::Default,

@@ -243,6 +243,22 @@ impl ClassSection {
             toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
         raw.validate()
     }
+
+    /// The CRL-addressable identity of a `[cli_wrapper]` Worker (schema 2); the Worker still
+    /// declares no `[class]`, so `EManifestSchemaConflict` is unchanged.
+    pub fn for_worker(name: String, version: String) -> Self {
+        Self {
+            name,
+            version,
+            abi: "1.0".into(),
+            manifest_schema_version: maos_spirit_abi::MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION,
+            min_substrate_version: "0.0.0".into(),
+            forms: vec!["subprocess".into()],
+            trust_tier: "local".into(),
+            description: "cli_wrapper Worker".into(),
+            artifact: None,
+        }
+    }
 }
 
 /// Story 17-3b (D-17-3b-J(a)/(g)) — one structural TOML parse of a whole
@@ -4754,6 +4770,52 @@ impl CliWrapperConfig {
                 max_supported: MAX,
             }
         })
+    }
+
+    /// D-LRQC-04 A (`[cli_wrapper]` schema 2): remove and validate the Worker's CRL-addressable
+    /// identity before the strict parse. Required from schema 2, refused on schema 1. It names a
+    /// revocable `name@version`; it is not a `[class]` section.
+    pub fn take_worker_identity(
+        section: &mut toml::Value,
+        schema: u32,
+    ) -> Result<Option<(String, String)>, ManifestError> {
+        let (name, version) = match section.as_table_mut() {
+            Some(table) => (table.remove("class_name"), table.remove("class_version")),
+            None => (None, None),
+        };
+        if schema < 2 {
+            return match (name, version) {
+                (None, None) => Ok(None),
+                _ => Err(ManifestError::Toml(validation_msg(
+                    "cli_wrapper.class_name",
+                    "class_name and class_version need manifest_schema_version = 2",
+                ))),
+            };
+        }
+        let text = |value: Option<toml::Value>, field: &str| match value {
+            Some(toml::Value::String(text)) => Ok(text),
+            _ => Err(ManifestError::Toml(validation_msg(
+                field,
+                "required string at schema 2",
+            ))),
+        };
+        let name = text(name, "cli_wrapper.class_name")?;
+        let version = text(version, "cli_wrapper.class_version")?;
+        let name_ok = !name.is_empty()
+            && name.len() <= 128
+            && name
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+        let parts: Vec<&str> = version.split('.').collect();
+        let canonical = |part: &&str| part.parse::<u64>().is_ok_and(|n| n.to_string() == *part);
+        let version_ok = parts.len() == 3 && parts.iter().all(canonical);
+        if !name_ok || !version_ok {
+            return Err(ManifestError::Toml(validation_msg(
+                "cli_wrapper.class_name",
+                "class_name must be [a-z0-9-]{1,128} and class_version MAJOR.MINOR.PATCH",
+            )));
+        }
+        Ok(Some((name, version)))
     }
 
     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {

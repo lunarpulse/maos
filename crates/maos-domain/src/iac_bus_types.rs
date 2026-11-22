@@ -78,6 +78,9 @@ pub enum IacBusError {
     CrossHostPeerIntakeTimeout { peer: String, message: String },
     #[error("cross-host configuration invalid: {detail}")]
     CrossHostConfigInvalid { detail: String },
+    /// FR13 (KQ2) — a quarantined sender's frame is refused before the log append.
+    #[error("sender spirit_pid {spirit_pid} is quarantined; frame refused")]
+    SenderQuarantined { spirit_pid: u32 },
     #[error(
         "spirit restart detected on peer {peer}: prior={prior_boot_nonce} observed={observed_boot_nonce}"
     )]

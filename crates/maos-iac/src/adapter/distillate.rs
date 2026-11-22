@@ -53,6 +53,8 @@ pub struct DistillateWriter {
     transparency_log: Arc<TransparencyLogAdapter>,
     #[allow(dead_code)]
     memory: Arc<dyn std::any::Any + Send + Sync>,
+    /// FR13 — the shared sender fence; a fenced pid's distillate write is refused.
+    sender_fence: std::sync::OnceLock<crate::adapter::SenderFence>,
     /// Story 4.5 — AC5 isolation hook for corpus runner observation.
     #[cfg(feature = "spirit_test")]
     isolation_hook: Option<
@@ -71,9 +73,16 @@ impl DistillateWriter {
         Self {
             transparency_log,
             memory,
+            sender_fence: std::sync::OnceLock::new(),
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
         }
+    }
+
+    /// FR13 — share the IAC bus's sender fence (set once at the composition root) so a
+    /// quarantined pid cannot write distillates.
+    pub fn set_sender_fence(&self, fence: crate::adapter::SenderFence) {
+        let _ = self.sender_fence.set(fence);
     }
 
     /// Story 4.5 — attach an isolation hook for cross-Spirit corpus observation.
@@ -343,6 +352,13 @@ impl DistillationPort for DistillateWriter {
         spirit_pid: u32,
         request: DistillationRequest,
     ) -> Result<DistillationReceipt, DistillationError> {
+        if self
+            .sender_fence
+            .get()
+            .is_some_and(|fence| fence.contains(&spirit_pid))
+        {
+            return Err(DistillationError::Quarantined { spirit_pid });
+        }
         // 0. Emit CapabilityInvocation audit row BEFORE data movement (FR4).
         let audit_payload = serde_json::json!({
             "source_count": request.source_log_ref.len(),

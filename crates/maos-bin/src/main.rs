@@ -2758,6 +2758,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "maos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)"
     );
 
+    // FR13 (D-LRQC-01 A) — the durable quarantine holds, loaded before any Spirit is admitted;
+    // a damaged store refuses the boot rather than dropping holds.
+    let hold_path = maos_bin::quarantine::QuarantineGate::default_path()?;
+    if hold_path.is_none() {
+        eprintln!("maos: quarantine holds are not durable: no home resolved");
+    }
+    let quarantine = Arc::new(maos_bin::quarantine::QuarantineGate::open(
+        hold_path,
+        Arc::clone(&capability),
+        Arc::clone(&iac),
+        Arc::clone(&transparency_log),
+    )?);
+    distillate_writer.set_sender_fence(iac.sender_fence());
+
     // Story 6.4 — install the TransparencyLogAdapter on the Mailbox so the
     // Phase 1.5 consent-rupture quarantine row can be written BEFORE the
     // ConsentRupture frame is emitted (I2 log-before-deliver).
@@ -3597,6 +3611,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 redistill_sink: hook_pump.redistill_sink(),
             }),
             hooks: Arc::clone(&hook_pump),
+            quarantine: Arc::clone(&quarantine),
             butler_principal: Arc::clone(&butler_principal),
             #[cfg(feature = "wasm-host")]
             swap_slot: swap_slot.clone(),
@@ -3624,6 +3639,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             successor_manifest_slot,
         ));
         door.set_forget_pump(&hook_pump);
+        door.set_quarantine(Arc::clone(&quarantine));
         operator_door_port = Some(door);
         if let Some(config) = operator_http_config {
             let bind_door = |bind: std::net::SocketAddr| {
@@ -4442,6 +4458,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     memory: &memory,
                     pid_by_spirit_id: &pid_by_spirit_id,
                     hooks: None,
+                    quarantine: Some(&*quarantine),
                 },
                 if let Some(mode) = workflow_mode {
                     Some(Arc::new(maos_bin::workflow::GovernedInference {
@@ -4552,6 +4569,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 memory: &memory,
                 pid_by_spirit_id: &pid_by_spirit_id,
                 hooks: Some(&*hook_pump),
+                quarantine: Some(&*quarantine),
             },
             &selected_crypto,
             boot_nonce,
@@ -4577,14 +4595,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await,
     );
     let mut yank_poller_task = {
-        let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
-            capability.clone(),
-            transparency_log.clone(),
-            scheduler.clone(),
-            revocation_applier.clone(),
-            yank_policy,
-            registry_cfg.uri.clone(),
-        ));
+        let observer = Arc::new(
+            maos_bin::yank_policy::YankRuntime::new(
+                capability.clone(),
+                transparency_log.clone(),
+                scheduler.clone(),
+                revocation_applier.clone(),
+                yank_policy,
+                registry_cfg.uri.clone(),
+            )
+            .with_quarantine(Arc::clone(&quarantine)),
+        );
         eprintln!(
             "maos: yank cadence={}s policy={} registry-fetch={}",
             interval.as_secs(),
@@ -6079,6 +6100,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             memory: &memory,
                             pid_by_spirit_id: &pid_by_spirit_id,
                             hooks: Some(&hook_pump),
+                            quarantine: Some(&*quarantine),
                         },
                         &gated,
                         spirit_obj,
@@ -6977,6 +6999,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Story 20-9 — a spawned form registers too (consolidate; telemetry only
                     // when its manifest lists it).
                     hooks: Some(&*hook_pump),
+                    quarantine: Some(&*quarantine),
                 },
                 &gated,
                 spirit_obj,
@@ -10353,6 +10376,8 @@ struct BinPrivateOpsImpl {
     /// Story 17-4 — a door-loaded compiled-in Spirit registers with the
     /// root's hook pump like any other admission.
     hooks: Arc<maos_bin::hook_pump::HookPump>,
+    /// FR13 — a door-loaded Spirit re-applies an active quarantine hold like every admission.
+    quarantine: Arc<maos_bin::quarantine::QuarantineGate>,
     /// Story 19-2 (D-19-2-08 A) — the boot-bound Butler principal.
     butler_principal: Arc<std::sync::OnceLock<String>>,
     /// Story 20-9 — the root's spawned-form handles, filled once its supervision is armed.
@@ -10597,6 +10622,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                 memory: &self.memory,
                 pid_by_spirit_id: &self.pid_by_spirit_id,
                 hooks: Some(&self.hooks),
+                quarantine: Some(&*self.quarantine),
             },
             &gated,
             spirit_obj,
@@ -10640,6 +10666,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                     memory: &self.memory,
                     pid_by_spirit_id: &self.pid_by_spirit_id,
                     hooks: Some(&self.hooks),
+                    quarantine: Some(&*self.quarantine),
                 },
                 self.spirit_build.boot_nonce,
                 &gated,

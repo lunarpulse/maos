@@ -559,6 +559,7 @@ impl SpiritSchedulerAdapter {
         self.capability.context_budget().remove(spirit_pid);
         self.capability.set_paused(spirit_pid, false);
         self.capability.set_quarantined(spirit_pid, false);
+        self._iac.set_sender_fenced(spirit_pid, false);
         {
             let mut spirits = self.spirits.write().unwrap();
             spirits.remove(&spirit_pid);
@@ -616,6 +617,7 @@ impl SpiritSchedulerAdapter {
         match outcome {
             HookOutcome::Fired { .. }
             | HookOutcome::SkippedManifest
+            | HookOutcome::SkippedQuarantined
             | HookOutcome::BudgetWarning80 { .. }
             | HookOutcome::DeferredToNextStory
             | HookOutcome::HaltPending => Ok(()),

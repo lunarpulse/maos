@@ -3029,7 +3029,11 @@ mod worker {
                     Arc::clone(&transparency_log),
                     root_cancel.clone(),
                 ) {
-                    Ok(egress) => Some(egress),
+                    Ok(egress) => {
+                        let fence = iac.sender_fence();
+                        egress.0.fence_senders(move |pid| fence.contains(&pid));
+                        Some(egress)
+                    }
                     Err(error) => {
                         eprintln!("maos: egress proxy unavailable: {error}");
                         None
