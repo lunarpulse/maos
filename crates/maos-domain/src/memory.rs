@@ -323,6 +323,9 @@ pub enum MemoryError {
         requested: u64,
         limit: u64,
     },
+    /// FR13 — a quarantined pid's own write is refused at the single store chokepoint.
+    #[error("spirit_pid {spirit_pid} is quarantined; memory write refused")]
+    Quarantined { spirit_pid: u32 },
 }
 
 // ---------------------------------------------------------------------------

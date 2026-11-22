@@ -12,10 +12,17 @@ const MANIFEST: &str = include_str!("../manifest.toml");
 #[test]
 fn cli_wrapper_section_parses_with_authoritative_validator() {
     let mut section = value(MANIFEST)["cli_wrapper"].clone();
+    let schema =
+        CliWrapperConfig::take_schema_version(&mut section).expect("schema version in window");
     assert_eq!(
-        CliWrapperConfig::take_schema_version(&mut section).expect("schema version in window"),
-        1,
-        "the shipped Worker manifest declares manifest_schema_version = 1"
+        schema, 2,
+        "the shipped Worker manifest declares manifest_schema_version = 2"
+    );
+    let identity = CliWrapperConfig::take_worker_identity(&mut section, schema)
+        .expect("schema-2 Worker identity");
+    assert_eq!(
+        identity,
+        Some(("worker-fixture".to_string(), "1.0.0".to_string()))
     );
     let cfg = CliWrapperConfig::from_toml_str(&toml::to_string(&section).unwrap())
         .expect("[cli_wrapper] valid");

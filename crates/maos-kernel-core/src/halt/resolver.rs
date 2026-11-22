@@ -172,7 +172,7 @@ impl HaltResolver for KernelHaltResolver {
                 //    Charged to the Spirit but never refused on quota grounds
                 //    (D-21-6-06): the Spirit's next growing write is refused.
                 self.memory
-                    .write_inner(
+                    .write_kernel_origin(
                         pending.spirit_pid,
                         MemoryTier::Private,
                         &MemoryNamespace::Default,

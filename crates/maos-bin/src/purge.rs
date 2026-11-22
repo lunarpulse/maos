@@ -216,6 +216,17 @@ pub fn maos_roots() -> Vec<MaosRoot> {
             WrittenBy::Maos,
         );
     }
+    if let Some(holds) =
+        std::env::var_os("MAOS_QUARANTINE_STORE_PATH").filter(|value| !value.is_empty())
+    {
+        push(
+            &mut roots,
+            "quarantine holds",
+            PathBuf::from(holds),
+            RootKind::File,
+            WrittenBy::Maos,
+        );
+    }
 
     roots.sort_by(|left, right| {
         left.path

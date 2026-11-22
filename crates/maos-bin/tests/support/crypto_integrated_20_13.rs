@@ -100,6 +100,7 @@ async fn crypto_provider_one_boot_reaches_all_four_surfaces() {
         hooks: None,
         providers: None,
         iac: None,
+        quarantine: None,
     };
     let _installed = maos_bin::installed_spirits::InstalledSpirits::boot(
         vec![("crypto-integrated".into(), installed.join("manifest.toml"))],

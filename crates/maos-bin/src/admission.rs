@@ -1230,6 +1230,8 @@ pub struct AdmissionDeps<'a> {
     pub hooks: Option<&'a crate::hook_pump::HookPump>,
     pub providers: Option<&'a ProviderCatalog>,
     pub iac: Option<&'a Arc<maos_iac::adapter::IacBusAdapter>>,
+    /// FR13 — re-applies an active quarantine hold of this identity before the SCB can run.
+    pub quarantine: Option<&'a crate::quarantine::QuarantineGate>,
 }
 
 /// Whether the triple runs its third leg.
@@ -1451,6 +1453,9 @@ async fn admit_inner(
     };
 
     on_loaded(pid);
+    if let Some(gate) = deps.quarantine {
+        gate.reapply(pid, &spirit_id, &gated.class_section.version);
+    }
 
     // FR31: bind before admission/start; a rejected binding rolls the load back.
     if let Err(error) = deps

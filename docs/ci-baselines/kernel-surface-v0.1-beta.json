@@ -195,7 +195,7 @@
     {
       "kind": "enum",
       "path": "maos_kernel_core::scheduler::hook_dispatch::HookOutcome",
-      "signature_hash": "7dabf64e452c514a029b3f49089b2a86767e5c2cf10cfa092e9916c842106fce"
+      "signature_hash": "c8223de921df6ab003aca35e43ffbeffc6f536937570f73001bfff71f344a989"
     },
     {
       "kind": "enum",
@@ -795,7 +795,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::revocation::applier::RevocationApplier",
-      "signature_hash": "5b566f7a248846c4e4293449205505794068b5bfeb93cc5054f1b3239cf4c946"
+      "signature_hash": "98d783da6a0ca13752bce9c6c8c3d77c21c2cfb29772b6047ca3c7a4024492e5"
     },
     {
       "kind": "struct",

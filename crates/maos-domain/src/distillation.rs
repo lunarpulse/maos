@@ -170,6 +170,10 @@ pub enum DistillationError {
     /// SQLite or IO error during digest write or source-frame lookup.
     #[error("storage error: {0}")]
     Storage(String),
+
+    /// FR13 — a quarantined pid's distillate write is refused before any row is written.
+    #[error("spirit_pid {spirit_pid} is quarantined; distillate write refused")]
+    Quarantined { spirit_pid: u32 },
 }
 
 #[cfg(test)]
