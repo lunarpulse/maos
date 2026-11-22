@@ -463,7 +463,11 @@ fn invariant_lock(
         let new_src =
             fs::read_to_string(root.join(&rel_path)).map_err(|e| format!("{rel_path}: {e}"))?;
         let old_src = git_show_old(&root, &rel_path).unwrap_or_default();
-        owed.push((old_src.clone(), new_src.clone(), changed.contains(&rel_path)));
+        owed.push((
+            old_src.clone(),
+            new_src.clone(),
+            changed.contains(&rel_path),
+        ));
         regression_detected.extend(cadence_problem(inv_id, &old_src, &new_src)?);
     }
 

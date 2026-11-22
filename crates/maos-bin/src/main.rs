@@ -12627,6 +12627,8 @@ struct CohortDaemonBootstrap {
     /// j1-crosshost-2b — the operator-configured `[cli_wrapper]` manifest host B
     /// runs for an inbound delegation. `None` ⇒ no intake sink, no J1 consumer.
     worker_manifest: Option<std::path::PathBuf>,
+    /// Story 21-3 — the durable pin file; set only by `run_cohort_a2a_daemon`.
+    pin_persistence: Option<Arc<dyn maos_a2a_core::tofu::PinPersistence>>,
 }
 
 // Story 13.5c — read MAOS_COHORT_DAEMON_CONFIG (if set) and load the verified
@@ -12694,6 +12696,7 @@ fn load_cohort_daemon_bootstrap(
         control_spirit: maos_spirit_abi::identity::SpiritId::from(file.control_spirit),
         digest_summary: file.digest_summary,
         worker_manifest: file.worker_manifest,
+        pin_persistence: None,
     })
 }
 
@@ -13169,7 +13172,18 @@ async fn run_cohort_a2a_daemon(
     // The state is loaded at the composition root when the config is present;
     // its absence here means MAOS_COHORT_DAEMON_CONFIG was unset — the pre-13.5c
     // typed error, preserved.
-    let bootstrap = bootstrap.ok_or("MAOS_COHORT_DAEMON_CONFIG must name the daemon TOML")?;
+    let mut bootstrap = bootstrap.ok_or("MAOS_COHORT_DAEMON_CONFIG must name the daemon TOML")?;
+    // Story 21-3 — only this root opens the durable pin file (one writer per file).
+    // One file per local host identity: several daemons may share a `MAOS_HOME` (the
+    // multi-team scene), but each pin file keeps its single writer. Hex keeps the config
+    // string out of the path grammar.
+    let pin_file = maos_domain::operator_door::maos_home()?
+        .ok_or("cohort daemon: neither MAOS_HOME nor HOME is set; no home for the pin file")?
+        .join(format!(
+            "a2a-pins-{}.json",
+            hex::encode(bootstrap.local_host.as_str())
+        ));
+    bootstrap.pin_persistence = Some(Arc::new(maos_persistence::FilePinStore::open(&pin_file)?));
     validate_enterprise_daemon_wiring(enterprise_posture_required, &enterprise_daemon_governance)?;
     // Story 13.5a — the SIEM export consumer previously never ran in daemon
     // mode (the dispatch returns above its spawn). It shares the posture's
@@ -13641,6 +13655,7 @@ async fn build_cohort_a2a_daemon_runtime(
         control_spirit,
         digest_summary,
         worker_manifest: _,
+        pin_persistence,
     } = bootstrap;
     let pull_peers: Vec<maos_spirit_abi::identity::HostId> = peer_configs
         .iter()
@@ -13685,6 +13700,7 @@ async fn build_cohort_a2a_daemon_runtime(
             Some(rupture_sink),
             crossing_port,
             intake_sink,
+            pin_persistence,
         )
         .await
         .map_err(|error| format!("cohort a2a-tcp daemon bind failed: {error}"))?,

@@ -41,6 +41,14 @@ pub enum TcpTransportError {
     Config(String),
     /// JSON-RPC protocol error after a successful handshake (e.g. parse error).
     Protocol(String),
+    /// Story 21-3 / D-21-3-02 — the durable pin record names a runtime-promoted
+    /// fingerprint that `[[tcp.peer_pins]]` (still on the retired one) does not.
+    /// Boot refuses rather than re-trust the retired fingerprint.
+    PinPromotionNotCarried {
+        peer: String,
+        configured: String,
+        promoted: String,
+    },
 }
 
 impl TcpTransportError {
@@ -109,6 +117,9 @@ impl TcpTransportError {
             TcpTransportError::Io(m) => A2AError::Io(m.clone()),
             TcpTransportError::Config(m) => A2AError::ConfigInvalid(m.clone()),
             TcpTransportError::Protocol(m) => A2AError::TransportFailed(m.clone()),
+            TcpTransportError::PinPromotionNotCarried { .. } => {
+                A2AError::ConfigInvalid(self.to_string())
+            }
         }
     }
 
@@ -159,6 +170,17 @@ impl fmt::Display for TcpTransportError {
             TcpTransportError::Io(m) => write!(f, "io error: {m}"),
             TcpTransportError::Config(m) => write!(f, "config error: {m}"),
             TcpTransportError::Protocol(m) => write!(f, "protocol error: {m}"),
+            TcpTransportError::PinPromotionNotCarried {
+                peer,
+                configured,
+                promoted,
+            } => write!(
+                f,
+                "pin store refuses to boot: peer {peer} was promoted at runtime from \
+                 {configured} (still named by `[[tcp.peer_pins]]`) to {promoted}; carry {promoted} \
+                 into `[[tcp.peer_pins]]` and the signed cohort manifest and restart, or delete \
+                 a2a-pins.json to boot from the configured pin"
+            ),
         }
     }
 }

@@ -39,6 +39,12 @@ total_seconds = 2800
 # --- Exceptions (18-0 AC5, ruling R3: ~ CI max Σ x 1.25) ---------------------
 
 [[exception]]
+binary = "maos-bin::recall_mediation_17_3d"
+seconds = 60
+reason = "17-3d recall mediation (21 tests, real wasm runners): hosted Σ 30.264 s on run 45065445151 (PR #32) versus the 30 s default; budget = observed x2 (load-dependent)"
+owner = "21-9-wasm-host-default-on"
+
+[[exception]]
 binary = "maos-bin::participant_recall_17_8"
 seconds = 50
 reason = "17-8 participant recall (8 tests, real wasm runners): hosted Σ 32.7 s on run 45048662238 (PR #43); budget = observed + 50 % (load-dependent)"

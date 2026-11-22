@@ -351,6 +351,7 @@ async fn cross_host_bind_refuses_the_zero_own_boot_nonce() {
         None,
         None,
         None,
+        None,
     )
     .await
     .err()
@@ -389,6 +390,7 @@ hex = "0000000000000000000000000000000000000000000000000000000000000000"
         0x2B_B, // own nonce is fine; the PIN carries the sentinel
         maos_a2a_tcp::TcpTimeouts::production(std::time::Duration::from_secs(30)),
         maos_a2a_core::HandshakeRetryPolicy::default(),
+        None,
         None,
         None,
         None,

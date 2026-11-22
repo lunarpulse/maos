@@ -47,14 +47,6 @@ use std::path::{Path, PathBuf};
 /// reasons becomes the place failures go to be forgotten.
 const ALLOWED: &[(&str, &str)] = &[
     (
-        "crates/maos-bin/tests/cert_rotation_trigger_14_2a.rs",
-        "Drives the `cohort-a2a-daemon` root through an explicit \
-         MAOS_OPERATOR_HTTP_BIND + MAOS_OPERATOR_BEARER_TOKEN pair, so its \
-         endpoint never comes from control.json and cannot collide with the \
-         developer's home. It also scrapes the listening marker, which is what \
-         proves the third door root still binds.",
-    ),
-    (
         "crates/maos-journey-test/tests/journey_butler.rs",
         "Spawns only through `Pty::spawn(&cmd, &world)`, whose child \
          environment IS `JourneyWorldBuilder::build`'s env map — and that map \

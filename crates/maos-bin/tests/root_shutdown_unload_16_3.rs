@@ -2066,6 +2066,7 @@ mod cohort {
     }
 
     fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
+        let home = doorless_home::fresh_home();
         let mut command = Command::new(maos());
         command
             .current_dir(workspace_root())
@@ -2076,10 +2077,7 @@ mod cohort {
             .env("MAOS_TEST_BOOT_NONCE", boot_nonce.to_string())
             // Both roots share one log (MAOS_AUDIT_DB) by design, so only
             // "HOME" moves — no developer control.json endpoint for either.
-            .env(
-                "HOME",
-                t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
-            )
+            .env("HOME", t3_substrate::isolated_runtime_home(&home))
             .env("PATH", child_process_path())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -2100,7 +2098,7 @@ mod cohort {
             .env("MAOS_TEST_BOOT_NONCE", NONCE_A.to_string())
             .env(
                 "HOME",
-                t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
+                t3_substrate::isolated_runtime_home(&doorless_home::fresh_home()),
             )
             // Required on every cross-host arm: the goal is operator-supplied
             // and the fixture asserts the MECHANISM, not the goal's content.

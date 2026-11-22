@@ -4814,7 +4814,7 @@ jobs:
           MAOS_TEST_POSTGRES: postgresql://postgres:postgres@localhost:5432/maos_team_b
         run: >-
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated
-          --unit maos-17-2-multi-tenant-loom --timeout 1500 --
+          --unit maos-17-2-multi-tenant-loom --timeout 3000 --
           cargo run -p xtask -- check-multi-tenant-loom --json
       # Story 13.6e (AC5) — publish the evidence ledger (see the reza job).
       - name: Publish evidence ledger

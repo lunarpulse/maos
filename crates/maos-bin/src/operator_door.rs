@@ -3176,6 +3176,10 @@ impl OperatorCommandPort for OperatorDoor {
         self.0.repin.pending()
     }
 
+    fn peer_pins(&self) -> Option<maos_control::PeerPinStatus> {
+        self.0.repin.peer_pins()
+    }
+
     fn applied_revocations(&self) -> Vec<maos_control::RevocationRow> {
         let reports =
             self.0.crl_reports.lock().expect(
