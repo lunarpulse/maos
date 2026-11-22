@@ -453,7 +453,7 @@ fn invariant_lock(
 
     // Requirement (c) and the forward-only cadence check: both read the register frontmatter
     // at the base and on disk.
-    let mut missing_phase_commitment = true;
+    let mut owed = Vec::new();
     let mut regression_detected = Vec::new();
     for inv_id in touched_invariants
         .iter()
@@ -463,12 +463,11 @@ fn invariant_lock(
         let new_src =
             fs::read_to_string(root.join(&rel_path)).map_err(|e| format!("{rel_path}: {e}"))?;
         let old_src = git_show_old(&root, &rel_path).unwrap_or_default();
-        if changed.contains(&rel_path) && phase_commitment(&old_src, &new_src)? {
-            missing_phase_commitment = false;
-        }
+        owed.push((old_src.clone(), new_src.clone(), changed.contains(&rel_path)));
         regression_detected.extend(cadence_problem(inv_id, &old_src, &new_src)?);
     }
 
+    let missing_phase_commitment = phase_commitment_missing(&owed)?;
     let passed =
         !missing_corpus_delta && !missing_phase_commitment && regression_detected.is_empty();
 
@@ -541,6 +540,20 @@ fn phase_commitment(old_src: &str, new_src: &str) -> Result<bool, String> {
     let flip = claim(old_src)?.as_deref() == Some("asserted")
         && claim(new_src)?.as_deref() == Some("guaranteed");
     Ok(flip || parse_cadence(old_src)? != parse_cadence(new_src)?)
+}
+
+/// Requirement (c) binds only when a touched register's CANDIDATE claim is `guaranteed`; a
+/// non-claiming (`asserted`) edit makes no promise that needs a phase commitment. Each entry is
+/// `(base source, candidate source, file itself changed)`. Once owed, any changed file whose
+/// cadence cell moved or whose claim validly flipped clears it.
+fn phase_commitment_missing(touched: &[(String, String, bool)]) -> Result<bool, String> {
+    let mut owed = false;
+    let mut committed = false;
+    for (old_src, new_src, file_changed) in touched {
+        owed |= front(new_src)?["claim"].as_str() == Some("guaranteed");
+        committed |= *file_changed && phase_commitment(old_src, new_src)?;
+    }
+    Ok(owed && !committed)
 }
 
 const PHASES: [&str; 6] = ["v0.1", "v0.3", "v0.5", "v0.9", "v1.0", "v1.5"];

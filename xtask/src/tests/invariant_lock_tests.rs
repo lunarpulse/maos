@@ -355,6 +355,35 @@ fn phase_commitment_ignores_context_and_accepts_cadence_or_validated_flip() {
 }
 
 #[test]
+fn phase_commitment_is_owed_only_by_guaranteed_candidates() {
+    let doc = |claim: &str, v10: &str| {
+        format!("---\nid: I1\nclaim: {claim}\nowner: x\nenforcement_cadence:\n  v1.0: {v10}\n---\nbody\n")
+    };
+    let t = |old: String, new: String, changed: bool| (old, new, changed);
+    // Non-claiming edit (asserted before and after, no cadence change): nothing owed.
+    let asserted = vec![t(doc("asserted", "fuzz"), doc("asserted", "fuzz").replace("body", "b2"), true)];
+    assert!(!phase_commitment_missing(&asserted).unwrap());
+    // Planted red: candidate claims `guaranteed`, claim and cadence unchanged vs base.
+    let unchanged = vec![t(doc("guaranteed", "fuzz"), doc("guaranteed", "fuzz").replace("body", "b2"), true)];
+    assert!(phase_commitment_missing(&unchanged).unwrap());
+    // A guaranteed candidate in a file not itself changed (witness-only touch) is still red.
+    let witness_only = vec![t(doc("guaranteed", "fuzz"), doc("guaranteed", "fuzz"), false)];
+    assert!(phase_commitment_missing(&witness_only).unwrap());
+    // A validated asserted -> guaranteed flip clears it.
+    let flip = vec![t(doc("asserted", "fuzz"), doc("guaranteed", "fuzz"), true)];
+    assert!(!phase_commitment_missing(&flip).unwrap());
+    // A changed cadence cell on a guaranteed file clears it.
+    let cell = vec![t(doc("guaranteed", "runtime"), doc("guaranteed", "fuzz"), true)];
+    assert!(!phase_commitment_missing(&cell).unwrap());
+    // Mixed: one guaranteed file unchanged plus an asserted file: the guaranteed owes.
+    let mixed = vec![
+        t(doc("asserted", "fuzz"), doc("asserted", "fuzz"), true),
+        t(doc("guaranteed", "fuzz"), doc("guaranteed", "fuzz"), true),
+    ];
+    assert!(phase_commitment_missing(&mixed).unwrap());
+}
+
+#[test]
 fn witness_files_and_ci_job_of_a_guaranteed_row_are_lock_scope() {
     let row = |claim: &str| {
         format!("---\nid: I1\nclaim: {claim}\nowner: x\nproperty_test: crates/a/tests/t.rs#t\nadversarial_corpus: crates/a/c.jsonl\nci_job: proofs\n---\n")

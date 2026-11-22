@@ -14,6 +14,8 @@ Revisits: §3.2, §8.7
 
 2026-11-22 (operator ruling): the approval-count leg is removed; this repository has a single maintainer and the leg was unsatisfiable. The corpus-delta, cadence-regression and claim-honesty legs are unchanged.
 
+2026-11-22 (operator ruling, pending): requirement (c) applies only to touched files whose candidate claim is `guaranteed`; non-claiming edits owe no phase commitment.
+
 **Rationale.** The constitutional commitment (Innovation #7 in PRD Step 6) requires architectural enforcement, not founder discipline. Without ADR-037, ADRs are markdown that one human can rewrite.
 
 **Alternatives considered.** Process-only amendment (rejected: relies on founder discipline). External governance board (rejected: scope inflation).
