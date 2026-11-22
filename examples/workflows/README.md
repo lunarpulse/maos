@@ -203,6 +203,15 @@ Live comparison writes one JSON line with `event: "workflow_comparison"`,
   times `repeat`), `ran` (runs that completed), and `passed` (completed runs
   that matched every label). `pass_rate` is `passed / runs`, while `ran_rate`
   is `ran / runs`; both use all scheduled runs as the denominator.
+- `passed` combines two checks that are also reported apart. `decision_passed`
+  counts runs whose final outcome, path and step outcomes match the case
+  labels (the workflow's decision); `decision_rate` is over all runs.
+  `evidence_passed` counts runs whose labeled `step_artifacts` fields all
+  match, out of `evidence_runs` (runs of cases that label artifacts), with
+  `evidence_rate` null when no case labels any. Abstained runs count as misses
+  in both. `decision_without_evidence` counts runs that decided as labeled
+  while a labeled artifact field did not match, the cases a bare `passed` or
+  final outcome would hide.
 - `abstained` counts runs that did not complete (`ran: false`), such as a
   provider transport error, malformed JSON, an incomplete or oversized
   response, or an unknown outcome. `failed` counts completed runs that missed
@@ -212,8 +221,13 @@ Live comparison writes one JSON line with `event: "workflow_comparison"`,
   response usage. Latency is wall time around each inference port call, not
   total workflow runtime.
 - Each `cases` entry has an `id` and `baseline`/`candidate` summaries with
-  `runs`, `ran`, `passed`, and ordered `details` using the existing per-run
-  verdict detail format.
+  `runs`, `ran`, `passed`, `decision_passed`, `evidence_passed`, and ordered
+  `details` using the existing per-run verdict detail format. A completed run's
+  detail carries `decision` and, for cases with artifact labels, `evidence`
+  next to `artifact_checks`, which names the mismatched fields. A case's
+  `evidence_passed` of 0 also means "no artifact labels"; use the plan's
+  `evidence_runs` to tell them apart. Replay and rules-mode per-run details
+  carry the same added keys; their format 1 report is otherwise unchanged.
 
 Live comparison exits zero when it produces the report without a governance
 failure, even if some runs abstain or no run passes. Capability or policy denial
@@ -258,14 +272,17 @@ Limitations:
 
 ### First measurement (baseline, not a threshold)
 
-One real run of the example above, on 2026-11-21: `llama3.1:8b` through a local
-Ollama 0.40.17 on CPU, the 12-case holdout with `--repeat 3`. It is a reference
-point for later changes, not a quality claim.
+Real runs of the example above, on 2026-11-21 and 2026-11-22: `llama3.1:8b`
+through a local Ollama 0.40.17 on CPU, the 12-case holdout. They are a
+reference point for later changes, not a quality claim. The first run used
+`--repeat 3` and gave `passed` 12 / 36 for the baseline and 18 / 36 for the
+candidate; the example's `--repeat 1` run below gives the same rates and was
+taken after the decision and evidence fields existed.
 
-| Plan | `passed` / `runs` | `ran` / `runs` | Final outcome matches the label |
-|---|---|---|---|
-| Baseline | 12 / 36 | 36 / 36 | 6 / 12 cases |
-| Candidate | 18 / 36 | 36 / 36 | 12 / 12 cases |
+| Plan | `ran` | `passed` | `decision_passed` | `evidence_passed` | `decision_without_evidence` |
+|---|---|---|---|---|---|
+| Baseline | 12 / 12 | 4 | 6 | 6 | 2 |
+| Candidate | 12 / 12 | 6 | 12 | 6 | 6 |
 
 - With the unedited catalog prompt, all 72 runs abstained as `malformed evidence
   JSON` (`ran` 0). The tighter prompt, tuned on the three
@@ -277,9 +294,8 @@ point for later changes, not a quality claim.
 - The candidate's 6 misses are all `quote`: the model returned a shorter span
   that is verbatim in the excerpt, while the label asks for the full sentence.
   Some shorter spans are enough (`issued PO-711`); one drops the key fact
-  (`PO-756 was voided` omits "no replacement"). `passed` therefore mixes the
-  decision and the evidence; read `artifact_checks` in each detail to tell
-  them apart.
+  (`PO-756 was voided` omits "no replacement"). Reading `passed` alone hides
+  this; `decision_passed` and `evidence_passed` separate the two.
 - Both plans share the same extractor, so token counts matched exactly
   (5,556 in, 972 out per plan). The run measures whether the candidate's
   routing works with this model's output, not a difference between models.
