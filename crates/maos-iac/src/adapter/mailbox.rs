@@ -592,6 +592,7 @@ impl Mailbox {
                 }
             }
 
+            let mut same_host_err: Option<IacBusError> = None;
             for addr in &frame.to {
                 // Story 6.3 — cross-host addresses are routed in Phase 3; skip
                 // the same-host mailbox path for those.
@@ -602,15 +603,28 @@ impl Mailbox {
                 // Story 21-7 — the incarnation the journal recorded must still be the admitted
                 // one at the enqueue: a reload since the verdict never reaches the replacement.
                 let recorded = recipients.iter().find(|r| r.spirit_id == spirit_id);
-                if let (Some(live), Some(recorded)) = (resolver, recorded) {
-                    if live.resolve(&[spirit_id.as_str()])[0] != Some(recorded.pid) {
+                let sender = match self.mpsc_senders.get(&(spirit_id.clone(), kind)) {
+                    Some(entry) => entry.value().clone(),
+                    None => {
+                        same_host_err.get_or_insert(IacBusError::UnknownSpirit(spirit_id));
+                        continue;
+                    }
+                };
+                // The channel is taken first, then the incarnation is rechecked: a replacement
+                // registered after this lookup can never receive on the old incarnation's
+                // channel. A kernel Retract with no recorded recipient has no incarnation to
+                // notify, so it is never enqueued by name alone.
+                if let Some(live) = resolver {
+                    let admitted = match recorded {
+                        Some(recorded) => {
+                            live.resolve(&[spirit_id.as_str()])[0] == Some(recorded.pid)
+                        }
+                        None => kind != FrameKind::Retract,
+                    };
+                    if !admitted {
                         continue;
                     }
                 }
-                let sender = match self.mpsc_senders.get(&(spirit_id.clone(), kind)) {
-                    Some(entry) => entry.value().clone(),
-                    None => return Err(IacBusError::UnknownSpirit(spirit_id)),
-                };
 
                 // Update last_inbound_frame_ns for the recipient via the activity
                 // tracker trait. Mutex guard is scoped to this block so the future
@@ -631,10 +645,13 @@ impl Mailbox {
                         self.metrics.inc_pending(&spirit_id, kind);
                     }
                     Err(_) => {
-                        if kind == FrameKind::EpistemicHalt {
-                            return Err(IacBusError::HaltQueueOverflow(spirit_id));
-                        }
-                        return Err(IacBusError::ChannelClosed(spirit_id, kind));
+                        // One closed recipient never strands the later ones (all eligible
+                        // recipients are attempted; the first failure is reported after).
+                        same_host_err.get_or_insert(if kind == FrameKind::EpistemicHalt {
+                            IacBusError::HaltQueueOverflow(spirit_id)
+                        } else {
+                            IacBusError::ChannelClosed(spirit_id, kind)
+                        });
                     }
                 }
             }
@@ -668,6 +685,9 @@ impl Mailbox {
                 }
             }
 
+            if let Some(e) = same_host_err {
+                return Err(e);
+            }
             Ok(LogBeforeDeliver::new(()))
         }) // close Box::pin async move
     }

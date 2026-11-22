@@ -312,6 +312,81 @@ async fn retract_skips_a_recipient_that_is_no_longer_the_admitted_incarnation() 
     );
 }
 
+// Planted mutation: re-resolving the notified ids at prepare (the replacement's pid becomes
+// the journaled recipient) fails the recipient-pid assertion.
+#[tokio::test]
+async fn retract_journals_only_original_incarnations_as_recipients() {
+    let mut w = world();
+    w.send(task(1, "a", &["b", "c"])).await;
+    w.pids.write().unwrap().insert("c".into(), 33);
+    let RetractOutcome::Retracted { retract_frame_id } = w
+        .bus
+        .retract([1; 16], "superseded".into(), &SpiritId::from("a"), None)
+        .await
+        .unwrap()
+    else {
+        panic!("expected a retraction");
+    };
+    let pids: Vec<u32> =
+        w.tl.recorded_recipients(retract_frame_id)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.pid)
+            .collect();
+    assert_eq!(
+        pids,
+        vec![2],
+        "only the original `b` incarnation is a recipient"
+    );
+    assert!(w.drain("c").len() == 1, "c keeps only the original frame");
+}
+
+// Planted mutation: `?`-returning on the first closed channel (or marking before the write)
+// strands `c` / leaves a marker without a Retract row.
+#[tokio::test]
+async fn a_closed_recipient_never_strands_later_recipients_and_the_marker_commits_with_the_row() {
+    let mut w = world();
+    w.send(task(1, "a", &["b", "c"])).await;
+    w.drain("c");
+    drop(w.handles.remove("b"));
+
+    let result = w
+        .bus
+        .retract([1; 16], "superseded".into(), &SpiritId::from("a"), None)
+        .await;
+    assert!(matches!(result, Err(IacBusError::ChannelClosed(id, _)) if id == "b"));
+    let got = w.drain("c");
+    assert!(
+        matches!(got.as_slice(), [(FrameKind::Retract, _)]),
+        "c is still notified: {got:?}"
+    );
+    let marker =
+        w.tl.is_retracted([1; 16])
+            .unwrap()
+            .expect("marker committed");
+    assert!(
+        w.tl.query_frame_by_id(marker).unwrap().is_some(),
+        "the marker names a journaled Retract row"
+    );
+}
+
+// Planted mutation: restoring the live-declaration fallback in `evaluate` quarantines this.
+#[tokio::test]
+async fn an_unstamped_frame_is_never_gated_by_a_same_named_declaration() {
+    let mut w = world();
+    w.declare("a", &[("b", ConsentRecall::Full)]);
+    // The operator shell's root dispatch (or a verified peer) named `a`, never stamped.
+    w.bus
+        .deliver_typed(task(1, "a", &["c"]), 1, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        w.drain("c").len(),
+        1,
+        "an unstamped frame is not quarantined"
+    );
+}
+
 #[tokio::test]
 async fn the_unbound_port_refuses_a_spirit_sender_and_keeps_the_kernel_at_pid_zero() {
     let w = world();

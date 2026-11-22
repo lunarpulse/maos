@@ -407,15 +407,18 @@ impl LifecycleLink {
         let Some(predecessor) = locked(&self.predecessor).take() else {
             return;
         };
+        // The outcome callback installs the successor's consent declaration: it runs BEFORE the
+        // handover becomes visible, so the session can never serve the successor's child under
+        // the predecessor's policy.
+        if let Some(outcome) = locked(&self.outcome).take() {
+            outcome(true);
+        }
         if let Some(prewarm) = locked(&self.prewarm).take() {
             self.awaiting.store(true, Ordering::Release);
             *locked(&predecessor.handover) = Some(Handover {
                 core: Arc::clone(core),
                 prewarm,
             });
-        }
-        if let Some(outcome) = locked(&self.outcome).take() {
-            outcome(true);
         }
     }
 

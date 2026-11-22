@@ -7,7 +7,8 @@
 //!
 //! A declaration is bound to the admitted pid it was registered for, and a stamped frame carries
 //! its OWN snapshot of it to the gate (`inflight`, released by the sender's seam), so a reload
-//! between the stamp and the gate can neither widen nor mix the verdicts.
+//! between the stamp and the gate can neither widen nor mix the verdicts. A frame never stamped
+//! (root or peer traffic) is not gated.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -144,14 +145,13 @@ impl ConsentPolicy {
 
 impl ConsentGate for ConsentPolicy {
     fn evaluate(&self, frame: &IacFrame, recipient: &FrameAddress) -> Result<(), RuptureReason> {
-        let pinned = self
+        // Only a frame stamped for an authenticated, admitted local Spirit sender is gated. An
+        // unstamped frame (the operator's root dispatch, a verified peer) is identified by a
+        // string alone, so a same-named installed Spirit's declaration never applies to it.
+        let snapshot = self
             .inflight
             .get(&frame.frame_id)
-            .map(|entry| entry.value().clone());
-        let snapshot = pinned.unwrap_or_else(|| {
-            let live = self.grants.get(frame.from.spirit_id.as_str());
-            live.map(|entry| Arc::clone(&entry.value().1))
-        });
+            .and_then(|entry| entry.value().clone());
         match snapshot {
             Some(grants)
                 if recipient.host_id.is_some()

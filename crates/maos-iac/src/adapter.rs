@@ -900,6 +900,7 @@ impl IacBusAdapter {
         // either arm: the Retract row, its side rows, the retraction marker and
         // the delivered frame all name it (never the shared `last_frame_id`).
         let retract_frame_id = self.transparency_log.mint_frame_id();
+        let mut pinned: Vec<(String, u32)> = Vec::new();
         let retract_frame = maos_domain::frame::IacFrame {
             frame_id: retract_frame_id,
             timestamp_ns: 0,
@@ -940,14 +941,20 @@ impl IacBusAdapter {
                         .transparency_log
                         .recipient_resolver()
                         .map_or_else(Vec::new, |resolver| resolver.resolve(&ids));
-                    recorded
+                    // Each notified destination stays bound to its ORIGINAL incarnation: the
+                    // pins below feed `prepare`, so the journal and the enqueue recheck name
+                    // the original pid and a reload since never makes a replacement the
+                    // recipient.
+                    pinned = recorded
                         .iter()
                         .zip(live)
                         .filter(|(recipient, pid)| same_boot && *pid == Some(recipient.pid))
-                        .map(|(recipient, _)| maos_domain::frame::FrameAddress {
-                            spirit_id: maos_spirit_abi::identity::SpiritId::from(
-                                recipient.spirit_id.as_str(),
-                            ),
+                        .map(|(recipient, _)| (recipient.spirit_id.clone(), recipient.pid))
+                        .collect();
+                    pinned
+                        .iter()
+                        .map(|(id, _)| maos_domain::frame::FrameAddress {
+                            spirit_id: maos_spirit_abi::identity::SpiritId::from(id.as_str()),
                             host_id: None,
                             role: None,
                         })
@@ -963,15 +970,14 @@ impl IacBusAdapter {
             intent_lineage: original_lineage,
         };
 
-        // Step 3.5: atomically check-and-mark retracted BEFORE writing the TL row
-        // (prevents duplicate Retract rows on concurrent/replayed retractions).
-        if let Some(existing) = self
-            .transparency_log
-            .check_and_mark_retracted(original_frame_id, retract_frame_id)
-            .map_err(|e| {
+        // Step 3.5: an already-retracted original answers without any new work; the marker
+        // itself commits with the Retract row and its recipients (one transaction, step 4).
+        let already = |frame_id: [u8; 16]| {
+            self.transparency_log.is_retracted(frame_id).map_err(|e| {
                 maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
-            })?
-        {
+            })
+        };
+        if let Some(existing) = already(original_frame_id)? {
             return Ok(RetractOutcome::Already {
                 existing_retract_frame_id: existing,
             });
@@ -979,9 +985,8 @@ impl IacBusAdapter {
 
         // Step 4: log the retract frame (I2) through the routed writer, via DRR
         // if configured. Story 17-8 AC2.4 — prepared once, consumed on delivery.
-        let prepared = self
-            .mailbox
-            .prepare(&retract_frame, self.transparency_log.recipient_resolver());
+        let pinned = PinnedRecipients(pinned);
+        let prepared = self.mailbox.prepare(&retract_frame, Some(&pinned));
         let token_column = capability_token.as_ref().map(capability_token_column);
         let payload_bytes = serde_json::to_vec(&retract_frame.payload).map_err(|e| {
             maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
@@ -1011,13 +1016,20 @@ impl IacBusAdapter {
                 )
                 .into_inner()
         };
-        // A kernel-minted id cannot be a peer replay: a duplicate is a sequence
-        // defect and halts, exactly like `insert_frame_event_with_sender` (I2).
-        assert!(
-            write == transparency_log::FrameRowWrite::Written,
-            "MAOS kernel panic — Transparency Log write failed: duplicate frame_id on a \
-             KERNEL-MINTED retract id (Architecture §7.3 I2)."
-        );
+        // A kernel-minted id cannot be a peer replay: a duplicate is the marker of a
+        // concurrent retraction (nothing of this attempt committed), else a sequence
+        // defect that halts, exactly like `insert_frame_event_with_sender` (I2).
+        if write == transparency_log::FrameRowWrite::Duplicate {
+            let Some(existing) = already(original_frame_id)? else {
+                panic!(
+                    "MAOS kernel panic — Transparency Log write failed: duplicate frame_id on a \
+                     KERNEL-MINTED retract id (Architecture §7.3 I2)."
+                );
+            };
+            return Ok(RetractOutcome::Already {
+                existing_retract_frame_id: existing,
+            });
+        }
 
         // Step 6: route through mailbox to the original recipient
         self.mailbox
@@ -1025,6 +1037,20 @@ impl IacBusAdapter {
             .await?;
 
         Ok(RetractOutcome::Retracted { retract_frame_id })
+    }
+}
+
+/// The original incarnations a retract notifies: `resolve` answers each pinned id with its
+/// original pid, never the live map's (a replacement of the same name is not the recipient).
+#[derive(Debug)]
+struct PinnedRecipients(Vec<(String, u32)>);
+
+impl transparency_log::RecipientResolver for PinnedRecipients {
+    fn resolve(&self, spirit_ids: &[&str]) -> Vec<Option<u32>> {
+        spirit_ids
+            .iter()
+            .map(|id| self.0.iter().find(|(p, _)| p == id).map(|(_, pid)| *pid))
+            .collect()
     }
 }
 

@@ -263,6 +263,7 @@ impl Drop for Recipient {
 }
 
 struct IdentityOwner {
+    iac: Arc<maos_iac::adapter::IacBusAdapter>,
     lookup: Arc<RwLock<BTreeMap<String, u32>>>,
     id: String,
     pid: u32,
@@ -270,6 +271,9 @@ struct IdentityOwner {
 
 impl Drop for IdentityOwner {
     fn drop(&mut self) {
+        // The declaration goes with the identity, owner-checked like the lookup below: a
+        // replacement incarnation's declaration survives this teardown.
+        self.iac.consent_policy().unregister(&self.id, self.pid);
         let mut lookup = self
             .lookup
             .write()
@@ -375,6 +379,7 @@ pub async fn run_admitted_session(
     launch: SessionLaunch,
 ) -> Result<SessionReport, SessionError> {
     let owner = IdentityOwner {
+        iac: Arc::clone(&deps.iac),
         lookup: Arc::clone(&deps.pid_by_spirit_id),
         id: admitted.spirit_id.clone(),
         pid: admitted.pid,

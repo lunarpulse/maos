@@ -395,6 +395,8 @@ enum SideRows<'a> {
     Routed {
         recipients: &'a [FrameRecipient],
         consent: Option<&'a ConsentEnvelope>,
+        /// A kernel Retract's original frame: its retraction marker commits with the row.
+        retracts: Option<[u8; 16]>,
     },
     /// AC3.5 — a rupture of `envelope`'s grant naming each rejected recipient.
     Rupture {
@@ -404,14 +406,32 @@ enum SideRows<'a> {
 }
 
 impl SideRows<'_> {
-    fn write(self, conn: &Connection, frame_id: &[u8; 16]) -> rusqlite::Result<()> {
+    fn write(self, conn: &Connection, frame_id: &[u8; 16]) -> rusqlite::Result<FrameRowWrite> {
         let role =
             |role: Option<maos_spirit_abi::identity::SpiritRole>| role.map(|r| format!("{r:?}"));
         match self {
             Self::Routed {
                 recipients,
                 consent,
+                retracts,
             } => {
+                // An already-marked original: nothing of this retraction commits (`Duplicate`).
+                if let Some(original) = retracts {
+                    let marked =
+                        conn.execute(
+                            "INSERT OR IGNORE INTO transparency_log_retractions
+                         (original_frame_id, retract_frame_id, retracted_at_ns)
+                         VALUES (?1, ?2, ?3)",
+                            rusqlite::params![
+                                &original[..],
+                                &frame_id[..],
+                                wall_clock_now_ns() as i64,
+                            ],
+                        )?;
+                    if marked == 0 {
+                        return Ok(FrameRowWrite::Duplicate);
+                    }
+                }
                 for recipient in recipients {
                     conn.execute(
                         "INSERT INTO transparency_log_recipients
@@ -426,7 +446,7 @@ impl SideRows<'_> {
                     )?;
                 }
                 let Some(envelope) = consent else {
-                    return Ok(());
+                    return Ok(FrameRowWrite::Written);
                 };
                 let policy: i64 = match envelope.recall {
                     ConsentRecall::Full => 0,
@@ -450,7 +470,7 @@ impl SideRows<'_> {
                         policy,
                     ],
                 )?;
-                Ok(())
+                Ok(FrameRowWrite::Written)
             }
             Self::Rupture {
                 envelope,
@@ -471,7 +491,7 @@ impl SideRows<'_> {
                         ],
                     )?;
                 }
-                Ok(())
+                Ok(FrameRowWrite::Written)
             }
         }
     }
@@ -1324,6 +1344,14 @@ impl TransparencyLogAdapter {
             Some(SideRows::Routed {
                 recipients,
                 consent: frame.consent_envelope.as_ref(),
+                retracts: match &frame.payload {
+                    maos_domain::frame::FramePayload::Retract(retract)
+                        if frame.auto_marker == FrameOrigin::Kernel =>
+                    {
+                        Some(retract.original_frame_id)
+                    }
+                    _ => None,
+                },
             }),
         ))
     }
@@ -1407,9 +1435,9 @@ impl TransparencyLogAdapter {
                         origin as i64,
                     ])
                 }) {
-                Ok(_) => sides
-                    .map_or(Ok(()), |sides| sides.write(conn, &frame_id))
-                    .map(|()| FrameRowWrite::Written),
+                Ok(_) => sides.map_or(Ok(FrameRowWrite::Written), |sides| {
+                    sides.write(conn, &frame_id)
+                }),
                 // Only the base row's primary key can mean already journaled.
                 Err(error) if Self::is_duplicate_primary_key(&error) => {
                     Ok(FrameRowWrite::Duplicate)
@@ -3097,53 +3125,6 @@ impl TransparencyLogAdapter {
             )
             .map_err(AuditError::SqliteWriteFatal)?;
         Ok(rows > 0)
-    }
-
-    /// Story 6.1 — atomically check-and-mark retraction.
-    ///
-    /// Holds the inner lock across both operations to prevent TOCTOU races.
-    /// Returns `Ok(retract_frame_id)` if already retracted, `Ok(None)` if
-    /// not yet retracted (caller should proceed with retraction).
-    pub fn check_and_mark_retracted(
-        &self,
-        original_frame_id: [u8; 16],
-        retract_frame_id: [u8; 16],
-    ) -> Result<Option<[u8; 16]>, AuditError> {
-        let inner = self.inner.lock();
-        // Check if already retracted
-        let row: Option<Vec<u8>> = inner
-            .conn
-            .query_row(
-                "SELECT retract_frame_id FROM transparency_log_retractions
-                 WHERE original_frame_id = ?1 LIMIT 1",
-                rusqlite::params![&original_frame_id[..]],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(AuditError::SqliteRead)?;
-        if let Some(blob) = row {
-            let mut arr = [0u8; 16];
-            if blob.len() == 16 {
-                arr.copy_from_slice(&blob);
-            }
-            return Ok(Some(arr));
-        }
-        // Not yet retracted — mark it atomically
-        let timestamp_ns = wall_clock_now_ns();
-        inner
-            .conn
-            .execute(
-                "INSERT OR IGNORE INTO transparency_log_retractions
-                 (original_frame_id, retract_frame_id, retracted_at_ns)
-                 VALUES (?1, ?2, ?3)",
-                rusqlite::params![
-                    &original_frame_id[..],
-                    &retract_frame_id[..],
-                    timestamp_ns as i64,
-                ],
-            )
-            .map_err(AuditError::SqliteWriteFatal)?;
-        Ok(None)
     }
 
     /// Story 6.1 — check whether a frame has been retracted.

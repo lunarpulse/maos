@@ -233,6 +233,20 @@ The independent reviewer was a read-only static agent that self-reported GPT-fam
 
 **Orchestrator-run local results (no hosted receipts).** `maos-iac`, `maos-manifest`, and `maos-wasm-host` were green. In `maos-bin`, `consent_declaration_21_7`, `consent_gate_21_7`, `spawned_installed_20_9`, `spawned_door_20_9`, `spawned_swap_20_9`, and `--lib` were green. The kernel was unchanged at 20,428 tokei; the orchestrator's ceiling adjudication is recorded in the forecast above.
 
+## 2026-11-22 independent review (static, GPT-family: the non-GPT D-21-7-06 review is STILL OWED; no tests run by the reviewer)
+
+Dispositions as left by the fix pass (edit-only; compile, measurement and test runs are the orchestrator's).
+
+- **F1 (HIGH) fixed.** `LifecycleLink::commit` (`spawned_lifecycle.rs`) now runs the outcome callback, which installs the successor's consent declaration, BEFORE the handover is published to the predecessor's session. No end-to-end test: a successor needs a live `Prewarm` runner child.
+- **F2 (HIGH) fixed.** `retract` (`adapter.rs`) pins each notified destination to its original pid (`PinnedRecipients`); the journal records the original pid and the enqueue recheck compares against it. `Mailbox` looks the channel up first, then rechecks the incarnation, and a kernel Retract with no recorded recipient is never enqueued by name. Test: `retract_journals_only_original_incarnations_as_recipients`.
+- **F3 (MEDIUM) partly fixed.** The retraction marker now commits in the Retract row's own transaction (`SideRows::Routed.retracts` in `transparency_log.rs`; `check_and_mark_retracted` removed); a failed or cancelled write leaves no marker, and a concurrent duplicate answers `Already`. The mailbox attempts every eligible recipient and reports the first failure afterwards. Test: `a_closed_recipient_never_strands_later_recipients_and_the_marker_commits_with_the_row`. OPEN: a post-commit delivery failure is returned to the caller but a later retry answers `Already` without re-notifying the undelivered recipients (the journal's Retract row and recipient rows are the only retained record).
+- **F4 (MEDIUM) DEFERRED.** Admission schema floor and roster validation need an ABI ratification.
+- **F5 (MEDIUM) fixed.** `ConsentPolicy::evaluate` gates only frames stamped for an authenticated admitted local Spirit; unstamped root or peer traffic is never gated by a same-named declaration. Test: `an_unstamped_frame_is_never_gated_by_a_same_named_declaration`.
+- **F6 (MEDIUM) crash half fixed, revert half DEFERRED.** `IdentityOwner::drop` (`spirit_session.rs`) now withdraws the consent declaration, pid-checked, with the identity. Restoring the predecessor's declaration on auto-revert needs a hook in `hot_swap/coordinator.rs` (out of scope); meanwhile the policy left after a revert is the successor's, which a swap may only narrow, and a session whose child was retired ends and withdraws it. No new test (session teardown needs a live session).
+- **F7 (ruled WIT variant: ABI change) DEFERRED.**
+- **F8 (AC1 payload-confidentiality wording vs ADR-012 recall-only scope) DEFERRED: operator decision.**
+- **F9 (hosted witness targets a wasm-host build) DEFERRED: depends on 21-9 landing.**
+
 ## Change Log
 
 - 2026-11-20: Created at `ea8c51b6`. Recorded the Postgres-free scope, parked Postgres/Reza residual, six PROPOSED D-rows, conditional forecasts and parent-owned cite corrections. Status backlog pending operator rulings. Tracker untouched (`sprint-status.yaml:419` still `backlog`).
