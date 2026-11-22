@@ -141,10 +141,22 @@ invalid, or too-low cap is refused before any inference, and a runtime counter
 prevents calls beyond the cap.
 
 The example below assumes a running local Ollama server with `llama3.1:8b`
-available, a built `maos`, and `jq`. Run it from the repository root. It pins
-Ollama in an isolated copy of the catalog, applies only the temporary baseline
-under strict replay (admission only, no inference call), then compares the
-unapplied candidate in live mode.
+available, a built `maos`, and `jq`. Run it from the repository root; set
+`MAOS_OLLAMA_URL` if the server is not on `localhost:11434`. It pins Ollama in an
+isolated copy of the catalog, applies only the temporary baseline under strict
+replay (admission only, no inference call), then compares the unapplied
+candidate in live mode.
+
+The copy also replaces the extractor prompt. The committed catalog prompt asks
+for "only JSON" but is part of the replay cassettes' prompt hashes, so it is not
+edited in place. `llama3.1:8b` answers it with prose, a code fence, and wrong
+keys, and every run then abstains as `malformed evidence JSON`. The stricter
+prompt below spells out the exact object. The parser stays strict: a model that
+cannot honor the output contract abstains rather than being rescued.
+
+`--repeat 1` is enough here. The workflow hook requests temperature 0, and in
+the first measurement below three repeats produced identical tokens. Use
+`--repeat` above 1 only with a provider or settings that vary between calls.
 
 ```sh
 (
@@ -158,9 +170,12 @@ export XDG_STATE_HOME="$HOME/state" XDG_CACHE_HOME="$HOME/cache"
 mkdir "$MAOS_HOME"
 printf 'Measurement home (kept for audit): %s\n' "$MAOS_HOME" >&2
 unset MAOS_INFERENCE_MODE MAOS_REPLAY_CASSETTE MAOS_REPLAY_STRICT
-awk '
+prompt='Read the invoice excerpt. Reply with exactly one JSON object and nothing else: no prose, no markdown, no code fence. The object must have exactly two keys: "outcome", whose value is the string "finding_ready", and "artifact", an object with "purchase_order_present" (true only if the excerpt states a purchase order was issued or assigned; otherwise false) and "quote" (a verbatim substring copied from the excerpt that supports the answer). Example: {"outcome":"finding_ready","artifact":{"purchase_order_present":false,"quote":"copied text"}}'
+awk -v p="$prompt" '
+  BEGIN { q = sprintf("%c", 39) }
   /^provider = "anthropic"$/ { $0 = "provider = \"ollama\"" }
   /^model = "claude-haiku-4-5-20251001"$/ { $0 = "model = \"llama3.1:8b\"" }
+  /^prompt = "Read the invoice excerpt\./ { $0 = "prompt = " q p q }
   { print }
 ' "$examples/catalog.toml" > "$MAOS_HOME/workflow-catalog.toml"
 baseline=$("$maos" workflow plan "$examples/invoice-evidence.toml" \
@@ -170,10 +185,10 @@ MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 \
   "$maos" workflow apply "$HOME/baseline.json" "$baseline" >/dev/null
 candidate=$("$maos" workflow plan "$examples/invoice-evidence-reroute.toml" \
   "$HOME/candidate.json" | jq -er 'select(.digest) | .digest')
-MAOS_INFERENCE_MODE=live MAOS_OLLAMA_URL=http://localhost:11434 \
-  MAOS_WORKFLOW_MAX_INFERENCE_CALLS=200 \
+MAOS_INFERENCE_MODE=live MAOS_OLLAMA_URL="${MAOS_OLLAMA_URL:-http://localhost:11434}" \
+  MAOS_WORKFLOW_MAX_INFERENCE_CALLS=50 \
   "$maos" workflow compare "$HOME/candidate.json" "$candidate" \
-  "$examples/invoice-evidence-holdout-v1.json" --repeat 3 > "$HOME/report.json"
+  "$examples/invoice-evidence-holdout-v1.json" > "$HOME/report.json"
 jq -e 'select(.event == "workflow_comparison" and .format == 2 and .mode == "live") |
   {repeat, max_inference_calls, cases_sha256, plans}' "$HOME/report.json"
 )
@@ -240,6 +255,37 @@ Limitations:
   Use a separately kept, unseen set for release-quality estimates. The
   synthetic cassette control below checks scoring and routing only, not
   live model quality.
+
+### First measurement (baseline, not a threshold)
+
+One real run of the example above, on 2026-11-21: `llama3.1:8b` through a local
+Ollama 0.40.17 on CPU, the 12-case holdout with `--repeat 3`. It is a reference
+point for later changes, not a quality claim.
+
+| Plan | `passed` / `runs` | `ran` / `runs` | Final outcome matches the label |
+|---|---|---|---|
+| Baseline | 12 / 36 | 36 / 36 | 6 / 12 cases |
+| Candidate | 18 / 36 | 36 / 36 | 12 / 12 cases |
+
+- With the unedited catalog prompt, all 72 runs abstained as `malformed evidence
+  JSON` (`ran` 0). The tighter prompt, tuned on the three
+  [live cases](invoice-evidence-live-cases.json) only, brought `ran` to 36 / 36.
+- The extractor's `purchase_order_present` answer was correct for all 12
+  cases. The baseline scores low because its missing-order route finishes as
+  `request_order`, not the labeled `hold_for_procurement`; that label is
+  exactly what the candidate changes.
+- The candidate's 6 misses are all `quote`: the model returned a shorter span
+  that is verbatim in the excerpt, while the label asks for the full sentence.
+  Some shorter spans are enough (`issued PO-711`); one drops the key fact
+  (`PO-756 was voided` omits "no replacement"). `passed` therefore mixes the
+  decision and the evidence; read `artifact_checks` in each detail to tell
+  them apart.
+- Both plans share the same extractor, so token counts matched exactly
+  (5,556 in, 972 out per plan). The run measures whether the candidate's
+  routing works with this model's output, not a difference between models.
+- 12 of 12 correct decisions bound the true rate only to roughly 74% or higher
+  at 95% confidence, and repeats of one case are not independent samples. Use a
+  separately kept unseen set before setting any threshold.
 
 ### Run the holdout scoring control
 
