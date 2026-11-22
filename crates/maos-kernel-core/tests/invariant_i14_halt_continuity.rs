@@ -12,8 +12,10 @@ use std::sync::Arc;
 
 use maos_domain::frame::EpistemicHaltPayload;
 use maos_domain::halt::{HaltId, HaltState};
+use maos_domain::hot_swap::HotSwapError;
 use maos_domain::invariants::i14::{check, Observation, Swap};
 use maos_kernel_core::halt::PendingHaltMetadata;
+use maos_kernel_core::hot_swap::{HotSwapPrecheck, PrecheckOutcome};
 use maos_kernel_core::lifecycle::{
     SuccessorSpiritFactory, UpgradeError, UpgradeOutcome, UpgradePolicy,
 };
@@ -83,10 +85,39 @@ async fn trial(compat: Option<u32>, halts: usize) -> Swap {
             )
             .expect("pending halt");
     }
+    // The standalone precheck (no coordinator cutover) must predict the swap gate's verdict.
+    // Plant: make `validate_halt_set` accept an undeclared successor (the precheck stays safe).
+    let declared: Vec<u32> = compat.into_iter().collect();
+    let precheck = HotSwapPrecheck::check(
+        &harness.halt_registry,
+        pid,
+        PREDECESSOR_VERSION,
+        &declared,
+        65536,
+        65536,
+    );
+    let compatible = compat == Some(PREDECESSOR_VERSION);
+    assert_eq!(
+        precheck.verdict,
+        if compatible {
+            PrecheckOutcome::SafeMigrated
+        } else {
+            PrecheckOutcome::HaltContinuityViolation
+        },
+        "precheck verdict for successor {compat:?}"
+    );
     let outcome = harness
         .orchestrator
         .upgrade("witness", &successor, UpgradePolicy::HotSwap)
         .await;
+    // The refusal is the typed continuity error, not any error (plant: refuse with another error).
+    match &outcome {
+        Ok(report) => assert!(compatible && report.outcome == UpgradeOutcome::Completed),
+        Err(UpgradeError::HotSwap(HotSwapError::HaltContinuityViolation(_))) => {
+            assert!(!compatible, "a compatible successor was refused")
+        }
+        Err(other) => panic!("untyped refusal for successor {compat:?}: {other:?}"),
+    }
     let kept = before.iter().all(|(id, metadata)| {
         harness.halt_registry.lookup_state(id) == Some(HaltState::PendingResolution)
             && harness.halt_registry.lookup_pending_metadata(id).as_ref() == Some(metadata)

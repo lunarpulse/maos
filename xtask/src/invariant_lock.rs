@@ -111,6 +111,17 @@ fn executing_witness(
     path: &str,
 ) -> Result<bool, String> {
     use syn::parse::Parser;
+    // Only the compared operands are evidence: format arguments after them are diagnostics, so
+    // `assert!(ok, "{}", corpus)` does not make the corpus a checked input.
+    fn operands(mac: &syn::Macro) -> Vec<syn::Expr> {
+        let count = if mac.path.is_ident("assert") { 1 } else { 2 };
+        syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated
+            .parse2(mac.tokens.clone())
+            .map_or_else(
+                |_| Vec::new(),
+                |args| args.into_iter().take(count).collect(),
+            )
+    }
     fn call_uses(expr: &syn::Expr, binding: &syn::Ident) -> bool {
         let direct =
             |expr: &syn::Expr| matches!(expr, syn::Expr::Path(p) if p.path.is_ident(binding));
@@ -135,9 +146,7 @@ fn executing_witness(
                         .iter()
                         .any(|name| m.mac.path.is_ident(name)) =>
             {
-                syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated
-                    .parse2(m.mac.tokens.clone())
-                    .is_ok_and(|args| args.iter().any(|e| call_uses(e, binding)))
+                operands(&m.mac).iter().any(|e| call_uses(e, binding))
             }
             _ => false,
         }
@@ -205,9 +214,7 @@ fn executing_witness(
                         }
                         syn::Stmt::Expr(e, _) => e,
                         syn::Stmt::Macro(m) if m.attrs.is_empty() && assertion(&m.mac) => {
-                            checked |= syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated
-                                .parse2(m.mac.tokens.clone()).is_ok_and(|args|
-                                    args.iter().any(|e| bindings.iter().any(|b| call_uses(e, b))));
+                            checked |= operands(&m.mac).iter().any(|e| bindings.iter().any(|b| call_uses(e, b)));
                             continue;
                         }
                         _ => break,
@@ -412,6 +419,20 @@ fn invariant_lock(
     {
         touched_invariants.push("maos-domain-invariants".into());
     }
+    let workflow_rel = ".github/workflows/discipline.yml";
+    let new_wf =
+        fs::read_to_string(root.join(workflow_rel)).map_err(|e| format!("{workflow_rel}: {e}"))?;
+    let old_wf = git_show_old(&root, workflow_rel).unwrap_or_default();
+    for inv_id in claims.keys() {
+        let rel = format!("docs/invariants/{inv_id}.md");
+        let new_src = fs::read_to_string(root.join(&rel)).map_err(|e| format!("{rel}: {e}"))?;
+        let old_src = git_show_old(&root, &rel).unwrap_or_default();
+        if !touched_invariants.contains(inv_id)
+            && witness_touched(&changed, (&old_src, &new_src), (&old_wf, &new_wf))?
+        {
+            touched_invariants.push(inv_id.clone());
+        }
+    }
 
     if touched_invariants.is_empty() {
         return Ok(LockReport {
@@ -563,19 +584,20 @@ fn check_reviews(pr_number: Option<u64>) -> Result<(usize, bool), String> {
     };
 
     let output = Command::new("gh")
-        .args(["pr", "view", &pr.to_string(), "--json", "reviews"])
+        .args([
+            "pr",
+            "view",
+            &pr.to_string(),
+            "--json",
+            "reviews,headRefOid",
+        ])
         .output();
 
     match output {
         Ok(o) if o.status.success() => {
             let json: serde_json::Value =
                 serde_json::from_slice(&o.stdout).map_err(|e| e.to_string())?;
-            let reviews = json["reviews"].as_array().unwrap_or(&vec![]).clone();
-            let approved: Vec<_> = reviews
-                .into_iter()
-                .filter(|r| r["state"].as_str() == Some("APPROVED"))
-                .collect();
-            let count = approved.len();
+            let count = eligible_approvals(&json);
             Ok((count, count < 2))
         }
         Ok(o) => {
@@ -590,11 +612,106 @@ fn check_reviews(pr_number: Option<u64>) -> Result<(usize, bool), String> {
     }
 }
 
+const PHASES: [&str; 6] = ["v0.1", "v0.3", "v0.5", "v0.9", "v1.0", "v1.5"];
+
+/// ADR-037 two-reviewer rule: DISTINCT eligible maintainer identities (owner/member/collaborator)
+/// whose LATEST effective review (approve, request changes, dismiss; by `submittedAt`) is an
+/// approval of the PR's CURRENT head commit.
+fn eligible_approvals(pr: &serde_json::Value) -> usize {
+    let Some(head) = pr["headRefOid"].as_str() else {
+        return 0;
+    };
+    let mut latest: BTreeMap<String, &serde_json::Value> = BTreeMap::new();
+    for review in pr["reviews"].as_array().into_iter().flatten() {
+        let eligible = matches!(
+            review["authorAssociation"].as_str(),
+            Some("OWNER" | "MEMBER" | "COLLABORATOR")
+        );
+        let effective = matches!(
+            review["state"].as_str(),
+            Some("APPROVED" | "CHANGES_REQUESTED" | "DISMISSED")
+        );
+        let Some(login) = review["author"]["login"].as_str() else {
+            continue;
+        };
+        if !eligible || !effective {
+            continue;
+        }
+        let at = |r: &serde_json::Value| r["submittedAt"].as_str().unwrap_or("").to_string();
+        let key = login.to_ascii_lowercase();
+        if latest.get(&key).is_none_or(|seen| at(seen) <= at(review)) {
+            latest.insert(key, review);
+        }
+    }
+    latest
+        .values()
+        .filter(|r| {
+            r["state"].as_str() == Some("APPROVED") && r["commit"]["oid"].as_str() == Some(head)
+        })
+        .count()
+}
+
+/// F4: the witness a `guaranteed` row stands on (test file, corpus, CI job body) is lock scope,
+/// judged for the base AND the candidate register so a row cannot be downgraded and its witness
+/// weakened in one step.
+fn witness_touched(
+    changed: &BTreeSet<String>,
+    (old_src, new_src): (&str, &str),
+    (old_wf, new_wf): (&str, &str),
+) -> Result<bool, String> {
+    let workflow = |src: &str| -> Result<serde_yaml::Value, String> {
+        if src.trim().is_empty() {
+            return Ok(serde_yaml::Value::Null);
+        }
+        serde_yaml::from_str(src).map_err(|e| e.to_string())
+    };
+    let (old_wf, new_wf) = (workflow(old_wf)?, workflow(new_wf)?);
+    for src in [old_src, new_src] {
+        let row = front(src)?;
+        if row["claim"].as_str() != Some("guaranteed") {
+            continue;
+        }
+        let test = row["property_test"]
+            .as_str()
+            .map(|t| t.split_once('#').map_or(t, |p| p.0));
+        let corpus = row["adversarial_corpus"].as_str();
+        if [test, corpus]
+            .into_iter()
+            .flatten()
+            .any(|p| changed.contains(p))
+        {
+            return Ok(true);
+        }
+        if let Some(job) = row["ci_job"].as_str() {
+            if old_wf["jobs"][job] != new_wf["jobs"][job] {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+/// The candidate's own cells are validated before any map comparison: every value must be a
+/// known cadence and every phase key canonical or already present at the base, so a new
+/// unrecognized key cannot ride in unchecked.
 fn cadence_problem(inv_id: &str, old_src: &str, new_src: &str) -> Result<Option<String>, String> {
     let new_cadence = parse_cadence(new_src)?;
+    let old_cadence = parse_cadence(old_src)?;
     let order = ["—", "CI", "runtime", "fuzz"];
     let rank = |s: &str| order.iter().position(|&x| x == s);
-    for (phase, old_val) in &parse_cadence(old_src)? {
+    for (phase, value) in &new_cadence {
+        let problem = if !PHASES.contains(&phase.as_str()) && !old_cadence.contains_key(phase) {
+            "unrecognized phase key".to_string()
+        } else if rank(value).is_none() {
+            format!("invalid value {value}")
+        } else {
+            continue;
+        };
+        return Ok(Some(format!(
+            "ADR-037 violation: {inv_id} cadence {phase} {problem}"
+        )));
+    }
+    for (phase, old_val) in &old_cadence {
         let problem = match new_cadence.get(phase) {
             None => "removed".to_string(),
             Some(n) if rank(n).is_none() => format!("invalid value {n}"),

@@ -355,3 +355,85 @@ fn phase_commitment_ignores_context_and_accepts_cadence_or_validated_flip() {
     assert!(phase_commitment(&doc("asserted", "fuzz"), &doc("guaranteed", "fuzz")).unwrap());
     assert!(!phase_commitment(&doc("guaranteed", "fuzz"), &doc("asserted", "fuzz")).unwrap());
 }
+
+fn review(login: &str, assoc: &str, state: &str, at: &str, oid: &str) -> serde_json::Value {
+    serde_json::json!({
+        "author": {"login": login}, "authorAssociation": assoc, "state": state,
+        "submittedAt": at, "commit": {"oid": oid},
+    })
+}
+
+#[test]
+fn two_approvals_need_two_distinct_eligible_maintainers_on_the_current_head() {
+    let pr = |reviews: Vec<serde_json::Value>| {
+        serde_json::json!({"headRefOid": "head2", "reviews": reviews})
+    };
+    // Planted mutation: count every APPROVED entry (the pre-fix gate).
+    // Same account twice is one identity.
+    let twice = pr(vec![
+        review("alice", "MEMBER", "APPROVED", "2026-11-22T01:00:00Z", "head2"),
+        review("Alice", "MEMBER", "APPROVED", "2026-11-22T02:00:00Z", "head2"),
+    ]);
+    assert_eq!(eligible_approvals(&twice), 1);
+    // An approval of an older revision is stale.
+    let stale = pr(vec![
+        review("alice", "MEMBER", "APPROVED", "2026-11-22T01:00:00Z", "head2"),
+        review("bob", "OWNER", "APPROVED", "2026-11-22T01:30:00Z", "head1"),
+    ]);
+    assert_eq!(eligible_approvals(&stale), 1);
+    // Approval then changes-requested: the later review wins.
+    let superseded = pr(vec![
+        review("alice", "MEMBER", "APPROVED", "2026-11-22T01:00:00Z", "head2"),
+        review("bob", "OWNER", "APPROVED", "2026-11-22T01:30:00Z", "head2"),
+        review("bob", "OWNER", "CHANGES_REQUESTED", "2026-11-22T02:00:00Z", "head2"),
+    ]);
+    assert_eq!(eligible_approvals(&superseded), 1);
+    // A later plain comment does not supersede an approval; a non-maintainer never counts.
+    let ok = pr(vec![
+        review("alice", "MEMBER", "APPROVED", "2026-11-22T01:00:00Z", "head2"),
+        review("bob", "COLLABORATOR", "APPROVED", "2026-11-22T01:30:00Z", "head2"),
+        review("bob", "COLLABORATOR", "COMMENTED", "2026-11-22T02:00:00Z", "head2"),
+        review("eve", "NONE", "APPROVED", "2026-11-22T02:00:00Z", "head2"),
+    ]);
+    assert_eq!(eligible_approvals(&ok), 2);
+    assert_eq!(eligible_approvals(&serde_json::json!({"reviews": []})), 0);
+}
+
+#[test]
+fn witness_files_and_ci_job_of_a_guaranteed_row_are_lock_scope() {
+    let row = |claim: &str| {
+        format!("---\nid: I1\nclaim: {claim}\nowner: x\nproperty_test: crates/a/tests/t.rs#t\nadversarial_corpus: crates/a/c.jsonl\nci_job: proofs\n---\n")
+    };
+    let wf = |step: &str| format!("jobs:\n  proofs:\n    steps:\n    - run: {step}\n  other:\n    steps:\n    - run: x\n");
+    let set = |paths: &[&str]| paths.iter().map(|p| p.to_string()).collect::<BTreeSet<_>>();
+    let (g, a) = (row("guaranteed"), row("asserted"));
+    // Planted mutation: gate only register/predicate paths (the pre-fix scope).
+    assert!(witness_touched(&set(&["crates/a/tests/t.rs"]), (&g, &g), (&wf("a"), &wf("a"))).unwrap());
+    assert!(witness_touched(&set(&["crates/a/c.jsonl"]), (&g, &g), (&wf("a"), &wf("a"))).unwrap());
+    assert!(witness_touched(&set(&[]), (&g, &g), (&wf("a"), &wf("b"))).unwrap());
+    // The BASE row counts too: downgrading and weakening the witness in one step is scoped.
+    assert!(witness_touched(&set(&["crates/a/tests/t.rs"]), (&g, &a), (&wf("a"), &wf("a"))).unwrap());
+    // Untouched witness, other job edits, and asserted rows are out of scope.
+    assert!(!witness_touched(&set(&["README.md"]), (&g, &g), (&wf("a"), &wf("a"))).unwrap());
+    assert!(!witness_touched(&set(&["crates/a/tests/t.rs"]), (&a, &a), (&wf("a"), &wf("b"))).unwrap());
+    let other = wf("a").replace("run: x", "run: y");
+    assert!(!witness_touched(&set(&[]), (&g, &g), (&wf("a"), &other)).unwrap());
+}
+
+#[test]
+fn candidate_cadence_cells_with_new_unrecognized_phase_keys_are_refused() {
+    let doc = |cells: &str| format!("---\nid: I1\nclaim: asserted\nenforcement_cadence:\n{cells}---\n");
+    let old = doc("  v1.0: fuzz\n  v1.5: fuzz\n");
+    // Planted mutation: compare only the base's keys (new candidate keys skip validation).
+    let new_key = doc("  v1.0: fuzz\n  v1.5: fuzz\n  v9.9: bogus\n");
+    assert!(cadence_problem("I1", &old, &new_key).unwrap().unwrap().contains("unrecognized"));
+    let new_phase_valid_value = doc("  v1.0: fuzz\n  v1.5: fuzz\n  v2.0: CI\n");
+    assert!(cadence_problem("I1", &old, &new_phase_valid_value).unwrap().unwrap().contains("unrecognized"));
+    let new_bad_value = doc("  v1.0: fuzz\n  v1.5: fuzz\n  v0.9: bogus\n");
+    assert!(cadence_problem("I1", &old, &new_bad_value).unwrap().unwrap().contains("invalid"));
+    // A legacy key already at the base stays valid; canonical phases may be added.
+    let legacy = doc("  v0.1-alpha: CI\n  v1.0: fuzz\n  v1.5: fuzz\n");
+    assert!(cadence_problem("I1", &legacy, &legacy).unwrap().is_none());
+    let added = doc("  v0.9: runtime\n  v1.0: fuzz\n  v1.5: fuzz\n");
+    assert!(cadence_problem("I1", &old, &added).unwrap().is_none());
+}

@@ -216,7 +216,7 @@ Creation: **anthropic/claude-opus-5-5** (`DraftInvariantLedger`). No implementer
 | HIGH | Lock gate used string search and `HEAD~1`. | Fixed by the base-ref and YAML frontmatter changes above. |
 | MEDIUM | I2, I3, I4, I6, I7, I8, I10, I11, I12, I13: the property tests do not all drive production entry points or would not all fail if enforcement were removed. | Downgraded to `asserted` with owner text `witness strengthening owed`. Tests, corpora and CI steps remain as non-claiming witnesses. |
 
-Only I14 is labeled `guaranteed`, with the cutover residual stated; I5 and I9 stay `asserted`. These are ledger dispositions, not evidence of a hosted pass.
+No row is labeled `guaranteed` after the 2026-11-22 review (I14 downgraded, cutover race open, owner 21-9 hot-swap); I5 and I9 stay `asserted`. These are ledger dispositions, not evidence of a hosted pass.
 
 **AC10 not done.** A production caller for the kernel T3 admission arm still requires a design decision: an additive kernel entry point or a throwaway adapter in `maos-bin`. D-E20-6 applies to the trust boundary.
 
@@ -225,6 +225,26 @@ Only I14 is labeled `guaranteed`, with the cutover residual stated; I5 and I9 st
 **Measured ceilings:** kernel 20,429 → 20,187 (lowered); `maos-domain` 10,483 → 10,782 (measured +299, within the story forecast of +120…+350); xtask 46,754 → 46,762 (+8). After a kernel file was deleted, the kernel pin was updated by hand to `src_lines: 25764`, 89 files.
 
 **Not run:** the named plants for each invariant, `cargo fuzz build`, hosted CI and `check-ship-gate-completeness`. No closures were made for `deferred-work.md:132`, `:133` or `:1660`.
+
+## 2026-11-22 independent review (static, GPT-family: the non-GPT D-E20-6 B review is STILL OWED; no tests run by the reviewer)
+
+Dispositions are as left by the fix pass; the orchestrator compiles, measures and runs the tests afterwards (none run by the fixer).
+
+| # | Finding | Disposition |
+|---|---|---|
+| F1 HIGH | Review count accepted every APPROVED entry (same account twice, stale-head and superseded approvals). | **Fixed**: `eligible_approvals` requires two DISTINCT eligible maintainer identities (OWNER/MEMBER/COLLABORATOR) whose latest effective review is APPROVED on the current `headRefOid`; test `two_approvals_need_two_distinct_eligible_maintainers_on_the_current_head`. |
+| F2 | Verifier runs from the PR's own revision. | **DEFERRED**: run it from a protected revision / required workflow (CI architecture decision for the operator). |
+| F3 HIGH | I14 `guaranteed` while the production cutover can violate it. | **Fixed (honesty)**: I14 and its FR53 mapping downgraded to `asserted` with "witness strengthening owed; production cutover race open (owner: 21-9 hot-swap)" in `I14.md`, `docs/invariants/README.md` and the `invariant_claims_20_3b` pin (no row guaranteed). `hot_swap/coordinator.rs` untouched. |
+| F4 HIGH | Lock scope omitted test, corpus and CI job of a guaranteed row; diagnostic-only corpus use counted as a check. | **Fixed**: `witness_touched` (base and candidate row; test file, corpus, CI job body) and `operands` (only compared assertion operands count); tests `witness_files_and_ci_job_of_a_guaranteed_row_are_lock_scope` and the two `diagnostic-only corpus` vectors in `guaranteed_refuses_nonexecuting_or_unbound_witnesses`. |
+| F5 | Worker launch I1 (`worker_spawn.rs`). | **DEFERRED**: owner 21-10 AC10 design decision. |
+| F6 MEDIUM | I14 witness passes without the monitor handoff / precheck fixes. | **Partly fixed**: the witness now asserts the typed `HaltContinuityViolation` refusal and drives the standalone `HotSwapPrecheck::check`; it still cannot fail on the coordinator cutover race (owner 21-9 hot-swap), hence the F3 downgrade. |
+| F7 | Review-submission trigger. | **DEFERRED**. |
+| F8 MEDIUM | New unrecognized candidate phase keys were not validated. | **Fixed**: `cadence_problem` validates candidate keys (canonical phase or already at the base) and values before comparing; test `candidate_cadence_cells_with_new_unrecognized_phase_keys_are_refused`. |
+| F9 | Merge journal PR identity. | **DEFERRED**. |
+| F10 | Predicate completeness (i2, i4, i6, i11; I9 predicate sentence). | **DEFERRED**. |
+| F11 | T3 admission arm (AC10). | **DEFERRED**: design decision. |
+
+AC verdicts: AC1 partial; AC2 partial; AC3 partial; AC4 enforced for predicate inputs; AC5 not enforced (mutation runs not performed); AC6 partial; AC7 enforced; AC8 API only; AC9 enforced in source; AC10 not enforced; AC11 partial.
 
 ## Change Log
 

@@ -103,6 +103,9 @@ fn guaranteed_refuses_nonexecuting_or_unbound_witnesses() -> Result<(), String> 
         ("cfg-excluded call", "#[test] fn preserves_property() { let corpus = include_str!(\"adversary.jsonl\"); #[cfg(any())] check(corpus); }".into(), workflow.to_owned()),
         ("cfg-excluded assert", "#[test] fn preserves_property() { let corpus = include_str!(\"adversary.jsonl\"); #[cfg(any())] assert!(corpus.contains(\"malicious\")); }".into(), workflow.to_owned()),
         ("discarded call result", source.replace("assert!(corpus.contains(\"malicious\"))", "corpus.len()"), workflow.to_owned()),
+        // Planted mutation: count every assertion argument as evidence (diagnostics included).
+        ("diagnostic-only corpus in assert!", source.replace("assert!(corpus.contains(\"malicious\"))", "assert!(true, \"{}\", corpus)"), workflow.to_owned()),
+        ("diagnostic-only corpus in assert_eq!", source.replace("assert!(corpus.contains(\"malicious\"))", "assert_eq!(1, 1, \"{}\", corpus)"), workflow.to_owned()),
         ("exit before use", source.replace("let corpus", "std::process::exit(0); let corpus"), workflow.to_owned()),
         ("imported exit", source.replace("let corpus", "exit(0); let corpus"), workflow.to_owned()),
         ("shadow assert in test", source.replace("let corpus", "macro_rules! assert { ($($t:tt)*) => {}; } let corpus"), workflow.to_owned()),
@@ -277,9 +280,12 @@ fn routed_witness_binaries_and_labelled_red_owners_remain_enrolled() -> Result<(
         .ok_or("workspace")?;
     let claims = read_claims(root)?;
     let continuity = claims.get("I14").ok_or("I14")?;
-    assert!(matches!(continuity.claim, ClaimState::Guaranteed));
+    // No row is guaranteed: I14 was downgraded (2026-11-22 review F3/F6).
+    assert!(claims
+        .values()
+        .all(|c| matches!(c.claim, ClaimState::Asserted)));
     assert!(continuity.requirement_claims["FR53"]
-        .contains("witnessed by routed_halt_swap_20_3b (green"));
+        .contains("production cutover race open (owner: 21-9 hot-swap)"));
     let ledger = include_str!("../../docs/invariants/README.md");
     assert!(ledger.contains("FR34 | asserted; owner: none (trigger-owned; see deferred-work)"));
     Ok(())
