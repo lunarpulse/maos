@@ -667,6 +667,32 @@ review R3/R7; approval is satisfied under D-17-7-FW-10, recorded below.
 cache or learned state. Story 17-7 review R1; approval is satisfied under
 D-17-7-FW-10, recorded below.
 
+### `FiringReservation` — `crates/maos-kernel-core/src/scheduler/mod.rs`
+
+**Reason:** one RAII slot in the idle or schedule watchdog's existing bounded
+in-flight set (at most 256 entries per watchdog). Idle keys are live Spirit PIDs
+and schedule keys are `(pid, schedule_id)`. A native export detached after a
+deadline still owns its slot until it actually finishes; the schedule path also
+holds it through completion accounting. The final owner removes the exact key.
+No persistent history, inferred state or secret is stored. Approved under
+D-21-9-KB-02 below.
+
+### `ScopeInstall` — `crates/maos-kernel-core/src/capability/cap_policy/mod.rs`
+
+**Reason:** one swap's undo receipt contains only the previous and newly installed
+declared scope sets. It restores only the still-admitted PID whose effective set
+matches the install, and is dropped after failed publication, a consumed revert,
+or the closing/cancellation of the owning monitor window. Neither set is a secret
+or learned state; no scope history is kept. Approved under D-21-9-KB-02 below.
+
+## Story 21-9 approval record
+
+**Lunarpulse — operator approval in D-21-9-KB-02, 2026-11-21 UTC:** approved only
+the two entries above and explicitly waived the second signature for these two
+sites in this story. This records one genuine signer, not a second maintainer.
+The default two-signature rule, I9 claim and source whitelist stay unchanged.
+Material changes to either custody rationale need fresh review and approval.
+
 ## Story 17-7 approval record
 
 **Lunarpulse — approved in the operator conversation:** “I approve it. does it work?”

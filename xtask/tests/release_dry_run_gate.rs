@@ -34,7 +34,7 @@ fn write_artifacts(dir: &Path, target: &str) {
 /// manifest that carries the right number of lines with constant or swapped hashes
 /// must not pass: only the `maos-<suffix>` entry is re-verified by the discipline
 /// self-test, so a wrong `maosctl` line would otherwise survive to the first tag.
-const HOST_DIGESTS: [(&str, &str); 4] = [
+const HOST_DIGESTS: [(&str, &str); 5] = [
     (
         "maos-linux-amd64",
         "35bf7c30d75be5349b37cc63b25e28ad68ba5f17416ce70d2404d89eb63db310",
@@ -50,6 +50,10 @@ const HOST_DIGESTS: [(&str, &str); 4] = [
     (
         "maos-spirit-linux-amd64",
         "eb6d2307dbab1e0fa24d738bd8d436d55099e664b0bbab8c13bbed123e813740",
+    ),
+    (
+        "maos-wasm-runner-linux-amd64",
+        "d29d9ca17570fd4970e65ff0208801c9a6c3c9d093d7026e9a1720192a508a36",
     ),
 ];
 

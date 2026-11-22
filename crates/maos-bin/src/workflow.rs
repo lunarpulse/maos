@@ -443,10 +443,21 @@ impl Comparison {
                 let runs = verdicts.len();
                 let ran = verdicts.iter().filter(|v| v.ran).count();
                 let passed = verdicts.iter().filter(|v| v.passed).count();
+                let decided = verdicts.iter().filter(|v| v.decision).count();
+                let evidence_runs = verdicts.iter().filter(|v| v.evidence.is_some()).count();
+                let evidenced = verdicts.iter().filter(|v| v.evidence == Some(true)).count();
+                let split = verdicts
+                    .iter()
+                    .filter(|v| v.decision && v.evidence == Some(false))
+                    .count();
                 let rate = |count: usize| count as f64 / runs.max(1) as f64;
                 json!({
                     "runs": runs, "ran": ran, "passed": passed, "abstained": runs - ran,
                     "failed": ran - passed, "pass_rate": rate(passed), "ran_rate": rate(ran),
+                    "decision_passed": decided, "decision_rate": rate(decided),
+                    "evidence_runs": evidence_runs, "evidence_passed": evidenced,
+                    "evidence_rate": (evidence_runs > 0).then(|| evidenced as f64 / evidence_runs as f64),
+                    "decision_without_evidence": split,
                     "calls": stats.calls, "input_tokens": stats.input_tokens,
                     "output_tokens": stats.output_tokens,
                     "latency_ms_total": stats.latency_ms_total,
@@ -458,6 +469,8 @@ impl Comparison {
                     "runs": verdicts.len(),
                     "ran": verdicts.iter().filter(|v| v.ran).count(),
                     "passed": verdicts.iter().filter(|v| v.passed).count(),
+                    "decision_passed": verdicts.iter().filter(|v| v.decision).count(),
+                    "evidence_passed": verdicts.iter().filter(|v| v.evidence == Some(true)).count(),
                     "details": verdicts.iter().map(|v| &v.detail).collect::<Vec<_>>(),
                 })
             };
@@ -546,6 +559,10 @@ fn case_inputs(cases: &mut [Case]) -> impl ExactSizeIterator<Item = (&Case, Valu
 struct Verdict {
     ran: bool,
     passed: bool,
+    /// Outcome, path and step outcomes match the labels (the workflow's decision).
+    decision: bool,
+    /// The labelled artifact fields match; `None` when the case labels no artifacts.
+    evidence: Option<bool>,
     detail: Value,
 }
 
@@ -1041,26 +1058,31 @@ tier = "T0"
                 } {
                     return Err(fault.into());
                 }
+                let labeled = !checks.is_empty();
                 let verdict = match report {
                     Ok(report) => {
-                        let passed = case.expect.matches(&report) && checks.values()
+                        let decision = case.expect.matches(&report);
+                        let evidence = checks.values()
                             .all(|(_, mismatches)| mismatches.as_ref().is_some_and(Vec::is_empty));
+                        let passed = decision && evidence;
                         let mut detail = json!({
-                            "passed": passed, "observed_outcome": report.outcome,
+                            "passed": passed, "decision": decision,
+                            "observed_outcome": report.outcome,
                             "path": report.path, "run_id": report.run_id,
                         });
-                        if !checks.is_empty() {
+                        if labeled {
+                            detail["evidence"] = json!(evidence);
                             detail["artifact_checks"] = checks.into_iter().map(|(step, (_, mismatches))| {
                                 json!({"step": step, "visited": mismatches.is_some(), "mismatched_fields": mismatches})
                             }).collect::<Value>();
                         }
-                        Verdict { ran: true, passed, detail }
+                        Verdict { ran: true, passed, decision, evidence: labeled.then_some(evidence), detail }
                     }
                     Err(error) => {
                         let live = self.inference.as_ref().is_some_and(|i| i.live_limit().is_some());
                         let error = error.to_string();
                         Verdict {
-                            ran: false, passed: false,
+                            ran: false, passed: false, decision: false, evidence: labeled.then_some(false),
                             detail: json!({"passed": false, "error": if live { report_error(error) } else { error }}),
                         }
                     }
@@ -1197,13 +1219,14 @@ tier = "T0"
                 }
             }
             if let Some(iac) = self.deps.iac {
-                iac.unregister_promotion_set(&binding.spirit_id);
+                iac.withdraw_spirit(&binding.spirit_id, binding.pid);
             }
-            self.deps
-                .pid_by_spirit_id
-                .write()
-                .unwrap()
-                .remove(&binding.spirit_id);
+            {
+                let mut map = self.deps.pid_by_spirit_id.write().unwrap();
+                if map.get(&binding.spirit_id) == Some(&binding.pid) {
+                    map.remove(&binding.spirit_id);
+                }
+            }
         }
         match (result, cleanup) {
             (Ok(_), Some(error)) => Err(error.into()),

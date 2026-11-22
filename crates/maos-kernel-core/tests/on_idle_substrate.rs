@@ -42,7 +42,10 @@ fn make_scb(enabled_hooks: Vec<String>, idle_window_ms: u32) -> Arc<SpiritContro
             yield_every_polls: 64,
             idle_window_ms,
         },
-        lifecycle: LifecycleSection { enabled_hooks },
+        lifecycle: LifecycleSection {
+            enabled_hooks,
+            telemetry: None,
+        },
         ..Default::default()
     };
     let scb = SpiritControlBlock::new(
@@ -217,6 +220,7 @@ fn rendezvous_scb(pid: u32, spirit: RendezvousSpirit) -> Arc<SpiritControlBlock>
         },
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["on_idle".into()],
+            telemetry: None,
         },
         ..Default::default()
     };

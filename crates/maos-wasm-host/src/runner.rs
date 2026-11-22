@@ -7,8 +7,16 @@
 //! # Usage
 //!
 //! ```text
-//! maos-wasm-runner --component <path.wasm> --fuel <n>
+//! maos-wasm-runner --held-component-fd <n> --held-component-device <dev> \
+//!     --held-component-inode <ino> --held-component-sha256 <hex> --fuel <n>
+//! maos-wasm-runner --component <path.wasm> --fuel <n>   # standalone local test only
 //! ```
+//!
+//! The first form is the governed launch: the kernel's dedicated WASM/T2 spawn keeps the
+//! verified read-only component file open on the descriptor number it already holds, in this
+//! child only, and appends the flags; no path is given or reopened. The second form is a
+//! standalone local-test interface and is mutually
+//! exclusive with the first; the governed route never emits it.
 //!
 //! # Architecture
 //!
@@ -108,8 +116,25 @@ fn main() -> ExitCode {
     }
 }
 
+/// Where the component bytes come from. The two are mutually exclusive.
+enum ComponentSource {
+    /// Governed launch: the verified open file the T2 spawn installed on a private descriptor.
+    Held(HeldHandoff),
+    /// Standalone local-test interface (`--component <path>`). The governed route never
+    /// emits it and the kernel's WASM spawn rejects it in generic argv.
+    LocalTestPath(String),
+}
+
+struct HeldHandoff {
+    fd: i32,
+    device: u64,
+    inode: u64,
+    /// Digest of the exact compilation bytes; mandatory for every governed launch.
+    sha256: [u8; 32],
+}
+
 struct RunnerArgs {
-    component_path: String,
+    source: ComponentSource,
     fuel: u64,
     #[cfg(all(feature = "runner-fault-inject", debug_assertions, target_os = "linux"))]
     forbidden_syscall_after_ready: bool,
@@ -131,38 +156,221 @@ impl From<String> for RunError {
 }
 
 fn parse_args() -> Result<RunnerArgs, String> {
-    let mut component_path = None;
+    let mut local_component = None;
+    let mut held_fd = None;
+    let mut held_device = None;
+    let mut held_inode = None;
+    let mut held_sha256 = None;
     let mut fuel = 10_000_000u64;
     #[cfg(all(feature = "runner-fault-inject", debug_assertions, target_os = "linux"))]
     let mut forbidden_syscall_after_ready = false;
     let mut iter = std::env::args().skip(1);
+    fn parsed<T: std::str::FromStr>(
+        iter: &mut impl Iterator<Item = String>,
+        flag: &str,
+    ) -> Result<T, String>
+    where
+        T::Err: std::fmt::Display,
+    {
+        let value = iter
+            .next()
+            .ok_or_else(|| format!("{flag} requires a value"))?;
+        value
+            .parse()
+            .map_err(|e| format!("invalid {flag} value '{value}': {e}"))
+    }
     while let Some(arg) = iter.next() {
         match arg.as_str() {
-            "--component" => {
-                component_path = Some(
-                    iter.next()
-                        .ok_or_else(|| "--component requires a value".to_string())?,
-                );
-            }
-            "--fuel" => {
+            "--component" => local_component = Some(parsed::<String>(&mut iter, &arg)?),
+            "--held-component-fd" => held_fd = Some(parsed::<i32>(&mut iter, &arg)?),
+            "--held-component-device" => held_device = Some(parsed::<u64>(&mut iter, &arg)?),
+            "--held-component-inode" => held_inode = Some(parsed::<u64>(&mut iter, &arg)?),
+            "--held-component-sha256" => {
                 let v = iter
                     .next()
-                    .ok_or_else(|| "--fuel requires a value".to_string())?;
-                fuel = v
-                    .parse()
-                    .map_err(|e| format!("invalid --fuel value '{v}': {e}"))?;
+                    .ok_or_else(|| "--held-component-sha256 requires a value".to_string())?;
+                held_sha256 = Some(
+                    parse_sha256_hex(&v)
+                        .map_err(|e| format!("invalid --held-component-sha256: {e}"))?,
+                );
             }
+            "--fuel" => fuel = parsed(&mut iter, &arg)?,
             #[cfg(all(feature = "runner-fault-inject", debug_assertions, target_os = "linux"))]
             "--test-forbidden-syscall-after-ready" => forbidden_syscall_after_ready = true,
             other => return Err(format!("unknown argument: {other}")),
         }
     }
+    let source = match (
+        local_component,
+        held_fd,
+        held_device,
+        held_inode,
+        held_sha256,
+    ) {
+        (Some(path), None, None, None, None) => ComponentSource::LocalTestPath(path),
+        (None, Some(fd), Some(device), Some(inode), Some(sha256)) => {
+            ComponentSource::Held(HeldHandoff {
+                fd,
+                device,
+                inode,
+                sha256,
+            })
+        }
+        (Some(_), ..) => {
+            return Err(
+                "--component (local test only) cannot be combined with --held-component-*"
+                    .to_string(),
+            )
+        }
+        _ => {
+            return Err(
+                "a governed launch requires --held-component-fd, --held-component-device, \
+                 --held-component-inode and --held-component-sha256"
+                    .to_string(),
+            )
+        }
+    };
     Ok(RunnerArgs {
-        component_path: component_path.ok_or_else(|| "--component is required".to_string())?,
+        source,
         fuel,
         #[cfg(all(feature = "runner-fault-inject", debug_assertions, target_os = "linux"))]
         forbidden_syscall_after_ready,
     })
+}
+
+/// Read cap for a component artifact.
+const MAX_COMPONENT_BYTES: u64 = 64 * 1024 * 1024;
+
+fn hex_nibble(c: u8) -> Result<u8, String> {
+    match c {
+        b'0'..=b'9' => Ok(c - b'0'),
+        b'a'..=b'f' => Ok(c - b'a' + 10),
+        b'A'..=b'F' => Ok(c - b'A' + 10),
+        _ => Err("non-hex digit".to_string()),
+    }
+}
+
+fn parse_sha256_hex(value: &str) -> Result<[u8; 32], String> {
+    let bytes = value.as_bytes();
+    if bytes.len() != 64 {
+        return Err(format!("expected 64 hex digits, got {}", bytes.len()));
+    }
+    let mut digest = [0u8; 32];
+    for (slot, pair) in digest.iter_mut().zip(bytes.chunks_exact(2)) {
+        *slot = (hex_nibble(pair[0])? << 4) | hex_nibble(pair[1])?;
+    }
+    Ok(digest)
+}
+
+/// Read the component from the open `file` and close it. `identity` is the admitted
+/// `(st_dev, st_ino)` the handle must match; `expected_sha256` is the signed digest of the
+/// exact bytes compiled. The read starts at offset zero because the admitting side may have
+/// left the shared offset at EOF.
+fn read_component(
+    mut file: std::fs::File,
+    #[cfg_attr(not(unix), allow(unused_variables))] identity: Option<(u64, u64)>,
+    expected_sha256: Option<[u8; 32]>,
+) -> Result<Vec<u8>, RunError> {
+    use std::io::{Seek, SeekFrom};
+    let metadata = file
+        .metadata()
+        .map_err(|e| RunError::InvalidComponent(e.to_string()))?;
+    if !metadata.is_file() {
+        return Err(RunError::InvalidComponent(
+            "component is not a regular file".into(),
+        ));
+    }
+    #[cfg(unix)]
+    if let Some((device, inode)) = identity {
+        use std::os::unix::fs::MetadataExt;
+        if metadata.dev() != device || metadata.ino() != inode {
+            return Err(RunError::InvalidComponent(
+                "held component does not match the admitted file identity".into(),
+            ));
+        }
+    }
+    if metadata.len() > MAX_COMPONENT_BYTES {
+        return Err(RunError::InvalidComponent(
+            "component exceeds 64 MiB cap".into(),
+        ));
+    }
+    file.seek(SeekFrom::Start(0))
+        .map_err(|e| RunError::InvalidComponent(format!("component seek: {e}")))?;
+    let mut wasm_bytes = Vec::new();
+    wasm_bytes
+        .try_reserve_exact(metadata.len() as usize)
+        .map_err(|e| RunError::InvalidComponent(format!("component buffer: {e}")))?;
+    (&mut file)
+        .take(metadata.len())
+        .read_to_end(&mut wasm_bytes)
+        .map_err(|e| RunError::InvalidComponent(format!("component read: {e}")))?;
+    let mut extra = [0u8; 1];
+    if wasm_bytes.len() as u64 != metadata.len()
+        || file
+            .read(&mut extra)
+            .map_err(|e| RunError::InvalidComponent(e.to_string()))?
+            != 0
+    {
+        return Err(RunError::InvalidComponent(
+            "component length changed during read".into(),
+        ));
+    }
+    // Close the artifact before any compilation or guest execution.
+    drop(file);
+    if let Some(expected) = expected_sha256 {
+        use sha2::{Digest, Sha256};
+        if Sha256::digest(&wasm_bytes).as_slice() != expected.as_slice() {
+            return Err(RunError::InvalidComponent(
+                "component bytes do not match the signed SHA-256".into(),
+            ));
+        }
+    }
+    Ok(wasm_bytes)
+}
+
+/// Consume the private governed handoff: the descriptor the T2 spawn installed for this
+/// process alone. No path is opened and no `/proc` reopen is attempted.
+fn read_held_component(handoff: &HeldHandoff) -> Result<Vec<u8>, RunError> {
+    #[cfg(unix)]
+    {
+        use std::os::fd::{FromRawFd, OwnedFd};
+        if handoff.fd <= 2 {
+            return Err(RunError::InvalidComponent(
+                "held component descriptor occupies a stdio slot".into(),
+            ));
+        }
+        // SAFETY: F_GETFL only reads the status flags of the numbered descriptor; no memory is passed.
+        let status = unsafe { libc::fcntl(handoff.fd, libc::F_GETFL) };
+        if status < 0 {
+            return Err(RunError::InvalidComponent(
+                "held component descriptor is not open".into(),
+            ));
+        }
+        #[cfg(target_os = "linux")]
+        let o_path = libc::O_PATH;
+        #[cfg(not(target_os = "linux"))]
+        let o_path = 0;
+        if status & libc::O_ACCMODE != libc::O_RDONLY || status & o_path != 0 {
+            return Err(RunError::InvalidComponent(
+                "held component descriptor is not read-only".into(),
+            ));
+        }
+        // SAFETY: the descriptor is open (checked above) and was installed for this process
+        // by the spawn handoff; nothing else in this process owns it, and it is taken once.
+        let file = std::fs::File::from(unsafe { OwnedFd::from_raw_fd(handoff.fd) });
+        read_component(
+            file,
+            Some((handoff.device, handoff.inode)),
+            Some(handoff.sha256),
+        )
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = handoff;
+        Err(RunError::InvalidComponent(
+            "held component transport is unsupported on this platform".into(),
+        ))
+    }
 }
 
 /// Maximum compile time allowed for `Component::new`/`Module::new` before
@@ -183,43 +391,17 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
         .build()
         .map_err(|e| RunError::Other(format!("ambient runtime: {e}")))?;
     let _ambient = ambient.enter();
-    // Read the opened file through a cap: metadata alone cannot bound a file
-    // changed between resolution and the contained runner's open.
-    const MAX_COMPONENT_BYTES: u64 = 64 * 1024 * 1024;
-    let mut file = std::fs::File::open(&args.component_path)
-        .map_err(|e| RunError::InvalidComponent(format!("cannot open component: {e}")))?;
-    let metadata = file
-        .metadata()
-        .map_err(|e| RunError::InvalidComponent(e.to_string()))?;
-    if !metadata.is_file() {
-        return Err(RunError::InvalidComponent(
-            "component is not a regular file".into(),
-        ));
-    }
-    if metadata.len() > MAX_COMPONENT_BYTES {
-        return Err(RunError::InvalidComponent(
-            "component exceeds 64 MiB cap".into(),
-        ));
-    }
-    let mut wasm_bytes = Vec::new();
-    wasm_bytes
-        .try_reserve_exact(metadata.len() as usize)
-        .map_err(|e| RunError::InvalidComponent(format!("component buffer: {e}")))?;
-    (&mut file)
-        .take(metadata.len())
-        .read_to_end(&mut wasm_bytes)
-        .map_err(|e| RunError::InvalidComponent(format!("component read: {e}")))?;
-    let mut extra = [0u8; 1];
-    if wasm_bytes.len() as u64 != metadata.len()
-        || file
-            .read(&mut extra)
-            .map_err(|e| RunError::InvalidComponent(e.to_string()))?
-            != 0
-    {
-        return Err(RunError::InvalidComponent(
-            "component length changed during read".into(),
-        ));
-    }
+    // Governed launches carry the verified open file on a private descriptor; only the
+    // standalone local-test interface names a path. Either way the file is read through
+    // a cap and closed before compilation, so no handle reaches guest execution.
+    let wasm_bytes = match &args.source {
+        ComponentSource::Held(handoff) => read_held_component(handoff)?,
+        ComponentSource::LocalTestPath(path) => {
+            let file = std::fs::File::open(path)
+                .map_err(|e| RunError::InvalidComponent(format!("cannot open component: {e}")))?;
+            read_component(file, None, None)?
+        }
+    };
 
     let mut engine_config = Config::new();
     engine_config.consume_fuel(true);

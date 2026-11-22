@@ -21,7 +21,9 @@ use std::process::Command;
 use maos_domain::invariants::i1::Scope;
 use maos_domain::invariants::i9::SandboxTier;
 
-use super::{Cleanup, SandboxSpec, SandboxedChild, SpawnError};
+use super::{
+    Cleanup, HeldComponentError, HeldWasmComponent, SandboxSpec, SandboxedChild, SpawnError,
+};
 /// Per-arch allow-list row: x86_64 legacy calls + `poll`; aarch64 `ppoll` (17-6) + `membarrier` (wasmtime icache sync, 17-3c CI repair).
 #[cfg(target_arch = "x86_64")]
 #[rustfmt::skip]
@@ -33,10 +35,65 @@ const ARCH_SYSCALLS: &[i64] = &[libc::SYS_ppoll, libc::SYS_membarrier];
 #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
 const ARCH_SYSCALLS: &[i64] = &[];
 
+/// Validate a handle for the governed WASM handoff and keep the parent's copy
+/// close-on-exec: read-only access mode (not `O_PATH`), not a stdio slot.
+pub(super) fn prepare_held_component(file: &std::fs::File) -> Result<(), HeldComponentError> {
+    let fd = file.as_raw_fd();
+    if fd <= 2 {
+        return Err(HeldComponentError::Inspect(
+            "descriptor occupies a stdio slot".into(),
+        ));
+    }
+    // SAFETY: fcntl(F_GETFL) reads flags of a descriptor borrowed from `file`; no memory is passed.
+    let status = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+    if status < 0 {
+        return Err(HeldComponentError::Inspect(
+            io::Error::last_os_error().to_string(),
+        ));
+    }
+    if status & libc::O_ACCMODE != libc::O_RDONLY || status & libc::O_PATH != 0 {
+        return Err(HeldComponentError::NotReadOnly);
+    }
+    // SAFETY: fcntl(F_GETFD) reads descriptor flags of a live descriptor; no memory is passed.
+    let descriptor = unsafe { libc::fcntl(fd, libc::F_GETFD) };
+    if descriptor < 0 {
+        return Err(HeldComponentError::Inspect(
+            io::Error::last_os_error().to_string(),
+        ));
+    }
+    // SAFETY: fcntl(F_SETFD) sets the close-on-exec bit on a live descriptor; no memory is passed.
+    if descriptor & libc::FD_CLOEXEC == 0
+        && unsafe { libc::fcntl(fd, libc::F_SETFD, descriptor | libc::FD_CLOEXEC) } < 0
+    {
+        return Err(HeldComponentError::Inspect(
+            io::Error::last_os_error().to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Spawn the runner with `held` kept open on the descriptor number it already holds, in this
+/// child only (close-on-exec cleared in `pre_exec`; every other descriptor stays close-on-exec).
+pub(crate) fn spawn_sandboxed_with_held_component(
+    spec: &SandboxSpec,
+    command: &mut Command,
+    held: &HeldWasmComponent,
+) -> Result<SandboxedChild, SpawnError> {
+    spawn_with_handoff(spec, command, Some(held.file.as_raw_fd()))
+}
+
 /// Spawn a sandboxed child on Linux.
 pub fn spawn_sandboxed(
     spec: &SandboxSpec,
     command: &mut Command,
+) -> Result<SandboxedChild, SpawnError> {
+    spawn_with_handoff(spec, command, None)
+}
+
+fn spawn_with_handoff(
+    spec: &SandboxSpec,
+    command: &mut Command,
+    held_fd: Option<std::os::fd::RawFd>,
 ) -> Result<SandboxedChild, SpawnError> {
     let tier = spec.tier;
     let scopes = spec.declared_scopes.clone();
@@ -125,6 +182,18 @@ pub fn spawn_sandboxed(
                         libc::write(2, msg.as_ptr() as *const _, msg.len());
                         return Err(io::Error::last_os_error());
                     }
+                }
+            }
+            // --- Held component handoff (after Landlock consumed its ruleset fd, before
+            // seccomp): clear close-on-exec on the one owned descriptor, in this child only.
+            // The number is the one the open file already holds in the parent, so it cannot
+            // collide with another descriptor, including spawn's internal status channel.
+            if let Some(source) = held_fd {
+                if source <= 2 {
+                    return Err(io::Error::from_raw_os_error(libc::EBADF));
+                }
+                if libc::fcntl(source, libc::F_SETFD, 0) < 0 {
+                    return Err(io::Error::last_os_error());
                 }
             }
             // --- seccomp-bpf (syscall allow-list) ---

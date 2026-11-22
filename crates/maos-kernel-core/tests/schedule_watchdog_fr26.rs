@@ -81,7 +81,10 @@ fn make_scb(
     counter: Arc<AtomicU32>,
 ) -> Arc<SpiritControlBlock> {
     let manifest = SpiritManifestBundle {
-        lifecycle: LifecycleSection { enabled_hooks },
+        lifecycle: LifecycleSection {
+            enabled_hooks,
+            telemetry: None,
+        },
         schedules: SchedulesSection { entries: schedules },
         ..Default::default()
     };
@@ -922,4 +925,183 @@ async fn schedule_poll_once_reports_a_suppressed_fire() {
     );
     assert_eq!(counter.load(Ordering::SeqCst), 0);
     assert_eq!(rows_of(&tl, pid, "schedule.suppressed:suppressed").len(), 1);
+}
+
+/// Explicit release latch for a held hook: `wait` blocks the hook thread until
+/// `release` (idempotent) or a generous failure bound, so a failed test can
+/// never leak a blocked thread.
+struct Gate {
+    open: std::sync::Mutex<bool>,
+    cv: std::sync::Condvar,
+}
+
+impl Gate {
+    const FAILURE_BOUND: std::time::Duration = std::time::Duration::from_secs(20);
+
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            open: std::sync::Mutex::new(false),
+            cv: std::sync::Condvar::new(),
+        })
+    }
+
+    fn release(&self) {
+        *self.open.lock().unwrap_or_else(|e| e.into_inner()) = true;
+        self.cv.notify_all();
+    }
+
+    fn wait(&self) {
+        let guard = self.open.lock().unwrap_or_else(|e| e.into_inner());
+        drop(
+            self.cv
+                .wait_timeout_while(guard, Self::FAILURE_BOUND, |open| !*open)
+                .unwrap_or_else(|e| e.into_inner()),
+        );
+    }
+}
+
+/// Releases the gate when dropped, so an unwinding test frees the held worker.
+struct ReleaseOnDrop(Arc<Gate>);
+
+impl Drop for ReleaseOnDrop {
+    fn drop(&mut self) {
+        self.0.release();
+    }
+}
+
+/// Story 21-9 AC8 — `on_schedule` that holds its (blocking) hook thread until
+/// the test releases `gate`, so a test can observe whether later polls
+/// progress behind it.
+struct SlowSpirit {
+    started: Arc<AtomicU32>,
+    finished: Arc<AtomicU32>,
+    active: Arc<AtomicU32>,
+    max_active: Arc<AtomicU32>,
+    gate: Arc<Gate>,
+}
+
+impl maos_spirit_abi::lifecycle::Spirit for SlowSpirit {
+    fn on_schedule(
+        &self,
+        _ctx: &mut maos_spirit_abi::ctx::Ctx,
+        _payload: &maos_spirit_abi::lifecycle::SchedulePayload<'_>,
+    ) {
+        self.started.fetch_add(1, Ordering::SeqCst);
+        let now = self.active.fetch_add(1, Ordering::SeqCst) + 1;
+        self.max_active.fetch_max(now, Ordering::SeqCst);
+        self.gate.wait();
+        self.active.fetch_sub(1, Ordering::SeqCst);
+        self.finished.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+/// Story 21-9 AC8 — a slow earlier hook does not hold back a later poll of an
+/// independent Spirit, the slow entry is never dispatched twice concurrently,
+/// no firing is left reserved once shutdown joins, and shutdown joins the
+/// hook that was still running.
+#[tokio::test]
+async fn schedule_21_9_slow_hook_does_not_block_later_polls_or_duplicate() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let started = Arc::new(AtomicU32::new(0));
+    let finished = Arc::new(AtomicU32::new(0));
+    let active = Arc::new(AtomicU32::new(0));
+    let max_active = Arc::new(AtomicU32::new(0));
+    let gate = Gate::new();
+    let release = ReleaseOnDrop(Arc::clone(&gate));
+    let manifest = |schedules: Vec<ScheduleEntry>| SpiritManifestBundle {
+        lifecycle: LifecycleSection {
+            enabled_hooks: vec!["on_schedule".into()],
+            telemetry: None,
+        },
+        schedules: SchedulesSection { entries: schedules },
+        ..Default::default()
+    };
+    let slow = SpiritControlBlock::new(
+        41,
+        "slow".into(),
+        manifest(vec![entry("slow", 1, 3600, vec![])]),
+        make_spirit_obj(SlowSpirit {
+            started: Arc::clone(&started),
+            finished: Arc::clone(&finished),
+            active: Arc::clone(&active),
+            max_active: Arc::clone(&max_active),
+            gate: Arc::clone(&gate),
+        }),
+        0,
+    );
+    slow.state
+        .store(ScbLifecycleState::Running as u8, Ordering::Release);
+    let fast_counter = Arc::new(AtomicU32::new(0));
+    let fast = make_scb(
+        42,
+        "fast",
+        vec!["on_schedule".into()],
+        vec![entry("fast", 1, 3600, vec![])],
+        Arc::clone(&fast_counter),
+    );
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().unwrap().insert(41, Arc::new(slow));
+    scbs.write().unwrap().insert(42, fast);
+
+    let (dispatcher, tl) = make_dispatcher();
+    std::env::set_var("MAOS_SCHEDULE_FAST", "1");
+    let watchdog = Arc::new(ScheduleWatchdog::new(scbs, dispatcher, tl));
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let handle = Arc::clone(&watchdog).spawn(cancel.child_token());
+
+    // Failure bound only: no assertion depends on elapsed time.
+    let deadline = std::time::Instant::now() + Gate::FAILURE_BOUND;
+    let step = tokio::time::Duration::from_millis(2);
+    while started.load(Ordering::SeqCst) == 0 && std::time::Instant::now() < deadline {
+        tokio::time::sleep(step).await;
+    }
+    // The slow hook has entered and is held. Count only fast firings that
+    // happen after that point: each is a later poll that progressed behind it.
+    let fast_at_entry = fast_counter.load(Ordering::SeqCst);
+    while fast_counter.load(Ordering::SeqCst) < fast_at_entry + 3
+        && std::time::Instant::now() < deadline
+    {
+        tokio::time::sleep(step).await;
+    }
+    let started_held = started.load(Ordering::SeqCst);
+    let finished_held = finished.load(Ordering::SeqCst);
+    let fast_after = fast_counter.load(Ordering::SeqCst);
+    let reserved_held = watchdog.in_flight_len();
+
+    // Natural shutdown: cancel, then release the held worker so the join owns
+    // its completion.
+    cancel.cancel();
+    release.0.release();
+    let joined = tokio::time::timeout(tokio::time::Duration::from_secs(3), handle).await;
+
+    assert_eq!(
+        started_held, 1,
+        "slow entry dispatched exactly once while held"
+    );
+    assert_eq!(finished_held, 0, "slow hook still in flight while held");
+    assert!(
+        fast_after >= fast_at_entry + 3,
+        "later polls must progress behind the held slow hook (fast fired {} after entry)",
+        fast_after - fast_at_entry
+    );
+    assert!(reserved_held >= 1, "the held slow firing stays reserved");
+    assert!(
+        joined.is_ok() && joined.unwrap().is_ok(),
+        "shutdown must join the released in-flight hook"
+    );
+    assert_eq!(
+        finished.load(Ordering::SeqCst),
+        started.load(Ordering::SeqCst),
+        "shutdown joined every started hook"
+    );
+    assert_eq!(
+        max_active.load(Ordering::SeqCst),
+        1,
+        "no concurrent duplicate"
+    );
+    assert_eq!(
+        watchdog.in_flight_len(),
+        0,
+        "no reservation outlives shutdown"
+    );
 }

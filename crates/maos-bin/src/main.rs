@@ -2127,14 +2127,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err(format!("memory-root create failed: {e}").into());
     }
 
-    let private_store = Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
-        memory_root,
-        4 * 1024,
-    ));
-    let shared_store = Arc::new(
-        maos_kernel_core::memory::shared::SharedMemoryStore::open(&memory_db_path)
-            .map_err(|e| format!("failed to open shared memory store: {e}"))?,
-    );
+    // FR28: both stores carry the operator-resolved quota.
+    let (private_store, shared_store) =
+        maos_kernel_core::memory::open_stores(memory_root, 4 * 1024, &memory_db_path)
+            .map_err(|e| format!("failed to open shared memory store: {e}"))?;
     let principal_index = Arc::new(
         maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&memory_db_path)
             .map_err(|e| format!("failed to open principal index: {e}"))?,
@@ -2774,11 +2770,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Story 6.4 — install the TransparencyLogAdapter on the Mailbox so the
     // Phase 1.5 consent-rupture quarantine row can be written BEFORE the
-    // ConsentRupture frame is emitted (I2 log-before-deliver). The default
-    // ConsentGate (`None`) preserves existing behavior; operator-supplied
-    // gates can be installed via `mailbox.install_consent_gate(...)`.
+    // ConsentRupture frame is emitted (I2 log-before-deliver).
     let _ = mailbox.install_transparency_log(Arc::clone(&transparency_log));
     eprintln!("maos: Mailbox TL installer wired (Story 6.4)");
+
+    // Story 21-7 — the production consent gate, set-once, over the one policy the session
+    // granter also reads (the admitted Spirits' `[consent.recall]` declarations). A failed
+    // install is a boot error, like the recipient resolver's.
+    mailbox
+        .install_consent_gate(Arc::clone(iac.consent_policy()) as _)
+        .map_err(|()| "consent gate installed twice")?;
+    eprintln!("maos: Mailbox consent gate wired (Story 21-7)");
 
     // j1-crosshost-1a AC2.1-2.3 — the A2A delegation leg, installed HERE (beside
     // the TL installer) and not at the mailbox construction site, because the
@@ -3060,6 +3062,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc::clone(&telemetry),
             Arc::clone(&shared_journal),
         )
+        .with_memory(Arc::clone(&memory))
         .with_replica_resolver(Arc::clone(&replica_resolver)),
     );
     let scheduler_mut =
@@ -3380,6 +3383,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         manifest,
                         factory_successor_slot.peek(),
                         factory_successor_slot.peek_origin(),
+                        factory_successor_slot.take_artifact().and_then(|held| {
+                            held.downcast::<maos_bin::spirit_session::LaunchArtifact>()
+                                .ok()
+                                .map(|artifact| *artifact)
+                        }),
                     )
                 })
                 .map_err(|reason| {
@@ -4567,6 +4575,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             &selected_crypto,
             boot_nonce,
+            shell_mode,
             #[cfg(feature = "wasm-host")]
             spirit_host.as_deref(),
             #[cfg(feature = "wasm-host")]
@@ -6485,6 +6494,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 classify_spirit(name).is_some()
             })
             .map_err(|refusal| format!("maos run: {refusal}"))?;
+            #[cfg(feature = "wasm-host")]
+            let mut held_component = maos_bin::spirit_session::bind_registry_launch(
+                &mut gated,
+                std::path::Path::new(&run.manifest_path),
+            )?;
+            #[cfg(not(feature = "wasm-host"))]
             gated.bind_registry_package_at(std::path::Path::new(&run.manifest_path))?;
             maos_bin::admission::check_gated_pins(&gated, provider_catalog.get())
                 .map_err(|refusal| refusal.to_string())?;
@@ -6498,11 +6513,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
             #[cfg(feature = "wasm-host")]
             let mut spawned_launch = if wasm {
-                Some(maos_bin::spirit_session::manifest_launch(
+                Some(maos_bin::spirit_session::manifest_launch_for(
                     spirit_host.as_deref().ok_or("WASM host is unavailable")?,
                     &gated,
                     std::path::Path::new(&run.manifest_path),
                     run.once,
+                    held_component.take(),
                 )?)
             } else {
                 None
@@ -10381,11 +10397,68 @@ struct BinPrivateOpsImpl {
     schedule_watchdog: Arc<maos_kernel_core::scheduler::ScheduleWatchdog>,
 }
 
+/// Acquire, once, the component the WASM manifest `text` declares. `source` is the original
+/// path the manifest was read from (never a private snapshot): a signed package there is
+/// verified and the component that verification acquired is handed over directly, matched to
+/// the gated manifest, id and version; a source that carries a package never falls back to a
+/// local open. An unsigned source is opened locally under `origin`. `pin` is a digest the
+/// bytes must have.
+#[cfg(feature = "wasm-host")]
+fn acquire_source_launch(
+    text: &str,
+    source: Option<&std::path::Path>,
+    origin: &std::path::Path,
+    pin: Option<[u8; 32]>,
+) -> Result<maos_bin::spirit_session::LaunchArtifact, maos_bin::admission::AdmissionRefusal> {
+    use maos_bin::admission::AdmissionRefusal;
+    use maos_bin::spirit_session::LaunchArtifact;
+    let class_build = |detail: String| AdmissionRefusal::ClassBuild {
+        detail: format!("under {}: {detail}", origin.display()),
+    };
+    let gated = maos_bin::admission::gate_manifest(text, &|_| false)?;
+    let signed = source
+        .map(|source| maos_registry::install::signed_package_at_launch(&gated.spirit_id, source))
+        .transpose()
+        .map_err(|error| AdmissionRefusal::from_registry_error(&*error))?
+        .flatten();
+    if let Some((package, component)) = signed {
+        if package.manifest_toml != text.as_bytes()
+            || package.version != gated.class_section.version
+        {
+            return Err(AdmissionRefusal::Admission {
+                detail: "registry manifest differs from its signed package".into(),
+            });
+        }
+        let component = component
+            .ok_or_else(|| class_build("the signed package carries no component".into()))?;
+        if pin.is_some_and(|pin| pin != component.artifact_sha256()) {
+            return Err(class_build(
+                "the signed component differs from the digest it was pinned to".into(),
+            ));
+        }
+        return Ok(LaunchArtifact::from_verified(component, &gated)?);
+    }
+    let name = gated
+        .class_section
+        .artifact
+        .as_deref()
+        .ok_or_else(|| class_build("WASM manifest has no artifact".into()))?;
+    Ok(LaunchArtifact::acquire_local(origin, name, pin)?)
+}
+
+#[cfg(feature = "wasm-host")]
+fn swap_context_of(
+    slot: &maos_bin::spawned_lifecycle::SwapSlot,
+    spirit_id: &str,
+) -> Option<maos_bin::spawned_lifecycle::SwapContext> {
+    slot.get()?.target(spirit_id)?.lifecycle().swap_context()
+}
+
 #[cfg(feature = "network")]
 #[async_trait::async_trait]
 impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
-    fn forget_promotion_set(&self, spirit_id: &str) {
-        self.iac.unregister_promotion_set(spirit_id);
+    fn forget_promotion_set(&self, spirit_id: &str, pid: u32) {
+        self.iac.withdraw_spirit(spirit_id, pid);
     }
 
     async fn append_lifecycle_journal(
@@ -10489,14 +10562,14 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
             original_target,
             policy,
             |path, source| {
-                enforce_vetted_upgrade_precondition(spirit_id, path, evidence).map_err(
-                    |detail| maos_bin::operator_door::UpgradeFailure {
-                        code: "vetting_precondition_failed",
-                        detail,
-                        invalid: true,
-                        conflict: false,
-                    },
-                )?;
+                let refused = |code, detail| maos_bin::operator_door::UpgradeFailure {
+                    code,
+                    detail,
+                    invalid: true,
+                    conflict: false,
+                };
+                enforce_vetted_upgrade_precondition(spirit_id, path, evidence)
+                    .map_err(|detail| refused("vetting_precondition_failed", detail))?;
                 // The final hop is the door's private snapshot; its `artifact` stays where the
                 // operator named the target. An intermediate hop is the plan's own file.
                 let origin = if source == target_manifest {
@@ -10509,8 +10582,67 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                     || std::path::PathBuf::from("."),
                     std::path::Path::to_path_buf,
                 );
+                // The component this exact hop launches is acquired here, once, and carried
+                // to the successor factory. A signed source (the final hop's original target,
+                // or an intermediate hop's own file) hands over the component its own
+                // verification acquired; only an unsigned source is opened locally.
+                #[cfg(feature = "wasm-host")]
+                let held: Option<maos_bin::operator_door::HeldLaunch> = {
+                    let text = maos_bin::admission::read_manifest(path)
+                        .map_err(|error| refused("component_artifact_refused", error.to_string()))?;
+                    // The hop's declared form is compared with the live Spirit's form before
+                    // any component is opened: a form change at a pid is a typed mismatch that
+                    // preserves the predecessor, never an artifact-access refusal. The live
+                    // form is read from the coordinator's current session handles, per hop.
+                    if let Ok(class) = maos_bin::admission::manifest_identity(&text) {
+                        let hop_spawned = !class.forms.iter().any(|form| form == "rust-inproc");
+                        let live_spawned = self
+                            .swap_slot
+                            .get()
+                            .is_some_and(|handles| handles.target(spirit_id).is_some());
+                        if hop_spawned != live_spawned {
+                            let form = |spawned: bool| if spawned { "spawned" } else { "in-process" };
+                            return Err(maos_bin::operator_door::UpgradeFailure {
+                                code: "swap_form_mismatch",
+                                detail: format!(
+                                    "swap_form_mismatch: '{spirit_id}' is {} and the successor is {}",
+                                    form(live_spawned),
+                                    form(hop_spawned)
+                                ),
+                                invalid: false,
+                                conflict: true,
+                            });
+                        }
+                    }
+                    if maos_bin::admission::is_spawned_form(&text) {
+                        let (signed_source, pin) = if source == target_manifest {
+                            (
+                                original_target,
+                                evidence.package.map(|package| {
+                                    <[u8; 32]>::from(<sha2::Sha256 as sha2::Digest>::digest(
+                                        &package.artifact_bytes,
+                                    ))
+                                }),
+                            )
+                        } else {
+                            (source, None)
+                        };
+                        let launch = acquire_source_launch(&text, Some(signed_source), &origin, pin)
+                            .map_err(|refusal| match refusal.code() {
+                                code @ "wasm_transport_unsupported" => {
+                                    refused(code, refusal.to_string())
+                                }
+                                _ => refused("component_artifact_refused", refusal.to_string()),
+                            })?;
+                        Some(Box::new(launch) as maos_bin::operator_door::HeldLaunch)
+                    } else {
+                        None
+                    }
+                };
+                #[cfg(not(feature = "wasm-host"))]
+                let held: Option<maos_bin::operator_door::HeldLaunch> = None;
                 self.successor_manifest_slot
-                    .stage_at(path.to_path_buf(), origin);
+                    .stage_at(path.to_path_buf(), origin, held);
                 Ok(())
             },
             |text| self.record_upgraded_manifest(spirit_id, text),
@@ -10640,9 +10772,20 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         &self,
         manifest: &std::path::Path,
         origin: &std::path::Path,
+        held: maos_bin::operator_door::HeldLaunch,
     ) -> Result<maos_bin::admission::Admitted, maos_bin::admission::AdmissionRefusal> {
+        let artifact = *held
+            .downcast::<maos_bin::spirit_session::LaunchArtifact>()
+            .map_err(|_| maos_bin::admission::AdmissionRefusal::ClassBuild {
+                detail: "held_component_refused: not a launch artifact".into(),
+            })?;
         let text = maos_bin::admission::read_manifest(manifest)?;
-        let gated = self.prepare_spawned_restore(manifest, &text, origin)?;
+        let mut gated = self.prepare_spawned_restore(manifest, &text, origin)?;
+        // The publisher the held component was verified (or restored) under binds the
+        // snapshot: it has no package beside it, so it is never looked up there.
+        if let Some(publisher) = artifact.publisher() {
+            gated.bind_registry_publisher(&publisher);
+        }
         let handles = self.swap_slot.get().ok_or(
             maos_bin::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
                 surface: "operator door",
@@ -10666,6 +10809,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                 &gated,
                 manifest,
                 origin,
+                artifact,
             )
             .await
             .map_err(|refusal| {
@@ -10689,7 +10833,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         &self,
         manifest: &std::path::Path,
         manifest_toml: &str,
-        origin: &std::path::Path,
+        _origin: &std::path::Path,
     ) -> Result<maos_bin::admission::GatedManifest, maos_bin::admission::AdmissionRefusal> {
         let mut gated = maos_bin::admission::gate_manifest(manifest_toml, &|_| false)?;
         gated.bind_registry_package_at(manifest)?;
@@ -10701,25 +10845,63 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                 },
             );
         }
-        // The artifact must still be where the Spirit was launched from (and stay inside that
-        // directory), or the restore of a refused cold swap would leave the Spirit absent.
-        let artifact = gated.class_section.artifact.as_deref().unwrap_or_default();
-        maos_bin::spirit_session::resolve_artifact(origin, artifact).map_err(|error| {
-            maos_bin::admission::AdmissionRefusal::ClassBuild {
-                detail: format!("under {}: {error}", origin.display()),
-            }
-        })?;
         Ok(gated)
+    }
+
+    /// The component a cold swap (or its restore) launches, acquired once under `origin` before
+    /// any unload and carried through the launch. An artifact that is absent, escapes `origin`,
+    /// or differs from `pin` is refused typed here.
+    #[cfg(feature = "wasm-host")]
+    fn acquire_spawned_artifact(
+        &self,
+        _manifest: &std::path::Path,
+        manifest_toml: &str,
+        origin: &std::path::Path,
+        source: Option<&std::path::Path>,
+        pin: Option<[u8; 32]>,
+    ) -> Result<maos_bin::operator_door::HeldLaunch, maos_bin::admission::AdmissionRefusal> {
+        use maos_bin::operator_door::BinPrivateOps as _;
+        let artifact = acquire_source_launch(manifest_toml, source, origin, pin)?;
+        let id = maos_bin::admission::peek_spirit_id_from_str(manifest_toml);
+        if artifact.publisher() != id.and_then(|id| self.spawned_publisher(&id)) {
+            return Err(maos_bin::admission::AdmissionRefusal::ClassBuild {
+                detail: maos_bin::spirit_session::SWAP_PUBLISHER_CHANGED.into(),
+            });
+        }
+        Ok(Box::new(artifact))
+    }
+
+    #[cfg(feature = "wasm-host")]
+    fn spawned_artifact_sha256(&self, spirit_id: &str) -> Option<[u8; 32]> {
+        swap_context_of(&self.swap_slot, spirit_id)?.artifact_sha256
+    }
+
+    #[cfg(feature = "wasm-host")]
+    fn spawned_publisher(&self, spirit_id: &str) -> Option<[u8; 32]> {
+        swap_context_of(&self.swap_slot, spirit_id)?.verified_publisher
+    }
+
+    #[cfg(feature = "wasm-host")]
+    fn acquire_spawned_restore(
+        &self,
+        _manifest: &std::path::Path,
+        manifest_toml: &str,
+        origin: &std::path::Path,
+        pin: [u8; 32],
+        publisher: Option<[u8; 32]>,
+    ) -> Result<maos_bin::operator_door::HeldLaunch, maos_bin::admission::AdmissionRefusal> {
+        // The exact recorded bytes (digest-pinned, opened locally: the staged name is never
+        // consulted for provenance) re-enter with the publisher verified at first launch.
+        let mut artifact = acquire_source_launch(manifest_toml, None, origin, Some(pin))?;
+        if let Some(publisher) = publisher {
+            artifact = artifact.restored_under(publisher, pin)?;
+        }
+        Ok(Box::new(artifact))
     }
 
     #[cfg(feature = "wasm-host")]
     fn spawned_origin(&self, spirit_id: &str) -> Option<std::path::PathBuf> {
-        self.swap_slot
-            .get()?
-            .target(spirit_id)?
-            .lifecycle()
-            .swap_context()
-            .map(|context| context.origin)
+        swap_context_of(&self.swap_slot, spirit_id).map(|context| context.origin)
     }
 
     #[cfg(feature = "wasm-host")]
@@ -10754,6 +10936,20 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
 
     fn migration_plan_pending(&self, spirit_id: &str) -> bool {
         migration_plan::plan_pending(spirit_id)
+    }
+
+    fn widens_promotion(&self, spirit_id: &str, text: &str) -> bool {
+        let fr8 = maos_bin::admission::manifest_identity(text).is_ok_and(|class| {
+            class.manifest_schema_version >= maos_manifest::FR8_DECLARATIONS_SINCE_SCHEMA
+        });
+        let section = toml::from_str::<toml::Value>(text)
+            .ok()
+            .filter(|_| fr8)
+            .and_then(|root| toml::to_string(root.get("intent_promotion_set")?).ok())
+            .and_then(|body| maos_manifest::IntentPromotionSetSection::from_toml_str(&body).ok());
+        self.iac.promotion_set_of(spirit_id).is_some_and(|held| {
+            !section.is_some_and(|section| section.to_allowed_set().is_subset_of(&held))
+        })
     }
 
     fn butler_principal(&self) -> Option<String> {
@@ -14963,6 +15159,7 @@ async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
     let manifest = SpiritManifestBundle {
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["on_schedule".into()],
+            telemetry: None,
         },
         schedules: SchedulesSection {
             entries: vec![entry],

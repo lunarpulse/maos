@@ -5,6 +5,8 @@ package=$2
 suffix=$3
 scratch=$(mktemp -d /tmp/maos-deb.XXXXXX)
 trap 'rm -rf "$scratch"' EXIT
+pubkey=$(python3 -c 'import pathlib,re,sys; print(re.search(r"RELEASE_PUBKEY := ([0-9a-f]{64})",pathlib.Path(sys.argv[1],"recipes/debian/rules").read_text())[1])' "$dist")
+python3 packaging/verify-release.py --directory "$dist" --pubkey "$pubkey" "maos-$suffix" "maosctl-$suffix" "maos-spirit-$suffix" "maos-registry-server-$suffix" "maos-wasm-runner-$suffix"
 sudo dpkg -i "$package"
 version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml","rb"))["workspace"]["package"]["version"])')
 maos --version | tee "$scratch/version"
@@ -30,7 +32,7 @@ for row in receipt['roots']:
         assert not pathlib.Path(row['path']).exists(), row
 PY
 sudo dpkg -r maos
-for bin in maos maosctl maos-spirit maos-registry-server; do test ! -e "/usr/bin/$bin"; done
+for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do test ! -e "/usr/bin/$bin"; done
 set +e
 dpkg -L maos > "$scratch/list" 2> "$scratch/list.err"
 rc=$?

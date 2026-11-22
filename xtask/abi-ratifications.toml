@@ -327,6 +327,16 @@ adr_ref = "ADR-045,ADR-069"
 status = "proposed"
 covered_changes = ["CLI_WRAPPER_SCHEMA_VERSION", "MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION", "MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION", "CliWrapperConfig::take_schema_version", "CliWrapperAdmissionError::ECliWrapperSchemaUnsupported"]
 
+# Story 21-9 AC9 — operator ratified this schema contract on 2026-11-21.
+# This decision does not waive the independent D-E20-6 review or authorize release.
+[[ratification]]
+proposal_id = "21-9-manifest-schema-8"
+summary = "MANIFEST_SCHEMA_VERSION 7→8; optional strict [lifecycle.telemetry] {scope = \"scalar.tap.*\", time_cap_seconds = 1..=5} is required for an explicit on_telemetry_event listing; below schema 8 a listing or table is refused (no degradation); effective overall cap defaults to 30 s without [budget]; no new Scope variant, ABI_VERSION and guest wire unchanged"
+adr_ref = "ADR-045,ADR-069"
+status = "ratified"
+covered_changes = ["MANIFEST_SCHEMA_VERSION", "LifecycleSection", "RawLifecycleSection", "TelemetrySubscription", "validate_telemetry_subscription"]
+ratified_at = "2026-11-21"
+
 # later-registry-quarantine-closure D-LRQC-04 A (operator-approved 2026-11-21) — PROPOSED (never
 # self-ratified). `[cli_wrapper]` schema 2 requires the Worker's CRL-addressable identity
 # (`class_name` + `class_version`); schema 1 manifests still load and cannot carry it.

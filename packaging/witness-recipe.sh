@@ -54,14 +54,14 @@ case "$route" in
     cat "$scratch/negative.log"
     grep -F InvalidSignature "$scratch/negative.log"
     ! rpm -q maos
-    for bin in maos maosctl maos-spirit maos-registry-server; do test ! -e "/usr/bin/$bin"; done
+    for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do test ! -e "/usr/bin/$bin"; done
     restore
     "$root/packaging/build-packages.sh" "$dist" rpm "$scratch/good"
     rpm -i "$scratch/good"/*.rpm
     /usr/bin/maos --version
     python3 "$root/packaging/check-installed.py" "$dist" /usr/bin linux-amd64
     rpm -e maos
-    for bin in maos maosctl maos-spirit maos-registry-server; do test ! -e "/usr/bin/$bin"; done
+    for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do test ! -e "/usr/bin/$bin"; done
     rpm --eval "%{lua:print(rpm.vercmp(\"1.0.0~rc.1\",\"1.0.0\"))}" | python3 -c 'import sys; assert int(sys.stdin.read()) < 0'
     ;;
   arch)
@@ -75,7 +75,7 @@ case "$route" in
     cat "$scratch/negative.log"
     grep -F InvalidSignature "$scratch/negative.log"
     ! pacman -Q maos
-    for bin in maos maosctl maos-spirit maos-registry-server; do test ! -e "/usr/bin/$bin"; done
+    for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do test ! -e "/usr/bin/$bin"; done
     restore
     cp "$dist/recipes/PKGBUILD" "$scratch/good/"
     (cd "$scratch/good" && sudo -u builder makepkg -si --noconfirm)
@@ -89,7 +89,7 @@ case "$route" in
       test "$(vercmp "$actual" "$actual")" -eq 0
     fi
     pacman -R --noconfirm maos
-    for bin in maos maosctl maos-spirit maos-registry-server; do test ! -e "/usr/bin/$bin"; done
+    for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do test ! -e "/usr/bin/$bin"; done
     ;;
   brew)
     brew tap-new maos/verify
@@ -102,7 +102,7 @@ case "$route" in
     grep -F InvalidSignature "$scratch/negative.log"
     ! brew list --formula maos >/dev/null 2>&1
     prefix=$(brew --prefix)/opt/maos
-    for bin in maos maosctl maos-spirit maos-registry-server; do test ! -e "$prefix/bin/$bin"; done
+    for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do test ! -e "$prefix/bin/$bin"; done
     restore
     cp "$dist/recipes/maos.rb" "$tap/Formula/maos.rb"
     HOMEBREW_NO_INSTALL_CLEANUP=1 brew install --build-from-source maos/verify/maos
@@ -116,7 +116,7 @@ case "$route" in
     python3 "$root/packaging/check-installed.py" "$dist" "$(brew --prefix maos)/bin" linux-amd64
     prefix=$(brew --prefix maos)
     brew uninstall maos
-    for bin in maos maosctl maos-spirit maos-registry-server; do test ! -e "$prefix/bin/$bin"; done
+    for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do test ! -e "$prefix/bin/$bin"; done
     brew untap maos/verify
     test "$audit_status" -eq 0
     ;;

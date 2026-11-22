@@ -240,13 +240,13 @@ pub fn known_spirit_pids(policy: &PolicyTable) -> Vec<u32> {
 }
 
 pub fn apply_fail_closed_outcome(policy: &PolicyTable, outcome: &FailClosedOutcome) {
-    let mut global: HashSet<String> = outcome.deny_keys.iter().cloned().collect();
-    global.extend(outcome.subject_denies.global.iter().cloned());
-
-    let mut inner = (*policy.inner().load_full()).clone();
-    inner.operator_policy.per_capability_deny = global;
-    inner.operator_policy.per_spirit_capability_deny = outcome.subject_denies.per_spirit.clone();
-    policy.update(inner);
+    policy.mutate(|inner| {
+        let mut global: HashSet<String> = outcome.deny_keys.iter().cloned().collect();
+        global.extend(outcome.subject_denies.global.iter().cloned());
+        inner.operator_policy.per_capability_deny = global;
+        inner.operator_policy.per_spirit_capability_deny =
+            outcome.subject_denies.per_spirit.clone();
+    });
 }
 
 fn duration_nanos_u64(duration: Duration) -> u64 {

@@ -139,6 +139,9 @@ async fn orchestrator_executes_hot_and_migrator_with_fresh_successors() {
         .load("worker-hot", predecessor.clone(), CorpusSpirit, 0x1001)
         .await
         .expect("load hot predecessor");
+    harness.policy.mutate(|policy| {
+        policy.manifest_scopes.insert(pid, Default::default());
+    });
     harness
         .scheduler
         .start(pid)
@@ -181,6 +184,11 @@ async fn orchestrator_executes_hot_and_migrator_with_fresh_successors() {
         .load("worker-migrator", predecessor, CorpusSpirit, 0x1003)
         .await
         .expect("load migrator predecessor");
+    harness.policy.mutate(|policy| {
+        policy
+            .manifest_scopes
+            .insert(migrator_pid, Default::default());
+    });
     harness
         .scheduler
         .start(migrator_pid)

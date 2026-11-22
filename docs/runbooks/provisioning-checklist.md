@@ -111,6 +111,16 @@ than inherited from planning prose.
   **Dated note 2026-11-12:** under the operator ruling Hold 1 (pen-test) and Hold 2 (ECCN)
   are explicit claim boundaries with no GA effect; `RELEASE-HOLDS.md` remains the
   authority for what the release notes must state.
+- **WASM default-on export clauses (story 21-9 AC2, D-21-PF-08 A; no provisioning item, no counsel).**
+  `xtask/tests/decision_adrs_and_provisioning.rs` clauses (g) and (h) require
+  (g) the `STABILITY.md` `PRESERVED:export` fence to state exactly
+  `No ECCN determination was made; the surface is not classified.` and that the
+  default build includes Wasmtime with the engine-free build
+  (`--no-default-features --features network`) still supported; and (h)
+  `README.md` to document that default build and that engine-free command. Neither
+  clause is a legal claim: no counsel review, ECCN or EAR99 determination
+  exists, and no distribution permission is implied
+  (`docs/compliance/export-counsel-precondition.md`).
 - **Re-measured 2026-09-24 (work started):** the inventory rule still yields
   exactly seven names (`DOCKERHUB_TOKEN`, `DOCKERHUB_USERNAME`,
   `FUZZ_LEDGER_WRITE_TOKEN`, `MAOS_ANTHROPIC_API_KEY`, `MAOS_RELEASE_PUBKEY`,

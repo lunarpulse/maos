@@ -6,28 +6,29 @@ Two jobs (SCP 2026-11-12 section 5.B7c, option A):
 1. PER LANDING (`--check` / `--apply`): the kernel EXACT pin, after `cargo fmt --all`.
 
   xtask/kernel-core-baseline.toml        src_lines, [kernel_src] set_hash + per-file
-                                         digests, one HISTORY comment block
-  xtask/tests/kernel_pin_content_hash_16_0.rs   the four `src_lines` constants
+                                         digests (values only; no comment is written)
 
 2. AT A RETROSPECTIVE / THE B7c-A LANDING (`--rebase`): the per-crate CEILINGS.
 
   xtask/kloc.toml                        every crate row := measured + max(100,
-                                         ceil(0.02 * measured)); one dated
-                                         `# RE-BASED <date> (<reason>)` segment per
-                                         changed row. Per-crate rows are ceilings with
+                                         ceil(0.02 * measured)); only the value
+                                         changes, comments are kept as they are.
+                                         Per-crate rows are ceilings with
                                          stated headroom, NOT per-landing exact pins:
                                          `--check`/`--apply` never touch them. The
                                          zero-headroom `maos-kernel-core` row is HELD
                                          (never raised; `--lower-kernel` lowers it to
                                          its measured value).
 
+History is the commit message: `--note` is accepted and printed to stdout, never written to a file.
+
 It MEASURES with the prebuilt xtask gates (`check-kernel-baseline --json` /
 `--emit-pin`, `kloc-check --json`, `check-service-boundary --json`) and never runs
 cargo. Python 3, standard library only. See scripts/README-repin.md.
 
   scripts/repin.py --check                         # table pin vs measured, rc != 0 on drift
-  scripts/repin.py --apply --story 20-13 --note "TEXT"   # rewrite the kernel pin, print diff
-  scripts/repin.py --rebase --note "REASON" [--measure-root DIR | --measure-json FILE] [--lower-kernel] [--dry-run]
+  scripts/repin.py --apply --story 20-13 [--note "TEXT"]   # rewrite the kernel pin values, print diff
+  scripts/repin.py --rebase [--note "REASON"] [--measure-root DIR | --measure-json FILE] [--lower-kernel] [--dry-run]
 
 Exit codes: 0 in sync / applied / nothing to do; 1 drift (--check) or a post-write
 verification failure (rolled back); 2 a HUMAN decision is needed (nothing written);
@@ -40,7 +41,6 @@ line it does not own. Every replacement is exactly-once or the run aborts.
 from __future__ import annotations
 
 import argparse
-import datetime
 import difflib
 import io
 import os
@@ -48,16 +48,14 @@ import re
 import subprocess
 import sys
 import tempfile
-import textwrap
 from pathlib import Path
 
 KERNEL_CRATE = "maos-kernel-core"
 BASELINE = "xtask/kernel-core-baseline.toml"
 KLOC = "xtask/kloc.toml"
-KPIN_TEST = "xtask/tests/kernel_pin_content_hash_16_0.rs"
 SURFACE = "docs/ci-baselines/kernel-surface-v0.1-beta.json"
 TRACKER = "_bmad-output/implementation-artifacts/sprint-status.yaml"
-OWNED_FILES = (BASELINE, KPIN_TEST)
+OWNED_FILES = (BASELINE,)
 
 # ADR-069 (see recovery_lane_ceiling_rule.rs): the alarm needs `ENVELOPE ALARM` in the kernel ROW comment.
 ADR_069_ALARM = 22_000
@@ -75,8 +73,6 @@ ROW_RE = re.compile(
     r'^(?P<key>"[^"]+"|[A-Za-z0-9_.\-]+)(?P<eq>[ \t]*=[ \t]*)(?P<val>\d+)'
     r"(?P<gap>[ \t]*)(?P<comment>#.*)?$"
 )
-# The segment `--rebase` writes at the head of a row's inline comment (the reason has no `|`).
-REBASED_RE = re.compile(r"^RE-BASED \d{4}-\d{2}-\d{2} \([^|]*\)(?: \| |$)")
 
 
 class Refuse(Exception):
@@ -199,24 +195,6 @@ def baseline_pins(text: str) -> dict:
         "set_hash": lines[hash_idx[0]].split('"')[1],
         "files": files,
     }
-
-
-KPIN_PATTERNS = [
-    ("read_pinned reader", re.compile(r'(read_pinned\(&baseline_toml\(\)\)\.expect\("read_pinned"\),\s*)(\d[\d_]*)(,)')),
-    ("a2a-tcp reader", re.compile(r'(assert_eq!\(a2a, )(\d[\d_]*)(, "the a2a-tcp reader"\);)')),
-    ("fkcs oracle reader", re.compile(r'(assert_eq!\(oracle, )(\d[\d_]*)(, "the fkcs oracle reader"\);)')),
-    ("toml-parser reader", re.compile(r'(assert_eq!\(parsed\["src_lines"\]\.as_integer\(\), Some\()(\d[\d_]*)(\)\);)')),
-]
-
-
-def kpin_values(text: str) -> dict[str, int]:
-    out = {}
-    for name, rx in KPIN_PATTERNS:
-        found = rx.findall(text)
-        if len(found) != 1:
-            raise ToolError(f"{KPIN_TEST}: `{name}` constant matched {len(found)} times, expected exactly 1")
-        out[name] = int(found[0][1].replace("_", ""))
-    return out
 
 
 def load_tracker(root: Path) -> dict[str, str]:
@@ -342,15 +320,7 @@ def analyze(root: Path, m: dict):
         want["set_hash"] = m["set_hash"]
     want["added"], want["removed"] = added, removed
 
-    # -- tests
-    kp = kpin_values(read(root, KPIN_TEST))
-    for name, val in kp.items():
-        st = "ok" if val == m["physical"] else "DRIFT"
-        table.append((f"{KPIN_TEST}: {name}", str(val), str(m["physical"]), st))
-        if st != "ok":
-            want["kpin"] = m["physical"]
-            drift.append(f"kpin:{name}")
-
+    # (no test-file literals: `kernel_pin_content_hash_16_0.rs` asserts the readers agree with `read_pinned`)
     # -- kernel ceiling row (read-only here: ceilings move only via --rebase) + ADR-069 envelope
     row = rows[KERNEL_CRATE][1]
     tokei = m["kernel_tokei"]
@@ -399,17 +369,13 @@ def print_table(table):
 # ------------------------------------------------------------------------ text edits
 
 
-def delta_phrase(old: int, new: int) -> str:
-    return f"{old} -> {new} ({signed(new - old)})"
-
-
-def build_texts(root: Path, want: dict, story: str, note: str) -> dict[str, str]:
+def build_texts(root: Path, want: dict) -> dict[str, str]:
     m = want["measured"]
     bp = want["bp"]
     texts = {rel: read(root, rel) for rel in OWNED_FILES}
     new_texts: dict[str, str] = {}
 
-    # ---- kernel-core-baseline.toml
+    # ---- kernel-core-baseline.toml: values only, no comments are written
     if any(k in want for k in ("src_lines", "set_hash", "digests_changed")):
         blines = texts[BASELINE].split("\n")
         pinned = bp["files"]
@@ -420,44 +386,20 @@ def build_texts(root: Path, want: dict, story: str, note: str) -> dict[str, str]
             blines[bp["hash_idx"]] = f'set_hash = "{want["set_hash"]}"'
         if "src_lines" in want:
             blines[bp["src_idx"]] = f"src_lines = {want['src_lines']}"
-        phys = (f"physical {delta_phrase(bp['src_lines'], want['src_lines'])}" if "src_lines" in want
-                else f"physical {bp['src_lines']} (unchanged)")
-        files = want.get("digests_changed", [])
-        text = (f"HISTORY: {story} -> exact formatted {phys}, tokei {m['kernel_tokei']}, {len(m['digests'])} "
-                f"files, none added or removed; changed files: {', '.join(files) if files else 'none (set hash only)'}; "
-                f"digests and set_hash adopted from `--emit-pin`. {note}")
-        block = textwrap.wrap(text, width=96, initial_indent="# ", subsequent_indent="# ",
-                              break_long_words=False, break_on_hyphens=False)
-        blines[bp["src_idx"] + 1:bp["src_idx"] + 1] = block
         new_texts[BASELINE] = "\n".join(blines)
-
-    # ---- kernel_pin_content_hash_16_0.rs
-    if "kpin" in want:
-        t = texts[KPIN_TEST]
-        for name, rx in KPIN_PATTERNS:
-            t, n = rx.subn(lambda mo: f"{mo[1]}{want['kpin']}{mo[3]}", t)
-            if n != 1:
-                raise ToolError(f"{KPIN_TEST}: `{name}` replaced {n} times, expected exactly 1")
-        new_texts[KPIN_TEST] = t
     return new_texts
 
 
 def validate_new_texts(new_texts: dict[str, str], want: dict):
-    """A re-parse of every owned file we wrote."""
+    """A re-parse of the owned file we wrote."""
     if BASELINE in new_texts:
         bp = baseline_pins(new_texts[BASELINE])
         if "src_lines" in want and bp["src_lines"] != want["src_lines"]:
             raise ToolError("internal: baseline src_lines does not read back")
-        if bp["src_idx"] != want["bp"]["src_idx"]:
-            raise ToolError("internal: src_lines moved off its line (the 16-0 test pins it)")
         if {k: v for k, (_, v) in bp["files"].items()} != want["measured"]["digests"]:
             raise ToolError("internal: per-file digests do not equal `--emit-pin` after rewrite")
         if bp["set_hash"] != want["measured"]["set_hash"]:
             raise ToolError("internal: set_hash does not equal `--emit-pin` after rewrite")
-    if KPIN_TEST in new_texts:
-        vals = set(kpin_values(new_texts[KPIN_TEST]).values())
-        if vals != {want["kpin"]}:
-            raise ToolError("internal: kernel_pin test constants do not all read back the new value")
 
 
 def print_diff(root: Path, new_texts: dict[str, str]):
@@ -479,15 +421,12 @@ def ceiling_for(measured: int) -> int:
     return measured + max(REBASE_FLOOR, -(-measured * REBASE_PCT // 100))
 
 
-def rebase_row(line: str, new_val: int, date: str, reason: str) -> str:
-    """The row with its value replaced and ONE `RE-BASED <date> (<reason>)` segment at the
-    head of its inline comment (a previous RE-BASED segment is replaced, the rest is kept)."""
+def rebase_row(line: str, new_val: int) -> str:
+    """The row with only its value replaced; the inline comment is kept byte for byte."""
     m = ROW_RE.match(line)
     if not m:
         raise ToolError(f"row does not parse: {line[:80]}")
-    prior = REBASED_RE.sub("", (m["comment"] or "")[1:].lstrip(), count=1)
-    comment = f"# RE-BASED {date} ({reason})" + (f" | {prior}" if prior else "")
-    return f"{m['key']}{m['eq']}{new_val}{m['gap'] or '   '}{comment}"
+    return f"{m['key']}{m['eq']}{new_val}{m['gap']}{m['comment'] or ''}"
 
 
 def load_measure_json(path: Path) -> dict[str, int]:
@@ -509,8 +448,8 @@ def load_measure_json(path: Path) -> dict[str, int]:
     return per_crate
 
 
-def rebase_plan(root: Path, measure_root: Path | None, measure_json: Path | None, xtask: Path, date: str,
-                reason: str, lower_kernel: bool):
+def rebase_plan(root: Path, measure_root: Path | None, measure_json: Path | None, xtask: Path,
+                lower_kernel: bool):
     """Returns (table, new text or None, refusals). The kloc.toml of `root` is the one rewritten;
     the measurement comes from `measure_json` (a saved `kloc-check --json` report) or `measure_root`
     (measured with `xtask`), floored at what `root` measures itself with `xtask`.
@@ -560,7 +499,7 @@ def rebase_plan(root: Path, measure_root: Path | None, measure_json: Path | None
         if new == old:
             table.append((crate, old, m, fl, old, "ok"))
             continue
-        lines[idx] = rebase_row(lines[idx], new, date, reason)
+        lines[idx] = rebase_row(lines[idx], new)
         table.append((crate, old, m, fl, new, "RE-BASED " + signed(new - old)))
 
     new_text = "\n".join(lines)
@@ -596,13 +535,9 @@ def rebase(root: Path, xtask: Path, args) -> int:
         if not (root / KLOC).is_file():
             raise ToolError(f"{root} is not a maos repo root: missing {KLOC}")
         reason = " ".join((args.note or "").split())
-        if not reason or "|" in reason:
-            raise Refuse("--rebase needs --note REASON (the dated RE-BASED segment; no `|` characters)")
-        date = args.date or datetime.date.today().isoformat()
-        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
-            raise Refuse("--date must be YYYY-MM-DD")
-        table, new_text, refusals = rebase_plan(root, measure_root, measure_json, xtask, date, reason,
-                                                args.lower_kernel)
+        if reason:
+            print(f"note (stdout only; history is the commit message): {reason}")
+        table, new_text, refusals = rebase_plan(root, measure_root, measure_json, xtask, args.lower_kernel)
     except Refuse as r:
         print("REFUSED -- a human decision is needed; nothing was written:", file=sys.stderr)
         print(f"  - {r}", file=sys.stderr)
@@ -664,8 +599,8 @@ def main(argv=None) -> int:
     mode.add_argument("--rebase", action="store_true",
                       help="re-base every kloc.toml crate row to measured + max(100, ceil(2%%)) "
                            "(retrospectives / the B7c-A landing only); the kernel row is held")
-    ap.add_argument("--story", help="live tracker story key (or unique prefix, e.g. 20-13); cited by the baseline HISTORY block")
-    ap.add_argument("--note", help="--apply: HISTORY text (driver, ruling); --rebase: the reason (no `|`)")
+    ap.add_argument("--story", help="live tracker story key (or unique prefix, e.g. 20-13); --apply only")
+    ap.add_argument("--note", help="free text, printed to stdout only (history is the commit message)")
     src = ap.add_mutually_exclusive_group()
     src.add_argument("--measure-root", metavar="DIR",
                      help="--rebase: tree measured by the prebuilt `xtask kloc-check --json` (default --root; that "
@@ -678,7 +613,6 @@ def main(argv=None) -> int:
     ap.add_argument("--lower-kernel", action="store_true",
                     help="--rebase: lower the zero-headroom `maos-kernel-core` row to its measured value "
                          "(default off: the kernel row is held, never raised by a re-base)")
-    ap.add_argument("--date", help="--rebase: date written into the RE-BASED segment (default today, YYYY-MM-DD)")
     ap.add_argument("--dry-run", action="store_true", help="--rebase: print the table, write nothing")
     ap.add_argument("--root", help="repo root (default: parent of scripts/)")
     ap.add_argument("--xtask", help="prebuilt xtask binary (default: $REPIN_XTASK, $CARGO_TARGET_DIR, <root>/target)")
@@ -715,7 +649,7 @@ def main(argv=None) -> int:
                 print(f"  - {r}")
             return EXIT_HUMAN
         if drift:
-            print(f"\nDRIFT in {len(drift)} pin location(s); run `repin.py --apply --story KEY --note TEXT`")
+            print(f"\nDRIFT in {len(drift)} pin location(s); run `repin.py --apply --story KEY`")
             return EXIT_DRIFT
         print("\nPINS IN SYNC")
         return EXIT_OK
@@ -728,10 +662,9 @@ def main(argv=None) -> int:
         if not drift:
             print("\nnothing to do: every pin already equals the measured value")
             return EXIT_OK
-        if not args.story or not args.note or not args.note.strip():
-            raise Refuse("--apply needs --story KEY (a live tracker story) and --note TEXT (the HISTORY text) "
-                         "because pins would move")
-        note = " ".join(args.note.split())
+        if not args.story:
+            raise Refuse("--apply needs --story KEY (a live tracker story) because pins would move")
+        note = " ".join((args.note or "").split())
         story_key = resolve_story(root, args.story)
     except Refuse as r:
         print("\nREFUSED -- a human decision is needed; nothing was written:", file=sys.stderr)
@@ -739,7 +672,7 @@ def main(argv=None) -> int:
         return EXIT_HUMAN
 
     try:
-        new_texts = build_texts(root, want, story_key, note)
+        new_texts = build_texts(root, want)
         validate_new_texts(new_texts, want)
     except ToolError as e:
         print(f"repin: ERROR: {e}", file=sys.stderr)
@@ -749,6 +682,8 @@ def main(argv=None) -> int:
         return EXIT_OK
 
     print(f"\n--- diff (story {story_key}) ---")
+    if note:
+        print(f"note (stdout only; history is the commit message): {note}")
     print_diff(root, new_texts)
 
     originals = {rel: read(root, rel) for rel in new_texts}

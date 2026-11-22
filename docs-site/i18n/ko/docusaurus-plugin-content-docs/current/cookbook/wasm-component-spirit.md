@@ -80,6 +80,9 @@ unload 전에 거부되고(`409 swap_invariant_dropped`) 선행 버전이 계속
 서비스합니다. 이 검사는 구조적 검사이며 상태가 보존되었다는 증명은
 아닙니다.
 
+이 스키마 v5 예시는 텔레메트리를 구독하지 않습니다. `telemetry`
+lifecycle export를 사용하려면 [스키마 v8 구독 계약](/manifest/v8)을 따르세요.
+
 추가된 `maos:spirit/skills@2.4.0`의 `author(document)`와
 `propose(target-id, target-version, diff)`는 `handle-frame` 안에서만 호출할
 수 있습니다. 오류는 `capability-denied`, 안정적인 거부 코드인
@@ -103,7 +106,9 @@ fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
 
 동의는 발신자가 아닌 기록된 수신자에게 적용됩니다. envelope가 만료되었거나, 이후의 일치하는 grant 범위 rupture가 있거나, 정책이 `Withheld`이면 frame은 `recall`에서 제외되고 `fetch`는 `consent-withheld`를 반환합니다. `HeaderOnly` frame은 `payload-available = false`로 목록에 남지만, fetch는 payload 대신 `consent-withheld`를 반환합니다. 데몬 측 `ConsentEnvelope.recall` 정책의 기본값은 `Full`이며 알 수 없는 값은 안전하게 `Withheld`로 처리합니다. 이 정책은 **WIT에 포함되지 않습니다**. guest는 효과만 볼 수 있고 guest가 주장한 envelope는 권한을 부여하지 않습니다. lossless frame 전송에 대한 이 의도적인 예외는 `17-8-consent-recall-policy`로 비준되었습니다.
 
-**프로덕션 한계(Story 17-8, AC3.6 / rule 11):** HEAD 기준으로 `HeaderOnly`나 `Withheld`를 설정하는 프로덕션 granter는 없고 프로덕션에는 `ConsentGate`가 설치되지 않습니다. envelope가 있는 frame은 A2A delegation intake를 통해서만 승인된 로컬 수신자에게 도달합니다. peer-identity rupture에는 envelope가 없으므로 아무것도 보류하지 않습니다. native compiled-in Spirit의 bus 전송은 pid 0으로 기록되며, 발신자 귀속은 이 story의 비목표입니다. 동의 사례는 `deliver_typed`로 frame을 전달하는 suite에서 검증되며 활성 프로덕션 정책이라고 주장하지 않습니다.
+**현재 동작(Story 21-7):** 데몬은 승인된 각 Spirit이 선언한 `[consent.recall]`([Manifest 스키마 v7](/manifest/v7#consent-recall))에 대해 프로덕션 consent granter와 `ConsentGate`를 하나 설치합니다. granter는 인증된 발신자입니다. 발신 frame에는 데몬이 찍은 envelope가 붙고 guest가 제공한 envelope는 폐기됩니다. grant를 선언하면 부여하지 않은 로컬 수신 주소는 거부됩니다. rupture frame은 이 WIT에서 가장 가까운 이유인 `intent-allowlist-mismatch`로 표시하고, journal에는 `consent_not_granted`가 기록됩니다. retract는 여전히 승인된 incarnation인 기록된 모든 수신자에게 도달합니다. 여기서 "동의"는 기술적인 recall 및 전달 제한이며, 법적 동의, GDPR 적법 근거, 법률 검토를 거친 것이 아닙니다. peer-identity rupture에는 envelope가 없으므로 아무것도 보류하지 않습니다. native compiled-in Spirit에는 bus 전송 primitive가 없으며, 바인딩되지 않은 bus port는 Spirit 발신자를 pid 0으로 기록하지 않고 거부합니다. Postgres 기반 collective tier는 이 동의 상태를 보존하지 않습니다.
+
+**보장 범위:** recall 한정입니다. 이 제한은 수신자가 나중에 `recall`과 `fetch`로 읽을 수 있는 내용만 통제하며, 이미 수신자의 세션에 전달된 frame을 회수하거나 숨기지 않습니다.
 
 ### 오류와 감사 기록
 
@@ -151,13 +156,13 @@ in-band 프로토콜 위반은 `recall.channel.closed:protocol-violation`을 기
 
 ## Lifecycle 트리거와 hot swap (`maos:spirit@2.4.0`)
 
-`spirit-lifecycle` world는 위의 frame export에 선택적 export `maos:spirit/lifecycle`을 하나 더합니다. 이를 구현하면 kernel의 예산이 있는 트리거(`idle`, `consolidate`, `telemetry`, `schedule`, `pause`, `resume`)를 받고 제자리에서 교체할 수 있습니다. `maosctl spirit upgrade <name> --to <manifest>`는 pid, 그 pid가 가진 capability token, 작업 메모리를 유지하고, `snapshot`이 반환한 상태를 후속 버전의 `swap-in`에 전달합니다(`--policy migrator`에서는 `migrate`가 먼저). world `spirit`로 빌드한 guest나 2.0–2.3 component는 그대로 실행되며 호출되지 않습니다. 이 경우 swap은 무엇이든 교체되기 전에 `spawned_swap_unsupported`로 거부됩니다. 생성된 scaffold는 `lifecycle`(`idle`, `snapshot`, `swap-in`)을 export하므로 게시된 버전도 같은 방식으로 upgrade할 수 있습니다.
+`spirit-lifecycle` world는 예산이 적용되는 트리거(`idle`, `consolidate`, `telemetry`, `schedule`, `pause`, `resume`)와 제자리 교체에 쓰이는 선택적 `maos:spirit/lifecycle` export를 추가합니다. `maosctl spirit upgrade <name> --to <manifest>`는 PID와 작업 메모리를 유지하고 `snapshot` 상태를 후속 버전의 `swap-in`에 전달합니다(`--policy migrator`에서는 `migrate`가 먼저 실행됩니다). 기존 토큰은 후속 버전에도 해당 권한이 있으면 계속 사용할 수 있습니다. 이 export가 없는 2.0–2.3 등의 컴포넌트는 실행할 수 있지만 교체 요청은 변경 전에 `spawned_swap_unsupported`로 거부됩니다. 생성된 scaffold는 `idle`, `snapshot`, `swap-in`을 export합니다.
 
 모든 lifecycle export는 `result<_, lifecycle-error>`를 반환하고 프레임을 내보내지 않습니다. `idle`, `consolidate`, `telemetry`, `schedule`은 `recall`, `context`, `skills` import를 사용할 수 있고, `pause`, `resume`, `snapshot`, `swap-in`, `migrate`는 사용할 수 없습니다. 각 export는 `[budget].time_cap_seconds` 아래에서 실행됩니다. 트리거 표, 타입화된 swap 거부, cold swap, 스왑 후 되돌림 동작은 [Lifecycle Hooks](./lifecycle-hooks#spawned-wasm-component-spirits)를 참고하세요.
 
 ## Discussion
 
-manifest는 형식별 결과 전에 모든 섹션을 검증합니다. 게시된/default MAOS 빌드는 Hold 2가 `wasm-host` engine을 비활성화하는 동안 이 형식을 `wasm_engine_off`로 거부합니다. `--features wasm-host`로 만든 빌드는 `maos run`을 통해 격리된 T2 runner(`maos` 옆에 설치된 `maos-wasm-runner`) 안에서 component를 실행합니다. 격리된 runner가 제공하지 않는 in-process 기능(component의 `maosctl load`와 topology)은 `spawned_surface_unsupported`로 거부됩니다. component의 swap, upgrade, cold swap은 `maosctl spirit upgrade`로 수행합니다(아래). 이는 알 수 없는 class나 형식이 아니라 의도적인 타입화된 거부입니다.
+MAOS는 형식별 처리를 하기 전에 매니페스트 전체를 검증합니다. 기본 빌드에는 엔진이 포함됩니다. Linux에서 `maos run`은 `maos` 옆에 설치된 `maos-wasm-runner`를 사용해 격리된 T2 환경에서 컴포넌트를 실행합니다. `--no-default-features --features network`로 엔진을 제외한 빌드는 `wasm_engine_off`를 반환합니다. `maosctl spirit load`와 토폴로지는 `rust-inproc` 전용이며, 컴포넌트를 넘기면 `spawned_surface_unsupported`가 반환됩니다. 지원되는 컴포넌트 교체에는 `maosctl spirit upgrade`를 사용합니다.
 
 생성된 TypeScript guest는 world의 `onStart`, `handleFrame`, `onShutdown` export를 구현합니다. guest 코드에서 halt하려면 `throw { tag: "fault", val: "<reason>" }` 값을 throw하세요. host는 이 형태를 `Halt::Fault`로 매핑합니다. guest의 WASI stdout/stderr(`console.log` 포함)는 runner의 stderr로 전달되어 `spirit.diagnostic` 행으로 journal에 기록됩니다. 이는 신뢰할 수 없는 guest 텍스트로 취급하세요. 세션마다 256행 / 64 KiB로 제한되고 초과분은 `dropped_diagnostics`에 집계되며, 너무 긴 줄은 표시와 함께 잘리고 frame이 되지 않습니다.
 

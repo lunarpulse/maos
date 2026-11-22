@@ -91,9 +91,8 @@ MAOS separates the **kernel** (invariant, small, ~20 KLOC core) from **Spirits**
 A **MAOS Host** is a single OS process running the kernel. The kernel exposes
 five services plus two internal modules and one stable contract. Spirits run as
 in-process Rust actors (v0.1) or subprocess binaries (the first
-third-party-shippable form); the WASM-component form (ADR-031, ADR-060) ships
-as an opt-in build (`--features wasm-host`, off by default; making it default-on
-is owned by `21-9-wasm-host-default-on`).
+third-party-shippable form). The default host includes the WASM-component form
+(ADR-031, ADR-060) through the `wasm-host` feature.
 
 ```mermaid
 flowchart TB
@@ -205,22 +204,20 @@ Three entry points, depending on why you're here (mirrors the
 
 ### ▶️ Run MAOS
 
-Build the kernel host (`maos`) and the operator CLI (`maosctl`):
+Build the host (`maos`), its sibling WASM runner and the operator CLI (`maosctl`):
 
 ```sh
-cargo build -p maos-bin --release      # the `maos` Host executable
-cargo build -p maos-cli --release      # the `maosctl` operator CLI
+cargo build --locked --release -p maos-bin -p maos-wasm-host -p maos-cli
 ```
 
-The default build excludes the WASM engine. To build the opt-in component host
-and runner for development:
+For an explicitly engine-free host, keep networking but disable default features:
 
 ```sh
-cargo build -p maos-bin --release --features wasm-host
+cargo build --locked --release -p maos-bin --no-default-features --features network
 ```
 
-WASM-enabled distribution remains subject to
-[`docs/compliance/export-counsel-precondition.md`](docs/compliance/export-counsel-precondition.md).
+The default build includes Wasmtime. No ECCN determination or counsel review
+is claimed; see [export classification](docs/compliance/eccn-classification.md).
 
 Initialize a Host and start the runtime daemon:
 
@@ -341,7 +338,7 @@ maos/
 ├── examples/      # worked example Spirits (Rust + TypeScript)
 ├── templates/     # cargo-generate Spirit templates (Rust + TS)
 ├── schemas/       # JSON schemas (manifest, ComplianceClaim, gateway, halt registry)
-├── wit/           # WebAssembly Interface Types (WASM Spirit form, opt-in `wasm-host`)
+├── wit/           # WebAssembly Interface Types (WASM Spirit form)
 ├── docs/          # invariants, ADRs, dev-discipline, the three-door docs site
 ├── xtask/         # build-discipline gates run on every PR
 ├── fuzz/          # fuzz targets

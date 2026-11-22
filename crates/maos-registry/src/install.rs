@@ -179,17 +179,96 @@ pub(crate) fn check_identity(document: &toml::Value, id: &str, version: &str) ->
     Ok(())
 }
 
+/// Launch-facing result: the one open, read-only, regular component file that
+/// was compared byte-for-byte with the signed artifact, bound to the signed
+/// package it came from. Deliberately not `Clone`: there is exactly one holder.
+/// The path it was acquired through is never a recovery input.
+#[derive(Debug)]
+pub struct VerifiedLaunchComponent {
+    file: std::fs::File,
+    artifact_sha256: [u8; 32],
+    spirit_id: SpiritId,
+    version: String,
+    manifest_sha256: [u8; 32],
+    publisher: [u8; 32],
+}
+
+impl VerifiedLaunchComponent {
+    /// SHA-256 of `SignedPackage.artifact_bytes`, the exact authorized bytes.
+    pub fn artifact_sha256(&self) -> [u8; 32] {
+        self.artifact_sha256
+    }
+    /// SHA-256 of the signed `manifest_toml` this component is bound to.
+    pub fn manifest_sha256(&self) -> [u8; 32] {
+        self.manifest_sha256
+    }
+    /// Signed package version this component is bound to.
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+    /// Signed package identity this component is bound to.
+    pub fn spirit_id(&self) -> &SpiritId {
+        &self.spirit_id
+    }
+    /// The publisher key that signed the package this component was verified under.
+    pub fn publisher(&self) -> [u8; 32] {
+        self.publisher
+    }
+    /// Surrender the held file together with the signed-byte digest.
+    pub fn into_parts(self) -> (std::fs::File, [u8; 32]) {
+        (self.file, self.artifact_sha256)
+    }
+}
+
+/// This platform has no defensive origin-relative component acquisition, so no
+/// launch-facing held component can be produced. Distinct from verification
+/// failure: downcast the boxed error to this type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeldComponentUnsupported;
+
+impl std::fmt::Display for HeldComponentUnsupported {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("held component launch is unsupported on this platform")
+    }
+}
+
+impl std::error::Error for HeldComponentUnsupported {}
+
+/// Installed boot result: verified manifest text, publisher, and the held
+/// component when the manifest names one (native spirits have none).
+#[derive(Debug)]
+pub struct InstalledLaunch {
+    pub manifest_toml: String,
+    pub publisher: [u8; 32],
+    pub component: Option<VerifiedLaunchComponent>,
+}
+
 /// A registry subject is the signed package AND its deployed bytes, not a
 /// neighboring metadata file. Local manifests without sidecars remain local.
 pub fn signed_package_at(name: &str, manifest_path: &Path) -> Result<Option<SignedPackage>, Error> {
-    signed_package_at_with(name, manifest_path, None)
+    signed_package_at_with(name, manifest_path, None).map(|found| found.map(|(pkg, _)| pkg))
+}
+
+/// [`signed_package_at`] for launch: also returns the held component, from the
+/// same single verification (no second open).
+pub fn signed_package_at_launch(
+    name: &str,
+    manifest_path: &Path,
+) -> Result<Option<(SignedPackage, Option<VerifiedLaunchComponent>)>, Error> {
+    match signed_package_at_with(name, manifest_path, None)? {
+        None => Ok(None),
+        Some((pkg, file)) => {
+            let component = launch_component(&pkg, file)?;
+            Ok(Some((pkg, component)))
+        }
+    }
 }
 
 fn signed_package_at_with(
     name: &str,
     manifest_path: &Path,
     crypto: Option<&dyn maos_domain::ports::CryptoProvider>,
-) -> Result<Option<SignedPackage>, Error> {
+) -> Result<Option<(SignedPackage, Option<std::fs::File>)>, Error> {
     let directory = manifest_path
         .parent()
         .ok_or("manifest has no package directory")?;
@@ -202,32 +281,106 @@ fn signed_package_at_with(
     if pkg.spirit_id.as_str() != name {
         return Err("installed package name differs".into());
     }
-    verify_deployed_package_with(&pkg, manifest_path, crypto)?;
-    Ok(Some(pkg))
+    let file = verify_deployed_package_with(&pkg, manifest_path, crypto)?;
+    Ok(Some((pkg, file)))
 }
 
 /// Validate an explicit immutable subject against its original deployed files.
 /// A temporary manifest snapshot is never a package-identity lookup location.
 pub fn verify_deployed_package(pkg: &SignedPackage, manifest_path: &Path) -> Result<(), Error> {
-    verify_deployed_package_with(pkg, manifest_path, None)
+    verify_deployed_package_with(pkg, manifest_path, None).map(drop)
+}
+
+#[cfg(unix)]
+fn launch_component(
+    pkg: &SignedPackage,
+    file: Option<std::fs::File>,
+) -> Result<Option<VerifiedLaunchComponent>, Error> {
+    use sha2::Digest;
+    let Some(file) = file else { return Ok(None) };
+    Ok(Some(VerifiedLaunchComponent {
+        file,
+        artifact_sha256: sha2::Sha256::digest(&pkg.artifact_bytes).into(),
+        spirit_id: pkg.spirit_id.clone(),
+        version: pkg.version.clone(),
+        manifest_sha256: sha2::Sha256::digest(&pkg.manifest_toml).into(),
+        publisher: pkg.publisher_pubkey,
+    }))
+}
+
+#[cfg(not(unix))]
+fn launch_component(
+    _pkg: &SignedPackage,
+    file: Option<std::fs::File>,
+) -> Result<Option<VerifiedLaunchComponent>, Error> {
+    match file {
+        None => Ok(None),
+        Some(_) => Err(Box::new(HeldComponentUnsupported)),
+    }
+}
+
+fn matches_reader(mut file: impl std::io::Read, expected: &[u8]) -> std::io::Result<bool> {
+    let mut buffer = [0; 8192];
+    for chunk in expected.chunks(buffer.len()) {
+        file.read_exact(&mut buffer[..chunk.len()])?;
+        if &buffer[..chunk.len()] != chunk {
+            return Ok(false);
+        }
+    }
+    Ok(file.read(&mut buffer[..1])? == 0)
+}
+
+/// Open the manifest-named component relative to the trusted package directory,
+/// one segment at a time with no symlink following, so neither a symlink nor a
+/// racing rename can move the opened object outside the origin. The result is a
+/// read-only regular file. Segments split on `/` exactly as materialization
+/// joins them; `..` is refused again here.
+#[cfg(unix)]
+fn open_component(directory: &Path, artifact: &str) -> Result<std::fs::File, Error> {
+    use rustix::fs::{fcntl_setfl, openat, Mode, OFlags};
+    let segments: Vec<&str> = artifact
+        .split('/')
+        .filter(|segment| !segment.is_empty() && *segment != ".")
+        .collect();
+    if segments.is_empty() || segments.contains(&"..") || artifact.contains('\0') {
+        return Err("component path escapes the package directory".into());
+    }
+    let mut current: std::os::fd::OwnedFd = rustix::fs::open(
+        directory,
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )?;
+    let last = segments.len() - 1;
+    for (index, segment) in segments.iter().enumerate() {
+        let mut flags = OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+        flags |= if index == last {
+            OFlags::NONBLOCK
+        } else {
+            OFlags::DIRECTORY
+        };
+        current = openat(&current, *segment, flags, Mode::empty())?;
+    }
+    let file = std::fs::File::from(current);
+    if !file.metadata()?.is_file() {
+        return Err("component is not a regular file".into());
+    }
+    // NONBLOCK only guarded the open against special files; the held handle is shared.
+    fcntl_setfl(&file, OFlags::empty())?;
+    Ok(file)
+}
+
+#[cfg(not(unix))]
+fn open_component(directory: &Path, artifact: &str) -> Result<std::fs::File, Error> {
+    Ok(std::fs::File::open(directory.join(artifact))?)
 }
 
 fn verify_deployed_package_with(
     pkg: &SignedPackage,
     manifest_path: &Path,
     crypto: Option<&dyn maos_domain::ports::CryptoProvider>,
-) -> Result<(), Error> {
+) -> Result<Option<std::fs::File>, Error> {
     fn matches(path: &Path, expected: &[u8]) -> std::io::Result<bool> {
-        use std::io::Read;
-        let mut file = std::fs::File::open(path)?;
-        let mut buffer = [0; 8192];
-        for chunk in expected.chunks(buffer.len()) {
-            file.read_exact(&mut buffer[..chunk.len()])?;
-            if &buffer[..chunk.len()] != chunk {
-                return Ok(false);
-            }
-        }
-        Ok(file.read(&mut buffer[..1])? == 0)
+        matches_reader(std::fs::File::open(path)?, expected)
     }
     let directory = manifest_path.parent().ok_or("package has no directory")?;
     crate::storage::path_segment(&pkg.version)?;
@@ -246,11 +399,15 @@ fn verify_deployed_package_with(
     check_identity(&document, pkg.spirit_id.as_str(), &pkg.version)?;
     let manifest = maos_manifest::ManifestDocument::parse(&pkg.manifest_toml)?;
     if let Some(artifact) = manifest.class_section()?.and_then(|class| class.artifact) {
-        if !matches(&directory.join(artifact), &pkg.artifact_bytes)? {
+        use std::io::Seek;
+        let mut file = open_component(directory, &artifact)?;
+        if !matches_reader(&mut file, &pkg.artifact_bytes)? {
             return Err("materialized component differs from signed bytes".into());
         }
+        file.rewind()?;
+        return Ok(Some(file));
     }
-    Ok(())
+    Ok(None)
 }
 
 /// Only an inventory-owned target supplies a vetted upgrade subject.
@@ -299,8 +456,39 @@ pub fn verify_installed<'a>(
     crypto_name: &str,
     endpoint: &dyn Fn(&str) -> Option<&'a str>,
 ) -> Result<(String, [u8; 32]), Error> {
+    let (pkg, _file) = verify_installed_inner(name, manifest_path, crypto, crypto_name, endpoint)?;
+    Ok((String::from_utf8(pkg.manifest_toml)?, pkg.publisher_pubkey))
+}
+
+/// [`verify_installed`] for launch: identical checks (same implementation), and
+/// the component compared against the signed bytes comes back held. A manifest
+/// that names a component on a platform without defensive acquisition fails
+/// with a downcastable [`HeldComponentUnsupported`].
+pub fn verify_installed_launch<'a>(
+    name: &str,
+    manifest_path: &Path,
+    crypto: &dyn maos_domain::ports::CryptoProvider,
+    crypto_name: &str,
+    endpoint: &dyn Fn(&str) -> Option<&'a str>,
+) -> Result<InstalledLaunch, Error> {
+    let (pkg, file) = verify_installed_inner(name, manifest_path, crypto, crypto_name, endpoint)?;
+    let component = launch_component(&pkg, file)?;
+    Ok(InstalledLaunch {
+        publisher: pkg.publisher_pubkey,
+        manifest_toml: String::from_utf8(pkg.manifest_toml)?,
+        component,
+    })
+}
+
+fn verify_installed_inner<'a>(
+    name: &str,
+    manifest_path: &Path,
+    crypto: &dyn maos_domain::ports::CryptoProvider,
+    crypto_name: &str,
+    endpoint: &dyn Fn(&str) -> Option<&'a str>,
+) -> Result<(SignedPackage, Option<std::fs::File>), Error> {
     let directory = manifest_path.parent().ok_or("install has no directory")?;
-    let pkg = signed_package_at_with(name, manifest_path, Some(crypto))?
+    let (pkg, file) = signed_package_at_with(name, manifest_path, Some(crypto))?
         .ok_or("installed signed package is absent")?;
     let mut fields =
         maos_compliance::runtime_context::extract_manifest_fingerprint_fields(&pkg.manifest_toml);
@@ -335,7 +523,7 @@ pub fn verify_installed<'a>(
     {
         return Err(format!("installed ComplianceClaim refused: {reason:?}").into());
     }
-    Ok((String::from_utf8(pkg.manifest_toml)?, pkg.publisher_pubkey))
+    Ok((pkg, file))
 }
 
 /// Same [registry] keys and env precedence as the daemon, with fail-closed parsing.
@@ -419,4 +607,31 @@ pub fn operator_config() -> Result<RegistryClientConfig, Error> {
         org_signing_pubkey,
         security: crate::security::RegistrySecurityConfig::from_operator(disk.get("registry"))?,
     })
+}
+
+#[cfg(all(test, unix))]
+mod held_component_tests {
+    use super::open_component;
+    use std::io::Read;
+
+    #[test]
+    fn component_is_opened_inside_origin_without_following_symlinks() {
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::fs::create_dir(root.path().join("wasm")).unwrap();
+        std::fs::write(root.path().join("wasm/a.wasm"), b"inside").unwrap();
+        std::fs::write(outside.path().join("b.wasm"), b"outside").unwrap();
+        std::os::unix::fs::symlink(outside.path(), root.path().join("link")).unwrap();
+        std::os::unix::fs::symlink(outside.path().join("b.wasm"), root.path().join("leaf.wasm"))
+            .unwrap();
+
+        let mut held = open_component(root.path(), "wasm/a.wasm").unwrap();
+        let mut text = String::new();
+        held.read_to_string(&mut text).unwrap();
+        assert_eq!(text, "inside");
+        assert!(open_component(root.path(), "link/b.wasm").is_err());
+        assert!(open_component(root.path(), "leaf.wasm").is_err());
+        assert!(open_component(root.path(), "../x.wasm").is_err());
+        assert!(open_component(root.path(), "wasm").is_err());
+    }
 }

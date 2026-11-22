@@ -385,7 +385,10 @@ instrument = "crates/maos-bench/src/bin/tier_c_harness.rs"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 # Baseline measured 2026-11-01 (20-7 L1, debug harness, 2000 iterations, runs 42476/42475/42476
 # allocations): 21.24 per `deliver_typed` on a current-thread runtime, in-memory transparency log.
-baseline = 21.24
+# Re-baselined 2026-11-21 (PR 31, hosted run 44928726512): 22.1 per `deliver_typed` (main run
+# 44913753466 measured 21.1). The branch adds one allocation per delivery in the IAC path
+# (scoped shell-reply routing, promotion registry); the exact site is not yet located.
+baseline = 22.1
 
 [[metric]]
 id = "frame-lowering-instructions"

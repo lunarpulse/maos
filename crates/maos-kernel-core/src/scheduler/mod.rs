@@ -12,6 +12,10 @@
 //! v0.1-β zero-size placeholder. The `LifecycleResolver` trait per
 //! architecture §4.0.9 lives in `maos-domain::lifecycle`, not here.
 
+use std::{collections::HashSet, hash::Hash, sync::Arc};
+
+use parking_lot::Mutex;
+
 pub use maos_domain::ports::SpiritSchedulerPort;
 
 pub mod control_block;
@@ -29,3 +33,30 @@ pub use kernel_ctx::KernelCtx;
 pub use schedule_watchdog::ScheduleWatchdog;
 pub use scheduler_loop::{pick_next_spirit_from_slice, SpiritSchedulerAdapter, SCHEDULER_QUANTUM};
 pub use verb_resolver::KernelLifecycleResolver;
+
+/// One in-flight watchdog key, held until the last task using its slot ends.
+#[maos_attrs::i9_exempt(reason = "bounded firing slot held only while its work is live")]
+struct FiringReservation<K: Eq + Hash> {
+    set: Arc<Mutex<HashSet<K>>>,
+    key: K,
+}
+
+impl<K: Clone + Eq + Hash> FiringReservation<K> {
+    fn try_reserve(set: &Arc<Mutex<HashSet<K>>>, key: K, max: usize) -> Option<Self> {
+        let mut guard = set.lock();
+        if guard.len() >= max || !guard.insert(key.clone()) {
+            return None;
+        }
+        drop(guard);
+        Some(Self {
+            set: Arc::clone(set),
+            key,
+        })
+    }
+}
+
+impl<K: Eq + Hash> Drop for FiringReservation<K> {
+    fn drop(&mut self) {
+        self.set.lock().remove(&self.key);
+    }
+}

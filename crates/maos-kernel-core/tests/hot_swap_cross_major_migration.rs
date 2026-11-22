@@ -156,6 +156,7 @@ async fn adjacent_upward_major_reaches_migrator_and_delivers_migrated_state() {
         scheduling: SchedulingSection::default(),
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["snapshot".into()],
+            telemetry: None,
         },
         class: Some(class_section("1.0.0")),
         hot_swap: Some(HotSwapManifestSection {
@@ -179,6 +180,7 @@ async fn adjacent_upward_major_reaches_migrator_and_delivers_migrated_state() {
         scheduling: SchedulingSection::default(),
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["migrate".into(), "on_swap_in".into()],
+            telemetry: None,
         },
         class: Some(class_section("2.0.0")),
         hot_swap: Some(HotSwapManifestSection {
@@ -231,6 +233,7 @@ async fn snapshot_panic_returns_snapshot_specific_error() {
     let predecessor_manifest = SpiritManifestBundle {
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["snapshot".into()],
+            telemetry: None,
         },
         class: Some(class_section("1.0.0")),
         hot_swap: Some(HotSwapManifestSection {
@@ -273,6 +276,7 @@ async fn zero_successor_schema_returns_distinct_expected_version_error() {
     let predecessor_manifest = SpiritManifestBundle {
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["snapshot".into()],
+            telemetry: None,
         },
         class: Some(class_section("1.0.0")),
         hot_swap: Some(HotSwapManifestSection {
@@ -445,6 +449,7 @@ async fn declared_default_migrator_returns_migrator_not_implemented() {
         class: Some(class_section("2.0.0")),
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["migrate".into()],
+            telemetry: None,
         },
         migrates_from: Some(MigratesFromSection {
             versions: vec!["1.0.0".into()],
@@ -494,6 +499,7 @@ async fn a_pid_unloaded_mid_swap_is_a_typed_not_loaded_refusal() {
     let predecessor_manifest = SpiritManifestBundle {
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["snapshot".into()],
+            telemetry: None,
         },
         class: Some(class_section("1.0.0")),
         hot_swap: Some(HotSwapManifestSection {
@@ -512,6 +518,7 @@ async fn a_pid_unloaded_mid_swap_is_a_typed_not_loaded_refusal() {
     let successor_manifest = SpiritManifestBundle {
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["migrate".into(), "on_swap_in".into()],
+            telemetry: None,
         },
         class: Some(class_section("2.0.0")),
         hot_swap: Some(HotSwapManifestSection {

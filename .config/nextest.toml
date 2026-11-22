@@ -56,6 +56,7 @@ binary_id(xtask::example_spirit_regen_integration)
 | binary_id(maos-bin::spawned_swap_20_9)
 | binary_id(maos-bin::spawned_door_20_9)
 | binary_id(maos-bin::spawned_installed_20_9)
+| binary_id(maos-bin::consent_gate_21_7)
 | binary_id(maos-bin::root_shutdown_unload_16_3)
 | binary_id(maos-kernel-core::t3_terminal_helpers_17_7)
 """

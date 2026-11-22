@@ -17,14 +17,17 @@
 //! per-process state, not persistent — no I9 exemption needed.
 
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use dashmap::DashMap;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 use maos_domain::frame::{
     ConsentRupturePayload, FrameAddress, FramePayload, IacFrame, RuptureReason, RuptureRejection,
+    TaskCompletePayload,
 };
 use maos_domain::iac_bus_types::IacBusError;
+use maos_domain::invariants::i1::TokenId;
 use maos_domain::invariants::i2::LogBeforeDeliver;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::ports::a2a::A2ARouter; // Story 6.3
@@ -128,6 +131,251 @@ impl PreparedDelivery {
     /// deduped by pid; each keeps the first non-`None` role in address order.
     pub fn recipients(&self) -> &[FrameRecipient] {
         &self.recipients
+    }
+}
+
+/// The one local destination the scoped shell reply route can address.
+///
+/// `@maos-shell` is a host-only pseudo-address, not a SpiritId: it carries an
+/// `@` and so can never satisfy the `[class].name` lowercase/digit/hyphen
+/// grammar of a real Spirit. It rides the existing guest ABI as an ordinary
+/// SpiritId string. It is never a registered mailbox: [`Mailbox::register_spirit`]
+/// refuses it, and an ordinary (non-route) send to it is refused as
+/// `UnknownSpirit` before any journal write. A real Spirit named `operator`
+/// is an ordinary Spirit with ordinary routing and is unaffected.
+pub const SHELL_REPLY_DESTINATION: &str = "@maos-shell";
+
+/// Whether `spirit_id` is the host-only shell reply pseudo-address.
+pub(super) fn is_shell_reply_destination(spirit_id: &str) -> bool {
+    spirit_id == SHELL_REPLY_DESTINATION
+}
+
+/// Why a scoped shell reply was refused before it touched the journal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShellReplyRefusal {
+    /// The route was already used (or is being used by another delivery).
+    Spent,
+    /// The route's deadline has passed.
+    Expired,
+    /// The shell turn that owns the receiver has closed it.
+    Closed,
+    /// The claimed correlation is not the one this route was armed with.
+    CorrelationMismatch,
+    /// The frame is not a `TaskComplete` with the matching payload variant.
+    PayloadMismatch,
+    /// The frame is not addressed to exactly one local, role-less `@maos-shell`.
+    DestinationMismatch,
+    /// The frame sender or runtime PID is not the one the route was armed for.
+    SenderMismatch,
+    /// The reply is not a Spirit-originated (`SpiritAuto`) frame.
+    OriginMismatch,
+    /// No real (non-zero) mediating `iac.send` token was supplied.
+    TokenMissing,
+}
+
+/// Failure of [`super::IacBusAdapter::deliver_shell_reply`].
+#[derive(Debug)]
+pub enum ShellReplyError {
+    /// Refused by the route's own binding; nothing was logged or delivered.
+    Refused(ShellReplyRefusal),
+    /// Refused or failed by the ordinary typed delivery pipeline.
+    Bus(IacBusError),
+}
+
+enum RouteState {
+    Armed(oneshot::Sender<TaskCompletePayload>),
+    Spent,
+}
+
+/// Ephemeral, private, one-shot capability owned by the active shell turn.
+///
+/// Not registered in the mailbox map (the pseudo-address cannot be registered
+/// at all), so no mailbox exists for it, no Spirit is ever a recipient, and a
+/// real Spirit named `operator` is never shadowed. At most
+/// one accepted, journaled `TaskComplete` ever reaches the paired
+/// [`ShellReplyReceiver`]; every attempt that reaches the journal spends it.
+pub struct ShellReplyRoute {
+    correlation: [u8; 16],
+    sender: maos_spirit_abi::identity::SpiritId,
+    sender_pid: u32,
+    deadline: Instant,
+    state: Mutex<RouteState>,
+}
+
+impl std::fmt::Debug for ShellReplyRoute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ShellReplyRoute")
+            .field("sender", &self.sender)
+            .field("sender_pid", &self.sender_pid)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Receiving half of a [`ShellReplyRoute`], held by the shell turn.
+#[derive(Debug)]
+pub struct ShellReplyReceiver {
+    rx: oneshot::Receiver<TaskCompletePayload>,
+}
+
+/// Arm one reply route for an active shell turn. `correlation`, `sender`
+/// (admitted Spirit) and `sender_pid` come from the trusted host, never from
+/// frame claims; the route expires at `deadline`.
+pub fn shell_reply_route(
+    correlation: [u8; 16],
+    sender: maos_spirit_abi::identity::SpiritId,
+    sender_pid: u32,
+    deadline: Instant,
+) -> (ShellReplyRoute, ShellReplyReceiver) {
+    let (tx, rx) = oneshot::channel();
+    (
+        ShellReplyRoute {
+            correlation,
+            sender,
+            sender_pid,
+            deadline,
+            state: Mutex::new(RouteState::Armed(tx)),
+        },
+        ShellReplyReceiver { rx },
+    )
+}
+
+impl ShellReplyReceiver {
+    /// Take the accepted, journaled answer at most once, without waiting.
+    pub fn try_recv(&mut self) -> Option<TaskCompletePayload> {
+        self.rx.try_recv().ok()
+    }
+
+    /// Retire the route: later or additional completions can no longer land.
+    /// A reply already accepted stays readable through [`Self::try_recv`].
+    pub fn close(&mut self) {
+        self.rx.close();
+    }
+}
+
+impl ShellReplyRoute {
+    fn lock(&self) -> std::sync::MutexGuard<'_, RouteState> {
+        self.state.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Non-consuming binding check, run before any journal write.
+    pub(super) fn validate(
+        &self,
+        frame: &IacFrame,
+        spirit_pid: u32,
+        capability_token: Option<TokenId>,
+        correlation: [u8; 16],
+    ) -> Result<(), ShellReplyRefusal> {
+        match &*self.lock() {
+            RouteState::Spent => return Err(ShellReplyRefusal::Spent),
+            RouteState::Armed(tx) if tx.is_closed() => return Err(ShellReplyRefusal::Closed),
+            RouteState::Armed(_) => {}
+        }
+        if Instant::now() >= self.deadline {
+            return Err(ShellReplyRefusal::Expired);
+        }
+        if correlation != self.correlation {
+            return Err(ShellReplyRefusal::CorrelationMismatch);
+        }
+        if frame.kind != FrameKind::TaskComplete
+            || !matches!(&frame.payload, FramePayload::TaskComplete(_))
+        {
+            return Err(ShellReplyRefusal::PayloadMismatch);
+        }
+        let one_shell_destination = frame.to.len() == 1
+            && frame.to.iter().all(|a| {
+                is_shell_reply_destination(a.spirit_id.as_str())
+                    && a.host_id.is_none()
+                    && a.role.is_none()
+            });
+        if !one_shell_destination {
+            return Err(ShellReplyRefusal::DestinationMismatch);
+        }
+        if spirit_pid == 0
+            || spirit_pid != self.sender_pid
+            || frame.from.spirit_id != self.sender
+            || frame.from.host_id.is_some()
+            || frame.from.role.is_some()
+        {
+            return Err(ShellReplyRefusal::SenderMismatch);
+        }
+        if frame.auto_marker != FrameOrigin::SpiritAuto {
+            return Err(ShellReplyRefusal::OriginMismatch);
+        }
+        match capability_token {
+            Some(token) if token != TokenId::ZERO => Ok(()),
+            _ => Err(ShellReplyRefusal::TokenMissing),
+        }
+    }
+
+    /// Spend the route for one delivery attempt; called once the frame has
+    /// passed every policy check and is about to be journaled.
+    pub(super) fn reserve(&self) -> Result<ShellReplyDelivery, ShellReplyRefusal> {
+        let mut state = self.lock();
+        match std::mem::replace(&mut *state, RouteState::Spent) {
+            RouteState::Spent => Err(ShellReplyRefusal::Spent),
+            RouteState::Armed(tx) if tx.is_closed() => Err(ShellReplyRefusal::Closed),
+            RouteState::Armed(_) if Instant::now() >= self.deadline => {
+                Err(ShellReplyRefusal::Expired)
+            }
+            RouteState::Armed(tx) => Ok(ShellReplyDelivery {
+                tx,
+                deadline: self.deadline,
+            }),
+        }
+    }
+
+    /// Durable correlation recorded on the journaled reply row (and on any
+    /// retract of it). It is derived only from the host-armed route, never from
+    /// guest data, and is written only by the scoped reply path, so it tells the
+    /// shell-only row apart from a frame to a real Spirit named `operator`.
+    pub(super) fn journal_correlation(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::with_capacity(SHELL_REPLY_CORRELATION_PREFIX.len() + 32);
+        out.push_str(SHELL_REPLY_CORRELATION_PREFIX);
+        for byte in self.correlation {
+            let _ = write!(out, "{byte:02x}");
+        }
+        out
+    }
+}
+
+/// Journal `correlation_id` prefix of a scoped shell reply row.
+const SHELL_REPLY_CORRELATION_PREFIX: &str = "maos.shell-reply/";
+
+/// Whether a journaled row's `correlation_id` marks a scoped shell reply.
+pub(super) fn is_shell_reply_correlation(correlation_id: Option<&str>) -> bool {
+    correlation_id.is_some_and(|c| c.starts_with(SHELL_REPLY_CORRELATION_PREFIX))
+}
+
+/// A spent route's sender, carried through the shared delivery pipeline.
+pub(super) struct ShellReplyDelivery {
+    tx: oneshot::Sender<TaskCompletePayload>,
+    deadline: Instant,
+}
+
+impl ShellReplyDelivery {
+    /// Publish to the private receiver, re-checking the route wall (deadline
+    /// and receiver still open) after the asynchronous journal write. The
+    /// result is moved out of the already journaled frame, not copied.
+    fn publish(self, frame: IacFrame) -> Result<(), ()> {
+        if Instant::now() >= self.deadline || self.tx.is_closed() {
+            return Err(());
+        }
+        let FramePayload::TaskComplete(answer) = frame.payload else {
+            return Err(());
+        };
+        self.tx.send(answer).map_err(|_| ())
+    }
+}
+
+impl PreparedDelivery {
+    /// The reply destination is a host-only pseudo-address, not an admitted
+    /// incarnation: journal no recipient PID (even for a real Spirit whose
+    /// name merely resembles it, e.g. `operator`).
+    pub(super) fn without_recipients(mut self) -> Self {
+        self.recipients.clear();
+        self.rejected_pids.clear();
+        self
     }
 }
 
@@ -263,7 +511,13 @@ impl Mailbox {
         self.a2a_router.set(router).map_err(|_| ())
     }
 
+    /// Register a Spirit mailbox. The host-only `@maos-shell` pseudo-address is
+    /// refused with `IacBusError::AlreadyRegistered` (it is permanently
+    /// occupied by the scoped shell reply route) and creates no sender.
     pub fn register_spirit(&self, spirit_id: &str) -> Result<SpiritMailboxHandle, IacBusError> {
+        if is_shell_reply_destination(spirit_id) {
+            return Err(IacBusError::AlreadyRegistered(spirit_id.to_string()));
+        }
         // Guard against double-registration (F14)
         if self
             .mpsc_senders
@@ -340,10 +594,16 @@ impl Mailbox {
         // so ConsentRupture/RateLimited frames the kernel emits don't enter
         // the gate (recursion floor). The gate is also bypassed at
         // `rupture_depth ≥ 2` to prevent rupture-on-rupture cycles per
-        // Story 6.4 AC3 test 3.8. Telemetry is broadcast and never gated.
+        // Story 6.4 AC3 test 3.8. Telemetry is broadcast and never gated. Story 21-7: a
+        // kernel-minted Retract goes only to recorded recipients, so a policy change between
+        // send and retract can never silence it.
         let is_kernel_sender = frame.from.spirit_id.as_str() == KERNEL_SENDER_SPIRIT_ID;
-        let gate_enabled =
-            frame.kind != FrameKind::TelemetryEvent && !is_kernel_sender && rupture_depth < 2;
+        let kernel_retract =
+            frame.kind == FrameKind::Retract && frame.auto_marker == FrameOrigin::Kernel;
+        let gate_enabled = frame.kind != FrameKind::TelemetryEvent
+            && !is_kernel_sender
+            && !kernel_retract
+            && rupture_depth < 2;
         let mut prepared = PreparedDelivery::default();
         match (self.consent_gate.get(), gate_enabled) {
             (Some(gate), true) => {
@@ -359,6 +619,9 @@ impl Mailbox {
             }
             _ => prepared.accepted = frame.to.iter().cloned().collect(),
         }
+        // Story 21-7 — telemetry is broadcast and ungated, so it never creates directed
+        // participant records: a gate-exempt frame cannot make an uncovered addressee a recipient.
+        let resolver = resolver.filter(|_| frame.kind != FrameKind::TelemetryEvent);
         let Some(resolver) = resolver else {
             return prepared;
         };
@@ -398,7 +661,7 @@ impl Mailbox {
     /// (`IacBusAdapter::deliver_typed`) BEFORE calling this method. A
     /// standalone call prepares its delivery internally, exactly as before.
     pub async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError> {
-        self.deliver_inner(frame, 0, None).await
+        self.deliver_inner(frame, 0, None, None).await
     }
 
     /// Story 17-8 AC2.4 — deliver a frame whose delivery was prepared (and
@@ -408,7 +671,20 @@ impl Mailbox {
         frame: IacFrame,
         prepared: PreparedDelivery,
     ) -> Result<LogBeforeDeliver<()>, IacBusError> {
-        self.deliver_inner(frame, 0, Some(prepared)).await
+        self.deliver_inner(frame, 0, Some(prepared), None).await
+    }
+
+    /// Scoped shell reply delivery: like [`Self::deliver_prepared`], but the
+    /// single `@maos-shell` address is served by the spent route's private
+    /// receiver instead of a registered mailbox.
+    pub(super) async fn deliver_prepared_shell_reply(
+        &self,
+        frame: IacFrame,
+        prepared: PreparedDelivery,
+        reply: ShellReplyDelivery,
+    ) -> Result<LogBeforeDeliver<()>, IacBusError> {
+        self.deliver_inner(frame, 0, Some(prepared), Some(reply))
+            .await
     }
 
     /// Recursive deliver entry point with rupture-depth tracking. ConsentRupture
@@ -420,6 +696,7 @@ impl Mailbox {
         frame: IacFrame,
         rupture_depth: u8,
         prepared: Option<PreparedDelivery>,
+        mut reply: Option<ShellReplyDelivery>,
     ) -> std::pin::Pin<
         Box<
             dyn std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send + 'a,
@@ -438,21 +715,6 @@ impl Mailbox {
                 return Ok(LogBeforeDeliver::new(()));
             }
 
-            // Phase 1: Partition recipients into same-host and cross-host.
-            // Story 6.3 — cross-host frames route via the installed A2ARouter;
-            // when no router is installed, fire `CrossHostNotConfigured`.
-            let mut cross_host_targets: Vec<maos_spirit_abi::identity::HostId> = Vec::new();
-            for addr in &frame.to {
-                let spirit_id = addr.spirit_id.as_str().to_string();
-                if let Some(host_id) = &addr.host_id {
-                    cross_host_targets.push(host_id.clone());
-                    continue; // same-host validation skipped for cross-host addresses
-                }
-                if !self.mpsc_senders.contains_key(&(spirit_id.clone(), kind)) {
-                    return Err(IacBusError::UnknownSpirit(spirit_id));
-                }
-            }
-
             let resolver = self
                 .transparency_log
                 .get()
@@ -461,7 +723,7 @@ impl Mailbox {
                 accepted: accepted_recipients,
                 rejected: rejected_recipients,
                 rejected_pids,
-                ..
+                recipients,
             } = prepared.unwrap_or_else(|| self.prepare_at(&frame, rupture_depth, resolver));
 
             if !rejected_recipients.is_empty() {
@@ -545,7 +807,7 @@ impl Mailbox {
                         FrameKind::ConsentRupture,
                     )) {
                         let _ = self
-                            .deliver_inner(rupture_frame, rupture_depth + 1, None)
+                            .deliver_inner(rupture_frame, rupture_depth + 1, None, None)
                             .await;
                     }
                 }
@@ -554,6 +816,25 @@ impl Mailbox {
                 if accepted_recipients.is_empty() {
                     return Ok(LogBeforeDeliver::new(()));
                 }
+            }
+
+            // Only an ACCEPTED destination must be a registered mailbox: a gate-rejected or
+            // unloaded addressee never suppresses the quarantine row or the typed rupture above.
+            // The shell reply pseudo-address is never an ordinary recipient: without a spent
+            // route it is refused like an unregistered Spirit; with one, the private receiver
+            // serves it and no mailbox is required.
+            let unknown = accepted_recipients.iter().find(|a| {
+                if a.host_id.is_some() || reply.is_some() {
+                    return false;
+                }
+                let key = (a.spirit_id.as_str().to_string(), kind);
+                is_shell_reply_destination(a.spirit_id.as_str())
+                    || !self.mpsc_senders.contains_key(&key)
+            });
+            if let Some(unknown) = unknown {
+                return Err(IacBusError::UnknownSpirit(
+                    unknown.spirit_id.as_str().to_string(),
+                ));
             }
 
             // Replace the frame's `to` slice with the accepted set so Phase 2/3
@@ -586,6 +867,19 @@ impl Mailbox {
                 }
             }
 
+            // Scoped shell reply: the single validated local `@maos-shell`
+            // address is served only by the private receiver, never a mailbox.
+            // The frame is moved (no copy) once the route wall still holds.
+            if let Some(delivery) = reply.take() {
+                return delivery
+                    .publish(frame)
+                    .map(|()| LogBeforeDeliver::new(()))
+                    .map_err(|()| {
+                        IacBusError::ChannelClosed(SHELL_REPLY_DESTINATION.to_owned(), kind)
+                    });
+            }
+
+            let mut same_host_err: Option<IacBusError> = None;
             for addr in &frame.to {
                 // Story 6.3 — cross-host addresses are routed in Phase 3; skip
                 // the same-host mailbox path for those.
@@ -593,10 +887,31 @@ impl Mailbox {
                     continue;
                 }
                 let spirit_id = addr.spirit_id.as_str().to_string();
+                // Story 21-7 — the incarnation the journal recorded must still be the admitted
+                // one at the enqueue: a reload since the verdict never reaches the replacement.
+                let recorded = recipients.iter().find(|r| r.spirit_id == spirit_id);
                 let sender = match self.mpsc_senders.get(&(spirit_id.clone(), kind)) {
                     Some(entry) => entry.value().clone(),
-                    None => return Err(IacBusError::UnknownSpirit(spirit_id)),
+                    None => {
+                        same_host_err.get_or_insert(IacBusError::UnknownSpirit(spirit_id));
+                        continue;
+                    }
                 };
+                // The channel is taken first, then the incarnation is rechecked: a replacement
+                // registered after this lookup can never receive on the old incarnation's
+                // channel. A kernel Retract with no recorded recipient has no incarnation to
+                // notify, so it is never enqueued by name alone.
+                if let Some(live) = resolver {
+                    let admitted = match recorded {
+                        Some(recorded) => {
+                            live.resolve(&[spirit_id.as_str()])[0] == Some(recorded.pid)
+                        }
+                        None => kind != FrameKind::Retract,
+                    };
+                    if !admitted {
+                        continue;
+                    }
+                }
 
                 // Update last_inbound_frame_ns for the recipient via the activity
                 // tracker trait. Mutex guard is scoped to this block so the future
@@ -617,10 +932,13 @@ impl Mailbox {
                         self.metrics.inc_pending(&spirit_id, kind);
                     }
                     Err(_) => {
-                        if kind == FrameKind::EpistemicHalt {
-                            return Err(IacBusError::HaltQueueOverflow(spirit_id));
-                        }
-                        return Err(IacBusError::ChannelClosed(spirit_id, kind));
+                        // One closed recipient never strands the later ones (all eligible
+                        // recipients are attempted; the first failure is reported after).
+                        same_host_err.get_or_insert(if kind == FrameKind::EpistemicHalt {
+                            IacBusError::HaltQueueOverflow(spirit_id)
+                        } else {
+                            IacBusError::ChannelClosed(spirit_id, kind)
+                        });
                     }
                 }
             }
@@ -654,6 +972,9 @@ impl Mailbox {
                 }
             }
 
+            if let Some(e) = same_host_err {
+                return Err(e);
+            }
             Ok(LogBeforeDeliver::new(()))
         }) // close Box::pin async move
     }
@@ -795,6 +1116,15 @@ impl IacBusPort for super::IacBusAdapter {
         // that depended on the halt as its duplicate signal must move to
         // `deliver_typed`. Kernel-minted-id writers keep their halt via
         // `halt_on_duplicate` inside the TL adapter.
+        //
+        // Story 21-7 (D-21-7-04 C) — pid 0 is the root's. Only the kernel's own frames may take
+        // this path; compiled-in Spirits have no bus-send primitive at GA, so a Spirit's frame
+        // is refused typed rather than journaled as the root.
+        if frame.from.spirit_id.as_str() != KERNEL_SENDER_SPIRIT_ID {
+            return Err(IacBusError::UnattributedSender(
+                frame.from.spirit_id.as_str().to_owned(),
+            ));
+        }
         self.deliver_typed(frame, 0, None).await.map(|logged| {
             let _ = logged.into_inner();
             LogBeforeDeliver::new(())

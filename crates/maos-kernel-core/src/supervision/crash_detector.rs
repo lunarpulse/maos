@@ -44,6 +44,9 @@ pub struct CrashDetector {
     journal: Arc<JournalAdapter>,
     /// v0.3-β: NullReplicaResolver; v0.5+ multi-instance hosting swaps this.
     replica: Option<Arc<dyn ReplicaResolver>>,
+    /// Shared memory adapter whose principal-write grant is withdrawn at
+    /// crash teardown; `None` leaves the grant to the caller.
+    memory: Option<Arc<crate::memory::MemoryManagerAdapter>>,
     /// Active per-PID crash handlers — abort previous on re-crash (extremely rare; safety net).
     active_handlers: Arc<Mutex<BTreeMap<u32, JoinHandle<()>>>>,
 }
@@ -67,6 +70,7 @@ impl CrashDetector {
             telemetry,
             journal,
             replica: None,
+            memory: None,
             active_handlers: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
@@ -74,6 +78,13 @@ impl CrashDetector {
     /// Story 5.3 — inject a ReplicaResolver (v0.5+ multi-instance hosting).
     pub fn with_replica_resolver(mut self, replica: Arc<dyn ReplicaResolver>) -> Self {
         self.replica = Some(replica);
+        self
+    }
+
+    /// Share the actual `MemoryManagerAdapter` (the one admission authorizes
+    /// principal writes on) so crash teardown deauthorizes the pid.
+    pub fn with_memory(mut self, memory: Arc<crate::memory::MemoryManagerAdapter>) -> Self {
+        self.memory = Some(memory);
         self
     }
 
@@ -193,6 +204,12 @@ impl CrashDetector {
             let mut map = self.spirits.write().expect("spirits lock poisoned");
             map.remove(&spirit_pid);
         }
+        // Terminal release owner: withdraw only this pid's own registrations.
+        if let Some(memory) = &self.memory {
+            memory.deauthorize_principal_writes(spirit_pid);
+        }
+        self.iac
+            .unregister_promotion_set_for_pid(&scb.spirit_id, spirit_pid);
         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
         let crash_journal_payload = serde_json::json!({
             "lifecycle_event": "Crash",
