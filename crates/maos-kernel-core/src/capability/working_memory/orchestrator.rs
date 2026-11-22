@@ -111,8 +111,13 @@ impl WorkingMemoryOrchestrator {
         value: f64,
         derived_from: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.capability
-            .set_scalar(spirit_pid, spirit_id, tag, value, derived_from)?;
+        self.capability.set_scalar_kernel_origin(
+            spirit_pid,
+            spirit_id,
+            tag,
+            value,
+            derived_from,
+        )?;
         Ok(())
     }
 }

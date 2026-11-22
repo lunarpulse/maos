@@ -72,22 +72,30 @@ impl ValidatedRevocationRules {
             .collect()
     }
 
+    /// The applied CRLs with an entry matching class `name` at `version`.
+    pub(crate) fn matching(&self, name: &str, version: &str) -> Vec<CrlId> {
+        let rules = self
+            .rules
+            .read()
+            .expect("validated revocation rules lock poisoned");
+        rules
+            .iter()
+            .filter(|(_, entries)| {
+                entries.iter().any(|entry| {
+                    entry.spirit_class == name
+                        && matches!(
+                            semver_range_contains(version, &entry.version_range),
+                            Ok(true)
+                        )
+                })
+            })
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
     /// Must be called while the async `admission_guard` is held.
     pub(crate) fn rejects_manifest_locked(&self, manifest: &SpiritManifestBundle) -> bool {
-        let Some(class) = manifest.class.as_ref() else {
-            return false;
-        };
-        self.rules
-            .read()
-            .expect("validated revocation rules lock poisoned")
-            .values()
-            .flatten()
-            .any(|entry| {
-                entry.spirit_class == class.name
-                    && matches!(
-                        semver_range_contains(&class.version, &entry.version_range),
-                        Ok(true)
-                    )
-            })
+        let class = manifest.class.as_ref();
+        class.is_some_and(|class| !self.matching(&class.name, &class.version).is_empty())
     }
 }

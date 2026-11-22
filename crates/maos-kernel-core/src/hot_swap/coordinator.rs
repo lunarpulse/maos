@@ -227,6 +227,7 @@ impl HotSwapCoordinator {
             HookOutcome::Fired { .. }
             | HookOutcome::BudgetWarning80 { .. }
             | HookOutcome::SkippedManifest
+            | HookOutcome::SkippedQuarantined
             | HookOutcome::DeferredToNextStory
             | HookOutcome::HaltPending => {}
             HookOutcome::BudgetExceeded { .. } | HookOutcome::Panicked { .. } => {
@@ -380,6 +381,7 @@ impl HotSwapCoordinator {
             HookOutcome::Fired { .. }
             | HookOutcome::BudgetWarning80 { .. }
             | HookOutcome::SkippedManifest
+            | HookOutcome::SkippedQuarantined
             | HookOutcome::DeferredToNextStory
             | HookOutcome::HaltPending => {}
             HookOutcome::BudgetExceeded { .. } | HookOutcome::Panicked { .. } => {

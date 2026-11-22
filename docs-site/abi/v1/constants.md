@@ -162,11 +162,13 @@ Story 20-5 — schema version of a Worker manifest's `[cli_wrapper]` table.
 
 A counter separate from [`MANIFEST_SCHEMA_VERSION`]: a Worker manifest has no
 `[class]`, so it carries no ABI triple. An absent
-`[cli_wrapper] manifest_schema_version` means `1` for the whole v1.x line.
+`[cli_wrapper] manifest_schema_version` means `1`. Schema `2`
+(later-registry-quarantine-closure D-LRQC-04 A) requires `class_name` + `class_version`, the
+Worker's CRL-addressable identity; schema `1` cannot carry them.
 
 
 ```rust
-pub const CLI_WRAPPER_SCHEMA_VERSION: u32 = 1u32;
+pub const CLI_WRAPPER_SCHEMA_VERSION: u32 = 2u32;
 ```
 
 ### `MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION` {#maos-spirit-abi-min-supported-cli-wrapper-schema-version}
@@ -185,5 +187,5 @@ with `CliWrapperAdmissionError::ECliWrapperSchemaUnsupported`.
 
 
 ```rust
-pub const MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION: u32 = 1u32;
+pub const MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION: u32 = 2u32;
 ```

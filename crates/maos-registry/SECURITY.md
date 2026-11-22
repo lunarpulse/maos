@@ -170,13 +170,30 @@ than silently disabling expiry. Shell/worker/oneshot drains join timer/poller
 owners before supervisor stop, unload and audit drain. A portable AST guard checks
 all seven release sites and eleven named drain arms, including the shared macro.
 
-`MAOS_YANK_POLICY=warn` (default) records the event. `quarantine` fences the running
-Spirit that a signed yank matches (kernel KQ1) and journals one `spirit.quarantined`
-receipt. **This is not isolation:** only capability-mediated actions (issue, verify,
-recheck: MCP, inference, memory-by-token, IAC-by-token) are refused; private and shared
-memory writes, scalar mutation, DRR/native IAC and IO, hooks and telemetry are not
-fenced. The fence is per-pid and in memory and is shed by restart, unload, swap and
-reload, and a consumed yank row is never re-applied (the CRL path is durable).
+`MAOS_YANK_POLICY=warn` (default) records the event. `quarantine` records a durable
+`(spirit_id, version)` hold (written before any fence) and fences every live Spirit of that
+identity (Running, Paused or Loaded) through the kernel's sticky FR13 fence, journaling one
+`spirit.quarantined` receipt. The hold is re-applied at every admission of that identity
+(restart, unload/reload, crash and reload) before the Spirit can run, with a
+`quarantine:reapplied` receipt, until `maosctl quarantine-release <spirit_id>` (door-only,
+journaled, refused while an applied CRL still matches). **This is not isolation:** fenced are
+capability-mediated actions (issue, verify, recheck: MCP, inference, memory-by-token,
+IAC-by-token), the Spirit's own private and shared memory writes, scalar writes, native IAC
+sends, distillate writes, a Worker's egress bearer, and event-driven hooks (`on_frame`,
+`on_telemetry_event`, `on_schedule`, `on_idle`, `on_consolidate`); a cold upgrade or hot swap
+of a quarantined Spirit is refused until release. Retained limits: memory **reads** are not
+fenced; the Spirit's process or container keeps running; the fence is keyed by pid, so pid
+wrap-around is disclosed; the hold names `name@version`, so a locally re-signed artifact of the
+same name and version is not told apart from the yanked one; a schema-1 `[cli_wrapper]` Worker
+has no CRL-addressable identity (only schema 2 does). The CRL path stays durable by refusal at
+load.
+
+Open findings of the 2026-11-21 static review are deferred and listed in the
+`later-registry-quarantine-closure` story's Dev Agent Record ("static review: open findings"):
+release/CRL race, hold/admission serialization, CRL durability at boot, swap commit guard,
+effect-boundary fences, `on_load` ordering, release journal recoverability, poller telemetry
+and directory fsync.
+
 `auto-revoke` signs an exact-version
 local CRL with origin `RegistryYank` and invokes the existing applier, preserving
 the Spirit's declared revocation action rather than implementing a second applier.
