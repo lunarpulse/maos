@@ -156,6 +156,12 @@ fn installed_signed_manifest_journals_verified_publisher_and_rejects_tamper() {
         .replace("example-state", "tampered");
     std::fs::write(installed, text).unwrap();
     let output = shell(&scratch);
-    assert!(String::from_utf8_lossy(&output.stdout).contains("refused at boot: admission_refused"));
+    // A refused boot is the shell's single typed diagnostic on stderr (it no longer prints a
+    // refusal as an answer on stdout) plus a nonzero exit.
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("refused at boot: admission_refused") && !output.status.success(),
+        "{stderr}"
+    );
     assert_eq!(declarations(&scratch), rows);
 }

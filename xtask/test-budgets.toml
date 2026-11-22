@@ -29,7 +29,7 @@ default_seconds = 30
 # sum880.766s. ceil(1151.8 * 1.25)=1440; no per-binary exception changes.
 # Record the next green hosted sum and re-tighten under 20-7's rule-10 review row.
 # Prior: 800 -> 1100 from hosted40955589411 sum880.6s, E19 wave-2 vectors.
-total_seconds = 1440
+total_seconds = 1675
 # AC15/cohort post-fix local JUnit64ad0f22 sum807.751s (10 failures); not hosted authority.
 
 # Story 18-5-context-token-budget-accounting: context_budget_18_5,
@@ -37,6 +37,24 @@ total_seconds = 1440
 # budget_thresholds_18_5 use default_seconds; no exception or extra budget.
 
 # --- Exceptions (18-0 AC5, ruling R3: ~ CI max Σ x 1.25) ---------------------
+
+[[exception]]
+binary = "maos-bin::spawned_swap_20_9"
+seconds = 365
+reason = "21-9 hot-swap suite (27 tests): real wasm runners, rollback windows and successor handover; hosted Σ 328.9 s on run 45007034265 (PR #31), budget = observed + 10 %"
+owner = "21-9-wasm-host-default-on"
+
+[[exception]]
+binary = "maos-bin::spawned_lifecycle_20_9"
+seconds = 85
+reason = "21-9 lifecycle suite (21 tests): scheduled firing walls, pre-warm and teardown on real runners; hosted Σ 74.8 s on run 45007034265 (PR #31), budget = observed + 10 %"
+owner = "21-9-wasm-host-default-on"
+
+[[exception]]
+binary = "maos-bin::spawned_scope_17_3c"
+seconds = 55
+reason = "17-3c spawned scope suite (24 tests): delegated-cgroup T2 runners; hosted Σ 47.9 s on run 45007034265 (PR #31), budget = observed + 10 %"
+owner = "21-9-wasm-host-default-on"
 
 [[exception]]
 binary = "maos-bin::worker_terminal_facts_17_7"
