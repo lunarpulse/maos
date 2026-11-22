@@ -29,6 +29,114 @@ pub use private::PrivateMemoryStore;
 pub use self_telemetry::SelfTelemetryAggregator;
 pub use shared::SharedMemoryStore;
 
+/// Per-identity memory-tier quota (Story 21.6, FR28). The kernel only refuses:
+/// it never compacts, evicts or truncates. Usage per Spirit identity is logical
+/// bytes (`key.len()` + `MemoryValue::approximate_len`) and logical entries;
+/// limits are inclusive and come from operator configuration
+/// (`security::operator_config::MemoryQuotaSection`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TierLimit {
+    #[doc = "Maximum key + value bytes."]
+    pub bytes: u64,
+    #[doc = "Maximum logical entries."]
+    pub entries: u64,
+}
+
+/// Operator-policy defaults (not workload measurements) — the single default source.
+pub const DEFAULT_PRIVATE_LIMIT: TierLimit = TierLimit {
+    bytes: 64 << 20,
+    entries: 16_384,
+};
+/// See [`DEFAULT_PRIVATE_LIMIT`].
+pub const DEFAULT_SHARED_LIMIT: TierLimit = TierLimit {
+    bytes: 16 << 20,
+    entries: 4_096,
+};
+
+/// Logical usage of one identity in one tier (visible to the tier stores).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Usage {
+    bytes: u64,
+    entries: u64,
+}
+
+impl Usage {
+    /// Account one committed write: `old` is the prior charge of the same key.
+    fn charge(&mut self, old: Option<u64>, new: u64) {
+        self.bytes = self
+            .bytes
+            .saturating_sub(old.unwrap_or(0))
+            .saturating_add(new);
+        self.entries = self.entries.saturating_add(u64::from(old.is_none()));
+    }
+
+    fn credit(&mut self, bytes: u64, entries: u64) {
+        debug_assert!(
+            bytes <= self.bytes && entries <= self.entries,
+            "credit exceeds charge"
+        );
+        self.bytes = self.bytes.saturating_sub(bytes);
+        self.entries = self.entries.saturating_sub(entries);
+    }
+}
+
+/// Charge for one logical entry.
+fn entry_len(key: &str, value_len: u64) -> u64 {
+    (key.len() as u64).saturating_add(value_len)
+}
+
+/// Refuse a write that grows either resource while a resulting total exceeds
+/// its limit, so an identity pushed over one limit by a kernel-authored write
+/// (the halt context) cannot grow through the other. A replacement that adds
+/// no entry and no bytes always passes. Totals use checked arithmetic.
+fn check(
+    tier: MemoryTier,
+    limit: TierLimit,
+    used: Usage,
+    old: Option<u64>,
+    new: u64,
+) -> Result<(), MemoryError> {
+    let (entry, grow) = (
+        u64::from(old.is_none()),
+        new.saturating_sub(old.unwrap_or(0)),
+    );
+    let refuse = |resource, used, requested, limit| {
+        Err(MemoryError::QuotaExceeded {
+            tier,
+            resource,
+            used,
+            requested,
+            limit,
+        })
+    };
+    if entry == 0 && grow == 0 {
+        return Ok(());
+    }
+    if used
+        .entries
+        .checked_add(entry)
+        .is_none_or(|n| n > limit.entries)
+    {
+        return refuse(QuotaResource::Entries, used.entries, entry, limit.entries);
+    }
+    if used.bytes.checked_add(grow).is_none_or(|n| n > limit.bytes) {
+        return refuse(QuotaResource::Bytes, used.bytes, grow, limit.bytes);
+    }
+    Ok(())
+}
+
+/// Both tier stores carrying the operator-resolved quota (FR28).
+pub fn open_stores(
+    root: std::path::PathBuf,
+    inline_threshold: usize,
+    db: &std::path::Path,
+) -> Result<(Arc<PrivateMemoryStore>, Arc<SharedMemoryStore>), MemoryError> {
+    let quota = crate::security::operator_config::MemoryQuotaSection::resolve_from_env_and_disk();
+    let private = PrivateMemoryStore::new(root, inline_threshold).with_quota(quota.private);
+    let shared = SharedMemoryStore::open(db)?.with_quota(quota.shared);
+    Ok((Arc::new(private), Arc::new(shared)))
+}
+
 /// Decision F — the registered set of storage backends the GDPR forget cascade
 /// must account for.  This is the single source of truth shared with the
 /// multi-backend erasure test: adding a backend here WITHOUT partitioning it
@@ -61,6 +169,7 @@ use maos_domain::invariants::i1::CapabilityToken;
 use maos_domain::memory::{
     CollectiveErrorKind, ExportEntry, ExportPayload, ForgetOutcome, ForgetReceipt, LegalHoldRecord,
     MemoryEntry, MemoryError, MemoryNamespace, MemoryTier, MemoryValue, PrincipalIndexRow,
+    QuotaResource,
 };
 use maos_iac::adapter::transparency_log::AuditError;
 
@@ -73,7 +182,7 @@ use maos_domain::invariants::i5::{MemoryScope, NamespaceKey};
 /// Production Memory Manager adapter — implements `MemoryManagerPort`
 /// with three-tier memory, Principal Namespace index, and I5 enforcement.
 #[maos_attrs::i9_exempt(
-    reason = "memory manager three-tier substrate — bounded by principal forget-cascade + per-Spirit memory budget; per-Spirit-keyed map / per-Spirit-namespaced filesystem / sqlite table for ADR-026 principal namespace + I5 isolation; the forget serializer is bounded synchronization state that makes legal-hold check-and-act atomic, not pattern-learning"
+    reason = "memory manager three-tier substrate — bounded by the per-identity tier quota (bytes + entries, operator [memory_quota], refused with MemoryError::QuotaExceeded; FR28) and the principal forget-cascade; per-Spirit-keyed map / per-Spirit-namespaced filesystem / sqlite table for ADR-026 principal namespace + I5 isolation; the forget serializer is bounded synchronization state that makes legal-hold check-and-act atomic, not pattern-learning"
 )]
 pub struct MemoryManagerAdapter {
     private: Arc<PrivateMemoryStore>,
@@ -193,6 +302,7 @@ impl MemoryManagerAdapter {
         namespace: &MemoryNamespace,
         key: &str,
         value: MemoryValue,
+        enforce: bool,
     ) -> Result<(), MemoryError> {
         #[cfg(feature = "spirit_test")]
         let case_id = format!(
@@ -242,12 +352,23 @@ impl MemoryManagerAdapter {
                         schema,
                         key,
                         Self::now_ns(),
-                        || self.private.write(spirit_pid, namespace, key, value),
+                        || {
+                            self.private
+                                .write(spirit_pid, namespace, key, value, enforce)
+                        },
                     );
                 }
-                self.private.write(spirit_pid, namespace, key, value)
+                self.private
+                    .write(spirit_pid, namespace, key, value, enforce)
             }
-            MemoryTier::Shared => self.shared.write(spirit_pid, namespace, key, value),
+            MemoryTier::Shared => self.shared.write(
+                spirit_pid,
+                &self.private.owner_dirname(spirit_pid),
+                namespace,
+                key,
+                value,
+                enforce,
+            ),
             MemoryTier::Collective => {
                 // P1 — I1/I2 fail-closed.  The trait path carries NO token /
                 // posture_hash / sandbox (the `MemoryManagerPort` ABI cannot
@@ -879,6 +1000,31 @@ impl MemoryManagerAdapter {
     }
 }
 
+impl MemoryManagerAdapter {
+    /// The single write path. `enforce = false` charges without refusing: used
+    /// for kernel-authored writes (the operator's halt context, D-21-6-06),
+    /// after which the Spirit's next usage-growing write is refused.
+    pub(crate) fn write_inner(
+        &self,
+        spirit_pid: u32,
+        tier: MemoryTier,
+        namespace: &MemoryNamespace,
+        key: &str,
+        value: MemoryValue,
+        enforce: bool,
+    ) -> Result<(), MemoryError> {
+        // FR13 (D-LRQC-06 B): a quarantined pid's own write never reaches a tier.
+        if self
+            .capabilities
+            .as_ref()
+            .is_some_and(|caps| caps.is_quarantined(spirit_pid))
+        {
+            return Err(MemoryError::Quarantined { spirit_pid });
+        }
+        self.write_kernel_origin(spirit_pid, tier, namespace, key, value, enforce)
+    }
+}
+
 impl MemoryManagerPort for MemoryManagerAdapter {
     fn validate_namespace_read(&self, key: &NamespaceKey<MemoryScope>) -> bool {
         // v0.3-β: all namespace reads are permitted at the port level;
@@ -900,15 +1046,29 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         key: &str,
         value: MemoryValue,
     ) -> Result<(), MemoryError> {
-        // FR13 (D-LRQC-06 B): a quarantined pid's own write never reaches a tier.
-        if self
-            .capabilities
-            .as_ref()
-            .is_some_and(|caps| caps.is_quarantined(spirit_pid))
-        {
-            return Err(MemoryError::Quarantined { spirit_pid });
+        self.write_inner(spirit_pid, tier, namespace, key, value, true)
+    }
+
+    fn delete(
+        &self,
+        spirit_pid: u32,
+        tier: MemoryTier,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<bool, MemoryError> {
+        Self::reject_principal_outside_private(tier, namespace)?;
+        match tier {
+            MemoryTier::Private => self.private.delete(spirit_pid, namespace, key),
+            MemoryTier::Shared => {
+                let owner = self.private.owner_dirname(spirit_pid);
+                self.shared.delete(&owner, namespace, key)
+            }
+            // The collective port has no delete.
+            MemoryTier::Collective => Err(MemoryError::CollectiveNotYetAvailable {
+                ship_target: "v1.5",
+                landing_story: "E10 Story 10.4",
+            }),
         }
-        self.write_kernel_origin(spirit_pid, tier, namespace, key, value)
     }
 
     fn read(
@@ -1087,6 +1247,44 @@ impl MemoryManagerPort for MemoryManagerAdapter {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn quota_check_evaluates_both_totals_and_refuses_overflow() {
+        let limit = TierLimit {
+            bytes: 100,
+            entries: 2,
+        };
+        let over_entries = Usage {
+            bytes: 10,
+            entries: 3,
+        };
+        let tier = MemoryTier::Private;
+        // Growing bytes while the entry total is over its limit is refused...
+        let grown = check(tier, limit, over_entries, Some(5), 6);
+        assert!(matches!(
+            grown,
+            Err(MemoryError::QuotaExceeded {
+                resource: QuotaResource::Entries,
+                used: 3,
+                requested: 0,
+                limit: 2,
+                ..
+            })
+        ));
+        // ...a replacement that grows nothing is not.
+        assert!(check(tier, limit, over_entries, Some(5), 5).is_ok());
+        assert!(check(tier, limit, over_entries, Some(5), 1).is_ok());
+        // Totals that would overflow u64 are refused, never wrapped or clamped.
+        let max = Usage {
+            bytes: u64::MAX,
+            entries: 0,
+        };
+        let wide = TierLimit {
+            bytes: u64::MAX,
+            entries: 1,
+        };
+        assert!(check(tier, wide, max, Some(0), 1).is_err());
+    }
 
     fn make_adapter_with_hook(
         hook: Option<Arc<dyn Fn() + Send + Sync>>,

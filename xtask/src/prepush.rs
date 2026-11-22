@@ -10,6 +10,8 @@ use std::time::{Instant, UNIX_EPOCH};
 use syn::visit::Visit;
 
 const WORKFLOW: &str = ".github/workflows/discipline.yml";
+/// The one release-size limit in bytes; `tests/integration/onb_nfr2_timing.sh` reads the same file.
+const RELEASE_SIZE_LIMIT: &str = include_str!("../../tests/integration/release-size-limit");
 // Literal CI invocations; build-test-fixtures precedes every test leg.
 const GATES: &[(&str, &str)] = &[
     ("stability-matrix --check", "STABILITY.md"),
@@ -502,11 +504,19 @@ fn test_budget(report: &mut Report, junit: &str, budget: &mut Command) {
     }
 }
 
+fn release_size_limit() -> u64 {
+    RELEASE_SIZE_LIMIT
+        .trim()
+        .parse()
+        .expect("tests/integration/release-size-limit holds one integer")
+}
+
 fn binary_size(root: &Path, report: &mut Report, closure: &BTreeSet<String>) {
+    let limit = release_size_limit();
     if !size_trigger(&report.changed_paths, closure) {
         return report.add(
             "binary-size",
-            "release maos <= 39069022 B",
+            &format!("release maos <= {limit} B"),
             "skip",
             "no Cargo.toml, Cargo.lock, maos-bin or transitive local dependency changes",
         );
@@ -531,8 +541,8 @@ fn binary_size(root: &Path, report: &mut Report, closure: &BTreeSet<String>) {
         let stripped = temp.path().join("maos");
         capture_command(command(root, "strip", "-o").arg(&stripped).arg(source))?;
         let actual = fs::metadata(stripped).map_err(|e| e.to_string())?.len();
-        if actual > 39_069_022 {
-            return Err(format!("expected <= 39069022 B, actual {actual} B"));
+        if actual > limit {
+            return Err(format!("expected <= {limit} B, actual {actual} B"));
         }
         Ok(())
     })();

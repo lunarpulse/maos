@@ -320,6 +320,35 @@ fn consent_rupture_peer_identity_unverified_round_trips() {
     assert_eq!(got.ruptured_at_ns, 9_999);
 }
 
+/// Story 21-7 — the WIT 2.x enum predates `ConsentNotGranted`: a guest is shown the nearest
+/// reason (never an unrepresentable-frame exit); the domain value is the journal's.
+#[test]
+fn consent_not_granted_rupture_lowers_to_the_nearest_wit_reason() {
+    let payload = ConsentRupturePayload {
+        rupture_id: [0x04; 16],
+        original_frame_id: [0x05; 16],
+        original_kind: FrameKind::TaskAssign,
+        accepted: vec![],
+        rejected: vec![RuptureRejection {
+            address: address(None),
+            reason: frame::RuptureReason::ConsentNotGranted,
+        }],
+        ruptured_at_ns: 1,
+    };
+    let frame = envelope(
+        FrameKind::ConsentRupture,
+        FramePayload::ConsentRupture(payload),
+    );
+    let round = round_trip(&frame);
+    let FramePayload::ConsentRupture(got) = &round.payload else {
+        panic!("expected ConsentRupture");
+    };
+    assert_eq!(
+        got.rejected[0].reason,
+        frame::RuptureReason::IntentAllowlistMismatch
+    );
+}
+
 #[test]
 fn rate_limited_payload_round_trips() {
     let payload = RateLimitedPayload {

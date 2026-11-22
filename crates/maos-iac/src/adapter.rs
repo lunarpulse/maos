@@ -12,6 +12,7 @@
 //! stub.
 
 pub mod channels;
+pub mod consent_policy; // Story 21-7 production consent granter + gate policy
 pub mod context_signal; // Story 18-5 ADR-016 context-budget reporter
 pub mod decision_logger;
 pub mod distillate;
@@ -29,6 +30,7 @@ pub mod transparency_log; // NEW — Story 4.4 DistillateWriter
 pub use maos_domain::ports::IacBusPort;
 
 pub use channels::*;
+pub use consent_policy::ConsentPolicy;
 pub use drr_scheduler::{BudgetWarningEvent, DrrScheduler};
 pub use frame::*;
 pub use mailbox::Mailbox;
@@ -83,6 +85,7 @@ pub struct IacBusAdapter {
     frame_lineage_cache:
         std::sync::Arc<dashmap::DashMap<[u8; 16], maos_domain::invariants::i13::IntentLineage>>,
     promotion_sets: std::sync::Arc<dashmap::DashMap<String, PromotionRegistration>>,
+    consent_policy: std::sync::Arc<ConsentPolicy>,
     promotion_audit_last: std::sync::Arc<std::sync::Mutex<Option<std::time::Instant>>>,
     /// FR13 (KQ2) — pids a quarantine fenced: `deliver_typed` refuses them before the log append.
     fenced_senders: SenderFence,
@@ -120,6 +123,7 @@ impl IacBusAdapter {
             }),
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
             promotion_sets: std::sync::Arc::new(dashmap::DashMap::new()),
+            consent_policy: std::sync::Arc::default(),
             promotion_audit_last: std::sync::Arc::new(std::sync::Mutex::new(None)),
             fenced_senders: SenderFence::default(),
             trace_sink: None,
@@ -284,6 +288,19 @@ impl IacBusAdapter {
         self.promotion_sets
             .get(spirit_id)
             .map(|reg| reg.set.clone())
+    }
+
+    /// Withdraw everything admission registered for incarnation `pid` of `spirit_id`: its
+    /// promotion set and its consent declaration (the latter only while still `pid`'s).
+    pub fn withdraw_spirit(&self, spirit_id: &str, pid: u32) {
+        self.unregister_promotion_set_for_pid(spirit_id, pid);
+        self.consent_policy.unregister(spirit_id, pid);
+    }
+
+    /// Story 21-7 — the one production consent policy (granter and gate), over this bus's
+    /// admitted Spirits' declarations.
+    pub fn consent_policy(&self) -> &std::sync::Arc<ConsentPolicy> {
+        &self.consent_policy
     }
 
     fn check_promotion(
@@ -937,7 +954,16 @@ impl IacBusAdapter {
                 },
             );
         }
-        if original_sender != retracting_spirit.as_str() {
+        // Story 21-7 — within this boot the authenticated sender must still be the incarnation
+        // that sent the frame, and only a same-boot audience is notified (pids restart per boot;
+        // the window between the resolver reads here and the enqueue is closed by the mailbox's
+        // per-destination incarnation recheck).
+        let same_boot = original_entry.boot_nonce == self.transparency_log.boot_nonce();
+        let resolver = self.transparency_log.recipient_resolver();
+        let live = |id: &str| resolver.map(|r| r.resolve(&[id])[0]);
+        let retired = same_boot
+            && live(original_sender).is_some_and(|pid| pid != Some(original_entry.spirit_pid));
+        if original_sender != retracting_spirit.as_str() || retired {
             return Err(
                 maos_domain::iac_bus_types::IacBusError::RetractAuthorityViolation {
                     caller: retracting_spirit.as_str().to_string(),
@@ -999,6 +1025,7 @@ impl IacBusAdapter {
         // either arm: the Retract row, its side rows, the retraction marker and
         // the delivered frame all name it (never the shared `last_frame_id`).
         let retract_frame_id = self.transparency_log.mint_frame_id();
+        let mut pinned: Vec<(String, u32)> = Vec::new();
         let retract_frame = maos_domain::frame::IacFrame {
             frame_id: retract_frame_id,
             timestamp_ns: 0,
@@ -1024,13 +1051,39 @@ impl IacBusAdapter {
                     });
                     v.into()
                 } else {
-                    let mut v = Vec::new();
-                    v.push(maos_domain::frame::FrameAddress {
-                        spirit_id: maos_spirit_abi::identity::SpiritId::from(recipient_id.as_str()),
-                        host_id: None,
-                        role: None,
-                    });
-                    v.into()
+                    // Story 21-7 (D-21-7-03 A) — every recorded recipient that is still the
+                    // admitted incarnation; remote and gate-rejected addressees never received it.
+                    let recorded = self
+                        .transparency_log
+                        .recorded_recipients(original_frame_id)
+                        .map_err(|e| {
+                            maos_domain::iac_bus_types::IacBusError::SerializationFailed(
+                                e.to_string(),
+                            )
+                        })?;
+                    let ids: Vec<&str> = recorded.iter().map(|r| r.spirit_id.as_str()).collect();
+                    let live = self
+                        .transparency_log
+                        .recipient_resolver()
+                        .map_or_else(Vec::new, |resolver| resolver.resolve(&ids));
+                    // Each notified destination stays bound to its ORIGINAL incarnation: the
+                    // pins below feed `prepare`, so the journal and the enqueue recheck name
+                    // the original pid and a reload since never makes a replacement the
+                    // recipient.
+                    pinned = recorded
+                        .iter()
+                        .zip(live)
+                        .filter(|(recipient, pid)| same_boot && *pid == Some(recipient.pid))
+                        .map(|(recipient, _)| (recipient.spirit_id.clone(), recipient.pid))
+                        .collect();
+                    pinned
+                        .iter()
+                        .map(|(id, _)| maos_domain::frame::FrameAddress {
+                            spirit_id: maos_spirit_abi::identity::SpiritId::from(id.as_str()),
+                            host_id: None,
+                            role: None,
+                        })
+                        .collect()
                 }
             },
             kind: maos_spirit_abi::identity::FrameKind::Retract,
@@ -1042,15 +1095,14 @@ impl IacBusAdapter {
             intent_lineage: original_lineage,
         };
 
-        // Step 3.5: atomically check-and-mark retracted BEFORE writing the TL row
-        // (prevents duplicate Retract rows on concurrent/replayed retractions).
-        if let Some(existing) = self
-            .transparency_log
-            .check_and_mark_retracted(original_frame_id, retract_frame_id)
-            .map_err(|e| {
+        // Step 3.5: an already-retracted original answers without any new work; the marker
+        // itself commits with the Retract row and its recipients (one transaction, step 4).
+        let already = |frame_id: [u8; 16]| {
+            self.transparency_log.is_retracted(frame_id).map_err(|e| {
                 maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
-            })?
-        {
+            })
+        };
+        if let Some(existing) = already(original_frame_id)? {
             return Ok(RetractOutcome::Already {
                 existing_retract_frame_id: existing,
             });
@@ -1071,11 +1123,11 @@ impl IacBusAdapter {
         } else {
             None
         };
+        let pinned = PinnedRecipients(pinned);
         let prepared = if shell_reply_correlation.is_some() {
             mailbox::PreparedDelivery::default()
         } else {
-            self.mailbox
-                .prepare(&retract_frame, self.transparency_log.recipient_resolver())
+            self.mailbox.prepare(&retract_frame, Some(&pinned))
         };
         let token_column = capability_token.as_ref().map(capability_token_column);
         let payload_bytes = serde_json::to_vec(&retract_frame.payload).map_err(|e| {
@@ -1108,13 +1160,20 @@ impl IacBusAdapter {
                 )
                 .into_inner()
         };
-        // A kernel-minted id cannot be a peer replay: a duplicate is a sequence
-        // defect and halts, exactly like `insert_frame_event_with_sender` (I2).
-        assert!(
-            write == transparency_log::FrameRowWrite::Written,
-            "MAOS kernel panic — Transparency Log write failed: duplicate frame_id on a \
-             KERNEL-MINTED retract id (Architecture §7.3 I2)."
-        );
+        // A kernel-minted id cannot be a peer replay: a duplicate is the marker of a
+        // concurrent retraction (nothing of this attempt committed), else a sequence
+        // defect that halts, exactly like `insert_frame_event_with_sender` (I2).
+        if write == transparency_log::FrameRowWrite::Duplicate {
+            let Some(existing) = already(original_frame_id)? else {
+                panic!(
+                    "MAOS kernel panic — Transparency Log write failed: duplicate frame_id on a \
+                     KERNEL-MINTED retract id (Architecture §7.3 I2)."
+                );
+            };
+            return Ok(RetractOutcome::Already {
+                existing_retract_frame_id: existing,
+            });
+        }
 
         // Step 6: route through mailbox to the original recipient (a scoped
         // shell reply has none: nothing is delivered).
@@ -1125,6 +1184,20 @@ impl IacBusAdapter {
         }
 
         Ok(RetractOutcome::Retracted { retract_frame_id })
+    }
+}
+
+/// The original incarnations a retract notifies: `resolve` answers each pinned id with its
+/// original pid, never the live map's (a replacement of the same name is not the recipient).
+#[derive(Debug)]
+struct PinnedRecipients(Vec<(String, u32)>);
+
+impl transparency_log::RecipientResolver for PinnedRecipients {
+    fn resolve(&self, spirit_ids: &[&str]) -> Vec<Option<u32>> {
+        spirit_ids
+            .iter()
+            .map(|id| self.0.iter().find(|(p, _)| p == id).map(|(_, pid)| *pid))
+            .collect()
     }
 }
 
@@ -1139,6 +1212,7 @@ impl Default for IacBusAdapter {
             }),
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
             promotion_sets: std::sync::Arc::new(dashmap::DashMap::new()),
+            consent_policy: std::sync::Arc::default(),
             promotion_audit_last: std::sync::Arc::new(std::sync::Mutex::new(None)),
             fenced_senders: SenderFence::default(),
             trace_sink: None,

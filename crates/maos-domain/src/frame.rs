@@ -415,6 +415,10 @@ pub enum RuptureReason {
     /// claim standing in for a control, so this variant exists rather than
     /// reusing one that is merely adjacent.
     PeerIdentityUnverified,
+    /// Story 21-7 — a local sender that declared recall restrictions did not
+    /// grant this addressee. Distinct from `IntentAllowlistMismatch`, which is
+    /// the RECEIVER's allowlist.
+    ConsentNotGranted,
 }
 
 /// Story 6.4 / NFR-Scale-4 — RateLimited payload.

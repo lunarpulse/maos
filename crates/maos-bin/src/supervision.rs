@@ -2733,7 +2733,11 @@ mod worker {
                 Some(Err(error)) => {
                     eprintln!("maos run: worker unload failed for pid {spirit_pid}: {error}");
                 }
-                Some(Ok(())) => {}
+                Some(Ok(_)) => {
+                    if let Some(core) = core {
+                        self.iac.withdraw_spirit(core.spirit_id(), spirit_pid);
+                    }
+                }
                 None => eprintln!("maos run: worker unload thread panicked for pid {spirit_pid}"),
             }
         }

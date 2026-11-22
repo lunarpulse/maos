@@ -118,12 +118,12 @@ async fn log_before_deliver_adapter_panics_on_broken_log() {
         intent_lineage: IntentLineage::default(),
     };
 
-    // Deliver through the adapter (log-write + mailbox route)
-    use maos_domain::ports::IacBusPort;
-    let result = adapter.deliver(frame).await;
+    // Deliver through the adapter (log-write + mailbox route) as an admitted sender at pid 7:
+    // the unbound port carries only the kernel's frames (Story 21-7).
+    let result = adapter.deliver_typed(frame, 7, None).await;
     assert!(
         result.is_ok(),
-        "adapter.deliver should succeed with valid log"
+        "adapter.deliver_typed should succeed with valid log"
     );
 
     // Verify frame reached the receiver

@@ -5,245 +5,41 @@
 #![cfg(all(target_os = "linux", feature = "network", feature = "wasm-host"))]
 #![forbid(unsafe_code)]
 
+#[path = "support/installed_shell_20_9.rs"]
+mod shell;
 #[path = "../../../tests/harness/registry_20_1.rs"]
 mod support;
 #[path = "support/spawned_world_20_9.rs"]
 mod world;
 
+use shell::{text, Shell};
 use std::path::Path;
-use std::process::{Child, ChildStdin, Stdio};
-use std::time::{Duration, Instant};
-use support::{publish_artifact, root, sibling, InProcessServer, Scratch};
 use world::{manifest, ALL_HOOKS, ID};
-
-struct Shell {
-    scratch: Scratch,
-    child: Option<Child>,
-    /// The shell reads its REPL from here and leaves on EOF: held open for the vector's life.
-    stdin: Option<ChildStdin>,
-    /// The registry the component was installed from: a successor is published here too.
-    server: InProcessServer,
-}
-
-impl Shell {
-    /// The door answers `spawned_swap_not_ready ... retry` until the running guest has started
-    /// (a debug runner compiles its component slowly on a hosted core); the typed refusal says
-    /// to retry, so the witness retries it within one bound and judges only the settled answer.
-    fn ctl(&self, args: &[&str]) -> std::process::Output {
-        let until = Instant::now() + Duration::from_secs(90);
-        loop {
-            let output = self
-                .scratch
-                .command(&sibling("maosctl"))
-                .env("MAOS_NOTIFY_DISABLE", "1")
-                .args(args)
-                .output()
-                .expect("maosctl");
-            if !text(&output).contains("spawned_swap_not_ready") || Instant::now() >= until {
-                return output;
-            }
-            std::thread::sleep(Duration::from_millis(500));
-        }
-    }
-
-    fn field(&self, key: &str) -> Option<String> {
-        let output = self.ctl(&["spirit", "inspect", ID]);
-        if !output.status.success() {
-            return None;
-        }
-        String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .find_map(|line| line.strip_prefix(&format!("{key}: ")))
-            .map(str::to_owned)
-    }
-
-    fn stderr(&self) -> String {
-        std::fs::read_to_string(self.scratch.0.join("shell.stderr")).unwrap_or_default()
-    }
-
-    /// A successor of the installed component, published under the SAME publisher key and
-    /// installed beside the running version: a same-pid swap keeps the Spirit's
-    /// publisher-bound storage identity, so an unsigned or differently-signed successor is
-    /// refused (`swap_publisher_changed`). Returns the installed successor manifest.
-    fn signed_successor(&self, version: &str, extra: &str) -> std::path::PathBuf {
-        let staging = self.scratch.0.join(format!("successor-{version}"));
-        std::fs::create_dir_all(&staging).unwrap();
-        let published = staging.join("manifest.toml");
-        std::fs::write(
-            &published,
-            manifest(ID, version, "dist/lifecycle_probe.wasm", &ALL_HOOKS, extra).replace(
-                "trust_tier = \"local\"",
-                "trust_tier = \"public-untrusted\"",
-            ),
-        )
-        .unwrap();
-        let output = publish_artifact(
-            &self.scratch,
-            &sibling("maos-spirit"),
-            &self.server.addr,
-            &published,
-            &world::fixtures::fixture("lifecycle_probe.wasm"),
-            &self.scratch.0.join("publisher.key"),
-        );
-        assert!(
-            output.status.success(),
-            "publish {version}: {}",
-            text(&output)
-        );
-        let install = self
-            .scratch
-            .command(&sibling("maosctl"))
-            .args([
-                "spirit",
-                "install",
-                &format!("{ID}@{version}"),
-                "--registry-uri",
-                &format!("http://{}/mcp", self.server.addr),
-            ])
-            .output()
-            .unwrap();
-        assert!(
-            install.status.success(),
-            "install {version}: {}",
-            text(&install)
-        );
-        // Installing a version writes a `<version>-<suffix>` generation directory and points
-        // the installed index at it: that index is the only honest way to find the manifest.
-        maos_registry::storage::LocalFsRegistryStorage::at_path(
-            self.scratch.0.join("home/.local/share/maos/registry"),
-        )
-        .unwrap()
-        .installed_manifests()
-        .unwrap()
-        .into_iter()
-        .find(|(name, _)| name == ID)
-        .expect("the successor is in the installed index")
-        .1
-    }
-}
-
-impl Drop for Shell {
-    fn drop(&mut self) {
-        self.stdin.take();
-        if let Some(mut child) = self.child.take() {
-            let until = Instant::now() + Duration::from_secs(10);
-            while Instant::now() < until && matches!(child.try_wait(), Ok(None)) {
-                std::thread::sleep(Duration::from_millis(100));
-            }
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-    }
-}
-
-fn text(output: &std::process::Output) -> String {
-    format!(
-        "{}{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    )
-}
 
 /// An installed component (`maos spirit install`, then the shell root's boot) at `1.0.0`
 /// whose manifest appends `extra` (further sections); returns the running shell.
 fn boot_installed(extra: &str) -> Shell {
-    let scratch = Scratch::new();
-    let server = InProcessServer::start(&scratch);
-    let package = scratch.0.join("package");
-    std::fs::create_dir_all(&package).unwrap();
-    let probe = world::fixtures::fixture("lifecycle_probe.wasm");
-    std::fs::copy(&probe, package.join("lifecycle_probe.wasm")).unwrap();
-    // The registry package: the published manifest names the component under `dist/`.
-    let published = package.join("manifest.toml");
-    std::fs::write(
-        &published,
-        manifest(ID, "1.0.0", "dist/lifecycle_probe.wasm", &ALL_HOOKS, extra).replace(
-            "trust_tier = \"local\"",
-            "trust_tier = \"public-untrusted\"",
-        ),
-    )
-    .unwrap();
-    let key = scratch.0.join("publisher.key");
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::write(&key, "53".repeat(32)).unwrap();
-        std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600)).unwrap();
-    }
-    let output = publish_artifact(
-        &scratch,
-        &sibling("maos-spirit"),
-        &server.addr,
-        &published,
-        &probe,
-        &key,
-    );
-    assert!(output.status.success(), "publish: {}", text(&output));
-    let install = scratch
-        .command(&sibling("maosctl"))
-        .args([
-            "spirit",
-            "install",
-            &format!("{ID}@1.0.0"),
-            "--registry-uri",
-            &format!("http://{}/mcp", server.addr),
-        ])
-        .output()
-        .unwrap();
-    assert!(install.status.success(), "install: {}", text(&install));
-    let maos = Path::new(env!("CARGO_BIN_EXE_maos"));
-    let _ = world::fixtures::fixture("maos-wasm-runner");
-    let init = scratch
-        .command(maos)
-        .args(["init", "--plain"])
-        .output()
-        .unwrap();
-    assert!(init.status.success(), "init: {}", text(&init));
+    let component = manifest(ID, "1.0.0", "dist/lifecycle_probe.wasm", &ALL_HOOKS, extra);
+    shell::boot_installed(&[(ID, component)], "lifecycle_probe.wasm").0
+}
 
-    let mut child = scratch
-        .command(maos)
-        .args(["shell", "--plain"])
-        .env("MAOS_INFERENCE_MODE", "replay")
-        .env("MAOS_REGISTRY_URI", "")
-        .env("MAOS_REGISTRY_YANK_POLL_INTERVAL_S", "300")
-        .env("MAOS_YANK_POLICY", "warn")
-        .env(
-            "MAOS_REPLAY_CASSETTE",
-            root().join("crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json"),
-        )
-        .env("MAOS_NOTIFY_DISABLE", "1")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(std::fs::File::create(scratch.0.join("shell.stderr")).unwrap())
-        .spawn()
-        .expect("maos shell");
-    let stdin = child.stdin.take();
-    let shell = Shell {
-        scratch,
-        child: Some(child),
-        stdin,
-        server,
-    };
-    let until = Instant::now() + Duration::from_secs(90);
-    while shell.field("lifecycle_state").as_deref() != Some("Running") {
-        assert!(
-            Instant::now() < until,
-            "the installed component never reached Running:\n{}",
-            shell.stderr()
-        );
-        std::thread::sleep(Duration::from_millis(200));
-    }
-    shell
+/// A successor of the installed component: a signed package of the SAME publisher (a same-pid
+/// swap keeps the Spirit's publisher-bound storage identity), installed beside the running
+/// version. Returns the installed successor manifest.
+fn signed_successor(shell: &Shell, version: &str, extra: &str) -> std::path::PathBuf {
+    let text = manifest(ID, version, "dist/lifecycle_probe.wasm", &ALL_HOOKS, extra);
+    shell.signed_successor(ID, version, &text, "lifecycle_probe.wasm")
 }
 
 #[test]
 fn an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run() {
     let shell = boot_installed("");
-    let pid = shell.field("pid").expect("the door reports its pid");
+    let pid = shell.field(ID, "pid").expect("the door reports its pid");
 
     // The successor is a signed package of the same publisher, installed beside the running
     // version; the installed predecessor is a component the root booted, not one `maos run`
     // started.
-    let v2 = shell.signed_successor("1.1.0", "");
+    let v2 = signed_successor(&shell, "1.1.0", "");
     let output = shell.ctl(&[
         "spirit",
         "upgrade",
@@ -259,8 +55,11 @@ fn an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run
         text(&output),
         shell.stderr()
     );
-    assert_eq!(shell.field("pid"), Some(pid), "the same pid");
-    assert_eq!(shell.field("lifecycle_state").as_deref(), Some("Running"));
+    assert_eq!(shell.field(ID, "pid"), Some(pid), "the same pid");
+    assert_eq!(
+        shell.field(ID, "lifecycle_state").as_deref(),
+        Some("Running")
+    );
 }
 
 /// Story 20-8 review correction (GPT P2-1) — the dry run compares a successor against the
@@ -272,9 +71,10 @@ fn an_installed_component_is_upgraded_in_place_through_the_door_without_maos_run
 fn an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invariant() {
     let shell =
         boot_installed("[swap_invariants]\npreserve = [\"open_pr_state\", \"review_queue\"]\n");
-    let pid = shell.field("pid").expect("the door reports its pid");
+    let pid = shell.field(ID, "pid").expect("the door reports its pid");
     let successor = |version: &str, preserve: &str| {
-        shell.signed_successor(
+        signed_successor(
+            &shell,
             version,
             &format!("[swap_invariants]\npreserve = [{preserve}]\n"),
         )
@@ -329,7 +129,7 @@ fn an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invar
         shell.stderr()
     );
     assert_eq!(
-        shell.field("pid"),
+        shell.field(ID, "pid"),
         Some(pid.clone()),
         "the predecessor is untouched"
     );
@@ -345,5 +145,5 @@ fn an_installed_components_precheck_agrees_with_its_swap_on_a_dropped_swap_invar
         text(&swapped),
         shell.stderr()
     );
-    assert_eq!(shell.field("pid"), Some(pid), "the same pid");
+    assert_eq!(shell.field(ID, "pid"), Some(pid), "the same pid");
 }

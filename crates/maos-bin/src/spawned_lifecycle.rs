@@ -617,6 +617,13 @@ impl LifecycleLink {
         if !live {
             return;
         }
+        // Story 21-7: the outcome callback installs the successor's consent declaration. It
+        // runs BEFORE the handover becomes visible, so the session can never serve the
+        // successor's child under the predecessor's policy.
+        let outcome = locked(&self.outcome).take();
+        if let Some(outcome) = outcome {
+            outcome(true);
+        }
         // `closed` is read under the same slot lock `take_handover` uses, and the session
         // closes the link before draining the slot: either the session drains what is parked
         // here, or this sees `closed` and refuses to park on a terminal session.
@@ -632,10 +639,6 @@ impl LifecycleLink {
         // A refused bridge or a displaced handover is torn down by its own drop, outside
         // every lock.
         drop(rejected);
-        let outcome = locked(&self.outcome).take();
-        if let Some(outcome) = outcome {
-            outcome(true);
-        }
     }
 
     // ── session side ────────────────────────────────────────────────────────────────────
@@ -1131,6 +1134,17 @@ pub fn spawned_successor(
     }
     let mut effective = context.sandbox.clone();
     effective.declared_scopes = successor_scopes;
+    // Story 21-7: a swap keeps or narrows consent; the successor's declaration replaces the
+    // predecessor's only at the committed handover.
+    let policy = Arc::clone(
+        (handles.session)(Arc::clone(&supervisor))
+            .iac
+            .consent_policy(),
+    );
+    let grants = gated.consent.as_ref().map(|c| c.recall.clone());
+    if let Some(change) = policy.widened_by(&class.name, grants.as_ref()) {
+        return Err(format!("swap_consent_widened: the successor {change}"));
+    }
     let launch_origin = origin.unwrap_or_else(|| {
         path.parent()
             .map_or_else(|| ".".into(), std::path::Path::to_path_buf)
@@ -1196,8 +1210,12 @@ pub fn spawned_successor(
         verified_publisher,
     });
     let archive_root = handles.archive_root.clone();
+    let (name, pid) = (class.name.clone(), target.spirit_pid());
     core.lifecycle()
         .attach_successor(prewarm, target.lifecycle(), move |committed| {
+            if committed {
+                policy.register(&name, pid, grants);
+            }
             let outcome = if committed { "admitted" } else { "refused" };
             // The FR11 identity record of the version that actually took over the pid: only a
             // committed `swap-in` records it, the admitted successor's own manifest text.

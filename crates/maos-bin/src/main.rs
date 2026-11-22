@@ -2127,14 +2127,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err(format!("memory-root create failed: {e}").into());
     }
 
-    let private_store = Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
-        memory_root,
-        4 * 1024,
-    ));
-    let shared_store = Arc::new(
-        maos_kernel_core::memory::shared::SharedMemoryStore::open(&memory_db_path)
-            .map_err(|e| format!("failed to open shared memory store: {e}"))?,
-    );
+    // FR28: both stores carry the operator-resolved quota.
+    let (private_store, shared_store) =
+        maos_kernel_core::memory::open_stores(memory_root, 4 * 1024, &memory_db_path)
+            .map_err(|e| format!("failed to open shared memory store: {e}"))?;
     let principal_index = Arc::new(
         maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&memory_db_path)
             .map_err(|e| format!("failed to open principal index: {e}"))?,
@@ -2774,11 +2770,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Story 6.4 — install the TransparencyLogAdapter on the Mailbox so the
     // Phase 1.5 consent-rupture quarantine row can be written BEFORE the
-    // ConsentRupture frame is emitted (I2 log-before-deliver). The default
-    // ConsentGate (`None`) preserves existing behavior; operator-supplied
-    // gates can be installed via `mailbox.install_consent_gate(...)`.
+    // ConsentRupture frame is emitted (I2 log-before-deliver).
     let _ = mailbox.install_transparency_log(Arc::clone(&transparency_log));
     eprintln!("maos: Mailbox TL installer wired (Story 6.4)");
+
+    // Story 21-7 — the production consent gate, set-once, over the one policy the session
+    // granter also reads (the admitted Spirits' `[consent.recall]` declarations). A failed
+    // install is a boot error, like the recipient resolver's.
+    mailbox
+        .install_consent_gate(Arc::clone(iac.consent_policy()) as _)
+        .map_err(|()| "consent gate installed twice")?;
+    eprintln!("maos: Mailbox consent gate wired (Story 21-7)");
 
     // j1-crosshost-1a AC2.1-2.3 — the A2A delegation leg, installed HERE (beside
     // the TL installer) and not at the mailbox construction site, because the
@@ -10455,6 +10457,10 @@ fn swap_context_of(
 #[cfg(feature = "network")]
 #[async_trait::async_trait]
 impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
+    fn forget_promotion_set(&self, spirit_id: &str, pid: u32) {
+        self.iac.withdraw_spirit(spirit_id, pid);
+    }
+
     async fn append_lifecycle_journal(
         &self,
         event: maos_domain::invariants::i10::LifecycleEvent,

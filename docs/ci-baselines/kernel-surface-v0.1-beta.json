@@ -790,7 +790,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::memory::MemoryManagerAdapter",
-      "signature_hash": "2ff3f30ff49492d5a52b5d9cdfdcde22c2b6a27b738d056c9444899df39225b5"
+      "signature_hash": "c45bd1419ae2f366c706b8a067f8b299d9cedc1aa48436c0cd996f1a454ddafc"
     },
     {
       "kind": "struct",
@@ -805,7 +805,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::memory::private::PrivateMemoryStore",
-      "signature_hash": "3e29cbb199077d6adc20babfdd0c771f6fb74af65953a44b20a3059b65b913cf"
+      "signature_hash": "2e870bcfdf14a0025b771569afec8b5d098c08de11e640287e119e8cf096331d"
     },
     {
       "kind": "struct",
@@ -815,7 +815,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::memory::shared::SharedMemoryStore",
-      "signature_hash": "b0d18032b1cb3e4678c33c3417f89eb791573af138379ac7084f6014d03b88ef"
+      "signature_hash": "76e2c4aff71bbb892e41dc4fcd8f14c5b42d6209d8f3d69938a3f81e0d78e81f"
     },
     {
       "kind": "struct",

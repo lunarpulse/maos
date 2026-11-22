@@ -106,7 +106,9 @@ fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
 
 동의는 발신자가 아닌 기록된 수신자에게 적용됩니다. envelope가 만료되었거나, 이후의 일치하는 grant 범위 rupture가 있거나, 정책이 `Withheld`이면 frame은 `recall`에서 제외되고 `fetch`는 `consent-withheld`를 반환합니다. `HeaderOnly` frame은 `payload-available = false`로 목록에 남지만, fetch는 payload 대신 `consent-withheld`를 반환합니다. 데몬 측 `ConsentEnvelope.recall` 정책의 기본값은 `Full`이며 알 수 없는 값은 안전하게 `Withheld`로 처리합니다. 이 정책은 **WIT에 포함되지 않습니다**. guest는 효과만 볼 수 있고 guest가 주장한 envelope는 권한을 부여하지 않습니다. lossless frame 전송에 대한 이 의도적인 예외는 `17-8-consent-recall-policy`로 비준되었습니다.
 
-**프로덕션 한계(Story 17-8, AC3.6 / rule 11):** HEAD 기준으로 `HeaderOnly`나 `Withheld`를 설정하는 프로덕션 granter는 없고 프로덕션에는 `ConsentGate`가 설치되지 않습니다. envelope가 있는 frame은 A2A delegation intake를 통해서만 승인된 로컬 수신자에게 도달합니다. peer-identity rupture에는 envelope가 없으므로 아무것도 보류하지 않습니다. native compiled-in Spirit의 bus 전송은 pid 0으로 기록되며, 발신자 귀속은 이 story의 비목표입니다. 동의 사례는 `deliver_typed`로 frame을 전달하는 suite에서 검증되며 활성 프로덕션 정책이라고 주장하지 않습니다.
+**현재 동작(Story 21-7):** 데몬은 승인된 각 Spirit이 선언한 `[consent.recall]`([Manifest 스키마 v7](/manifest/v7#consent-recall))에 대해 프로덕션 consent granter와 `ConsentGate`를 하나 설치합니다. granter는 인증된 발신자입니다. 발신 frame에는 데몬이 찍은 envelope가 붙고 guest가 제공한 envelope는 폐기됩니다. grant를 선언하면 부여하지 않은 로컬 수신 주소는 거부됩니다. rupture frame은 이 WIT에서 가장 가까운 이유인 `intent-allowlist-mismatch`로 표시하고, journal에는 `consent_not_granted`가 기록됩니다. retract는 여전히 승인된 incarnation인 기록된 모든 수신자에게 도달합니다. 여기서 "동의"는 기술적인 recall 및 전달 제한이며, 법적 동의, GDPR 적법 근거, 법률 검토를 거친 것이 아닙니다. peer-identity rupture에는 envelope가 없으므로 아무것도 보류하지 않습니다. native compiled-in Spirit에는 bus 전송 primitive가 없으며, 바인딩되지 않은 bus port는 Spirit 발신자를 pid 0으로 기록하지 않고 거부합니다. Postgres 기반 collective tier는 이 동의 상태를 보존하지 않습니다.
+
+**보장 범위:** recall 한정입니다. 이 제한은 수신자가 나중에 `recall`과 `fetch`로 읽을 수 있는 내용만 통제하며, 이미 수신자의 세션에 전달된 frame을 회수하거나 숨기지 않습니다.
 
 ### 오류와 감사 기록
 

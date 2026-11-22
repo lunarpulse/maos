@@ -159,6 +159,9 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         pread: Option<Arc<String>>,
     ) -> Result<crate::admission::Admitted, crate::admission::AdmissionRefusal>;
 
+    /// Withdraw any I13 recipient policy after a successful unload.
+    fn forget_promotion_set(&self, _spirit_id: &str, _pid: u32) {}
+
     /// Recovery uses precisely the same structural gate and constructor as load.
     #[cfg(feature = "network")]
     fn prepare_spirit(
@@ -1120,6 +1123,9 @@ impl DoorInner {
                 },
             };
         }
+        if verb == "unload" {
+            self.private_ops.forget_promotion_set(spirit_id, pid);
+        }
 
         if let Err(error) = self
             .private_ops
@@ -1698,6 +1704,14 @@ impl DoorInner {
                 ),
             );
         }
+        // Story 21-7: a swap keeps or narrows consent; it never widens it or drops it.
+        if let Some(change) = crate::admission::widened_consent(&predecessor_manifest, &target_text)
+        {
+            return OperatorOutcome::Conflict {
+                code: "swap_consent_widened".into(),
+                detail: format!("the successor {change} of '{spirit_id}'; refused before unload"),
+            };
+        }
         let restore_origin = spawned
             .then(|| self.private_ops.spawned_origin(spirit_id))
             .flatten();
@@ -1781,6 +1795,7 @@ impl DoorInner {
                 detail: error.to_string(),
             };
         }
+        self.private_ops.forget_promotion_set(spirit_id, pid);
         let target_origin = spawned.then_some(target_origin);
         let (outcome, journal, result) = match self
             .admit_and_start(
@@ -1894,6 +1909,10 @@ impl DoorInner {
         .map_err(|refusal| format!("{}: {refusal}", refusal.code()))?;
         if admitted.spirit_id != spirit_id {
             let unwound = self.scheduler.unload(admitted.pid).await;
+            if unwound.is_ok() {
+                self.private_ops
+                    .forget_promotion_set(&admitted.spirit_id, admitted.pid);
+            }
             return Err(format!(
                 "target_manifest_mismatch: admitted {}; unwind: {unwound:?}",
                 admitted.spirit_id
@@ -1905,6 +1924,10 @@ impl DoorInner {
         }
         if let Err(error) = self.scheduler.start(admitted.pid).await {
             let unwound = self.scheduler.unload(admitted.pid).await;
+            if unwound.is_ok() {
+                self.private_ops
+                    .forget_promotion_set(&admitted.spirit_id, admitted.pid);
+            }
             return Err(match unwound {
                 Ok(_) => format!("start_failed: {error}"),
                 Err(unwind) => format!("start_failed: {error}; unwind unload failed: {unwind}"),
@@ -2045,6 +2068,7 @@ impl DoorInner {
                 detail: error.to_string(),
             };
         }
+        self.private_ops.forget_promotion_set(spirit_id, pid);
         let halts_after = self
             .halt_registry
             .halt_metadata_for_spirit(pid, 0)
