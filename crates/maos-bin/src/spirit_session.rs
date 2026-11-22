@@ -563,7 +563,12 @@ pub async fn run_admitted_session(
                     if let Some((_, frame)) = recipient.handle.try_recv()
                         .map_err(|error| SessionError::Mailbox(error.to_string()))?
                     {
-                        if seed_id.is_some_and(|id| id != frame.frame_id) {
+                        if deps.capability.is_quarantined(admitted.pid) {
+                            // FR13: a quarantined incarnation starts no new frame turn; the
+                            // frame is refused typed (lifecycle requests below stay available).
+                            journal_undeliverable(&deps, admitted.pid, &admitted.spirit_id,
+                                frame.frame_id, "spirit is quarantined: ordinary frame refused");
+                        } else if seed_id.is_some_and(|id| id != frame.frame_id) {
                             // A `--once` session's only turn is the operator seed.
                             journal_undeliverable(&deps, admitted.pid, &admitted.spirit_id,
                                 frame.frame_id, "once session accepts only its operator seed");

@@ -111,13 +111,16 @@ The FKCS conformance review that discharged decision D8 (`epic-14-preflight-deci
   The issuer and operator-root-signed attestation-revocation-list writer live in
   `maos-spirit-cli`; `vet issue`/`vet revoke` do not enroll a vetter implicitly.
   Running expiry/revocation uses the yank cadence and preserves cause labels.
-  Quarantine requests in L1 had no effect; 20-1b landing 2 (final kernel landing, KQ1) adds a
-  capability-mediated fence: the `quarantine` policy fences each signed-yank-matched running
-  Spirit (issue, verify and recheck: MCP, inference, memory-by-token, IAC-by-token) and journals one
-  `spirit.quarantined` receipt. Private and shared memory writes, scalar mutation, DRR/native IAC and
-  IO, hooks and telemetry are not fenced; the fence is per-pid and in memory and is shed by restart,
-  unload, swap and reload; a consumed yank row is never re-applied (the CRL path is durable). It is
-  not isolation (operator ruling `q`, 2026-11-12).
+  Quarantine requests in L1 had no effect; 20-1b landing 2 (KQ1) added a capability-mediated
+  fence, and later-registry-quarantine-closure (2026-11-21) extends it: the `quarantine` policy
+  writes a durable `(spirit_id, version)` hold and fences every live Spirit of that identity;
+  the hold is re-applied at every admission until `maosctl quarantine-release`. Fenced: issue,
+  verify and recheck (MCP, inference, memory-by-token, IAC-by-token), the Spirit's own memory
+  writes, scalar writes, native IAC sends, distillate writes, Worker egress and event-driven
+  hooks; cold upgrade and hot swap are refused until release. Not fenced: memory reads; the
+  Spirit's process or container keeps running; pid wrap-around and the name+version (not
+  artifact) association of a local manifest are disclosed limits. It is not isolation
+  (operator ruling `q`, 2026-11-12).
 
 ## Amendment — 20-1b L1 independent-review corrections (2026-11-07)
 

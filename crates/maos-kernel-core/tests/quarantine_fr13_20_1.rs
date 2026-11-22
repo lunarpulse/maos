@@ -28,47 +28,25 @@ use maos_domain::ports::mcp::{
     McpAttribution, McpCallResponse, McpClientPort, McpError, McpTransportId,
 };
 use maos_domain::ports::InferencePort;
-use maos_domain::revocation::{
-    CrlId, RevocationAction, RevocationEntry, RevocationOrigin, SignedRevocationList,
-};
+use maos_domain::revocation::RevocationAction;
 use maos_kernel_core::capability::cap_policy::decision::TrustTier;
-use maos_kernel_core::capability::cap_policy::{
-    ManifestCapabilityScope, PolicyTable, PolicyTableInner,
-};
-use maos_kernel_core::capability::{
-    cap_audit, cap_quota::CapQuotaTracker, cap_tokens::Ed25519SigningKey,
-    CapabilityRegistryAdapter, WorkingMemoryStore,
-};
-use maos_kernel_core::iac::{
-    transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter},
-    IacBusAdapter, Mailbox,
-};
+use maos_kernel_core::capability::cap_policy::{ManifestCapabilityScope, PolicyTableInner};
+use maos_kernel_core::capability::CapabilityRegistryAdapter;
+use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use maos_kernel_core::inference::router::MultiProviderRouter;
 use maos_kernel_core::inference::InferencePortAdapter;
-use maos_kernel_core::journal::JournalAdapter;
 use maos_kernel_core::mcp::McpClientAdapter;
-use maos_kernel_core::memory::{
-    principal::PrincipalNamespaceIndex, private::PrivateMemoryStore, shared::SharedMemoryStore,
-    MemoryManagerAdapter,
-};
-use maos_kernel_core::revocation::RevocationApplier;
-use maos_kernel_core::scheduler::{
-    control_block::{ScbLifecycleState, SpiritManifestBundle},
-    SpiritSchedulerAdapter,
-};
-use maos_kernel_core::security::{
-    manifest::{ClassSection, OnRevocationSection, SupervisionSection},
-    RingCryptoProvider,
-};
-use maos_kernel_core::telemetry::{iac_rt::IacRtMetrics, TelemetryStreamAdapter};
+use maos_kernel_core::scheduler::control_block::ScbLifecycleState;
+use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 use maos_providers::provider::{Provider, ProviderError};
+
+#[path = "support/quarantine_world.rs"]
+mod quarantine_world;
+use quarantine_world::{crl_naming, fixture, manifest, Fixture, TestSpirit};
 
 const PROVIDER: &str = "count-stub";
 const SERVER: &str = "count-stub";
 const TOOL: &str = "write";
-
-struct TestSpirit;
-impl maos_spirit_abi::lifecycle::Spirit for TestSpirit {}
 
 /// Counts the calls that actually reach the effect.
 #[derive(Default)]
@@ -112,125 +90,6 @@ impl maos_mcp::McpClient for CountingMcp {
             McpAttribution::new(server_name.into(), McpTransportId::Stdio, tool.into()),
         ))
     }
-}
-
-struct Fixture {
-    scheduler: Arc<SpiritSchedulerAdapter>,
-    applier: RevocationApplier,
-    tl: Arc<TransparencyLogAdapter>,
-    capability: Arc<CapabilityRegistryAdapter>,
-    policy: Arc<PolicyTable>,
-    _tmp: tempfile::TempDir,
-}
-
-fn fixture() -> Fixture {
-    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-    let tmp = tempfile::TempDir::new().expect("tempdir");
-    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0x2011));
-    let telemetry = Arc::new(IacRtMetrics::new());
-    let (audit_tx, mut audit_rx) = cap_audit::channel();
-    std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
-    let policy = Arc::new(PolicyTable::new());
-    let capability = Arc::new(CapabilityRegistryAdapter::new(
-        Arc::new(RingCryptoProvider),
-        Ed25519SigningKey::new([0u8; 32]),
-        0x2011,
-        Arc::clone(&policy),
-        audit_tx,
-        CapQuotaTracker::new(),
-        Arc::new(WorkingMemoryStore::new()),
-        Arc::new(TelemetryStreamAdapter::default()),
-    ));
-    let memory = Arc::new(MemoryManagerAdapter::new(
-        Arc::new(PrivateMemoryStore::new(tmp.path().join("memory"), 4)),
-        Arc::new(SharedMemoryStore::open(&tmp.path().join("memory.db")).expect("shared store")),
-        Arc::new(
-            PrincipalNamespaceIndex::open(&tmp.path().join("memory.db")).expect("principal index"),
-        ),
-        Arc::clone(&tl),
-    ));
-    let iac = Arc::new(IacBusAdapter::new(
-        Arc::new(Mailbox::new(Arc::clone(&telemetry))),
-        Arc::clone(&tl),
-    ));
-    let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
-    let scheduler = Arc::new(SpiritSchedulerAdapter::new(
-        Arc::clone(&tl),
-        Arc::clone(&capability),
-        memory,
-        Arc::clone(&iac),
-        Arc::clone(&halt_registry),
-        Arc::clone(&telemetry),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    ));
-    let journal =
-        Arc::new(JournalAdapter::open(&tmp.path().join("journal.ndjson")).expect("journal"));
-    let applier = RevocationApplier::new(
-        scheduler.scbs(),
-        Arc::clone(&capability),
-        Arc::clone(&scheduler),
-        iac,
-        halt_registry,
-        Arc::clone(&tl),
-        journal,
-        telemetry,
-    );
-    Fixture {
-        scheduler,
-        applier,
-        tl,
-        capability,
-        policy,
-        _tmp: tmp,
-    }
-}
-
-fn manifest(name: &str) -> SpiritManifestBundle {
-    SpiritManifestBundle {
-        class: Some(ClassSection {
-            name: name.into(),
-            version: "1.2.3".into(),
-            abi: "1.0".into(),
-            manifest_schema_version: 1,
-            min_substrate_version: "0.1.0".into(),
-            forms: vec!["rust-inproc".into()],
-            trust_tier: "local".into(),
-            description: "FR13 quarantine fixture".into(),
-            artifact: None,
-        }),
-        on_revocation: Some(OnRevocationSection {
-            action: RevocationAction::Quarantine,
-        }),
-        supervision: Some(SupervisionSection {
-            heartbeat_interval_ms: 5_000,
-            progress_threshold_ms: 5_000,
-            silent_failure_threshold_ms: 5_000,
-        }),
-        ..SpiritManifestBundle::default()
-    }
-}
-
-fn crl_naming(class: &str) -> SignedRevocationList {
-    let entries =
-        vec![
-            RevocationEntry::new(class, ">=1.0.0,<2.0.0", "FR13 quarantine fixture", None)
-                .expect("valid revocation entry"),
-        ];
-    SignedRevocationList::new(
-        CrlId::from_entries(&entries).expect("CRL id"),
-        1,
-        0,
-        RevocationOrigin::Operator,
-        entries,
-        [1; 64],
-        [2; 32],
-    )
-    .expect("valid CRL")
 }
 
 fn scopes() -> Vec<Scope> {

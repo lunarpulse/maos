@@ -104,6 +104,10 @@ pub enum Subcommand {
     /// Worker from where it stopped, and re-enqueues its Orchestrator buffer
     /// in order (FR51 b/c).
     Resume(ResumeArgs),
+    /// Release a quarantined Spirit (FR13): clears its capability, sender and Worker egress fences
+    /// and its durable hold. Refused while an applied CRL still matches it (forget the CRL
+    /// first). A director pause is not lifted. Door-only; Spirits cannot call it.
+    QuarantineRelease(QuarantineReleaseArgs),
     /// Revoke a capability token (FR51 d): its next mint or verify fails, the
     /// response of an inference or MCP call made with it that is still on the
     /// wire is refused, and a Worker spawned under it is stopped
@@ -889,6 +893,13 @@ pub struct PauseArgs {
 #[derive(clap::Args, Debug)]
 pub struct ResumeArgs {
     /// Spirit ID to resume.
+    pub spirit: String,
+}
+
+/// FR13 — release a quarantined Spirit.
+#[derive(clap::Args, Debug)]
+pub struct QuarantineReleaseArgs {
+    /// Spirit ID to release.
     pub spirit: String,
 }
 

@@ -68,8 +68,10 @@ fn shipped_worker_manifests() -> Vec<(std::path::PathBuf, toml::Value, CliWrappe
             // the re-serialized `[cli_wrapper]` section, so drive it the same way rather
             // than a shape the production path never sees.
             let mut section = section.clone();
-            CliWrapperConfig::take_schema_version(&mut section)
+            let schema = CliWrapperConfig::take_schema_version(&mut section)
                 .unwrap_or_else(|e| panic!("{} schema version: {e}", path.display()));
+            CliWrapperConfig::take_worker_identity(&mut section, schema)
+                .unwrap_or_else(|e| panic!("{} worker identity: {e}", path.display()));
             let section_toml = toml::to_string(&section)
                 .unwrap_or_else(|e| panic!("{} [cli_wrapper] re-serialize: {e}", path.display()));
             let cfg = CliWrapperConfig::from_toml_str(&section_toml)
@@ -154,7 +156,8 @@ fn builtin_probe_authority_cannot_admit_the_operator_echo_destination() {
     ))
     .unwrap();
     let mut section = root.get("cli_wrapper").unwrap().clone();
-    CliWrapperConfig::take_schema_version(&mut section).unwrap();
+    let schema = CliWrapperConfig::take_schema_version(&mut section).unwrap();
+    CliWrapperConfig::take_worker_identity(&mut section, schema).unwrap();
     let config = CliWrapperConfig::from_toml_str(&toml::to_string(&section).unwrap()).unwrap();
     let grant = maos_bin::worker_spawn::builtin_probe_grant();
     assert!(matches!(

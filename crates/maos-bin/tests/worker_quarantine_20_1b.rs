@@ -7,20 +7,19 @@
 //! This asserts the capability-mediated fence and nothing else. It does NOT claim isolation:
 //! the container is not frozen and not killed by a quarantine (ruling `q`).
 //!
-//! Route. A Worker's SCB carries no `[class]` (`worker_spawn.rs` binds
-//! `SpiritManifestBundle { on_crash, supervision, ..Default }`), and the CRL arm skips a
-//! class-less SCB (`applier.rs`, `let Some(class) = ... else { continue }`). So a CRL
-//! cannot reach a Worker. The test applies a real CRL naming the Worker, records
-//! `crl_matched_count`, and when it did not quarantine the Worker applies the same kernel
-//! primitive (`set_quarantined`) that the CRL arm and the yank policy call, recording the
-//! route. If the product later makes a Worker CRL-addressable the record changes and the
-//! test requires the Worker to be fenced by the CRL itself.
+//! Route (later-registry-quarantine-closure AC4, D-LRQC-04 A / D-LRQC-05 A). A schema-2 Worker
+//! manifest declares `class_name` + `class_version` and `[on_revocation] action = "quarantine"`;
+//! `worker_spawn.rs` binds them as the SCB's `ClassSection` and `on_revocation`. A real CRL
+//! naming that identity therefore reaches the Worker through the CRL arm itself
+//! (`crl_matched_count == 1`): the test no longer calls `set_quarantined` and requires the CRL
+//! to fence. `container_activity_continues` is still recorded, not denied.
 //!
 //! Host: the live-container test uses `require_t3`: a named local skip, FAIL-CLOSED on CI.
 //! The fence/refusal half also runs without the substrate on a container-less Worker
-//! binding (`a_bound_worker_scb_...`). Planted red: drop the fence (`set_quarantined` in
-//! `fence_and_refuse`) so the post-quarantine mint succeeds, and the refusal assertions fail
-//! in both tests; only the live-container test proves the container half.
+//! binding (`a_bound_worker_scb_...`). Planted red: make the CRL arm skip the Worker (drop the
+//! `class` from the `worker_spawn.rs` bundle, or `set_sender_fenced`/`set_quarantined` in the
+//! `Quarantine` arm) so the CRL does not fence it and the route assertions fail in both tests;
+//! only the live-container test proves the container half (the hosted T3 run is orchestrator-owned).
 #[path = "../../../tests/harness/fixtures.rs"]
 mod fixtures;
 #[path = "../../../tests/harness/t3_substrate.rs"]
@@ -32,7 +31,9 @@ use maos_bin::supervision::{
 use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope, TokenId};
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::capability::CapError;
-use maos_domain::revocation::{CrlId, RevocationEntry, RevocationOrigin, SignedRevocationList};
+use maos_domain::revocation::{
+    CrlId, RevocationAction, RevocationEntry, RevocationOrigin, SignedRevocationList,
+};
 use maos_kernel_core::capability::{
     cap_audit::{self, CapAuditWriter},
     cap_policy::{decision::TrustTier, ManifestCapabilityScope, PolicyTable},
@@ -40,6 +41,7 @@ use maos_kernel_core::capability::{
 };
 use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
 use maos_kernel_core::scheduler::control_block::SpiritManifestBundle;
+use maos_kernel_core::security::manifest::{ClassSection, OnRevocationSection};
 use maos_kernel_core::security::sandbox::t3::{
     child::SandboxedContainerChild, image_lock::VerifiedImageAttestation,
 };
@@ -377,13 +379,14 @@ impl Root {
     /// The real T3 launch path (`maos run` of a standalone `hang-chatty` Worker).
     fn launch(&self) -> Running {
         let manifest = format!(
-            "[cli_wrapper]\ncommand = \"worker-cli-fixture\"\n\
+            "[cli_wrapper]\nmanifest_schema_version = 2\nclass_name = \"worker-lrqc\"\n\
+             class_version = \"1.0.0\"\ncommand = \"worker-cli-fixture\"\n\
              argv_prefix = [\"--maos-worker\", \"--maos-fixture-mode=hang-chatty\"]\n\
              output_shape_version = \"1.0.0\"\nskill_bundle = [\"maos-bridge\"]\n\
              recovery_policy = \"respawn_fresh\"\n[cli_wrapper.posture]\n\
              stdio_shape = \"ndjson_over_stdio\"\ncontrol_channel = \"signals\"\n\
              shutdown_signal = \"SIGTERM\"\n[sandbox]\ntier = \"{TIER}\"\n\
-             [author]\nname = \"MAOS Project\"\n"
+             [author]\nname = \"MAOS Project\"\n[on_revocation]\naction = \"quarantine\"\n"
         );
         let handle = self.runtime.handle().clone();
         let (log, capability, policy, supervision) = (
@@ -487,23 +490,26 @@ fn fence_and_refuse(root: &Root, pid: u32) -> Fence {
         .get(&pid)
         .cloned()
         .expect("the Worker's SCB");
-    let class = scb.runtime_snapshot().manifest.class.clone();
-    let class_declared = class.is_some();
-    let named = class.map_or_else(|| scb.spirit_id.clone(), |class| class.name);
+    let class = scb
+        .runtime_snapshot()
+        .manifest
+        .class
+        .clone()
+        .expect("a schema-2 Worker carries its CRL-addressable identity");
+    let class_declared = true;
     let report = root
         .runtime
-        .block_on(root.applier.apply_crl(crl_naming(&named)))
+        .block_on(root.applier.apply_crl(crl_naming(&class.name)))
         .expect("apply CRL");
-    let route = if root.capability.is_quarantined(pid) {
-        "crl"
-    } else {
-        assert_eq!(
-            report.matched_count, 0,
-            "a CRL that matched the Worker must have fenced it"
-        );
-        root.capability.set_quarantined(pid, true);
-        "set_quarantined: the kernel primitive the CRL arm and the yank policy call; the CRL did not reach the Worker"
-    };
+    assert_eq!(
+        report.matched_count, 1,
+        "the CRL names the Worker's identity"
+    );
+    assert!(
+        root.capability.is_quarantined(pid),
+        "the CRL itself fenced the Worker (no direct set_quarantined)"
+    );
+    let route = "crl";
     let fenced_at = now_ns();
     assert!(root.capability.is_quarantined(pid), "the Worker is fenced");
 
@@ -618,7 +624,19 @@ fn a_bound_worker_scb_is_fenced_and_its_next_mediated_calls_are_refused_ac11_5()
     let root = Root::new(home.path());
     let binding = root
         .supervision
-        .bind(&WorkerTask::Standalone, SpiritManifestBundle::default())
+        .bind(
+            &WorkerTask::Standalone,
+            SpiritManifestBundle {
+                class: Some(ClassSection::for_worker(
+                    "worker-lrqc".into(),
+                    "1.0.0".into(),
+                )),
+                on_revocation: Some(OnRevocationSection {
+                    action: RevocationAction::Quarantine,
+                }),
+                ..Default::default()
+            },
+        )
         .expect("bind a real Worker SCB");
     let pid = binding.spirit_pid();
     assert_ne!(pid, 0, "a real scheduler pid");

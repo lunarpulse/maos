@@ -88,6 +88,7 @@ async fn admit(
             &maos_bin::admission::AdmissionDeps {
                 providers: None,
                 iac: Some(&world.iac),
+                quarantine: None,
                 scheduler: &world.scheduler,
                 security: &world.security,
                 transparency_log: &world.tl,

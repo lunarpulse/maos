@@ -53,6 +53,8 @@ struct Grant {
 #[derive(Default)]
 pub struct BearerTable {
     grants: Mutex<HashMap<u32, Grant>>,
+    /// FR13 — the quarantine predicate; a fenced pid's bearer never verifies.
+    fence: std::sync::OnceLock<Box<dyn Fn(u32) -> bool + Send + Sync>>,
 }
 
 impl BearerTable {
@@ -102,6 +104,9 @@ impl BearerTable {
         destination: &EgressDestination,
         bearer: &str,
     ) -> bool {
+        if self.fence.get().is_some_and(|fenced| fenced(pid)) {
+            return false;
+        }
         // The public wire format bounds hashing work even for hostile input.
         if bearer.len() != TOKEN_HEX_BYTES
             || !bearer
@@ -125,5 +130,10 @@ impl BearerTable {
     /// Remove the credential for this process; repeated revocation is harmless.
     pub fn revoke(&self, pid: u32) {
         self.grants.lock().remove(&pid);
+    }
+
+    /// Install the quarantine predicate once; later calls are ignored.
+    pub fn set_fence(&self, fenced: impl Fn(u32) -> bool + Send + Sync + 'static) {
+        let _ = self.fence.set(Box::new(fenced));
     }
 }
