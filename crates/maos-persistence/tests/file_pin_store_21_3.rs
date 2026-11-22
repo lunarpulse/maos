@@ -309,3 +309,121 @@ fn a_failed_write_leaves_the_prior_file_valid() {
     drop(store);
     assert_eq!(FilePinStore::open(&path).unwrap().load(), prior);
 }
+
+// Planted mutation (F6): dropping the positional-array check accepts the 9-element row.
+#[test]
+fn positional_arrays_are_not_schema_1() {
+    let positional_row = json!([
+        "peer-a",
+        fp(1).wire(),
+        "7",
+        null,
+        null,
+        fp(1).wire(),
+        "7",
+        0,
+        null
+    ]);
+    for body in [
+        json!([1, []]),
+        doc(1, vec![positional_row]),
+        doc(
+            1,
+            vec![{
+                let mut pin = row("peer-a");
+                pin["invalidated"] = json!(["manual", null]);
+                pin
+            }],
+        ),
+    ] {
+        assert!(
+            matches!(refusal(&body), PinFileError::Schema { .. }),
+            "{body}"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn the_data_file_is_opened_nofollow_and_a_fifo_never_blocks() {
+    // Planted mutation (F3): reading the pin file by path follows the link / blocks on the FIFO.
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("real.json");
+    fs::write(
+        &target,
+        serde_json::to_vec(&doc(1, vec![row("peer-a")])).unwrap(),
+    )
+    .unwrap();
+    let path = path_in(&dir);
+    std::os::unix::fs::symlink(&target, &path).unwrap();
+    assert!(matches!(
+        FilePinStore::open(&path).unwrap_err(),
+        PinFileError::Io { .. }
+    ));
+
+    fs::remove_file(&path).unwrap();
+    let made = std::process::Command::new("mkfifo").arg(&path).status();
+    if made.is_ok_and(|status| status.success()) {
+        assert!(matches!(
+            FilePinStore::open(&path).unwrap_err(),
+            PinFileError::Io { .. }
+        ));
+    }
+}
+
+#[test]
+fn a_fence_is_refused_at_open_and_lifted_only_by_a_successful_write() {
+    // Planted mutation (F1): `open` ignoring a non-empty lock/fence file.
+    let dir = tempfile::tempdir().unwrap();
+    let path = path_in(&dir);
+    let store = FilePinStore::open(&path).unwrap();
+    store.store(&[record("peer-a", 1)]).unwrap();
+    store.fence().unwrap();
+    drop(store);
+    assert!(matches!(
+        FilePinStore::open(&path).unwrap_err(),
+        PinFileError::Fenced { .. }
+    ));
+
+    // The operator empties the fence file; a later good write also lifts a fence.
+    fs::write(dir.path().join(format!("{PIN_FILE_NAME}.lock")), b"").unwrap();
+    let store = FilePinStore::open(&path).unwrap();
+    store.fence().unwrap();
+    store.store(&[record("peer-a", 1)]).unwrap();
+    drop(store);
+    FilePinStore::open(&path).unwrap();
+}
+
+// F1 end to end: a rotation retires fingerprint A in memory, the pin-file write fails, and
+// the restart must not load the old snapshot that still names A as the current pin.
+// Planted mutation: omit the `fence()` call in `persist_narrowed`.
+#[cfg(unix)]
+#[test]
+fn a_failed_retirement_write_is_not_revived_by_a_restart() {
+    use maos_a2a_core::tofu::InMemoryTofuPinStore;
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let path = path_in(&dir);
+    let port = std::sync::Arc::new(FilePinStore::open(&path).unwrap());
+    let store = InMemoryTofuPinStore::new().with_persistence(port.clone());
+    store.restore(record("peer-a", 1)).unwrap();
+    store.flush().unwrap();
+    let peer = PeerId::new("peer-a");
+    store.open_rotation_window(&peer, &fp(2)).unwrap();
+
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o500)).unwrap();
+    let writable_anyway = fs::File::create(dir.path().join("probe")).is_ok();
+    let retired = store.close_rotation_window(&peer);
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    if writable_anyway {
+        return; // privileged runner: permissions cannot inject the failure
+    }
+    assert_eq!(retired, Some(fp(1)));
+    assert!(store.is_degraded());
+    drop(store);
+    drop(port);
+    assert!(matches!(
+        FilePinStore::open(&path).unwrap_err(),
+        PinFileError::Fenced { .. }
+    ));
+}

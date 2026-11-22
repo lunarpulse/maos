@@ -166,7 +166,8 @@ pub struct PinRecord {
     pub anchor: (PeerCertFingerprint, u64),
     /// Count of pinned-fingerprint changes since first seed (D-21-3-05).
     pub generation: u64,
-    /// Observed boot nonce of the pending re-pin request (D-21-3-03 A).
+    /// Observed boot nonce of the pending re-pin request (D-21-3-03 A). A request
+    /// armed while a rotation window was open is not recorded: it is not approvable.
     pub pending_observed: Option<u64>,
 }
 
@@ -176,8 +177,13 @@ pub struct PinRecord {
 pub trait PinPersistence: Send + Sync {
     /// The records read and validated when the backing file was opened.
     fn load(&self) -> Vec<PinRecord>;
-    /// Durably replace the whole record set.
+    /// Durably replace the whole record set. A success also lifts any fence.
     fn store(&self, records: &[PinRecord]) -> Result<(), String>;
+    /// A narrowing transition (retirement, invalidation) could not be written:
+    /// durably mark the backing file untrustworthy so the next open refuses
+    /// instead of reviving the older snapshot. It must not need a fresh
+    /// directory entry, since the failing write may be exactly that.
+    fn fence(&self) -> Result<(), String>;
 }
 
 struct PinMeta {
@@ -473,9 +479,12 @@ impl InMemoryTofuPinStore {
             || ((pin.fingerprint.clone(), pin.boot_nonce), 0),
             |meta| (meta.anchor.clone(), meta.generation),
         );
+        // A request armed while a rotation window was open can never be approved
+        // (`rotating`); it is not recorded, so a restart cannot re-arm it as approvable.
         let pending_observed = self
             .pending_repins
             .get(key)
+            .filter(|pending| !pending.rotating)
             .map(|pending| pending.request.observed_boot_nonce);
         PinRecord {
             pin,
@@ -496,13 +505,28 @@ impl InMemoryTofuPinStore {
         Ok(())
     }
 
-    /// Narrowing transitions apply in memory; a refused write only marks the
-    /// store degraded (D-21-3-04 A).
+    /// Narrowing transitions apply in memory; a refused write marks the store
+    /// degraded (D-21-3-04 A) and FENCES the durable file, so a restart refuses
+    /// to revive the older, wider snapshot the failed write left behind.
     fn persist_narrowed(&self) {
         if let Err(detail) = self.persist(None) {
             self.degraded.store(true, Ordering::Release);
             tracing::error!(%detail, "TOFU pin file not written; pins degraded");
+            if let Some(Err(fence)) = self.persistence.as_ref().map(|port| port.fence()) {
+                tracing::error!(%fence, "TOFU pin file not fenced; a restart may revive retired pins");
+            }
         }
+    }
+
+    /// Persist the pin set with `pending` already removed. A refused write puts the
+    /// request back pending with no verdict (nothing was decided) and reports
+    /// `PersistFailed`; the in-memory and durable states then agree.
+    fn commit_consumed(&self, peer: &PeerId, pending: PendingRepin) -> Result<(), RePinDecision> {
+        self.persist(None).map_err(|detail| {
+            self.pending_repins
+                .insert(peer.as_str().to_string(), pending);
+            RePinDecision::PersistFailed { detail }
+        })
     }
 
     /// A promotion changed `peer`'s fingerprint: bump its durable generation.
@@ -1015,8 +1039,11 @@ impl TofuPinStore for InMemoryTofuPinStore {
         match pending.verdict.take() {
             None => RePinDecision::TimedOut,
             Some(RepinVerdict::Reject { reason }) => {
-                // The consumed request is dropped durably too: a reboot must not re-arm it.
-                self.persist_narrowed();
+                // The removal is committed BEFORE the verdict is reported: a reboot must
+                // not re-arm a request the operator was told is consumed.
+                if let Err(failed) = self.commit_consumed(peer, pending) {
+                    return failed;
+                }
                 RePinDecision::RejectedByOperator { reason }
             }
             Some(RepinVerdict::Approve { approval_id }) => {
@@ -1025,7 +1052,9 @@ impl TofuPinStore for InMemoryTofuPinStore {
                         && matches!(pin.invalidated, Some(Invalidated::SpiritRestarted { .. }))
                 });
                 if pending.rotating || !awaits_consent {
-                    self.persist_narrowed();
+                    if let Err(failed) = self.commit_consumed(peer, pending) {
+                        return failed;
+                    }
                     return RePinDecision::RejectedByStore {
                         error: EPinMismatch::Invalidated {
                             peer: peer.as_str().to_string(),
@@ -1034,7 +1063,9 @@ impl TofuPinStore for InMemoryTofuPinStore {
                     };
                 }
                 if let Some(colliding_peer) = self.colliding_peer(peer, new_observed) {
-                    self.persist_narrowed();
+                    if let Err(failed) = self.commit_consumed(peer, pending) {
+                        return failed;
+                    }
                     return RePinDecision::RejectedByStore {
                         error: EPinMismatch::FingerprintCollision {
                             peer: peer.as_str().to_string(),

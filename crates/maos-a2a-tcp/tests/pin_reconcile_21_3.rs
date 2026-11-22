@@ -34,6 +34,10 @@ impl PinPersistence for Port {
         self.stored.lock().unwrap().push(records.to_vec());
         Ok(())
     }
+
+    fn fence(&self) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 fn fp(seed: u8) -> PeerCertFingerprint {

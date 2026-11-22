@@ -6,7 +6,7 @@ use maos_a2a_core::tofu::{
     Invalidated, PinPersistence, PinRecord, RePinDecision, RepinRequest, RepinSink, RepinVerdict,
 };
 use maos_a2a_core::{InMemoryTofuPinStore, PeerCertFingerprint, PeerId, TofuPinStore};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -17,6 +17,7 @@ const RESTARTED_NONCE: u64 = 11;
 struct Recording {
     snapshots: Mutex<Vec<Vec<PinRecord>>>,
     fail: AtomicBool,
+    fences: AtomicUsize,
 }
 
 impl Recording {
@@ -33,12 +34,16 @@ impl PinPersistence for Recording {
     fn load(&self) -> Vec<PinRecord> {
         Vec::new()
     }
-
     fn store(&self, records: &[PinRecord]) -> Result<(), String> {
         if self.fail.load(Ordering::SeqCst) {
             return Err("disk full".into());
         }
         self.snapshots.lock().unwrap().push(records.to_vec());
+        Ok(())
+    }
+
+    fn fence(&self) -> Result<(), String> {
+        self.fences.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 }
@@ -388,7 +393,13 @@ async fn a_consumed_request_is_dropped_durably_but_the_pin_stays_invalidated() {
     assert_eq!(record.pending_observed, None, "a reboot must not re-arm it");
     assert!(record.pin.invalidated.is_some());
 
-    // A failing write while consuming only degrades the store.
+    // A failing write while consuming leaves the request pending (see the next test).
+}
+
+// Planted mutation (F5): reporting the verdict before the removal is committed (the old
+// `persist_narrowed` after removal) makes `decision` a rejection and drops the request.
+#[tokio::test]
+async fn a_consumed_request_that_cannot_be_written_stays_pending_with_no_verdict() {
     let (store, port) = pinned().await;
     store
         .invalidate_if_boot_nonce_differs(&peer(), RESTARTED_NONCE)
@@ -404,11 +415,65 @@ async fn a_consumed_request_is_dropped_durably_but_the_pin_stays_invalidated() {
         )
         .unwrap();
     port.fail.store(true, Ordering::SeqCst);
-    store
+    let decision = store
         .await_repin_consent(&peer(), &fp(1), RESTARTED_NONCE)
         .await;
-    assert!(store.is_degraded());
-    assert!(store.healthy_records().is_none());
+    assert!(matches!(decision, RePinDecision::PersistFailed { .. }));
+    assert_eq!(store.pending_repins().len(), 1, "still pending");
+    assert!(!store.is_degraded(), "durable and in-memory states agree");
+    // No verdict survived: consuming again finds none.
+    port.fail.store(false, Ordering::SeqCst);
+    assert_eq!(
+        store
+            .await_repin_consent(&peer(), &fp(1), RESTARTED_NONCE)
+            .await,
+        RePinDecision::TimedOut
+    );
+}
+
+// Planted mutation (F1): dropping the `fence()` call in `persist_narrowed`.
+#[tokio::test]
+async fn a_narrowing_write_failure_fences_the_durable_file_and_a_widening_one_does_not() {
+    let (store, port) = pinned().await;
+    store.open_rotation_window(&peer(), &fp(2)).unwrap();
+    port.fail.store(true, Ordering::SeqCst);
+    store.close_rotation_window(&peer());
+    assert_eq!(port.fences.load(Ordering::SeqCst), 1, "retirement fenced");
+    store
+        .invalidate_if_boot_nonce_differs(&peer(), RESTARTED_NONCE)
+        .await
+        .unwrap();
+    assert_eq!(port.fences.load(Ordering::SeqCst), 2, "invalidation fenced");
+
+    let (store, port) = fixture();
+    port.fail.store(true, Ordering::SeqCst);
+    store
+        .pin_first_contact(&peer(), &fp(1), &fp(1), SEED_NONCE)
+        .await
+        .unwrap_err();
+    assert_eq!(port.fences.load(Ordering::SeqCst), 0, "nothing narrowed");
+}
+
+// Planted mutation (F4): recording `pending_observed` for a rotating request.
+#[tokio::test]
+async fn a_request_armed_during_a_rotation_window_is_not_recorded_for_rearming() {
+    let (store, port) = pinned().await;
+    store.open_rotation_window(&peer(), &fp(2)).unwrap();
+    store
+        .invalidate_if_boot_nonce_differs(&peer(), RESTARTED_NONCE)
+        .await
+        .unwrap();
+    assert_eq!(store.pending_repins().len(), 1, "visible until restart");
+    let record = &port.last()[0];
+    assert!(record.pin.invalidated.is_some());
+    assert_eq!(record.pending_observed, None);
+
+    let rebooted = InMemoryTofuPinStore::new();
+    rebooted.restore(record.clone()).unwrap();
+    assert!(
+        rebooted.pending_repins().is_empty(),
+        "never approvable after restart"
+    );
 }
 
 #[tokio::test]
