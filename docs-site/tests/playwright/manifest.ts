@@ -8,7 +8,6 @@ export type RouteManifest = {
   redirects?: ManifestRedirect[];
   error_codes?: string[];
   error_routes_pattern?: string;
-  expected_distinct_pages?: number;
 };
 
 export const siteDir = path.resolve(__dirname, "../..");
