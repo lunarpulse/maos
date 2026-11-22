@@ -26,6 +26,25 @@ fn v(world: &World, name: &str, version: &str, artifact: &str, extra: &str) -> P
     world.write(name, &manifest(ID, version, artifact, &ALL_HOOKS, extra))
 }
 
+/// A swap monitored under the production 30 s window instead of the process's `MAOS_AUTO_REVERT_FAST`
+/// one: `PostSwapMonitor::new` reads the variable when the swap publishes, so the window is the
+/// production one for a swap that publishes while this is held. Dropping it restores the FAST
+/// window the rest of this binary runs under.
+struct ProductionWindow;
+
+impl ProductionWindow {
+    fn open() -> Self {
+        std::env::remove_var("MAOS_AUTO_REVERT_FAST");
+        Self
+    }
+}
+
+impl Drop for ProductionWindow {
+    fn drop(&mut self) {
+        std::env::set_var("MAOS_AUTO_REVERT_FAST", "1");
+    }
+}
+
 async fn halted(world: &World, pid: u32) -> HaltId {
     let id = HaltId::new("carried-halt").unwrap();
     world
@@ -339,14 +358,42 @@ async fn a_revert_after_the_predecessor_child_retired_ends_the_session_typed() {
     let running = world.start(&v1).await;
     world.turn(ID, "").await;
     halted(&world, running.pid).await;
+    let predecessor_child = world
+        .supervisor
+        .bindings()
+        .into_iter()
+        .find(|binding| binding.spirit_pid == running.pid)
+        .and_then(|binding| binding.child_pid)
+        .expect("the predecessor's live child");
+    // The revert this vector is about needs the session to have ADOPTED the successor and retired
+    // the predecessor's child before the carried halt leaves the registry (a revert before that
+    // makes the handover stale and the predecessor, restored, keeps serving). Adoption takes as
+    // long as the predecessor's child takes to exit, which a loaded runner does not bound inside
+    // the 300 ms `MAOS_AUTO_REVERT_FAST` window, so this swap is monitored under the production
+    // 30 s window (1 s ticks) instead; the halt then leaves the registry on an observable (the
+    // retired binding), never on a wall-clock guess. The assertion on how the session ends is
+    // unchanged.
+    let window = ProductionWindow::open();
     world
         .upgrade(&v2, UpgradePolicy::HotSwap)
         .await
         .expect("the swap commits");
-    // A carried halt that leaves the registry inside the window trips the monitor (MAOS_AUTO_REVERT_FAST).
-    // Hosted debug runners are several times slower than a dev box: the bound is generous (x4); the
-    // assertion on how the session ends is unchanged.
+    drop(window);
+    let retired = Instant::now() + Duration::from_secs(60);
+    while !world.supervisor.bindings().iter().any(|binding| {
+        binding.spirit_pid == running.pid
+            && binding.child_pid == Some(predecessor_child)
+            && binding.child.is_none()
+    }) {
+        assert!(
+            Instant::now() < retired,
+            "the session never retired the predecessor's child"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    // A carried halt that leaves the registry inside the window trips the monitor.
     assert_eq!(world.halt.drain_for_spirit(running.pid).len(), 1);
+    // Hosted debug runners are several times slower than a dev box: the bound is generous (x4).
     let ended = tokio::time::timeout(Duration::from_secs(80), running.session)
         .await
         .expect("the session ends")
