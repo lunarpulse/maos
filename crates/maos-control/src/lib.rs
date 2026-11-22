@@ -192,6 +192,34 @@ pub struct RepinRequestRow {
     pub expired: bool,
 }
 
+/// Story 21-3 — why a pin is invalidated, as an operator reads it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PeerPinInvalidation {
+    pub reason: String,
+    /// `None` for a manual invalidation.
+    pub prior_boot_nonce: Option<u64>,
+}
+
+/// Story 21-3 — one TOFU pin as `GET /v1/a2a/pins` reads it (plain owned
+/// scalars: no `maos-a2a-core` edge, as [`RepinRequestRow`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PeerPinRow {
+    pub peer: String,
+    /// Wire form `sha256:<hex64>`.
+    pub fingerprint: String,
+    /// Durable count of fingerprint changes since first seed.
+    pub generation: u64,
+    pub boot_nonce: u64,
+    pub invalidated: Option<PeerPinInvalidation>,
+}
+
+/// Health of the installed pin store; `Unhealthy` answers 503 `pins_unhealthy`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PeerPinStatus {
+    Healthy(Vec<PeerPinRow>),
+    Unhealthy { detail: String },
+}
+
 /// Configuration for the authenticated operator endpoint.
 #[derive(Debug, Clone)]
 pub struct OperatorHttpConfig {
@@ -641,6 +669,13 @@ pub trait OperatorCommandPort: Send + Sync + 'static {
     /// `cohort-a2a-daemon` root installs one): the route then answers 404,
     /// never an empty list that would read as "no restart detected".
     fn pending_repins(&self) -> Option<Vec<RepinRequestRow>> {
+        None
+    }
+
+    /// Story 21-3 — the daemon's durable TOFU pins, sorted by peer. `None`
+    /// when this process installed no pin store: the route then answers 404,
+    /// never an empty array that would read as "nothing pinned".
+    fn peer_pins(&self) -> Option<PeerPinStatus> {
         None
     }
 }
@@ -1164,6 +1199,7 @@ fn route<S: SandboxReportSource>(routes: &Routes<'_, S>, request: &mut Incoming<
         // (405 to every other method); the decision is POST-only, its peer
         // segment validated before the method guard like every id route.
         ["v1", "a2a", "repins"] => get_only(method, || pending_repins(routes)),
+        ["v1", "a2a", "pins"] => get_only(method, || peer_pins(routes)),
         ["v1", "a2a", "repins", peer] => {
             let peer = match validate_id(peer) {
                 Ok(peer) => peer,
@@ -1958,6 +1994,40 @@ fn pending_repins<S: SandboxReportSource>(routes: &Routes<'_, S>) -> Response {
                 "detected_at": row.detected_at_secs,
                 "expires_at": row.expires_at_secs,
                 "expired": row.expired,
+            })
+        })
+        .collect();
+    Response::value(200, serde_json::Value::Array(rows))
+}
+
+/// Story 21-3 — `GET /v1/a2a/pins`: a JSON ARRAY sorted by peer; `boot_nonce`
+/// (and an invalidation's `prior_boot_nonce`) are DECIMAL STRINGS. An empty
+/// array means "installed, nothing pinned"; no installed store is a 404.
+fn peer_pins<S: SandboxReportSource>(routes: &Routes<'_, S>) -> Response {
+    let Some(status) = routes.commands.and_then(|port| port.peer_pins()) else {
+        return Response::new(404, NOT_FOUND_BODY);
+    };
+    let rows = match status {
+        PeerPinStatus::Healthy(rows) => rows,
+        PeerPinStatus::Unhealthy { detail } => {
+            return Response::value(
+                503,
+                serde_json::json!({"error": "pins_unhealthy", "detail": detail}),
+            );
+        }
+    };
+    let rows: Vec<serde_json::Value> = rows
+        .into_iter()
+        .map(|row| {
+            serde_json::json!({
+                "peer": row.peer,
+                "fingerprint": row.fingerprint,
+                "generation": row.generation,
+                "boot_nonce": row.boot_nonce.to_string(),
+                "invalidated": row.invalidated.map(|invalidation| serde_json::json!({
+                    "reason": invalidation.reason,
+                    "prior_boot_nonce": invalidation.prior_boot_nonce.map(|nonce| nonce.to_string()),
+                })),
             })
         })
         .collect();

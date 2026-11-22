@@ -312,6 +312,7 @@ impl TcpA2ATransport {
             rupture_sink,
             crossing_port,
             None,
+            None,
         )
         .await
     }
@@ -348,6 +349,8 @@ impl TcpA2ATransport {
         rupture_sink: Option<Arc<dyn ConsentRuptureSink>>,
         crossing_port: Option<Arc<dyn maos_a2a_core::CrossTeamCrossingPort>>,
         intake_sink: Option<tokio::sync::mpsc::Sender<IacFrame>>,
+        // Story 21-3 — the durable pin file; `Some` only from the daemon root.
+        pin_persistence: Option<Arc<dyn maos_a2a_core::tofu::PinPersistence>>,
     ) -> Result<Self, TcpTransportError> {
         // j1-crosshost-2b §A6 review P8 (AC4.1) — the cross-host path REFUSES the
         // `boot_nonce = 0` sentinel. Loopback stamps it to skip restart detection
@@ -372,7 +375,7 @@ impl TcpA2ATransport {
                 )));
             }
         }
-        let pins = tcp_config.build_pin_store().await?;
+        let pins = tcp_config.build_pin_store(pin_persistence).await?;
         let posture = tcp_config.trust_posture()?;
         let (own_chain, own_key) = tcp_config.load_identity()?;
 
@@ -446,6 +449,10 @@ impl TcpA2ATransport {
         let local_addr = listener
             .local_addr()
             .map_err(|e| TcpTransportError::Io(format!("local_addr: {e}")))?;
+        // Story 21-3 — durable state is rewritten only after every fallible setup step.
+        pins.flush().map_err(|e| {
+            TcpTransportError::Config(format!("cannot write the durable pin file: {e}"))
+        })?;
 
         let intake_entered = Arc::new(AtomicUsize::new(0));
         let active_connections = Arc::new(AtomicUsize::new(0));

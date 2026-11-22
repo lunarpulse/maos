@@ -307,7 +307,7 @@ fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
         .env("MAOS_TEST_BOOT_NONCE", boot_nonce.to_string())
         .env(
             "HOME",
-            t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
+            t3_substrate::isolated_runtime_home(&doorless_home::fresh_home()),
         )
         .env("PATH", target_debug_path())
         .stdout(Stdio::piped())
@@ -495,7 +495,7 @@ fn run_host_a(config: &Path, audit_db: &Path) -> std::process::Output {
         .env("MAOS_TEST_BOOT_NONCE", NONCE_A.to_string())
         .env(
             "HOME",
-            t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
+            t3_substrate::isolated_runtime_home(&doorless_home::fresh_home()),
         )
         .env(
             "MAOS_DELEGATED_GOAL",
