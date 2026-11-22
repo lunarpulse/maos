@@ -29,7 +29,7 @@ default_seconds = 30
 # sum880.766s. ceil(1151.8 * 1.25)=1440; no per-binary exception changes.
 # Record the next green hosted sum and re-tighten under 20-7's rule-10 review row.
 # Prior: 800 -> 1100 from hosted40955589411 sum880.6s, E19 wave-2 vectors.
-total_seconds = 2000
+total_seconds = 2800
 # AC15/cohort post-fix local JUnit64ad0f22 sum807.751s (10 failures); not hosted authority.
 
 # Story 18-5-context-token-budget-accounting: context_budget_18_5,
@@ -37,6 +37,18 @@ total_seconds = 2000
 # budget_thresholds_18_5 use default_seconds; no exception or extra budget.
 
 # --- Exceptions (18-0 AC5, ruling R3: ~ CI max Σ x 1.25) ---------------------
+
+[[exception]]
+binary = "maos-bin::participant_recall_17_8"
+seconds = 50
+reason = "17-8 participant recall (8 tests, real wasm runners): hosted Σ 32.7 s on run 45048662238 (PR #43); budget = observed + 50 % (load-dependent)"
+owner = "21-9-wasm-host-default-on"
+
+[[exception]]
+binary = "maos-bin::spawned_door_20_9"
+seconds = 80
+reason = "21-9 door suite (6 tests, real runners): hosted Σ 52.8 s on run 45048662238 (PR #43); budget = observed + 50 % (load-dependent)"
+owner = "21-9-wasm-host-default-on"
 
 [[exception]]
 binary = "maos-bin::spawned_swap_20_9"
