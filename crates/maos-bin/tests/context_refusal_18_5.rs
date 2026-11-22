@@ -255,6 +255,7 @@ fn idle(
             SpiritManifestBundle {
                 lifecycle: LifecycleSection {
                     enabled_hooks: vec!["on_idle".into()],
+                    telemetry: None,
                 },
                 budget: Some(budget.clone()),
                 ..Default::default()

@@ -72,6 +72,9 @@ async fn trial(compat: Option<u32>, halts: usize) -> Swap {
         .await
         .expect("load");
     harness.scheduler.start(pid).await.expect("start");
+    harness.policy.mutate(|policy| {
+        policy.manifest_scopes.insert(pid, Default::default());
+    });
     let before: Vec<_> = (0..halts)
         .map(|n| halt(&format!("i14-halt-{n}"), pid))
         .collect();

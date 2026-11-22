@@ -227,10 +227,14 @@ def main():
     check(quota * 100 == period * declared["resources"]["cpu_max_pct"], sample)
     check(int(sample["memory_max"]) == declared["resources"]["memory_max_mb"] * 1024 * 1024, sample)
     check(argv_value(sample["argv"], "--fuel") == str(declared_fuel), sample)
-    observed_component = argv_value(sample["argv"], "--component")
-    check(observed_component is not None and Path(observed_component).resolve() == component
-          and digest(Path(observed_component)) == provenance["component_sha256"],
-          f"observed --component {observed_component!r} is not the hashed {component}")
+    # A governed launch hands the runner an already-verified held descriptor, never a path:
+    # the observable identity is the digest the host passed with it, which must be the hash of
+    # the declared artifact (and no path argument may carry a second, unverified copy).
+    observed_digest = argv_value(sample["argv"], "--held-component-sha256")
+    check(observed_digest is not None
+          and observed_digest.lower() == provenance["component_sha256"].lower()
+          and argv_value(sample["argv"], "--component") is None,
+          f"observed --held-component-sha256 {observed_digest!r} is not the hashed {component}")
     check(sample["seccomp_modes"] == ["2"], f"runner Seccomp modes {sample['seccomp_modes']}, want ['2']")
     check(sample["no_new_privs"] == ["1"], f"runner NoNewPrivs {sample['no_new_privs']}, want ['1']")
     check(sample["vm_hwm_rss_kib"] > 0, sample)

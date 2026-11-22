@@ -82,7 +82,7 @@ pub struct SpiritSchedulerAdapter {
     tl: Arc<TransparencyLogAdapter>,
     dispatcher: Arc<HookDispatcher>,
     capability: Arc<crate::capability::CapabilityRegistryAdapter>,
-    _memory: Arc<crate::memory::MemoryManagerAdapter>,
+    memory: Arc<crate::memory::MemoryManagerAdapter>,
     _iac: Arc<crate::iac::IacBusAdapter>,
     _halt_registry: Arc<crate::halt::HaltRegistry>,
     security_manager: Option<Arc<crate::security::SecurityManagerAdapter>>,
@@ -134,7 +134,7 @@ impl SpiritSchedulerAdapter {
             dispatcher: Arc::new(dispatcher),
             tl,
             capability,
-            _memory: memory,
+            memory,
             _iac: iac,
             _halt_registry: halt_registry,
             security_manager,
@@ -564,6 +564,11 @@ impl SpiritSchedulerAdapter {
             let mut spirits = self.spirits.write().unwrap();
             spirits.remove(&spirit_pid);
         }
+        // Terminal release owner: withdraw this pid's own registrations,
+        // unconditionally (independent of the fallible hook below).
+        self.memory.deauthorize_principal_writes(spirit_pid);
+        self._iac
+            .unregister_promotion_set_for_pid(&scb.spirit_id, spirit_pid);
 
         let outcome = self.dispatcher.fire_on_unload(&scb).await;
         if let Err(error) = self.check_hook_outcome("on_unload", spirit_pid, outcome) {

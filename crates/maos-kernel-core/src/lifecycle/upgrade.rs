@@ -10,7 +10,9 @@ use std::io;
 use std::path::Path;
 use std::sync::Arc;
 
+use maos_domain::invariants::i1::Scope;
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
+use maos_domain::invariants::i13::AllowedPromotionSet;
 
 use crate::capability::cap_tokens::monotonic_now_ns;
 use crate::hot_swap::HotSwapCoordinator;
@@ -80,22 +82,23 @@ impl UpgradeOrchestrator {
         let start_ns = monotonic_now_ns();
 
         // 1. Parse successor manifest
-        let successor_manifest = load_bundle_from_file(successor_manifest_path).map_err(|e| {
-            let reason = e.to_string();
-            if reason.contains("manifest not found")
-                || reason.contains("No such file")
-                || reason.contains("NotFound")
-            {
-                UpgradeError::ManifestNotFound {
-                    path: successor_manifest_path.display().to_string(),
+        let (successor_manifest, declared_scopes, promotion_set) =
+            load_bundle_from_file(successor_manifest_path).map_err(|e| {
+                let reason = e.to_string();
+                if reason.contains("manifest not found")
+                    || reason.contains("No such file")
+                    || reason.contains("NotFound")
+                {
+                    UpgradeError::ManifestNotFound {
+                        path: successor_manifest_path.display().to_string(),
+                    }
+                } else {
+                    UpgradeError::ManifestParse {
+                        path: successor_manifest_path.display().to_string(),
+                        reason,
+                    }
                 }
-            } else {
-                UpgradeError::ManifestParse {
-                    path: successor_manifest_path.display().to_string(),
-                    reason,
-                }
-            }
-        })?;
+            })?;
 
         // 2. Resolve predecessor PID
         let predecessor_pid =
@@ -134,39 +137,18 @@ impl UpgradeOrchestrator {
         let outcome = UpgradeOutcome::Completed;
 
         // 4. Dispatch per policy
-        match policy {
-            UpgradePolicy::HotSwap => {
-                match self
-                    .hot_swap
-                    .initiate_swap(
-                        spirit_id,
-                        &successor_manifest,
-                        Arc::clone(&successor_spirit_obj),
-                    )
-                    .await
-                {
-                    Ok(_result) => {}
-                    Err(e) => return Err(UpgradeError::HotSwap(e)),
-                }
-            }
-            UpgradePolicy::Migrator => {
-                if successor_manifest.migrates_from.is_none() {
-                    return Err(UpgradeError::MigratorNotDeclared);
-                }
-                match self
-                    .hot_swap
-                    .initiate_swap(
-                        spirit_id,
-                        &successor_manifest,
-                        Arc::clone(&successor_spirit_obj),
-                    )
-                    .await
-                {
-                    Ok(_result) => {}
-                    Err(e) => return Err(UpgradeError::HotSwap(e)),
-                }
-            }
+        if policy == UpgradePolicy::Migrator && successor_manifest.migrates_from.is_none() {
+            return Err(UpgradeError::MigratorNotDeclared);
         }
+        self.hot_swap
+            .initiate_with_policy(
+                spirit_id,
+                &successor_manifest,
+                successor_spirit_obj,
+                Some((declared_scopes.as_slice(), promotion_set)),
+            )
+            .await
+            .map_err(UpgradeError::HotSwap)?;
 
         let latency_ns = monotonic_now_ns().saturating_sub(start_ns);
 
@@ -307,7 +289,14 @@ pub enum UpgradeError {
 /// Load a `SpiritManifestBundle` from a TOML file path.
 pub(crate) fn load_bundle_from_file(
     path: &Path,
-) -> Result<SpiritManifestBundle, crate::security::manifest::ManifestError> {
+) -> Result<
+    (
+        SpiritManifestBundle,
+        Vec<Scope>,
+        Option<AllowedPromotionSet>,
+    ),
+    crate::security::manifest::ManifestError,
+> {
     use crate::security::manifest::*;
 
     let toml_str = std::fs::read_to_string(path).map_err(|e| {
@@ -334,8 +323,12 @@ pub(crate) fn load_bundle_from_file(
         Some(_) => SchedulingSection::from_toml_str(&extract("scheduling")?)?,
         None => SchedulingSection::default(),
     };
-    let lifecycle = match root.get("lifecycle") {
-        Some(_) => LifecycleSection::from_toml_str(&extract("lifecycle")?)?,
+    let lifecycle_toml = match root.get("lifecycle") {
+        Some(_) => Some(extract("lifecycle")?),
+        None => None,
+    };
+    let mut lifecycle = match &lifecycle_toml {
+        Some(s) => LifecycleSection::from_toml_str(s)?,
         None => LifecycleSection::default(),
     };
     // Story 7.5a — `[class]` is REQUIRED at parse time. A manifest without
@@ -384,6 +377,13 @@ pub(crate) fn load_bundle_from_file(
         .and_then(|v| toml::to_string(v).ok())
         .map(|s| crate::security::manifest::Budget::from_toml_str(&s))
         .transpose()?;
+    // D-21-9-02 A — the successor's telemetry declaration is validated here, before any
+    // authority is carried: a listing without (or with an out-of-range) declaration is refused.
+    lifecycle.telemetry = validate_telemetry_subscription(
+        class.as_ref().map_or(0, |c| c.manifest_schema_version),
+        lifecycle_toml.as_deref(),
+        budget.as_ref(),
+    )?;
     // Story 20-8 (FR8) — the successor's declaration, read at schema >= 7 as at admission.
     let swap_invariants = root
         .get("swap_invariants")
@@ -394,6 +394,32 @@ pub(crate) fn load_bundle_from_file(
         })
         .map(|_| extract("swap_invariants").and_then(|s| SwapInvariantsSection::from_toml_str(&s)))
         .transpose()?;
+    // The successor's I13 promotion set: same schema-7 gate and section parser as admission.
+    let intent_promotion_set = root
+        .get("intent_promotion_set")
+        .filter(|_| {
+            class
+                .as_ref()
+                .is_some_and(|c| c.manifest_schema_version >= FR8_DECLARATIONS_SINCE_SCHEMA)
+        })
+        .map(|_| {
+            extract("intent_promotion_set")
+                .and_then(|s| IntentPromotionSetSection::from_toml_str(&s))
+                .map(|section| section.to_allowed_set())
+        })
+        .transpose()?;
+    // D-21-PF-14 — the successor's declared scopes from the same validated
+    // `[capabilities.required]` parser and schema degradation as admission
+    // (`caps_required_or_empty` + `degrade_for_schema_version`); absent ⇒ empty set.
+    let caps_text = match root.get("capabilities").and_then(|c| c.get("required")) {
+        Some(value) => toml::to_string(value)
+            .map_err(|e| ManifestError::Toml(format!("serialize [capabilities.required]: {e}")))?,
+        None => String::new(),
+    };
+    let declared_scopes = maos_manifest::capabilities_required_to_scopes(
+        &CapabilitiesRequired::from_toml_str(&caps_text)?
+            .degrade_for_schema_version(class.as_ref().map_or(0, |c| c.manifest_schema_version)),
+    );
 
     // Story 6.4 — `[[schedule]]` array-of-tables. The raw section parser
     // reads the array under the `schedule` key; we synthesize a doc that
@@ -422,19 +448,23 @@ pub(crate) fn load_bundle_from_file(
         }
     };
 
-    Ok(SpiritManifestBundle {
-        scheduling,
-        lifecycle,
-        class,
-        hot_swap,
-        migrates_from,
-        halt_protocol_compatibility,
-        on_crash,
-        on_revocation,
-        supervision,
-        schedules,
-        gateways,
-        budget,
-        swap_invariants,
-    })
+    Ok((
+        SpiritManifestBundle {
+            scheduling,
+            lifecycle,
+            class,
+            hot_swap,
+            migrates_from,
+            halt_protocol_compatibility,
+            on_crash,
+            on_revocation,
+            supervision,
+            schedules,
+            gateways,
+            budget,
+            swap_invariants,
+        },
+        declared_scopes,
+        intent_promotion_set,
+    ))
 }

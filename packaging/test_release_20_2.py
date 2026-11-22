@@ -196,7 +196,8 @@ class ReleaseControls(unittest.TestCase):
 
     def test_hosted_2_arch_prepare_materializes_all_symlinked_binaries(self):
         names = [name+'-linux-amd64' for name in
-                 ['maos', 'maosctl', 'maos-spirit', 'maos-registry-server']]
+                 ['maos', 'maosctl', 'maos-spirit', 'maos-registry-server',
+                  'maos-wasm-runner']]
         cache = self.dist/'cache'
         stage = self.dist/'src'
         cache.mkdir()
@@ -338,7 +339,7 @@ git -c user.useConfigOnly=true var GIT_COMMITTER_IDENT
         values.update(VERSION='0.1.0-alpha.1',
                       BASE_URL='https://github.com/lunarpulse/maos/releases/download/v0.1.0-alpha.1',
                       BREW_RELEASES='    "linux-amd64" => %w[\n'+
-                      '\n'.join('      '+'a'*64 for _ in range(4))+'\n    ],')
+                      '\n'.join('      '+'a'*64 for _ in range(5))+'\n    ],')
         for name, value in values.items():
             formula = formula.replace('@'+name+'@', value)
         self.assertNotRegex(formula, r'@[A-Z_]+@')
@@ -355,9 +356,10 @@ git -c user.useConfigOnly=true var GIT_COMMITTER_IDENT
         self.assertIsNotNone(chmod)
         self.assertLess(formula.index('names.each { |name| bin.install'), chmod.start())
         self.assertIn('skip_clean "bin/maos", "bin/maosctl", "bin/maos-spirit", '
-                      '"bin/maos-registry-server"', formula)
+                      '"bin/maos-registry-server", "bin/maos-wasm-runner"', formula)
         names = re.search(r'^    names = %w\[([^\]]+)\]', formula, flags=re.M)[1].split()
-        self.assertEqual(names, ['maos', 'maosctl', 'maos-spirit', 'maos-registry-server'])
+        self.assertEqual(names, ['maos', 'maosctl', 'maos-spirit', 'maos-registry-server',
+                                 'maos-wasm-runner'])
         paths = [self.dist/name for name in names]
         hashes = {}
         for path in paths:

@@ -1,3 +1,9 @@
+// Story 21-9: two build shapes, each with its own witness. The default build
+// (WASM host on) runs the `cfg(feature = "wasm-host")` branches; the explicit
+// engine-free build (`--no-default-features --features network`, run by the
+// `example-spirit-ts-tests` CI job) runs the `cfg(not(feature = "wasm-host"))`
+// typed `wasm_engine_off` refusals. The default shape must never be satisfied by
+// the refusal tests, and the refusal shape must never be satisfied by the host.
 #![cfg(feature = "network")]
 #![forbid(unsafe_code)]
 

@@ -18,21 +18,22 @@ Source0: @BASE_URL@/maos-%{maos_artifact_suffix}
 Source1: @BASE_URL@/maosctl-%{maos_artifact_suffix}
 Source2: @BASE_URL@/maos-spirit-%{maos_artifact_suffix}
 Source3: @BASE_URL@/maos-registry-server-%{maos_artifact_suffix}
-Source4: @BASE_URL@/SHA256SUMS
-Source5: @BASE_URL@/SHA256SUMS.sig
-Source6: @BASE_URL@/verify-release.py
+Source4: @BASE_URL@/maos-wasm-runner-%{maos_artifact_suffix}
+Source5: @BASE_URL@/SHA256SUMS
+Source6: @BASE_URL@/SHA256SUMS.sig
+Source7: @BASE_URL@/verify-release.py
 
 %description
 MAOS multi-Spirit runtime with append-only audit logging and capability tokens.
 
 %prep
 cd %{_sourcedir}
-python3 verify-release.py --pubkey @PUBKEY@ maos-%{maos_artifact_suffix} maosctl-%{maos_artifact_suffix} maos-spirit-%{maos_artifact_suffix} maos-registry-server-%{maos_artifact_suffix}
+python3 verify-release.py --pubkey @PUBKEY@ maos-%{maos_artifact_suffix} maosctl-%{maos_artifact_suffix} maos-spirit-%{maos_artifact_suffix} maos-registry-server-%{maos_artifact_suffix} maos-wasm-runner-%{maos_artifact_suffix}
 
 %build
 
 %install
-for bin in maos maosctl maos-spirit maos-registry-server; do
+for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do
     install -Dm755 %{_sourcedir}/$bin-%{maos_artifact_suffix} %{buildroot}%{_bindir}/$bin
 done
 
@@ -41,3 +42,4 @@ done
 %{_bindir}/maosctl
 %{_bindir}/maos-spirit
 %{_bindir}/maos-registry-server
+%{_bindir}/maos-wasm-runner

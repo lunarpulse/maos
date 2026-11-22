@@ -115,6 +115,7 @@ async fn same_major_swap_happy_path() {
         scheduling: SchedulingSection::default(),
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["on_load".into(), "snapshot".into(), "on_swap_out".into()],
+            telemetry: None,
         },
         ..Default::default()
     };
@@ -178,6 +179,9 @@ trust_tier = "local"
 forms = ["rust-inproc"]
 description = "FR10 witness predecessor"
 
+[capabilities.required]
+provider.complete = ["witness.fixture"]
+
 [hot_swap]
 state_schema_uri = "maos://schemas/witness"
 state_schema_version = 65536
@@ -195,6 +199,9 @@ manifest_schema_version = 1
 trust_tier = "local"
 forms = ["rust-inproc"]
 description = "FR10 witness successor"
+
+[capabilities.required]
+provider.complete = ["witness.fixture"]
 
 [hot_swap]
 state_schema_uri = "maos://schemas/witness"
@@ -242,6 +249,23 @@ async fn hot_swap_keeps_tokens_and_working_memory_at_the_same_pid() {
         },
     );
     harness.policy.update(inner);
+    harness
+        .hot_swap
+        .precheck("witness", successor_path.to_str().unwrap(), "0.1.0")
+        .expect("the retained scope passes the same precheck");
+    let widened = harness.write_manifest(
+        "witness-widened.toml",
+        &WITNESS_SUCCESSOR.replace("witness.fixture", "openai.fixture"),
+    );
+    let error = harness
+        .hot_swap
+        .precheck("witness", widened.to_str().unwrap(), "0.1.0")
+        .expect_err("the operator precheck refuses a scope the predecessor does not hold");
+    assert!(
+        error.to_string().contains("predecessor does not hold"),
+        "{error}"
+    );
+
     let token = harness
         .capability
         .issue_with_mediation(pid, scope, 600, [0u8; 32], IntentClass::Standard)

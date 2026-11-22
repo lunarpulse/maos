@@ -249,8 +249,14 @@ fn real_tree_release_ready_is_aggregate_minus_twelve_documented_exclusions() {
         String::from_utf8_lossy(&output.stderr)
     );
     let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    // aggregate.needs (75) with v1-0-ship-gate expanded to its 44 needs is 108 jobs; nine are excluded jobs.
-    assert_eq!(report["release_ready_needs"], 99);
+    let yaml: serde_yaml::Value =
+        serde_yaml::from_str(&fs::read_to_string(workflow(copy.path(), "discipline.yml")).unwrap())
+            .unwrap();
+    let listed = yaml["jobs"]["release-ready"]["needs"]
+        .as_sequence()
+        .unwrap()
+        .len();
+    assert_eq!(report["release_ready_needs"], listed);
     assert_eq!(
         report["release_ready_excluded"].as_array().unwrap().len(),
         12

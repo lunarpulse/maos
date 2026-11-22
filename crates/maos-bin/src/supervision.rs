@@ -894,6 +894,14 @@ mod worker {
             self.cleanup_container(Instant::now() + TEARDOWN_BUDGET);
         }
 
+        /// The planned-stop transition alone, for an owner that signals through its own exact
+        /// child handle: the phase latches `PlannedStop` (so the exit is not a crash and the run
+        /// may not complete), and nothing is signalled, torn down, dispositioned or unloaded here.
+        /// It takes only the binding's short state lock, never held across any other work.
+        pub fn begin_planned_stop(&self) {
+            let _ = self.begin_stop();
+        }
+
         /// Story 19-2 (D-19-2-14 A) — freeze or thaw the container, bounded by
         /// `TEARDOWN_BUDGET`; only a `Running` binding with a CID freezes. A
         /// freeze that fails is undone best-effort under its own fresh
@@ -1820,9 +1828,22 @@ mod worker {
             }
             let core =
                 self.prepare_core(spirit_id.to_owned(), &WorkerTask::Standalone, bundle, false);
-            let spirit = maos_kernel_core::scheduler::control_block::make_spirit_obj(
-                WorkerSpirit::new(Arc::clone(&core)),
-            );
+            let spirit =
+                maos_kernel_core::scheduler::control_block::make_spirit_obj_with_host_hooks(
+                    WorkerSpirit::new(Arc::clone(&core)),
+                    WorkerSpirit::finalize,
+                    maos_kernel_core::scheduler::control_block::FiringHooks {
+                        idle: |spirit, ctx, deadline| spirit.fire_idle(ctx, deadline),
+                        schedule: |spirit, ctx, payload, deadline| {
+                            spirit.fire_schedule(ctx, payload, deadline)
+                        },
+                    },
+                );
+            // The one effective telemetry wall of this manifest's validated declaration, the
+            // pump's own value; without a declaration the link serves no telemetry.
+            #[cfg(feature = "wasm-host")]
+            core.lifecycle()
+                .set_telemetry_wall(crate::hook_pump::telemetry_wall(bundle));
             #[cfg(feature = "wasm-host")]
             core.note_spirit_object(&spirit);
             #[cfg(feature = "wasm-host")]
@@ -2714,7 +2735,7 @@ mod worker {
                 }
                 Some(Ok(_)) => {
                     if let Some(core) = core {
-                        self.iac.unregister_promotion_set(core.spirit_id());
+                        self.iac.withdraw_spirit(core.spirit_id(), spirit_pid);
                     }
                 }
                 None => eprintln!("maos run: worker unload thread panicked for pid {spirit_pid}"),
@@ -2804,12 +2825,71 @@ mod worker {
             Self { core }
         }
 
+        /// Host-only finalizer: the hot-swap coordinator accepted the outer swap-in and
+        /// published this object into the SCB. Only now does the guest's provisional `Done`
+        /// hand its child to the predecessor's session; a refused or stale candidate never
+        /// gets here. Non-blocking.
+        fn finalize(&self, event: maos_kernel_core::scheduler::control_block::HostLifecycleEvent) {
+            let maos_kernel_core::scheduler::control_block::HostLifecycleEvent::SwapCommitted {
+                pid,
+                ..
+            } = event;
+            #[cfg(feature = "wasm-host")]
+            if self.core.spirit_pid() == pid {
+                self.core.lifecycle().publish_commit();
+            }
+            #[cfg(not(feature = "wasm-host"))]
+            let _ = pid;
+        }
+
+        /// Typed host callback for the kernel's `on_idle` firing: `deadline` is the real
+        /// monotonic wall the kernel captured before queuing it, handed straight to the
+        /// lifecycle link so the owning session ends the export at it rather than at a
+        /// recomputed relative cap. No ambient state.
+        #[cfg(feature = "wasm-host")]
+        fn fire_idle(&self, _ctx: &mut Ctx, deadline: Instant) {
+            self.lifecycle_until(LifecycleRequest::Idle, Some(deadline));
+        }
+
+        /// Typed host callback for the kernel's `on_schedule` firing; see [`Self::fire_idle`].
+        #[cfg(feature = "wasm-host")]
+        fn fire_schedule(&self, _ctx: &mut Ctx, payload: &SchedulePayload<'_>, deadline: Instant) {
+            self.lifecycle_until(
+                LifecycleRequest::Schedule {
+                    payload: WireBytes(payload.schedule_data.to_vec()),
+                },
+                Some(deadline),
+            );
+        }
+
+        #[cfg(not(feature = "wasm-host"))]
+        fn fire_idle(&self, _ctx: &mut Ctx, _deadline: Instant) {}
+
+        #[cfg(not(feature = "wasm-host"))]
+        fn fire_schedule(
+            &self,
+            _ctx: &mut Ctx,
+            _payload: &maos_spirit_abi::lifecycle::SchedulePayload<'_>,
+            _deadline: Instant,
+        ) {
+        }
+
         /// One lifecycle export of a spawned Spirit, never waiting past the hook budget.
         /// `Unsupported` is a no-op; every other failure is the typed panic a `Spirit` hook
         /// reports as `HookOutcome::Panicked` (Story 20-9 AC2).
         #[cfg(feature = "wasm-host")]
         fn lifecycle(&self, request: LifecycleRequest) -> LifecycleReply {
-            match self.core.lifecycle().call(&self.core, request) {
+            self.lifecycle_until(request, None)
+        }
+
+        /// [`Self::lifecycle`] under the kernel firing's real absolute wall, if it has one.
+        #[cfg(feature = "wasm-host")]
+        fn lifecycle_until(
+            &self,
+            request: LifecycleRequest,
+            firing: Option<Instant>,
+        ) -> LifecycleReply {
+            match self.core.lifecycle().call(&self.core, request, firing) {
                 Ok(LifecycleReply::Declined(detail)) => panic!("lifecycle_declined: {detail}"),
                 Ok(LifecycleReply::Failed(detail)) => panic!("lifecycle_failed: {detail}"),
                 Ok(reply) => reply,
@@ -2895,7 +2975,7 @@ mod worker {
             let request = LifecycleRequest::Migrate {
                 state: WireBytes(state.to_vec()),
             };
-            match self.core.lifecycle().call(&self.core, request) {
+            match self.core.lifecycle().call(&self.core, request, None) {
                 Ok(LifecycleReply::State(migrated)) => Ok(migrated.0),
                 Ok(LifecycleReply::Declined(detail)) | Ok(LifecycleReply::Failed(detail)) => {
                     Err(MigratorError::new_internal(format!("lifecycle: {detail}")))

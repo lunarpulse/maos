@@ -415,22 +415,22 @@ location = "crates/maos-domain/src/log_recall.rs:357"
 location = "crates/maos-domain/src/log_recall.rs:358"
 
 [[allow]]
-location = "crates/maos-domain/src/memory.rs:407"
+location = "crates/maos-domain/src/memory.rs:425"
 
 [[allow]]
-location = "crates/maos-domain/src/memory.rs:408"
+location = "crates/maos-domain/src/memory.rs:426"
 
 [[allow]]
-location = "crates/maos-domain/src/memory.rs:545"
+location = "crates/maos-domain/src/memory.rs:563"
 
 [[allow]]
-location = "crates/maos-domain/src/memory.rs:546"
+location = "crates/maos-domain/src/memory.rs:564"
 
 [[allow]]
-location = "crates/maos-domain/src/memory.rs:556"
+location = "crates/maos-domain/src/memory.rs:574"
 
 [[allow]]
-location = "crates/maos-domain/src/memory.rs:557"
+location = "crates/maos-domain/src/memory.rs:575"
 
 [[allow]]
 location = "crates/maos-domain/src/orchestrator.rs:98"

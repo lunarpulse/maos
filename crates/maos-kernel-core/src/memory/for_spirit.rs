@@ -39,6 +39,15 @@ impl<'a> SpiritMemoryView<'a> {
             .write(self.spirit_pid, tier, namespace, key, value)
     }
 
+    pub fn delete(
+        &self,
+        tier: MemoryTier,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<bool, MemoryError> {
+        self.adapter.delete(self.spirit_pid, tier, namespace, key)
+    }
+
     pub fn read(
         &self,
         tier: MemoryTier,

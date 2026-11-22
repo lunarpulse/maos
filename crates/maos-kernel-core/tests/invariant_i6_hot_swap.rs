@@ -44,6 +44,9 @@ const VARIANTS: [(u32, Option<&str>); 4] = [
 
 fn manifest(version: &str, schema: u32, migrates: Option<&str>) -> String {
     let mut text = HEADER.replace("VERSION", version);
+    // Story 21-9 (D-21-PF-14): a swap installs the successor's declared scopes as the pid's
+    // effective policy, so the tokens at the pid survive only if the successor keeps the scope.
+    text += "[capabilities.required]\nprovider.complete = [\"witness\"]\n";
     if migrates.is_some() {
         text += "[lifecycle]\nenabled_hooks = [\"migrate\", \"on_swap_in\"]\n";
     }
@@ -66,7 +69,7 @@ fn frame(goal: u64) -> IacFrame {
         frame_id: [goal as u8; 16],
         timestamp_ns: 0,
         logical_clock: 0,
-        from: address("director"),
+        from: address(maos_kernel_core::iac::mailbox::KERNEL_SENDER_SPIRIT_ID),
         to: smallvec![address("witness")],
         kind: FrameKind::TaskAssign,
         intent: IntentClass::Standard,

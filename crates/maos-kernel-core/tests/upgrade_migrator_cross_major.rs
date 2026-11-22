@@ -123,6 +123,9 @@ async fn migrator_policy_executes_successor_migration_and_commits_on_stable_scb(
         )
         .await
         .expect("load predecessor");
+    harness.policy.mutate(|policy| {
+        policy.manifest_scopes.insert(pid, Default::default());
+    });
     harness
         .scheduler
         .start(pid)

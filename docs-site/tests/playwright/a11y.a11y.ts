@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { koPath, loadManifest, manifestRoutePaths } from "./manifest";
+import { buildPageRoutes, koPath, loadManifest, manifestRoutePaths } from "./manifest";
 
+function normalizeRoute(route: string): string {
+  return route.replace(/\/$/, "") || "/";
+}
 
 function fingerprint(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -33,10 +36,7 @@ test.describe("gate:a11y", () => {
     let koTranslated = 0;
     let reachedNetwork = 0;
     const missingMain: string[] = [];
-    if (manifest.expected_distinct_pages === undefined) {
-      throw new Error("route-manifest.json is missing expected_distinct_pages baseline");
-    }
-    const distinctExpected = manifest.expected_distinct_pages;
+    const visited = new Set<string>();
 
     // Diagnostic only (no assertion depends on it): where the scan spends its time, printed
     // as the scan runs so a timeout still leaves the evidence in the log.
@@ -65,6 +65,7 @@ test.describe("gate:a11y", () => {
         gotoMs += Date.now() - gotoStart;
         expect(response?.status(), localePath).toBeLessThan(400);
         reachedNetwork++;
+        visited.add(normalizeRoute(localePath));
 
         const mainCount = await page.locator("main").count();
         if (mainCount === 0) {
@@ -100,9 +101,12 @@ test.describe("gate:a11y", () => {
       missingMain,
       `pages missing \u003cmain\u003e landmark: ${missingMain.join(", ")}`
     ).toEqual([]);
-    expect(
-      Math.abs(scanned.size - distinctExpected) <= 1,
-      `distinct_pages_scanned=${scanned.size} distinct_pages_expected=${distinctExpected}`
-    ).toBe(true);
+    const redirectSources = new Set(
+      (manifest.redirects ?? []).flatMap((r) => [r.from, koPath(r.from)]).map(normalizeRoute)
+    );
+    const unscanned = buildPageRoutes()
+      .map(normalizeRoute)
+      .filter((route) => !visited.has(route) && !redirectSources.has(route));
+    expect(unscanned, `built pages missing from the manifest: ${unscanned.join(", ")}`).toEqual([]);
   });
 });

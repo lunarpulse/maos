@@ -17,17 +17,17 @@ prepare() {
     local suffix=linux-amd64
     [[ "$CARCH" = aarch64 ]] && suffix=linux-arm64
     local f
-    for f in "maos-$suffix" "maosctl-$suffix" "maos-spirit-$suffix" "maos-registry-server-$suffix"; do
+    for f in "maos-$suffix" "maosctl-$suffix" "maos-spirit-$suffix" "maos-registry-server-$suffix" "maos-wasm-runner-$suffix"; do
         if [[ -L "$f" ]]; then
             cp --remove-destination "$(readlink -f "$f")" "$f"
         fi
     done
-    python3 verify-release.py --pubkey '@PUBKEY@' "maos-$suffix" "maosctl-$suffix" "maos-spirit-$suffix" "maos-registry-server-$suffix"
+    python3 verify-release.py --pubkey '@PUBKEY@' "maos-$suffix" "maosctl-$suffix" "maos-spirit-$suffix" "maos-registry-server-$suffix" "maos-wasm-runner-$suffix"
 }
 package() {
     local suffix=linux-amd64 bin
     [[ "$CARCH" = aarch64 ]] && suffix=linux-arm64
-    for bin in maos maosctl maos-spirit maos-registry-server; do
+    for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do
         install -Dm755 "$srcdir/$bin-$suffix" "$pkgdir/usr/bin/$bin"
     done
 }

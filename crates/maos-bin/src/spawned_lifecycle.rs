@@ -6,7 +6,7 @@
 //! and a committed `swap-in` hands that child to the predecessor's session.
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, RecvTimeoutError, SyncSender, TrySendError};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 use std::time::{Duration, Instant};
 
 use maos_domain::invariants::i1::Scope;
@@ -49,6 +49,11 @@ pub struct CallState {
     phase: AtomicU8,
     owner: Option<Arc<AtomicBool>>,
     invocation: Option<Arc<Invocation>>,
+    /// The hook's link deadline for this call; a started call past it is EXPIRED.
+    link_deadline: Instant,
+    /// The one absolute wall the kernel captured before queuing an `on_idle` / `on_schedule`
+    /// firing; the session ends the export at this same instant, never at a recomputed cap.
+    firing: Option<Instant>,
 }
 
 impl CallState {
@@ -56,12 +61,21 @@ impl CallState {
     const STARTED: u8 = 1;
     const CANCELLED: u8 = 2;
     const ANSWERED: u8 = 3;
+    /// A started call whose firing wall or link deadline passed before a reply was claimed.
+    const EXPIRED: u8 = 4;
 
-    fn new(owner: Option<Arc<AtomicBool>>, invocation: Option<Arc<Invocation>>) -> Arc<Self> {
+    fn new(
+        owner: Option<Arc<AtomicBool>>,
+        invocation: Option<Arc<Invocation>>,
+        firing: Option<Instant>,
+        link_deadline: Instant,
+    ) -> Arc<Self> {
         Arc::new(Self {
             phase: AtomicU8::new(Self::QUEUED),
             owner,
             invocation,
+            link_deadline,
+            firing,
         })
     }
 
@@ -83,7 +97,35 @@ impl CallState {
     /// Session: claim the right to deliver the reply. `false`: its hook stopped waiting, and
     /// the reply must change nothing.
     pub fn answer(&self) -> bool {
+        if self.lapsed() {
+            // A reply observed past the firing wall or link deadline changes nothing: the
+            // started call becomes EXPIRED in one atomic step (a concurrent waiter or an
+            // earlier answer/cancel that already won leaves its own phase untouched).
+            self.advance(Self::STARTED, Self::EXPIRED);
+            return false;
+        }
         self.advance(Self::STARTED, Self::ANSWERED)
+    }
+
+    /// The absolute wall the kernel captured for this firing, if it is one.
+    pub fn firing(&self) -> Option<Instant> {
+        self.firing
+    }
+
+    /// The earliest wall this call lives under: its firing wall, else its link deadline.
+    pub fn expiry(&self) -> Instant {
+        self.firing
+            .map_or(self.link_deadline, |wall| wall.min(self.link_deadline))
+    }
+
+    /// The call's firing wall or link deadline has passed.
+    fn lapsed(&self) -> bool {
+        Instant::now() >= self.expiry()
+    }
+
+    /// The firing's absolute wall (not the link deadline) has passed.
+    fn firing_lapsed(&self) -> bool {
+        self.firing.is_some_and(|wall| Instant::now() >= wall)
     }
 
     /// The swap attempt a snapshot was taken for.
@@ -103,6 +145,35 @@ impl CallState {
     fn cancel(&self) -> bool {
         self.cancel_queued() || self.advance(Self::STARTED, Self::CANCELLED)
     }
+
+    /// Hook: the link deadline passed. `Some(false)`: the call was still queued and is dropped;
+    /// `Some(true)`: the call is EXPIRED while the session was executing it (whether this
+    /// waiter or the session's own observation made the one atomic transition);
+    /// `None`: the session claimed the reply first.
+    fn expire(&self) -> Option<bool> {
+        if self.cancel_queued() {
+            Some(false)
+        } else if self.advance(Self::STARTED, Self::EXPIRED) || self.link_expired() {
+            Some(true)
+        } else {
+            None
+        }
+    }
+
+    /// Session: this call's started execution is EXPIRED (distinct from CANCELLED/ANSWERED).
+    pub fn link_expired(&self) -> bool {
+        self.phase.load(Ordering::Acquire) == Self::EXPIRED
+    }
+
+    /// Session: observe a started call's deadline. `true` once the call is EXPIRED, either
+    /// already or because its wall passed and this transition won against any reply claim;
+    /// `false` for a call that is not started-and-lapsed (answered, cancelled, queued).
+    pub fn observe_expiry(&self) -> bool {
+        if self.link_expired() {
+            return true;
+        }
+        self.lapsed() && self.advance(Self::STARTED, Self::EXPIRED)
+    }
 }
 
 /// One queued export.
@@ -118,6 +189,12 @@ pub struct Call {
 pub struct SwapContext {
     pub sandbox: SandboxSpec,
     pub origin: std::path::PathBuf,
+    /// SHA-256 of the exact component bytes this child was launched with: what a restore of
+    /// this incarnation must reacquire, never "whatever the pathname holds now".
+    pub artifact_sha256: Option<[u8; 32]>,
+    /// The publisher key verified when this incarnation was launched from a signed package
+    /// (or restored from one that was); `None` for a local source.
+    pub verified_publisher: Option<[u8; 32]>,
 }
 
 impl SwapContext {
@@ -129,10 +206,18 @@ impl SwapContext {
 /// A launched, `Ready`, lifecycle-probed successor child.
 pub struct Prewarm {
     pub bridge: SpawnedBridge,
+    /// The successor's exact stop handle, taken when it was spawned and moved to the host
+    /// owner at handover; no fallible acquisition remains after the swap commits.
+    pub(crate) stop: maos_kernel_core::lifecycle::cli_wrapper::runtime::ChildStopHandle,
     pub writer: FrameWriter,
     pub turn_budget: Duration,
     pub context_window: maos_kernel_core::capability::context_budget::ContextWindow,
     pub scopes: Vec<Scope>,
+    /// The authority this successor was launched under: the predecessor's admitted sandbox
+    /// narrowed to exactly the successor's own declared scopes (each entitled by a scope the
+    /// predecessor held). The session's sends, recall and skill authority derive from it
+    /// once the outer commit adopts this child, and the next link's swap context carries it.
+    pub sandbox: SandboxSpec,
     /// Where this swap attempt must be over, however long its stages' budgets: set when the
     /// attempt began, shared by the pre-warm and every exchange of the swap.
     pub deadline: Instant,
@@ -149,27 +234,24 @@ impl Prewarm {
     /// is drained and dropped, but every line is a turn of this loop, so a guest that never
     /// stops writing diagnostics cannot outlast its cap; a frame that arrives late is refused.
     fn next_stdout(&mut self, deadline: Instant) -> Result<Vec<u8>, String> {
-        loop {
-            let left = deadline.saturating_duration_since(Instant::now());
-            if left.is_zero() {
-                return Err(DEADLINE.into());
-            }
-            match self
-                .bridge
-                .poll_frame(left.min(Duration::from_millis(20)))
-                .map_err(|error| format!("child_poll: {error}"))?
-            {
-                BridgePoll::Idle | BridgePoll::Data(SubStream::Stderr, _) => {}
-                BridgePoll::Closed => return Err("child_closed".into()),
-                BridgePoll::Data(SubStream::Stdout, bytes) => {
-                    return if Instant::now() > deadline {
-                        Err(DEADLINE.into())
-                    } else {
-                        Ok(bytes)
-                    };
+        next_stdout_on(&mut Live(self), deadline)
+    }
+
+    /// The request's write, held to the same wall as its reply by the transport's own
+    /// deadline (`write_frame_until`), on this thread. The `FrameWriter` owns the terminal
+    /// partial-write state: after a timed-out or failed frame it refuses every later write.
+    /// The refusal then tears the child down once, on its owner's path (the link drops the
+    /// prewarm and releases its attempt); nothing here kills or reaps it.
+    fn write_until(&mut self, body: &[u8], deadline: Instant) -> Result<(), String> {
+        self.writer
+            .write_frame_until(body, deadline)
+            .map_err(|error| {
+                if error.kind() == std::io::ErrorKind::TimedOut {
+                    DEADLINE.into()
+                } else {
+                    format!("child_write: {error}")
                 }
-            }
-        }
+            })
     }
 
     /// When a stage allowed `cap` must end: no later than this attempt's one deadline.
@@ -183,16 +265,8 @@ impl Prewarm {
         request: &LifecycleRequest,
         cap: Duration,
     ) -> Result<LifecycleReply, String> {
-        let deadline = self.until(cap);
-        let body = wire::encode_request(request).map_err(|error| format!("encode: {error}"))?;
-        self.writer
-            .write_frame(&body)
-            .map_err(|error| format!("child_write: {error}"))?;
-        let bytes = self.next_stdout(deadline)?;
-        if !wire::is_reply(&bytes) {
-            return Err("child_protocol".into());
-        }
-        wire::decode_reply(&bytes).map_err(|error| format!("decode: {error}"))
+        let attempt = self.deadline;
+        exchange_on(&mut Live(self), request, cap, attempt)
     }
 
     /// Wait for the runner's empty `Ready` control frame.
@@ -204,6 +278,71 @@ impl Prewarm {
             Err("child_protocol".into())
         }
     }
+}
+
+/// The clock, request write and frame poll of one pre-warm stage: the live child in production
+/// (a monomorphized wrapper, no dynamic dispatch), a scripted logical clock in the tests.
+trait StageIo {
+    fn now(&self) -> Instant;
+    fn write(&mut self, body: &[u8], deadline: Instant) -> Result<(), String>;
+    fn poll(&mut self, wait: Duration) -> Result<BridgePoll, String>;
+}
+
+struct Live<'a>(&'a mut Prewarm);
+
+impl StageIo for Live<'_> {
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+
+    fn write(&mut self, body: &[u8], deadline: Instant) -> Result<(), String> {
+        self.0.write_until(body, deadline)
+    }
+
+    fn poll(&mut self, wait: Duration) -> Result<BridgePoll, String> {
+        self.0
+            .bridge
+            .poll_frame(wait)
+            .map_err(|error| format!("child_poll: {error}"))
+    }
+}
+
+fn next_stdout_on<I: StageIo>(io: &mut I, deadline: Instant) -> Result<Vec<u8>, String> {
+    loop {
+        let left = deadline.saturating_duration_since(io.now());
+        if left.is_zero() {
+            return Err(DEADLINE.into());
+        }
+        match io.poll(left.min(Duration::from_millis(20)))? {
+            BridgePoll::Idle | BridgePoll::Data(SubStream::Stderr, _) => {}
+            BridgePoll::Closed => return Err("child_closed".into()),
+            BridgePoll::Data(SubStream::Stdout, bytes) => {
+                return if io.now() > deadline {
+                    Err(DEADLINE.into())
+                } else {
+                    Ok(bytes)
+                };
+            }
+        }
+    }
+}
+
+/// The one `min(cap, attempt)` deadline of a stage, shared by the request's write and then the
+/// reply's poll: the write's completion grants the reply no fresh budget.
+fn exchange_on<I: StageIo>(
+    io: &mut I,
+    request: &LifecycleRequest,
+    cap: Duration,
+    attempt: Instant,
+) -> Result<LifecycleReply, String> {
+    let deadline = (io.now() + cap).min(attempt);
+    let body = wire::encode_request(request).map_err(|error| format!("encode: {error}"))?;
+    io.write(&body, deadline)?;
+    let bytes = next_stdout_on(io, deadline)?;
+    if !wire::is_reply(&bytes) {
+        return Err("child_protocol".into());
+    }
+    wire::decode_reply(&bytes).map_err(|error| format!("decode: {error}"))
 }
 
 /// Ends the successor's declaration attempt: `true` at commit, `false` when it is dropped first.
@@ -230,6 +369,14 @@ pub struct LifecycleLink {
     swap: Mutex<Option<SwapContext>>,
     prewarm: Mutex<Option<Prewarm>>,
     predecessor: Mutex<Option<Arc<LifecycleLink>>>,
+    /// A successor whose guest `swap-in` answered `Done` but whose outer swap the coordinator
+    /// has not yet accepted: provisional, adopts nothing and publishes nothing. Only
+    /// [`Self::publish_commit`] (the host's `SwapCommitted` event) moves it to the predecessor;
+    /// a refused, stale or detached swap-in leaves it here and it dies with this link.
+    staged: Mutex<Option<(Weak<BindingCore>, Prewarm)>>,
+    /// The validated effective `[lifecycle.telemetry]` wall of the manifest this link serves
+    /// (`hook_pump::telemetry_wall`); `None`: the manifest receives no telemetry here.
+    telemetry_wall: Mutex<Option<Duration>>,
     handover: Mutex<Option<Handover>>,
     outcome: Mutex<Option<Outcome>>,
 }
@@ -256,6 +403,8 @@ impl LifecycleLink {
             swap: Mutex::new(None),
             prewarm: Mutex::new(None),
             predecessor: Mutex::new(None),
+            staged: Mutex::new(None),
+            telemetry_wall: Mutex::new(None),
             handover: Mutex::new(None),
             outcome: Mutex::new(None),
         })
@@ -282,10 +431,13 @@ impl LifecycleLink {
 
     /// Run one export and wait for its reply, never past the cap. `core` is the caller's
     /// core: a pre-warmed successor's committed `swap-in` hands that core to its predecessor.
+    /// `firing` is the absolute wall the kernel captured before queuing an `on_idle` /
+    /// `on_schedule` firing; the queued call carries that same instant to the session.
     pub fn call(
         &self,
         core: &Arc<BindingCore>,
         request: LifecycleRequest,
+        firing: Option<Instant>,
     ) -> Result<LifecycleReply, String> {
         let cap = *locked(&self.cap);
         let inline = {
@@ -307,7 +459,7 @@ impl LifecycleLink {
             }
             let reply = reply?;
             if matches!(request, LifecycleRequest::SwapIn { .. }) && reply == LifecycleReply::Done {
-                self.commit(core);
+                self.stage(core);
             }
             return Ok(reply);
         }
@@ -323,8 +475,13 @@ impl LifecycleLink {
         // for that. A telemetry or consolidate trigger gives up inside the pump's own wall for
         // it, so the pump never charges a subscriber for time it spent queued. A snapshot waits
         // behind the active turn for the whole cap.
+        // Telemetry is held to the one effective wall the manifest's validated declaration
+        // gives it (the pump's own); a link with none grants nothing, however the hook was fired.
         let limit = match request {
-            LifecycleRequest::Telemetry { .. } => Some(crate::hook_pump::TELEMETRY_WALL),
+            LifecycleRequest::Telemetry { .. } => match *locked(&self.telemetry_wall) {
+                Some(wall) => Some(wall),
+                None => return Ok(LifecycleReply::Unsupported),
+            },
             LifecycleRequest::Consolidate { .. } => Some(crate::hook_pump::CONSOLIDATE_WALL),
             _ => None,
         };
@@ -336,7 +493,15 @@ impl LifecycleLink {
         // A pump trigger is also cut loose at its wall (plus slack for the pump to account the
         // overrun first): its hook is quarantined there, so it must not outlive the wall by
         // the manifest's whole budget, which a shutdown would then have to wait out.
-        let to_deadline = limit.map_or(cap, |limit| cap.min(queue_share + limit + WALL_SLACK));
+        let to_deadline = limit.map_or(cap + WALL_SLACK, |limit| {
+            cap.min(queue_share + limit + WALL_SLACK)
+        });
+        // The firing's absolute wall passed before it could even queue (the blocking pool or
+        // the caller was late): dropped untouched, never a strike, and no running call or
+        // session is disturbed.
+        if firing.is_some_and(|wall| Instant::now() >= wall) {
+            return Err(BUSY.into());
+        }
         let pid = core.spirit_pid();
         let (owner, invocation) = match &request {
             LifecycleRequest::Snapshot => (locked(&self.attempt).clone(), None),
@@ -353,9 +518,16 @@ impl LifecycleLink {
             invocation.queued();
         }
         let began = Instant::now();
-        let (deadline, queue_deadline) = (began + to_deadline, began + queue_share);
+        // A kernel firing's one absolute wall also bounds the queue wait, so a call still
+        // unstarted at it is dropped as busy; once started the session ends itself at that
+        // same instant, and this waiter's own backstop is the wall plus the pump slack.
+        let queue_deadline =
+            firing.map_or(began + queue_share, |wall| (began + queue_share).min(wall));
+        let deadline = firing.map_or(began + to_deadline, |wall| {
+            (began + to_deadline).min(wall + WALL_SLACK)
+        });
         let (answer, reply) = sync_channel(1);
-        let state = CallState::new(owner, invocation);
+        let state = CallState::new(owner, invocation, firing, deadline);
         let mut call = Call {
             request,
             answer,
@@ -393,30 +565,80 @@ impl LifecycleLink {
                     if now >= queue_deadline && state.cancel_queued() {
                         return Err(BUSY.into());
                     }
-                    if now >= deadline && state.cancel() {
-                        return Err(DEADLINE.into());
+                    if now >= deadline {
+                        match state.expire() {
+                            // Still queued: nothing of this hook's is executing, so no session
+                            // is touched and the busy session's own work is left alone.
+                            Some(false) => return Err(DEADLINE.into()),
+                            // Executing: giving up as the waiter would leave the export running
+                            // past its link deadline, so the owning session is told (typed,
+                            // `CallState::link_expired`) and ends itself, journaling the cause
+                            // and killing and finalizing the child it owns.
+                            Some(true) => return Err(DEADLINE.into()),
+                            None => {}
+                        }
                     }
                 }
             }
         }
     }
 
-    /// The successor's `swap-in` succeeded: its child now belongs to the predecessor's session.
-    /// Until that session adopts it, this link's hooks queue for it rather than vanish.
-    fn commit(&self, core: &Arc<BindingCore>) {
+    /// The successor's guest `swap-in` answered `Done`: provisional only. The child waits here
+    /// until the coordinator accepts the outer swap ([`Self::publish_commit`]).
+    fn stage(&self, core: &Arc<BindingCore>) {
+        if let Some(prewarm) = locked(&self.prewarm).take() {
+            *locked(&self.staged) = Some((Arc::downgrade(core), prewarm));
+        }
+    }
+
+    /// The coordinator published this link's object after accepting the outer swap-in: the
+    /// child now belongs to the predecessor's session, which adopts it. Until then this
+    /// link's hooks queue for that session rather than vanish. A swap that is no longer the
+    /// predecessor's live attempt hands nothing over (the staged child dies here).
+    pub fn publish_commit(&self) {
+        // Nothing staged: end the attempt (and its fence) while the predecessor and the
+        // attempt token are still held; the outcome stays for `Drop` (`false`).
+        let Some((core, prewarm)) = locked(&self.staged).take() else {
+            self.release_predecessor();
+            return;
+        };
         let Some(predecessor) = locked(&self.predecessor).take() else {
             return;
         };
-        if let Some(prewarm) = locked(&self.prewarm).take() {
-            self.awaiting.store(true, Ordering::Release);
-            *locked(&predecessor.handover) = Some(Handover {
-                core: Arc::clone(core),
-                prewarm,
-            });
+        // The core owns this link: it is attached to the handover only here, at publication,
+        // so a staged child that is never published holds no reference back to its own owner.
+        let Some(core) = core.upgrade() else {
+            return;
+        };
+        let staged = Handover { core, prewarm };
+        let live = locked(&self.own)
+            .as_ref()
+            .is_some_and(|own| predecessor.attempt_is_live(own));
+        if !live {
+            return;
         }
-        if let Some(outcome) = locked(&self.outcome).take() {
+        // Story 21-7: the outcome callback installs the successor's consent declaration. It
+        // runs BEFORE the handover becomes visible, so the session can never serve the
+        // successor's child under the predecessor's policy.
+        let outcome = locked(&self.outcome).take();
+        if let Some(outcome) = outcome {
             outcome(true);
         }
+        // `closed` is read under the same slot lock `take_handover` uses, and the session
+        // closes the link before draining the slot: either the session drains what is parked
+        // here, or this sees `closed` and refuses to park on a terminal session.
+        let rejected = {
+            let mut slot = locked(&predecessor.handover);
+            if predecessor.closed.load(Ordering::Acquire) {
+                Some(staged)
+            } else {
+                self.awaiting.store(true, Ordering::Release);
+                slot.replace(staged)
+            }
+        };
+        // A refused bridge or a displaced handover is torn down by its own drop, outside
+        // every lock.
+        drop(rejected);
     }
 
     // ── session side ────────────────────────────────────────────────────────────────────
@@ -425,6 +647,14 @@ impl LifecycleLink {
     pub fn take(&self) -> Option<Call> {
         let rx = locked(&self.rx);
         while let Ok(call) = rx.try_recv() {
+            if call.state.firing_lapsed() {
+                // The firing's absolute wall passed while this call waited: it never starts
+                // (the guest is never entered for it) and costs its hook no strike.
+                if call.state.cancel_queued() {
+                    let _ = call.answer.send(Answer::Reply(LifecycleReply::Unsupported));
+                }
+                continue;
+            }
             if call.state.start() {
                 return Some(call);
             }
@@ -490,6 +720,26 @@ impl LifecycleLink {
 
     pub fn set_swap_context(&self, context: SwapContext) {
         *locked(&self.swap) = Some(context);
+    }
+
+    /// The effective telemetry wall this link holds a delivery to (`None`: no telemetry).
+    pub fn set_telemetry_wall(&self, wall: Option<Duration>) {
+        *locked(&self.telemetry_wall) = wall;
+    }
+
+    /// A swap this (predecessor) link was fenced for ended without its successor being
+    /// adopted (stale or reverted): release the fence it still holds.
+    pub fn end_current_attempt(&self) {
+        if let Some(attempt) = locked(&self.attempt).take() {
+            attempt.store(false, Ordering::Release);
+        }
+        self.set_fenced(false);
+    }
+
+    fn attempt_is_live(&self, own: &Arc<AtomicBool>) -> bool {
+        locked(&self.attempt)
+            .as_ref()
+            .is_some_and(|live| Arc::ptr_eq(live, own) && live.load(Ordering::Acquire))
     }
 
     pub fn swap_context(&self) -> Option<SwapContext> {
@@ -626,6 +876,10 @@ pub struct SwapHandles {
     /// Builds the session's dependencies around a live supervisor.
     pub session: SessionBuilder,
     pub hosted: Arc<HostedSessions>,
+    /// The FR11 archive of this root: where a successor's identity record is written and the
+    /// cross-major gate reads. Injected, not read from the process environment at each use, so
+    /// two roots in one process never see each other's records.
+    pub archive_root: std::path::PathBuf,
 }
 
 /// A weak handle to the root's [`SwapHandles`], filled once root supervision is armed. The
@@ -661,6 +915,7 @@ impl SwapHandles {
             host: Arc::clone(host),
             session: Arc::clone(session),
             hosted: Arc::clone(hosted),
+            archive_root: maos_audit::default_archive_dir(),
         });
         slot.set(&handles);
         supervisor.keep_swap_handles(handles);
@@ -683,6 +938,7 @@ impl SwapHandles {
         gated: &crate::admission::GatedManifest,
         manifest: &std::path::Path,
         origin: &std::path::Path,
+        artifact: crate::spirit_session::LaunchArtifact,
     ) -> Result<crate::admission::Admitted, crate::admission::AdmissionRefusal> {
         use crate::admission::{load_admit_start_unarchived, AdmissionRefusal, StartPolicy};
         let class_build = |detail: String| AdmissionRefusal::ClassBuild { detail };
@@ -692,9 +948,15 @@ impl SwapHandles {
                 .ok_or(AdmissionRefusal::SpawnedSurfaceUnsupported {
                     surface: "operator door",
                 })?;
-        let launch =
-            crate::spirit_session::manifest_launch_in(&*self.host, gated, manifest, origin, false)
-                .map_err(|error| class_build(error.to_string()))?;
+        let launch = crate::spirit_session::manifest_launch_held(
+            &*self.host,
+            gated,
+            manifest,
+            origin,
+            false,
+            artifact,
+        )
+        .map_err(|error| class_build(error.to_string()))?;
         // The previous incarnation of this id has been unloaded and its session signalled, not
         // necessarily finished: until it releases its mailbox registration this admission loses.
         if tokio::time::timeout(
@@ -721,12 +983,13 @@ impl SwapHandles {
             boot_nonce,
             StartPolicy::StartNow,
             &mut |pid| bound.bind_scheduler_pid(pid),
+            &self.archive_root,
         )
         .await?;
         // The FR11 record precedes the start: a death inside the start window must not leave a
         // started version unrecorded. A component that never starts has it withdrawn again.
-        let archive_root = maos_audit::default_archive_dir();
-        let provisional = crate::admission::archive_provisional(&archive_root, gated);
+        let archive_root = self.archive_root.as_path();
+        let provisional = crate::admission::archive_provisional(archive_root, gated);
         let session = (self.session)(Arc::clone(&supervisor));
         let (id, hold) = (gated.spirit_id.clone(), self.hosted.hold());
         let (started, link, budget) = (
@@ -768,7 +1031,7 @@ impl SwapHandles {
             let _ = tokio::time::timeout(Duration::from_secs(10), task).await;
         }
         if provisional {
-            crate::admission::withdraw_provisional(&archive_root, gated);
+            crate::admission::withdraw_provisional(&self.archive_root, gated);
         }
         crate::admission::unwind_admitted(deps, admitted.pid, &gated.spirit_id).await;
         Err(class_build(format!("spawned_start_failed: {failure}")))
@@ -792,6 +1055,7 @@ pub fn spawned_successor(
     manifest: &maos_kernel_core::scheduler::control_block::SpiritManifestBundle,
     staged: Option<std::path::PathBuf>,
     origin: Option<std::path::PathBuf>,
+    artifact: Option<crate::spirit_session::LaunchArtifact>,
 ) -> Result<Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj>, String> {
     use crate::admission::{
         emit_manifest_declaration_event, emit_manifest_declaration_outcome, gate_manifest,
@@ -854,34 +1118,63 @@ pub fn spawned_successor(
             )
         }
     }
-    if let Some(scope) = maos_manifest::capabilities_required_to_scopes(&gated.caps_required)
-        .into_iter()
-        .find(|scope| !context.declared().contains(scope))
-    {
-        return Err(format!(
-            "swap_capability_widened: the successor declares {scope:?}, which this pid was not admitted for"
-        ));
+    // Each declared scope of the successor must be entitled (hierarchically, never widened) by
+    // a scope the predecessor was admitted for; the successor then runs under exactly its
+    // own declared scopes, a sandbox that is never wider than the predecessor's.
+    let mut successor_scopes: Vec<Scope> = Vec::new();
+    for scope in maos_manifest::capabilities_required_to_scopes(&gated.caps_required) {
+        if !context.declared().iter().any(|held| held.entitles(&scope)) {
+            return Err(format!(
+                "swap_capability_widened: the successor declares {scope:?}, which this pid was not admitted for"
+            ));
+        }
+        if !successor_scopes.contains(&scope) {
+            successor_scopes.push(scope);
+        }
+    }
+    let mut effective = context.sandbox.clone();
+    effective.declared_scopes = successor_scopes;
+    // Story 21-7: a swap keeps or narrows consent; the successor's declaration replaces the
+    // predecessor's only at the committed handover.
+    let policy = Arc::clone(
+        (handles.session)(Arc::clone(&supervisor))
+            .iac
+            .consent_policy(),
+    );
+    let grants = gated.consent.as_ref().map(|c| c.recall.clone());
+    if let Some(change) = policy.widened_by(&class.name, grants.as_ref()) {
+        return Err(format!("swap_consent_widened: the successor {change}"));
     }
     let launch_origin = origin.unwrap_or_else(|| {
         path.parent()
             .map_or_else(|| ".".into(), std::path::Path::to_path_buf)
     });
-    let launch = crate::spirit_session::manifest_launch_in(
+    let artifact = artifact
+        .ok_or("spawned_swap_launch_failed: no held component was acquired for this hop")?;
+    let artifact_sha256 = artifact.sha256();
+    let verified_publisher = artifact.publisher();
+    // A same-pid swap keeps the Spirit's storage identity: a successor under a different
+    // publisher (or signed vs unsigned) would silently re-key it, so it is refused.
+    if verified_publisher != context.verified_publisher {
+        return Err(crate::spirit_session::SWAP_PUBLISHER_CHANGED.into());
+    }
+    let launch = crate::spirit_session::manifest_launch_held(
         &*handles.host,
         &gated,
         &path,
         &launch_origin,
         false,
+        artifact,
     )
     .map_err(|error| format!("spawned_swap_launch_failed: {error}"))?;
     let (core, object) = supervisor
         .prepare_spawned(&class.name, manifest)
         .map_err(|error| format!("spawned_swap_launch_failed: {error}"))?;
     core.bind_scheduler_pid(target.spirit_pid());
-    let mut bridge = crate::spirit_session::spawn_runner(
-        context.sandbox.clone(),
+    let (mut bridge, stop) = crate::spirit_session::spawn_runner(
+        effective.clone(),
         launch.plan,
-        launch.component_artifact.as_ref(),
+        launch.component_artifact,
         &class.name,
     )
     .map_err(|error| format!("spawned_swap_launch_failed: {error}"))?;
@@ -890,10 +1183,12 @@ pub fn spawned_successor(
         .map_err(|error| format!("spawned_swap_launch_failed: {error}"))?;
     let mut prewarm = Prewarm {
         bridge,
+        stop,
         writer,
         turn_budget: launch.turn_budget,
         context_window: launch.context_window,
         scopes: launch.scopes,
+        sandbox: effective.clone(),
         deadline: began + ATTEMPT_WALL,
     };
     let launch_failed = |error: String| format!("spawned_swap_launch_failed: {error}");
@@ -909,12 +1204,24 @@ pub fn spawned_successor(
         .map_err(|error| format!("spawned_swap_launch_failed: {error}"))?;
     let tl = Arc::clone(tl);
     core.lifecycle().set_swap_context(SwapContext {
-        sandbox: context.sandbox,
+        sandbox: effective,
         origin: launch_origin,
+        artifact_sha256: Some(artifact_sha256),
+        verified_publisher,
     });
+    let archive_root = handles.archive_root.clone();
+    let (name, pid) = (class.name.clone(), target.spirit_pid());
     core.lifecycle()
         .attach_successor(prewarm, target.lifecycle(), move |committed| {
+            if committed {
+                policy.register(&name, pid, grants);
+            }
             let outcome = if committed { "admitted" } else { "refused" };
+            // The FR11 identity record of the version that actually took over the pid: only a
+            // committed `swap-in` records it, the admitted successor's own manifest text.
+            if committed {
+                crate::admission::archive_admitted(&archive_root, &gated);
+            }
             emit_manifest_declaration_outcome(&tl, &attempt, outcome);
         });
     Ok(object)
@@ -968,5 +1275,159 @@ impl LifecycleCallers {
             }
         }
         self.consolidation.shutdown().await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    /// Logical time: `t` ms past `base`. The write acks at `ack`, the poll answers `Idle` and
+    /// advances to `idle_to`, or returns the scripted frame at `frame_at`.
+    struct Scripted {
+        base: Instant,
+        now_ms: Cell<u64>,
+        ack_ms: u64,
+        idle_to_ms: u64,
+        frame_at_ms: u64,
+        reply: Vec<u8>,
+        write_deadline: Option<Instant>,
+        polls: Vec<Duration>,
+    }
+
+    impl StageIo for Scripted {
+        fn now(&self) -> Instant {
+            self.base + Duration::from_millis(self.now_ms.get())
+        }
+
+        fn write(&mut self, _body: &[u8], deadline: Instant) -> Result<(), String> {
+            self.write_deadline = Some(deadline);
+            self.now_ms.set(self.ack_ms);
+            Ok(())
+        }
+
+        fn poll(&mut self, wait: Duration) -> Result<BridgePoll, String> {
+            self.polls.push(wait);
+            if self.polls.len() == 1 && self.frame_at_ms <= self.idle_to_ms {
+                self.now_ms.set(self.frame_at_ms);
+                return Ok(BridgePoll::Data(SubStream::Stdout, self.reply.clone()));
+            }
+            self.now_ms.set(self.idle_to_ms);
+            Ok(BridgePoll::Idle)
+        }
+    }
+
+    fn scripted(ack_ms: u64, idle_to_ms: u64, frame_at_ms: u64) -> Scripted {
+        Scripted {
+            base: Instant::now(),
+            now_ms: Cell::new(0),
+            ack_ms,
+            idle_to_ms,
+            frame_at_ms,
+            reply: wire::encode_reply(&LifecycleReply::Supported(true)).unwrap(),
+            write_deadline: None,
+            polls: Vec::new(),
+        }
+    }
+
+    fn run(io: &mut Scripted, cap_ms: u64, attempt_ms: u64) -> Result<LifecycleReply, String> {
+        let attempt = io.base + Duration::from_millis(attempt_ms);
+        exchange_on(
+            io,
+            &LifecycleRequest::Probe,
+            Duration::from_millis(cap_ms),
+            attempt,
+        )
+    }
+
+    fn refused_after_shared_budget(io: &Scripted, result: Result<LifecycleReply, String>) {
+        assert!(
+            matches!(&result, Err(e) if e == DEADLINE),
+            "late reply was not refused"
+        );
+        assert_eq!(
+            io.write_deadline,
+            Some(io.base + Duration::from_millis(12)),
+            "write did not get the one min(stage, attempt) deadline"
+        );
+        assert_eq!(
+            io.polls,
+            vec![Duration::from_millis(3)],
+            "reply poll was not given only what the write left, once"
+        );
+    }
+
+    #[test]
+    fn the_stage_cap_is_one_budget_for_the_write_then_the_reply_poll() {
+        // Stage cap 12 ms binds under a 30 ms attempt; a valid reply would arrive at 13 ms.
+        let mut io = scripted(9, 12, 13);
+        let result = run(&mut io, 12, 30);
+        refused_after_shared_budget(&io, result);
+    }
+
+    #[test]
+    fn the_attempt_deadline_is_one_budget_for_the_write_then_the_reply_poll() {
+        // Attempt wall 12 ms binds under a 30 ms stage cap.
+        let mut io = scripted(9, 12, 13);
+        let result = run(&mut io, 30, 12);
+        refused_after_shared_budget(&io, result);
+    }
+
+    #[test]
+    fn a_valid_reply_within_the_shared_budget_is_accepted() {
+        let mut io = scripted(9, 12, 11);
+        let result = run(&mut io, 12, 30);
+        assert!(matches!(result, Ok(LifecycleReply::Supported(true))));
+        assert_eq!(io.polls, vec![Duration::from_millis(3)]);
+    }
+
+    #[test]
+    fn a_frame_returned_past_the_shared_budget_is_refused_after_the_poll() {
+        // The poll itself was granted 3 ms but returns the frame with time already at 13 ms.
+        let mut io = scripted(9, 13, 13);
+        let result = run(&mut io, 12, 30);
+        refused_after_shared_budget(&io, result);
+    }
+    use super::*;
+
+    /// A successor link wired behind `predecessor` without a child (no staged handover).
+    fn bare_successor(predecessor: &Arc<LifecycleLink>) -> (Arc<LifecycleLink>, Arc<AtomicBool>) {
+        let successor = LifecycleLink::new();
+        let own = predecessor.begin_attempt();
+        *locked(&successor.own) = Some(Arc::clone(&own));
+        *locked(&successor.predecessor) = Some(Arc::clone(predecessor));
+        (successor, own)
+    }
+
+    #[test]
+    fn a_commit_with_nothing_staged_ends_its_attempt_and_unfences_the_predecessor() {
+        let predecessor = LifecycleLink::new();
+        let (successor, own) = bare_successor(&predecessor);
+        predecessor.fence_for_snapshot(Some(&own));
+        assert!(predecessor.fenced());
+        successor.publish_commit();
+        assert!(
+            !predecessor.fenced(),
+            "the commit left the predecessor fenced"
+        );
+        assert!(!own.load(Ordering::SeqCst), "the attempt was left live");
+        // A second finalization is a no-op.
+        successor.publish_commit();
+        drop(successor);
+        assert!(!predecessor.fenced());
+    }
+
+    #[test]
+    fn a_commit_with_nothing_staged_never_touches_a_newer_attempt() {
+        let predecessor = LifecycleLink::new();
+        let (successor, old) = bare_successor(&predecessor);
+        let newer = predecessor.begin_attempt();
+        predecessor.fence_for_snapshot(Some(&newer));
+        assert!(!old.load(Ordering::SeqCst));
+        successor.publish_commit();
+        assert!(
+            predecessor.fenced() && newer.load(Ordering::SeqCst),
+            "a stale commit cleared the newer attempt's fence"
+        );
     }
 }

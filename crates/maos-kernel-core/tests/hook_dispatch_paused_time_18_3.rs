@@ -91,6 +91,7 @@ where
         scheduling: SchedulingSection::default(),
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["on_load".into()],
+            telemetry: None,
         },
         budget: Some(researcher_budget()),
         ..Default::default()

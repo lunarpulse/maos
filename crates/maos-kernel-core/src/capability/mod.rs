@@ -345,13 +345,30 @@ impl CapabilityRegistryAdapter {
         posture_hash: [u8; 32],
         sandbox: SandboxTier,
     ) -> Result<(), CapError> {
-        let result = if self.is_paused(token.spirit_pid) {
-            Err(CapError::Revoked)
-        } else {
-            self.tokens.verify(token, posture_hash, sandbox)
-        };
+        let result = self.verify_entitled(token, posture_hash, sandbox);
         self.record_verification(token, VerifyOutcome::from_result(&result));
         result
+    }
+
+    /// Shared mediated verification: pause fence, then ordinary token checks,
+    /// then the stored scope must still be entitled by the PID's CURRENT
+    /// policy scopes (a hot-swap narrowing revokes authority already minted).
+    /// Uses the one shard read and the lock-free policy read; no approval re-run.
+    fn verify_entitled(
+        &self,
+        token: &CapabilityToken,
+        posture_hash: [u8; 32],
+        sandbox: SandboxTier,
+    ) -> Result<(), CapError> {
+        if self.is_paused(token.spirit_pid) {
+            return Err(CapError::Revoked);
+        }
+        let scope = self.tokens.verify_scoped(token, posture_hash, sandbox)?;
+        if self.policy.still_entitles(token.spirit_pid, &scope) {
+            Ok(())
+        } else {
+            Err(CapError::Revoked)
+        }
     }
 
     /// Story 19-2 (FR51 a) — fence (`true`) or release (`false`) every
@@ -371,10 +388,7 @@ impl CapabilityRegistryAdapter {
     /// audited) before a slow external call: refuses if the token was revoked
     /// or its pid paused meanwhile. Silent — the pre-call row is the audit.
     pub fn recheck(&self, token: &CapabilityToken) -> Result<(), CapError> {
-        if self.is_paused(token.spirit_pid) {
-            return Err(CapError::Revoked);
-        }
-        self.tokens.verify(token, [0u8; 32], SandboxTier(0))
+        self.verify_entitled(token, [0u8; 32], SandboxTier(0))
     }
 
     /// Whether `spirit_pid` is fenced by a director pause or a quarantine.
@@ -398,6 +412,37 @@ impl CapabilityRegistryAdapter {
             .read()
             .unwrap_or_else(|e| e.into_inner())
             .contains(&spirit_pid)
+    }
+
+    /// Hot-swap preflight (D-21-PF-14): the successor's declared scopes must be
+    /// held or entitled by `spirit_pid`'s effective policy scopes. Pure.
+    pub(crate) fn check_successor_scopes(
+        &self,
+        spirit_pid: u32,
+        successor: &[Scope],
+    ) -> Result<(), cap_policy::ScopeInstallError> {
+        self.policy.check_scope_narrowing(spirit_pid, successor)
+    }
+
+    /// Hot-swap commit: install the successor's (never wider) declared scopes as
+    /// the PID's effective policy scopes. `Ok(None)` ⇒ unchanged. Tokens already
+    /// minted are not rewritten, but `verify_and_audit` / `recheck` refuse any
+    /// whose stored scope the installed set no longer entitles.
+    pub(crate) fn install_successor_scopes(
+        &self,
+        spirit_pid: u32,
+        successor: &[Scope],
+    ) -> Result<Option<cap_policy::ScopeInstall>, cap_policy::ScopeInstallError> {
+        self.policy.narrow_scopes(spirit_pid, successor)
+    }
+
+    /// Matching rollback of [`Self::install_successor_scopes`].
+    pub(crate) fn restore_predecessor_scopes(
+        &self,
+        spirit_pid: u32,
+        install: &cap_policy::ScopeInstall,
+    ) -> bool {
+        self.policy.restore_scopes(spirit_pid, install)
     }
 
     /// Whether `spirit_pid` is paused by the director alone (readback, AC6).
@@ -547,7 +592,10 @@ mod tests {
     use super::*;
     use crate::security::crypto::tests::MockCryptoProvider;
 
-    fn test_adapter() -> CapabilityRegistryAdapter {
+    fn test_adapter_with_audit() -> (
+        CapabilityRegistryAdapter,
+        tokio::sync::mpsc::Receiver<cap_audit::CapAuditEvent>,
+    ) {
         let crypto: Arc<dyn CryptoProvider> = Arc::new(MockCryptoProvider);
         let signing_key = cap_tokens::Ed25519SigningKey::new([0u8; 32]);
         let policy = PolicyTable::new();
@@ -566,21 +614,29 @@ mod tests {
             );
             policy.update(inner);
         }
-        let (audit_tx, mut audit_rx) = cap_audit::channel();
-        std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
+        let (audit_tx, audit_rx) = cap_audit::channel();
         let quota = CapQuotaTracker::new();
         let working_memory = Arc::new(WorkingMemoryStore::new());
         let telemetry = Arc::new(TelemetryStreamAdapter::default());
-        CapabilityRegistryAdapter::new(
-            crypto,
-            signing_key,
-            0xDEAD_BEEF,
-            Arc::new(policy),
-            audit_tx,
-            quota,
-            working_memory,
-            telemetry,
+        (
+            CapabilityRegistryAdapter::new(
+                crypto,
+                signing_key,
+                0xDEAD_BEEF,
+                Arc::new(policy),
+                audit_tx,
+                quota,
+                working_memory,
+                telemetry,
+            ),
+            audit_rx,
         )
+    }
+
+    fn test_adapter() -> CapabilityRegistryAdapter {
+        let (adapter, mut audit_rx) = test_adapter_with_audit();
+        std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
+        adapter
     }
 
     #[test]
@@ -611,5 +667,71 @@ mod tests {
         assert!(adapter.on_value_below(2.0, 3.0));
         assert!(adapter.on_value_within(2.0, 1.0, 3.0));
         assert!(!adapter.on_value_outside(2.0, 1.0, 3.0));
+    }
+
+    #[test]
+    fn narrowed_policy_refuses_unentitled_tokens_until_matching_restore() {
+        cap_tokens::init_monotonic_base();
+        let (adapter, mut audit) = test_adapter_with_audit();
+        let posture = [0u8; 32];
+        let scope = |subtree: &str| Scope::FsRead {
+            subtree: subtree.into(),
+        };
+        let mint = |scope| {
+            adapter
+                .issue(7, scope, 60, posture, IntentClass::Standard)
+                .unwrap()
+        };
+        let removed = mint(scope("/tmp/sibling"));
+        let kept = mint(scope("/tmp/kept/child"));
+        let implicit = mint(Scope::SelfTelemetryRead);
+        let verify = |token| {
+            (
+                adapter.verify_and_audit(token, posture, SandboxTier(0)),
+                adapter.recheck(token),
+            )
+        };
+        let accepted = (Ok(()), Ok(()));
+        assert_eq!(verify(&removed), accepted);
+        assert_eq!(verify(&kept), accepted);
+        assert_eq!(verify(&implicit), accepted);
+        while audit.try_recv().is_ok() {}
+
+        let install = adapter
+            .install_successor_scopes(7, &[scope("/tmp/kept")])
+            .unwrap()
+            .expect("narrowing changes the set");
+        assert_eq!(
+            verify(&removed),
+            (Err(CapError::Revoked), Err(CapError::Revoked))
+        );
+        assert_eq!(verify(&kept), accepted);
+        assert_eq!(verify(&implicit), accepted);
+        let mut verification = Vec::new();
+        while let Ok(event) = audit.try_recv() {
+            if let cap_audit::CapAuditEvent::Verify {
+                token_id,
+                spirit_pid,
+                outcome,
+            } = event
+            {
+                assert_eq!(spirit_pid, 7);
+                verification.push((token_id, outcome));
+            }
+        }
+        assert_eq!(
+            verification,
+            [
+                (removed.token_id, VerifyOutcome::Revoked),
+                (kept.token_id, VerifyOutcome::Ok),
+                (implicit.token_id, VerifyOutcome::Ok),
+            ],
+            "verify records the mediated decision once; recheck stays silent"
+        );
+
+        assert!(adapter.restore_predecessor_scopes(7, &install));
+        assert_eq!(verify(&removed), accepted);
+        assert_eq!(verify(&kept), accepted);
+        assert_eq!(verify(&implicit), accepted);
     }
 }

@@ -55,6 +55,33 @@ describe("WASM component guest", () => {
     );
   });
 
+  it("answers a shell request with one echoing task-complete addressed to the shell", () => {
+    const shell = { spiritId: "@maos-shell" };
+    const request = {
+      ...frame, frameFrom: shell, to: [{ spiritId: "spirit" }], kind: "task-assign",
+      autoMarker: "human-authored",
+      payload: { tag: "task-assign", val: {
+        goal: "hello", scope: [], successCriteria: "Answer the operator's shell message",
+      } },
+    } as unknown as Parameters<typeof handleFrame>[0];
+    const [reply, ...rest] = handleFrame(request);
+    expect(rest).toEqual([]);
+    expect(reply.kind).toBe("task-complete");
+    expect(reply.to).toEqual([shell]);
+    expect(reply.payload).toEqual({ tag: "task-complete", val: { resultText: "echo: hello" } });
+  });
+
+  it("echoes a task-assign that is not the shell's request unchanged", () => {
+    const other = {
+      ...frame, frameFrom: { spiritId: "peer" }, kind: "task-assign",
+      autoMarker: "human-authored",
+      payload: { tag: "task-assign", val: {
+        goal: "hello", scope: [], successCriteria: "Answer the operator's shell message",
+      } },
+    } as unknown as Parameters<typeof handleFrame>[0];
+    expect(handleFrame(other)).toEqual([other]);
+  });
+
   it.each(["refused", "unavailable", "capability-denied"])(
     "continues after skill authoring reports %s", (tag) => {
       vi.mocked(author).mockImplementation(() => { throw componentError(tag); });

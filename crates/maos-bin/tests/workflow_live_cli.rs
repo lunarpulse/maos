@@ -545,6 +545,55 @@ fn live_comparison_separates_accuracy_from_cost_and_changes_nothing() {
 }
 
 #[test]
+fn decision_and_evidence_are_reported_separately() {
+    let fx = Fixture::new("catalog-live.toml");
+    // Case 0: right answer, but a shorter verbatim quote than the label. Case 1: wrong answer.
+    // Case 2: right answer and quote. Both plans get the same replies.
+    let fake = Fake::start(Duration::ZERO, |body| match index(body) {
+        0 => Reply::ok(finding(true, "PO-731 for this invoice"), (11, 7)),
+        i => Reply::ok(truth(i, i == 2), (11, 7)),
+    });
+
+    let out = fx.compare_live(&fake, &[], Some("6"));
+    assert!(out.status.success(), "{out:?}");
+    let report = report(&out).expect("one workflow_comparison record");
+
+    // Baseline: only case 0's decision matches (its old terminal mislabels the missing-order
+    // case 2 although the evidence is right). Candidate: cases 0 and 2 decide right.
+    for (side, decided, passed) in [("baseline", 1, 0), ("candidate", 2, 1)] {
+        let p = &report["plans"][side];
+        assert_eq!(p["passed"], passed, "{p}");
+        assert_eq!(p["decision_passed"], decided, "{p}");
+        assert!((p["decision_rate"].as_f64().unwrap() - decided as f64 / 3.0).abs() < 1e-9);
+        assert_eq!(p["evidence_runs"], 3, "{p}");
+        assert_eq!(p["evidence_passed"], 1, "{p}");
+        assert!((p["evidence_rate"].as_f64().unwrap() - 1.0 / 3.0).abs() < 1e-9);
+        // Only case 0 decides right on wrong evidence.
+        assert_eq!(p["decision_without_evidence"], 1, "{p}");
+    }
+
+    let cases = report["cases"].as_array().unwrap();
+    let expected = [
+        ([true, true], [false, false]),
+        ([false, false], [false, false]),
+        ([false, true], [true, true]),
+    ];
+    for (case, (decision, evidence)) in cases.iter().zip(expected) {
+        for (side, (decided, evidenced)) in [
+            ("baseline", (decision[0], evidence[0])),
+            ("candidate", (decision[1], evidence[1])),
+        ] {
+            let r = &case[side];
+            assert_eq!(col(r, "decision"), json!([decided]), "{case}");
+            assert_eq!(col(r, "evidence"), json!([evidenced]), "{case}");
+            assert_eq!(r["decision_passed"], u8::from(decided), "{case}");
+            assert_eq!(r["evidence_passed"], u8::from(evidenced), "{case}");
+            assert_eq!(r["passed"], u8::from(decided && evidenced), "{case}");
+        }
+    }
+}
+
+#[test]
 fn comparison_refuses_before_any_call() {
     let fx = Fixture::new("catalog-live.toml");
     let fake = Fake::start(Duration::ZERO, right);
@@ -653,6 +702,11 @@ fn per_run_failures_abstain_with_fixed_diagnostics_and_wrong_answers_fail() {
         (88, 56),
         false,
     );
+    for side in ["baseline", "candidate"] {
+        // Abstained runs of labeled cases count as evidence misses, never as skipped.
+        assert_eq!(report["plans"][side]["evidence_runs"], 12);
+        assert_eq!(report["plans"][side]["evidence_passed"], 7);
+    }
     for side in ["baseline", "candidate"] {
         assert_eq!(report["plans"][side]["calls"], 12);
     }

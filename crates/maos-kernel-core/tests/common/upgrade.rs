@@ -40,6 +40,7 @@ impl maos_spirit_abi::lifecycle::Spirit for CorpusSpirit {
 pub struct UpgradeHarness {
     pub scheduler: Arc<SpiritSchedulerAdapter>,
     pub orchestrator: Arc<UpgradeOrchestrator>,
+    pub hot_swap: Arc<HotSwapCoordinator>,
     pub journal: Arc<JournalAdapter>,
     pub transparency_log: Arc<TransparencyLogAdapter>,
     /// Story 19-5 (AC4.2) — the registry the scheduler and hot swap share,
@@ -120,7 +121,7 @@ impl UpgradeHarness {
         ));
         let orchestrator = Arc::new(UpgradeOrchestrator::new(
             Arc::clone(&scheduler),
-            hot_swap,
+            Arc::clone(&hot_swap),
             Arc::clone(&transparency_log),
             Arc::clone(&journal),
             telemetry,
@@ -129,6 +130,7 @@ impl UpgradeHarness {
         Self {
             scheduler,
             orchestrator,
+            hot_swap,
             journal,
             transparency_log,
             capability,

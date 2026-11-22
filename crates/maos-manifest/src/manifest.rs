@@ -25,6 +25,15 @@ pub enum ManifestError {
     CapOutOfRange { field: String, value: u32 },
     #[error("TOML deserialization failed: {0}")]
     Toml(String),
+    /// `[[schedule]]` declares more entries than [`MAX_SCHEDULE_ENTRIES`]
+    /// (empty-payload entries count). `actual` is the declared entry count.
+    #[error("schedule entry cap exceeded: {actual} entries declared, at most {limit} allowed")]
+    ScheduleEntryLimit { limit: usize, actual: usize },
+    /// The `[[schedule]]` payloads decode to more than
+    /// [`MAX_SCHEDULE_DECODED_BYTES`] in total. `actual` is the running total
+    /// including the entry that crossed the cap.
+    #[error("schedule decoded payload cap exceeded: {actual} bytes decoded in total, at most {limit} allowed")]
+    ScheduleDecodedBytesLimit { limit: usize, actual: usize },
 }
 
 /// Parse the manifest-declared registry trust tier from TOML structure.
@@ -1701,17 +1710,13 @@ const VALID_HOOK_NAMES: &[&str] = &[
 ///
 /// Empty `enabled_hooks` means "all hooks allowed" (matches
 /// `kernel_invocation_allowed(&[], _) → true`).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LifecycleSection {
     pub enabled_hooks: Vec<String>,
-}
-
-impl Default for LifecycleSection {
-    fn default() -> Self {
-        Self {
-            enabled_hooks: vec![],
-        }
-    }
+    /// Validated `[lifecycle.telemetry]`. Only the output of
+    /// [`validate_telemetry_subscription`] is trusted; `from_toml_str` always
+    /// leaves this `None`.
+    pub telemetry: Option<TelemetrySubscription>,
 }
 
 impl LifecycleSection {
@@ -1727,6 +1732,136 @@ impl LifecycleSection {
 struct RawLifecycleSection {
     #[serde(default)]
     enabled_hooks: Vec<String>,
+    /// `[lifecycle.telemetry]` (D-21-9-02 A). Shape-checked here (strict, both
+    /// fields required); authority, schema gate and range live in
+    /// [`validate_telemetry_subscription`] only.
+    #[serde(default)]
+    telemetry: Option<RawTelemetrySubscription>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawTelemetrySubscription {
+    scope: String,
+    time_cap_seconds: i64,
+}
+
+/// First manifest schema that can declare `[lifecycle.telemetry]` (D-21-9-02 A).
+/// A named const because `check-manifest-schema-version` forbids literal compares.
+pub const TELEMETRY_SUBSCRIPTION_SINCE_SCHEMA: u32 = 8;
+/// The only scope literal `[lifecycle.telemetry]` accepts: the existing
+/// root-wide `scalar.tap.*` read. Not a new `Scope` variant.
+pub const TELEMETRY_SUBSCRIPTION_SCOPE: &str = "scalar.tap.*";
+/// Inclusive ceiling on `[lifecycle.telemetry].time_cap_seconds` (whole seconds).
+pub const TELEMETRY_TIME_CAP_MAX_SECONDS: u32 = 5;
+/// Overall hook cap applied when a manifest has no `[budget]`; mirrors the
+/// kernel dispatcher's `DEFAULT_TIME_CAP_SECONDS`.
+pub const DEFAULT_OVERALL_TIME_CAP_SECONDS: u32 = 30;
+
+const TELEMETRY_HOOK_NAME: &str = "on_telemetry_event";
+
+/// A validated `[lifecycle.telemetry]` declaration: the explicit per-hook wall
+/// for `on_telemetry_event`, in whole seconds within `1..=5` and no greater
+/// than the effective overall cap. Only [`validate_telemetry_subscription`]
+/// constructs one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TelemetrySubscription {
+    time_cap_seconds: u32,
+}
+
+impl TelemetrySubscription {
+    /// The declared cap in whole seconds.
+    pub fn time_cap_seconds(&self) -> u32 {
+        self.time_cap_seconds
+    }
+
+    /// The declared cap as a `Duration`.
+    pub fn time_cap(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(u64::from(self.time_cap_seconds))
+    }
+}
+
+/// The single shared validator for the telemetry subscription (D-21-9-02 A),
+/// called by admission and by the successor loader.
+///
+/// `lifecycle_toml` is the raw `[lifecycle]` table body (`None` when absent),
+/// `declared_schema` the manifest's `[class].manifest_schema_version`, and
+/// `budget` the parsed `[budget]` (absent means the effective overall cap is
+/// [`DEFAULT_OVERALL_TIME_CAP_SECONDS`]).
+///
+/// - Neither an explicit `on_telemetry_event` listing nor a table: `Ok(None)`
+///   (an empty `enabled_hooks` is not a listing and grants nothing).
+/// - A listing at a schema below [`TELEMETRY_SUBSCRIPTION_SINCE_SCHEMA`], a
+///   listing without the table, or a table without a listing: refused.
+/// - Otherwise `scope` must equal [`TELEMETRY_SUBSCRIPTION_SCOPE`] and
+///   `time_cap_seconds` lie in `1..=`[`TELEMETRY_TIME_CAP_MAX_SECONDS`] and not
+///   exceed the effective overall cap.
+pub fn validate_telemetry_subscription(
+    declared_schema: u32,
+    lifecycle_toml: Option<&str>,
+    budget: Option<&Budget>,
+) -> Result<Option<TelemetrySubscription>, ManifestError> {
+    let Some(body) = lifecycle_toml else {
+        return Ok(None);
+    };
+    let raw: RawLifecycleSection =
+        toml::from_str(body).map_err(|e| ManifestError::Toml(e.to_string()))?;
+    let listed = raw.enabled_hooks.iter().any(|h| h == TELEMETRY_HOOK_NAME);
+    let gated = declared_schema >= TELEMETRY_SUBSCRIPTION_SINCE_SCHEMA;
+    let refuse =
+        |field: &str, reason: String| Err(ManifestError::Toml(validation_msg(field, &reason)));
+    let Some(table) = raw.telemetry else {
+        if listed {
+            return refuse(
+                "lifecycle.enabled_hooks",
+                if gated {
+                    format!("'{TELEMETRY_HOOK_NAME}' requires a [lifecycle.telemetry] declaration")
+                } else {
+                    format!(
+                        "'{TELEMETRY_HOOK_NAME}' requires manifest_schema_version >= {TELEMETRY_SUBSCRIPTION_SINCE_SCHEMA} and [lifecycle.telemetry], got schema {declared_schema}"
+                    )
+                },
+            );
+        }
+        return Ok(None);
+    };
+    if !gated {
+        return refuse(
+            "lifecycle.telemetry",
+            format!(
+                "requires manifest_schema_version >= {TELEMETRY_SUBSCRIPTION_SINCE_SCHEMA}, got {declared_schema}"
+            ),
+        );
+    }
+    if !listed {
+        return refuse(
+            "lifecycle.telemetry",
+            format!("declared without '{TELEMETRY_HOOK_NAME}' in lifecycle.enabled_hooks"),
+        );
+    }
+    let (scope, cap) = (table.scope, table.time_cap_seconds);
+    if scope != TELEMETRY_SUBSCRIPTION_SCOPE {
+        return refuse(
+            "lifecycle.telemetry.scope",
+            format!("must be \"{TELEMETRY_SUBSCRIPTION_SCOPE}\", got {scope:?}"),
+        );
+    }
+    if cap < 1 || cap > i64::from(TELEMETRY_TIME_CAP_MAX_SECONDS) {
+        return refuse(
+            "lifecycle.telemetry.time_cap_seconds",
+            format!("must be in [1, {TELEMETRY_TIME_CAP_MAX_SECONDS}], got {cap}"),
+        );
+    }
+    let overall = budget.map_or(DEFAULT_OVERALL_TIME_CAP_SECONDS, |b| b.time_cap_seconds);
+    if cap > i64::from(overall) {
+        return refuse(
+            "lifecycle.telemetry.time_cap_seconds",
+            format!("{cap} exceeds the overall budget.time_cap_seconds {overall}"),
+        );
+    }
+    Ok(Some(TelemetrySubscription {
+        time_cap_seconds: cap as u32,
+    }))
 }
 
 impl RawLifecycleSection {
@@ -1756,6 +1891,7 @@ impl RawLifecycleSection {
         }
         Ok(LifecycleSection {
             enabled_hooks: self.enabled_hooks,
+            telemetry: None,
         })
     }
 }
@@ -1922,8 +2058,23 @@ fn default_principal_revocability() -> bool {
     true
 }
 
+/// Inclusive ceiling on `[[schedule]]` entries per manifest, empty-payload
+/// entries included (D-21-9-01 A).
+pub const MAX_SCHEDULE_ENTRIES: usize = 64;
+/// Inclusive ceiling on the total decoded `payload_b64` bytes per manifest,
+/// summed across entries (D-21-9-01 A). Independent of [`MAX_SCHEDULE_ENTRIES`].
+pub const MAX_SCHEDULE_DECODED_BYTES: usize = 65_536;
+
 impl RawSchedulesSection {
     fn validate(self) -> Result<SchedulesSection, ManifestError> {
+        // Entry count is checked before any output is allocated.
+        if self.entries.len() > MAX_SCHEDULE_ENTRIES {
+            return Err(ManifestError::ScheduleEntryLimit {
+                limit: MAX_SCHEDULE_ENTRIES,
+                actual: self.entries.len(),
+            });
+        }
+        let mut decoded_total: usize = 0;
         let mut seen_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut entries = Vec::with_capacity(self.entries.len());
         for raw in self.entries {
@@ -1965,6 +2116,16 @@ impl RawSchedulesSection {
             // payload_b64 decode (base64 standard). Hand-rolled minimal decoder
             // — workspace has no `base64` dep; FR47 forbids adding one for
             // Story 6.4 (verified via xtask). Empty string → empty bytes.
+            // Aggregate decoded-byte cap, checked from the exact decoded length
+            // before the payload buffer is allocated. Malformed lengths fall
+            // through to the strict decoder, which rejects them.
+            decoded_total += b64_decoded_len(&raw.payload_b64).unwrap_or(0);
+            if decoded_total > MAX_SCHEDULE_DECODED_BYTES {
+                return Err(ManifestError::ScheduleDecodedBytesLimit {
+                    limit: MAX_SCHEDULE_DECODED_BYTES,
+                    actual: decoded_total,
+                });
+            }
             let payload_bytes = decode_b64_strict(&raw.payload_b64)
                 .map_err(|e| ManifestError::Toml(validation_msg("schedule.payload_b64", &e)))?;
             // compliance_claim_ref_hex — 64 hex chars (= 32 bytes) if present.
@@ -2007,6 +2168,15 @@ impl RawSchedulesSection {
         }
         Ok(SchedulesSection { entries })
     }
+}
+
+/// Exact decoded length of a padded base64 string, computed without decoding.
+/// `None` when the length is not a multiple of 4 (the strict decoder rejects
+/// it). Over-long padding is clamped here; the strict decoder rejects it too.
+fn b64_decoded_len(input: &str) -> Option<usize> {
+    let len = input.len();
+    let pad = (len - input.trim_end_matches('=').len()).min(2);
+    (len % 4 == 0).then(|| len / 4 * 3 - pad)
 }
 
 /// Minimal base64 (RFC 4648 §4 standard alphabet) decoder for the
@@ -3927,6 +4097,183 @@ homepage = "ftp://example.org""#;
         assert_eq!(s.enabled_hooks.len(), 11);
     }
 
+    // ---- [lifecycle.telemetry] (D-21-9-02 A) ----
+
+    fn telemetry_lifecycle(hooks: &str, table: &str) -> String {
+        format!("enabled_hooks = [{hooks}]\n{table}")
+    }
+
+    const TELEMETRY_TABLE_3S: &str =
+        "[telemetry]\nscope = \"scalar.tap.*\"\ntime_cap_seconds = 3\n";
+
+    fn budget_with_cap(time_cap_seconds: u32) -> Budget {
+        Budget::from_toml_str(&format!(
+            "context_window_size = 4096\ntime_cap_seconds = {time_cap_seconds}"
+        ))
+        .unwrap()
+    }
+
+    fn gated(
+        toml: &str,
+        budget: Option<&Budget>,
+    ) -> Result<Option<TelemetrySubscription>, ManifestError> {
+        validate_telemetry_subscription(TELEMETRY_SUBSCRIPTION_SINCE_SCHEMA, Some(toml), budget)
+    }
+
+    fn telemetry_refusal(schema: u32, lifecycle: &str, budget: Option<&Budget>) -> String {
+        match validate_telemetry_subscription(schema, Some(lifecycle), budget).unwrap_err() {
+            ManifestError::Toml(msg) => msg,
+            other => panic!("unexpected error {other:?}"),
+        }
+    }
+
+    #[test]
+    fn telemetry_valid_declaration_yields_exact_duration() {
+        let lifecycle = telemetry_lifecycle("\"on_telemetry_event\"", TELEMETRY_TABLE_3S);
+        let budget = budget_with_cap(10);
+        let sub = gated(&lifecycle, Some(&budget)).unwrap().unwrap();
+        assert_eq!(sub.time_cap_seconds(), 3);
+        assert_eq!(sub.time_cap(), std::time::Duration::from_secs(3));
+        // The legacy section parser tolerates the table and keeps the hook list.
+        let section = LifecycleSection::from_toml_str(&lifecycle).unwrap();
+        assert_eq!(
+            section.enabled_hooks,
+            vec!["on_telemetry_event".to_string()]
+        );
+    }
+
+    #[test]
+    fn telemetry_non_listeners_are_unchanged_at_every_schema() {
+        for schema in [1, 7, TELEMETRY_SUBSCRIPTION_SINCE_SCHEMA] {
+            // Empty enabled_hooks ("all hooks") is not an explicit listing.
+            for lifecycle in [
+                None,
+                Some(""),
+                Some("enabled_hooks = []"),
+                Some("enabled_hooks = [\"on_load\", \"on_idle\"]"),
+            ] {
+                assert_eq!(
+                    validate_telemetry_subscription(schema, lifecycle, None).unwrap(),
+                    None,
+                    "schema {schema}: {lifecycle:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn telemetry_listing_without_table_is_refused_at_every_schema() {
+        let lifecycle = "enabled_hooks = [\"on_load\", \"on_telemetry_event\"]";
+        for schema in [1, 7, TELEMETRY_SUBSCRIPTION_SINCE_SCHEMA] {
+            let msg = telemetry_refusal(schema, lifecycle, None);
+            assert!(msg.contains("lifecycle.enabled_hooks"), "{msg}");
+        }
+    }
+
+    #[test]
+    fn telemetry_declaration_below_gate_schema_is_refused() {
+        let lifecycle = telemetry_lifecycle("\"on_telemetry_event\"", TELEMETRY_TABLE_3S);
+        for schema in [1, 7] {
+            let msg = telemetry_refusal(schema, &lifecycle, None);
+            assert!(msg.contains("lifecycle.telemetry"), "{msg}");
+            assert!(msg.contains("manifest_schema_version"), "{msg}");
+        }
+        // An inert table (no listing) below the gate is refused too.
+        let inert = telemetry_lifecycle("\"on_load\"", TELEMETRY_TABLE_3S);
+        assert!(telemetry_refusal(7, &inert, None).contains("lifecycle.telemetry"));
+    }
+
+    #[test]
+    fn telemetry_table_without_listing_is_refused_as_inert() {
+        let empty_hooks = telemetry_lifecycle("", TELEMETRY_TABLE_3S);
+        let other_hooks = telemetry_lifecycle("\"on_load\"", TELEMETRY_TABLE_3S);
+        for lifecycle in [
+            TELEMETRY_TABLE_3S,
+            empty_hooks.as_str(),
+            other_hooks.as_str(),
+        ] {
+            let msg = telemetry_refusal(TELEMETRY_SUBSCRIPTION_SINCE_SCHEMA, lifecycle, None);
+            assert!(msg.contains("lifecycle.telemetry"), "{lifecycle}: {msg}");
+        }
+    }
+
+    #[test]
+    fn telemetry_scope_must_be_the_exact_literal() {
+        for scope in [
+            "scalar.tap",
+            "scalar.tap.*.x",
+            "Scalar.Tap.*",
+            " scalar.tap.*",
+            "scalar.*",
+            "",
+        ] {
+            let table = format!("[telemetry]\nscope = \"{scope}\"\ntime_cap_seconds = 3\n");
+            let lifecycle = telemetry_lifecycle("\"on_telemetry_event\"", &table);
+            let msg = telemetry_refusal(TELEMETRY_SUBSCRIPTION_SINCE_SCHEMA, &lifecycle, None);
+            assert!(
+                msg.contains("lifecycle.telemetry.scope"),
+                "{scope:?}: {msg}"
+            );
+        }
+    }
+
+    #[test]
+    fn telemetry_cap_boundaries_one_to_five_whole_seconds() {
+        let at = |cap: i64| {
+            let table =
+                format!("[telemetry]\nscope = \"scalar.tap.*\"\ntime_cap_seconds = {cap}\n");
+            let lifecycle = telemetry_lifecycle("\"on_telemetry_event\"", &table);
+            gated(&lifecycle, None)
+        };
+        assert_eq!(at(1).unwrap().unwrap().time_cap_seconds(), 1);
+        assert_eq!(at(5).unwrap().unwrap().time_cap_seconds(), 5);
+        for bad in [0, 6, -1, 86_400] {
+            let err = at(bad).unwrap_err().to_string();
+            assert!(
+                err.contains("lifecycle.telemetry.time_cap_seconds"),
+                "{bad}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn telemetry_cap_is_bounded_by_the_overall_budget() {
+        let lifecycle = telemetry_lifecycle(
+            "\"on_telemetry_event\"",
+            "[telemetry]\nscope = \"scalar.tap.*\"\ntime_cap_seconds = 5\n",
+        );
+        let check = |overall: u32| gated(&lifecycle, Some(&budget_with_cap(overall)));
+        // Equal to the overall cap is accepted; one below is refused.
+        assert!(check(5).unwrap().is_some());
+        assert!(check(4).unwrap_err().to_string().contains("overall"));
+        // Absent [budget] takes the effective default, not a refusal.
+        assert!(gated(&lifecycle, None).unwrap().is_some());
+    }
+
+    #[test]
+    fn telemetry_table_shape_is_strict() {
+        let bad_tables = [
+            // Missing either field.
+            "[telemetry]\nscope = \"scalar.tap.*\"\n",
+            "[telemetry]\ntime_cap_seconds = 3\n",
+            // Unknown key.
+            "[telemetry]\nscope = \"scalar.tap.*\"\ntime_cap_seconds = 3\nextra = 1\n",
+            // Wrong types: fractional, string, or a non-table.
+            "[telemetry]\nscope = \"scalar.tap.*\"\ntime_cap_seconds = 2.5\n",
+            "[telemetry]\nscope = \"scalar.tap.*\"\ntime_cap_seconds = \"3\"\n",
+            "[telemetry]\nscope = 7\ntime_cap_seconds = 3\n",
+        ];
+        for table in bad_tables {
+            let lifecycle = telemetry_lifecycle("\"on_telemetry_event\"", table);
+            assert!(gated(&lifecycle, None).is_err(), "{table}");
+        }
+        assert!(gated(
+            "enabled_hooks = [\"on_telemetry_event\"]\ntelemetry = 3\n",
+            None
+        )
+        .is_err());
+    }
+
     // ---- McpSection (Story 5.5c, Fix #26) ----
 
     fn mcp_section_toml_valid() -> &'static str {
@@ -4297,6 +4644,52 @@ impl SwapInvariantsSection {
         Ok(Self {
             preserve: declared_names("swap_invariants.preserve", raw.preserve)?,
         })
+    }
+}
+
+/// Story 21-7 (D-21-7-01 A) — `[consent.recall]`: the recall restriction a sending Spirit grants
+/// each LOCAL recipient spirit id. A technical delivery/recall control, not legal consent.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ConsentSection {
+    pub recall: std::collections::BTreeMap<String, maos_domain::frame::ConsentRecall>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawConsentSection {
+    recall: std::collections::BTreeMap<String, String>,
+}
+
+impl ConsentSection {
+    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+        use maos_domain::frame::ConsentRecall;
+        let raw: RawConsentSection = parse_raw(s)?;
+        let refuse = |msg: String| ManifestError::Toml(validation_msg("consent.recall", &msg));
+        if raw.recall.is_empty() || raw.recall.len() > 32 {
+            return Err(refuse(format!(
+                "needs 1..=32 entries, got {}",
+                raw.recall.len()
+            )));
+        }
+        let mut recall = std::collections::BTreeMap::new();
+        for (id, policy) in raw.recall {
+            let excerpt: String = id.chars().take(64).collect();
+            let valid_id = (1..=128).contains(&id.len())
+                && id
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+            if !valid_id {
+                return Err(refuse(format!("invalid spirit id {excerpt:?}")));
+            }
+            let policy = match policy.as_str() {
+                "full" => ConsentRecall::Full,
+                "header_only" => ConsentRecall::HeaderOnly,
+                "withheld" => ConsentRecall::Withheld,
+                _ => return Err(refuse(format!("unknown recall policy for {excerpt:?}"))),
+            };
+            recall.insert(id, policy);
+        }
+        Ok(Self { recall })
     }
 }
 
@@ -4981,6 +5374,80 @@ cadence_secs = 604801
             matches!(&err, ManifestError::Toml(ref msg) if msg.contains("cadence_secs")),
             "got: {err:?}"
         );
+    }
+
+    /// `n` schedule entries; entry `i` carries `payloads[i]` (empty when absent).
+    fn schedule_toml(n: usize, payloads: &[String]) -> String {
+        let mut out = String::new();
+        for i in 0..n {
+            let payload = payloads.get(i).map(String::as_str).unwrap_or("");
+            out.push_str(&format!(
+                "[[schedule]]\nid = \"s{i}\"\ncadence_secs = 60\npayload_b64 = \"{payload}\"\n"
+            ));
+        }
+        out
+    }
+
+    /// Base64 of `bytes` zero bytes (`bytes >= 1`), padded.
+    fn zero_payload_b64(bytes: usize) -> String {
+        let mut s = "AAAA".repeat(bytes / 3);
+        match bytes % 3 {
+            1 => s.push_str("AA=="),
+            2 => s.push_str("AAA="),
+            _ => {}
+        }
+        s
+    }
+
+    #[test]
+    fn schedule_entry_cap_is_inclusive_and_counts_empty_entries() {
+        let ok = SchedulesSection::from_toml_str(&schedule_toml(64, &[])).unwrap();
+        assert_eq!(ok.entries.len(), 64);
+        let err = SchedulesSection::from_toml_str(&schedule_toml(65, &[])).unwrap_err();
+        assert_eq!(
+            err,
+            ManifestError::ScheduleEntryLimit {
+                limit: 64,
+                actual: 65
+            }
+        );
+    }
+
+    #[test]
+    fn schedule_decoded_bytes_cap_is_inclusive_and_aggregate() {
+        // One entry at exactly the cap, then one byte over.
+        let at_cap = schedule_toml(1, &[zero_payload_b64(65_536)]);
+        let s = SchedulesSection::from_toml_str(&at_cap).unwrap();
+        assert_eq!(s.entries[0].payload_bytes.len(), 65_536);
+        let over = schedule_toml(1, &[zero_payload_b64(65_537)]);
+        assert_eq!(
+            SchedulesSection::from_toml_str(&over).unwrap_err(),
+            ManifestError::ScheduleDecodedBytesLimit {
+                limit: 65_536,
+                actual: 65_537
+            }
+        );
+        // The cap is the sum across entries, not a per-entry allowance.
+        let split_ok = schedule_toml(2, &[zero_payload_b64(32_768), zero_payload_b64(32_768)]);
+        assert!(SchedulesSection::from_toml_str(&split_ok).is_ok());
+        let split_over = schedule_toml(2, &[zero_payload_b64(32_768), zero_payload_b64(32_769)]);
+        assert!(matches!(
+            SchedulesSection::from_toml_str(&split_over).unwrap_err(),
+            ManifestError::ScheduleDecodedBytesLimit { actual: 65_537, .. }
+        ));
+    }
+
+    #[test]
+    fn schedule_caps_keep_malformed_base64_rejected() {
+        // Length not a multiple of 4 and a bad alphabet char stay `Toml` errors.
+        for bad in ["AAA", "AA!A", "A=AA"] {
+            let err =
+                SchedulesSection::from_toml_str(&schedule_toml(1, &[bad.to_string()])).unwrap_err();
+            assert!(
+                matches!(&err, ManifestError::Toml(msg) if msg.contains("payload_b64")),
+                "got: {err:?}"
+            );
+        }
     }
 
     #[test]

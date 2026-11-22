@@ -15,7 +15,7 @@ use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::{check, FrameOrigin, Observation, Sender, Stamp};
 use maos_domain::invariants::i8::A2AIntent;
 use maos_domain::ports::IacBusPort;
-use maos_iac::adapter::mailbox::Mailbox;
+use maos_iac::adapter::mailbox::{Mailbox, KERNEL_SENDER_SPIRIT_ID};
 use maos_iac::adapter::transparency_log::{FrameFilter, TransparencyLogAdapter};
 use maos_iac::adapter::{IacBusAdapter, IacRtMetrics};
 use maos_kernel_core::capability::cap_tokens::init_monotonic_base;
@@ -90,7 +90,19 @@ fn generated(seed: u64) -> Observation {
             Sender::Kernel => offered.auto_marker = FrameOrigin::Kernel,
         }
         let sent = offered.auto_marker;
-        if runtime.block_on(adapter.deliver(offered)).is_err() {
+        // Story 21-7: the port `deliver` is the kernel's own path (a Spirit sender is refused
+        // typed); an admitted Spirit's frame goes through `deliver_typed` as its pid, exactly
+        // as the session seam does.
+        let delivery = match sender {
+            Sender::Spirit => runtime
+                .block_on(adapter.deliver_typed(offered, 1, None))
+                .map(drop),
+            _ => {
+                offered.from.spirit_id = SpiritId::from(KERNEL_SENDER_SPIRIT_ID);
+                runtime.block_on(adapter.deliver(offered)).map(drop)
+            }
+        };
+        if delivery.is_err() {
             continue;
         }
         let rows = log

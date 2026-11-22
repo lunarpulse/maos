@@ -72,7 +72,10 @@ fn make_dispatcher_with_mailbox(
 fn make_scb(enabled_hooks: Vec<String>) -> Arc<SpiritControlBlock> {
     let manifest = SpiritManifestBundle {
         scheduling: SchedulingSection::default(),
-        lifecycle: LifecycleSection { enabled_hooks },
+        lifecycle: LifecycleSection {
+            enabled_hooks,
+            telemetry: None,
+        },
         ..Default::default()
     };
     let scb = SpiritControlBlock::new(
@@ -132,6 +135,7 @@ async fn hook_exceeds_budget_and_returns_budget_exceeded() {
         scheduling: SchedulingSection::default(),
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["on_load".into()],
+            telemetry: None,
         },
         ..Default::default()
     };
@@ -197,6 +201,7 @@ async fn hook_crosses_eighty_percent_before_timeout() {
         scheduling: SchedulingSection::default(),
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["on_load".into()],
+            telemetry: None,
         },
         ..Default::default()
     };
@@ -245,6 +250,7 @@ async fn panicking_hook_returns_payload_preview() {
         scheduling: SchedulingSection::default(),
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["on_load".into()],
+            telemetry: None,
         },
         ..Default::default()
     };

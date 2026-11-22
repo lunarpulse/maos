@@ -1346,9 +1346,9 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
     }
 
-    /// AC-3 value-provenance assertion: MANIFEST_SCHEMA_VERSION in the generated
-    /// constants.md equals the live source constant, read through a path that is
-    /// independent of the generator's regex-based `read_abi_constants` helper.
+    /// AC-3 value-provenance assertion: the version stamp and declaration in
+    /// constants.md reflect the live source constant, read independently of
+    /// the generator's regex-based `read_abi_constants` helper.
     #[test]
     fn value_provenance_manifest_schema_version() {
         let lib_rs = workspace_root().join("crates/maos-spirit-abi/src/lib.rs");
@@ -1384,6 +1384,13 @@ mod tests {
             expected.is_match(&constants_md),
             "constants.md does not reflect live MANIFEST_SCHEMA_VERSION {}",
             live_value
+        );
+        let stamp_suffix = format!(" · MANIFEST_SCHEMA_VERSION = {live_value}*");
+        assert!(
+            constants_md
+                .lines()
+                .any(|line| line.starts_with("*ABI_VERSION = ") && line.ends_with(&stamp_suffix)),
+            "constants.md version stamp does not reflect live MANIFEST_SCHEMA_VERSION {live_value}"
         );
     }
 

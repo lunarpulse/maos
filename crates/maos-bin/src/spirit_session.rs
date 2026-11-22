@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use maos_domain::frame::{FrameAddress, FramePayload, IacFrame};
@@ -19,10 +19,11 @@ use maos_iac::adapter::transparency_log::{FrameKind as JournalKind, Transparency
 use maos_iac::adapter::IacBusAdapter;
 use maos_kernel_core::capability::{is_mediated_scope, CapabilityRegistryAdapter};
 use maos_kernel_core::lifecycle::cli_wrapper::runtime::{
-    argv_prefix_hash, spawn_and_bridge, Backpressure, BridgePoll, BridgeSpawnSpec, ExitCause,
-    SubStream,
+    argv_prefix_hash, spawn_and_bridge, Backpressure, BridgePoll, BridgeSpawnSpec, ChildStopHandle,
+    ChildStopRefusal, ExitCause, FrameWriter, SpawnedBridge, SubStream,
 };
 use maos_kernel_core::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
+use maos_kernel_core::security::sandbox::{HeldComponentError, HeldWasmComponent};
 use maos_kernel_core::security::SecurityManagerAdapter;
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
 use sha2::{Digest, Sha256};
@@ -75,8 +76,9 @@ pub struct SessionDeps {
 
 pub struct SessionLaunch {
     pub plan: SpiritLaunchPlan,
-    /// Only the contained runner receives this read grant. It is not a policy grant.
-    pub component_artifact: Option<PathBuf>,
+    /// The one held, read-only, regular component file this launch hands to its runner.
+    /// `None` only for a child that is not a WASM component. Never cloned, never a path.
+    pub component_artifact: Option<LaunchArtifact>,
     pub turn_budget: Duration,
     /// Story 18-5 — the admitted manifest's context window and thresholds.
     pub context_window: maos_kernel_core::capability::context_budget::ContextWindow,
@@ -89,7 +91,635 @@ pub struct SessionLaunch {
     pub origin: PathBuf,
 }
 
-/// Resolve metadata before admission; component validation stays in the T2 child.
+/// How an installed Spirit's session tells the host owner it is ready, binds the one current
+/// shell `TaskAssign` to its live child, and reports the turn's end. Created by the host owner
+/// and handed to [`run_admitted_shell_session`]; every field is host-side, never guest input.
+pub struct ShellPort {
+    state: Mutex<PortState>,
+    changed: Condvar,
+    serial: Mutex<()>,
+    turn_budget: Duration,
+}
+
+enum Phase {
+    Starting,
+    Ready { pid: u32, generation: u64 },
+    Ended,
+}
+
+struct PortState {
+    phase: Phase,
+    slot: Option<ShellSlot>,
+}
+
+/// A shell request queued for delivery, waiting for the session to dequeue its exact frame.
+struct ShellSlot {
+    id: [u8; 16],
+    sender: String,
+    pid: u32,
+    generation: u64,
+    deadline: Instant,
+    route: maos_iac::adapter::mailbox::ShellReplyRoute,
+    done: std::sync::mpsc::SyncSender<()>,
+}
+
+/// The session's view of the one bound shell turn.
+struct ShellBinding {
+    id: [u8; 16],
+    deadline: Instant,
+    /// Taken by the first shell-addressed `TaskComplete`; later ones are refused.
+    route: Option<maos_iac::adapter::mailbox::ShellReplyRoute>,
+    done: std::sync::mpsc::SyncSender<()>,
+}
+
+/// Marks the port ended when the session's worker leaves, whatever the cause.
+struct ShellEnd(Option<Arc<ShellPort>>);
+
+impl Drop for ShellEnd {
+    fn drop(&mut self) {
+        if let Some(port) = &self.0 {
+            let mut state = port.lock();
+            state.phase = Phase::Ended;
+            state.slot = None;
+            port.changed.notify_all();
+        }
+    }
+}
+
+impl ShellPort {
+    pub fn new(turn_budget: Duration) -> Arc<Self> {
+        Arc::new(Self {
+            state: Mutex::new(PortState {
+                phase: Phase::Starting,
+                slot: None,
+            }),
+            changed: Condvar::new(),
+            serial: Mutex::new(()),
+            turn_budget,
+        })
+    }
+
+    pub fn turn_budget(&self) -> Duration {
+        self.turn_budget
+    }
+
+    /// One shell turn at a time owns the port.
+    pub fn serialize(&self) -> std::sync::MutexGuard<'_, ()> {
+        self.serial
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, PortState> {
+        self.state.lock().unwrap_or_else(|error| error.into_inner())
+    }
+
+    fn ready(&self, pid: u32, generation: u64) {
+        let mut state = self.lock();
+        if !matches!(state.phase, Phase::Ended) {
+            state.phase = Phase::Ready { pid, generation };
+            self.changed.notify_all();
+        }
+    }
+
+    /// Wait, within the bounded startup (Ready, then the startup probe, each one turn budget),
+    /// for the session's own readiness signal; returns the admitted PID and live generation.
+    pub fn await_ready(&self) -> Result<(u32, u64), String> {
+        let until = Instant::now() + self.turn_budget * 2;
+        let mut state = self.lock();
+        loop {
+            match state.phase {
+                Phase::Ready { pid, generation } => return Ok((pid, generation)),
+                Phase::Ended => return Err("session ended before it was ready".into()),
+                Phase::Starting => {}
+            }
+            let remaining = until.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err("session startup deadline exceeded".into());
+            }
+            state = self
+                .changed
+                .wait_timeout(state, remaining)
+                .unwrap_or_else(|error| error.into_inner())
+                .0;
+        }
+    }
+
+    /// Queue one request before its frame is delivered. `id` is the host-minted frame ID of the
+    /// outgoing `TaskAssign`; the session binds only that exact inbound frame.
+    pub fn arm(
+        self: &Arc<Self>,
+        id: [u8; 16],
+        sender: &str,
+        pid: u32,
+        generation: u64,
+        deadline: Instant,
+    ) -> Result<ShellTurn, String> {
+        let mut state = self.lock();
+        match state.phase {
+            Phase::Ready {
+                pid: live,
+                generation: current,
+            } if live == pid && current == generation => {}
+            Phase::Ended => return Err("session ended".into()),
+            _ => return Err("session generation changed before the turn was queued".into()),
+        }
+        if state.slot.is_some() {
+            return Err("a shell turn is already queued".into());
+        }
+        let (route, receiver) = maos_iac::adapter::mailbox::shell_reply_route(
+            id,
+            SpiritId::from(sender),
+            pid,
+            deadline,
+        );
+        let (done, finished) = std::sync::mpsc::sync_channel(1);
+        state.slot = Some(ShellSlot {
+            id,
+            sender: sender.to_owned(),
+            pid,
+            generation,
+            deadline,
+            route,
+            done,
+        });
+        Ok(ShellTurn {
+            port: Arc::clone(self),
+            id,
+            deadline,
+            receiver,
+            finished,
+        })
+    }
+
+    /// Bind the dequeued `frame` if (and only if) it is the one queued shell request and the
+    /// session is still the admitted PID/generation it was queued for. `Err` skips the frame.
+    fn claim(
+        &self,
+        frame: &IacFrame,
+        pid: u32,
+        generation: u64,
+    ) -> Result<Option<ShellBinding>, &'static str> {
+        if frame.from.spirit_id.as_str() != maos_iac::adapter::mailbox::SHELL_REPLY_DESTINATION {
+            return Ok(None);
+        }
+        let mut state = self.lock();
+        let Some(slot) = state.slot.take_if(|slot| slot.id == frame.frame_id) else {
+            return Err("shell turn is no longer active");
+        };
+        let one_target = frame.to.len() == 1
+            && frame.to.iter().all(|to| {
+                to.spirit_id.as_str() == slot.sender && to.host_id.is_none() && to.role.is_none()
+            });
+        let local_shell = frame.from.host_id.is_none() && frame.from.role.is_none();
+        if frame.kind != FrameKind::TaskAssign
+            || !local_shell
+            || !one_target
+            || !matches!(frame.auto_marker, FrameOrigin::HumanAuthored)
+            || !matches!(frame.intent, IntentClass::Standard)
+            || slot.pid != pid
+            || slot.generation != generation
+            || Instant::now() >= slot.deadline
+        {
+            return Err("shell turn binding mismatch");
+        }
+        Ok(Some(ShellBinding {
+            id: slot.id,
+            deadline: slot.deadline,
+            route: Some(slot.route),
+            done: slot.done,
+        }))
+    }
+}
+
+/// The shell caller's end of one queued turn. Dropping it retires the request and closes the
+/// reply route, so nothing late can satisfy it.
+pub struct ShellTurn {
+    port: Arc<ShellPort>,
+    id: [u8; 16],
+    deadline: Instant,
+    receiver: maos_iac::adapter::mailbox::ShellReplyReceiver,
+    finished: std::sync::mpsc::Receiver<()>,
+}
+
+impl ShellTurn {
+    pub fn deadline(&self) -> Instant {
+        self.deadline
+    }
+
+    /// Hold the routed answer until the session reports the matching clean `TurnComplete`,
+    /// then release it once. Timeout, session end or a turn with no accepted answer is an error.
+    pub fn wait(mut self) -> Result<String, String> {
+        let remaining = self.deadline.saturating_duration_since(Instant::now());
+        match self.finished.recv_timeout(remaining) {
+            // A clean turn observed past the turn's own deadline publishes nothing.
+            Ok(()) if Instant::now() >= self.deadline => {
+                self.receiver.close();
+                Err("turn deadline exceeded".into())
+            }
+            Ok(()) => self
+                .receiver
+                .try_recv()
+                .map(|answer| answer.result)
+                .ok_or_else(|| "spirit completed its turn without returning an answer".into()),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                self.receiver.close();
+                Err("turn deadline exceeded".into())
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                self.receiver.close();
+                Err("session ended or changed before the turn completed".into())
+            }
+        }
+    }
+}
+
+impl Drop for ShellTurn {
+    fn drop(&mut self) {
+        let mut state = self.port.lock();
+        if state.slot.as_ref().is_some_and(|slot| slot.id == self.id) {
+            state.slot = None;
+        }
+    }
+}
+
+/// Bind the dequeued frame to the host-queued shell turn, if it is that turn's exact frame.
+/// `Some` is the reason the frame must be skipped.
+fn claim_shell_turn(
+    port: Option<&ShellPort>,
+    frame: &IacFrame,
+    pid: u32,
+    generation: u64,
+    bound: &mut Option<ShellBinding>,
+) -> Option<&'static str> {
+    match port?.claim(frame, pid, generation) {
+        Ok(found) => {
+            if found.is_some() {
+                *bound = found;
+            }
+            None
+        }
+        Err(reason) => Some(reason),
+    }
+}
+
+/// The only frame shape the scoped route carries: one `TaskComplete` addressed to the shell.
+fn is_shell_reply(frame: &IacFrame) -> bool {
+    frame.kind == FrameKind::TaskComplete
+        && frame.to.len() == 1
+        && frame.to.iter().all(|to| {
+            to.spirit_id.as_str() == maos_iac::adapter::mailbox::SHELL_REPLY_DESTINATION
+                && to.host_id.is_none()
+                && to.role.is_none()
+        })
+}
+
+#[cfg(test)]
+mod shell_turn_tests {
+    use super::*;
+    use maos_iac::adapter::mailbox::SHELL_REPLY_DESTINATION;
+
+    fn request(id: [u8; 16], sender: &str) -> IacFrame {
+        let address = |name: &str| FrameAddress {
+            spirit_id: SpiritId::from(name),
+            host_id: None,
+            role: None,
+        };
+        IacFrame {
+            frame_id: id,
+            timestamp_ns: 0,
+            logical_clock: 0,
+            from: address(sender),
+            to: smallvec::smallvec![address("example")],
+            kind: FrameKind::TaskAssign,
+            intent: IntentClass::Standard,
+            payload: FramePayload::TaskAssign(maos_domain::frame::TaskAssignPayload {
+                goal: "hello".into(),
+                scope: Vec::new(),
+                success_criteria: String::new(),
+                posture_preferences: Default::default(),
+                prior_distillate_ref: None,
+            }),
+            auto_marker: FrameOrigin::HumanAuthored,
+            consent_envelope: None,
+            intent_lineage: Default::default(),
+        }
+    }
+
+    #[test]
+    fn late_shell_request_does_not_take_the_next_turn_after_handover() {
+        let budget = Duration::from_secs(30);
+        let port = ShellPort::new(budget);
+        let deadline = Instant::now() + budget;
+        port.ready(7, 1);
+        let first = [1; 16];
+        drop(port.arm(first, "example", 7, 1, deadline).unwrap());
+
+        port.ready(7, 2);
+        let next = [2; 16];
+        let _turn = port.arm(next, "example", 7, 2, deadline).unwrap();
+        assert!(matches!(
+            port.claim(&request(first, SHELL_REPLY_DESTINATION), 7, 2),
+            Err("shell turn is no longer active")
+        ));
+        assert!(matches!(
+            port.claim(&request(next, "operator"), 7, 2),
+            Ok(None)
+        ));
+        assert!(matches!(
+            port.claim(&request(next, SHELL_REPLY_DESTINATION), 7, 2),
+            Ok(Some(binding)) if binding.id == next
+        ));
+    }
+}
+
+/// Custody of the component a launch runs: the exact open read-only regular file, bound to the
+/// SHA-256 of its bytes. Non-cloneable and one-shot: [`spawn_runner`] hands it to the child and
+/// closes the parent's copy; a pathname is only ever an acquisition input, never a recovery one.
+#[derive(Debug)]
+pub struct LaunchArtifact {
+    held: HeldWasmComponent,
+    sha256: [u8; 32],
+    /// The publisher a signed verification (or a restore of one) bound these bytes to; set
+    /// only by [`Self::from_verified`] and [`Self::restored_under`], never by a caller.
+    publisher: Option<[u8; 32]>,
+}
+
+const MAX_ARTIFACT_BYTES: u64 = 64 * 1024 * 1024;
+
+/// The refusal for a same-pid swap whose successor was verified under a different publisher.
+pub const SWAP_PUBLISHER_CHANGED: &str = "swap_publisher_changed: the successor's verified \
+     publisher differs from the one this pid was launched under";
+
+fn held_error(error: HeldComponentError) -> SessionError {
+    match error {
+        HeldComponentError::TransportUnsupported => {
+            SessionError::WasmTransportUnsupported(error.to_string())
+        }
+        other => SessionError::HeldComponent(other.to_string()),
+    }
+}
+
+impl LaunchArtifact {
+    /// SHA-256 of the exact bytes the runner will compile (it re-hashes its compile buffer).
+    pub fn sha256(&self) -> [u8; 32] {
+        self.sha256
+    }
+
+    /// Acquire the plain local component `artifact` names under the trusted `origin`, once.
+    /// Only a relative path is accepted; every segment is opened with no symlink following, so
+    /// neither a `..` climb, an absolute path, nor a symlink can leave `origin`. `pin` is the
+    /// digest the bytes must have (a signed or previously launched component), else refused.
+    pub fn acquire_local(
+        origin: &std::path::Path,
+        artifact: &str,
+        pin: Option<[u8; 32]>,
+    ) -> Result<Self, SessionError> {
+        let file = open_inside(origin, artifact)?;
+        Self::hold(file, pin)
+    }
+
+    /// [`Self::acquire_local`] for a caller that names a file, with its directory as the origin.
+    pub fn acquire_local_file(path: &std::path::Path) -> Result<Self, SessionError> {
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| SessionError::Bridge(format!("{}: not a file path", path.display())))?;
+        let origin = path
+            .parent()
+            .filter(|dir| !dir.as_os_str().is_empty())
+            .unwrap_or(std::path::Path::new("."));
+        Self::acquire_local(origin, name, None)
+    }
+
+    /// Take the registry verifier's already-open component for the gated manifest. The signed
+    /// receipt (id, version, manifest digest) must match what was gated; the runner compiles
+    /// only bytes that hash to the signed artifact digest.
+    pub fn from_verified(
+        component: maos_registry::install::VerifiedLaunchComponent,
+        gated: &crate::admission::GatedManifest,
+    ) -> Result<Self, SessionError> {
+        let manifest_digest: [u8; 32] = Sha256::digest(gated.manifest_toml.as_bytes()).into();
+        if component.spirit_id().as_str() != gated.spirit_id
+            || component.version() != gated.class_section.version
+            || component.manifest_sha256() != manifest_digest
+        {
+            return Err(SessionError::ArtifactDigestMismatch(
+                "the signed receipt differs from the gated manifest".into(),
+            ));
+        }
+        if gated
+            .publisher
+            .is_some_and(|bound| bound != component.publisher())
+        {
+            return Err(SessionError::ArtifactDigestMismatch(
+                "the signed receipt's publisher differs from the gated manifest's".into(),
+            ));
+        }
+        let publisher = Some(component.publisher());
+        let (file, sha256) = component.into_parts();
+        let held = HeldWasmComponent::new(file, sha256).map_err(held_error)?;
+        Ok(Self {
+            held,
+            sha256,
+            publisher,
+        })
+    }
+
+    /// Cold restore of a previously launched incarnation: the exact bytes `recorded_sha256`
+    /// (the digest its swap context recorded) re-enter under the publisher that incarnation
+    /// was verified under. Nothing else can attach a publisher to a locally held artifact, and
+    /// only for exactly those bytes.
+    pub fn restored_under(
+        mut self,
+        publisher: [u8; 32],
+        recorded_sha256: [u8; 32],
+    ) -> Result<Self, SessionError> {
+        if self.sha256 != recorded_sha256 || self.publisher.is_some_and(|held| held != publisher) {
+            return Err(SessionError::ArtifactDigestMismatch(
+                "the restored component is not the recorded signed incarnation".into(),
+            ));
+        }
+        self.publisher = Some(publisher);
+        Ok(self)
+    }
+
+    /// The publisher this artifact was verified (or restored) under; `None` for local bytes.
+    pub fn publisher(&self) -> Option<[u8; 32]> {
+        self.publisher
+    }
+
+    fn hold(mut file: std::fs::File, pin: Option<[u8; 32]>) -> Result<Self, SessionError> {
+        use std::io::{Read, Seek, SeekFrom};
+        let refuse = |why: String| SessionError::HeldComponent(why);
+        let metadata = file.metadata().map_err(|e| refuse(e.to_string()))?;
+        if !metadata.is_file() {
+            return Err(refuse("component is not a regular file".into()));
+        }
+        if metadata.len() > MAX_ARTIFACT_BYTES {
+            return Err(refuse(format!(
+                "component exceeds the {MAX_ARTIFACT_BYTES}-byte cap"
+            )));
+        }
+        let mut hasher = Sha256::new();
+        // The streaming cap below still bounds a file that grows while it is read.
+        let mut buffer = [0u8; 8 * 1024];
+        let mut total = 0u64;
+        loop {
+            let read = match file.read(&mut buffer) {
+                Ok(read) => read,
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(error) => return Err(refuse(format!("read: {error}"))),
+            };
+            if read == 0 {
+                break;
+            }
+            total += read as u64;
+            if total > MAX_ARTIFACT_BYTES {
+                return Err(refuse(format!(
+                    "component exceeds the {MAX_ARTIFACT_BYTES}-byte cap"
+                )));
+            }
+            hasher.update(&buffer[..read]);
+        }
+        file.seek(SeekFrom::Start(0))
+            .map_err(|error| refuse(format!("rewind: {error}")))?;
+        let sha256: [u8; 32] = hasher.finalize().into();
+        if pin.is_some_and(|pin| pin != sha256) {
+            return Err(SessionError::ArtifactDigestMismatch(
+                "the component's bytes differ from the digest they were pinned to".into(),
+            ));
+        }
+        let held = HeldWasmComponent::new(file, sha256).map_err(held_error)?;
+        Ok(Self {
+            held,
+            sha256,
+            publisher: None,
+        })
+    }
+}
+
+#[cfg(unix)]
+fn open_inside(origin: &std::path::Path, artifact: &str) -> Result<std::fs::File, SessionError> {
+    use rustix::fs::{fcntl_setfl, openat, Mode, OFlags};
+    use rustix::io::Errno;
+    let escape = |why: &str| SessionError::ArtifactEscapesOrigin(format!("{artifact:?} {why}"));
+    let segments: Vec<&str> = artifact
+        .split('/')
+        .filter(|segment| !segment.is_empty() && *segment != ".")
+        .collect();
+    if artifact.starts_with('/')
+        || artifact.contains('\0')
+        || segments.is_empty()
+        || segments.contains(&"..")
+    {
+        return Err(escape("is not a path inside the manifest's directory"));
+    }
+    let unavailable = |error: Errno| {
+        if matches!(error, Errno::LOOP | Errno::NOTDIR) {
+            escape("resolves outside the manifest's directory")
+        } else {
+            SessionError::Bridge(format!("{artifact:?}: {error}"))
+        }
+    };
+    let mut current: std::os::fd::OwnedFd = rustix::fs::open(
+        origin,
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .map_err(|error| SessionError::Bridge(format!("{}: {error}", origin.display())))?;
+    let last = segments.len() - 1;
+    for (index, segment) in segments.iter().enumerate() {
+        let flags = if index == last {
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::NONBLOCK
+        } else {
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC
+        };
+        current = openat(&current, *segment, flags, Mode::empty()).map_err(unavailable)?;
+    }
+    let file = std::fs::File::from(current);
+    // NONBLOCK only guarded the open against special files; the held handle is shared.
+    fcntl_setfl(&file, OFlags::empty())
+        .map_err(|error| SessionError::Bridge(format!("{artifact:?}: {error}")))?;
+    Ok(file)
+}
+
+#[cfg(not(unix))]
+fn open_inside(_origin: &std::path::Path, _artifact: &str) -> Result<std::fs::File, SessionError> {
+    Err(SessionError::WasmTransportUnsupported(
+        "no defensive component acquisition on this platform".into(),
+    ))
+}
+
+/// Acquire the component a staged manifest declares, relative to `origin` (`pin` as in
+/// [`LaunchArtifact::acquire_local`]). `None` when the manifest declares no WASM component.
+pub fn acquire_staged_artifact(
+    manifest: &std::path::Path,
+    origin: &std::path::Path,
+    pin: Option<[u8; 32]>,
+) -> Result<Option<LaunchArtifact>, SessionError> {
+    let text = crate::admission::read_manifest(manifest)
+        .map_err(|error| SessionError::Bridge(error.to_string()))?;
+    let gated = crate::admission::gate_manifest(&text, &|_| false)
+        .map_err(|error| SessionError::Bridge(error.to_string()))?;
+    if gated.class_section.forms != ["wasm-component"] {
+        return Ok(None);
+    }
+    let artifact = declared_artifact(&gated)?;
+    LaunchArtifact::acquire_local(origin, artifact, pin).map(Some)
+}
+
+fn declared_artifact(gated: &crate::admission::GatedManifest) -> Result<&str, SessionError> {
+    gated
+        .class_section
+        .artifact
+        .as_deref()
+        .ok_or(SessionError::Protocol("WASM manifest has no artifact"))
+}
+
+impl From<SessionError> for crate::admission::AdmissionRefusal {
+    fn from(error: SessionError) -> Self {
+        match error {
+            SessionError::WasmTransportUnsupported(detail) => {
+                Self::WasmTransportUnsupported { detail }
+            }
+            other => Self::ClassBuild {
+                detail: other.to_string(),
+            },
+        }
+    }
+}
+
+/// A signed registry package beside `manifest` binds the gated manifest's publisher and yields
+/// the component the verifier compared against the signed bytes, held. `Ok(None)` for a plain
+/// local manifest. The signed receipt must match the gated text, version and id.
+pub fn bind_registry_launch(
+    gated: &mut crate::admission::GatedManifest,
+    manifest: &std::path::Path,
+) -> Result<Option<LaunchArtifact>, crate::admission::AdmissionRefusal> {
+    use crate::admission::AdmissionRefusal;
+    let Some((pkg, component)) =
+        maos_registry::install::signed_package_at_launch(&gated.spirit_id, manifest)
+            .map_err(|error| AdmissionRefusal::from_registry_error(&*error))?
+    else {
+        return Ok(None);
+    };
+    if pkg.manifest_toml != gated.manifest_toml.as_bytes()
+        || pkg.version != gated.class_section.version
+    {
+        return Err(AdmissionRefusal::Admission {
+            detail: "registry manifest snapshot differs from package".into(),
+        });
+    }
+    gated.bind_registry_publisher(&pkg.publisher_pubkey);
+    component
+        .map(|component| LaunchArtifact::from_verified(component, gated))
+        .transpose()
+        .map_err(Into::into)
+}
+
+/// Resolve metadata before admission and acquire the plain local component once, under the
+/// manifest's own directory. A registry-bound manifest never launches from a pathname.
 pub fn manifest_launch(
     host: &dyn maos_host::SpiritHostPort,
     gated: &crate::admission::GatedManifest,
@@ -100,38 +730,7 @@ pub fn manifest_launch(
     manifest_launch_in(host, gated, manifest, origin, once)
 }
 
-/// The component a manifest's `artifact` names, resolved against `origin`. Only a relative path
-/// whose real location stays inside `origin` resolves: an absolute path, a `..` climb, or a
-/// symlink out of the directory is refused typed, so the runner's read grant and the code that
-/// runs under the admitted sandbox are the operator's named directory's and nothing else's.
-pub fn resolve_artifact(
-    origin: &std::path::Path,
-    artifact: &str,
-) -> Result<std::path::PathBuf, SessionError> {
-    let escape = |why: &str| SessionError::ArtifactEscapesOrigin(format!("{artifact:?} {why}"));
-    let relative = std::path::Path::new(artifact);
-    if relative.is_absolute()
-        || relative
-            .components()
-            .any(|part| matches!(part, std::path::Component::ParentDir))
-    {
-        return Err(escape("is not a path inside the manifest's directory"));
-    }
-    let root = origin
-        .canonicalize()
-        .map_err(|error| SessionError::Bridge(format!("{}: {error}", origin.display())))?;
-    let resolved = root
-        .join(relative)
-        .canonicalize()
-        .map_err(|error| SessionError::Bridge(format!("{artifact:?}: {error}")))?;
-    if resolved.starts_with(&root) {
-        Ok(resolved)
-    } else {
-        Err(escape("resolves outside the manifest's directory"))
-    }
-}
-
-/// [`manifest_launch`] with the artifact resolved against `origin`, not the manifest's own
+/// [`manifest_launch`] with the artifact acquired under `origin`, not the manifest's own
 /// directory: the door stages a successor's bytes in a private file, and its artifact stays
 /// where the operator named it.
 pub fn manifest_launch_in(
@@ -141,16 +740,46 @@ pub fn manifest_launch_in(
     origin: &std::path::Path,
     once: bool,
 ) -> Result<SessionLaunch, SessionError> {
-    let artifact = gated
-        .class_section
-        .artifact
-        .as_ref()
-        .ok_or(SessionError::Protocol("WASM manifest has no artifact"))?;
-    let artifact = resolve_artifact(origin, artifact)?;
+    if gated.publisher.is_some() {
+        return Err(SessionError::SignedLaunchNeedsHeldArtifact);
+    }
+    let artifact = LaunchArtifact::acquire_local(origin, declared_artifact(gated)?, None)?;
+    manifest_launch_held(host, gated, manifest, origin, once, artifact)
+}
+
+/// [`manifest_launch`] for a caller that may already hold the verified component (`maos run`
+/// of an installed package): `Some` is used as is, `None` acquires the local component.
+pub fn manifest_launch_for(
+    host: &dyn maos_host::SpiritHostPort,
+    gated: &crate::admission::GatedManifest,
+    manifest: &std::path::Path,
+    once: bool,
+    held: Option<LaunchArtifact>,
+) -> Result<SessionLaunch, SessionError> {
+    match held {
+        Some(artifact) => {
+            let origin = manifest.parent().unwrap_or(std::path::Path::new("."));
+            manifest_launch_held(host, gated, manifest, origin, once, artifact)
+        }
+        None => manifest_launch(host, gated, manifest, once),
+    }
+}
+
+/// The launch for an artifact the caller already holds. `origin` is kept for later swaps only;
+/// this launch never reopens anything from it.
+pub fn manifest_launch_held(
+    host: &dyn maos_host::SpiritHostPort,
+    gated: &crate::admission::GatedManifest,
+    manifest: &std::path::Path,
+    origin: &std::path::Path,
+    once: bool,
+    artifact: LaunchArtifact,
+) -> Result<SessionLaunch, SessionError> {
+    let declared = declared_artifact(gated)?.to_owned();
     let plan = host
         .resolve_launch(&maos_host::SpiritLaunchRequest {
             form: maos_host::SpiritForm::WasmComponent,
-            artifact: artifact.to_string_lossy().into_owned(),
+            artifact: declared,
             form_config: Vec::new(),
         })
         .map_err(|error| SessionError::Bridge(error.to_string()))?;
@@ -235,6 +864,10 @@ pub enum SessionError {
     Stopped,
     #[error("session {0} deadline exceeded")]
     Deadline(&'static str),
+    /// The executing lifecycle export outlived its hook's link deadline: the hook gave up and
+    /// the session ended itself, the child killed and finalized as for any other deadline.
+    #[error("session {0} link deadline exceeded")]
+    LinkDeadline(&'static str),
     #[error("session child terminated: {0:?}")]
     Child(ExitCause),
     #[error("incompatible_world: the runner refused a component importing an unsupported world")]
@@ -247,6 +880,81 @@ pub enum SessionError {
     SwapReverted,
     #[error("artifact_escapes_origin: component artifact {0}")]
     ArtifactEscapesOrigin(String),
+    #[error("artifact_digest_mismatch: {0}")]
+    ArtifactDigestMismatch(String),
+    #[error("signed_launch_needs_held_artifact: a registry-bound component launches only from its verified held file, never a pathname")]
+    SignedLaunchNeedsHeldArtifact,
+    #[error("wasm_transport_unsupported: {0}")]
+    WasmTransportUnsupported(String),
+    #[error("held_component_refused: {0}")]
+    HeldComponent(String),
+    #[error("lifecycle_stop_unavailable: {0}")]
+    ChildStop(#[from] ChildStopRefusal),
+}
+
+/// What a session's sends, task scopes and recall are held to. The first incarnation is
+/// admitted by the kernel (an empty send list defers to its mint policy, as before). After an
+/// outer-committed swap the authority is the successor's own declared scopes and ENFORCED
+/// here: the kernel's per-pid policy is not narrowed by a session, so an empty or narrower list
+/// is a denial, never a delegation to the (wider) predecessor policy.
+struct Authority {
+    declared: Vec<Scope>,
+    enforced: bool,
+}
+
+impl Authority {
+    fn admitted(sandbox: &maos_kernel_core::security::sandbox::SandboxSpec) -> Self {
+        Self {
+            declared: sandbox.declared_scopes.clone(),
+            enforced: false,
+        }
+    }
+
+    fn successor(sandbox: &maos_kernel_core::security::sandbox::SandboxSpec) -> Self {
+        Self {
+            declared: sandbox.declared_scopes.clone(),
+            enforced: true,
+        }
+    }
+
+    fn entitles(&self, scope: &Scope) -> bool {
+        self.declared.iter().any(|held| held.entitles(scope))
+    }
+
+    /// Whether a frame's `iac.send` scope may be minted at all.
+    fn send_granted(&self, scope: &Scope) -> bool {
+        if self.enforced {
+            return self.entitles(scope);
+        }
+        let mut sends = self
+            .declared
+            .iter()
+            .filter(|s| matches!(s, Scope::IacSend { .. }));
+        match sends.clone().next() {
+            None => true,
+            Some(_) => sends.any(|declared| declared == scope),
+        }
+    }
+
+    /// A recall or fetch the successor does not declare: the typed denial reply.
+    fn recall_denial(&self, body: &[u8]) -> Option<Vec<u8>> {
+        use maos_wasm_host::recall_wire::{self as wire, RecallReply, RecallRequest, WireError};
+        if !self.enforced {
+            return None;
+        }
+        let needed = match wire::decode_request(body).ok()? {
+            RecallRequest::Recall { .. } => Scope::LogRecall,
+            RecallRequest::Fetch { .. } => Scope::LogFetch,
+            _ => return None,
+        };
+        if self.entitles(&needed) {
+            return None;
+        }
+        Some(
+            wire::encode_reply(&RecallReply::Error(WireError::CapabilityDenied))
+                .unwrap_or_default(),
+        )
+    }
 }
 
 struct Recipient {
@@ -263,6 +971,7 @@ impl Drop for Recipient {
 }
 
 struct IdentityOwner {
+    iac: Arc<maos_iac::adapter::IacBusAdapter>,
     lookup: Arc<RwLock<BTreeMap<String, u32>>>,
     id: String,
     pid: u32,
@@ -270,6 +979,9 @@ struct IdentityOwner {
 
 impl Drop for IdentityOwner {
     fn drop(&mut self) {
+        // The declaration goes with the identity, owner-checked like the lookup below: a
+        // replacement incarnation's declaration survives this teardown.
+        self.iac.consent_policy().unregister(&self.id, self.pid);
         let mut lookup = self
             .lookup
             .write()
@@ -298,21 +1010,21 @@ struct DiagnosticBudget {
     bytes: usize,
 }
 
-/// Spawn the contained runner for `plan` under `sandbox`, plus a read grant on its artifact.
-/// The session and the swap's pre-warmed successor start a child the same way.
+/// Spawn the contained runner for `plan` under `sandbox`. A component artifact travels only as
+/// the held file the dedicated WASM/T2 spawn gives the child; there is no path argv and no
+/// synthesized read grant. The session and the swap's pre-warmed successor start a child the
+/// same way, and the parent's copy of the file closes when this returns, spawned or refused.
 pub(crate) fn spawn_runner(
-    mut sandbox: maos_kernel_core::security::sandbox::SandboxSpec,
+    sandbox: maos_kernel_core::security::sandbox::SandboxSpec,
     plan: SpiritLaunchPlan,
-    artifact: Option<&PathBuf>,
+    artifact: Option<LaunchArtifact>,
     spirit_id: &str,
-) -> Result<maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge, SessionError> {
-    if let Some(artifact) = artifact {
-        sandbox.declared_scopes.push(Scope::FsRead {
-            subtree: artifact.to_string_lossy().into_owned(),
-        });
-    }
+) -> Result<(SpawnedBridge, ChildStopHandle), SessionError> {
+    use maos_kernel_core::lifecycle::cli_wrapper::runtime::{
+        spawn_wasm_t2_and_bridge, BridgeError,
+    };
     let prefix_hash = argv_prefix_hash(&plan.argv);
-    spawn_and_bridge(BridgeSpawnSpec {
+    let spec = BridgeSpawnSpec {
         program: plan.program,
         sandbox,
         argv_prefix: plan.argv,
@@ -326,8 +1038,20 @@ pub(crate) fn spawn_runner(
         backpressure: Backpressure::Block,
         env: plan.env,
         t3: None,
-    })
-    .map_err(|error| SessionError::Bridge(error.to_string()))
+    };
+    let mut bridge = match artifact {
+        Some(artifact) => spawn_wasm_t2_and_bridge(spec, artifact.held),
+        None => spawn_and_bridge(spec),
+    }
+    .map_err(|error| match error {
+        BridgeError::WasmTransportUnsupported(why) => SessionError::WasmTransportUnsupported(why),
+        BridgeError::HeldComponent(why) => SessionError::HeldComponent(why),
+        other => SessionError::Bridge(other.to_string()),
+    })?;
+    // The bridge's one stop handle moves out now, while nothing else is committed to this
+    // child, so a missing handle can never surface after a predecessor was retired.
+    let stop = bridge.take_child_stop_handle()?;
+    Ok((bridge, stop))
 }
 
 /// A committed swap retires the predecessor child at a planned stop. Its pid, tokens and
@@ -354,6 +1078,245 @@ fn retire(deps: &SessionDeps, pid: u32, old: LiveWorker) {
     binding.release_for_swap();
 }
 
+/// How a decoded reply fared in the single arbitration with expiry.
+enum Claim {
+    Clean,
+    Cancelled,
+    Expired,
+}
+
+/// One frame for the writer thread. `wall`, when set, is the absolute instant past which the
+/// frame must not start being written: the export it belongs to has already expired.
+struct Outbound {
+    body: Vec<u8>,
+    wall: Option<Instant>,
+}
+
+impl Outbound {
+    fn open(body: Vec<u8>) -> Self {
+        Self { body, wall: None }
+    }
+
+    fn within(body: Vec<u8>, wall: Option<Instant>) -> Self {
+        Self { body, wall }
+    }
+}
+
+/// The capacity-one writer for one child. A deadline-tagged write uses the same
+/// absolute wall through pipe backpressure; a partial expired frame is terminal.
+fn spawn_frame_writer(
+    pid: u32,
+    mut writer: FrameWriter,
+) -> std::io::Result<(
+    std::sync::mpsc::SyncSender<Outbound>,
+    std::thread::JoinHandle<std::io::Result<()>>,
+)> {
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Outbound>(1);
+    let thread = std::thread::Builder::new()
+        .name(format!("spirit-frame-writer-{pid}"))
+        .spawn(move || {
+            for out in rx {
+                match out.wall {
+                    Some(wall) => writer.write_frame_until(&out.body, wall)?,
+                    None => writer.write_frame(&out.body)?,
+                }
+            }
+            Ok(())
+        })?;
+    Ok((tx, thread))
+}
+
+/// One armed expiry: the exact incarnation's shared handle (never a numeric PID), its binding,
+/// and the absolute monotonic wall.
+struct Armed {
+    id: u64,
+    wall: Instant,
+    stop: Arc<ChildStopHandle>,
+    core: Arc<BindingCore>,
+}
+
+#[derive(Default)]
+struct WatchState {
+    next: u64,
+    armed: Option<Armed>,
+    /// The arm whose stop the watch thread is issuing right now, with this lock released.
+    stopping: Option<u64>,
+    shutdown: bool,
+}
+
+struct WatchShared {
+    state: Mutex<WatchState>,
+    changed: Condvar,
+}
+
+impl WatchShared {
+    fn lock(&self) -> std::sync::MutexGuard<'_, WatchState> {
+        self.state.lock().unwrap_or_else(|error| error.into_inner())
+    }
+}
+
+/// One sleepable monotonic watch lane per live session. An export that can import is armed
+/// (exact child, absolute wall) before the guest is entered; at the wall the lane latches the
+/// binding's planned stop and signals the exact child, with no mediation, journal, pipe or
+/// writer in its path and no lock held across the stop. A clean reply and expiry compete for
+/// the same arm: whoever takes it from the slot wins. Dropping the lane disarms it and joins
+/// its thread, which only ever waits on its own condition variable or issues one signal.
+struct DeadlineWatch {
+    shared: Arc<WatchShared>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl DeadlineWatch {
+    fn start(pid: u32) -> std::io::Result<Self> {
+        let shared = Arc::new(WatchShared {
+            state: Mutex::new(WatchState::default()),
+            changed: Condvar::new(),
+        });
+        let lane = Arc::clone(&shared);
+        let thread = std::thread::Builder::new()
+            .name(format!("spirit-deadline-watch-{pid}"))
+            .spawn(move || watch_loop(&lane))?;
+        Ok(Self {
+            shared,
+            thread: Some(thread),
+        })
+    }
+
+    /// Arm the lane for one export on exactly this child.
+    fn arm(&self, wall: Instant, stop: Arc<ChildStopHandle>, core: Arc<BindingCore>) -> u64 {
+        let mut state = self.shared.lock();
+        state.next += 1;
+        let id = state.next;
+        state.armed = Some(Armed {
+            id,
+            wall,
+            stop,
+            core,
+        });
+        self.shared.changed.notify_all();
+        id
+    }
+
+    /// The one short arbitration between a decoded clean reply and expiry, under the lane's
+    /// lock and with only atomic compare-and-swap inside it. The arm stays armed through the
+    /// reply's decode; it is removed here only when the reply is timely (the wall has not
+    /// passed) AND the call's own verdict allows it: `Clean` (the reply claim won) or
+    /// `Cancelled` (the waiter gave up first and nothing was lost: disarm, no response, no
+    /// kill). If the wall has passed, or the call became EXPIRED, the arm is never removed
+    /// here: this waits only until the lane's independent stop attempt has been issued, and
+    /// returns `Expired` before any caller journals anything.
+    fn claim(&self, id: u64, call: &crate::spawned_lifecycle::CallState) -> Claim {
+        let mut state = self.shared.lock();
+        if let Some(wall) = state
+            .armed
+            .as_ref()
+            .filter(|armed| armed.id == id)
+            .map(|armed| armed.wall)
+        {
+            if Instant::now() < wall {
+                if call.answer() {
+                    state.armed = None;
+                    return Claim::Clean;
+                }
+                if !call.link_expired() {
+                    state.armed = None;
+                    return Claim::Cancelled;
+                }
+            }
+            // Let the lane re-evaluate the wall at once.
+            self.shared.changed.notify_all();
+        }
+        self.settle(state, id);
+        Claim::Expired
+    }
+
+    /// Wait until this arm's stop has been issued by the lane (or the arm is gone), so that
+    /// nothing slower than the stop precedes it. No lock is held while waiting.
+    fn await_stop(&self, id: u64) {
+        let state = self.shared.lock();
+        self.settle(state, id);
+    }
+
+    fn settle(&self, mut state: std::sync::MutexGuard<'_, WatchState>, id: u64) {
+        while !state.shutdown
+            && (state.armed.as_ref().is_some_and(|armed| armed.id == id)
+                || state.stopping == Some(id))
+        {
+            state = self
+                .shared
+                .changed
+                .wait(state)
+                .unwrap_or_else(|error| error.into_inner());
+        }
+    }
+
+    /// Retire any arm and wait out a stop attempt in flight: nothing of this lane acts on a
+    /// child once this returns.
+    fn quiesce(&self) {
+        let mut state = self.shared.lock();
+        state.armed = None;
+        while state.stopping.is_some() {
+            state = self
+                .shared
+                .changed
+                .wait(state)
+                .unwrap_or_else(|error| error.into_inner());
+        }
+    }
+}
+
+impl Drop for DeadlineWatch {
+    fn drop(&mut self) {
+        {
+            let mut state = self.shared.lock();
+            state.shutdown = true;
+            state.armed = None;
+            self.shared.changed.notify_all();
+        }
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+fn watch_loop(shared: &WatchShared) {
+    let mut state = shared.lock();
+    loop {
+        if state.shutdown {
+            return;
+        }
+        let Some(wall) = state.armed.as_ref().map(|armed| armed.wall) else {
+            state = shared
+                .changed
+                .wait(state)
+                .unwrap_or_else(|error| error.into_inner());
+            continue;
+        };
+        let now = Instant::now();
+        if now < wall {
+            state = shared
+                .changed
+                .wait_timeout(state, wall - now)
+                .unwrap_or_else(|error| error.into_inner())
+                .0;
+            continue;
+        }
+        let Some(armed) = state.armed.take() else {
+            continue;
+        };
+        state.stopping = Some(armed.id);
+        drop(state);
+        // The binding's planned-stop transition, then the exact child's own signal. A failed
+        // signal is not evidence of termination: the session's cleanup still kills and reaps.
+        armed.core.begin_planned_stop();
+        let _ = armed.stop.stop();
+        drop(armed);
+        state = shared.lock();
+        state.stopping = None;
+        shared.changed.notify_all();
+    }
+}
+
 /// One lifecycle export in flight on the child: its hook awaits `answer` (a probe has none).
 struct Pending {
     answer: Option<std::sync::mpsc::SyncSender<Answer>>,
@@ -361,6 +1324,9 @@ struct Pending {
     /// hook is still waiting when the reply arrives (a probe has no hook).
     state: Option<Arc<crate::spawned_lifecycle::CallState>>,
     request: LifecycleRequest,
+    /// The deadline-watch arm guarding this export while the guest can import; claimed with its
+    /// reply. A probe has none.
+    arm: Option<u64>,
 }
 
 /// How long after a committed swap the session watches for the post-swap monitor reverting it.
@@ -374,7 +1340,30 @@ pub async fn run_admitted_session(
     core: Arc<BindingCore>,
     launch: SessionLaunch,
 ) -> Result<SessionReport, SessionError> {
+    run_session(deps, admitted, core, launch, None).await
+}
+
+/// [`run_admitted_session`] for an installed Spirit whose host owner serves shell turns
+/// through `shell`.
+pub async fn run_admitted_shell_session(
+    deps: SessionDeps,
+    admitted: Admitted,
+    core: Arc<BindingCore>,
+    launch: SessionLaunch,
+    shell: Arc<ShellPort>,
+) -> Result<SessionReport, SessionError> {
+    run_session(deps, admitted, core, launch, Some(shell)).await
+}
+
+async fn run_session(
+    deps: SessionDeps,
+    admitted: Admitted,
+    core: Arc<BindingCore>,
+    launch: SessionLaunch,
+    shell: Option<Arc<ShellPort>>,
+) -> Result<SessionReport, SessionError> {
     let owner = IdentityOwner {
+        iac: Arc::clone(&deps.iac),
         lookup: Arc::clone(&deps.pid_by_spirit_id),
         id: admitted.spirit_id.clone(),
         pid: admitted.pid,
@@ -389,6 +1378,7 @@ pub async fn run_admitted_session(
         // registration and the identity below are released.
         let _ended = ended;
         let _owner = owner;
+        let _shell_end = ShellEnd(shell.clone());
         if admitted.sandbox.tier != SandboxTier::T2 {
             return Err(SessionError::SandboxTier);
         }
@@ -401,8 +1391,7 @@ pub async fn run_admitted_session(
         // Declared `iac.send` peer classes come from the kernel's own admission
         // result (the SCB adopted above), never from the policy table: the
         // composition root neither seeds nor reads the manifest-derived table.
-        let declared_sends: Vec<Scope> = admitted.sandbox.declared_scopes.iter()
-            .filter(|scope| matches!(scope, Scope::IacSend { .. })).cloned().collect();
+        let mut authority = Authority::admitted(&admitted.sandbox);
         let swap_sandbox = admitted.sandbox.clone();
         let mut recipient = Recipient {
             mailbox: Arc::clone(deps.iac.mailbox()),
@@ -410,9 +1399,16 @@ pub async fn run_admitted_session(
                 .map_err(|error| SessionError::Mailbox(error.to_string()))?,
             id: admitted.spirit_id.clone(),
         };
-        let bridge = spawn_runner(admitted.sandbox, launch.plan, launch.component_artifact.as_ref(),
+        let artifact_sha256 = launch.component_artifact.as_ref().map(LaunchArtifact::sha256);
+        let verified_publisher = launch
+            .component_artifact
+            .as_ref()
+            .and_then(LaunchArtifact::publisher);
+        let (bridge, stop) = spawn_runner(admitted.sandbox, launch.plan, launch.component_artifact,
             &admitted.spirit_id)?;
         let mut live = LiveWorker { binding, bridge };
+        // The one handle moves to this host owner, shared only with its one watcher.
+        let mut stop = Arc::new(stop);
         deps.supervisor.watch(live.binding.core(), live.bridge.child_pid());
         #[cfg(target_os = "linux")]
         if let Some(missing_mechanism) = live.bridge.take_resource_downgrade() {
@@ -446,27 +1442,32 @@ pub async fn run_admitted_session(
         let mut active = false;
         let mut link = Arc::clone(live.binding.core().lifecycle());
         link.attach_session(launch.turn_budget);
-        link.set_swap_context(SwapContext { sandbox: swap_sandbox, origin: launch.origin.clone() });
+        link.set_swap_context(SwapContext {
+            sandbox: swap_sandbox,
+            origin: launch.origin.clone(),
+            artifact_sha256,
+            verified_publisher,
+        });
         let mut pending: Option<Pending> = None;
         let mut turn_budget = launch.turn_budget;
         let mut swapped_at: Option<Instant> = None;
         let result = (|| {
-            let mut writer = live.bridge.take_frame_writer()
+            let writer = live.bridge.take_frame_writer()
                 .map_err(|error| SessionError::Bridge(error.to_string()))?;
-            let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<u8>>(1);
-            writer_thread = Some(std::thread::Builder::new()
-                .name(format!("spirit-frame-writer-{}", admitted.pid))
-                .spawn(move || {
-                    for body in rx {
-                        writer.write_frame(&body)?;
-                    }
-                    Ok::<(), std::io::Error>(())
-                }).map_err(|error| SessionError::Bridge(error.to_string()))?);
-            let mut tx = Some(tx);
+            let (first_tx, first_thread) = spawn_frame_writer(admitted.pid, writer)
+                .map_err(|error| SessionError::Bridge(error.to_string()))?;
+            writer_thread = Some(first_thread);
+            let mut tx = Some(first_tx);
+            // The session's one monotonic child-stop lane; dropped (disarmed and joined) when
+            // this loop returns, before any cleanup below.
+            let watch = DeadlineWatch::start(admitted.pid)
+                .map_err(|error| SessionError::Bridge(error.to_string()))?;
             let mut draining = false;
             let mut initial_frame = launch.initial_frame;
             let mut seed_id = None;
             let mut turn = TurnState::default();
+            let mut generation = 1u64;
+            let mut bound: Option<ShellBinding> = None;
             let mut diagnostics = DiagnosticBudget::default();
             let mut recall = MediatedLogRecall::new(
                 Arc::clone(&deps.log_recall), Arc::clone(&deps.capability),
@@ -495,45 +1496,84 @@ pub async fn run_admitted_session(
             bind_recall(&mut recall, launch.context_window, &launch.scopes)?;
             let mut deadline = Some((Instant::now() + launch.turn_budget, "startup"));
             let runtime = tokio::runtime::Handle::current();
+            // Observed expiry of the current stage deadline or of the pending call's firing
+            // wall / link deadline. A started call's expiry is one atomic EXPIRED transition
+            // (`CallState::observe_expiry`), so a concurrent reply claim cannot also win.
+            let expiry = |deadline: Option<(Instant, &'static str)>,
+                          pending: &Option<Pending>| -> Option<SessionError> {
+                if let Some((until, stage)) = deadline {
+                    if Instant::now() >= until {
+                        if pending.is_some() {
+                            // The independent stop is issued before anything slower.
+                            if let Some(arm) = pending.as_ref().and_then(|p| p.arm) {
+                                watch.await_stop(arm);
+                            }
+                            journal_session_event(&deps, admitted.pid, &admitted.spirit_id,
+                                "spirit.lifecycle.deadline", serde_json::json!({ "stage": stage }));
+                        }
+                        return Some(SessionError::Deadline(stage));
+                    }
+                }
+                if pending.as_ref().and_then(|p| p.state.as_ref()).is_some_and(|s| s.observe_expiry()) {
+                    if let Some(arm) = pending.as_ref().and_then(|p| p.arm) {
+                        watch.await_stop(arm);
+                    }
+                    journal_session_event(&deps, admitted.pid, &admitted.spirit_id,
+                        "spirit.lifecycle.deadline", serde_json::json!({ "stage": "lifecycle link" }));
+                    return Some(SessionError::LinkDeadline("lifecycle export"));
+                }
+                None
+            };
+            // The soonest wall a recall reply's write may still begin under.
+            let wall_of = |deadline: Option<(Instant, &'static str)>,
+                           pending: &Option<Pending>| -> Option<Instant> {
+                let call = pending.as_ref().and_then(|p| p.state.as_ref()).map(|state| state.expiry());
+                match (deadline.map(|(until, _)| until), call) {
+                    (Some(stage), Some(call)) => Some(stage.min(call)),
+                    (stage, call) => stage.or(call),
+                }
+            };
             loop {
                 if deps.supervisor.is_stopping() {
                     return Err(SessionError::Stopped);
                 }
-                if let Some((until, stage)) = deadline {
-                    if Instant::now() >= until {
-                        if pending.is_some() {
-                            journal_session_event(&deps, admitted.pid, &admitted.spirit_id,
-                                "spirit.lifecycle.deadline", serde_json::json!({ "stage": stage }));
-                        }
-                        return Err(SessionError::Deadline(stage));
-                    }
+                if let Some(error) = expiry(deadline, &pending) {
+                    return Err(error);
                 }
                 if !active && pending.is_none() {
                     if let Some(next) = link.take_handover() {
-                        // The successor's `swap-in` committed (Story 20-9 AC4): its child now
-                        // serves this pid. The predecessor child retires at a planned stop.
+                        // The coordinator accepted the successor's swap-in and published it
+                        // (Story 20-9 AC4); only that outer commit hands this child over. A
+                        // candidate the SCB no longer runs (reverted or unloaded since) is
+                        // stale: it dies unadopted and this predecessor, restored, keeps its pid.
+                        let crate::spawned_lifecycle::Handover { core: next_core, prewarm } = next;
+                        if !deps.supervisor.holds_spirit_object(&next_core) {
+                            journal_session_event(&deps, admitted.pid, &admitted.spirit_id,
+                                "spirit.swap.handover_stale", serde_json::json!({}));
+                            link.end_current_attempt();
+                            continue;
+                        }
+                        let next_stop = Arc::new(prewarm.stop);
+                        // No arm outlives its export: nothing of the watch may still act on the
+                        // child about to be released.
+                        watch.quiesce();
                         tx.take();
                         if let Some(thread) = writer_thread.take() {
                             let _ = thread.join();
                         }
-                        let crate::spawned_lifecycle::Handover { core: next_core, prewarm } = next;
+                        // From here on only the successor's declared scopes grant anything.
+                        authority = Authority::successor(&prewarm.sandbox);
                         let next_writer = prewarm.writer;
                         let binding = deps.supervisor.adopt_spawned(Arc::clone(&next_core))
                             .map_err(|error| SessionError::Supervision(error.to_string()))?;
                         retire(&deps, admitted.pid, std::mem::replace(&mut live,
                             LiveWorker { binding, bridge: prewarm.bridge }));
+                        stop = next_stop;
                         deps.supervisor.watch(live.binding.core(), live.bridge.child_pid());
                         live.binding.core().mark_ready();
-                        let (next_tx, next_rx) = std::sync::mpsc::sync_channel::<Vec<u8>>(1);
-                        let mut next_writer = next_writer;
-                        writer_thread = Some(std::thread::Builder::new()
-                            .name(format!("spirit-frame-writer-{}", admitted.pid))
-                            .spawn(move || {
-                                for body in next_rx {
-                                    next_writer.write_frame(&body)?;
-                                }
-                                Ok::<(), std::io::Error>(())
-                            }).map_err(|error| SessionError::Bridge(error.to_string()))?);
+                        let (next_tx, next_thread) = spawn_frame_writer(admitted.pid, next_writer)
+                            .map_err(|error| SessionError::Bridge(error.to_string()))?;
+                        writer_thread = Some(next_thread);
                         tx = Some(next_tx);
                         link.close();
                         link = Arc::clone(next_core.lifecycle());
@@ -543,6 +1583,10 @@ pub async fn run_admitted_session(
                         bind_recall(&mut recall, prewarm.context_window, &prewarm.scopes)?;
                         report.child_pid = live.bridge.child_pid();
                         swapped_at = Some(Instant::now());
+                        generation += 1;
+                        if let Some(port) = &shell {
+                            port.ready(admitted.pid, generation);
+                        }
                     }
                 }
                 if swapped_at.is_some_and(|at| at.elapsed() < REVERT_WATCH)
@@ -572,10 +1616,19 @@ pub async fn run_admitted_session(
                             // A `--once` session's only turn is the operator seed.
                             journal_undeliverable(&deps, admitted.pid, &admitted.spirit_id,
                                 frame.frame_id, "once session accepts only its operator seed");
+                        } else if let Some(reason) = claim_shell_turn(shell.as_deref(), &frame,
+                            admitted.pid, generation, &mut bound)
+                        {
+                            journal_undeliverable(&deps, admitted.pid, &admitted.spirit_id,
+                                frame.frame_id, reason);
                         } else {
                             match maos_wasm_host::codec::encode_cbor(&frame) {
-                                Err(error) => journal_undeliverable(&deps, admitted.pid,
-                                    &admitted.spirit_id, frame.frame_id, &error),
+                                Err(error) => {
+                                    // The slot claimed for this frame must not stay bound.
+                                    bound = None;
+                                    journal_undeliverable(&deps, admitted.pid,
+                                        &admitted.spirit_id, frame.frame_id, &error);
+                                }
                                 Ok(body) => {
                                     deps.supervisor.begin_turn(live.binding.core(),
                                         format!("turn:{}", ulid::Ulid::from_bytes(frame.frame_id)))
@@ -585,10 +1638,15 @@ pub async fn run_admitted_session(
                                     turn.inbound_clock = frame.logical_clock;
                                     turn.frames = 0;
                                     turn.recalls = 0;
-                                    deadline = Some((Instant::now() + turn_budget, "active turn"));
+                                    // One absolute shell turn deadline clips the active export.
+                                    let mut until = Instant::now() + turn_budget;
+                                    if let Some(shell_turn) = &bound {
+                                        until = until.min(shell_turn.deadline);
+                                    }
+                                    deadline = Some((until, "active turn"));
                                     tx.as_ref()
                                         .ok_or(SessionError::Protocol("session stdin already closed"))?
-                                        .send(body)
+                                        .send(Outbound::open(body))
                                         .map_err(|error| SessionError::Bridge(error.to_string()))?;
                                 }
                             }
@@ -605,18 +1663,54 @@ pub async fn run_admitted_session(
                             let body = lifecycle_wire::encode_request(&call.request)
                                 .map_err(SessionError::Codec)?;
                             turn.recalls = 0;
-                            deadline = Some((Instant::now() + turn_budget, "lifecycle export"));
-                            tx.as_ref()
+                            // A kernel firing ends at the one absolute wall it captured before
+                            // queuing; only an export without one is bounded by the turn budget.
+                            let export_wall = call.state.firing()
+                                .unwrap_or_else(|| Instant::now() + turn_budget);
+                            let wall = export_wall.min(call.state.expiry());
+                            if Instant::now() >= wall {
+                                let _ = call.answer.send(Answer::Reply(LifecycleReply::Unsupported));
+                                continue;
+                            }
+                            // Arm this incarnation before its guest can enter the hook.
+                            let arm = watch.arm(wall, Arc::clone(&stop), Arc::clone(live.binding.core()));
+                            deadline = Some((export_wall, "lifecycle export"));
+                            pending = Some(Pending {
+                                answer: Some(call.answer),
+                                state: Some(call.state),
+                                request: call.request,
+                                arm: Some(arm),
+                            });
+                            if let Err(error) = tx.as_ref()
                                 .ok_or(SessionError::Protocol("session stdin already closed"))?
-                                .send(body)
-                                .map_err(|error| SessionError::Bridge(error.to_string()))?;
-                            pending = Some(Pending { answer: Some(call.answer), state: Some(call.state), request: call.request });
+                                .send(Outbound::within(body, Some(wall)))
+                            {
+                                return Err(expiry(deadline, &pending)
+                                    .unwrap_or_else(|| SessionError::Bridge(error.to_string())));
+                            }
                         }
                     }
                 }
-                match live.bridge.poll_frame(Duration::from_millis(20))
-                    .map_err(|error| SessionError::Bridge(error.to_string()))?
-                {
+                // The poll never waits past the soonest wall (stage deadline or the pending
+                // call's firing wall / link deadline), so nothing can be returned late.
+                let poll_wait = {
+                    let now = Instant::now();
+                    let mut wait = Duration::from_millis(20);
+                    if let Some((until, _)) = deadline {
+                        wait = wait.min(until.saturating_duration_since(now));
+                    }
+                    if let Some(state) = pending.as_ref().and_then(|p| p.state.as_ref()) {
+                        wait = wait.min(state.expiry().saturating_duration_since(now));
+                    }
+                    wait
+                };
+                let polled = live.bridge.poll_frame(poll_wait);
+                // A deadline can truncate a reply in the middle of framing.
+                // Classify expiry before forwarding either output or the framing error.
+                if let Some(error) = expiry(deadline, &pending) {
+                    return Err(error);
+                }
+                match polled.map_err(|error| SessionError::Bridge(error.to_string()))? {
                     BridgePoll::Idle => {}
                     BridgePoll::Closed => {
                         if !ready || active || pending.is_some() {
@@ -653,15 +1747,23 @@ pub async fn run_admitted_session(
                                 .map_err(SessionError::Codec)?;
                             tx.as_ref()
                                 .ok_or(SessionError::Protocol("session stdin already closed"))?
-                                .send(probe)
+                                .send(Outbound::open(probe))
                                 .map_err(|error| SessionError::Bridge(error.to_string()))?;
-                            pending = Some(Pending { answer: None, state: None, request: LifecycleRequest::Probe });
+                            pending = Some(Pending { answer: None, state: None, request: LifecycleRequest::Probe, arm: None });
                             deadline = Some((Instant::now() + turn_budget, "lifecycle probe"));
                         } else if active {
                             deps.supervisor.complete_turn(live.binding.core());
                             revoke(&deps.capability, &mut leases)?;
+                            // The completion work above is blocking: a clean turn observed
+                            // past its wall publishes no answer.
+                            if let Some(error) = expiry(deadline, &pending) {
+                                return Err(error);
+                            }
                             active = false;
                             report.turns += 1;
+                            if let Some(shell_turn) = bound.take() {
+                                let _ = shell_turn.done.send(());
+                            }
                             deadline = None;
                             if launch.once {
                                 draining = true;
@@ -674,19 +1776,39 @@ pub async fn run_admitted_session(
                     }
                     BridgePoll::Data(SubStream::Stdout, bytes) => {
                         if lifecycle_wire::is_reply(&bytes) {
+                            if pending.is_none() {
+                                return Err(SessionError::Protocol("lifecycle reply without a request"));
+                            }
+                            // Decode with the arm still held: expiry stays independent of it.
+                            let reply = lifecycle_wire::decode_reply(&bytes).map_err(SessionError::Codec)?;
+                            let verdict = match pending.as_ref()
+                                .and_then(|p| p.arm.zip(p.state.as_ref()))
+                            {
+                                Some((arm, call)) => watch.claim(arm, call),
+                                None => Claim::Clean,
+                            };
+                            // A reply that lost to expiry is discarded unseen; the lane has
+                            // already issued the stop, and the typed deadline is journaled after.
+                            let wanted = match verdict {
+                                Claim::Expired => {
+                                    return Err(expiry(deadline, &pending)
+                                        .unwrap_or(SessionError::Deadline("lifecycle export")));
+                                }
+                                Claim::Clean => true,
+                                // The waiter gave up in time: no response, and no kill.
+                                Claim::Cancelled => false,
+                            };
                             let Some(done) = pending.take() else {
                                 return Err(SessionError::Protocol("lifecycle reply without a request"));
                             };
-                            let reply = lifecycle_wire::decode_reply(&bytes).map_err(SessionError::Codec)?;
                             deadline = None;
-                            // A hook that already stopped waiting leaves its reply unconsumed.
-                            let wanted = match &done.state {
-                                Some(state) => state.answer(),
-                                None => true,
-                            };
                             match (&done.request, &reply) {
-                                (LifecycleRequest::Probe, LifecycleReply::Supported(supported)) =>
-                                    link.set_supported(*supported),
+                                (LifecycleRequest::Probe, LifecycleReply::Supported(supported)) => {
+                                    link.set_supported(*supported);
+                                    if let Some(port) = &shell {
+                                        port.ready(admitted.pid, generation);
+                                    }
+                                }
                                 (LifecycleRequest::Probe, _) =>
                                     return Err(SessionError::Protocol("unexpected probe reply")),
                                 // The predecessor's state is now taken: no more work until the swap
@@ -708,10 +1830,19 @@ pub async fn run_admitted_session(
                                 Err(crate::recall_mediation::ProtocolViolation("recall outside an active export"))
                             } else if turn.recalls >= MAX_RECALLS_PER_TURN {
                                 Err(crate::recall_mediation::ProtocolViolation("recall budget exceeded"))
+                            } else if let Some(denied) = authority.recall_denial(&bytes) {
+                                turn.recalls += 1;
+                                Ok(denied)
                             } else {
                                 turn.recalls += 1;
                                 recall.serve_wire(admitted.pid, &bytes)
                             };
+                            // Mediation is synchronous and cannot be preempted: a result that
+                            // returns past the wall is discarded, not even refused.
+                            if let Some(error) = expiry(deadline, &pending) {
+                                return Err(error);
+                            }
+                            let wall = wall_of(deadline, &pending);
                             match reply {
                                 Err(error) => {
                                     recall.channel_closed(admitted.pid, error.0);
@@ -719,7 +1850,7 @@ pub async fn run_admitted_session(
                                 }
                                 Ok(body) => tx.as_ref()
                                     .ok_or(SessionError::Protocol("session stdin already closed"))?
-                                    .send(body)
+                                    .send(Outbound::within(body, wall))
                                     .map_err(|error| SessionError::Bridge(error.to_string()))?,
                             }
                             continue;
@@ -737,8 +1868,8 @@ pub async fn run_admitted_session(
                             .ok_or(SessionError::Protocol("active export has no deadline"))?
                             .0;
                         if authorize_and_deliver(&deps, &runtime, admitted.pid,
-                            &admitted.spirit_id, &declared_sends, frame, until, &mut leases,
-                            &mut turn)?
+                            &admitted.spirit_id, &authority, frame, until, &mut leases,
+                            &mut turn, bound.as_mut())?
                         {
                             report.delivered_frames += 1;
                         } else {
@@ -748,6 +1879,18 @@ pub async fn run_admitted_session(
                 }
             }
         })();
+        // An export that outlived its hard wall is not left to leave by itself: closing stdin
+        // cannot interrupt a running guest call, so the child is stopped now (planned stop,
+        // then kill) without the ordinary graceful wait. Leases, finalization and reap follow
+        // below in the same order as for any other end.
+        let hard_expiry = matches!(
+            result,
+            Err(SessionError::Deadline(_) | SessionError::LinkDeadline(_))
+        );
+        if hard_expiry {
+            live.binding.core().stop_session();
+            let _ = live.bridge.kill();
+        }
         if let Some(Pending { answer: Some(answer), .. }) = pending.take() {
             let _ = answer.send(Answer::SessionEnded);
         }
@@ -758,7 +1901,7 @@ pub async fn run_admitted_session(
         // itself (its stdin closed with the loop), then a planned stop, then a
         // kill: `wait_and_finalize` below can never block forever.
         let grace_end = Instant::now() + TERMINATION_GRACE;
-        let exited = loop {
+        let exited = hard_expiry || loop {
             if !matches!(live.bridge.try_exit_cause(), Ok(None)) {
                 break true;
             }
@@ -840,6 +1983,25 @@ fn fail(
     error
 }
 
+/// Map a bus refusal onto the session's typed error.
+fn bus_error(error: maos_domain::iac_bus_types::IacBusError) -> SessionError {
+    match error {
+        maos_domain::iac_bus_types::IacBusError::IntentPromotionDenied { .. } => {
+            SessionError::IntentPromotionDenied
+        }
+        other => SessionError::Mailbox(other.to_string()),
+    }
+}
+
+fn shell_reply_error(error: maos_iac::adapter::mailbox::ShellReplyError) -> SessionError {
+    match error {
+        maos_iac::adapter::mailbox::ShellReplyError::Refused(refusal) => {
+            SessionError::Mailbox(format!("shell reply refused: {refusal:?}"))
+        }
+        maos_iac::adapter::mailbox::ShellReplyError::Bus(error) => bus_error(error),
+    }
+}
+
 /// Drive one bus delivery to completion within the turn's remaining time,
 /// noticing a supervisor stop while it waits.
 fn deliver_bounded<T>(
@@ -847,6 +2009,16 @@ fn deliver_bounded<T>(
     runtime: &tokio::runtime::Handle,
     deadline: Instant,
     work: impl Future<Output = Result<T, maos_domain::iac_bus_types::IacBusError>>,
+) -> Result<T, SessionError> {
+    deliver_bounded_with(deps, runtime, deadline, work, bus_error)
+}
+
+fn deliver_bounded_with<T, E>(
+    deps: &SessionDeps,
+    runtime: &tokio::runtime::Handle,
+    deadline: Instant,
+    work: impl Future<Output = Result<T, E>>,
+    map: impl FnOnce(E) -> SessionError,
 ) -> Result<T, SessionError> {
     let remaining = deadline.saturating_duration_since(Instant::now());
     runtime.block_on(async {
@@ -857,11 +2029,7 @@ fn deliver_bounded<T>(
             tokio::select! {
                 done = &mut work => {
                     return match done {
-                        Ok(result) => result.map_err(|error| match error {
-                            maos_domain::iac_bus_types::IacBusError::IntentPromotionDenied { .. } =>
-                                SessionError::IntentPromotionDenied,
-                            other => SessionError::Mailbox(other.to_string()),
-                        }),
+                        Ok(result) => result.map_err(map),
                         Err(_) => Err(SessionError::Deadline("delivery")),
                     };
                 }
@@ -1046,7 +2214,7 @@ fn mint<'a>(
 /// is a broadcast; an addressed frame reaches Spirit peers.
 fn send_scope(frame: &IacFrame) -> Scope {
     Scope::IacSend {
-        peer_class: if frame.to.is_empty() {
+        peer_class: if frame.to.is_empty() && frame.kind != FrameKind::Retract {
             "broadcast"
         } else {
             "spirit:peer"
@@ -1112,11 +2280,12 @@ fn authorize_and_deliver(
     runtime: &tokio::runtime::Handle,
     pid: u32,
     spirit_id: &str,
-    declared_sends: &[Scope],
+    authority: &Authority,
     mut frame: IacFrame,
     deadline: Instant,
     leases: &mut Vec<TokenId>,
     turn: &mut TurnState,
+    shell: Option<&mut ShellBinding>,
 ) -> Result<bool, SessionError> {
     let expected_kind = match &frame.payload {
         FramePayload::TaskAssign(_) => FrameKind::TaskAssign,
@@ -1157,6 +2326,25 @@ fn authorize_and_deliver(
             refusal = retract_refusal(deps, spirit_id, retract)?;
         }
     }
+    let shell = shell.filter(|_| is_shell_reply(&frame));
+    if refusal.is_none()
+        && shell
+            .as_ref()
+            .is_some_and(|binding| binding.route.is_none())
+    {
+        refusal = Some("shell_reply_already_sent");
+    }
+    // The reply pseudo-destination carries only the one bound turn's `TaskComplete`: no other
+    // frame, and no unbound or later reply, may name it, and it never routes ordinarily.
+    if refusal.is_none()
+        && shell.is_none()
+        && frame
+            .to
+            .iter()
+            .any(|to| to.spirit_id.as_str() == maos_iac::adapter::mailbox::SHELL_REPLY_DESTINATION)
+    {
+        refusal = Some("shell_reply_destination_reserved");
+    }
     let mut allowed = refusal.is_none();
     // `iac.send` mediation (FR4): every delivery carries its own kernel token.
     // A declared peer class must match; undeclared `iac.send` is the kernel's
@@ -1165,7 +2353,7 @@ fn authorize_and_deliver(
     let mut send = None;
     let mut send_token = None;
     if allowed {
-        let decision = if declared_sends.is_empty() || declared_sends.contains(&send_scope) {
+        let decision = if authority.send_granted(&send_scope) {
             mint(deps, pid, posture_hash, &send_scope, &mut issued)
         } else {
             ScopeDecision {
@@ -1204,6 +2392,15 @@ fn authorize_and_deliver(
                             &mut issued,
                             SessionError::Deadline("scope authorization"),
                         ));
+                    }
+                    if authority.enforced && !authority.entitles(scope) {
+                        decisions.push(ScopeDecision {
+                            scope,
+                            kernel_verdict: None,
+                            refusal: Some("scope_not_granted".into()),
+                        });
+                        allowed = false;
+                        break;
                     }
                     let decision = mint(deps, pid, posture_hash, scope, &mut issued);
                     allowed = decision.kernel_verdict == Some("allow");
@@ -1276,6 +2473,8 @@ fn authorize_and_deliver(
         revoke(&deps.capability, &mut issued)?;
         return Ok(false);
     }
+    let reply = shell.and_then(|binding| binding.route.take().map(|route| (route, binding.id)));
+    let mut all_refused = false;
     let delivery = if let FramePayload::Retract(retract) = &frame.payload {
         deliver_bounded(
             deps,
@@ -1293,15 +2492,43 @@ fn authorize_and_deliver(
         frame.frame_id = ulid::Ulid::new().to_bytes();
         frame.timestamp_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
         frame.stamp_as_spirit(spirit_id, &turn.lineage);
+        // Story 21-7 — a guest-supplied envelope is discarded; the granter stamps the one the
+        // authenticated sender's declaration implies, pinned to this frame for the gate, so it
+        // commits in the routed transaction. Telemetry is ungated: never "all refused". A
+        // scoped shell reply is addressed to the host-only `@maos-shell` pseudo-address, never
+        // a Spirit: it is unstamped (no declaration can cover it) and never "all refused".
+        let policy = deps.iac.consent_policy();
+        if reply.is_some() {
+            frame.consent_envelope = None;
+        } else {
+            all_refused = policy.stamp(&mut frame, pid) && frame.kind != FrameKind::TelemetryEvent;
+        }
+        let frame_id = frame.frame_id;
         turn.clock = turn.clock.max(turn.inbound_clock) + 1;
         frame.logical_clock = turn.clock;
-        deliver_bounded(
-            deps,
-            runtime,
-            deadline,
-            deps.iac.deliver_typed(frame, pid, send_token),
-        )
-        .map(drop)
+        let delivered = match reply {
+            Some((route, correlation)) => match send_token {
+                Some(token) => deliver_bounded_with(
+                    deps,
+                    runtime,
+                    deadline,
+                    deps.iac
+                        .deliver_shell_reply(frame, pid, token, &route, correlation),
+                    shell_reply_error,
+                )
+                .map(drop),
+                None => Err(SessionError::Protocol("shell reply has no send token")),
+            },
+            None => deliver_bounded(
+                deps,
+                runtime,
+                deadline,
+                deps.iac.deliver_typed(frame, pid, send_token),
+            )
+            .map(drop),
+        };
+        policy.release(frame_id);
+        delivered
     };
     if matches!(delivery, Err(SessionError::IntentPromotionDenied)) {
         revoke(&deps.capability, &mut issued)?;
@@ -1315,5 +2542,5 @@ fn authorize_and_deliver(
     } else {
         leases.extend(issued);
     }
-    Ok(true)
+    Ok(!all_refused)
 }

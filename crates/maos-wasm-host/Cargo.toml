@@ -98,6 +98,11 @@ serde_json = "1.0"
 # Logging
 tracing = "0.1"
 
+# Governed held-component handoff (src/runner.rs): descriptor flag inspection and the
+# SHA-256 of the exact compilation bytes.
+libc = "0.2"
+sha2 = "0.10"
+
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "test-util"] }
 tempfile = "3"
@@ -106,7 +111,6 @@ smallvec = "1"
 # classify_exit on the forbidden-syscall probe fixture. Dev-dependency only:
 # does not ship and does not add wasmtime to kernel-core's own closure.
 maos-kernel-core = { path = "../maos-kernel-core" }
-libc = "0.2"
 # WIT AST parsing for the corpus completeness denominator (D5: "enumerated
 # mechanically from the .wit AST", not a hand-maintained const array).
 wit-parser = "0.254"
