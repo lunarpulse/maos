@@ -9,7 +9,7 @@ There are two different mechanisms and the script keeps them apart:
 
 | Mechanism | What it is | When it moves | Command |
 |---|---|---|---|
-| **Kernel exact pin** | `xtask/kernel-core-baseline.toml` (`src_lines`, `set_hash`, per-file digests, HISTORY block) and the four `src_lines` constants in `xtask/tests/kernel_pin_content_hash_16_0.rs`; anti-drift | **every landing that changes kernel source** | `--check` / `--apply` |
+| **Kernel exact pin** | `xtask/kernel-core-baseline.toml` (`src_lines`, `set_hash`, per-file digests); anti-drift | **every landing that changes kernel source** | `--check` / `--apply` |
 | **Crate ceilings** | the `xtask/kloc.toml` crate rows: ceilings **with stated headroom** | **only at an epic retrospective** (and the B7c-A landing itself); never per landing | `--rebase` |
 
 A landing does **not** re-pin any `kloc.toml` row, does not write a per-landing `kloc.toml` HISTORY segment, and
@@ -18,10 +18,10 @@ per-landing `RATIFIED_AT_EASING` figure are retired too.
 
 ```
 scripts/repin.py --check
-scripts/repin.py --apply --story 20-13 --note "AC7 KT3: SecurityManagerAdapter carries the selected crypto provider" \
+scripts/repin.py --apply --story 20-13 [--note "TEXT"] \
                  [--root DIR] [--xtask PATH]
-scripts/repin.py --rebase --note "Epic-21 retrospective ceiling re-base" [--measure-root DIR | --measure-json FILE] \
-                 [--lower-kernel] [--date YYYY-MM-DD] [--dry-run] [--root DIR] [--xtask PATH]
+scripts/repin.py --rebase [--note "REASON"] [--measure-root DIR | --measure-json FILE] \
+                 [--lower-kernel] [--dry-run] [--root DIR] [--xtask PATH]
 ```
 
 The xtask binary is found via `--xtask`, `$REPIN_XTASK`, `$CARGO_TARGET_DIR/{debug,release}/xtask`,
@@ -32,8 +32,8 @@ then `<root>/target/{debug,release}/xtask`; if none exists the script stops (exi
 
 | Gate it runs | Measured | Pin location it rewrites |
 |---|---|---|
-| `check-kernel-baseline --json` | kernel physical lines | `kernel-core-baseline.toml` `src_lines`; the four `src_lines` constants in `xtask/tests/kernel_pin_content_hash_16_0.rs` |
-| `check-kernel-baseline --emit-pin` | `set_hash`, per-file digests | `[kernel_src] set_hash`, changed `[kernel_src.files]` digests; one HISTORY comment block is inserted **after** `src_lines` (the line number 505 is pinned by a test and does not move) |
+| `check-kernel-baseline --json` | kernel physical lines | `kernel-core-baseline.toml` `src_lines` (the test file `kernel_pin_content_hash_16_0.rs` holds no copy: it asserts the readers agree with `read_pinned`) |
+| `check-kernel-baseline --emit-pin` | `set_hash`, per-file digests | `[kernel_src] set_hash`, changed `[kernel_src.files]` digests (values only; no HISTORY block is written) |
 | `kloc-check --json` | kernel tokei | nothing (read-only: checked against the `maos-kernel-core` ceiling row and the ADR-069 alarm/envelope) |
 | `check-service-boundary --json` | public-surface diff | nothing (read-only; see refusals) |
 
@@ -44,8 +44,8 @@ decision is pending (listed), `3` a gate could not be run. A clean tree must be 
 (`check-kernel-baseline` is re-run; all files are restored), `3` tool error. It prints a unified diff (very long
 lines are truncated for display only) and is idempotent: the second `--apply` is a no-op. Needs `--story` (full key
 or unique prefix, must be `in-progress`, `review` or `ready-for-dev` in
-`_bmad-output/implementation-artifacts/sprint-status.yaml`; epic rows and `done` stories are refused) and `--note`
-(the narrative cited by the HISTORY block).
+`_bmad-output/implementation-artifacts/sprint-status.yaml`; epic rows and `done` stories are refused). `--note` is
+optional free text printed to stdout only; no comment is written to any file.
 
 ### Refused for a human (exit 2)
 
@@ -61,7 +61,7 @@ or unique prefix, must be `in-progress`, `review` or `ready-for-dev` in
 ## Crate ceilings: `--rebase` (retrospectives and the B7c-A landing only)
 
 ```
-scripts/repin.py --rebase --note "REASON" [--measure-root DIR | --measure-json FILE] [--lower-kernel] [--date YYYY-MM-DD] [--dry-run]
+scripts/repin.py --rebase [--note "REASON"] [--measure-root DIR | --measure-json FILE] [--lower-kernel] [--dry-run]
 ```
 
 1. Per-crate tokei comes from the prebuilt `xtask kloc-check --json` run in `--measure-root` (default `--root`), or
@@ -70,9 +70,8 @@ scripts/repin.py --rebase --note "REASON" [--measure-root DIR | --measure-json F
    never below what `--root` itself measures (when `--measure-root` or `--measure-json` is given, `--root` is
    measured too with `--xtask` and acts as a floor). `_aggregate_*` rows are not crate rows and are untouched; a
    crate with no code at all (the phantom `= 0` tripwire rows) is kept.
-3. Comments stay intact. Each *changed* row gets exactly one `# RE-BASED <date> (<reason>)` segment at the head of its
-   inline comment (`… = N   # RE-BASED 2026-11-13 (reason) | <previous comment>`); a re-base replaces the previous
-   `RE-BASED` segment instead of stacking them. `--note` is the reason (no `|`); `--date` defaults to today.
+3. Only the value changes: every row's inline comment is kept byte for byte (no `RE-BASED` segment is written).
+   `--note` is optional and printed to stdout only; history is the commit message.
 4. `maos-kernel-core` is a **zero-headroom crate** (`ZERO_HEADROOM_CRATES` in `recovery_lane_ceiling_rule.rs`): its
    row is **held** (`held (zero headroom)` in the table), never raised. `--lower-kernel` lowers it to its measured
    value. It is refused (exit 2) if the kernel measures above its row, if the resulting row would exceed the ADR-069
@@ -88,7 +87,7 @@ The kernel exact pin is not touched by `--rebase`.
 
 1. final code, `cargo fmt --all`, rebuild xtask if it changed (the binary must match the tree);
 2. `scripts/repin.py --check` — resolve every listed refusal (kernel grant, surface refresh);
-3. `scripts/repin.py --apply --story KEY --note "…"`;
+3. `scripts/repin.py --apply --story KEY` (history is the commit message; `--note` is optional and stdout-only);
 4. `scripts/repin.py --check` (rc 0) and commit. A landing that does not change kernel source needs no re-pin at all.
 
 ## Retrospective procedure

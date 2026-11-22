@@ -79,7 +79,7 @@ on one image.**
 
 Since SCP 2026-11-12 §5.B7c (option A, ruled 2026-11-13) the per-crate `xtask/kloc.toml` rows are **ceilings with
 stated headroom, re-based at each epic retrospective** (`scripts/repin.py --rebase`); a landing re-pins only the
-kernel exact pin (`scripts/repin.py --apply`). To keep the growth visible without a per-landing re-pin, every epic
+kernel exact pin (`scripts/repin.py --apply`: values only, no per-landing HISTORY block; history is the commit message). To keep the growth visible without a per-landing re-pin, every epic
 retrospective produces one row of this table (documentation only: no gate reads it), measured on the retrospective
 commit after `cargo fmt --all` with the prebuilt xtask and `tokei` 14.0.0:
 
