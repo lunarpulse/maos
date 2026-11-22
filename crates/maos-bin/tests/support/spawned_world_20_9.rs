@@ -506,10 +506,35 @@ impl World {
         manifest_path: &Path,
         recall_clock: Option<maos_iac::adapter::log_recall::ConsentClock>,
     ) -> Running {
+        self.start_with(manifest_path, recall_clock, None).await
+    }
+
+    /// [`Self::start`] under `turn_budget` as the session's startup/probe/turn wall instead of the
+    /// manifest's `[budget].time_cap_seconds`. The kernel's own firings keep that cap (the
+    /// dispatcher's wall), so a vector whose cap is tiny by design can still give the child its
+    /// startup slack.
+    pub async fn start_with_turn_budget(
+        &self,
+        manifest_path: &Path,
+        turn_budget: Duration,
+    ) -> Running {
+        self.start_with(manifest_path, None, Some(turn_budget))
+            .await
+    }
+
+    async fn start_with(
+        &self,
+        manifest_path: &Path,
+        recall_clock: Option<maos_iac::adapter::log_recall::ConsentClock>,
+        turn_budget: Option<Duration>,
+    ) -> Running {
         let text = std::fs::read_to_string(manifest_path).unwrap();
         let gated = gate_manifest(&text, &|_| false).unwrap();
         let mut launch =
             manifest_launch(&*self.handles.host, &gated, manifest_path, false).unwrap();
+        if let Some(turn_budget) = turn_budget {
+            launch.turn_budget = turn_budget;
+        }
         if gated
             .class_section
             .artifact

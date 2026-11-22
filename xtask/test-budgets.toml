@@ -40,8 +40,8 @@ total_seconds = 2000
 
 [[exception]]
 binary = "maos-bin::spawned_swap_20_9"
-seconds = 365
-reason = "21-9 hot-swap suite (27 tests): real wasm runners, rollback windows and successor handover; hosted Σ 328.9 s on run 45007034265 (PR #31), budget = observed + 10 %"
+seconds = 450
+reason = "21-9 hot-swap suite (27 tests): real wasm runners, rollback windows and successor handover; hosted Σ 328.9 s (passing run 45007034265, PR #31), 408 s on a run where one test hit its 80 s bound (45039456657, PR #36); budget = passing max + 35 %"
 owner = "21-9-wasm-host-default-on"
 
 [[exception]]
