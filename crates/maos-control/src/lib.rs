@@ -341,6 +341,10 @@ pub enum OperatorCommand {
     Unload {
         spirit_id: String,
     },
+    /// FR13 (D-LRQC-03 A) — the door-only release of a quarantined Spirit's fences and holds.
+    QuarantineRelease {
+        spirit_id: String,
+    },
     Posture {
         spirit_id: String,
         posture: String,
@@ -464,6 +468,7 @@ impl OperatorCommand {
             | Self::ResolveHalt { spirit_id, .. }
             | Self::OrchestratorEnqueue { spirit_id, .. }
             | Self::OrchestratorRecall { spirit_id }
+            | Self::QuarantineRelease { spirit_id }
             | Self::OptionPick { spirit_id, .. } => Some(spirit_id),
             // `Load` is `None` BY CONSTRUCTION, not by omission: the id it
             // will create lives inside a file the daemon has not opened yet,
@@ -1526,6 +1531,7 @@ fn spirit_command<S: SandboxReportSource>(
         "resume" => OperatorCommand::Resume { spirit_id },
         "unload" => OperatorCommand::Unload { spirit_id },
         "uninstall" => OperatorCommand::Uninstall { spirit_id },
+        "quarantine-release" => OperatorCommand::QuarantineRelease { spirit_id },
         "posture" => {
             let body = match body_json(request) {
                 Ok(body) => body,

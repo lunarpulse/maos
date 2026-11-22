@@ -192,16 +192,44 @@ fn every_nightly_job_records_its_result_as_summary_line_and_artifact() {
             "{name}: a red job is recorded too"
         );
         assert_eq!(record["with"]["job"].as_str(), Some(name));
-        assert!(
-            record["with"]["status"]
-                .as_str()
-                .is_some_and(|status| status.contains("job.status")),
-            "{name}: the recorded status derives from job.status"
+        // Every job records `job.status` verbatim, except `determinism-tests`: its advisory step is
+        // `continue-on-error`, so the job is green even when the tests failed. It records the surfaced
+        // step result when there is one (a test failure beats job success), else `job.status`.
+        let expected = if name == "determinism-tests" {
+            "${{ steps.surface.outputs.result || job.status }}"
+        } else {
+            "${{ job.status }}"
+        };
+        assert_eq!(
+            record["with"]["status"].as_str(),
+            Some(expected),
+            "{name}: recorded status expression"
         );
     }
     let action: Value =
         serde_yaml::from_str(&read(".github/actions/record-nightly-result/action.yml"))
             .expect("parse record-nightly-result");
+    let mut descriptive = vec![
+        ("name", action["name"].as_str().expect("action name")),
+        (
+            "description",
+            action["description"].as_str().expect("action description"),
+        ),
+    ];
+    for input in ["job", "status"] {
+        descriptive.push((
+            input,
+            action["inputs"][input]["description"]
+                .as_str()
+                .unwrap_or_else(|| panic!("input {input} description")),
+        ));
+    }
+    for (field, text) in descriptive {
+        assert!(
+            !text.contains("${{"),
+            "action metadata {field} must stay literal: expression examples are evaluated by the runner"
+        );
+    }
     let steps = action["runs"]["steps"].as_sequence().expect("steps");
     let write = steps[0]["run"].as_str().expect("write step");
     assert!(write.contains("$GITHUB_STEP_SUMMARY"), "job summary line");
@@ -216,6 +244,39 @@ fn every_nightly_job_records_its_result_as_summary_line_and_artifact() {
     assert_eq!(
         upload["with"]["name"].as_str(),
         Some("nightly-result-${{ inputs.job }}")
+    );
+    // The Unix smoke below supplies the values resolved by these bindings.
+    let env = steps[0]["env"].as_mapping().expect("write step env");
+    let wiring = [
+        ("NIGHTLY_JOB", "${{ inputs.job }}"),
+        ("NIGHTLY_STATUS", "${{ inputs.status }}"),
+        ("NIGHTLY_SHA", "${{ github.sha }}"),
+        (
+            "NIGHTLY_RUN_URL",
+            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+        ),
+    ];
+    for (key, expected) in wiring {
+        assert_eq!(
+            env.get(key).and_then(|value| value.as_str()),
+            Some(expected),
+            "the write step's env {key} wiring"
+        );
+    }
+    assert_eq!(
+        upload["with"]["path"].as_str(),
+        Some("${{ runner.temp }}/nightly-result/${{ inputs.job }}.txt"),
+        "the upload path is the recorder's actual output file"
+    );
+    assert_eq!(
+        upload["with"]["retention-days"].as_u64(),
+        Some(90),
+        "result artifacts are retained 90 days"
+    );
+    assert_eq!(
+        upload["with"]["if-no-files-found"].as_str(),
+        Some("error"),
+        "a missing result file must fail the upload, not pass silently"
     );
     // Where the old job uploaded an artifact, the nightly job still does.
     let expect_upload = [
@@ -260,17 +321,6 @@ fn slow_sensitive_jobs_can_red_the_run_and_advisory_jobs_keep_their_labelled_con
                 .any(|step| step["continue-on-error"].as_bool() == Some(true));
         assert!(masked, "{name}: advisory jobs keep their continue-on-error");
     }
-    // The recorded line of `determinism-tests` reads the step outcome, because its test step masks itself.
-    let record = nightly["jobs"]["determinism-tests"]["steps"]
-        .as_sequence()
-        .expect("steps")
-        .last()
-        .expect("record step")
-        .clone();
-    assert_eq!(
-        record["with"]["status"].as_str(),
-        Some("${{ steps.surface.outputs.result || job.status }}")
-    );
 }
 
 #[test]
@@ -338,6 +388,64 @@ fn deferred_work_records_every_move_with_owner_and_return_rule() {
         assert!(
             row.contains("10 consecutive") && row.contains("before GA"),
             "{name}: the row states the 10-consecutive-green rule and the before-GA requirement"
+        );
+    }
+}
+
+/// Runs the real write step under bash (unix only) for the three statuses the recorder is given: the
+/// line carries exactly the allowed fields and the artifact file holds the same line.
+#[cfg(unix)]
+#[test]
+fn record_nightly_result_write_step_emits_one_line_to_summary_and_artifact_file() {
+    let action: Value =
+        serde_yaml::from_str(&read(".github/actions/record-nightly-result/action.yml"))
+            .expect("parse record-nightly-result");
+    let write = action["runs"]["steps"][0]["run"]
+        .as_str()
+        .expect("write step");
+    for status in ["success", "failure", "cancelled"] {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let summary = dir.path().join("summary");
+        let out = std::process::Command::new("bash")
+            .arg("-c")
+            .arg(write)
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .env("LC_ALL", "C")
+            .env("NIGHTLY_JOB", "determinism-tests")
+            .env("NIGHTLY_STATUS", status)
+            .env("NIGHTLY_SHA", "abc123")
+            .env("NIGHTLY_RUN_URL", "https://example.test/runs/1")
+            .env("GITHUB_STEP_SUMMARY", &summary)
+            .env("RUNNER_TEMP", dir.path())
+            .output()
+            .expect("run write step");
+        assert!(out.status.success(), "write step failed for {status}");
+        let line = fs::read_to_string(dir.path().join("nightly-result/determinism-tests.txt"))
+            .expect("result file");
+        let fields: Vec<&str> = line.trim_end().split(' ').collect();
+        assert_eq!(fields.len(), 6, "line fields for {status}: {line}");
+        assert_eq!(fields[0], "nightly-result");
+        assert_eq!(fields[1], "job=determinism-tests");
+        assert_eq!(fields[2], format!("status={status}"));
+        assert_eq!(fields[3], "sha=abc123");
+        let at = fields[4]
+            .strip_prefix("at=")
+            .unwrap_or_else(|| panic!("timestamp field: {line}"));
+        assert!(at.ends_with('Z'), "UTC suffix Z: {at}");
+        let parsed = chrono::DateTime::parse_from_rfc3339(at)
+            .unwrap_or_else(|e| panic!("RFC3339 timestamp {at}: {e}"));
+        assert_eq!(parsed.offset().local_minus_utc(), 0, "UTC offset: {at}");
+        assert_eq!(fields[5], "run=https://example.test/runs/1");
+        assert_eq!(
+            fs::read_to_string(&summary).expect("summary"),
+            line,
+            "summary line equals the artifact line"
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            line,
+            "stdout echoes the same line"
         );
     }
 }

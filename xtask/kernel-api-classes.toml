@@ -70,6 +70,7 @@
 # `with_log_recall` builders.
 "maos_kernel_core::scheduler::kernel_ctx::KernelCtx"                  = "supervision"
 "maos_kernel_core::scheduler::hook_dispatch::HookDispatcher"          = "supervision"
+"maos_kernel_core::scheduler::hook_dispatch::HookOutcome"             = "supervision" # LRQC: SkippedQuarantined joins the hook outcome set
 
 # Story 1a.3 — CryptoProvider port + RingCryptoProvider adapter.
 "maos_kernel_core::security::crypto::RingCryptoProvider"              = "data-movement"

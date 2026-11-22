@@ -184,6 +184,103 @@ impl MemoryManagerAdapter {
         self
     }
 
+    /// The unfenced store write for kernel- and operator-originated callers (the operator's
+    /// halt context). Spirit-facing paths go through [`MemoryManagerPort::write`], which fences.
+    pub(crate) fn write_kernel_origin(
+        &self,
+        spirit_pid: u32,
+        tier: MemoryTier,
+        namespace: &MemoryNamespace,
+        key: &str,
+        value: MemoryValue,
+    ) -> Result<(), MemoryError> {
+        #[cfg(feature = "spirit_test")]
+        let case_id = format!(
+            "memory.write:{spirit_pid}:{:?}:{key}",
+            namespace.kind_label()
+        );
+        #[cfg(feature = "spirit_test")]
+        self.fire_isolation_hooks(&case_id, true);
+
+        // AC-5/AC-9: every store write routes through the single region
+        // chokepoint.  DirectWrite is home-by-construction (passes when pinning
+        // matches or is disabled); future replay/restore paths MUST construct a
+        // `WriteEntryPoint` carrying source-region provenance and will fail
+        // closed here on a cross-region write.
+        write_entry_point::enforce_region(
+            &write_entry_point::WriteEntryPoint::DirectWrite,
+            self.home_region.as_ref(),
+        )
+        .map_err(|e| MemoryError::Storage(e.to_string()))?;
+
+        // Sec-redteam SR-1: principal namespace writes require explicit
+        // authorization when enforcement is enabled.
+        if let MemoryNamespace::Principal { .. } = namespace {
+            if let Some(ref lock) = self.principal_write_enforcement {
+                let authorized = lock
+                    .read()
+                    .expect("principal_write_enforcement RwLock poisoned");
+                if !authorized.contains(&spirit_pid) {
+                    return Err(MemoryError::PrincipalWriteUnauthorized { spirit_pid });
+                }
+            }
+        }
+
+        Self::reject_principal_outside_private(tier, namespace)?;
+        match tier {
+            MemoryTier::Private => {
+                // Commit discoverable intent before the durable spill.
+                if let MemoryNamespace::Principal {
+                    principal_id,
+                    schema,
+                } = namespace
+                {
+                    return self.principal_index.record_write(
+                        principal_id,
+                        spirit_pid,
+                        &self.private.owner_dirname(spirit_pid),
+                        schema,
+                        key,
+                        Self::now_ns(),
+                        || self.private.write(spirit_pid, namespace, key, value),
+                    );
+                }
+                self.private.write(spirit_pid, namespace, key, value)
+            }
+            MemoryTier::Shared => self.shared.write(spirit_pid, namespace, key, value),
+            MemoryTier::Collective => {
+                // P1 — I1/I2 fail-closed.  The trait path carries NO token /
+                // posture_hash / sandbox (the `MemoryManagerPort` ABI cannot
+                // change), so it CANNOT perform capability mediation.  When
+                // I1/I2 mediation is wired (`self.capabilities` is `Some`, i.e.
+                // the production composition root), the unmediated path is
+                // DENIED — callers MUST use the cap-gated `collective_write`
+                // (which verifies+audits the LoomWrite token before the port
+                // call).  Only the legacy/test path (no capabilities injected)
+                // falls through to the direct port delegation.
+                if self.capabilities.is_some() {
+                    return Err(MemoryError::Collective {
+                        kind: CollectiveErrorKind::CapabilityDenied,
+                        reason:
+                            "unmediated collective write via the trait path denied while I1/I2 \
+                                 capability mediation is wired; use the cap-gated collective_write \
+                                 (carries the LoomWrite token + posture)"
+                                .into(),
+                    });
+                }
+                match &self.collective_port {
+                    Some(port) => port
+                        .write(spirit_pid, namespace, key, value)
+                        .map_err(Self::collective_port_error),
+                    None => Err(MemoryError::CollectiveNotYetAvailable {
+                        ship_target: "v1.5",
+                        landing_story: "E10 Story 10.4",
+                    }),
+                }
+            }
+        }
+    }
+
     /// Reject `Principal` namespace outside the private tier (Decision D).
     /// ONLY the private tier has a forget cascade and a `principal_index`; the
     /// shared and collective tiers hold cross-Spirit data with no erase path,
@@ -791,91 +888,15 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         key: &str,
         value: MemoryValue,
     ) -> Result<(), MemoryError> {
-        #[cfg(feature = "spirit_test")]
-        let case_id = format!(
-            "memory.write:{spirit_pid}:{:?}:{key}",
-            namespace.kind_label()
-        );
-        #[cfg(feature = "spirit_test")]
-        self.fire_isolation_hooks(&case_id, true);
-
-        // AC-5/AC-9: every store write routes through the single region
-        // chokepoint.  DirectWrite is home-by-construction (passes when pinning
-        // matches or is disabled); future replay/restore paths MUST construct a
-        // `WriteEntryPoint` carrying source-region provenance and will fail
-        // closed here on a cross-region write.
-        write_entry_point::enforce_region(
-            &write_entry_point::WriteEntryPoint::DirectWrite,
-            self.home_region.as_ref(),
-        )
-        .map_err(|e| MemoryError::Storage(e.to_string()))?;
-
-        // Sec-redteam SR-1: principal namespace writes require explicit
-        // authorization when enforcement is enabled.
-        if let MemoryNamespace::Principal { .. } = namespace {
-            if let Some(ref lock) = self.principal_write_enforcement {
-                let authorized = lock
-                    .read()
-                    .expect("principal_write_enforcement RwLock poisoned");
-                if !authorized.contains(&spirit_pid) {
-                    return Err(MemoryError::PrincipalWriteUnauthorized { spirit_pid });
-                }
-            }
+        // FR13 (D-LRQC-06 B): a quarantined pid's own write never reaches a tier.
+        if self
+            .capabilities
+            .as_ref()
+            .is_some_and(|caps| caps.is_quarantined(spirit_pid))
+        {
+            return Err(MemoryError::Quarantined { spirit_pid });
         }
-
-        Self::reject_principal_outside_private(tier, namespace)?;
-        match tier {
-            MemoryTier::Private => {
-                // Commit discoverable intent before the durable spill.
-                if let MemoryNamespace::Principal {
-                    principal_id,
-                    schema,
-                } = namespace
-                {
-                    return self.principal_index.record_write(
-                        principal_id,
-                        spirit_pid,
-                        &self.private.owner_dirname(spirit_pid),
-                        schema,
-                        key,
-                        Self::now_ns(),
-                        || self.private.write(spirit_pid, namespace, key, value),
-                    );
-                }
-                self.private.write(spirit_pid, namespace, key, value)
-            }
-            MemoryTier::Shared => self.shared.write(spirit_pid, namespace, key, value),
-            MemoryTier::Collective => {
-                // P1 — I1/I2 fail-closed.  The trait path carries NO token /
-                // posture_hash / sandbox (the `MemoryManagerPort` ABI cannot
-                // change), so it CANNOT perform capability mediation.  When
-                // I1/I2 mediation is wired (`self.capabilities` is `Some`, i.e.
-                // the production composition root), the unmediated path is
-                // DENIED — callers MUST use the cap-gated `collective_write`
-                // (which verifies+audits the LoomWrite token before the port
-                // call).  Only the legacy/test path (no capabilities injected)
-                // falls through to the direct port delegation.
-                if self.capabilities.is_some() {
-                    return Err(MemoryError::Collective {
-                        kind: CollectiveErrorKind::CapabilityDenied,
-                        reason:
-                            "unmediated collective write via the trait path denied while I1/I2 \
-                                 capability mediation is wired; use the cap-gated collective_write \
-                                 (carries the LoomWrite token + posture)"
-                                .into(),
-                    });
-                }
-                match &self.collective_port {
-                    Some(port) => port
-                        .write(spirit_pid, namespace, key, value)
-                        .map_err(Self::collective_port_error),
-                    None => Err(MemoryError::CollectiveNotYetAvailable {
-                        ship_target: "v1.5",
-                        landing_story: "E10 Story 10.4",
-                    }),
-                }
-            }
-        }
+        self.write_kernel_origin(spirit_pid, tier, namespace, key, value)
     }
 
     fn read(

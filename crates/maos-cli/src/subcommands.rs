@@ -43,6 +43,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Orchestrator(args) => dispatch_orchestrator(args, color),
         Subcommand::Pause(args) => dispatch_pause(args, color),
         Subcommand::Resume(args) => dispatch_resume(args, color),
+        Subcommand::QuarantineRelease(args) => dispatch_quarantine_release(args, color),
         Subcommand::RevokeToken(args) => dispatch_revoke_token(args, color),
         Subcommand::Spirit(args) => dispatch_spirit(args, color),
         Subcommand::Revocations(args) => dispatch_revocations(args, color),
@@ -2198,6 +2199,25 @@ fn dispatch_resume(args: &ResumeArgs, _color: ColorChoice) -> ExitCode {
             &format!("/v1/spirits/{}/resume", args.spirit),
             None,
             LONG_ROUTE_BUDGET,
+        )
+    })
+}
+
+/// FR13 — the door-only release of a quarantined Spirit.
+fn dispatch_quarantine_release(
+    args: &crate::cli::QuarantineReleaseArgs,
+    _color: ColorChoice,
+) -> ExitCode {
+    if let Some(code) = checked_id("quarantine-release", &args.spirit) {
+        return code;
+    }
+    door_verb("quarantine-release", |config| {
+        door_client::exchange(
+            config,
+            "POST",
+            &format!("/v1/spirits/{}/quarantine-release", args.spirit),
+            None,
+            DEFAULT_ROUTE_BUDGET,
         )
     })
 }
