@@ -21,5 +21,11 @@ override_dh_auto_configure:
 override_dh_auto_install:
 	set -e; for bin in $(BINS); do install -Dm755 $$bin-$(SUFFIX) debian/maos/usr/bin/$$bin; done
 
+# Story 22-2 (D-22-2-05 A): the unit is installed but neither enabled nor started; the
+# operator writes /etc/maos/host.toml first. dh_installsysusers (compat 13 default
+# sequence) creates the maos account from debian/maos.sysusers.
+override_dh_installsystemd:
+	dh_installsystemd --no-enable --no-start
+
 override_dh_auto_build override_dh_auto_test override_dh_strip override_dh_dwz:
 	:

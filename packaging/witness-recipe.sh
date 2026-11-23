@@ -8,7 +8,7 @@ if [[ ${3:-} != --inside ]]; then
   case "$route" in
     rpm)
       docker run --rm -v "$root:$root" -w "$root" fedora:43@sha256:f01112b9a1f1d0504ad962d9adfa401425033f8ab067e0a821904ebdde5b8ca5 bash -euc '
-        dnf install -y rpm-build python3-cryptography
+        dnf install -y rpm-build python3-cryptography systemd
         packaging/witness-recipe.sh rpm "$1" --inside
       ' bash "$dist"
       exit ;;
@@ -60,6 +60,11 @@ case "$route" in
     rpm -i "$scratch/good"/*.rpm
     /usr/bin/maos --version
     python3 "$root/packaging/check-installed.py" "$dist" /usr/bin linux-amd64
+    # Story 22-2 (D-22-2-06 A): this container runs no systemd, so the unit is verified, not started.
+    test -f /usr/lib/systemd/system/maos.service
+    test -f /usr/share/doc/maos/examples/host.toml
+    getent passwd maos
+    systemd-analyze verify /usr/lib/systemd/system/maos.service
     rpm -e maos
     for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do test ! -e "/usr/bin/$bin"; done
     rpm --eval "%{lua:print(rpm.vercmp(\"1.0.0~rc.1\",\"1.0.0\"))}" | python3 -c 'import sys; assert int(sys.stdin.read()) < 0'

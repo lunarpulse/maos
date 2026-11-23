@@ -1,0 +1,22 @@
+[Unit]
+Description=MAOS Host (standing cast from /etc/maos/host.toml)
+Documentation=https://github.com/lunarpulse/maos
+After=network.target
+
+[Service]
+Type=simple
+User=maos
+Group=maos
+StateDirectory=maos
+Environment=MAOS_HOME=/var/lib/maos
+# `maos init` is the one minter of the operator door config; it is idempotent.
+ExecStartPre=/usr/bin/maos init --plain
+ExecStart=/usr/bin/maos serve --config /etc/maos/host.toml
+Restart=on-failure
+# Exit 78 is a typed Host-file refusal; restarting cannot fix the file.
+RestartPreventExitStatus=78
+# SIGTERM enters the drain (the audit drain alone is bounded at 10 s).
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

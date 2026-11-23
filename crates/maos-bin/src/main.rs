@@ -3643,6 +3643,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
         door.set_forget_pump(&hook_pump);
         door.set_quarantine(Arc::clone(&quarantine));
+        door.set_audit_store_path(audit_db_path.clone());
         operator_door_port = Some(door);
         if let Some(config) = operator_http_config {
             let bind_door = |bind: std::net::SocketAddr| {

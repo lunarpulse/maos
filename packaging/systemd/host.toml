@@ -1,0 +1,11 @@
+# Example MAOS Host file. Copy to /etc/maos/host.toml, then: systemctl enable --now maos
+# A missing or invalid file is a typed refusal (exit 78) visible in `systemctl status maos`.
+[host]
+inference_mode = "replay"           # MAOS_INFERENCE_MODE: live, record or replay
+
+# The standing cast: one table per Spirit. `manifest` paths are relative to this file.
+# [[host.spirits]]
+# manifest = "/srv/maos/spirits/butler/manifest.toml"
+#
+# [[host.spirits]]
+# installed = "researcher"          # a registry-installed Spirit

@@ -1,0 +1,3 @@
+# The MAOS service account. The operator runs maosctl as this user:
+#   sudo -u maos env MAOS_HOME=/var/lib/maos maosctl status
+u maos - "MAOS Host" /var/lib/maos

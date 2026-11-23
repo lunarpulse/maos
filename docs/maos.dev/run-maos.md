@@ -321,6 +321,52 @@ root, so data under a legacy location stays readable in place and a migration pl
 is still consumed. `MAOS_MEMORY_ROOT` and `MAOS_REGISTRY_YANK_CURSOR_PATH` override all three. `maos purge`
 names every location.
 
+## Run as a service
+
+The deb and the rpm install `/usr/lib/systemd/system/maos.service` and a `maos` system account (home
+`/var/lib/maos`, created by `sysusers.d` on the deb and a `%pre` scriptlet on the rpm). Neither package enables
+or starts the unit. They ship an example Host file at `/usr/share/doc/maos/examples/host.toml`, not at
+`/etc/maos/host.toml`; you write that file:
+
+```sh
+sudo install -d /etc/maos
+sudo cp /usr/share/doc/maos/examples/host.toml /etc/maos/host.toml   # then declare your cast
+sudo systemctl enable --now maos
+```
+
+The unit runs as `maos` with `MAOS_HOME=/var/lib/maos`. Before each start it runs `maos init --plain`, the one
+minter of the operator door config (`control.json`); `init` is idempotent. It then runs `maos serve --config
+/etc/maos/host.toml`. A missing or invalid file is the typed refusal of the previous section (exit 78),
+visible in `systemctl status maos`; the unit does not restart on 78, because restarting cannot fix the file,
+and restarts on any other failure. `systemctl stop maos` sends SIGTERM and the Host drains; systemd waits up
+to `TimeoutStopSec=30`.
+
+**Known limit.** A local Worker that never exits is not joined with a bound at shutdown
+(`RELEASE-HOLDS.md` row 11, open). systemd kills the Host at `TimeoutStopSec` and the unit ends `failed`.
+
+### `maosctl status`
+
+`maosctl status` is one authenticated read of `GET /v1/daemon` with the `control.json` bearer, and prints
+one line: `pid=<pid> version=<version> spirits=<n> audit_store_writable=<true|false>`. It must run as the
+Host's user, because `control.json` is refused when another uid owns it:
+
+```sh
+sudo -u maos env MAOS_HOME=/var/lib/maos maosctl status
+```
+
+| Exit | Meaning |
+|---|---|
+| 0 | The daemon answers and its audit store is writable. |
+| 74 | The daemon answers and its audit store is not writable. |
+| 69 | The daemon is unreachable. |
+| 77 | The operator bearer was rejected. |
+| 78 | The home is not initialised. |
+
+Writable means a separate connection to the live audit store takes a write lock (`BEGIN IMMEDIATE`, then
+rollback) within 3 seconds, and the capability audit channel is open. The probe writes no row. A held lock
+reads as not writable, so a liveness probe should tolerate one 74 before restarting the Host. No route is
+added and none is unauthenticated: `/v1/daemon` gains the key `audit_store_writable` and keeps every other key.
+
 ## Operate
 
 The kernel composition root lives in `crates/maos-bin`. Operational surfaces — the transparency log, capability mediation, sandbox tiers, ComplianceClaim admission, the registry, and yank propagation — are documented in the reference guides:

@@ -52,6 +52,10 @@ There are no install-time signature-verifying maintainer scripts; native
 package installation does not independently reverify that original manifest.
 End-user pre-install verification of the signed packaging manifest is required.
 The recipes disable stripping/debug rewriting to preserve signed bytes.
+Both packages install the service unit `/usr/lib/systemd/system/maos.service` and the `maos` system account.
+The unit is **not enabled or started on install**: write `/etc/maos/host.toml` (an example is at
+`/usr/share/doc/maos/examples/host.toml`), then `systemctl enable --now maos`. See
+[Run as a service](./run-maos.md#run-as-a-service). AUR and Homebrew install no unit.
 
 ## Homebrew and AUR
 

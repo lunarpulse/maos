@@ -56,6 +56,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Cohort(args) => dispatch_cohort(args, color),
         Subcommand::A2a(args) => dispatch_a2a(args),
         Subcommand::Agents => dispatch_agents(),
+        Subcommand::Status => dispatch_status(),
     }
 }
 
@@ -199,6 +200,55 @@ fn dispatch_agents() -> ExitCode {
                 println!("{id}\t{state}");
             }
             ExitCode::SUCCESS
+        },
+    )
+}
+
+/// Story 22-2 (AC2) — `maosctl status`: one line `pid=… version=… spirits=… audit_store_writable=…`.
+/// Exit 0 only when the daemon answers 200 and reports its audit store writable; 74 when it
+/// answers and the store is not writable; transport and refusal codes are the door's.
+fn dispatch_status() -> ExitCode {
+    door_verb_mapped(
+        "status",
+        |config| door_client::exchange(config, "GET", "/v1/daemon", None, DEFAULT_ROUTE_BUDGET),
+        |response| {
+            if response.status != 200 {
+                return door_client::map_response("status", response);
+            }
+            let body = response.body_json();
+            let Some(writable) = body
+                .get("audit_store_writable")
+                .and_then(serde_json::Value::as_bool)
+            else {
+                eprintln!(
+                    "maosctl: status — the daemon's /v1/daemon reports no audit_store_writable"
+                );
+                return ExitCode::from(1);
+            };
+            let pid = body
+                .get("pid")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0);
+            let version = body
+                .get("version")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("unknown");
+            let spirits = body
+                .get("spirit_ids")
+                .and_then(serde_json::Value::as_array)
+                .map_or(0, Vec::len);
+            println!(
+                "pid={pid} version={version} spirits={spirits} audit_store_writable={writable}"
+            );
+            if writable {
+                ExitCode::SUCCESS
+            } else {
+                eprintln!(
+                    "maosctl: status — the daemon answers but its audit store is not writable \
+                     (write lock refused or timed out)"
+                );
+                ExitCode::from(74)
+            }
         },
     )
 }

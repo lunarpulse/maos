@@ -159,6 +159,10 @@ pub enum Subcommand {
     /// Story 22-1 — the agents the running Host holds: one `<spirit_id>\t<lifecycle_state>`
     /// line per Spirit, read from the daemon door (`GET /v1/daemon`).
     Agents,
+    /// Story 22-2 — one health line for a supervisor or probe: exit 0 when the daemon answers
+    /// and its audit store takes a write lock, 74 when it answers and the store does not,
+    /// 69 when it is unreachable, 78 when the home is not initialised (`GET /v1/daemon`).
+    Status,
 }
 
 /// Story 10.4a — `maosctl migrate sqlite-to-postgres`.

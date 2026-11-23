@@ -599,6 +599,10 @@ pub struct DaemonStatusRow {
     pub spirit_ids: Vec<String>,
     pub audit_degraded: bool,
     pub audit_drop_count: u64,
+    /// Story 22-2 (D-22-2-02 A) — the live audit store accepts a write lock right now. A
+    /// separate probe connection runs `BEGIN IMMEDIATE; ROLLBACK` (no row is written); false
+    /// when that fails or times out. A new sibling key, like `lifecycle_states`.
+    pub audit_store_writable: bool,
     /// Story 16-6 (R2) — each id's lifecycle state, positionally aligned with
     /// `spirit_ids`.
     ///
@@ -1189,6 +1193,7 @@ fn route<S: SandboxReportSource>(routes: &Routes<'_, S>, request: &mut Incoming<
                         "lifecycle_states": daemon.lifecycle_states,
                         "audit_degraded": daemon.audit_degraded,
                         "audit_drop_count": daemon.audit_drop_count,
+                        "audit_store_writable": daemon.audit_store_writable,
                     }),
                 )
             }

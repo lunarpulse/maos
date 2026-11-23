@@ -637,6 +637,41 @@ struct DoorInner {
     /// FR13 — the durable quarantine holds; set once by the composition root (absent in tests
     /// that do not exercise them).
     quarantine: Mutex<Option<Arc<crate::quarantine::QuarantineGate>>>,
+    /// Story 22-2 (D-22-2-02 A) — the live Transparency Log file the writability probe opens
+    /// its own connection to. Set once by the composition root; unset reads as not writable.
+    audit_store_path: std::sync::OnceLock<std::path::PathBuf>,
+}
+
+/// Longest the writability probe waits for the audit store's write lock. Well under the
+/// door's 10 s route budget, so a held lock reads as "not writable" rather than a timeout.
+const AUDIT_PROBE_BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// Story 22-2 (D-22-2-02 A) — can the store at `path` take a write lock right now? Opens a
+/// fresh connection (never the adapter's, whose mutex the writer holds), runs
+/// `BEGIN IMMEDIATE`, a same-value `user_version` write and `ROLLBACK`; it writes no row.
+fn audit_store_accepts_write_lock(path: &std::path::Path) -> bool {
+    let Ok(connection) =
+        rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)
+    else {
+        return false;
+    };
+    // `BEGIN IMMEDIATE` alone succeeds on a WAL store whose main file is read-only (a read-only
+    // remount, a revoked write permission): SQLite opened it read-only and defers the refusal
+    // to the first page write. So the transaction rewrites `user_version` to its current value,
+    // which dirties the header page, then rolls back: no row, no change.
+    if connection.busy_timeout(AUDIT_PROBE_BUSY_TIMEOUT).is_err() {
+        return false;
+    }
+    let Ok(version) =
+        connection.pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+    else {
+        return false;
+    };
+    connection
+        .execute_batch(&format!(
+            "BEGIN IMMEDIATE; PRAGMA user_version = {version}; ROLLBACK;"
+        ))
+        .is_ok()
 }
 
 /// `maosctl`-visible director identity on every approval-log row (FR42 keeps
@@ -706,7 +741,13 @@ impl OperatorDoor {
             forget_pump: Mutex::default(),
             repin: Arc::new(crate::repin_door::RepinControl::new()),
             quarantine: Mutex::default(),
+            audit_store_path: std::sync::OnceLock::new(),
         }))
+    }
+
+    /// Story 22-2 — name the live audit store for the `/v1/daemon` writability probe.
+    pub fn set_audit_store_path(&self, path: std::path::PathBuf) {
+        let _ = self.0.audit_store_path.set(path);
     }
 
     pub fn set_forget_pump(&self, pump: &Arc<crate::hook_pump::HookPump>) {
@@ -3146,6 +3187,12 @@ impl OperatorCommandPort for OperatorDoor {
             lifecycle_states,
             audit_degraded: audit_health.degraded,
             audit_drop_count: audit_health.total_drops,
+            audit_store_writable: !audit_health.degraded
+                && self
+                    .0
+                    .audit_store_path
+                    .get()
+                    .is_some_and(|path| audit_store_accepts_write_lock(path)),
         }
     }
 
