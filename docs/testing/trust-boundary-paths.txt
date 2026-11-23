@@ -1,0 +1,26 @@
+# Trust-boundary paths (WP-10, operator decision 5, 2026-11-23).
+# A PR whose diff touches any path matching a glob below owes one static review by a model
+# family other than the author's (docs/testing/proof-contract.md, "Review by path").
+# One glob per line; `#` starts a comment. Informational: no CI step reads this file.
+.github/workflows/release.yml
+docs/runbooks/release-signing.md
+scripts/repin.py
+deny.toml
+Cargo.lock
+crates/maos-capability/src/**
+crates/maos-kernel-core/src/security/**
+crates/maos-kernel-core/src/capability/**
+crates/maos-kernel-core/src/isolation/**
+crates/maos-kernel-core/src/revocation/**
+crates/maos-domain/src/sandbox.rs
+crates/maos-escape-detector/**
+crates/maos-a2a-core/src/consent.rs
+crates/maos-cohort/src/consent.rs
+crates/maos-bin/src/cross_team_consent.rs
+crates/maos-iac/src/adapter/consent_policy.rs
+crates/maos-secrets/**
+crates/maos-sso/**
+crates/maos-audit/**
+crates/maos-registry/**
+crates/maos-compliance/src/vetting/**
+crates/maos-spirit-cli/src/vet.rs

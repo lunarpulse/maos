@@ -1,6 +1,9 @@
 # T3 pre-release: PRD NFR-Sec-5/6, >=24h measured fuzzing per target, zero crashes.
-# Four <=6h links cannot hold 24h plus setup under the hosted 6h job cap.
-# Operator ruling: link COUNT yields to 24h; five 5h soaks leave setup headroom.
+# Five 5h shards per target run IN PARALLEL (no `needs:` between links, no corpus hand-off
+# between them; every shard starts from the same checked-in seed corpus). The evidence is
+# unchanged: five link records per target of one run at the exact commit, >=86,400
+# libFuzzer-measured seconds summed per target, zero crashes (check_release_precondition.rs).
+# `corpus-merge` unions the five shard corpora into the next chain's seed.
 # The final assertion checks libFuzzer-measured seconds, never configured time.
 # The rc release precondition (`check-release-precondition --fuzz-ledger`, 20-5) reads
 # this chain from the `fuzz-ledger` branch; it never starts it. The operator dispatches
@@ -81,7 +84,6 @@ jobs:
           path: out/
           retention-days: 90
   fuzz-link-2:
-    needs: fuzz-link-1
     runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
@@ -108,11 +110,6 @@ jobs:
             rss_flag: ''
     steps:
       - uses: actions/checkout@v5
-      - name: Resume previous link corpus
-        uses: actions/download-artifact@v4
-        with:
-          name: t3-corpus-${{ matrix.target }}-1-${{ github.run_id }}
-          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}
       - name: Install nightly and cargo-fuzz
         run: |
           rustup toolchain install nightly-2026-09-25 --component rust-src
@@ -153,7 +150,6 @@ jobs:
           path: out/
           retention-days: 90
   fuzz-link-3:
-    needs: fuzz-link-2
     runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
@@ -180,11 +176,6 @@ jobs:
             rss_flag: ''
     steps:
       - uses: actions/checkout@v5
-      - name: Resume previous link corpus
-        uses: actions/download-artifact@v4
-        with:
-          name: t3-corpus-${{ matrix.target }}-2-${{ github.run_id }}
-          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}
       - name: Install nightly and cargo-fuzz
         run: |
           rustup toolchain install nightly-2026-09-25 --component rust-src
@@ -225,7 +216,6 @@ jobs:
           path: out/
           retention-days: 90
   fuzz-link-4:
-    needs: fuzz-link-3
     runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
@@ -252,11 +242,6 @@ jobs:
             rss_flag: ''
     steps:
       - uses: actions/checkout@v5
-      - name: Resume previous link corpus
-        uses: actions/download-artifact@v4
-        with:
-          name: t3-corpus-${{ matrix.target }}-3-${{ github.run_id }}
-          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}
       - name: Install nightly and cargo-fuzz
         run: |
           rustup toolchain install nightly-2026-09-25 --component rust-src
@@ -297,7 +282,6 @@ jobs:
           path: out/
           retention-days: 90
   fuzz-link-5:
-    needs: fuzz-link-4
     runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
@@ -324,11 +308,6 @@ jobs:
             rss_flag: ''
     steps:
       - uses: actions/checkout@v5
-      - name: Resume previous link corpus
-        uses: actions/download-artifact@v4
-        with:
-          name: t3-corpus-${{ matrix.target }}-4-${{ github.run_id }}
-          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}
       - name: Install nightly and cargo-fuzz
         run: |
           rustup toolchain install nightly-2026-09-25 --component rust-src
@@ -367,6 +346,67 @@ jobs:
           overwrite: true
           name: t3-logs-${{ matrix.target }}-5-${{ github.run_id }}
           path: out/
+          retention-days: 90
+  corpus-merge:
+    needs: [fuzz-link-1, fuzz-link-2, fuzz-link-3, fuzz-link-4, fuzz-link-5]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: manifest_parser
+            fuzz_dir: crates/maos-manifest/fuzz
+            rss_flag: ''
+          - target: frame_deser
+            fuzz_dir: crates/maos-domain/fuzz
+            rss_flag: '-rss_limit_mb=0'
+          - target: fuzz_exec_deps_parse_elf
+            fuzz_dir: crates/maos-exec-deps/fuzz
+            rss_flag: ''
+          - target: cap_token_verify
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i11_digest_chain
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i8_consent_intent
+            fuzz_dir: crates/maos-a2a-core/fuzz
+            rss_flag: ''
+    steps:
+      - uses: actions/checkout@v5
+      - name: Union the five shard corpora
+        uses: actions/download-artifact@v4
+        with:
+          pattern: t3-corpus-${{ matrix.target }}-*-${{ github.run_id }}
+          merge-multiple: true
+          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}
+      - name: Install nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly-2026-09-25 --component rust-src
+          cargo install cargo-fuzz --locked
+      - name: Minimize the union (libFuzzer -merge=1, the repo's guarded corpus minimizer)
+        timeout-minutes: 90
+        env:
+          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+          RUSTUP_TOOLCHAIN: nightly-2026-09-25
+        run: bash scripts/minimize-fuzz-corpus.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' '${{ matrix.rss_flag }}' 3600
+      - name: Save merged corpus as the next chain seed
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: t3-corpus-merged-${{ matrix.target }}-${{ github.run_id }}
+          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Preserve merge logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: t3-merge-logs-${{ matrix.target }}-${{ github.run_id }}
+          path: out/
+          if-no-files-found: ignore
           retention-days: 90
   t3-ledger-collect:
     needs: [fuzz-link-1, fuzz-link-2, fuzz-link-3, fuzz-link-4, fuzz-link-5]
