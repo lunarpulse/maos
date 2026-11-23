@@ -1,0 +1,13 @@
+AC2 plant: crates/maos-kernel-core/src/hot_swap/saga.rs compensate: the DiscardSuccessor arm split from RestorePredecessor and hard-coded to "SwapInFired" again. Command: cargo nextest run --locked -p maos-kernel-core --test hot_swap_cross_major_migration -E 'test(a_pid_unloaded_mid_swap_is_a_typed_not_loaded_refusal) | test(a_failed_swap_in_journals_the_swap_in_phase)'. Result: a_pid_unloaded_mid_swap_is_a_typed_not_loaded_refusal FAILS (the phase is SnapshotTaken); the swap-in vector still passes. Plant reverted.
+
+        PASS [   0.037s] (1/2) maos-kernel-core::hot_swap_cross_major_migration a_failed_swap_in_journals_the_swap_in_phase
+        FAIL [   0.041s] (2/2) maos-kernel-core::hot_swap_cross_major_migration a_pid_unloaded_mid_swap_is_a_typed_not_loaded_refusal
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.04s
+    thread 'a_pid_unloaded_mid_swap_is_a_typed_not_loaded_refusal' (689226) panicked at crates/maos-kernel-core/tests/hot_swap_cross_major_migration.rs:585:5:
+    assertion `left == right` failed: the refusal fires before swap-in and journals the phase it reached
+      left: ["SwapInFired"]
+     right: ["SnapshotTaken"]
+     Summary [   0.042s] 2 tests run: 1 passed, 1 failed, 10 skipped
+        FAIL [   0.041s] (2/2) maos-kernel-core::hot_swap_cross_major_migration a_pid_unloaded_mid_swap_is_a_typed_not_loaded_refusal
+error: test run failed
+rc=100

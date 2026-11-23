@@ -23,18 +23,18 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 | `kernel_version` | `1.0.0-rc.2` |
 | release channel | release candidate — pre-release; LTS clock not started |
 | `abi_version` | `1` |
-| `manifest_schema_version` (current) | `8` |
-| supported schema window | `1..=8` |
+| `manifest_schema_version` (current) | `9` |
+| supported schema window | `1..=9` |
 | `[cli_wrapper]` `manifest_schema_version` (current; absent means 1) | `2` |
 | supported `[cli_wrapper]` window | `1..=2` |
 | workspace crates | `60` |
 
 | Manifest schema | Kernel behavior |
 |---|---|
-| `manifest_schema_version = 8` (current) | ✅ strict load (`deny_unknown_fields`) |
-| `manifest_schema_version = 7` (N-1) | ✅ within the supported version window (subject to declaration validation) |
+| `manifest_schema_version = 9` (current) | ✅ strict load (`deny_unknown_fields`) |
+| `manifest_schema_version = 8` (N-1) | ✅ within the supported version window (subject to declaration validation) |
 | `manifest_schema_version < 1` | ⛔ hard refusal — typed `SecurityError::EAbiTooOld` at admit |
-| `manifest_schema_version > 8` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
+| `manifest_schema_version > 9` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
 | `min_substrate_version` > running `kernel_version` | ⛔ hard refusal — typed `SecurityError::ESubstrateTooOld` (FR8) |
 | `[cli_wrapper]` `manifest_schema_version` outside `1..=2` | ⛔ hard refusal before the strict parse — typed `CliWrapperAdmissionError::ECliWrapperSchemaUnsupported` |
 

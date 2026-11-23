@@ -1413,7 +1413,7 @@ async fn a_spawned_successor_that_drops_a_swap_invariant_is_refused_typed_and_th
         .into_iter()
         .filter_map(|row| serde_json::from_slice::<serde_json::Value>(&row.payload_redacted).ok())
         .filter_map(|value| {
-            let event = value["event"].as_object()?.values().next()?.clone();
+            let event = &value["event"];
             (event["version"] == "2.0.0")
                 .then(|| event["attempt_id"].as_str().map(str::to_owned))?
         })

@@ -312,16 +312,7 @@ fn drive_turn(fuel: u64, author_reply: RecallReply) -> (Option<i32>, String, Vec
         .stderr(std::process::Stdio::piped())
         .spawn()
         .unwrap_or_else(|error| panic!("cannot spawn {}: {error}", runner.display()));
-    let mut frame = full_frame();
-    if std::env::var("MAOS_TS_FRAME").as_deref() == Ok("small") {
-        // TEMP-22-9-MEASURE
-        if let FramePayload::TaskAssign(body) = &mut frame.payload {
-            body.scope.clear();
-            body.prior_distillate_ref = None;
-            body.goal = "x".into();
-        }
-        frame.consent_envelope = None;
-    }
+    let frame = full_frame();
     let input = codec::encode_cbor(&frame).expect("canonical frame");
     let mut writer = Some(BufWriter::new(child.stdin.take().expect("runner stdin")));
     let first = writer.as_mut().expect("open");
@@ -365,7 +356,8 @@ fn drive_turn(fuel: u64, author_reply: RecallReply) -> (Option<i32>, String, Vec
 
 /// 22-9 F1 — a denied `author()` is answered by the guest's own `catch`: it logs the decline
 /// and the turn completes within the ordinary 10,000,000 fuel, with no `OutOfFuel` and no
-/// exit 4.
+/// exit 4. Measured (release runner, this frame): the turn needs more than 7,000,000 and at most
+/// 8,000,000 fuel, denied or accepted alike, so 10,000,000 leaves a 20-30% margin, not more.
 #[test]
 #[ignore = "needs the componentize-js artifact; run by example-spirit-ts-tests with --ignored"]
 fn typescript_component_declines_a_denied_author_without_running_out_of_fuel() {
@@ -381,26 +373,5 @@ fn typescript_component_declines_a_denied_author_without_running_out_of_fuel() {
         emitted.len(),
         3,
         "Ready, one echoed frame and the turn-complete marker"
-    );
-}
-
-// TEMP-22-9-MEASURE
-#[test]
-#[ignore = "temporary"]
-fn temp_measure_fuel() {
-    let fuel: u64 = std::env::var("MAOS_TS_FUEL").unwrap().parse().unwrap();
-    let reply = if std::env::var("MAOS_TS_AUTHOR").unwrap() == "denied" {
-        RecallReply::Error(WireError::CapabilityDenied)
-    } else {
-        RecallReply::Skill {
-            entry_id: "entry".into(),
-            target: "example-spirit-ts.example@1.0.0".into(),
-        }
-    };
-    let (code, stderr, emitted) = drive_turn(fuel, reply);
-    println!(
-        "MEASURE fuel={fuel} code={code:?} emitted={} oof={}",
-        emitted.len(),
-        stderr.contains("OutOfFuel")
     );
 }

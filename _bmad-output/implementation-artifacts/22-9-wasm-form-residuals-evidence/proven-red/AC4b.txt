@@ -1,0 +1,13 @@
+AC4 plant (roster): crates/maos-bin/src/admission.rs check_consent_recipients: the unknown-recipient find made unsatisfiable ('&& false'). Command: cargo nextest run --locked -p maos-bin --test consent_declaration_21_7 -E 'test(a_consent_recipient_the_host_does_not_know_is_refused_typed) | test(a_recipient_installed_after_its_sender_is_admitted)'. Result: both FAIL. Plant reverted.
+
+        FAIL [   0.200s] (1/2) maos-bin::consent_declaration_21_7 a_recipient_installed_after_its_sender_is_admitted
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.19s
+    thread 'a_recipient_installed_after_its_sender_is_admitted' (692770) panicked at crates/maos-bin/tests/consent_declaration_21_7.rs:122:5:
+        FAIL [   0.200s] (2/2) maos-bin::consent_declaration_21_7 a_consent_recipient_the_host_does_not_know_is_refused_typed
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.19s
+    thread 'a_consent_recipient_the_host_does_not_know_is_refused_typed' (692771) panicked at crates/maos-bin/tests/consent_declaration_21_7.rs:106:64:
+     Summary [   0.201s] 2 tests run: 0 passed, 2 failed, 4 skipped
+        FAIL [   0.200s] (1/2) maos-bin::consent_declaration_21_7 a_recipient_installed_after_its_sender_is_admitted
+        FAIL [   0.200s] (2/2) maos-bin::consent_declaration_21_7 a_consent_recipient_the_host_does_not_know_is_refused_typed
+error: test run failed
+rc=100
