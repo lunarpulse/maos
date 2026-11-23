@@ -277,7 +277,7 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "maos-attrs"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -286,7 +286,7 @@ dependencies = [
 
 [[package]]
 name = "maos-domain"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "ed25519-dalek",
@@ -303,7 +303,7 @@ dependencies = [
 
 [[package]]
 name = "maos-manifest"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-attrs",
  "maos-domain",
@@ -325,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "maos-spirit-abi"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "serde",
 ]

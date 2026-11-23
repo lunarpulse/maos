@@ -449,12 +449,12 @@ cargo fmt --all && cargo clippy --workspace --all-targets
 
 ## Project status & roadmap
 
-**Status: `v1.0.0-rc.2` release candidate (workspace version `1.0.0-rc.2`), actively developed.** The kernel substrate, the Spirit
+**Status: `v1.0.0` general availability (workspace version `1.0.0`).** The kernel substrate, the Spirit
 ABI, the adapter ring, and all nine reference Spirits are implemented; the live
 runtime spine (`maos run`) fires real Spirit behavior through production wiring.
-Work is organized as **23 epics** (0, 1a, 1b, 2–21); epics 0 through 19 are done,
-and Epic 20 (the `v1.0.0-rc.2` release candidate and LTS rule) and Epic 21 are in
-progress.
+Work is organized as **23 epics** (0, 1a, 1b, 2–21); epics 0 through 21 are the
+`v1.0.0` scope. What the release does not claim is listed in the
+[release notes](docs/release/v1.0.0.md) and [`RELEASE-HOLDS.md`](RELEASE-HOLDS.md).
 
 | Phase | Milestone | Target |
 |---|---|---|

@@ -704,7 +704,7 @@ checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
 name = "maos-acp"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "crossbeam-channel",
  "maos-capability",
@@ -716,7 +716,7 @@ dependencies = [
 
 [[package]]
 name = "maos-attrs"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -725,7 +725,7 @@ dependencies = [
 
 [[package]]
 name = "maos-capability"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "dashmap",
  "maos-attrs",
@@ -741,7 +741,7 @@ dependencies = [
 
 [[package]]
 name = "maos-director-surface"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-acp",
  "maos-domain",
@@ -754,7 +754,7 @@ dependencies = [
 
 [[package]]
 name = "maos-domain"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "ed25519-dalek",
@@ -771,7 +771,7 @@ dependencies = [
 
 [[package]]
 name = "maos-eval"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-domain",
  "maos-spirit-abi",
@@ -784,18 +784,18 @@ dependencies = [
 
 [[package]]
 name = "maos-exec-deps"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "maos-frame-codec"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 
 [[package]]
 name = "maos-iac"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "arc-swap",
  "dashmap",
@@ -816,7 +816,7 @@ dependencies = [
 
 [[package]]
 name = "maos-kernel-core"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "arc-swap",
  "ciborium",
@@ -869,7 +869,7 @@ dependencies = [
 
 [[package]]
 name = "maos-manifest"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-attrs",
  "maos-domain",
@@ -883,7 +883,7 @@ dependencies = [
 
 [[package]]
 name = "maos-mcp"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-domain",
  "serde",
@@ -893,7 +893,7 @@ dependencies = [
 
 [[package]]
 name = "maos-providers"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "dashmap",
  "maos-domain",
@@ -905,7 +905,7 @@ dependencies = [
 
 [[package]]
 name = "maos-spirit-abi"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "serde",
 ]

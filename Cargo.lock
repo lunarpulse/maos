@@ -2507,7 +2507,7 @@ checksum = "dae608c151f68243f2b000364e1f7b186d9c29845f7d2d85bd31b9ad77ad552b"
 
 [[package]]
 name = "maos-a2a"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "maos-a2a-core",
@@ -2523,7 +2523,7 @@ dependencies = [
 
 [[package]]
 name = "maos-a2a-core"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "dashmap",
@@ -2549,7 +2549,7 @@ dependencies = [
 
 [[package]]
 name = "maos-a2a-tcp"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "ed25519-dalek",
@@ -2580,7 +2580,7 @@ dependencies = [
 
 [[package]]
 name = "maos-acp"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "crossbeam-channel",
  "maos-capability",
@@ -2592,7 +2592,7 @@ dependencies = [
 
 [[package]]
 name = "maos-attrs"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2601,7 +2601,7 @@ dependencies = [
 
 [[package]]
 name = "maos-audit"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -2620,7 +2620,7 @@ dependencies = [
 
 [[package]]
 name = "maos-bench"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "butler",
  "criterion",
@@ -2649,7 +2649,7 @@ dependencies = [
 
 [[package]]
 name = "maos-bin"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "architect",
  "async-trait",
@@ -2736,7 +2736,7 @@ dependencies = [
 
 [[package]]
 name = "maos-capability"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "dashmap",
  "maos-attrs",
@@ -2752,7 +2752,7 @@ dependencies = [
 
 [[package]]
 name = "maos-cli"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "clap",
@@ -2782,7 +2782,7 @@ dependencies = [
 
 [[package]]
 name = "maos-cohort"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -2803,7 +2803,7 @@ dependencies = [
 
 [[package]]
 name = "maos-compliance"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "hex",
  "maos-corpus-gen",
@@ -2820,7 +2820,7 @@ dependencies = [
 
 [[package]]
 name = "maos-control"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-domain",
  "maos-kernel-core",
@@ -2830,7 +2830,7 @@ dependencies = [
 
 [[package]]
 name = "maos-corpus-gen"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "clap",
  "hex",
@@ -2863,7 +2863,7 @@ dependencies = [
 
 [[package]]
 name = "maos-director-surface"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-acp",
  "maos-domain",
@@ -2876,7 +2876,7 @@ dependencies = [
 
 [[package]]
 name = "maos-domain"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "ed25519-dalek",
@@ -2894,7 +2894,7 @@ dependencies = [
 
 [[package]]
 name = "maos-egress"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "getrandom 0.3.4",
  "hex",
@@ -2910,7 +2910,7 @@ dependencies = [
 
 [[package]]
 name = "maos-escape-detector"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "libc",
  "maos-domain",
@@ -2925,7 +2925,7 @@ dependencies = [
 
 [[package]]
 name = "maos-eval"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-audit",
  "maos-domain",
@@ -2943,14 +2943,14 @@ dependencies = [
 
 [[package]]
 name = "maos-exec-deps"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "maos-fkcs"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-domain",
  "maos-registry",
@@ -2964,18 +2964,18 @@ dependencies = [
 
 [[package]]
 name = "maos-frame-codec"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 
 [[package]]
 name = "maos-host"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "maos-iac"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -2999,7 +2999,7 @@ dependencies = [
 
 [[package]]
 name = "maos-journey-test"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "butler",
  "maos-audit",
@@ -3020,7 +3020,7 @@ dependencies = [
 
 [[package]]
 name = "maos-kernel-core"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -3068,7 +3068,7 @@ dependencies = [
 
 [[package]]
 name = "maos-loom-lite"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "deadpool-postgres",
  "ed25519-dalek",
@@ -3090,7 +3090,7 @@ dependencies = [
 
 [[package]]
 name = "maos-manifest"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-attrs",
  "maos-domain",
@@ -3104,7 +3104,7 @@ dependencies = [
 
 [[package]]
 name = "maos-mcp"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-domain",
  "serde",
@@ -3114,7 +3114,7 @@ dependencies = [
 
 [[package]]
 name = "maos-notify-push"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-director-surface",
  "maos-domain",
@@ -3125,7 +3125,7 @@ dependencies = [
 
 [[package]]
 name = "maos-orchestrator-buffer"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "dashmap",
  "maos-attrs",
@@ -3141,7 +3141,7 @@ dependencies = [
 
 [[package]]
 name = "maos-pdp"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "cedar-policy",
  "maos-domain",
@@ -3152,7 +3152,7 @@ dependencies = [
 
 [[package]]
 name = "maos-persistence"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "getrandom 0.3.4",
  "hex",
@@ -3166,7 +3166,7 @@ dependencies = [
 
 [[package]]
 name = "maos-providers"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "dashmap",
  "maos-domain",
@@ -3179,7 +3179,7 @@ dependencies = [
 
 [[package]]
 name = "maos-registry"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "base64",
  "hex",
@@ -3211,7 +3211,7 @@ dependencies = [
 
 [[package]]
 name = "maos-secrets"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "getrandom 0.3.4",
  "keyring",
@@ -3224,7 +3224,7 @@ dependencies = [
 
 [[package]]
 name = "maos-shell"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-audit",
  "maos-cli",
@@ -3245,7 +3245,7 @@ dependencies = [
 
 [[package]]
 name = "maos-siem"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-audit",
  "maos-domain",
@@ -3257,7 +3257,7 @@ dependencies = [
 
 [[package]]
 name = "maos-skill"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-domain",
  "maos-spirit-abi",
@@ -3274,7 +3274,7 @@ dependencies = [
 
 [[package]]
 name = "maos-spirit-abi"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3282,7 +3282,7 @@ dependencies = [
 
 [[package]]
 name = "maos-spirit-cli"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -3308,7 +3308,7 @@ dependencies = [
 
 [[package]]
 name = "maos-spirit-derive"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3317,7 +3317,7 @@ dependencies = [
 
 [[package]]
 name = "maos-spirit-hello"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-domain",
  "maos-frame-codec",
@@ -3331,7 +3331,7 @@ dependencies = [
 
 [[package]]
 name = "maos-spirit-sdk"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "maos-spirit-abi",
  "maos-spirit-derive",
@@ -3345,7 +3345,7 @@ dependencies = [
 
 [[package]]
 name = "maos-sso"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "base64",
  "jsonwebtoken",
@@ -3357,7 +3357,7 @@ dependencies = [
 
 [[package]]
 name = "maos-telemetry"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "futures",
  "maos-domain",
@@ -3371,7 +3371,7 @@ dependencies = [
 
 [[package]]
 name = "maos-topology"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "semver",
  "serde",
@@ -3382,7 +3382,7 @@ dependencies = [
 
 [[package]]
 name = "maos-wasm-host"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "ciborium",
  "ciborium-io",
@@ -7013,7 +7013,7 @@ checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
 
 [[package]]
 name = "xtask"
-version = "1.0.0-rc.2"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "clap",
