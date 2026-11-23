@@ -1,0 +1,45 @@
+AC4 plant (a): xtask/src/check_third_party_trial.rs check(): inserted 'if n < 12 { failures.push(...participants_total < 12 floor) }' before the verdict (marked E227-PLANT). Command: cargo test --locked -p xtask --test story_10_2_proven_red -- trial_gate. Result: trial_gate_small_clean_cohort_is_green_with_its_n FAILS (and trial_gate_reads_a_cohort_without_strata, trial_gate_zero_participants_is_insufficient). Plant reverted.
+
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+test trial_gate_zero_participants_is_insufficient ... FAILED
+test trial_gate_reads_a_cohort_without_strata ... FAILED
+test trial_gate_small_clean_cohort_is_green_with_its_n ... FAILED
+thread 'trial_gate_zero_participants_is_insufficient' (4150165) panicked at xtask/tests/story_10_2_proven_red.rs:746:5:
+thread 'trial_gate_reads_a_cohort_without_strata' (4150151) panicked at xtask/tests/story_10_2_proven_red.rs:649:5:
+thread 'trial_gate_small_clean_cohort_is_green_with_its_n' (4150157) panicked at xtask/tests/story_10_2_proven_red.rs:619:9:
+test result: FAILED. 20 passed; 3 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.04s
+rc=101
+
+AC4 plant (b): same file: added 'pub no_prior_contribution: i64,' back to TrialSection (marked E227-PLANT), the required strata field. Same command. Result: trial_gate_reads_a_cohort_without_strata FAILS (the file has no such key: missing field), along with 12 other trial_gate tests that read a strata-free fixture. Plant reverted.
+
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+test trial_gate_small_clean_cohort_is_green_with_its_n ... FAILED
+test trial_gate_refuses_public_dev_producer_key_at_v2_0 ... FAILED
+test trial_gate_reads_a_cohort_without_strata ... FAILED
+test trial_gate_small_cohort_quality_shortfall_blocks ... FAILED
+test trial_gate_rejects_when_signed_sbom_false_overrides_self_reported_true_at_v2_0 ... FAILED
+test trial_gate_small_negative_frames_is_fatal_with_report ... FAILED
+test trial_gate_rejects_missing_producer_signed_attestation_at_v2_0 ... FAILED
+test trial_gate_passes_on_valid_results ... FAILED
+test trial_gate_twelve_with_one_shortfall_is_red ... FAILED
+test trial_gate_zero_participants_is_insufficient ... FAILED
+test trial_gate_accepts_valid_record_with_producer_signed_attestation_at_v2_0 ... FAILED
+test trial_gate_rejects_tampered_producer_signature_at_v2_0 ... FAILED
+test trial_gate_small_success_mismatch_is_fatal_with_report ... FAILED
+thread 'trial_gate_small_clean_cohort_is_green_with_its_n' (4150382) panicked at xtask/tests/story_10_2_proven_red.rs:619:9:
+thread 'trial_gate_refuses_public_dev_producer_key_at_v2_0' (4150377) panicked at xtask/tests/story_10_2_proven_red.rs:564:5:
+thread 'trial_gate_reads_a_cohort_without_strata' (4150376) panicked at xtask/tests/story_10_2_proven_red.rs:649:5:
+thread 'trial_gate_small_cohort_quality_shortfall_blocks' (4150383) panicked at xtask/tests/story_10_2_proven_red.rs:665:5:
+thread 'trial_gate_rejects_when_signed_sbom_false_overrides_self_reported_true_at_v2_0' (4150381) panicked at xtask/tests/story_10_2_proven_red.rs:439:5:
+thread 'trial_gate_small_negative_frames_is_fatal_with_report' (4150387) panicked at xtask/tests/story_10_2_proven_red.rs:680:5:
+thread 'trial_gate_rejects_missing_producer_signed_attestation_at_v2_0' (4150378) panicked at xtask/tests/story_10_2_proven_red.rs:351:9:
+thread 'trial_gate_passes_on_valid_results' (4150375) panicked at xtask/tests/story_10_2_proven_red.rs:295:5:
+thread 'trial_gate_twelve_with_one_shortfall_is_red' (4150390) panicked at xtask/tests/story_10_2_proven_red.rs:734:5:
+thread 'trial_gate_zero_participants_is_insufficient' (4150394) panicked at xtask/tests/story_10_2_proven_red.rs:746:5:
+thread 'trial_gate_accepts_valid_record_with_producer_signed_attestation_at_v2_0' (4150369) panicked at xtask/tests/story_10_2_proven_red.rs:401:5:
+thread 'trial_gate_rejects_tampered_producer_signature_at_v2_0' (4150379) panicked at xtask/tests/story_10_2_proven_red.rs:482:5:
+thread 'trial_gate_small_success_mismatch_is_fatal_with_report' (4150388) panicked at xtask/tests/story_10_2_proven_red.rs:696:5:
+test result: FAILED. 10 passed; 13 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.10s
+rc=101

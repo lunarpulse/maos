@@ -903,9 +903,10 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Story 10.2 AC1 — third-party trial N=12 gate: parse trial-results.toml,
-    /// assert successes >= 10 + stratification + per-participant validation,
-    /// Wilson CI advisory (conditional per calibrate-per-commit).
+    /// Story 10.2 AC1, simplified by Story 22-7 — third-party trial gate: parse
+    /// trial-results.toml and judge every participant (integrity and the success
+    /// conjunction); no sampling floor, no strata, no Wilson CI (human-author
+    /// denominator removed).
     #[command(name = "check-third-party-trial")]
     CheckThirdPartyTrial {
         #[arg(long)]

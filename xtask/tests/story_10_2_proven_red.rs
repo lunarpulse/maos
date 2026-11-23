@@ -52,7 +52,7 @@ fn write_file(root: &std::path::Path, rel: &str, content: &str) {
 // Task 1.7: Third-Party Trial Gate — 5 proven-red vectors
 // ═══════════════════════════════════════════════════════════════════
 
-fn make_trial(successes: i64, strata: [i64; 5], participants: &str) -> String {
+fn make_trial(successes: i64, participants: &str) -> String {
     format!(
         r#"[trial]
 participants_total = 12
@@ -60,14 +60,8 @@ successes = {successes}
 trial_start = "2026-06-01"
 trial_end = "2026-06-14"
 methodology_version = "1.0"
-no_prior_contribution = {}
-no_rust_spirit = {}
-no_rust = {}
-non_english = {}
-offline_only = {}
 
-{participants}"#,
-        strata[0], strata[1], strata[2], strata[3], strata[4]
+{participants}"#
     )
 }
 
@@ -146,7 +140,6 @@ fn cohort_signed_attestations_json(red_sbom_id: Option<&str>, seed: &[u8; 32]) -
 const VALID_PARTICIPANTS: &str = r#"
 [[participant]]
 id = "P001"
-stratum = ["no_prior_contribution"]
 produced_binary = true
 binary_loads = true
 frames_run = 1500
@@ -156,7 +149,6 @@ signing_chain_verified = true
 
 [[participant]]
 id = "P002"
-stratum = ["no_prior_contribution"]
 produced_binary = true
 binary_loads = true
 frames_run = 1200
@@ -166,7 +158,6 @@ signing_chain_verified = true
 
 [[participant]]
 id = "P003"
-stratum = ["no_prior_contribution"]
 produced_binary = true
 binary_loads = true
 frames_run = 2000
@@ -176,7 +167,6 @@ signing_chain_verified = true
 
 [[participant]]
 id = "P004"
-stratum = ["no_prior_contribution"]
 produced_binary = true
 binary_loads = true
 frames_run = 1100
@@ -186,7 +176,6 @@ signing_chain_verified = true
 
 [[participant]]
 id = "P005"
-stratum = ["no_rust_spirit"]
 produced_binary = true
 binary_loads = true
 frames_run = 1800
@@ -196,7 +185,6 @@ signing_chain_verified = true
 
 [[participant]]
 id = "P006"
-stratum = ["no_rust_spirit"]
 produced_binary = true
 binary_loads = true
 frames_run = 1300
@@ -206,7 +194,6 @@ signing_chain_verified = true
 
 [[participant]]
 id = "P007"
-stratum = ["no_rust_spirit"]
 produced_binary = true
 binary_loads = true
 frames_run = 1600
@@ -216,7 +203,6 @@ signing_chain_verified = true
 
 [[participant]]
 id = "P008"
-stratum = ["no_rust"]
 produced_binary = true
 binary_loads = true
 frames_run = 1400
@@ -226,7 +212,6 @@ signing_chain_verified = true
 
 [[participant]]
 id = "P009"
-stratum = ["no_rust"]
 produced_binary = true
 binary_loads = true
 frames_run = 1700
@@ -236,7 +221,6 @@ signing_chain_verified = true
 
 [[participant]]
 id = "P010"
-stratum = ["non_english"]
 produced_binary = true
 binary_loads = true
 frames_run = 1250
@@ -246,7 +230,6 @@ signing_chain_verified = true
 
 [[participant]]
 id = "P011"
-stratum = ["non_english"]
 produced_binary = false
 binary_loads = false
 frames_run = 0
@@ -256,7 +239,6 @@ signing_chain_verified = false
 
 [[participant]]
 id = "P012"
-stratum = ["offline_only"]
 produced_binary = false
 binary_loads = false
 frames_run = 0
@@ -265,32 +247,38 @@ sbom_verified = false
 signing_chain_verified = false
 "#;
 
-/// Vector (a): successes = 8 (below floor of 10) → fail.
+/// Vector (a): a reported successes = 8 that the participant records (10) do not reconcile → fail.
+/// Story 22-7: no longer a "below the floor of 10" vector; the floor is gone, the integrity check stays.
 #[test]
 fn trial_gate_fails_on_low_successes() {
     let out = run_in_tempdir("check-third-party-trial", |root| {
         write_file(
             root,
             "docs/third-party-trial/results/trial-results.toml",
-            &make_trial(8, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+            &make_trial(8, VALID_PARTICIPANTS),
         );
     });
     assert!(!out.status.success(), "gate should fail with successes=8");
 }
 
-/// Vector (b): no_prior_contribution = 3 (below ≥4) → fail.
+/// Story 22-7: the strata are gone, so a low-stratification vector has nothing to fail. A stale
+/// `no_prior_contribution = 3` in the file is ignored, not judged.
 #[test]
-fn trial_gate_fails_on_low_stratification() {
+fn trial_gate_has_no_stratification_floor() {
     let out = run_in_tempdir("check-third-party-trial", |root| {
         write_file(
             root,
             "docs/third-party-trial/results/trial-results.toml",
-            &make_trial(10, [3, 3, 2, 2, 1], VALID_PARTICIPANTS),
+            &make_trial(10, VALID_PARTICIPANTS).replace(
+                "methodology_version = \"1.0\"",
+                "methodology_version = \"1.0\"\nno_prior_contribution = 3",
+            ),
         );
     });
     assert!(
-        !out.status.success(),
-        "gate should fail with no_prior_contribution=3"
+        out.status.success(),
+        "a stale strata count is ignored, not judged: {}",
+        String::from_utf8_lossy(&out.stderr)
     );
 }
 
@@ -301,7 +289,7 @@ fn trial_gate_passes_on_valid_results() {
         write_file(
             root,
             "docs/third-party-trial/results/trial-results.toml",
-            &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+            &make_trial(10, VALID_PARTICIPANTS),
         );
     });
     assert!(
@@ -339,7 +327,7 @@ fn trial_gate_rejects_missing_producer_signed_attestation_at_v2_0() {
     write_file(
         dir.path(),
         "docs/third-party-trial/results/trial-results.toml",
-        &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+        &make_trial(10, VALID_PARTICIPANTS),
     );
     // NOTE: deliberately NO derived-attestations.json — the honor-system stamp
     // ([derivation_provenance] stamp=...) is no longer accepted at v2.0.
@@ -397,7 +385,7 @@ fn trial_gate_accepts_valid_record_with_producer_signed_attestation_at_v2_0() {
     write_file(
         dir.path(),
         "docs/third-party-trial/results/trial-results.toml",
-        &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+        &make_trial(10, VALID_PARTICIPANTS),
     );
     write_file(
         dir.path(),
@@ -430,7 +418,7 @@ fn trial_gate_rejects_when_signed_sbom_false_overrides_self_reported_true_at_v2_
     write_file(
         dir.path(),
         "docs/third-party-trial/results/trial-results.toml",
-        &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+        &make_trial(10, VALID_PARTICIPANTS),
     );
     write_file(
         dir.path(),
@@ -462,7 +450,7 @@ fn trial_gate_rejects_tampered_producer_signature_at_v2_0() {
     write_file(
         dir.path(),
         "docs/third-party-trial/results/trial-results.toml",
-        &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+        &make_trial(10, VALID_PARTICIPANTS),
     );
     // Tamper one signature nibble after serialization (safe byte round-trip).
     let json = cohort_signed_attestations_json(None, &TEST_PRODUCER_SEED);
@@ -507,7 +495,7 @@ fn producer_emit_writes_file_the_consumer_accepts_round_trip() {
     write_file(
         dir.path(),
         "docs/third-party-trial/results/trial-results.toml",
-        &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+        &make_trial(10, VALID_PARTICIPANTS),
     );
     // Producer emit: derive the cohort records + sign + write derived-attestations.json.
     let cohort: Vec<DerivedParticipantAttestation> = COHORT_IDS
@@ -559,7 +547,7 @@ fn trial_gate_refuses_public_dev_producer_key_at_v2_0() {
     write_file(
         dir.path(),
         "docs/third-party-trial/results/trial-results.toml",
-        &make_trial(10, [4, 3, 2, 2, 1], VALID_PARTICIPANTS),
+        &make_trial(10, VALID_PARTICIPANTS),
     );
     // Deliberately do NOT set MAOS_TRIAL_PRODUCER_PUBKEY → consumer would trust
     // the public dev key. It must refuse instead.
@@ -617,27 +605,51 @@ fn run_small_trial(content: &str, phase: &str) -> std::process::Output {
 
 fn small_trial() -> String {
     let participants = (1..=3).map(|id| format!(
-        "\n[[participant]]\nid = \"P{id:03}\"\nstratum = [\"no_prior_contribution\"]\nproduced_binary = true\nbinary_loads = true\nframes_run = 1000\nhalt_recall = 0.9\nsbom_verified = true\nsigning_chain_verified = true\n"
+        "\n[[participant]]\nid = \"P{id:03}\"\nproduced_binary = true\nbinary_loads = true\nframes_run = 1000\nhalt_recall = 0.9\nsbom_verified = true\nsigning_chain_verified = true\n"
     )).collect::<String>();
-    make_trial(3, [3, 0, 0, 0, 0], &participants)
-        .replace("participants_total = 12", "participants_total = 3")
+    make_trial(3, &participants).replace("participants_total = 12", "participants_total = 3")
 }
 
+/// Story 22-7 (D-22-7-10 A): a cohort of 3 that passes every per-participant check reads green and
+/// says its N. It replaces `trial_gate_small_consistent_cohort_is_preliminary`.
 #[test]
-fn trial_gate_small_consistent_cohort_is_preliminary() {
-    let out = run_small_trial(&small_trial(), "v1_5");
+fn trial_gate_small_clean_cohort_is_green_with_its_n() {
+    for phase in ["v1_5", "v2_0"] {
+        let out = run_small_trial(&small_trial(), phase);
+        assert!(out.status.success(), "{phase}: {out:?}");
+        let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(report["trial_status"], "recorded");
+        assert_eq!(report["successes_derived"], 3);
+        let reason = report["reason"].as_str().unwrap();
+        assert!(reason.contains("N=3; no sampling floor"), "{reason}");
+        assert!(
+            !reason.contains("floor met") && !reason.contains("< 12"),
+            "{reason}"
+        );
+    }
+}
+
+/// Story 22-7: a `trial-results.toml` with no strata fields and no `stratum` key parses.
+#[test]
+fn trial_gate_reads_a_cohort_without_strata() {
+    let content = small_trial();
+    for removed in [
+        "stratum",
+        "no_prior_contribution",
+        "no_rust",
+        "non_english",
+        "offline_only",
+    ] {
+        assert!(
+            !content.contains(removed),
+            "the fixture must carry no {removed}"
+        );
+    }
+    let out = run_small_trial(&content, "v1_5");
     assert!(out.status.success(), "{out:?}");
     let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(report["trial_status"], "preliminary");
-    assert_eq!(report["evidence_state"], "INDETERMINATE");
-    assert_eq!(report["passed"], false);
-    assert_eq!(report["advisory"], true);
     assert_eq!(report["successes_derived"], 3);
-    let out = run_small_trial(&small_trial(), "v2_0");
-    assert!(!out.status.success());
-    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(report["trial_status"], "preliminary");
-    assert_eq!(report["evidence_state"], "INDETERMINATE");
+    assert!(report.get("strata").is_none() && report.get("wilson_ci_lower").is_none());
 }
 
 #[test]
@@ -711,18 +723,33 @@ fn trial_gate_small_inflated_successes_is_fatal() {
     assert!(!out.status.success(), "{out:?}");
 }
 
+/// Story 22-7 (D-22-7-10 A): a cohort of 12 with ONE per-participant shortfall is red. It replaces
+/// `trial_gate_twelve_with_validated_stratum_shortfall_is_red`: there are no strata to fall short of.
 #[test]
-fn trial_gate_twelve_with_validated_stratum_shortfall_is_red() {
-    let participants = VALID_PARTICIPANTS.replace(
-        "stratum = [\"offline_only\"]",
-        "stratum = [\"no_prior_contribution\"]",
-    );
-    let out = run_small_trial(&make_trial(10, [5, 3, 2, 2, 0], &participants), "v1_5");
+fn trial_gate_twelve_with_one_shortfall_is_red() {
+    let participants = VALID_PARTICIPANTS.replacen("frames_run = 1500", "frames_run = 500", 1);
+    let out = run_small_trial(&make_trial(9, &participants), "v1_5");
     assert!(!out.status.success(), "{out:?}");
     let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(report["trial_status"], "complete");
+    assert_eq!(report["trial_status"], "recorded");
     assert_eq!(report["passed"], false);
     assert_eq!(report["advisory"], false);
+    assert!(report["reason"].as_str().unwrap().contains("500 frames"));
+}
+
+/// Story 22-7: no participants is `Insufficient`, never green and never red.
+#[test]
+fn trial_gate_zero_participants_is_insufficient() {
+    let content = "participant = []\n[trial]\nparticipants_total = 0\nsuccesses = 0\n\
+                   trial_start = \"2026-06-01\"\ntrial_end = \"2026-06-14\"\nmethodology_version = \"1.0\"\n";
+    let out = run_small_trial(content, "v1_5");
+    assert!(out.status.success(), "{out:?}");
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["trial_status"], "empty");
+    assert_eq!(report["evidence_state"], "INDETERMINATE");
+    assert_eq!(report["passed"], false);
+    assert_eq!(report["advisory"], true);
+    assert!(!run_small_trial(content, "v2_0").status.success());
 }
 
 /// Vector (e): malformed TOML → hard-fail.
@@ -1047,7 +1074,7 @@ fn trial_gate_fails_on_empty_participants_with_fabricated_successes() {
         write_file(
             root,
             "docs/third-party-trial/results/trial-results.toml",
-            &make_trial(12, [4, 3, 2, 2, 1], ""),
+            &make_trial(12, ""),
         ); // empty participants, successes=12
     });
     assert!(

@@ -1,0 +1,13 @@
+AC3 plant: crates/maos-spirit-cli/tests/agent_runs_22_7.rs check_record: 'if digest != record.transcript_sha256 {' -> 'if false && ...' and 'if record.author_kind != "agent" {' -> 'if false && ...' (both marked E227-PLANT). Command: cargo test --locked -p maos-spirit-cli --test agent_runs_22_7. Result: one_changed_transcript_byte_fails_the_digest_check FAILS and a_human_author_kind_fails_the_label_check FAILS (each unwraps an Err the checker no longer returns). The committed tree is status=pending (the three runs are an operator-lane step), so the witnesses that mutate a transcript byte and an author_kind are the synthetic-tree tests. Plant reverted.
+
+test three_agent_run_records_are_labelled_and_digest_bound ... ok
+test a_pending_tree_admits_no_run_directory ... ok
+test a_secret_in_a_transcript_fails_the_scrub_check ... ok
+test a_synthetic_recorded_tree_passes ... ok
+test one_harness_family_is_not_enough_and_k_must_match_the_readme ... ok
+test a_human_author_kind_fails_the_label_check ... FAILED
+test one_changed_transcript_byte_fails_the_digest_check ... FAILED
+thread 'a_human_author_kind_fails_the_label_check' (4149693) panicked at crates/maos-spirit-cli/tests/agent_runs_22_7.rs:336:57:
+thread 'one_changed_transcript_byte_fails_the_digest_check' (4149697) panicked at crates/maos-spirit-cli/tests/agent_runs_22_7.rs:324:57:
+test result: FAILED. 5 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+rc=101

@@ -1,27 +1,18 @@
-# Trial Results Schema — Story 10.2 AC-1
+# Trial Results Schema — Story 10.2 AC-1, simplified by Story 22-7
 # This file documents the expected schema for trial-results.toml.
-# Actual results may be committed as an integrity-validated preliminary cohort.
-
-# Floor policy date: 2026-10-15. N<12 is preliminary only after all integrity
-# checks pass; sampling minima do not waive count/identity/stratum consistency.
-# Preliminary is advisory at v1_0/v1_5, blocking at v2_0; no date promotion.
+#
+# Story 22-7 (D-22-7-10 A) removed the human-author denominator: there is no N = 12 floor, no
+# >= 10 successes floor, no stratification counts and no per-participant `stratum`. A file that
+# still carries them parses (they are ignored). Integrity failures are fatal at every N.
 [trial]
-participants_total = 12  # nonnegative int; >=12 sampling floor
-successes = 10          # nonnegative int <=N; ==derived; >=10 sampling floor
+participants_total = 12  # nonnegative int; must equal the number of [[participant]] records
+successes = 10          # nonnegative int <=N; must equal the successes derived from the records
 trial_start = "2026-01-01" # ISO-8601 date
 trial_end = "2026-01-14"   # ISO-8601 date
 methodology_version = "1.0" # semver string
 
-# Stratification verification — each must meet minimum
-no_prior_contribution = 4  # int, >= 4
-no_rust_spirit = 3         # int, >= 3
-no_rust = 2                # int, >= 2
-non_english = 2            # int, >= 2
-offline_only = 1           # int, >= 1
-
 [[participant]]
 id = "P001"                      # unique participant identifier
-stratum = ["no_prior_contribution", "non_english"]  # list of strata
 produced_binary = true           # bool
 binary_loads = true              # bool
 frames_run = 1500                # int, >= 1000 for success

@@ -1,0 +1,25 @@
+AC2 plant B: crates/maos-registry/src/validate.rs validate(): 'if wasm {' (the component-shape check) -> 'if false && wasm {' (marked E227-PLANT). Command: cargo test --locked -p maos-spirit-cli --test validate_22_7. Result: validate_refuses_a_core_module_as_artifact FAILS (left: [] right: [("component", "component_not_a_component")]), plus validate_refuses_a_component_that_lacks_the_world_exports, validate_exit_codes_follow_the_verdict and validate_json_report_is_stable. Plant reverted.
+
+test validate_refuses_rust_inproc_from_a_registry ... ok
+test validate_exit_2_on_a_missing_file ... ok
+test validate_refuses_a_component_below_t2 ... ok
+test validate_accepts_the_template_manifest_with_a_component ... ok
+test validate_refuses_a_missing_required_section ... ok
+test validate_refuses_a_component_that_lacks_the_world_exports ... FAILED
+test validate_refuses_a_core_module_as_artifact ... FAILED
+test validate_json_report_is_stable ... FAILED
+test validate_exit_codes_follow_the_verdict ... FAILED
+thread 'validate_refuses_a_component_that_lacks_the_world_exports' (4148883) panicked at crates/maos-spirit-cli/tests/validate_22_7.rs:111:5:
+  left: []
+ right: [("component", "component_missing_export")]
+thread 'validate_refuses_a_core_module_as_artifact' (4148884) panicked at crates/maos-spirit-cli/tests/validate_22_7.rs:79:5:
+  left: []
+ right: [("component", "component_not_a_component")]
+thread 'validate_json_report_is_stable' (4148881) panicked at crates/maos-spirit-cli/tests/validate_22_7.rs:227:5:
+  left: Some(0)
+ right: Some(1)
+thread 'validate_exit_codes_follow_the_verdict' (4148880) panicked at crates/maos-spirit-cli/tests/validate_22_7.rs:209:5:
+  left: Some(0)
+ right: Some(1)
+test result: FAILED. 5 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+rc=101

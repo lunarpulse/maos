@@ -36,6 +36,7 @@ pub mod origin;
 pub mod security;
 pub mod server;
 pub mod storage;
+pub mod validate;
 pub mod yank;
 pub mod yank_auth;
 

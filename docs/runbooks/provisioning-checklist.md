@@ -37,7 +37,7 @@ than inherited from planning prose.
 | `fuzz-ledger branch permission` | `.github/workflows/fuzz-cadence.yml`, `fuzz-prerelease.yml`, `scripts/collect-ledger.sh` | hard fail if branch/file is missing or push is rejected; operators must provision the branch, initial ledger, and write access | `ops-provisioning-secrets-and-accounts` | `present` |
 | `self-hosted fuzz runner` | `.github/workflows/fuzz-cadence.yml` and `fuzz-prerelease.yml` | not required: both workflows use GitHub-hosted Ubuntu runners | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (hosted runners execute both fuzz tiers)` |
 | `24-hour fuzz execution` | `.github/workflows/fuzz-prerelease.yml` | chain fails on a crash, missing link/counter, or measured total below 86,400 libFuzzer seconds per target; five 5h links fit the hosted job cap | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (workflow implemented by 20-3a; the rc precondition `check-release-precondition --fuzz-ledger` landed in 20-5 L1, but the chain itself is an operator dispatch of fuzz-prerelease at the candidate SHA and has not completed)` |
-| `external third-party authors` | `xtask/src/check_third_party_trial.rs:325` | hard fail below the gate's honest denominator; the current gate requires 12 rather than the former prose's 3 | `ops-external-cohort-and-pen-test` | `absent` |
+| `external third-party authors` | `xtask/src/check_third_party_trial.rs` | no human-author denominator (story `22-7-domain-spirit-kit`): a present cohort of any N is judged on its per-participant checks and a green gate does not claim an N = 12 human cohort; the kit's evidence is the agent-run records in `docs/agent-runs/22-7/` | `ops-external-cohort-and-pen-test` | `absent` |
 | `external penetration test` | `RELEASE-HOLDS.md:24` | status and ship effect are authoritative only in Hold 1 | `ops-external-cohort-and-pen-test` | `not-a-provisioning-item (tracked by RELEASE-HOLDS.md Hold 1)` |
 | `Gemini live credential` | `MAOS_GEMINI_API_KEY` / `MAOS_KIMI_API_KEY` (`SecretKey::{GeminiApiKey,KimiApiKey}`, Story 20-4 L1); `ops-live-gemini-leg` covers both providers | skip-by-design: paid recording is operator-only and requires paid accounts (20-4 L2's kernel id-set and IO landing is in the tree, 2026-11-11); seed replay proves routing, not a vendor call | `ops-live-gemini-leg` | `absent` |
 | `stable performance runner` | `docs/adr/ADR-068-stable-performance-runner.md` §2–§4 | skip-by-design until it exists: the wall-clock performance verdicts read `ABSENT`, never `PASS` | `ops-stable-perf-runner` | `absent` |
@@ -59,8 +59,8 @@ than inherited from planning prose.
 > **Operator ruling 2026-11-12, later the same day (`drop`, `live`, `authors`).** Two rows were removed
 > with their owning sprint rows: `Google Calendar OAuth` and `Bedrock and Vertex credentials`. Neither was a
 > credential in the tree. No live vendor credential is owed: every live leg is optional and blocks nothing.
-> The `external third-party authors` row stays `absent` until story
-> `21-11-agent-authoring-kit-and-agent-author-trial` re-rules the gate for agent authors; human authors are
+> The `external third-party authors` row stays `absent`: story `22-7-domain-spirit-kit` re-ruled the gate for
+> agent authors (`check-third-party-trial` no longer has a human-author denominator) and human authors are
 > optional. `stable performance runner` stays `absent` and is not owed. See
 > `_bmad-output/planning-artifacts/decisions-2026-11-12-dedrift.md`.
 

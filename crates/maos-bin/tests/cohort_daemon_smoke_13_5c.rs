@@ -1109,10 +1109,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
         ("host_config.rs", include_str!("../src/host_config.rs")),
         // Story 22-4 — the directed-task registry and its Transparency-Log read-back. It
         // reads only audit rows and never seeds the manifest-derived policy table.
-        (
-            "directed_task.rs",
-            include_str!("../src/directed_task.rs"),
-        ),
+        ("directed_task.rs", include_str!("../src/directed_task.rs")),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

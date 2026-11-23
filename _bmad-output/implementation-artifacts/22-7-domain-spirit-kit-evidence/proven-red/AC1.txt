@@ -1,0 +1,22 @@
+AC1 plant: examples/incident-triage-ts/src/index.ts: resultText: triage(goal) -> `echo: ${goal}` (marked E227-PLANT). (a) npm test: 5 tests FAIL on the result string (output below). (b) domain_spirit_22_7 under the plant was NOT observed red: the run stopped on a stale-fixture refusal (maosctl older than its input), before the first ask. Plant reverted.
+
+      expected 'echo: Customers report data loss afte' to be 'sev1 | rule: data-loss | first step: ' // Object.is equality
+      expected 'echo: Checkout is slow, p99 latency d' to be 'sev2 | rule: degraded-latency | first' // Object.is equality
+      expected 'echo: There is a typo on the pricing ' to be 'sev3 | rule: minor-defect | first ste' // Object.is equality
+      expected 'echo: The cafeteria ran out of oat mi' to be 'sev4 | rule: none | first step: no ru' // Object.is equality
+      expected 'echo: hello' not to contain 'echo'
+ Failed Tests 5 
+ FAIL  tests/triage.test.ts > incident triage guest > answers "Customers report data loss after the migration"
+AssertionError: expected 'echo: Customers report data loss afte' to be 'sev1 | rule: data-loss | first step: ' // Object.is equality
+     43|   ])("answers %j", (goal, expected) => {
+     44|     expect(answer(goal)).toBe(expected);
+ FAIL  tests/triage.test.ts > incident triage guest > answers "Checkout is slow, p99 latency doubled"
+AssertionError: expected 'echo: Checkout is slow, p99 latency d' to be 'sev2 | rule: degraded-latency | first' // Object.is equality
+     43|   ])("answers %j", (goal, expected) => {
+     44|     expect(answer(goal)).toBe(expected);
+ FAIL  tests/triage.test.ts > incident triage guest > answers "There is a typo on the pricing page"
+AssertionError: expected 'echo: There is a typo on the pricing ' to be 'sev3 | rule: minor-defect | first ste' // Object.is equality
+     43|   ])("answers %j", (goal, expected) => {
+     44|     expect(answer(goal)).toBe(expected);
+ FAIL  tests/triage.test.ts > incident triage guest > answers an unknown text with sev4 and says no rule matched
+AssertionError: expected 'echo: The cafeteria ran out of oat mi' to be 'sev4 | rule: none | first step: no ru' // Object.is equality

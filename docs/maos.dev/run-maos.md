@@ -321,6 +321,21 @@ root, so data under a legacy location stays readable in place and a migration pl
 is still consumed. `MAOS_MEMORY_ROOT` and `MAOS_REGISTRY_YANK_CURSOR_PATH` override all three. `maos purge`
 names every location.
 
+### A component with resource caps needs a delegated cgroup
+
+A component whose manifest declares `cpu_max_pct` or `pids_max` (the `templates/spirit-ts` scaffold declares
+`cpu_max_pct = 100`) is launched into a writable, delegated cgroup v2 subtree, and the launch fails closed without
+one: the Spirit never reaches `Running` and the Host's stderr says why. Memory alone falls back to an address-space
+limit with a warning. Start the Host under a delegated scope:
+
+```sh
+systemd-run --user --scope -p Delegate=yes -- maos serve --config host.toml
+```
+
+The packaged `maos.service` unit does not set `Delegate=yes`, so a capped component in that unit's cast is refused
+at launch until the unit changes (`RELEASE-HOLDS.md`, K4). The authoring kit (`kit/spirit-author/AGENTS.md`) is the
+whole path from a scaffold to a Spirit answering `maosctl ask` in such a Host.
+
 ## Hand a Spirit a task
 
 `maosctl ask <spirit> "<text>"` hands a running, installed Spirit one task through the authenticated door and

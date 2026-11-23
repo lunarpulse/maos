@@ -96,7 +96,7 @@ gates = [
     "check-pentest-gate",
     # Story 10.1b AC3 — v1.0 NFR coverage-matrix completeness (no empty gates).
     "check-coverage-matrix-completeness",
-    # Trial: absent/preliminary are advisory at v1.0/v1.5; validated N>=12 shortfalls block.
+    # Trial: absent is advisory at v1.0/v1.5; a present cohort's per-participant findings block (no N floor, 22-7).
     "check-third-party-trial",
     # Story 11.1b — NEW tiered behavioral-oracle cross-form equivalence gate (binding).
     "check-wasm-form-equiv",
@@ -288,8 +288,8 @@ name = "check-pentest-gate"
 disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking-when-present" }
 binding = "blocking"
 
-# Absent or integrity-validated preliminary N<12: not a pass, advisory at v1_0/v1_5;
-# blocking at v2_0. At N>=12, sampling shortfalls block at every phase.
+# Story 22-7: no sampling floor (the human-author denominator is removed). Absent or N=0 is not a pass,
+# advisory at v1_0/v1_5, blocking at v2_0; a present cohort with any per-participant finding is red.
 [[ship_gate]]
 name = "check-third-party-trial"
 disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking-when-present", v2_0 = "blocking" }

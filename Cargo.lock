@@ -3206,6 +3206,7 @@ dependencies = [
  "toml 0.8.23",
  "tracing",
  "url",
+ "wasmparser 0.254.2",
  "webpki-roots 0.26.11",
 ]
 
