@@ -111,7 +111,7 @@ impl Shell {
         // Installing a version writes a `<version>-<suffix>` generation directory and points
         // the installed index at it: that index is the only honest way to find the manifest.
         maos_registry::storage::LocalFsRegistryStorage::at_path(
-            self.scratch.0.join("home/.local/share/maos/registry"),
+            self.scratch.0.join("home/.maos/registry"),
         )
         .unwrap()
         .installed_manifests()

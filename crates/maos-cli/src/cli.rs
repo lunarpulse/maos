@@ -156,6 +156,9 @@ pub enum Subcommand {
     Cohort(CohortArgs),
     /// Story 19-7 (AC3) — A2A trust operations on this host's daemon door.
     A2a(A2aArgs),
+    /// Story 22-1 — the agents the running Host holds: one `<spirit_id>\t<lifecycle_state>`
+    /// line per Spirit, read from the daemon door (`GET /v1/daemon`).
+    Agents,
 }
 
 /// Story 10.4a — `maosctl migrate sqlite-to-postgres`.

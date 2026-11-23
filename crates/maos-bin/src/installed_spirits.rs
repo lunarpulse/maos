@@ -178,6 +178,10 @@ impl InstalledSpirits {
         }
         result
     }
+    /// The stable admission code that refused `name` at this boot, if it was refused.
+    pub fn refusal_code(&self, name: &str) -> Option<&'static str> {
+        self.refusals.get(name).map(AdmissionRefusal::code)
+    }
     /// `None` alone means the name was neither loaded nor refused at this boot. A dispatched
     /// turn returns the Spirit's own answer, or the typed reason it produced none.
     pub fn dispatch(

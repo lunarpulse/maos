@@ -266,6 +266,61 @@ the resolved team's log — and the dry run and receipt name every sibling team
 log with its row counts. This retention is an operator-chosen, documented
 exception to FR2's clean-uninstall guarantee; deletion is the default.
 
+## Serve a standing Host
+
+`maos serve --config <host.toml>` starts a Host from one file. The file declares the Host's settings and the
+standing cast; every boot brings the same cast back, because the file names it. `maos run <manifest>` is
+unchanged and reads no Host file.
+
+```toml
+[host]
+home = "/srv/maos"                 # MAOS_HOME (absolute)
+door_bind = "127.0.0.1:7600"       # MAOS_OPERATOR_HTTP_BIND (loopback only)
+region = "eu-west"                 # MAOS_REGION_HOME
+crypto_provider = "ring"           # MAOS_CRYPTO_PROVIDER
+inference_mode = "replay"          # MAOS_INFERENCE_MODE: live, record or replay
+
+[[host.spirits]]
+manifest = "spirits/butler/manifest.toml"   # relative to this file; `path` is an alias
+
+[[host.spirits]]
+installed = "researcher"                    # a registry-installed Spirit
+```
+
+| Key | Environment name | Rule |
+|---|---|---|
+| `home` | `MAOS_HOME` | Absolute path. |
+| `door_bind` | `MAOS_OPERATOR_HTTP_BIND` | Loopback socket address; the door still needs `MAOS_OPERATOR_BEARER_TOKEN` (both or neither). |
+| `region` | `MAOS_REGION_HOME` | An `ascii-v1` region tag. |
+| `crypto_provider` | `MAOS_CRYPTO_PROVIDER` | Must equal the provider recorded in `<home>/config.toml` (default `ring`). |
+| `inference_mode` | `MAOS_INFERENCE_MODE` | `live`, `record` or `replay`. |
+
+A set environment variable overrides its key for the process; a key fills only a name that is unset. The
+environment never stands in for a missing or invalid file. The cast is exactly the `[[host.spirits]]` list:
+installed Spirits the file does not name, and Spirits added with `maosctl load`, do not boot. An entry takes
+`manifest` (or `path`) or `installed`, never `host`. `maosctl agents` reads the running cast back.
+
+A missing file, a TOML error, an unknown key, an invalid setting, a cast entry that cannot be admitted, or an
+older file that disagrees with a key the Host file sets (`operator.toml` `[region]`, the provider in
+`<home>/config.toml`) refuses the boot with exit 78 and one of the kinds `host_config_missing`,
+`host_config_parse`, `host_config_cast_entry`, `host_config_cast_host_key`, `host_config_setting`,
+`host_config_older_file_disagrees`, `host_config_installed_missing` or `host_config_installed_refused`.
+
+**Region is an integrity setting.** `MAOS_REGION_HOME` stamps every memory write. On a cohort host the daemon
+refuses to boot when this tag disagrees with the `region` the signed cohort manifest declares for the host's
+team, or when a region is set and the manifest declares no team for the host. The check compares what is
+deployed with what the signed manifest says; it does not stop an operator who controls both the process and the
+manifest from choosing a tag. Unset the tag to turn region pinning off.
+
+### Where data lives
+
+The private memory root, the registry store, the registry yank cursor and the migration plans share one
+precedence: an explicitly set `MAOS_HOME`, then `$XDG_DATA_HOME/maos`, then the legacy
+`$HOME/.local/share/maos`. A store lives under the highest root that already holds it, else under the highest
+root, so data under a legacy location stays readable in place and a migration plan written under another root
+is still consumed. `MAOS_MEMORY_ROOT` and `MAOS_REGISTRY_YANK_CURSOR_PATH` override all three. `maos purge`
+names every location.
+
 ## Operate
 
 The kernel composition root lives in `crates/maos-bin`. Operational surfaces — the transparency log, capability mediation, sandbox tiers, ComplianceClaim admission, the registry, and yank propagation — are documented in the reference guides:

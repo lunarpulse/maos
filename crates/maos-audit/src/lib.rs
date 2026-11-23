@@ -1579,30 +1579,19 @@ pub fn default_journal_path() -> std::path::PathBuf {
 /// Shared by `maos-bin` (write side) and any reader (e.g. operator
 /// inspection). Precedence (highest → lowest):
 ///   1. `MAOS_MEMORY_ROOT` env var
-///   2. `$XDG_DATA_HOME/maos/memory`
-///   3. `$HOME/.local/share/maos/memory`
-///   4. `/var/lib/maos/memory` (last-resort fallback)
+///   2. the `memory` store under the ranked data roots of
+///      `maos_domain::data_root` (explicit `MAOS_HOME`, `$XDG_DATA_HOME/maos`,
+///      legacy `$HOME/.local/share/maos`, last resort `/var/lib/maos`): the
+///      highest root that already holds it, else the highest root (22-1 AC6).
 pub fn default_memory_root() -> std::path::PathBuf {
-    use std::path::PathBuf;
     if let Ok(p) = std::env::var("MAOS_MEMORY_ROOT") {
         if !p.is_empty() {
-            return PathBuf::from(p);
+            return std::path::PathBuf::from(p);
         }
         // Empty env var treated as unset — fall through to next precedence.
         eprintln!("maos: MAOS_MEMORY_ROOT is set but empty — falling through to default path");
     }
-    let data_home = std::env::var("XDG_DATA_HOME")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var("HOME")
-                .ok()
-                .filter(|h| !h.is_empty())
-                .map(|h| PathBuf::from(h).join(".local").join("share"))
-        })
-        .unwrap_or_else(|| PathBuf::from("/var/lib"));
-    data_home.join("maos").join("memory")
+    maos_domain::data_root::resolve("memory")
 }
 
 /// Resolve the default Spirit Archive root directory (Story 5.2).
@@ -2491,25 +2480,22 @@ fn resolve_journal_path_from_env_internal(
 #[cfg(test)]
 fn resolve_memory_root_from_env_internal(
     maos_memory_root: Option<&str>,
+    maos_home: Option<&str>,
     xdg_data_home: Option<&str>,
     home: Option<&str>,
 ) -> std::path::PathBuf {
-    use std::path::PathBuf;
     if let Some(p) = maos_memory_root {
         if p.is_empty() {
             panic!("empty MAOS_MEMORY_ROOT");
         }
-        return PathBuf::from(p);
+        return std::path::PathBuf::from(p);
     }
-    let data_home = xdg_data_home
-        .filter(|s| !s.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| {
-            home.filter(|h| !h.is_empty())
-                .map(|h| PathBuf::from(h).join(".local").join("share"))
-        })
-        .unwrap_or_else(|| PathBuf::from("/var/lib"));
-    data_home.join("maos").join("memory")
+    let roots = maos_domain::data_root::roots_from(
+        maos_home.map(std::ffi::OsStr::new),
+        xdg_data_home.map(std::ffi::OsStr::new),
+        home.map(std::ffi::OsStr::new),
+    );
+    maos_domain::data_root::resolve_in(&roots, "memory")
 }
 
 #[cfg(test)]
@@ -3260,20 +3246,26 @@ mod tests {
 
     #[test]
     fn default_memory_root_respects_env_override() {
-        let p =
-            super::resolve_memory_root_from_env_internal(Some("/tmp/maos-test-memory"), None, None);
+        let p = super::resolve_memory_root_from_env_internal(
+            Some("/tmp/maos-test-memory"),
+            None,
+            None,
+            None,
+        );
         assert_eq!(p, std::path::PathBuf::from("/tmp/maos-test-memory"));
     }
 
     #[test]
     fn default_memory_root_falls_through_to_xdg() {
-        let p = super::resolve_memory_root_from_env_internal(None, Some("/tmp/xdgtest"), None);
+        let p =
+            super::resolve_memory_root_from_env_internal(None, None, Some("/tmp/xdgtest"), None);
         assert_eq!(p, std::path::PathBuf::from("/tmp/xdgtest/maos/memory"));
     }
 
     #[test]
     fn default_memory_root_falls_through_to_home_when_xdg_unset() {
-        let p = super::resolve_memory_root_from_env_internal(None, None, Some("/tmp/hometest"));
+        let p =
+            super::resolve_memory_root_from_env_internal(None, None, None, Some("/tmp/hometest"));
         assert_eq!(
             p,
             std::path::PathBuf::from("/tmp/hometest/.local/share/maos/memory")
@@ -3282,8 +3274,19 @@ mod tests {
 
     #[test]
     fn default_memory_root_last_resort_var_lib() {
-        let p = super::resolve_memory_root_from_env_internal(None, None, None);
+        let p = super::resolve_memory_root_from_env_internal(None, None, None, None);
         assert_eq!(p, std::path::PathBuf::from("/var/lib/maos/memory"));
+    }
+
+    #[test]
+    fn default_memory_root_explicit_maos_home_ranks_first() {
+        let p = super::resolve_memory_root_from_env_internal(
+            None,
+            Some("/tmp/maos-home-test"),
+            Some("/tmp/xdgtest"),
+            Some("/tmp/hometest"),
+        );
+        assert_eq!(p, std::path::PathBuf::from("/tmp/maos-home-test/memory"));
     }
 
     // ── FR41 SQLi-inert test ─────────────────────────────────────────

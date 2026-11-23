@@ -1,7 +1,9 @@
 use crate::fs_walk;
 use std::path::Path;
 use syn::visit::Visit;
-use syn::{Expr, ExprCall, ExprGroup, ExprLit, ExprParen, Lit, Path as SynPath};
+use syn::{
+    Expr, ExprCall, ExprGroup, ExprLit, ExprParen, ItemConst, ItemStatic, Lit, Path as SynPath,
+};
 
 #[derive(Debug)]
 struct EnvRead {
@@ -76,6 +78,44 @@ impl<'ast> Visit<'ast> for EnvReadVisitor {
         }
         syn::visit::visit_expr_call(self, node);
     }
+
+    // 22-1 AC2: a name held in a `const`/`static` `&str` is read through the
+    // constant (`read_override(ENV_ENDPOINT)`), which no literal-argument match sees.
+    fn visit_item_const(&mut self, node: &'ast ItemConst) {
+        self.push_const(&node.ty, &node.expr);
+        syn::visit::visit_item_const(self, node);
+    }
+
+    fn visit_item_static(&mut self, node: &'ast ItemStatic) {
+        self.push_const(&node.ty, &node.expr);
+        syn::visit::visit_item_static(self, node);
+    }
+}
+
+impl EnvReadVisitor {
+    fn push_const(&mut self, ty: &syn::Type, expr: &Expr) {
+        let syn::Type::Reference(reference) = ty else {
+            return;
+        };
+        let is_str = matches!(&*reference.elem, syn::Type::Path(p) if p.path.is_ident("str"));
+        let Some(value) = literal_string(expr).filter(|_| is_str) else {
+            return;
+        };
+        let name = value.value();
+        let shaped = name.len() > "MAOS_".len()
+            && name.starts_with("MAOS_")
+            && name
+                .bytes()
+                .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_');
+        if shaped {
+            self.reads.push(EnvRead {
+                line: value.span().start().line,
+                shape: "const &str",
+                is_prefix_scan: name.ends_with('_'),
+                name,
+            });
+        }
+    }
 }
 
 fn detect_env_reads(source: &str) -> Result<Vec<EnvRead>, String> {
@@ -116,9 +156,24 @@ pub fn run(maos_bin_dir: &str, json: bool) -> Result<(), String> {
 
     let mut violations = Vec::new();
 
-    let src_dir = Path::new(maos_bin_dir).join("src");
+    // 22-1 D-22-1-08 B: the product crates and spirits, rooted from `--maos-bin-dir`
+    // (`<root>/crates/maos-bin`), so the CI invocation is unchanged. xtask is harness.
     let mut rs_files = Vec::new();
-    fs_walk::collect_rs_files(&src_dir, &mut rs_files);
+    fs_walk::collect_rs_files(&Path::new(maos_bin_dir).join("src"), &mut rs_files);
+    if let Some(root) = Path::new(maos_bin_dir).parent().and_then(Path::parent) {
+        for group in ["crates", "spirits"] {
+            let Ok(members) = std::fs::read_dir(root.join(group)) else {
+                continue;
+            };
+            let mut members: Vec<_> = members.flatten().map(|m| m.path()).collect();
+            members.sort();
+            for member in members {
+                if member != Path::new(maos_bin_dir) {
+                    fs_walk::collect_rs_files(&member.join("src"), &mut rs_files);
+                }
+            }
+        }
+    }
 
     for file_path in &rs_files {
         let file_name = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
@@ -174,7 +229,7 @@ pub fn run(maos_bin_dir: &str, json: bool) -> Result<(), String> {
 
     if violations.is_empty() {
         eprintln!(
-            "check-env-contract: PASS ({} maos-bin/src MAOS_* vars registered, 0 violations; workspace-wide env surface is Story 21-4 / xtask env-contract.toml — D-I)",
+            "check-env-contract: PASS ({} MAOS_* vars registered, 0 violations across maos-bin, the product crates and the spirits; xtask env stays harness)",
             registered.len()
         );
         Ok(())
@@ -183,7 +238,7 @@ pub fn run(maos_bin_dir: &str, json: bool) -> Result<(), String> {
             eprintln!("  VIOLATION: {v}");
         }
         Err(format!(
-            "check-env-contract: FAIL — {} unregistered maos-bin/src MAOS_* env reads (workspace-wide env surface is Story 21-4 / xtask env-contract.toml — D-I)",
+            "check-env-contract: FAIL — {} unregistered MAOS_* env reads (maos-bin, the product crates and the spirits)",
             violations.len()
         ))
     }
@@ -301,5 +356,62 @@ let _ = any_env_with_prefix("MAOS_SIEM_");
         .unwrap();
 
         assert!(run(temp.path().to_str().unwrap(), false).is_err());
+    }
+
+    /// `<root>/crates/maos-bin` with a contract, plus a sibling crate's `src/<file>`.
+    fn workspace(
+        registered: &[&str],
+        crate_name: &str,
+        file: &str,
+        source: &str,
+    ) -> (tempfile::TempDir, String) {
+        let temp = tempfile::tempdir().unwrap();
+        let bin = temp.path().join("crates/maos-bin");
+        write_contract(&bin, registered);
+        let dir = temp.path().join("crates").join(crate_name).join("src");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join(file), source).unwrap();
+        let bin = bin.to_str().unwrap().to_string();
+        (temp, bin)
+    }
+
+    #[test]
+    fn unregistered_read_in_a_sibling_crate_fails_and_a_registered_one_passes() {
+        for crate_name in ["maos-domain", "maos-kernel-core"] {
+            let plant = "fn f() { let _ = std::env::var(\"MAOS_X_PLANT\"); }\n";
+            let (_t, bin) = workspace(&[], crate_name, "plant.rs", plant);
+            assert!(
+                run(&bin, false).is_err(),
+                "a planted read in {crate_name}/src must red"
+            );
+            let registered = "fn f() { let _ = std::env::var(\"MAOS_REGION_HOME\"); }\n";
+            let (_t, bin) = workspace(&["MAOS_REGION_HOME"], crate_name, "ok.rs", registered);
+            assert!(
+                run(&bin, false).is_ok(),
+                "{crate_name}: a registered read stays green"
+            );
+        }
+    }
+
+    #[test]
+    fn const_held_names_are_detected_in_sibling_crates() {
+        let source = "pub const ENV_ENDPOINT: &str = \"MAOS_OPERATOR_HTTP_ENDPOINT\";\n\
+                      static OTHER: &str = \"MAOS_OTHER_STATIC\";\n\
+                      const NOT_A_NAME: &str = \"maos_lower\";\n";
+        let (_t, bin) = workspace(&[], "maos-cli", "door_client.rs", source);
+        assert!(
+            run(&bin, false).is_err(),
+            "an unregistered const name must red"
+        );
+        let (_t, bin) = workspace(
+            &["MAOS_OPERATOR_HTTP_ENDPOINT", "MAOS_OTHER_STATIC"],
+            "maos-cli",
+            "door_client.rs",
+            source,
+        );
+        assert!(
+            run(&bin, false).is_ok(),
+            "registered const names stay green"
+        );
     }
 }

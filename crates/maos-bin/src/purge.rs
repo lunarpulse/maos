@@ -2,10 +2,12 @@
 
 //! Story 16-4 — authoritative enumeration of state MAOS writes.
 //!
-//! Paths come from their production resolvers. The only explicit legacy leg is
-//! `$HOME/.local/share/maos`: `maos-registry` and `maos-skill` still write there
-//! even when `XDG_DATA_HOME` points elsewhere. That leg is permanent until those
-//! crates ship a data migration; it is not a transitional compatibility alias.
+//! Paths come from their production resolvers. The explicit legacy leg is
+//! `$HOME/.local/share/maos`: `maos-skill` still writes there even when
+//! `XDG_DATA_HOME` points elsewhere, and the memory, registry, yank-cursor and
+//! migration-plan stores resolve over the ranked data roots of
+//! `maos_domain::data_root` (22-1), so data may still sit under it. That leg is
+//! permanent; it is not a transitional compatibility alias.
 
 use std::path::{Path, PathBuf};
 
@@ -191,6 +193,24 @@ pub fn maos_roots() -> Vec<MaosRoot> {
         RootKind::Directory,
         WrittenBy::Maos,
     );
+    // 22-1 AC6 (D-22-1-10 A): the memory root, registry store (its yank cursor sits
+    // inside) and migration plans resolve over ranked data roots, so a store can sit
+    // under any of them. Enumerate every location a resolver can now return.
+    for (label, rel) in [
+        ("private memory", "memory"),
+        ("registry store", "registry"),
+        ("migration plans", "upgrade-plans"),
+    ] {
+        for path in maos_domain::data_root::locations(rel) {
+            push(
+                &mut roots,
+                label,
+                path,
+                RootKind::Directory,
+                WrittenBy::Maos,
+            );
+        }
+    }
     // Registry import-bundle scratch (`maos-registry/src/import.rs`): written
     // under `$HOME/.cache/maos/import` with the same HOME semantics, or under
     // MAOS_IMPORT_SCRATCH_ROOT when set.

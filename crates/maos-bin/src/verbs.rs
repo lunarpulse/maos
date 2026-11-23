@@ -66,6 +66,7 @@ pub enum VerbName {
     Purge,
     Eval,
     Workflow,
+    Serve,
 }
 
 /// One row of the verb table.
@@ -146,6 +147,12 @@ pub const VERBS: &[Verb] = &[
         argv: "workflow",
         builds: &[Build::Network],
         summary: "Plan, apply, run or evaluate a business workflow",
+    },
+    Verb {
+        name: VerbName::Serve,
+        argv: "serve",
+        builds: &[Build::Network],
+        summary: "Serve a standing Host from a configuration file (serve --config <host.toml>)",
     },
 ];
 

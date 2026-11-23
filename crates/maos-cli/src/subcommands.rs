@@ -55,6 +55,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::ReleasePubkey => release_pubkey(),
         Subcommand::Cohort(args) => dispatch_cohort(args, color),
         Subcommand::A2a(args) => dispatch_a2a(args),
+        Subcommand::Agents => dispatch_agents(),
     }
 }
 
@@ -173,6 +174,33 @@ fn door_verb_mapped(
         },
         Err(error) => door_client::map_error(verb, error),
     }
+}
+
+/// Story 22-1 (D-22-1-02 B) — `maosctl agents`: id and lifecycle state of every Spirit the
+/// daemon holds. Story 22-5 adds the pid, form, originator, task and age columns.
+fn dispatch_agents() -> ExitCode {
+    door_verb_mapped(
+        "agents",
+        |config| door_client::exchange(config, "GET", "/v1/daemon", None, DEFAULT_ROUTE_BUDGET),
+        |response| {
+            if response.status != 200 {
+                return door_client::map_response("agents", response);
+            }
+            let body = response.body_json();
+            let column = |key: &str| -> Vec<String> {
+                body.get(key)
+                    .and_then(serde_json::Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|value| value.as_str().map(str::to_owned))
+                    .collect()
+            };
+            for (id, state) in column("spirit_ids").iter().zip(column("lifecycle_states")) {
+                println!("{id}\t{state}");
+            }
+            ExitCode::SUCCESS
+        },
+    )
 }
 
 /// Story 19-7 (AC3, D-19-7-01/02/03 A) — `maosctl a2a repin`: door-class

@@ -28,3 +28,13 @@ The J4 Mira-Nash deployment. Exactly two MAOS Hosts: Mira on a prod-edge node (r
 ## 11.3 What's the same across both topologies
 
 The substrate's invariants. The Spirit ABI. The manifest schema. The Capability Registry's mediation policy. The Transparency Log shape. The distillation pattern. The Approval Manager's UX. The hot-swap mechanism. The 14 invariants. The 39 ADRs (with their phased Status tags per §12.0). **Topology is configuration; architecture is invariant.** This is the substrate-positioning claim cashed: same primitives compose into either deployment.
+
+## 11.6 Standing Host (server)
+
+A Host that stays up is started from one file: `maos serve --config <host.toml>` (ADR-071). The file holds the
+Host's settings, each with one key and one registered `MAOS_*` name, and the standing cast as
+`[[host.spirits]]`. The cast is fed through the existing topology and installed boot paths, so a restart (a SIGTERM
+drain or a SIGKILL) brings back exactly the Spirits the file names; there is no separate restore mechanism.
+A bad file, an older config file that disagrees with it, or a region the signed cohort manifest contradicts is
+a typed boot refusal, never a warning. The data roots resolve by one precedence (an explicit `MAOS_HOME`, then XDG,
+then the legacy home). §11.6 is completed by Story 22-3.
