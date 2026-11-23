@@ -95,8 +95,9 @@ Since the CI release-ready program W2 (2026-11-15) the xtask-driven rows above (
 the single `xtask-gates` job rather than one job each; their names, commands and `--json` output are unchanged.
 
 Since the CI release-ready program W3 (2026-11-15) `reproducible-build` and `determinism-tests` (and the other advisory and
-measurement jobs, `nfr-rel-11-halt-receipt-999pct` and `expensive-tests`) run nightly in `.github/workflows/ci-nightly.yml`
-instead of on every push; each records a one-line job summary and an artifact `nightly-result-<job>`.
+measurement jobs) run nightly in `.github/workflows/ci-nightly.yml` instead of on every push; each records a one-line
+job summary and an artifact `nightly-result-<job>`. `nfr-rel-11-halt-receipt-999pct` and `expensive-tests` also ran
+nightly there, and returned to `discipline.yml` (`aggregate.needs`, `release-ready.needs`) for GA.
 
 **Any green gate going red is a merge-block** — except gates explicitly marked
 "advisory," which surface warnings without flipping overall workflow status.

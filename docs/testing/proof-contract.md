@@ -101,9 +101,10 @@ count beside the row when the kernel pin moved during the epic. Append the row; 
   (`cargo run -p xtask -- check-test-cost`). The `[[expensive]]` rows with `job = "expensive-tests"` run in that job,
   exactly that list, with `--run-ignored ignored-only`; every other row names the dedicated job that provisions its
   substrate and runs its ignored tests there (`--ignored`/`--include-ignored`, directly or through that job's gate).
-  Since the CI release-ready program W3 the `expensive-tests` job runs nightly in `.github/workflows/ci-nightly.yml`
-  (out of `aggregate.needs`; back after 10 consecutive green nightly runs and before GA, see `deferred-work.md`);
-  `check-test-cost` resolves a row's `job` in `discipline.yml` or `ci-nightly.yml`.
+  The `expensive-tests` job runs in `.github/workflows/discipline.yml` and is in `aggregate.needs` and
+  `release-ready.needs` (it ran nightly in `ci-nightly.yml` under the CI release-ready program W3 and returned for GA;
+  `repromotion.yml` is its 10-green dispatch); `check-test-cost` resolves a row's `job` in `discipline.yml` or
+  `ci-nightly.yml`.
 - A cargo call that compiles nothing — `cargo tree`, `cargo metadata`, `cargo locate-project`, `cargo pkgid` — says
   `// cargo-query: <reason>` on the line before instead, and stays in the default run (no `#[ignore]`).
   `cargo public-api` builds rustdoc JSON and stays expensive.

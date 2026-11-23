@@ -8,9 +8,10 @@ use std::path::PathBuf;
 
 use serde_yaml::Value;
 
-/// Slow or sensitive jobs that protect a release claim: NO `continue-on-error`, so a red night reds the
-/// run. They return to `aggregate.needs` after 10 consecutive green nightly runs and before GA.
-const SLOW_SENSITIVE: [&str; 2] = ["nfr-rel-11-halt-receipt-999pct", "expensive-tests"];
+/// Slow or sensitive jobs that protect a release claim. They ran nightly (W3) and RETURNED to `discipline.yml`,
+/// `aggregate.needs`, `release-ready.needs` and `xtask/release-ready-required.toml` for GA, as ordinary jobs
+/// with NO `continue-on-error`. They are no longer nightly jobs.
+const RETURNED: [&str; 2] = ["nfr-rel-11-halt-receipt-999pct", "expensive-tests"];
 
 /// Advisory / measurement jobs: they carried `continue-on-error` in `discipline.yml` and keep it.
 const ADVISORY: [&str; 6] = [
@@ -49,10 +50,7 @@ const LEAN_GATES_ADVISORY: [&str; 5] = [
 ];
 
 fn moved() -> impl Iterator<Item = &'static str> {
-    SLOW_SENSITIVE
-        .into_iter()
-        .chain(ADVISORY)
-        .chain(LEAN_GATES_ADVISORY)
+    ADVISORY.into_iter().chain(LEAN_GATES_ADVISORY)
 }
 
 fn needs(job: &Value) -> Vec<String> {
@@ -159,6 +157,12 @@ fn moved_jobs_run_nightly_and_are_on_no_merge_or_ship_gate_path() {
         .iter()
         .filter_map(|row| row["name"].as_str())
         .collect();
+    for name in RETURNED {
+        assert!(
+            nightly["jobs"][name].is_null(),
+            "{name} returned to discipline.yml; it must not also be a nightly job"
+        );
+    }
     let discipline_jobs = discipline["jobs"].as_mapping().expect("jobs");
     for name in moved() {
         assert!(nightly["jobs"][name].is_mapping(), "{name} runs nightly");
@@ -298,10 +302,7 @@ fn every_nightly_job_records_its_result_as_summary_line_and_artifact() {
         "a missing result file must fail the upload, not pass silently"
     );
     // Where the old job uploaded an artifact, the nightly job still does.
-    let expect_upload = [
-        ("expensive-tests", "expensive-tests-junit"),
-        ("clippy-advisory", "clippy-advisory-diagnostics"),
-    ];
+    let expect_upload = [("clippy-advisory", "clippy-advisory-diagnostics")];
     for (job, artifact) in expect_upload {
         assert!(
             nightly["jobs"][job]["steps"]
@@ -315,13 +316,24 @@ fn every_nightly_job_records_its_result_as_summary_line_and_artifact() {
 }
 
 #[test]
-fn slow_sensitive_jobs_can_red_the_run_and_advisory_jobs_keep_their_labelled_continue_on_error() {
+fn returned_jobs_are_ordinary_release_path_jobs_and_advisory_jobs_keep_their_labelled_continue_on_error(
+) {
     let nightly = workflow("ci-nightly.yml");
-    for name in SLOW_SENSITIVE {
-        let job = &nightly["jobs"][name];
+    let discipline = workflow("discipline.yml");
+    let required: toml::Value =
+        toml::from_str(&read("xtask/release-ready-required.toml")).expect("release-ready roster");
+    let required_jobs: Vec<&str> = required["jobs"]
+        .as_array()
+        .expect("roster jobs")
+        .iter()
+        .filter_map(toml::Value::as_str)
+        .collect();
+    for name in RETURNED {
+        let job = &discipline["jobs"][name];
+        assert!(job.is_mapping(), "{name} is a discipline job again");
         assert!(
             job["continue-on-error"].is_null(),
-            "{name}: a red night is the signal; it carries no continue-on-error"
+            "{name}: a red job is the signal; it carries no continue-on-error"
         );
         for step in job["steps"].as_sequence().expect("steps") {
             assert!(
@@ -329,6 +341,20 @@ fn slow_sensitive_jobs_can_red_the_run_and_advisory_jobs_keep_their_labelled_con
                 "{name}: no step-level continue-on-error"
             );
         }
+        for gate in ["aggregate", "release-ready"] {
+            assert!(
+                needs(&discipline["jobs"][gate]).iter().any(|n| n == name),
+                "{name} must be in {gate}.needs"
+            );
+        }
+        assert!(
+            required_jobs.contains(&name),
+            "{name} must be pinned in release-ready-required.toml"
+        );
+        assert!(
+            nightly["jobs"][name].is_null(),
+            "{name} is no longer a nightly job"
+        );
     }
     for name in ADVISORY.into_iter().chain(LEAN_GATES_ADVISORY) {
         let job = &nightly["jobs"][name];
@@ -380,7 +406,7 @@ fn timing_bound_binaries_are_in_the_serial_test_group_with_no_budget_change() {
 #[test]
 fn deferred_work_records_every_move_with_owner_and_return_rule() {
     let deferred = read("_bmad-output/implementation-artifacts/deferred-work.md");
-    for name in SLOW_SENSITIVE.into_iter().chain(ADVISORY) {
+    for name in ADVISORY {
         let row = deferred
             .lines()
             .find(|line| {
@@ -395,18 +421,21 @@ fn deferred_work_records_every_move_with_owner_and_return_rule() {
         );
         assert!(row.contains("Status: open"), "{name}: the row is open");
     }
-    for name in SLOW_SENSITIVE {
+    for name in RETURNED {
         let row = deferred
             .lines()
             .find(|line| {
                 line.starts_with("- **")
                     && line.contains(&format!("`{name}`"))
-                    && line.contains("ci-nightly.yml")
+                    && line.contains("returned from `ci-nightly.yml`")
             })
-            .expect("row");
+            .unwrap_or_else(|| {
+                panic!("deferred-work.md has no row recording the return of `{name}`")
+            });
+        assert!(row.contains("Status: closed"), "{name}: the row is closed");
         assert!(
-            row.contains("10 consecutive") && row.contains("before GA"),
-            "{name}: the row states the 10-consecutive-green rule and the before-GA requirement"
+            row.contains("repromotion.yml"),
+            "{name}: the row names the repromotion dispatch as its evidence"
         );
     }
 }

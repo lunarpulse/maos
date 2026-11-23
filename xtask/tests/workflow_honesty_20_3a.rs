@@ -358,8 +358,9 @@ fn aggregate_needs_holds_no_advisory_job() {
             "{name}: its registry binding is not `blocking`, so it cannot be an aggregate need"
         );
     }
-    // The advisory/measurement jobs and the two slow/sensitive release-relevant ones run nightly in
-    // `ci-nightly.yml` (CI release-ready program W3): still running, on no merge path.
+    // The advisory/measurement jobs run nightly in `ci-nightly.yml` (CI release-ready program W3): still
+    // running, on no merge path. `nfr-rel-11-halt-receipt-999pct` and `expensive-tests` returned to the
+    // merge path for GA (`ci_nightly_w3.rs` pins that).
     let nightly = workflow("ci-nightly.yml");
     for advisory in [
         "reproducible-build",
@@ -368,8 +369,6 @@ fn aggregate_needs_holds_no_advisory_job() {
         "nfr-perf-8-orchestrator-fanout",
         "nfr-perf-j4-latency",
         "clippy-advisory",
-        "nfr-rel-11-halt-receipt-999pct",
-        "expensive-tests",
     ] {
         assert!(
             nightly["jobs"][advisory].is_mapping(),
