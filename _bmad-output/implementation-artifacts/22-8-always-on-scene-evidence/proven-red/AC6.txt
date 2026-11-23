@@ -1,0 +1,21 @@
+AC6 plant (record never written): crates/maos-bin/src/native_task.rs PidBoundDiagnosisMemory::write: early 'return Ok(())' (marked E228-PLANT AC6) before the kernel memory write. Command: cargo nextest run --locked -p maos-journey-test --test journey_always_on -p maos-bin --test native_task_22_8. Result: the_standing_cast_takes_a_task_and_survives_a_restart FAILS at the third ask (prior_diagnoses 0, expected 1: 'Mira remembers the subject across the restart'); native_task_22_8::mira_answers_a_directed_task_and_its_reply_row_is_journaled FAILS the same way. Plant reverted.
+
+        PASS [   0.273s] (1/7) maos-bin::native_task_22_8 a_low_confidence_task_ends_halted
+        PASS [   0.236s] (2/7) maos-bin::native_task_22_8 a_task_that_is_not_a_signal_ends_failed_with_a_typed_reason
+        FAIL [   0.437s] (3/7) maos-bin::native_task_22_8 mira_answers_a_directed_task_and_its_reply_row_is_journaled
+    thread 'mira_answers_a_directed_task_and_its_reply_row_is_journaled' (124969) panicked at crates/maos-bin/tests/native_task_22_8.rs:276:5:
+    assertion `left == right` failed
+      left: Number(0)
+     right: 1
+        PASS [   0.235s] (4/7) maos-bin::native_task_22_8 nash_stays_not_directable
+        PASS [   0.486s] (5/7) maos-bin::native_task_22_8 the_default_cast_boots_keyless_in_deterministic_mode
+        PASS [   0.243s] (6/7) maos-bin::native_task_22_8 the_registry_exists_without_installed_members
+        FAIL [   1.498s] (7/7) maos-journey-test::journey_always_on the_standing_cast_takes_a_task_and_survives_a_restart
+    thread 'the_standing_cast_takes_a_task_and_survives_a_restart' (125424) panicked at crates/maos-journey-test/tests/journey_always_on.rs:363:5:
+    assertion `left == right` failed: Mira remembers the subject across the restart: {"task_id":"01M84KRXCN4K0CWTZ0J9VQCXWR","spirit_id":"mira","origin":"door","state":"completed","accepted_ns":1795451286933856350,"result":"{\"subject\":\"payments-api\",\"finding\":\"prod-edge anomaly on 'payments-api': error_rate = 0.420 vs baseline 0.020 (deviation 100.0%)  matches a known diagnostic pattern\",\
+      left: Number(0)
+     right: 1
+     Summary [   3.411s] 7 tests run: 5 passed, 2 failed, 0 skipped
+        FAIL [   0.437s] (3/7) maos-bin::native_task_22_8 mira_answers_a_directed_task_and_its_reply_row_is_journaled
+        FAIL [   1.498s] (7/7) maos-journey-test::journey_always_on the_standing_cast_takes_a_task_and_survives_a_restart
+rc=100

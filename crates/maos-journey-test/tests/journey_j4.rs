@@ -159,8 +159,7 @@ fn j4_earned_consent_rupture_typed_oracle() {
             .expect("failed to spawn the deny topology"),
     );
     let stderr = || std::fs::read_to_string(&stderr_path).unwrap_or_default();
-    let until = std::time::Instant::now() + std::time::Duration::from_secs(90);
-    loop {
+    let up = binaries::poll_until(90, || {
         let agents = command(&maosctl)
             .arg("agents")
             .output()
@@ -173,18 +172,14 @@ fn j4_earned_consent_rupture_typed_oracle() {
                     .any(|line| line.starts_with(&format!("{id}\t")) && line.contains("Running"))
             })
         {
-            break;
+            return true;
         }
         if let Some(status) = serving.0.try_wait().unwrap() {
             panic!("the deny topology exited early: {status}\n{}", stderr());
         }
-        assert!(
-            std::time::Instant::now() < until,
-            "the cast never came up\n{}",
-            stderr()
-        );
-        std::thread::sleep(std::time::Duration::from_millis(200));
-    }
+        false
+    });
+    assert!(up, "the cast never came up\n{}", stderr());
 
     let ask = command(&maosctl)
         .args(["ask", "mira", INCIDENT, "--wait"])

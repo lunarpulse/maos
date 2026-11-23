@@ -158,7 +158,7 @@ impl LoopbackCast {
                         .cloned();
                     match handler {
                         Some(handler) => {
-                            let _ = tokio::task::spawn_blocking(move || handler(frame));
+                            drop(tokio::task::spawn_blocking(move || handler(frame)));
                         }
                         None => eprintln!(
                             "maos: a2a frame for '{recipient}' dropped: no intake consumer is \
@@ -249,7 +249,6 @@ struct CastRoute {
 
 impl mira::AdvisoryRoute for CastRoute {
     fn deliver(&self, advisory: &mira::DiagnosticAdvisory) -> Result<(), String> {
-        let wire = serde_json::to_string(advisory).map_err(|e| format!("encode_failed: {e}"))?;
         let recipients: Vec<String> = {
             let attached = self.cast.handlers.lock().unwrap_or_else(|e| e.into_inner());
             self.cast
@@ -259,6 +258,7 @@ impl mira::AdvisoryRoute for CastRoute {
                 .map(|peer| peer.spirit.clone())
                 .collect()
         };
+        let wire = serde_json::to_string(advisory).map_err(|e| format!("encode_failed: {e}"))?;
         if recipients.is_empty() {
             return Err("no_recipient".into());
         }
@@ -352,16 +352,15 @@ pub fn architect_handler(
             }
         };
         let payload = serde_json::json!({ "proposal": proposal, "phrased": phrased });
-        let _ = log
-            .insert_frame_event_with_correlation(
-                FrameKind::TelemetryEvent,
-                pid,
-                None,
-                &proposal_correlation(frame.frame_id),
-                PROPOSAL_INTENT,
-                payload.to_string().as_bytes(),
-                FrameOrigin::SpiritAuto,
-            )
-            .into_inner();
+        log.insert_frame_event_with_correlation(
+            FrameKind::TelemetryEvent,
+            pid,
+            None,
+            &proposal_correlation(frame.frame_id),
+            PROPOSAL_INTENT,
+            payload.to_string().as_bytes(),
+            FrameOrigin::SpiritAuto,
+        )
+        .into_inner();
     })
 }

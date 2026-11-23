@@ -114,6 +114,8 @@ pub enum PayloadType {
     ContextEnvelope,
     RedistillRequest,
     RedistillOutcome,
+    /// A directed task's reply envelope: exactly one string field, `result`.
+    TaskReply,
 }
 
 /// The intent grammar of one writer site: an exact literal, or a fixed
@@ -707,6 +709,15 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         intent: WriterIntent::Exact("context.limit"),
         shape: Some(&[("ContextLimit", PayloadType::ContextEnvelope)]),
     },
+    // Story 22-8: Mira's native directed-task reply row, written before `completed` as a
+    // component's mailbox reply is (`{"TaskComplete":{"result":"<answer json>"}}`).
+    WriterShapeEntry {
+        site: ("native_task.rs", "run", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("task.reply"),
+        shape: Some(&[("TaskComplete", PayloadType::TaskReply)]),
+    },
     // ── maos-iac — Call (deliberately NOT exempt) ──────────────────────────
     // 17-3c: `deliver_typed` / DRR `flush_batch` now write the caller's
     // `iac.send` token, so they are token-bearing sites; a row a caller left
@@ -879,6 +890,12 @@ fn payload_matches(
                     && ["context_used", "context_window_size", "threshold_permille"]
                         .iter()
                         .all(|key| object.get(*key).is_some_and(serde_json::Value::is_u64))
+            }),
+            PayloadType::TaskReply => value.as_object().is_some_and(|object| {
+                object.len() == 1
+                    && object
+                        .get("result")
+                        .is_some_and(serde_json::Value::is_string)
             }),
             PayloadType::SpiritPidEqualsRow => value.as_u64() == Some(row_spirit_pid as u64),
         };

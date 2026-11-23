@@ -90,17 +90,16 @@ fn admit(
     row["from_pid"] = carried.from_pid.into();
     row["to_boot"] = boot_nonce.into();
     row["to_pid"] = carried.to_pid.into();
-    let _ = log
-        .insert_frame_event_with_correlation(
-            FrameKind::EpistemicHalt,
-            carried.to_pid,
-            None,
-            &carry_correlation(&carried.halt_id),
-            CARRIED_INTENT,
-            row.to_string().as_bytes(),
-            maos_domain::invariants::i3::FrameOrigin::Kernel,
-        )
-        .into_inner();
+    log.insert_frame_event_with_correlation(
+        FrameKind::EpistemicHalt,
+        carried.to_pid,
+        None,
+        &carry_correlation(&carried.halt_id),
+        CARRIED_INTENT,
+        row.to_string().as_bytes(),
+        maos_domain::invariants::i3::FrameOrigin::Kernel,
+    )
+    .into_inner();
     registry
         .insert_pending_with_metadata(
             halt_id,

@@ -494,6 +494,16 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             7,
             "context journal limit (kind 33)",
         ),
+        (
+            // Story 22-8 — Mira's native directed-task reply row (`native_task.rs`), the same
+            // envelope a component's mailbox reply carries; tokenless, at Mira's pid.
+            "task.complete",
+            None,
+            "task.reply",
+            r#"{"TaskComplete":{"result":"{\"subject\":\"payments-api\",\"advisory\":\"delivered\"}"}}"#,
+            7,
+            "native directed-task reply (22-8)",
+        ),
     ];
     let noncall_entries: Vec<&maos_audit::fr4_classifier::WriterShapeEntry> =
         WRITER_SHAPES.iter().filter(|w| w.shape.is_some()).collect();
