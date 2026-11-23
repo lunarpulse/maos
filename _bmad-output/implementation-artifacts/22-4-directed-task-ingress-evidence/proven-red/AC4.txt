@@ -1,0 +1,14 @@
+AC4 plant: crates/maos-bin/src/directed_task.rs accept(): per-Spirit bound '>=' raised by one to '>' (marker PLANT22_4_RED). Command: cargo nextest run --locked -p maos-bin --test task_registry_22_4 -E 'test(queue_refuses_past_its_bound_and_never_blocks)'. Result: FAILS - the ask past the bound is accepted (unwrap_err on an Ok Accepted value, task_registry_22_4.rs:292). Plant reverted.
+
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+        FAIL [   0.178s] (1/1) maos-bin::task_registry_22_4 queue_refuses_past_its_bound_and_never_blocks
+  stdout 
+    running 1 test
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.17s
+  stderr 
+    thread 'queue_refuses_past_its_bound_and_never_blocks' (3842232) panicked at crates/maos-bin/tests/task_registry_22_4.rs:292:17:
+    called `Result::unwrap_err()` on an `Ok` value: Accepted { task_id: "01M846XBYEAE91944DP4X2NF4K", replayed: false, state: Queued }
+     Summary [   0.179s] 1 test run: 0 passed, 1 failed, 15 skipped
+        FAIL [   0.178s] (1/1) maos-bin::task_registry_22_4 queue_refuses_past_its_bound_and_never_blocks
+rc=100

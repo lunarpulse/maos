@@ -1,0 +1,17 @@
+AC7 plant: crates/maos-bin/src/directed_task.rs halt_for_task(): since_ns bound dropped (halt_metadata_for_spirit(spirit_pid, 0); marker PLANT22_4_RED). Command: cargo nextest run --locked -p maos-bin --test task_registry_22_4 -E 'test(/a_halt_/)'. Result: a_halt_before_the_task_started_is_not FAILS (an earlier halt 'halt-before' is reported: state Halted, expected Completed); a_halt_on_the_target_during_the_task_is_reported passes. Plant reverted.
+
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+        PASS [   0.024s] (1/2) maos-bin::task_registry_22_4 a_halt_on_the_target_during_the_task_is_reported
+        FAIL [   0.206s] (2/2) maos-bin::task_registry_22_4 a_halt_before_the_task_started_is_not
+  stdout 
+    running 1 test
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.19s
+  stderr 
+    thread 'a_halt_before_the_task_started_is_not' (3843304) panicked at crates/maos-bin/tests/task_registry_22_4.rs:520:5:
+    assertion `left == right` failed: an earlier halt is not the task's: TaskRecord { task_id: "01M846YSRJ46KVNDQPFK8XN9HP", spirit_id: "probe", origin: "door", actor: "director", state: Halted, result: None, halt: Some(TaskHalt { halt_id: "halt-before", state: "PendingResolution" }), reason: None, accepted_ns: 1795437848338809208, ended_ns: Some(1795437848338876003) }
+      left: Halted
+     right: Completed
+     Summary [   0.207s] 2 tests run: 1 passed, 1 failed, 14 skipped
+        FAIL [   0.206s] (2/2) maos-bin::task_registry_22_4 a_halt_before_the_task_started_is_not
+rc=100
