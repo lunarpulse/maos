@@ -2198,7 +2198,7 @@ jobs:
             rc=1
             echo "::error title=Epic-18 exit line 2::exit 0 but the run did not consume one completion per row"
           fi
-          if ! cp "$scratch"/.local/share/maos/registry/spirits/butler/*/benchmark.signed.json "$RUNNER_TEMP/line2.benchmark.signed.json"; then
+          if ! cp "$MAOS_HOME"/registry/spirits/butler/*/benchmark.signed.json "$RUNNER_TEMP/line2.benchmark.signed.json"; then
             rc=1
             echo "::error title=Epic-18 exit line 2::no signed benchmark sidecar in registry storage"
           fi
@@ -2491,7 +2491,7 @@ jobs:
           MAOS_SPIRIT_SIGNING_KEY="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')" dist/maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest examples/example-spirit-ts/manifest.toml --artifact examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
           dist/maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
           "$PWD/dist/maos" init --plain
-          manifest="$(python3 -c 'import json,os,pathlib; r=pathlib.Path(os.environ["HOME"])/".local/share/maos/registry"; print(r/"installed"/json.loads((r/"installed-index.json").read_text())["example-spirit-ts"]/"manifest.toml")')"
+          manifest="$(python3 -c 'import json,os,pathlib; r=pathlib.Path(os.environ["MAOS_HOME"])/"registry"; print(r/"installed"/json.loads((r/"installed-index.json").read_text())["example-spirit-ts"]/"manifest.toml")')"
           /usr/bin/time -p sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" "$PWD/dist/maos" run "$manifest" --once 2>&1 | tee component.log
           grep -F 'spirit_session_complete' component.log
           # Component exchange, from the attributable session report the CLI prints:
