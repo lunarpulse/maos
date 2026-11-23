@@ -410,6 +410,9 @@ pub enum OperatorCommand {
     ReleaseLegalHold {
         principal: String,
     },
+    /// Story 22-6 (D-22-6-08 A, ADR-062) — seal the oldest prefix of the Transparency Log into
+    /// a signed segment now, below every floor the daemon knows. Host-wide: no Spirit key.
+    AuditRotate,
     /// An authenticated operator decision; Spirits have no decision port.
     SkillDecision {
         entry: String,
@@ -482,6 +485,7 @@ impl OperatorCommand {
             | Self::ImportRevocations { .. }
             | Self::ForgetMemory { .. }
             | Self::ReleaseLegalHold { .. }
+            | Self::AuditRotate
             | Self::AdmitGovernanceSchema { .. }
             | Self::SkillDecision { .. }
             // Story 19-7 — a host trust decision has no Spirit. The handler
@@ -517,7 +521,10 @@ impl OperatorCommand {
             // 25 s `TEARDOWN_BUDGET`, which a 10 s route would cut short.
             | Self::RevokeToken { .. }
             | Self::Pause { .. }
-            | Self::Resume { .. } => LONG_ROUTE_BUDGET,
+            | Self::Resume { .. }
+            // Story 22-6 — a seal copies a prefix of the log window by window; a large
+            // prefix does not fit inside a 10 s route.
+            | Self::AuditRotate => LONG_ROUTE_BUDGET,
             // Story 19-7 — explicit, never inherited from `_`: a re-pin
             // decision is a store lookup, one Approval Decision Log row and a
             // non-blocking consent read. Story 19-2's recall is a buffer drain
@@ -1509,6 +1516,13 @@ fn route<S: SandboxReportSource>(routes: &Routes<'_, S>, request: &mut Incoming<
                 Ok(principal) => submit(routes, OperatorCommand::ReleaseLegalHold { principal }),
                 Err(response) => response,
             }
+        }
+        // Story 22-6 — `POST /v1/audit/rotate`, no body.
+        ["v1", "audit", "rotate"] => {
+            if let Err(response) = post_guard(method, request) {
+                return response;
+            }
+            submit(routes, OperatorCommand::AuditRotate)
         }
         ["v1", "governance", "schemas"] => {
             if let Err(response) = post_guard(method, request) {

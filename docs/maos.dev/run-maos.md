@@ -279,6 +279,9 @@ door_bind = "127.0.0.1:7600"       # MAOS_OPERATOR_HTTP_BIND (loopback only)
 region = "eu-west"                 # MAOS_REGION_HOME
 crypto_provider = "ring"           # MAOS_CRYPTO_PROVIDER
 inference_mode = "replay"          # MAOS_INFERENCE_MODE: live, record or replay
+audit_rotate_bytes = 268435456     # MAOS_AUDIT_ROTATE_BYTES (default 256 MiB)
+audit_rotate_days = 30             # MAOS_AUDIT_ROTATE_DAYS (default 30)
+# audit_keep_days = 365            # MAOS_AUDIT_KEEP_DAYS (default unset; at least 90)
 
 [[host.spirits]]
 manifest = "spirits/butler/manifest.toml"   # relative to this file; `path` is an alias
@@ -294,6 +297,9 @@ installed = "researcher"                    # a registry-installed Spirit
 | `region` | `MAOS_REGION_HOME` | An `ascii-v1` region tag. |
 | `crypto_provider` | `MAOS_CRYPTO_PROVIDER` | Must equal the provider recorded in `<home>/config.toml` (default `ring`). |
 | `inference_mode` | `MAOS_INFERENCE_MODE` | `live`, `record` or `replay`. |
+| `audit_rotate_bytes` | `MAOS_AUDIT_ROTATE_BYTES` | Positive whole number of bytes; default 268435456 (256 MiB). When the live Transparency Log holds this many bytes, its oldest rows are sealed into a signed segment. |
+| `audit_rotate_days` | `MAOS_AUDIT_ROTATE_DAYS` | Positive whole number of days; default 30. Live rows older than this are sealed into a signed segment. |
+| `audit_keep_days` | `MAOS_AUDIT_KEEP_DAYS` | Positive whole number of days, **at least 90** (a lower value refuses the boot with `host_config_setting`, exit 78). Default unset: MAOS deletes no audit record. |
 
 A set environment variable overrides its key for the process; a key fills only a name that is unset. The
 environment never stands in for a missing or invalid file. The cast is exactly the `[[host.spirits]]` list:
@@ -311,6 +317,37 @@ refuses to boot when this tag disagrees with the `region` the signed cohort mani
 team, or when a region is set and the manifest declares no team for the host. The check compares what is
 deployed with what the signed manifest says; it does not stop an operator who controls both the process and the
 manifest from choosing a tag. Unset the tag to turn region pinning off.
+
+### Bound the audit store
+
+The Transparency Log no longer grows without limit. By policy the oldest rows move out of the live log into a
+sealed, signed segment, `<audit dir>/segments/<seq>.sqlite` with a `<seq>.manifest.json` beside it
+(`maos.audit-segment.v1`). The Host checks the policy at boot and every 60 seconds; `maosctl audit rotate`
+asks for one now. Queries, recall and citation read across the live log and every segment as if nothing had
+moved. Rotation needs the operator audit key (`MAOS_AUDIT_KEY`, then `~/.config/maos/audit-signing.key`), the
+same key `sealed-export` uses, and is region-derived when the Host has a region. With no key, rotation is
+refused with one `maos: audit rotation refused` line and the live log keeps growing: logging never fails
+because of sealing.
+
+A rotation never seals a row that something still needs: not the newest row, not an open forget intent, an
+outstanding re-distillation request or the completed-forget marker the door re-checks, and not a row the
+escape-anomaly tail or the Worker progress stamper has yet to read. A segment is deleted from the live log
+only after it is sealed and every copied row has been re-verified against its live twin. Nothing else is
+deleted unless you set `audit_keep_days`: then a whole segment older than that many days (never fewer than
+90) is removed, and never one that holds a frame of a principal under legal hold or with an open erasure.
+Each expiry is journaled as an `audit.segment.expired` row before the file is removed. A forget scrubs the
+principal's frames in the segments too; each affected segment is re-sealed with a manifest that names the
+digest it supersedes and the frames it scrubbed.
+
+| Command | What it does | Exit codes |
+|---|---|---|
+| `maosctl audit rotate` | Seal the oldest prefix now, over the operator door; with no Host answering, offline. Prints the outcome as JSON. | 0 sealed or nothing to seal; 1 refused (no audit key, bad policy); 75 the door is busy |
+| `maosctl audit verify-bundle <manifest> --seed <key>` (or `--pubkey <hex>`) | Verify one segment from its manifest and the segment file beside it: the signature, the file digest, the content digest, the Merkle root and the claimed shape. Works on one segment copied alone. | 0 verified; 1 verification failed; 2 input or key error |
+| `maosctl audit verify-segments <dir> [--seed <key>] [--log <db>]` | Check the chain of a segment directory: a missing, reordered or forked segment, each file digest and, with a key, each signature. A gap is explained only by an `audit.segment.expired` row in the log (`--log`, default `transparency.sqlite` beside the directory). | 0 intact; 1 broken; 2 input error |
+
+Back up the segment directory with the log: `maosctl backup` and `maosctl migrate sqlite-to-postgres` cover the
+live log only, and `maos purge` removes the segment directory it resolves at run time (`--keep-log` keeps it
+with the log and discloses the segment count and bytes).
 
 ### Where data lives
 

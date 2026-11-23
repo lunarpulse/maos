@@ -432,9 +432,12 @@ fn approval_log_is_distinct_table() {
             "transparency_log_consent",
             "transparency_log_consent_ruptures",
             "transparency_log_recipients",
-            "transparency_log_retractions"
+            "transparency_log_retractions",
+            // Story 22-6 — the sealed-segment registry and the peer-replay id table.
+            "transparency_log_sealed_ids",
+            "transparency_log_segments"
         ],
-        "expected exactly eight tables"
+        "expected exactly ten tables"
     );
 
     // 2. No foreign keys on transparency_log

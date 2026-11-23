@@ -7,6 +7,9 @@
 /// than a re-implementation of them.
 #[cfg(feature = "network")]
 pub mod admission;
+/// Story 22-6 (ADR-072) — audit-store rotation on the Host: the cut-floor registry, the 60 s
+/// policy task and the `audit rotate` door verb.
+pub mod audit_rotation;
 /// Story 18-1 — the `--once` Butler pass verdict.
 #[cfg(feature = "network")]
 pub mod butler_root;

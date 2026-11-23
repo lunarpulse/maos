@@ -1011,6 +1011,9 @@ impl DoorInner {
             OperatorCommand::ReleaseLegalHold { principal } => {
                 self.release_legal_hold_command(&principal).await
             }
+            OperatorCommand::AuditRotate => tokio::task::block_in_place(|| {
+                crate::audit_rotation::rotate_now(&self.transparency_log)
+            }),
             OperatorCommand::AdmitGovernanceSchema { schema } => {
                 self.admit_governance_schema_command(schema).await
             }
@@ -3277,6 +3280,7 @@ fn command_verb(command: &OperatorCommand) -> &'static str {
         OperatorCommand::ImportRevocations { .. } => "revocations-import",
         OperatorCommand::ForgetMemory { .. } => "forget",
         OperatorCommand::ReleaseLegalHold { .. } => "legal-hold-release",
+        OperatorCommand::AuditRotate => "audit-rotate",
         OperatorCommand::AdmitGovernanceSchema { .. } => "governance-admit",
         OperatorCommand::SkillDecision { .. } => "skill-decision",
         // Story 19-7 — the completion row reads
