@@ -67,6 +67,8 @@ struct Host {
     _server: InProcessServer,
     config: PathBuf,
     child: Option<Child>,
+    /// The cast holds the native class `nash` beside the probe.
+    native: bool,
 }
 
 impl Host {
@@ -128,6 +130,7 @@ impl Host {
             _server: server,
             config,
             child: None,
+            native,
         }
     }
 
@@ -190,14 +193,17 @@ impl Host {
             .collect()
     }
 
+    /// The whole cast Running: the probe and, when the cast has one, `nash`. The cast is
+    /// admitted in order, so a probe Running does not mean `nash` is even registered yet.
     fn await_running(&mut self) {
         let until = Instant::now() + WAIT;
+        let mut want = vec![format!("{ID}\tRunning")];
+        if self.native {
+            want.push("nash\tRunning".to_owned());
+        }
         loop {
-            if self
-                .agents()
-                .iter()
-                .any(|line| line == &format!("{ID}\tRunning"))
-            {
+            let agents = self.agents();
+            if want.iter().all(|line| agents.contains(line)) {
                 return;
             }
             if let Some(status) = self
