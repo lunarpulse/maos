@@ -1562,6 +1562,10 @@ async fn admit_inner(
     };
 
     on_loaded(pid);
+    crate::operator_door::record_form(
+        pid,
+        crate::operator_door::form_label(&gated.class_section.forms),
+    );
     if let Some(gate) = deps.quarantine {
         gate.reapply(pid, &spirit_id, &gated.class_section.version);
     }

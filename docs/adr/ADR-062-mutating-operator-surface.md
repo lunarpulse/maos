@@ -263,3 +263,19 @@ no operator POST mutation route. Directing a task is not an identity mutation.
   chain (TOFU pin, boot-nonce restart, consent granter and expiry, the accept allowlist and the cohort verdict),
   with its own origin, and never mints a `HumanAuthored` frame. 23-5 writes that part; 24-1 puts a Cedar
   decision before `submit`.
+
+## Amendment — Story 22-5
+
+Amended 2026-11-23 by Story `22-5-agents-list-and-session-view` (decisions D-22-5-02 to D-22-5-10,
+recommended answers), in the same change as the code it governs. Two read routes join the door, behind the same
+shared bearer, loopback-only and GET-only (405 with the fixed body to every other method), both before the
+POST-only `{verb}` arm: `GET /v1/agents` (one object per Spirit: id, pid, state, form, originator, task,
+`more_tasks`, `age_secs`, `spend {in,out}`) and `GET /v1/spirits/<id>/session` (an optional bounded JSON body
+`{after_rowid?, after_decision?, limit?}`, `limit` 1..=500). Neither submits an `OperatorCommand`, takes an
+operation id or writes a row; polling them never grows the log (D-22-5-10 A). The session route opens its own
+`READ_ONLY | NOFOLLOW` connection to the daemon's audit store and never uses the Transparency Log adapter. Its
+rows are **header only**: frame id, time, kind, intent, from/to, origin and a typed one-line summary built from
+parsed fields. Payload bytes, a halt's Spirit-supplied `derived_from` and the operator's typed halt context are
+never returned; an Approval Decision Log row is reduced to actor, capability, the decision and the resolution
+**kind** (`provided_context`, `accepted_halt` or `authorized_override`). The scope is the current boot
+(D-22-5-07 A). `maosctl audit query` remains the forensic path to full rows.

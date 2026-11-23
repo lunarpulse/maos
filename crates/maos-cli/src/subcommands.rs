@@ -15,10 +15,10 @@ use std::collections::HashMap;
 
 use crate::accessibility::ColorChoice;
 use crate::cli::{
-    A2aArgs, A2aOp, AskArgs, AuditFormat, AuditQuery, BackupArgs, BackupOp, ForgetArgs,
-    GovernanceArgs, GovernanceOp, HaltArgs, HaltOp, ImportArgs, InstallArgs, LegalHoldArgs,
-    LegalHoldOp, LoadArgs, MigrateArgs, MigrateOp, OrchestratorArgs, OrchestratorOp, PauseArgs,
-    PostureArgs, PostureChoice, RepinArgs, RepinOp, ResolutionKindChoice, ResumeArgs,
+    A2aArgs, A2aOp, AgentsArgs, AgentsOp, AskArgs, AuditFormat, AuditQuery, BackupArgs, BackupOp,
+    ForgetArgs, GovernanceArgs, GovernanceOp, HaltArgs, HaltOp, ImportArgs, InstallArgs,
+    LegalHoldArgs, LegalHoldOp, LoadArgs, MigrateArgs, MigrateOp, OrchestratorArgs, OrchestratorOp,
+    PauseArgs, PostureArgs, PostureChoice, RepinArgs, RepinOp, ResolutionKindChoice, ResumeArgs,
     RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp, SpiritArgs,
     SpiritOp, Subcommand, TaskArgs, TaskOp, UninstallArgs, UpgradePolicyArg,
 };
@@ -55,7 +55,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::ReleasePubkey => release_pubkey(),
         Subcommand::Cohort(args) => dispatch_cohort(args, color),
         Subcommand::A2a(args) => dispatch_a2a(args),
-        Subcommand::Agents => dispatch_agents(),
+        Subcommand::Agents(args) => dispatch_agents(args),
         Subcommand::Status => dispatch_status(),
         Subcommand::Ask(args) => dispatch_ask(args),
         Subcommand::Task(args) => dispatch_task(args),
@@ -179,31 +179,154 @@ fn door_verb_mapped(
     }
 }
 
-/// Story 22-1 (D-22-1-02 B) — `maosctl agents`: id and lifecycle state of every Spirit the
-/// daemon holds. Story 22-5 adds the pid, form, originator, task and age columns.
-fn dispatch_agents() -> ExitCode {
+/// A printable cell: control characters (tab, newline, escapes) become `?`; empty is `-`.
+fn cell(value: &serde_json::Value) -> String {
+    let text = match value {
+        serde_json::Value::String(text) => text.clone(),
+        serde_json::Value::Null => String::new(),
+        other => other.to_string(),
+    };
+    if text.is_empty() {
+        return "-".to_string();
+    }
+    text.chars()
+        .map(|c| if c.is_control() { '?' } else { c })
+        .collect()
+}
+
+/// Story 22-1/22-5 (AC1) — `maosctl agents`: one line per Spirit the daemon holds, sorted by
+/// id, no header: `id pid state form originator task[+N] age spend`, tab-separated, from
+/// `GET /v1/agents`. `agents show <id>` is the session view.
+fn dispatch_agents(args: &AgentsArgs) -> ExitCode {
+    if let Some(AgentsOp::Show {
+        id,
+        limit,
+        follow,
+        interval,
+    }) = &args.op
+    {
+        return dispatch_agents_show(id, *limit, *follow, *interval);
+    }
     door_verb_mapped(
         "agents",
-        |config| door_client::exchange(config, "GET", "/v1/daemon", None, DEFAULT_ROUTE_BUDGET),
+        |config| door_client::exchange(config, "GET", "/v1/agents", None, DEFAULT_ROUTE_BUDGET),
         |response| {
             if response.status != 200 {
                 return door_client::map_response("agents", response);
             }
-            let body = response.body_json();
-            let column = |key: &str| -> Vec<String> {
-                body.get(key)
-                    .and_then(serde_json::Value::as_array)
-                    .into_iter()
-                    .flatten()
-                    .filter_map(|value| value.as_str().map(str::to_owned))
-                    .collect()
-            };
-            for (id, state) in column("spirit_ids").iter().zip(column("lifecycle_states")) {
-                println!("{id}\t{state}");
+            for row in response.body_json().as_array().into_iter().flatten() {
+                let field = |key: &str| cell(row.get(key).unwrap_or(&serde_json::Value::Null));
+                let more = row.get("more_tasks").and_then(serde_json::Value::as_u64);
+                let task = match more {
+                    Some(n) if n > 0 && field("task") != "-" => format!("{}+{n}", field("task")),
+                    _ => field("task"),
+                };
+                let age = row
+                    .get("age_secs")
+                    .and_then(serde_json::Value::as_u64)
+                    .map_or("-".to_string(), |secs| format!("{secs}s"));
+                let spend = row
+                    .get("spend")
+                    .filter(|s| s.is_object())
+                    .map_or("-".to_string(), |s| {
+                        format!("{}/{}", cell(&s["in"]), cell(&s["out"]))
+                    });
+                println!(
+                    "{}\t{}\t{}\t{}\t{}\t{task}\t{age}\t{spend}",
+                    field("id"),
+                    field("pid"),
+                    field("state"),
+                    field("form"),
+                    field("originator"),
+                );
             }
             ExitCode::SUCCESS
         },
     )
+}
+
+/// Story 22-5 (AC2) — `maosctl agents show <id> [--limit N] [--follow] [--interval MS]`.
+/// The first read asks for the newest `limit` rows; `--follow` then polls with the rowid
+/// cursors of what it printed. Follow ends 0 when the id stops resolving or the response's
+/// `boot_nonce` or `pid` changes (said on stderr); an unreachable daemon is 69 (the door's).
+fn dispatch_agents_show(id: &str, limit: u16, follow: bool, interval_ms: u64) -> ExitCode {
+    let verb = "agents show";
+    if let Some(code) = checked_id(verb, id) {
+        return code;
+    }
+    let config = match door_client::resolve_door() {
+        Ok(config) => config,
+        Err(error) => return door_client::map_error(verb, error),
+    };
+    let interval = std::time::Duration::from_millis(interval_ms.max(100));
+    let mut cursor: Option<(u64, u64)> = None;
+    let mut identity: Option<(String, u64)> = None;
+    loop {
+        let mut query = serde_json::json!({ "limit": limit });
+        if let Some((rowid, decision)) = cursor {
+            query["after_rowid"] = rowid.into();
+            query["after_decision"] = decision.into();
+        }
+        let response = match door_client::exchange(
+            &config,
+            "GET",
+            &format!("/v1/spirits/{id}/session"),
+            Some(("application/json", query.to_string().as_bytes())),
+            DEFAULT_ROUTE_BUDGET,
+        ) {
+            Ok(response) => response,
+            Err(DoorError::ConnectRefused) => {
+                return door_client::door_class_connect_refused(verb, config.endpoint)
+            }
+            Err(error) => return door_client::map_error(verb, error),
+        };
+        if response.status == 404 && identity.is_some() {
+            eprintln!("maosctl: {verb} — {id} no longer resolves (unloaded); follow ends");
+            return ExitCode::SUCCESS;
+        }
+        if response.status != 200 {
+            return door_client::map_response(verb, response);
+        }
+        let body = response.body_json();
+        let seen = (
+            body["boot_nonce"].as_str().unwrap_or_default().to_string(),
+            body["pid"].as_u64().unwrap_or(0),
+        );
+        if identity.as_ref().is_some_and(|previous| *previous != seen) {
+            eprintln!("maosctl: {verb} — {id} was reloaded (boot or pid changed); follow ends");
+            return ExitCode::SUCCESS;
+        }
+        identity = Some(seen);
+        let (mut rowid, mut decision) = cursor.unwrap_or((0, 0));
+        for row in body["rows"].as_array().into_iter().flatten() {
+            let number = row["rowid"].as_u64().unwrap_or(0);
+            let approval = row["source"] == "approval";
+            if approval {
+                decision = decision.max(number);
+            } else {
+                rowid = rowid.max(number);
+            }
+            let nanos = row["timestamp_ns"].as_u64().unwrap_or(0);
+            println!(
+                "{}{number}\t{}.{:03}\t{}\t{}\t{}\t{}->{}\t{}\t{}",
+                if approval { "a" } else { "" },
+                nanos / 1_000_000_000,
+                nanos / 1_000_000 % 1000,
+                cell(&row["kind"]),
+                cell(&row["intent"]),
+                cell(&row["frame_id"]),
+                cell(&row["from"]),
+                cell(&row["to"]),
+                cell(&row["origin"]),
+                cell(&row["summary"]),
+            );
+        }
+        cursor = Some((rowid, decision));
+        if !follow {
+            return ExitCode::SUCCESS;
+        }
+        std::thread::sleep(interval);
+    }
 }
 
 /// Story 22-2 (AC2) — `maosctl status`: one line `pid=… version=… spirits=… audit_store_writable=…`.

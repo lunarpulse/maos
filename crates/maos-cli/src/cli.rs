@@ -156,9 +156,10 @@ pub enum Subcommand {
     Cohort(CohortArgs),
     /// Story 19-7 (AC3) — A2A trust operations on this host's daemon door.
     A2a(A2aArgs),
-    /// Story 22-1 — the agents the running Host holds: one `<spirit_id>\t<lifecycle_state>`
-    /// line per Spirit, read from the daemon door (`GET /v1/daemon`).
-    Agents,
+    /// Story 22-1/22-5 — the agents the running Host holds: one tab-separated line per Spirit
+    /// (`id pid state form originator task age spend`, `-` when empty; `GET /v1/agents`).
+    /// `agents show <id>` prints one Spirit's session.
+    Agents(AgentsArgs),
     /// Story 22-2 — one health line for a supervisor or probe: exit 0 when the daemon answers
     /// and its audit store takes a write lock, 74 when it answers and the store does not,
     /// 69 when it is unreachable, 78 when the home is not initialised (`GET /v1/daemon`).
@@ -939,6 +940,33 @@ pub enum TaskOp {
     Show {
         /// The task id `maosctl ask` printed.
         id: String,
+    },
+}
+
+/// Story 22-5 — `maosctl agents [show <id> ...]`.
+#[derive(clap::Args, Debug)]
+pub struct AgentsArgs {
+    #[command(subcommand)]
+    pub op: Option<AgentsOp>,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum AgentsOp {
+    /// One Spirit's session for the current boot, oldest first, header fields only (never
+    /// payload bytes or halt context). `GET /v1/spirits/{id}/session`.
+    Show {
+        /// The Spirit id.
+        id: String,
+        /// Rows to print (newest `N`), 1..=500.
+        #[arg(long, default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=500))]
+        limit: u16,
+        /// Keep polling for new rows. Exits 0 when the id stops resolving or its boot or pid
+        /// changes, 69 when the daemon becomes unreachable.
+        #[arg(long)]
+        follow: bool,
+        /// Poll interval in milliseconds (floor 100).
+        #[arg(long, value_name = "MS", default_value_t = 1000)]
+        interval: u64,
     },
 }
 

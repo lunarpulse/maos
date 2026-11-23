@@ -496,9 +496,18 @@ impl Host {
         if !out.status.success() {
             return Vec::new();
         }
+        // Story 22-5 widened the line to `id pid state form originator task age spend`; the
+        // 22-1 read-back is the id and the state (the pid and age change across a restart).
         let mut lines: Vec<String> = String::from_utf8_lossy(&out.stdout)
             .lines()
-            .map(str::to_owned)
+            .map(|line| {
+                let mut fields = line.split('\t');
+                format!(
+                    "{}\t{}",
+                    fields.next().unwrap_or_default(),
+                    fields.nth(1).unwrap_or_default()
+                )
+            })
             .collect();
         lines.sort();
         lines

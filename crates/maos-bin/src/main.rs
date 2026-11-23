@@ -4732,6 +4732,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .await
                 .map_err(|e| format!("shell: scheduler.load failed: {e}"))?;
+            maos_bin::operator_door::record_form(hello_pid, "in-process");
             // 2. Admit at the real pid through the canonical path. The
             //    journal is the daemon's `shared_journal` — the block's own
             //    `JournalAdapter::open` is deleted (one journal handle per

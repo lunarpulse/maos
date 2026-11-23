@@ -42,6 +42,36 @@ use maos_control::{
     UpgradePolicyRequest, COMMAND_QUEUED, COMMAND_STARTED,
 };
 
+/// Story 22-5 (D-22-5-03 A) — the form each admitted pid runs as: a non-durable map written by
+/// the admission path, read by `GET /v1/agents`. A pid no site recorded reads `unknown`.
+static SPIRIT_FORMS: Mutex<BTreeMap<u32, &'static str>> = Mutex::new(BTreeMap::new());
+
+/// Record `pid`'s form (`in-process`, `wasm`, `native` or `worker`).
+pub fn record_form(pid: u32, form: &'static str) {
+    SPIRIT_FORMS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .insert(pid, form);
+}
+
+/// The form a manifest's `[class].forms` list admits as.
+pub fn form_label(forms: &[String]) -> &'static str {
+    match forms {
+        [only] if only == "wasm-component" => "wasm",
+        [only] if only == "subprocess" => "native",
+        _ => "in-process",
+    }
+}
+
+fn form_of(pid: u32) -> &'static str {
+    SPIRIT_FORMS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .get(&pid)
+        .copied()
+        .unwrap_or("unknown")
+}
+
 /// Explicit package evidence resolved before a manifest becomes a temp snapshot.
 #[derive(Clone, Copy, Default)]
 pub struct UpgradeVetting<'a> {
@@ -3398,6 +3428,96 @@ impl OperatorCommandPort for OperatorDoor {
         installed(&self.0.directed_tasks)?
             .get(task_id)
             .map(|record| record.to_row())
+    }
+
+    /// Story 22-5 (AC1) — rows from ONE `scbs()` pass, each ledger cloned under its own lock;
+    /// both guards are gone before the journal is read.
+    fn agents(&self) -> Option<Vec<serde_json::Value>> {
+        let mut rows: Vec<serde_json::Value> = {
+            let scbs = self.0.scheduler.scbs();
+            let guard = scbs.read().unwrap_or_else(|error| error.into_inner());
+            guard
+                .values()
+                .map(|scb| {
+                    let ledger = scb
+                        .task_assignments_in_flight
+                        .lock()
+                        .unwrap_or_else(|error| error.into_inner())
+                        .clone();
+                    serde_json::json!({
+                        "id": scb.spirit_id,
+                        "pid": scb.pid,
+                        "state": format!("{:?}", scb.current_state()),
+                        "form": form_of(scb.pid),
+                        "originator": ledger.first().map(|t| &t.originator_spirit_id),
+                        "task": ledger.first().map(|t| &t.task_id),
+                        "more_tasks": ledger.len().saturating_sub(1),
+                        "age_secs": null,
+                        "spend": null,
+                    })
+                })
+                .collect()
+        };
+        rows.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
+        let pids: Vec<u32> = rows
+            .iter()
+            .filter_map(|r| r["pid"].as_u64())
+            .map(|p| p as u32)
+            .collect();
+        let vitals = self
+            .0
+            .audit_store_path
+            .get()
+            .map(|path| maos_audit::session::agent_vitals(path, self.0.boot_nonce, &pids));
+        if let Some(Ok(vitals)) = vitals {
+            let now_ns = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_nanos() as u64);
+            for (row, vital) in rows.iter_mut().zip(vitals) {
+                row["age_secs"] = vital
+                    .first_row_ns
+                    .map(|ns| now_ns.saturating_sub(ns) / 1_000_000_000)
+                    .into();
+                row["spend"] = serde_json::json!({"in": vital.tokens_in, "out": vital.tokens_out});
+            }
+        }
+        Some(rows)
+    }
+
+    /// Story 22-5 (AC2) — header-only rows of the Spirit's current boot, read through a
+    /// fresh read-only connection; never the Transparency Log adapter, never a write.
+    fn session(
+        &self,
+        spirit_id: &str,
+        query: &maos_control::SessionQuery,
+    ) -> Option<Result<serde_json::Value, String>> {
+        let pid = self.0.scheduler.resolve_pid(spirit_id)?;
+        let boot = self.0.scheduler.scbs().read().ok()?.get(&pid)?.boot_nonce;
+        let Some(path) = self.0.audit_store_path.get() else {
+            return Some(Err("the daemon names no audit store".into()));
+        };
+        let cursor = maos_audit::session::SessionCursor {
+            after_rowid: query.after_rowid,
+            after_decision: query.after_decision,
+        };
+        let classify = &maos_cli::subcommands::classify_halt_record;
+        let rows = maos_audit::session::session_rows(
+            path,
+            boot,
+            pid,
+            spirit_id,
+            cursor,
+            query.limit,
+            classify,
+        );
+        Some(rows.map_err(|error| error.to_string()).map(|rows| {
+            serde_json::json!({
+                "spirit_id": spirit_id,
+                "pid": pid,
+                "boot_nonce": boot.to_string(),
+                "rows": rows,
+            })
+        }))
     }
 
     fn applied_revocations(&self) -> Vec<maos_control::RevocationRow> {

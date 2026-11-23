@@ -18,6 +18,7 @@ pub mod fr4_classifier;
 pub use fr4_classifier::{classify_fr4_row, Fr4RowDisposition, WriterShapeEntry};
 pub mod log_composition;
 pub mod replay;
+pub mod session;
 
 pub mod backup;
 pub mod release_verify;

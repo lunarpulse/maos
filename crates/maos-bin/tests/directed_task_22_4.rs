@@ -184,9 +184,17 @@ impl Host {
         if !out.status.success() {
             return Vec::new();
         }
+        // Story 22-5 widened the line to `id pid state ...`; the read-back here is id and state.
         String::from_utf8_lossy(&out.stdout)
             .lines()
-            .map(str::to_owned)
+            .map(|line| {
+                let mut fields = line.split('\t');
+                format!(
+                    "{}\t{}",
+                    fields.next().unwrap_or_default(),
+                    fields.nth(1).unwrap_or_default()
+                )
+            })
             .collect()
     }
 

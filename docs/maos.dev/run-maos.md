@@ -364,6 +364,45 @@ the Spirit raw while the audit trail keeps a redacted copy; delivery is at most 
 not re-run, when the Host stops; an idempotency key is not crash-safe between the accept row and delivery; and
 `task show` reads only the live audit segment. The release's claim boundaries B1 to B7 are in `RELEASE-HOLDS.md`.
 
+## Agents and sessions
+
+`maosctl agents` lists every Spirit the running Host holds; `maosctl agents show <id>` reads one Spirit's session
+from what the Host already journaled. Both are authenticated reads through the loopback door (`GET /v1/agents`,
+`GET /v1/spirits/<id>/session`). They write nothing, and polling them never grows the audit log.
+
+```sh
+maosctl agents                       # one line per Spirit, sorted by id, no header
+maosctl agents show researcher       # the newest 50 rows of this boot, oldest first
+maosctl agents show researcher --limit 500 --follow --interval 1000
+```
+
+`agents` prints eight tab-separated columns, `-` for an empty value; the id is always the first:
+
+| Column | Source |
+|---|---|
+| `id`, `pid` | The scheduler's control block (the pid the audit trail journals). |
+| `state` | The Spirit's lifecycle state. |
+| `form` | `in-process`, `wasm`, `native` or `worker`, recorded when the Spirit was admitted; `unknown` for a pid no admission recorded. |
+| `originator` | The Spirit that handed over its current task; `-` when idle. For a Worker, the Orchestrator that assigned it. |
+| `task` | The first in-flight task id, `+N` when more are in flight; `-` when none. |
+| `age` | Whole seconds (`41s`) since the Spirit's first audit row of this boot; `-` before it has one. |
+| `spend` | `in/out` tokens summed from this boot's cost frames. Tokens only, no money. |
+
+`agents show` prints the Spirit's current-boot rows, oldest first: the frames it emitted, the frames it received
+(for example its `task.assign`), and the halt resolutions recorded against it. A row is `<rowid>`
+(`a<n>` for an approval row), time as `seconds.millis`, kind, intent (at most 64 characters), the 8-character
+frame id, `from->to`, origin and a typed summary (halt: `record`, `halt_id`, `tag`; cost: the token counts;
+approval: the decision and the resolution kind). **Never printed:** payload bytes, a halt's Spirit-supplied
+`derived_from`, and the text an operator typed when resolving a halt. `maosctl audit query --spirit <id>` prints
+full rows when you need them, and reads the store directly.
+
+`--follow` polls with a cursor of what it printed (`--interval` is in milliseconds, default 1000, floor 100). It
+exits 0, saying why on stderr, when the id stops resolving or its boot or pid changes (the Spirit was unloaded or
+reloaded, or the Host restarted); it exits 69 when the daemon becomes unreachable. Other exits are the door's: 1
+for an unknown id, 2 for a local id or `--limit` check, 75 for an unreadable audit store, 77 for a rejected
+bearer and 78 for an uninitialised home. Rows of an earlier boot of the same id are not shown; use
+`maosctl audit query --spirit <id> --all-boots`.
+
 ## Run as a service
 
 The deb and the rpm install `/usr/lib/systemd/system/maos.service` and a `maos` system account (home

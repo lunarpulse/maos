@@ -2337,6 +2337,7 @@ mod worker {
                 )
                 .map_err(|e| WorkerSupervisionError::Load(e.to_string()))?;
             core.bind_scheduler_pid(pid);
+            crate::operator_door::record_form(pid, "worker");
 
             if let Err(e) = self.exec.handle.block_on(self.exec.scheduler.start(pid)) {
                 // Story 16-6 — this used to read "the SCB is `Loaded` and
