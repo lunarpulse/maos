@@ -2358,6 +2358,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?;
     }
     maos_bin::crypto_provider::journal(&transparency_log, &selected_crypto);
+    // Story 22-6 (ADR-072, D-22-6-08 A) — bound the audit store by policy: one check at boot,
+    // then one every 60 s. Rotation seals a prefix below every registered floor; with no audit
+    // key it is refused with a typed line and the log keeps growing.
+    let _audit_rotation = maos_bin::audit_rotation::spawn_rotation_task(
+        Arc::clone(&transparency_log),
+        tokio_util::sync::CancellationToken::new(),
+    );
 
     // Story 13.5c — single composition root.  A `cohort-a2a-daemon` process
     // already ran this entire root; it must NOT open a second Transparency Log

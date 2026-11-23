@@ -933,7 +933,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 20-9 — 39 → 40: `spawned_lifecycle.rs` joins it.
     // Story 20-9 (round 4) — 40 → 41: `invocation.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 45] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 46] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("workflow.rs", include_str!("../src/workflow.rs")),
         ("invocation.rs", include_str!("../src/invocation.rs")),
@@ -1109,9 +1109,13 @@ fn composition_root_does_not_seed_manifest_scopes() {
         ("host_config.rs", include_str!("../src/host_config.rs")),
         // Story 22-4 — the directed-task registry and its Transparency-Log read-back. It
         // reads only audit rows and never seeds the manifest-derived policy table.
+        ("directed_task.rs", include_str!("../src/directed_task.rs")),
+        // Story 22-6 — the audit-store rotation task and cursor-floor registry. It reads only the
+        // Transparency Log and the escape tail's cursors and never seeds the manifest-derived
+        // policy table.
         (
-            "directed_task.rs",
-            include_str!("../src/directed_task.rs"),
+            "audit_rotation.rs",
+            include_str!("../src/audit_rotation.rs"),
         ),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");

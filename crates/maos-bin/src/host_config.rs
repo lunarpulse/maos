@@ -16,6 +16,9 @@
 //! region = "eu-west"                  # MAOS_REGION_HOME
 //! crypto_provider = "ring"            # MAOS_CRYPTO_PROVIDER
 //! inference_mode = "replay"           # MAOS_INFERENCE_MODE
+//! audit_rotate_bytes = 268435456       # MAOS_AUDIT_ROTATE_BYTES (default 256 MiB)
+//! audit_rotate_days = 30               # MAOS_AUDIT_ROTATE_DAYS (default 30)
+//! audit_keep_days = 365                # MAOS_AUDIT_KEEP_DAYS (default unset; at least 90)
 //!
 //! [[host.spirits]]
 //! manifest = "spirits/butler/manifest.toml"   # a topology entry; `path` is an alias
@@ -45,6 +48,15 @@ pub const HOST_SETTINGS: &[(&str, &str)] = &[
     ("region", ENV_REGION),
     ("crypto_provider", ENV_CRYPTO),
     ("inference_mode", ENV_INFERENCE),
+    (
+        "audit_rotate_bytes",
+        maos_cli::audit_rotation::ENV_ROTATE_BYTES,
+    ),
+    (
+        "audit_rotate_days",
+        maos_cli::audit_rotation::ENV_ROTATE_DAYS,
+    ),
+    ("audit_keep_days", maos_cli::audit_rotation::ENV_KEEP_DAYS),
 ];
 
 /// The stable error kind of a typed boot refusal.
@@ -110,6 +122,9 @@ struct HostSection {
     region: Option<String>,
     crypto_provider: Option<String>,
     inference_mode: Option<String>,
+    audit_rotate_bytes: Option<SettingValue>,
+    audit_rotate_days: Option<SettingValue>,
+    audit_keep_days: Option<SettingValue>,
     #[serde(default)]
     spirits: Vec<CastEntry>,
 }
@@ -163,7 +178,7 @@ impl HostConfig {
         let section = file.host;
         for (key, _) in HOST_SETTINGS {
             if let Some(value) = setting(&section, key) {
-                validate_setting(key, value)?;
+                validate_setting(key, &value)?;
             }
         }
         let base = path.parent().unwrap_or_else(|| Path::new("."));
@@ -266,7 +281,7 @@ impl HostConfig {
             .iter()
             .filter_map(|(key, env)| {
                 let value = setting(&self.section, key)?;
-                (!is_set(env)).then(|| (*env, value.to_owned()))
+                (!is_set(env)).then(|| (*env, value.into_owned()))
             })
             .collect()
     }
@@ -328,13 +343,32 @@ impl HostConfig {
     }
 }
 
-fn setting<'a>(section: &'a HostSection, key: &str) -> Option<&'a str> {
+/// A numeric Host key may be written as a TOML integer or a string; both reach the one
+/// environment name as text.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum SettingValue {
+    Number(i64),
+    Text(String),
+}
+
+fn setting<'a>(section: &'a HostSection, key: &str) -> Option<std::borrow::Cow<'a, str>> {
+    use std::borrow::Cow;
+    let number = |value: &'a Option<SettingValue>| {
+        value.as_ref().map(|value| match value {
+            SettingValue::Number(number) => Cow::Owned(number.to_string()),
+            SettingValue::Text(text) => Cow::Borrowed(text.as_str()),
+        })
+    };
     match key {
-        "home" => section.home.as_deref(),
-        "door_bind" => section.door_bind.as_deref(),
-        "region" => section.region.as_deref(),
-        "crypto_provider" => section.crypto_provider.as_deref(),
-        "inference_mode" => section.inference_mode.as_deref(),
+        "home" => section.home.as_deref().map(Cow::Borrowed),
+        "door_bind" => section.door_bind.as_deref().map(Cow::Borrowed),
+        "region" => section.region.as_deref().map(Cow::Borrowed),
+        "crypto_provider" => section.crypto_provider.as_deref().map(Cow::Borrowed),
+        "inference_mode" => section.inference_mode.as_deref().map(Cow::Borrowed),
+        "audit_rotate_bytes" => number(&section.audit_rotate_bytes),
+        "audit_rotate_days" => number(&section.audit_rotate_days),
+        "audit_keep_days" => number(&section.audit_keep_days),
         _ => None,
     }
 }
@@ -357,6 +391,16 @@ fn validate_setting(key: &str, value: &str) -> Result<(), HostConfigError> {
             .map_err(|e| bad(&e)),
         "inference_mode" if !matches!(value, "live" | "record" | "replay") => {
             Err(bad("must be live, record or replay"))
+        }
+        // Story 22-6 (D-22-6-08 A): positive whole numbers; expiry never below 90 days.
+        "audit_rotate_bytes" | "audit_rotate_days" | "audit_keep_days" => {
+            let env = HOST_SETTINGS
+                .iter()
+                .find(|(name, _)| *name == key)
+                .map_or(key, |(_, env)| *env);
+            maos_cli::audit_rotation::RotationPolicy::check(env, value)
+                .map(|_| ())
+                .map_err(|why| refuse(HostConfigKind::Setting, format!("{key}: {why}")))
         }
         _ => Ok(()),
     }

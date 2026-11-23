@@ -3230,6 +3230,13 @@ fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCo
             pubkey,
             seed,
         }) => audit_verify_bundle(bundle, pubkey.as_deref(), seed.as_ref()),
+        Some(AuditQuery::Rotate) => audit_rotate(),
+        Some(AuditQuery::VerifySegments {
+            dir,
+            log,
+            pubkey,
+            seed,
+        }) => audit_verify_segments(dir, log.as_ref(), pubkey.as_deref(), seed.as_ref()),
         Some(AuditQuery::ReconcileHosts {
             bundle_a,
             pubkey_a,
@@ -4123,6 +4130,11 @@ fn resolve_verify_key(
         };
     }
     let pubkey_arg = pubkey_arg.ok_or("one of --pubkey or --seed is required")?;
+    read_pubkey_arg(pubkey_arg)
+}
+
+/// A hex public key, or the path of a file holding one.
+fn read_pubkey_arg(pubkey_arg: &str) -> Result<[u8; 32], String> {
     // Resolve public key: distinguish file path from hex string.
     // A hex pubkey is exactly 64 hex chars (32 bytes). A file path typically
     // has an extension or directory separator — use that as the discriminator.
@@ -4170,6 +4182,16 @@ fn audit_verify_bundle(
             return ExitCode::from(2);
         }
     };
+    // Story 22-6 (D-22-6-03 A): a `maos.audit-segment.v1` manifest is verified against its
+    // sibling segment file; every other document takes the unchanged bundle path below.
+    if serde_json::from_str::<serde_json::Value>(&bundle_bytes)
+        .ok()
+        .and_then(|doc| doc.get("schema_version")?.as_str().map(str::to_owned))
+        .as_deref()
+        == Some(maos_audit::segment::SEGMENT_SCHEMA)
+    {
+        return audit_verify_segment(bundle, &bundle_bytes, pubkey_arg, seed_path);
+    }
 
     let bundle: maos_audit::sealed_export::AuditBundle = match serde_json::from_str(&bundle_bytes) {
         Ok(b) => b,
@@ -4198,6 +4220,186 @@ fn audit_verify_bundle(
         }
         Err(e) => {
             eprintln!("maosctl: audit verify-bundle — verification failed: {e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+/// Story 22-6 — the verification key for a manifest claiming `region`, from exactly one
+/// operator-supplied source (never the `attester_pubkey` the manifest carries, R-RG1).
+fn segment_verify_key(
+    region: Option<&str>,
+    pubkey_arg: Option<&str>,
+    seed_path: Option<&PathBuf>,
+) -> Result<[u8; 32], String> {
+    if let Some(path) = seed_path {
+        let seed = maos_domain::audit_key::load_audit_key_seed(&Some(path.clone()))
+            .map_err(|e| format!("cannot load base seed: {e}"))?;
+        return maos_audit::segment::expected_pubkey(&seed, region).map_err(|e| e.to_string());
+    }
+    read_pubkey_arg(pubkey_arg.ok_or("one of --pubkey or --seed is required")?)
+}
+
+/// Story 22-6 — `verify-bundle` on one segment manifest: exit 0 verified, 1 verification
+/// failed (signature, file digest, content digest, Merkle root or shape), 2 input or key error.
+fn audit_verify_segment(
+    manifest_path: &std::path::Path,
+    text: &str,
+    pubkey_arg: Option<&str>,
+    seed_path: Option<&PathBuf>,
+) -> ExitCode {
+    let manifest = match maos_audit::segment::parse_manifest(text.as_bytes()) {
+        Ok(manifest) => manifest,
+        Err(e) => {
+            eprintln!("maosctl: audit verify-bundle — {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let key = match segment_verify_key(manifest.region.as_deref(), pubkey_arg, seed_path) {
+        Ok(key) => key,
+        Err(e) => {
+            eprintln!("maosctl: audit verify-bundle — {e}");
+            return ExitCode::from(2);
+        }
+    };
+    match maos_audit::segment::verify_segment(manifest_path, &key) {
+        Ok(manifest) => {
+            eprintln!(
+                "maosctl: audit verify-bundle — OK (segment {}, {} rows, insertion ids {}..={})",
+                manifest.seq, manifest.row_count, manifest.first_rowid, manifest.last_rowid
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("maosctl: audit verify-bundle — verification failed: {e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+/// Story 22-6 (D-22-6-05 A) — `maosctl audit verify-segments <dir>`.
+fn audit_verify_segments(
+    dir: &std::path::Path,
+    log: Option<&PathBuf>,
+    pubkey_arg: Option<&str>,
+    seed_path: Option<&PathBuf>,
+) -> ExitCode {
+    if !dir.is_dir() {
+        eprintln!(
+            "maosctl: audit verify-segments — {} is not a directory",
+            dir.display()
+        );
+        return ExitCode::from(2);
+    }
+    let seed = match seed_path {
+        Some(path) => match maos_domain::audit_key::load_audit_key_seed(&Some(path.clone())) {
+            Ok(seed) => Some(seed),
+            Err(e) => {
+                eprintln!("maosctl: audit verify-segments — cannot load base seed: {e}");
+                return ExitCode::from(2);
+            }
+        },
+        None => None,
+    };
+    let fixed = match pubkey_arg.map(read_pubkey_arg).transpose() {
+        Ok(key) => key,
+        Err(e) => {
+            eprintln!("maosctl: audit verify-segments — {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let log_path = log.cloned().or_else(|| {
+        dir.parent()
+            .map(|parent| parent.join("transparency.sqlite"))
+            .filter(|path| path.is_file())
+    });
+    let expired = match &log_path {
+        Some(path) => match maos_audit::segment::expired_segments(path) {
+            Ok(rows) => rows,
+            Err(e) => {
+                eprintln!(
+                    "maosctl: audit verify-segments — cannot read expiry rows from {}: {e}",
+                    path.display()
+                );
+                return ExitCode::from(2);
+            }
+        },
+        None => Vec::new(),
+    };
+    let checked = seed.is_some() || fixed.is_some();
+    let key_for = |manifest: &maos_audit::segment::SegmentManifest| -> Option<[u8; 32]> {
+        seed.as_ref()
+            .and_then(|seed| {
+                maos_audit::segment::expected_pubkey(seed, manifest.region.as_deref()).ok()
+            })
+            .or(fixed)
+    };
+    let report = maos_audit::segment::verify_chain(dir, &expired, &key_for);
+    if report.problems.is_empty() {
+        eprintln!(
+            "maosctl: audit verify-segments — OK ({} segments, {} expired gap(s) explained, signatures {})",
+            report.segments,
+            report.explained_gaps,
+            if checked { "verified" } else { "not checked (no --seed/--pubkey)" }
+        );
+        ExitCode::SUCCESS
+    } else {
+        for problem in &report.problems {
+            eprintln!("maosctl: audit verify-segments — {problem}");
+        }
+        ExitCode::from(1)
+    }
+}
+
+/// Story 22-6 (D-22-6-08 A) — `maosctl audit rotate`: a door verb (operation id and completion
+/// row, ADR-062); with no Host answering it rotates the log offline, where no tail has a cursor.
+fn audit_rotate() -> ExitCode {
+    durable_verb(
+        "audit rotate",
+        |config| door_client::exchange(config, "POST", "/v1/audit/rotate", None, LONG_ROUTE_BUDGET),
+        audit_rotate_offline,
+    )
+}
+
+fn audit_rotate_offline() -> ExitCode {
+    use maos_iac::adapter::transparency_log::TransparencyLogAdapter;
+    let path = default_transparency_log_path();
+    if !path.is_file() {
+        eprintln!(
+            "maosctl: audit rotate — no Transparency Log at {}",
+            path.display()
+        );
+        return ExitCode::from(2);
+    }
+    let tl = match TransparencyLogAdapter::open(&path, 0) {
+        Ok(tl) => tl,
+        Err(e) => {
+            eprintln!(
+                "maosctl: audit rotate — cannot open {}: {e}",
+                path.display()
+            );
+            return ExitCode::from(2);
+        }
+    };
+    if let Err(e) = crate::audit_rotation::install_sealer(&tl) {
+        eprintln!("maosctl: audit rotate — refused: {e}");
+        return ExitCode::from(1);
+    }
+    let policy = match crate::audit_rotation::RotationPolicy::from_env() {
+        Ok(policy) => policy,
+        Err(e) => {
+            eprintln!("maosctl: audit rotate — {e}");
+            return ExitCode::from(2);
+        }
+    };
+    eprintln!("maosctl: audit rotate — no Host answered; rotating offline (no tail cursors)");
+    match crate::audit_rotation::rotate_once(&tl, &policy, i64::MAX, true, false) {
+        Ok(report) => {
+            println!("{}", report.to_json());
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("maosctl: audit rotate — refused: {e}");
             ExitCode::from(1)
         }
     }
@@ -5587,7 +5789,7 @@ fn audit_cost_reconcile(month: &str, pricing_path: &str, format: AuditFormat) ->
 /// precedence.  Matches `RegionSection::resolve_from_env_and_disk()` semantics so
 /// CLI sealed-exports region-pin identically to the in-process memory manager
 /// (Story 9.4b split-brain fix).
-fn resolve_region_home(
+pub(crate) fn resolve_region_home(
 ) -> Result<Option<maos_domain::region::Region>, maos_domain::region::RegionError> {
     let disk_tag = read_operator_toml_region_tag();
     maos_domain::region::Region::resolve_home(disk_tag.as_deref())

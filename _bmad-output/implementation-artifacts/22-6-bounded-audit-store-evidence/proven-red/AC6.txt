@@ -1,0 +1,12 @@
+AC6 plant: crates/maos-bin/src/purge.rs maos_roots: BOTH segment roots removed ('audit segments' + 'default audit segments') AND the MAOS_AUDIT_DB 'audit segments override' entry. Command: cargo nextest run --locked -p maos-bin --test maos_uninstall_16_4 -E 'test(root_enumeration)'. Result: the isolated child run (root_enumeration_child, spawned by root_enumeration_honors_every_production_resolver_and_ownership_boundary with MAOS_16_4_ROOT_CHILD=1) panics 'missing MAOS-owned resolver output stores/segments'; the parent test FAILS. NOTE: removing only the two default roots (first run) did NOT fail this test, because the override entry independently yields stores/segments under MAOS_AUDIT_DB; that first run failed only purge_removes_sealed_segments_and_keep_log_retains_them. NOTE 2: root_enumeration_child run alone is a no-op (CHILD_ENV gate, pre-existing pattern); it only runs through the parent. Plant reverted.
+
+        PASS [   0.003s] (1/2) maos-bin::maos_uninstall_16_4 root_enumeration_child
+        FAIL [   0.194s] (2/2) maos-bin::maos_uninstall_16_4 root_enumeration_honors_every_production_resolver_and_ownership_boundary
+  stderr 
+    thread 'root_enumeration_child' (3599586) panicked at crates/maos-bin/tests/maos_uninstall_16_4.rs:65:9:
+    missing MAOS-owned resolver output stores/segments: [
+    thread 'root_enumeration_honors_every_production_resolver_and_ownership_boundary' (3599584) panicked at crates/maos-bin/tests/maos_uninstall_16_4.rs:40:5:
+    isolated root-enumeration child failed
+     Summary [   0.195s] 2 tests run: 1 passed, 1 failed, 22 skipped
+        FAIL [   0.194s] (2/2) maos-bin::maos_uninstall_16_4 root_enumeration_honors_every_production_resolver_and_ownership_boundary
+rc=100

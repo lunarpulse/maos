@@ -1,0 +1,16 @@
+AC5 plant: rotation.rs sweep_sealed_segments returns Ok(()) before scrubbing any segment. Command: cargo nextest run ... -E 'forget_scrubs_sealed | interrupted_forget_with_sealed'. Result: BOTH FAIL: forget_scrubs_sealed_segments_and_reseals_them at its first sealed-frame assertion (0 frames, expected 4: it fails earlier than the subject-access assertion); interrupted_forget_with_sealed_frames_completes_after_restart at 'all_payloads ... !contains user:dora' (the principal's payloads remain in the segment). Plant reverted.
+
+        FAIL [   1.171s] (1/2) maos-bin::audit_rotation_22_6 interrupted_forget_with_sealed_frames_completes_after_restart
+  stderr 
+    thread 'interrupted_forget_with_sealed_frames_completes_after_restart' (3595769) panicked at crates/maos-bin/tests/audit_rotation_22_6.rs:1131:5:
+    assertion failed: all_payloads(&db).iter().all(|p| !p.contains("user:dora"))
+        FAIL [   1.206s] (2/2) maos-bin::audit_rotation_22_6 forget_scrubs_sealed_segments_and_reseals_them
+  stderr 
+    thread 'forget_scrubs_sealed_segments_and_reseals_them' (3595770) panicked at crates/maos-bin/tests/audit_rotation_22_6.rs:1025:5:
+    assertion `left == right` failed: the four sealed frames: []
+      left: 0
+     right: 4
+     Summary [   1.208s] 2 tests run: 0 passed, 2 failed, 13 skipped
+        FAIL [   1.171s] (1/2) maos-bin::audit_rotation_22_6 interrupted_forget_with_sealed_frames_completes_after_restart
+        FAIL [   1.206s] (2/2) maos-bin::audit_rotation_22_6 forget_scrubs_sealed_segments_and_reseals_them
+rc=100

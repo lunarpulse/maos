@@ -636,6 +636,32 @@ pub enum AuditQuery {
         #[arg(long)]
         seed: Option<std::path::PathBuf>,
     },
+    /// Story 22-6 — seal the oldest prefix of the Transparency Log into a signed segment now.
+    ///
+    /// Asks the running Host over the operator door; with no Host running it rotates the
+    /// log offline. Seals only rows below every floor (the newest row, open forgets,
+    /// outstanding redistills and each tail's cursor), deletes nothing that is not sealed and
+    /// verified, and needs the operator audit key. Exit 0 sealed or nothing to seal, 1 refused.
+    Rotate,
+    /// Story 22-6 — verify the segment chain of an audit segment directory.
+    ///
+    /// Reports a missing, reordered or forked segment, a digest that does not match its file
+    /// and, when a key is given, a signature that does not verify. A gap is explained only by
+    /// an `audit.segment.expired` row in the Transparency Log (`--log`, default the
+    /// `transparency.sqlite` beside the directory). Exit 0 intact, 1 broken, 2 input error.
+    VerifySegments {
+        /// The `segments` directory (manifests and segment files).
+        dir: std::path::PathBuf,
+        /// Transparency Log whose `audit.segment.expired` rows explain expired segments.
+        #[arg(long)]
+        log: Option<std::path::PathBuf>,
+        /// Hex-encoded Ed25519 public key, or path to a .hex file (the signing key).
+        #[arg(long, conflicts_with = "seed")]
+        pubkey: Option<String>,
+        /// Path to the base audit signing key; each manifest's key is derived from its region.
+        #[arg(long)]
+        seed: Option<std::path::PathBuf>,
+    },
     /// `j1-crosshost-2c` AC2.2 — reconcile two independently-signed halves of one
     /// cross-host run and, optionally, emit a signed two-host receipt.
     ///

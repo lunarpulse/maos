@@ -714,6 +714,21 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_AUDIT_ROTATE_BYTES",
+        purpose: "Live Transparency Log size in bytes at which the Host seals its oldest rows into a signed segment (default 268435456; the Host file's audit_rotate_bytes key; Story 22-6)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_AUDIT_ROTATE_DAYS",
+        purpose: "Age in days at which live Transparency Log rows are sealed into a signed segment (default 30; the Host file's audit_rotate_days key; Story 22-6)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_AUDIT_KEEP_DAYS",
+        purpose: "Opt-in expiry: sealed audit segments older than this many days (at least 90) are deleted, never one holding a legal-held or open-erasure principal; unset deletes nothing (the Host file's audit_keep_days key; Story 22-6)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_REGISTRY_TIER_FLOOR",
         purpose: "Override the registry trust-tier floor of operator.toml for one boot",
         stability: EnvStability::UserFacing,

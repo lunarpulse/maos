@@ -417,6 +417,70 @@ fn the_binary_refuses_bad_files_with_a_kind_and_serves_nothing() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+// ── Story 22-6 (D-22-6-08 A): the audit-store policy keys ───────────────────
+
+#[test]
+fn audit_policy_keys_reach_their_registered_names_and_keep_days_has_a_floor() {
+    let dir = scratch("audit-policy");
+    let path = write_config(
+        &dir,
+        "[host]\naudit_rotate_bytes = 1048576\naudit_rotate_days = '7'\naudit_keep_days = 90\n",
+    );
+    let config = HostConfig::load(&path).expect("integers and strings are both accepted");
+    let overlay = config.env_overlay(&|_| false);
+    assert_eq!(
+        overlay,
+        [
+            ("MAOS_AUDIT_ROTATE_BYTES", "1048576".to_string()),
+            ("MAOS_AUDIT_ROTATE_DAYS", "7".to_string()),
+            ("MAOS_AUDIT_KEEP_DAYS", "90".to_string()),
+        ]
+    );
+    assert!(
+        config
+            .env_overlay(&|name| name == "MAOS_AUDIT_ROTATE_BYTES")
+            .iter()
+            .all(|(name, _)| *name != "MAOS_AUDIT_ROTATE_BYTES"),
+        "a set name is never overwritten"
+    );
+    for (body, why) in [
+        ("audit_keep_days = 89", "expiry floor is 90 days"),
+        ("audit_keep_days = 0", "zero"),
+        ("audit_rotate_bytes = 0", "zero"),
+        ("audit_rotate_days = -1", "negative"),
+        ("audit_rotate_days = 'soon'", "not a number"),
+    ] {
+        assert_eq!(
+            kind_of(&format!("[host]\n{body}\n")),
+            HostConfigKind::Setting,
+            "{why}"
+        );
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_keep_days_below_ninety_refuses_the_binary_with_host_config_setting() {
+    let dir = scratch("keep-floor");
+    let home = dir.join("home");
+    std::fs::create_dir_all(&home).unwrap();
+    let path = write_config(&dir, "[host]\naudit_keep_days = 30\n");
+    let out = Command::new(maos())
+        .args(["serve", "--config"])
+        .arg(&path)
+        .env("HOME", &dir)
+        .env("MAOS_HOME", &home)
+        .env("XDG_DATA_HOME", dir.join("xdg"))
+        .env_remove("MAOS_AUDIT_KEEP_DAYS")
+        .output()
+        .expect("run maos serve");
+    assert_eq!(out.status.code(), Some(78));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("host_config_setting"), "{stderr}");
+    assert!(stderr.contains("audit_keep_days"), "{stderr}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 // ── AC1: the same cast after SIGTERM and after SIGKILL ──────────────────────
 
 struct Host {

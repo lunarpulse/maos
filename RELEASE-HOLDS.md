@@ -131,6 +131,22 @@
 | B6 | The task text reaches the Spirit raw (as a shell request, with the success criteria `Answer the operator's shell message`). The `TaskAssign` row and `task show`'s `result` are the Transparency Log's redacted copy. | That a task is confidential from the Spirit, or that the redacted copy equals what the Spirit received (as row 17). | Not this lane. |
 | B7 | `maosctl task show` reads the live Transparency Log segment. A task whose rows were rotated out of it reads `task_not_found`. | That a task stays readable after the log rotates. | `22-6` (AC2 reads across segments). |
 
+## Claim boundaries — Epic 22 release (bounded audit store)
+
+> Source: Story `22-6-bounded-audit-store`, ADR-072, decisions D-22-6-01…10 taken at their
+> recommended answers (operator not yet confirmed). The release these rows belong to is numbered by the
+> epic's open release-numbering D-row (`epic-22-always-on-host-w7.md:151`); the rows carry the story key,
+> not a release number. Each row is also one line of that release's notes. A boundary is violated by
+> over-claiming, not by shipping.
+
+| # | Boundary | What the release may NOT claim | Successor |
+|---|---|---|---|
+| 22-6.a | **Seal.** A segment signature proves that the holder of the operator audit key sealed these bytes. It does not prove that the rows are complete or that they were written at their stated times. The chain detects a missing, reordered or forked segment only between segments that are present. Removing the newest segments together with the live log is not detected: there is no external anchor (NFR-Aud-4 anchoring is optional and not built). | That a verified segment, or a verified chain, proves the audit trail is complete or unaltered since it was written, or that it is anchored outside the Host. | An external anchor or transparency service for segment digests (not scheduled). |
+| 22-6.b | **Bound.** The live log is bounded by the rotation policy. The segment directory is bounded only when `audit_keep_days` is set. By default MAOS deletes no audit record. | That the audit store's total disk use is bounded by default, or that an audit record is ever deleted unless the operator set `audit_keep_days`. | None; `audit_keep_days` (at least 90) is the bound. |
+| 22-6.c | **Forget.** A forget reaches the live log and the sealed segments in the resolved segment directory. It does not reach copies outside it: backups, operator copies, SIEM sinks or a Postgres migration target. A re-sealed segment proves who re-sealed it and which frames were scrubbed, not the original bytes. Spirit-uninstall lineage that sits inside a sealed segment is not scrubbed (the segment sweep matches principal subjects only). | That a forget or an uninstall erases a principal from every copy of the audit store, or that a re-sealed segment proves what the scrubbed bytes were. | None scheduled; the backup and migration rows below name the copies. |
+| 22-6.d | **Purge.** `maos purge` removes the segment directory that it resolves at run time. It does not remove segments in a directory configured earlier and since changed, or segments moved elsewhere. | That `maos purge` removes every segment a Host ever wrote. | None; the same shape as the OQ-10 ruling on pre-16-4 CRL files. |
+| 22-6.e | **Backup and migration.** `maosctl backup` and `maosctl migrate sqlite-to-postgres` cover the live log only; sealed segments are neither backed up nor migrated by them. `backup verify` compares live roots and fails if a rotation ran between backup and verify. | That a backup or a Postgres migration carries the sealed part of the audit store. | None scheduled; copy the segment directory with the log. |
+
 ## GA-tag procedure (engineering exits green; Holds 1–2 no longer gate)
 
 > **OPERATOR RULING 2026-11-12:** Holds 1–2 are claim boundaries, not GA

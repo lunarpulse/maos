@@ -23,6 +23,7 @@ pub mod session;
 pub mod backup;
 pub mod release_verify;
 pub mod sealed_export;
+pub mod segment;
 
 use std::io::Write;
 use std::path::Path;
@@ -190,14 +191,29 @@ fn resolve_kind_filter(kind_str: &str) -> Option<Vec<i64>> {
 /// Open the per-Host SQLite file read-only and return matching entries.
 
 pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, AuditError> {
-    let conn = rusqlite::Connection::open_with_flags(
-        db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY
-            | OpenFlags::SQLITE_OPEN_NO_MUTEX
-            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-    )
-    .map_err(AuditError::Open)?;
+    // Story 22-6: sealed segments first, then the live file. Each source is queried with the
+    // filter (and its limit) and the union is re-ordered by `(timestamp_ns, frame_id)`, so a
+    // clock step across a segment boundary orders as it does in an unrotated log.
+    let sources = segment::open_log_sources(db_path)?;
+    let mut all = Vec::new();
+    for conn in &sources {
+        all.extend(query_on(conn, &filter)?);
+    }
+    if sources.len() > 1 {
+        all.sort_by(|a, b| {
+            (a.timestamp_ns, &a.frame_id_hex).cmp(&(b.timestamp_ns, &b.frame_id_hex))
+        });
+        if let Some(limit) = filter.limit {
+            all.truncate(limit);
+        }
+    }
+    Ok(all)
+}
 
+fn query_on(
+    conn: &rusqlite::Connection,
+    filter: &AuditFilter,
+) -> Result<Vec<AuditEntry>, AuditError> {
     let mut sql = String::from(
         "SELECT frame_id, timestamp_ns, spirit_pid, boot_nonce,
                 capability_token, kind, intent, payload_redacted
@@ -372,13 +388,26 @@ pub fn query_with_redaction(
         )));
     }
 
-    let conn = rusqlite::Connection::open_with_flags(
-        db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY
-            | OpenFlags::SQLITE_OPEN_NO_MUTEX
-            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-    )
-    .map_err(AuditError::Open)?;
+    let sources = segment::open_log_sources(db_path)?;
+    let mut all = Vec::new();
+    for conn in &sources {
+        all.extend(query_with_redaction_on(conn, &filter)?);
+    }
+    if sources.len() > 1 {
+        all.sort_by(|a, b| {
+            (a.timestamp_ns, &a.frame_id_hex).cmp(&(b.timestamp_ns, &b.frame_id_hex))
+        });
+        if let Some(limit) = filter.limit {
+            all.truncate(limit);
+        }
+    }
+    Ok(all)
+}
+
+fn query_with_redaction_on(
+    conn: &rusqlite::Connection,
+    filter: &AuditFilter,
+) -> Result<Vec<AuditEntry>, AuditError> {
     let mut sql = String::from(
         "SELECT frame_id, timestamp_ns, spirit_pid, boot_nonce,
                 capability_token, kind, intent, payload_redacted
@@ -564,48 +593,44 @@ pub fn load_ratification_frames(db_path: &Path) -> Result<Vec<RatificationFrame>
     // since Story 1b.1; see maos-iac::adapter::transparency_log::FrameKind).
     const GOVERNANCE_EVENT_KIND: i64 = 28;
 
-    let conn = rusqlite::Connection::open_with_flags(
-        db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY
-            | OpenFlags::SQLITE_OPEN_NO_MUTEX
-            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-    )
-    .map_err(AuditError::Open)?;
-
-    let mut stmt = conn
-        .prepare(
-            "SELECT rowid, intent, payload_redacted FROM transparency_log \
-             WHERE kind = ?1 ORDER BY rowid ASC",
-        )
-        .map_err(AuditError::Query)?;
-
-    let rows = stmt
-        .query_map([GOVERNANCE_EVENT_KIND], |row| {
-            let seq: i64 = row.get(0)?;
-            let intent: String = row.get(1)?;
-            let payload: Vec<u8> = row.get(2)?;
-            Ok((seq, intent, payload))
-        })
-        .map_err(AuditError::Query)?;
-
     let mut frames = Vec::new();
-    for row in rows {
-        let (seq, intent, payload) = row.map_err(AuditError::Query)?;
-        if is_kind28_receipt_intent(&intent) {
-            continue;
-        }
-        let payload: GovernanceEventPayload = serde_json::from_slice(&payload).map_err(|e| {
-            AuditError::Row(format!(
-                "kind-28 row {seq} (intent {intent:?}) is neither a listed receipt nor a \
-                 typed governance event: {e}"
-            ))
-        })?;
-        if let GovernanceEventKind::AbiExtension(proposal) = payload.event {
-            if proposal.status == RatificationStatus::Ratified {
-                frames.push(RatificationFrame {
-                    proposal_id: proposal.proposal_id,
-                    seq,
-                });
+    // Story 22-6: insertion ids are global across segments, so the sequence stays one order.
+    for conn in segment::open_log_sources(db_path)? {
+        let mut stmt = conn
+            .prepare(
+                "SELECT rowid, intent, payload_redacted FROM transparency_log \
+                 WHERE kind = ?1 ORDER BY rowid ASC",
+            )
+            .map_err(AuditError::Query)?;
+
+        let rows = stmt
+            .query_map([GOVERNANCE_EVENT_KIND], |row| {
+                let seq: i64 = row.get(0)?;
+                let intent: String = row.get(1)?;
+                let payload: Vec<u8> = row.get(2)?;
+                Ok((seq, intent, payload))
+            })
+            .map_err(AuditError::Query)?;
+
+        for row in rows {
+            let (seq, intent, payload) = row.map_err(AuditError::Query)?;
+            if is_kind28_receipt_intent(&intent) {
+                continue;
+            }
+            let payload: GovernanceEventPayload =
+                serde_json::from_slice(&payload).map_err(|e| {
+                    AuditError::Row(format!(
+                        "kind-28 row {seq} (intent {intent:?}) is neither a listed receipt nor a \
+                     typed governance event: {e}"
+                    ))
+                })?;
+            if let GovernanceEventKind::AbiExtension(proposal) = payload.event {
+                if proposal.status == RatificationStatus::Ratified {
+                    frames.push(RatificationFrame {
+                        proposal_id: proposal.proposal_id,
+                        seq,
+                    });
+                }
             }
         }
     }
@@ -1701,7 +1726,7 @@ pub fn resolve_spirit_name_optional(
     if !db_path.exists() {
         return Ok(Vec::new());
     }
-    let conn = open_transparency_log_readonly(db_path)?;
+    let sources = log_sources(db_path)?;
 
     // D-16-1-K: kind 19 (SpiritAdmitted, name in `intent`) and kind 7
     // (`lifecycle.load`, name in the payload's `spirit_id`). Timestamp-ordered
@@ -1710,32 +1735,38 @@ pub fn resolve_spirit_name_optional(
                FROM transparency_log
                WHERE kind IN (7, 19)
                ORDER BY timestamp_ns ASC, frame_id ASC";
-    let mut stmt = conn
-        .prepare(sql)
-        .map_err(|e| format!("prepare failed: {e}"))?;
-    let rows = stmt
-        .query_map([], |row| {
-            let boot: i64 = row.get(0)?;
-            let pid: i64 = row.get(1)?;
-            let kind: i64 = row.get(2)?;
-            let intent: String = row.get(3)?;
-            let payload: Vec<u8> = row.get(4)?;
-            let timestamp_ns: i64 = row.get(5)?;
-            Ok((
-                boot as u64,
-                pid as u32,
-                kind,
-                intent,
-                payload,
-                timestamp_ns as u64,
-            ))
-        })
-        .map_err(|e| format!("query failed: {e}"))?;
+    let mut ordered = Vec::new();
+    for conn in &sources {
+        let mut stmt = conn
+            .prepare(sql)
+            .map_err(|e| format!("prepare failed: {e}"))?;
+        let rows = stmt
+            .query_map([], |row| {
+                let boot: i64 = row.get(0)?;
+                let pid: i64 = row.get(1)?;
+                let kind: i64 = row.get(2)?;
+                let intent: String = row.get(3)?;
+                let payload: Vec<u8> = row.get(4)?;
+                let timestamp_ns: i64 = row.get(5)?;
+                Ok((
+                    boot as u64,
+                    pid as u32,
+                    kind,
+                    intent,
+                    payload,
+                    timestamp_ns as u64,
+                ))
+            })
+            .map_err(|e| format!("query failed: {e}"))?;
+        for row in rows {
+            ordered.push(row.map_err(|e| format!("row error: {e}"))?);
+        }
+    }
+    // Story 22-6: segments then live; the LAST match below must be the latest by timestamp.
+    ordered.sort_by_key(|row| row.5);
 
     let mut matches: Vec<(u64, u32, u64)> = Vec::new(); // (boot, pid, timestamp_ns)
-    for row in rows {
-        let (boot, pid, kind, intent, payload, timestamp_ns) =
-            row.map_err(|e| format!("row error: {e}"))?;
+    for (boot, pid, kind, intent, payload, timestamp_ns) in ordered {
         let name_matches = match kind {
             19 => intent == name,
             // The scheduler's pid-0 transition echo names a Spirit but never
@@ -1772,25 +1803,47 @@ pub fn resolve_spirit_name_optional(
     Ok(resolved)
 }
 
-/// Rows of one read-only Transparency Log query; absence of the log is no rows.
-fn tl_query<T>(
-    db_path: &Path,
-    sql: &str,
-    params: impl rusqlite::Params,
-    map: impl FnMut(&rusqlite::Row<'_>) -> rusqlite::Result<T>,
-) -> Result<Vec<T>, String> {
+/// Story 20-11 AC3 / Story 22-6 — the planned-unload receipt payloads one unload of
+/// `(boot, pid)` wrote, read across sealed segments and the live log. The pid's last
+/// `lifecycle.unload` row bounds them, wherever that row sits.
+fn planned_unload_payloads(db_path: &Path, boot: u64, pid: u32) -> Result<Vec<Vec<u8>>, String> {
     if !db_path.exists() {
         return Ok(Vec::new());
     }
-    let conn = open_transparency_log_readonly(db_path)?;
-    let mut statement = conn
-        .prepare(sql)
-        .map_err(|e| format!("halt query failed: {e}"))?;
-    let rows = statement
-        .query_map(params, map)
-        .map_err(|e| format!("halt query failed: {e}"))?;
-    let rows = rows.collect::<Result<Vec<_>, _>>();
-    rows.map_err(|e| format!("halt row failed: {e}"))
+    let sources = log_sources(db_path)?;
+    let failed = |e: rusqlite::Error| format!("halt query failed: {e}");
+    let mut last_unload = 0_i64;
+    for conn in &sources {
+        let latest: Option<i64> = conn
+            .query_row(
+                "SELECT MAX(rowid) FROM transparency_log WHERE boot_nonce = ?1 AND spirit_pid = ?2 \
+                 AND intent = 'lifecycle.unload'",
+                [boot as i64, i64::from(pid)],
+                |row| row.get(0),
+            )
+            .map_err(failed)?;
+        last_unload = last_unload.max(latest.unwrap_or(0));
+    }
+    let mut payloads = Vec::new();
+    for conn in &sources {
+        let mut statement = conn
+            .prepare(
+                "SELECT payload_redacted FROM transparency_log WHERE kind = 3 AND boot_nonce = ?1 AND spirit_pid = ?2 \
+                 AND intent = 'planned_unload' AND length(payload_redacted) > 0 AND rowid > ?3 \
+                 AND CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) THEN \
+                     substr(json_extract(CAST(payload_redacted AS TEXT), '$.halt_id'), 1, 5) END IS NOT 'term-' ORDER BY rowid",
+            )
+            .map_err(failed)?;
+        let rows = statement
+            .query_map([boot as i64, i64::from(pid), last_unload], |row| {
+                row.get::<_, Vec<u8>>(0)
+            })
+            .map_err(failed)?;
+        for row in rows {
+            payloads.push(row.map_err(|e| format!("halt row failed: {e}"))?);
+        }
+    }
+    Ok(payloads)
 }
 
 /// Story 20-11 AC3 — the `(halt_id, receipt frame)` pairs one unload of
@@ -1801,23 +1854,15 @@ pub fn planned_unload_receipts(
     boot: u64,
     pid: u32,
 ) -> Result<Vec<(String, [u8; 16])>, String> {
-    tl_query(
-        db_path,
-        "SELECT payload_redacted FROM transparency_log WHERE kind = 3 AND boot_nonce = ?1 AND spirit_pid = ?2 \
-         AND intent = 'planned_unload' AND length(payload_redacted) > 0 AND rowid > COALESCE((SELECT MAX(rowid) \
-         FROM transparency_log WHERE boot_nonce = ?1 AND spirit_pid = ?2 AND intent = 'lifecycle.unload'), 0) \
-         AND CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) THEN \
-             substr(json_extract(CAST(payload_redacted AS TEXT), '$.halt_id'), 1, 5) END IS NOT 'term-' ORDER BY rowid",
-        [boot as i64, i64::from(pid)],
-        |row| row.get::<_, Vec<u8>>(0),
-    )?
-    .iter()
-    .map(|bytes| {
-        let receipt: maos_domain::halt::HaltReceipt = serde_json::from_slice(bytes)
-            .map_err(|e| format!("planned unload receipt undecodable: {e}"))?;
-        Ok((receipt.halt_id.as_str().to_owned(), receipt.frame_id))
-    })
-    .collect()
+    let payloads = planned_unload_payloads(db_path, boot, pid)?;
+    payloads
+        .iter()
+        .map(|bytes| {
+            let receipt: maos_domain::halt::HaltReceipt = serde_json::from_slice(bytes)
+                .map_err(|e| format!("planned unload receipt undecodable: {e}"))?;
+            Ok((receipt.halt_id.as_str().to_owned(), receipt.frame_id))
+        })
+        .collect()
 }
 
 /// Boot-local identity events ordered by journal timestamp and frame id.
@@ -1825,33 +1870,38 @@ pub type SpiritNames = std::collections::BTreeMap<(u64, u32), Vec<(u64, String)>
 
 /// Names recorded for each boot-local Spirit identity, in journal order.
 pub fn spirit_names(db_path: &Path) -> Result<SpiritNames, String> {
-    let conn = open_transparency_log_readonly(db_path)?;
-    let mut stmt = conn
-        .prepare(
-            "SELECT boot_nonce, spirit_pid, kind, intent, payload_redacted, timestamp_ns FROM transparency_log
-             WHERE kind=19 OR (kind=7 AND intent='lifecycle.load' AND capability_token IS NULL)
-             ORDER BY timestamp_ns ASC, frame_id ASC",
-        )
-        .map_err(|e| format!("prepare failed: {e}"))?;
-    let rows = stmt
-        .query_map([], |row| {
-            let (boot, pid, kind): (i64, i64, i64) = (row.get(0)?, row.get(1)?, row.get(2)?);
-            let (intent, payload): (String, Vec<u8>) = (row.get(3)?, row.get(4)?);
-            let timestamp: i64 = row.get(5)?;
-            Ok((
-                boot as u64,
-                pid as u32,
-                kind,
-                intent,
-                payload,
-                timestamp as u64,
-            ))
-        })
-        .map_err(|e| format!("query failed: {e}"))?;
+    let mut gathered = Vec::new();
+    for conn in log_sources(db_path)? {
+        let mut stmt = conn
+            .prepare(
+                "SELECT boot_nonce, spirit_pid, kind, intent, payload_redacted, timestamp_ns FROM transparency_log
+                 WHERE kind=19 OR (kind=7 AND intent='lifecycle.load' AND capability_token IS NULL)
+                 ORDER BY timestamp_ns ASC, frame_id ASC",
+            )
+            .map_err(|e| format!("prepare failed: {e}"))?;
+        let rows = stmt
+            .query_map([], |row| {
+                let (boot, pid, kind): (i64, i64, i64) = (row.get(0)?, row.get(1)?, row.get(2)?);
+                let (intent, payload): (String, Vec<u8>) = (row.get(3)?, row.get(4)?);
+                let timestamp: i64 = row.get(5)?;
+                Ok((
+                    boot as u64,
+                    pid as u32,
+                    kind,
+                    intent,
+                    payload,
+                    timestamp as u64,
+                ))
+            })
+            .map_err(|e| format!("query failed: {e}"))?;
+        for row in rows {
+            gathered.push(row.map_err(|e| format!("row error: {e}"))?);
+        }
+    }
+    // Story 22-6: segments then live, in journal order.
+    gathered.sort_by_key(|row| row.5);
     let mut names = SpiritNames::new();
-    for row in rows {
-        let (boot, pid, kind, intent, payload, timestamp) =
-            row.map_err(|e| format!("row error: {e}"))?;
+    for (boot, pid, kind, intent, payload, timestamp) in gathered {
         let name = if kind == 19 {
             Some(intent)
         } else {
@@ -1891,6 +1941,12 @@ fn open_transparency_log_readonly(db_path: &Path) -> Result<rusqlite::Connection
     .map_err(|e| format!("failed to open TL: {e}"))
 }
 
+/// Story 22-6 — every readable source of one Transparency Log (sealed segments, then live),
+/// read-only and `NOFOLLOW`; a missing registered segment is an error.
+fn log_sources(db_path: &Path) -> Result<Vec<rusqlite::Connection>, String> {
+    segment::open_log_sources(db_path).map_err(|e| format!("failed to open TL: {e}"))
+}
+
 /// Numeric/empty legacy owners cannot be attributed through a recycled pid.
 /// Return the real ambiguity inventory, never candidates for destructive forget.
 pub fn legacy_numeric_principal_owners(db_path: &Path) -> Result<Vec<String>, String> {
@@ -1913,16 +1969,21 @@ pub fn uninstall_principal_scope(db_path: &Path, spirit: &str) -> Result<Vec<Str
     if !db_path.exists() {
         return Ok(Vec::new());
     }
-    let connection = open_transparency_log_readonly(db_path)?;
-    let mut statement=connection.prepare("SELECT payload_redacted FROM transparency_log WHERE kind=10 AND origin=?1 AND intent='principal.uninstall.scope'").map_err(|error|error.to_string())?;
-    let rows = statement
-        .query_map(
-            [maos_domain::invariants::i3::FrameOrigin::Kernel as i64],
-            |row| row.get::<_, Vec<u8>>(0),
-        )
-        .map_err(|error| error.to_string())?;
+    let mut payloads = Vec::new();
+    for connection in log_sources(db_path)? {
+        let mut statement=connection.prepare("SELECT payload_redacted FROM transparency_log WHERE kind=10 AND origin=?1 AND intent='principal.uninstall.scope'").map_err(|error|error.to_string())?;
+        let rows = statement
+            .query_map(
+                [maos_domain::invariants::i3::FrameOrigin::Kernel as i64],
+                |row| row.get::<_, Vec<u8>>(0),
+            )
+            .map_err(|error| error.to_string())?;
+        for row in rows {
+            payloads.push(row.map_err(|error| error.to_string())?);
+        }
+    }
     let mut subjects = std::collections::BTreeSet::new();
-    for row in rows {
+    for row in payloads.into_iter().map(Ok::<_, String>) {
         let payload: serde_json::Value =
             serde_json::from_slice(&row.map_err(|error| error.to_string())?)
                 .map_err(|error| error.to_string())?;
@@ -2322,13 +2383,7 @@ pub fn enrich_subject_access(
     db_path: &Path,
     entries: Vec<PrincipalIndexEntry>,
 ) -> Result<Vec<SubjectAccessEntry>, AuditError> {
-    let conn = rusqlite::Connection::open_with_flags(
-        db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY
-            | OpenFlags::SQLITE_OPEN_NO_MUTEX
-            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-    )
-    .map_err(AuditError::Open)?;
+    let sources = segment::open_log_sources(db_path)?;
 
     // Build a (spirit_pid, boot_nonce) → (name, admit_timestamp_ns) map from
     // SpiritAdmitted frames (kind = 19). Keyed by (pid, boot) to handle pid
@@ -2336,7 +2391,7 @@ pub fn enrich_subject_access(
     // incarnation for each principal_index entry.
     let mut spirit_names: std::collections::HashMap<(u32, u64), (String, u64)> =
         std::collections::HashMap::new();
-    {
+    for conn in &sources {
         let sql = "SELECT spirit_pid, boot_nonce, intent, timestamp_ns
                    FROM transparency_log
                    WHERE kind = 19
@@ -2362,7 +2417,7 @@ pub fn enrich_subject_access(
     // Latest distillate for a given (pid, boot) wins; ordered by timestamp ASC.
     let mut distillate_map: std::collections::HashMap<(u32, u64), (Vec<String>, u32)> =
         std::collections::HashMap::new();
-    {
+    for conn in &sources {
         let sql = "SELECT spirit_pid, boot_nonce, frame_id, payload_redacted
                    FROM transparency_log
                    WHERE intent LIKE 'distillate%'

@@ -1,0 +1,9 @@
+AC3a plant: rotation.rs delete_sealed_prefix: 'let cut = SELECT max(rowid) FROM main.transparency_log' re-read inside the transaction, shadowing the cut that was copied. Command: cargo nextest run ... -E 'log_before_deliver_holds_across_rotation'. Result: FAILS at 'rotations ran while senders delivered' (the verify-and-delete guard sees live rows above the copied cut and rolls back every attempt, so no rotation commits). Plant reverted.
+
+        FAIL [   4.729s] (1/1) maos-bin::audit_rotation_22_6 log_before_deliver_holds_across_rotation
+  stderr 
+    thread 'log_before_deliver_holds_across_rotation' (3586552) panicked at crates/maos-bin/tests/audit_rotation_22_6.rs:485:5:
+    rotations ran while senders delivered
+     Summary [   4.730s] 1 test run: 0 passed, 1 failed, 14 skipped
+        FAIL [   4.729s] (1/1) maos-bin::audit_rotation_22_6 log_before_deliver_holds_across_rotation
+rc=100
