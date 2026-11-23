@@ -1080,6 +1080,156 @@
       "tier": "T2",
       "timestamp": "2026-11-22T14:57:13Z",
       "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 5,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-1",
+      "target": "cap_token_verify",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:08:34Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 2,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-2",
+      "target": "cap_token_verify",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:10:33Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 8006,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-1",
+      "target": "fuzz_exec_deps_parse_elf",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:15:54Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 7061,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-2",
+      "target": "fuzz_exec_deps_parse_elf",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:07:28Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 5818,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-3",
+      "target": "fuzz_exec_deps_parse_elf",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:02:34Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 8663,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-5",
+      "target": "fuzz_exec_deps_parse_elf",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:03:48Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 139,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-1",
+      "target": "i11_digest_chain",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:08:03Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 151,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-2",
+      "target": "i11_digest_chain",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:05:21Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 159,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-3",
+      "target": "i11_digest_chain",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:13:00Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 148,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-4",
+      "target": "i11_digest_chain",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:05:42Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 138,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-5",
+      "target": "i11_digest_chain",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:07:33Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 450,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-1",
+      "target": "i8_consent_intent",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:27:45Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 504,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-3",
+      "target": "i8_consent_intent",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:05:05Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 57297,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-3",
+      "target": "manifest_parser",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:09:06Z",
+      "workers": 4
+    },
+    {
+      "commit": "e51b6877c63df850daf1981322f9bfef32880335",
+      "corpus_size": 62108,
+      "cpu_seconds": 72004,
+      "run_id": "45152159643-4",
+      "target": "manifest_parser",
+      "tier": "T3",
+      "timestamp": "2026-11-23T15:03:43Z",
+      "workers": 4
     }
   ]
 }
