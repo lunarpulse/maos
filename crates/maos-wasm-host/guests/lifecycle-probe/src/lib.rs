@@ -306,6 +306,8 @@ impl LifecycleGuest for LifecycleProbe {
             s.counter = counter;
             s.swapped_in = Some(counter);
         });
+        // Story 22-9: a successor's `console.log` in `swap-in` (pre-warm) must reach the journal.
+        say("swap-in", &format!("restored counter {counter}"));
         Ok(())
     }
     fn migrate(state: Vec<u8>) -> Result<Vec<u8>, LifecycleError> {

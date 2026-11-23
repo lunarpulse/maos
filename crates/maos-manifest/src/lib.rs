@@ -26,7 +26,7 @@ pub use manifest::{
     OutputShapePredicate, OutputShapeViolation, Posture, PostureSection, ProviderCapabilities,
     ProviderConfig, ProvidersSection, ResolvedCaps, ResourceCaps, SandboxConfig, ScalarPredicate,
     ScheduleEntry, SchedulesSection, SchedulingSection, SkillCapabilities, SkillsSection,
-    SupervisionSection, SwapInvariantsSection, TelemetrySubscription,
+    SupervisionSection, SwapInvariantsSection, TelemetrySubscription, CONSENT_SINCE_SCHEMA,
     DEFAULT_OVERALL_TIME_CAP_SECONDS, FR8_DECLARATIONS_SINCE_SCHEMA, TELEMETRY_SUBSCRIPTION_SCOPE,
     TELEMETRY_SUBSCRIPTION_SINCE_SCHEMA, TELEMETRY_TIME_CAP_MAX_SECONDS,
 };

@@ -21,6 +21,8 @@ use crate::supervision::BindingCore;
 
 /// What a hook learns when its session did not answer.
 pub const SESSION_ENDED: &str = "session_ended";
+/// The session ended before the guest was entered for this call: the trigger never ran.
+pub const NOT_ENTERED: &str = "session_ended_not_entered";
 pub const DEADLINE: &str = "deadline";
 /// A trigger that found its session busy for half its budget: dropped, never a strike.
 pub const BUSY: &str = "busy";
@@ -38,6 +40,8 @@ const WALL_SLACK: Duration = Duration::from_secs(2);
 pub enum Answer {
     Reply(LifecycleReply),
     SessionEnded,
+    /// The session closed and drained this call before the guest was entered for it.
+    NotEntered,
 }
 
 /// How far one queued export got. A hook that gives up and the session that answers race for
@@ -221,6 +225,18 @@ pub struct Prewarm {
     /// Where this swap attempt must be over, however long its stages' budgets: set when the
     /// attempt began, shared by the pre-warm and every exchange of the swap.
     pub deadline: Instant,
+    /// Where this successor's stderr rows go, until the session that adopts it takes over.
+    pub(crate) log: PrewarmLog,
+}
+
+/// The journal row writer of a pre-warmed successor's stderr (Story 22-9): the Spirit's pid and
+/// id, and the same row/byte bound a serving session applies.
+pub(crate) struct PrewarmLog {
+    pub(crate) tl: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+    pub(crate) spirit_id: String,
+    pub(crate) pid: u32,
+    pub(crate) dropped: u64,
+    pub(crate) budget: crate::spirit_session::DiagnosticBudget,
 }
 
 /// A committed successor: the predecessor's session adopts it.
@@ -231,8 +247,10 @@ pub struct Handover {
 
 impl Prewarm {
     /// The next stdout frame of a child nobody else is serving, never past `deadline`. Stderr
-    /// is drained and dropped, but every line is a turn of this loop, so a guest that never
-    /// stops writing diagnostics cannot outlast its cap; a frame that arrives late is refused.
+    /// is journaled as `spirit.diagnostic` rows tagged `prewarm` (Story 22-9) under the serving
+    /// bound, then dropped with the overflow counted; every line is a turn of this loop, so a
+    /// guest that never stops writing diagnostics cannot outlast its cap; a frame that arrives
+    /// late is refused.
     fn next_stdout(&mut self, deadline: Instant) -> Result<Vec<u8>, String> {
         next_stdout_on(&mut Live(self), deadline)
     }
@@ -286,6 +304,8 @@ trait StageIo {
     fn now(&self) -> Instant;
     fn write(&mut self, body: &[u8], deadline: Instant) -> Result<(), String>;
     fn poll(&mut self, wait: Duration) -> Result<BridgePoll, String>;
+    /// One guest stderr line; the scripted clock of the unit tests has no journal.
+    fn stderr(&mut self, _line: &[u8]) {}
 }
 
 struct Live<'a>(&'a mut Prewarm);
@@ -305,6 +325,17 @@ impl StageIo for Live<'_> {
             .poll_frame(wait)
             .map_err(|error| format!("child_poll: {error}"))
     }
+
+    fn stderr(&mut self, line: &[u8]) {
+        let log = &mut self.0.log;
+        crate::spirit_session::journal_guest_diagnostic(
+            &log.tl,
+            (&log.spirit_id, log.pid, self.0.bridge.child_pid()),
+            (&mut log.dropped, &mut log.budget),
+            line,
+            Some("prewarm"),
+        );
+    }
 }
 
 fn next_stdout_on<I: StageIo>(io: &mut I, deadline: Instant) -> Result<Vec<u8>, String> {
@@ -314,7 +345,8 @@ fn next_stdout_on<I: StageIo>(io: &mut I, deadline: Instant) -> Result<Vec<u8>, 
             return Err(DEADLINE.into());
         }
         match io.poll(left.min(Duration::from_millis(20)))? {
-            BridgePoll::Idle | BridgePoll::Data(SubStream::Stderr, _) => {}
+            BridgePoll::Idle => {}
+            BridgePoll::Data(SubStream::Stderr, line) => io.stderr(&line),
             BridgePoll::Closed => return Err("child_closed".into()),
             BridgePoll::Data(SubStream::Stdout, bytes) => {
                 return if io.now() > deadline {
@@ -535,7 +567,7 @@ impl LifecycleLink {
         };
         loop {
             if self.closed.load(Ordering::Acquire) {
-                return Err(SESSION_ENDED.into());
+                return Err(NOT_ENTERED.into());
             }
             match self.tx.try_send(call) {
                 Ok(()) => break,
@@ -547,13 +579,14 @@ impl LifecycleLink {
                     state.cancel_queued();
                     return Err(BUSY.into());
                 }
-                Err(TrySendError::Disconnected(_)) => return Err(SESSION_ENDED.into()),
+                Err(TrySendError::Disconnected(_)) => return Err(NOT_ENTERED.into()),
             }
         }
         loop {
             match reply.recv_timeout(Duration::from_millis(20)) {
                 Ok(Answer::Reply(reply)) => return Ok(reply),
                 Ok(Answer::SessionEnded) => return Err(SESSION_ENDED.into()),
+                Ok(Answer::NotEntered) => return Err(NOT_ENTERED.into()),
                 // A session that ended after this call queued (its `close` drained first) never
                 // answers: fail now, not at the cap.
                 Err(RecvTimeoutError::Disconnected) => return Err(SESSION_ENDED.into()),
@@ -666,7 +699,7 @@ impl LifecycleLink {
     pub fn close(&self) {
         self.closed.store(true, Ordering::Release);
         while let Some(call) = self.take() {
-            let _ = call.answer.send(Answer::SessionEnded);
+            let _ = call.answer.send(Answer::NotEntered);
         }
     }
 
@@ -1038,9 +1071,6 @@ impl SwapHandles {
     }
 }
 
-/// How long a successor's pre-warm waits for the predecessor's own lifecycle probe.
-const PROBE_WAIT: Duration = Duration::from_secs(5);
-
 /// Slack past a component's start budget before a cold swap gives up waiting for its probe.
 const READY_GRACE: Duration = Duration::from_secs(5);
 
@@ -1105,15 +1135,19 @@ pub fn spawned_successor(
         .lifecycle()
         .swap_context()
         .ok_or("spawned_swap_unsupported")?;
-    match target.lifecycle().wait_supported(PROBE_WAIT) {
+    // D-21-PF-15 A / D-22-9-10 A: the door waits for the component's own lifecycle probe on
+    // the one attempt deadline, never a retry the operator must issue.
+    match target
+        .lifecycle()
+        .wait_supported(ATTEMPT_WALL.saturating_sub(began.elapsed()))
+    {
         Some(true) => {}
         Some(false) => {
             return Err("spawned_swap_unsupported: the running Spirit exports no lifecycle".into())
         }
-        // A slow component start (a TypeScript guest compiles for seconds) is not a missing export.
         None => {
             return Err(
-                "spawned_swap_not_ready: the running Spirit has not finished starting; retry"
+                "spawned_swap_not_ready: the running Spirit did not finish starting within the attempt wall"
                     .into(),
             )
         }
@@ -1136,11 +1170,18 @@ pub fn spawned_successor(
     effective.declared_scopes = successor_scopes;
     // Story 21-7: a swap keeps or narrows consent; the successor's declaration replaces the
     // predecessor's only at the committed handover.
-    let policy = Arc::clone(
-        (handles.session)(Arc::clone(&supervisor))
-            .iac
-            .consent_policy(),
-    );
+    let session = (handles.session)(Arc::clone(&supervisor));
+    crate::admission::check_consent_recipients(&gated, &|id| {
+        crate::admission::host_knows(id, &|loaded| {
+            supervisor.spawned_target(loaded).is_some()
+                || session
+                    .pid_by_spirit_id
+                    .read()
+                    .is_ok_and(|held| held.contains_key(loaded))
+        })
+    })
+    .map_err(refused)?;
+    let policy = Arc::clone(session.iac.consent_policy());
     let grants = gated.consent.as_ref().map(|c| c.recall.clone());
     if let Some(change) = policy.widened_by(&class.name, grants.as_ref()) {
         return Err(format!("swap_consent_widened: the successor {change}"));
@@ -1190,6 +1231,13 @@ pub fn spawned_successor(
         scopes: launch.scopes,
         sandbox: effective.clone(),
         deadline: began + ATTEMPT_WALL,
+        log: PrewarmLog {
+            tl: Arc::clone(tl),
+            spirit_id: class.name.clone(),
+            pid: target.spirit_pid(),
+            dropped: 0,
+            budget: Default::default(),
+        },
     };
     let launch_failed = |error: String| format!("spawned_swap_launch_failed: {error}");
     prewarm
@@ -1263,9 +1311,9 @@ impl LifecycleCallers {
 
     /// Stop and join every caller; each holds the scheduler and the capability registry, so
     /// the audit writer cannot drain while one runs.
-    pub async fn shutdown(self) {
+    pub async fn shutdown(mut self) {
         self.cancel.cancel();
-        for (name, handle) in self.watchdogs {
+        for (name, handle) in std::mem::take(&mut self.watchdogs) {
             match tokio::time::timeout(Duration::from_secs(5), handle).await {
                 Ok(Ok(())) => {}
                 Ok(Err(error)) => {
@@ -1275,6 +1323,14 @@ impl LifecycleCallers {
             }
         }
         self.consolidation.shutdown().await;
+    }
+}
+
+/// A panic or early return that never reaches `shutdown` still stops every caller (the
+/// consolidation watchdog cancels itself when dropped).
+impl Drop for LifecycleCallers {
+    fn drop(&mut self) {
+        self.cancel.cancel();
     }
 }
 

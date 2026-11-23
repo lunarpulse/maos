@@ -16,6 +16,7 @@ use std::sync::{
 
 use maos_domain::hot_swap::SchemaCompat;
 use maos_kernel_core::hot_swap::{migrator, HotSwapCoordinator};
+use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use maos_kernel_core::scheduler::control_block::{
     make_spirit_obj, ScbLifecycleState, SpiritControlBlock, SpiritManifestBundle,
 };
@@ -81,7 +82,7 @@ fn class_section(version: &str) -> ClassSection {
     }
 }
 
-fn make_coordinator<S>(
+fn build_coordinator<S>(
     tmp: &tempfile::TempDir,
     predecessor_manifest: SpiritManifestBundle,
     predecessor: S,
@@ -89,13 +90,12 @@ fn make_coordinator<S>(
     HotSwapCoordinator,
     Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
     Arc<SpiritControlBlock>,
+    Arc<TransparencyLogAdapter>,
 )
 where
     S: Spirit + Send + Sync + 'static,
 {
-    let tl = Arc::new(
-        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0xC0DE),
-    );
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xC0DE));
     let telemetry = Arc::new(IacRtMetrics::new());
     let capability = Arc::new(
         maos_kernel_core::capability::CapabilityRegistryAdapter::new(
@@ -135,7 +135,7 @@ where
     let coordinator = HotSwapCoordinator::new(
         Arc::clone(&spirits),
         journal,
-        tl,
+        Arc::clone(&tl),
         Arc::new(maos_kernel_core::halt::HaltRegistry::new()),
         capability,
         iac,
@@ -143,7 +143,39 @@ where
         telemetry,
         tmp.path().join("archives"),
     );
-    (coordinator, spirits, predecessor_scb)
+    (coordinator, spirits, predecessor_scb, tl)
+}
+
+fn make_coordinator<S>(
+    tmp: &tempfile::TempDir,
+    predecessor_manifest: SpiritManifestBundle,
+    predecessor: S,
+) -> (
+    HotSwapCoordinator,
+    Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
+    Arc<SpiritControlBlock>,
+)
+where
+    S: Spirit + Send + Sync + 'static,
+{
+    let (coordinator, spirits, scb, _) = build_coordinator(tmp, predecessor_manifest, predecessor);
+    (coordinator, spirits, scb)
+}
+
+/// The `phase` of every `hot_swap.aborted` row, parsed by key.
+fn aborted_phases(tl: &TransparencyLogAdapter) -> Vec<String> {
+    tl.query_frames(FrameFilter {
+        kind: Some(FrameKind::HotSwapAborted),
+        ..Default::default()
+    })
+    .expect("query the transparency log")
+    .into_iter()
+    .map(|row| {
+        let payload: serde_json::Value =
+            serde_json::from_slice(&row.payload_redacted).expect("receipt is JSON");
+        payload["phase"].as_str().expect("receipt phase").to_owned()
+    })
+    .collect()
 }
 
 #[tokio::test]
@@ -508,8 +540,8 @@ async fn a_pid_unloaded_mid_swap_is_a_typed_not_loaded_refusal() {
         }),
         ..Default::default()
     };
-    let (coordinator, spirits, _) =
-        make_coordinator(&tmp, predecessor_manifest, MajorOnePredecessor);
+    let (coordinator, spirits, _, tl) =
+        build_coordinator(&tmp, predecessor_manifest, MajorOnePredecessor);
     let swap_in_calls = Arc::new(AtomicU32::new(0));
     let successor = UnloadingSuccessor {
         spirits: Arc::clone(&spirits),
@@ -550,4 +582,74 @@ async fn a_pid_unloaded_mid_swap_is_a_typed_not_loaded_refusal() {
         0,
         "no swap-in on an unloaded pid"
     );
+    assert_eq!(
+        aborted_phases(&tl),
+        ["SnapshotTaken"],
+        "the refusal fires before swap-in and journals the phase it reached"
+    );
+}
+
+/// A successor whose `on_swap_in` panics (step 9).
+struct SwapInPanics;
+
+impl Spirit for SwapInPanics {
+    fn migrate(&self, _ctx: &mut Ctx, _predecessor_state: &[u8]) -> Result<Vec<u8>, MigratorError> {
+        Ok(b"major-two-state".to_vec())
+    }
+
+    fn on_swap_in<'a>(&self, _ctx: &mut Ctx, _payload: &SwapInPayload<'a>) {
+        panic!("swap-in panic sentinel");
+    }
+}
+
+/// 22-9 — a swap-in failure discards the successor and journals `SwapInFired`.
+#[tokio::test]
+async fn a_failed_swap_in_journals_the_swap_in_phase() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let tmp = tempfile::TempDir::new().expect("tempdir");
+    let predecessor_manifest = SpiritManifestBundle {
+        lifecycle: LifecycleSection {
+            enabled_hooks: vec!["snapshot".into()],
+            telemetry: None,
+        },
+        class: Some(class_section("1.0.0")),
+        hot_swap: Some(HotSwapManifestSection {
+            state_schema_uri: "urn:maos:test:state:v1".into(),
+            state_schema_version: 0x0001_0001,
+        }),
+        ..Default::default()
+    };
+    let (coordinator, _, _, tl) =
+        build_coordinator(&tmp, predecessor_manifest, MajorOnePredecessor);
+    let successor_manifest = SpiritManifestBundle {
+        lifecycle: LifecycleSection {
+            enabled_hooks: vec!["migrate".into(), "on_swap_in".into()],
+            telemetry: None,
+        },
+        class: Some(class_section("2.0.0")),
+        hot_swap: Some(HotSwapManifestSection {
+            state_schema_uri: "urn:maos:test:state:v2".into(),
+            state_schema_version: 0x0002_0001,
+        }),
+        migrates_from: Some(MigratesFromSection {
+            versions: vec!["1.0.0".into()],
+        }),
+        ..Default::default()
+    };
+    let error = coordinator
+        .initiate_swap(
+            "migration-spirit",
+            &successor_manifest,
+            make_spirit_obj(SwapInPanics),
+        )
+        .await
+        .expect_err("a panicking swap-in refuses the swap");
+    assert!(
+        matches!(
+            error,
+            maos_domain::hot_swap::HotSwapError::SwapInFailed { .. }
+        ),
+        "{error:?}"
+    );
+    assert_eq!(aborted_phases(&tl), ["SwapInFired"]);
 }

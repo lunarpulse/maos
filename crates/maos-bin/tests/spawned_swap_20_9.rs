@@ -1326,3 +1326,154 @@ fn a_late_end_of_an_older_attempt_never_unfences_a_newer_one() {
     predecessor.end_attempt(&second);
     assert!(!predecessor.fenced(), "the retry's own end releases it");
 }
+
+/// The pre-warm `spirit.diagnostic` rows (`phase = "prewarm"`) of `world`, each parsed by key.
+fn prewarm_diagnostics(world: &World) -> Vec<(u32, serde_json::Value)> {
+    world
+        .rows(TlKind::CliSubprocessOutput, "spirit.diagnostic")
+        .iter()
+        .filter_map(|row| {
+            let record: serde_json::Value = serde_json::from_slice(&row.payload_redacted).ok()?;
+            (record["phase"] == "prewarm").then_some((row.spirit_pid, record))
+        })
+        .collect()
+}
+
+// Story 22-9 F2 (D-22-9-06 A) — a successor's `console.log` in `swap-in` was drained and dropped;
+// it is now a `spirit.diagnostic` row tagged `prewarm` at the Spirit's pid.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_successors_swap_in_console_log_is_journaled_as_a_diagnostic() {
+    let mut world = World::bare().await;
+    let v1 = v(&world, "v1.toml", "1.0.0", "lifecycle_probe.wasm", "");
+    let v2 = v(&world, "v2.toml", "1.1.0", "lifecycle_probe.wasm", "");
+    let running = world.start(&v1).await;
+    world.turn(ID, "").await;
+    world
+        .upgrade(&v2, UpgradePolicy::HotSwap)
+        .await
+        .expect("the swap commits");
+    let rows = prewarm_diagnostics(&world);
+    let said: Vec<_> = rows
+        .iter()
+        .filter(|(_, record)| {
+            record["event"] == "spirit_diagnostic"
+                && record["line"]
+                    .as_str()
+                    .is_some_and(|line| line.contains("swap-in: restored counter 1"))
+        })
+        .collect();
+    assert!(!said.is_empty(), "the swap-in line is journaled: {rows:?}");
+    assert!(
+        said.iter().all(|(pid, _)| *pid == running.pid),
+        "at the Spirit's pid {}: {said:?}",
+        running.pid
+    );
+    settle(world, running).await;
+}
+
+// Story 22-9 AC12 — the swap-invariant refusal has a component-form witness: the successor that
+// drops a declared `[swap_invariants].preserve` entry is refused before any hook, the predecessor
+// keeps serving at the same pid, and its declaration row is followed by a `refused` outcome row.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_spawned_successor_that_drops_a_swap_invariant_is_refused_typed_and_the_predecessor_keeps_serving(
+) {
+    let mut world = World::bare().await;
+    let preserve = |names: &str| format!("\n[swap_invariants]\npreserve = [{names}]\n");
+    let v1 = v(
+        &world,
+        "v1.toml",
+        "1.0.0",
+        "lifecycle_probe.wasm",
+        &preserve("\"open_pr_state\", \"review_queue\""),
+    );
+    let v2 = v(
+        &world,
+        "v2.toml",
+        "2.0.0",
+        "lifecycle_probe.wasm",
+        &preserve("\"open_pr_state\""),
+    );
+    let running = world.start(&v1).await;
+    world.turn(ID, "").await;
+    let error = world
+        .upgrade(&v2, UpgradePolicy::HotSwap)
+        .await
+        .expect_err("the successor drops a declared invariant");
+    assert!(
+        error.contains("swap invariant dropped") && error.contains("review_queue"),
+        "{error}"
+    );
+    assert_eq!(world.scheduler.resolve_pid(ID), Some(running.pid));
+    let report = world.turn(ID, "").await;
+    assert_eq!(World::count(&report, "frames"), 2, "still v1:\n{report}");
+    assert!(report.contains("swap-in=-"), "no successor ran:\n{report}");
+    // The declaration row of the refused successor is followed by a `refused` outcome row.
+    let declared = world
+        .rows(TlKind::GovernanceEvent, "governance:manifest-declaration")
+        .into_iter()
+        .filter_map(|row| serde_json::from_slice::<serde_json::Value>(&row.payload_redacted).ok())
+        .filter_map(|value| {
+            let event = value["event"].as_object()?.values().next()?.clone();
+            (event["version"] == "2.0.0")
+                .then(|| event["attempt_id"].as_str().map(str::to_owned))?
+        })
+        .next()
+        .expect("the refused successor's declaration row");
+    let until = Instant::now() + Duration::from_secs(10);
+    loop {
+        let refused = world
+            .rows(
+                TlKind::TelemetryEvent,
+                "governance:manifest-declaration-outcome",
+            )
+            .into_iter()
+            .filter_map(|row| {
+                serde_json::from_slice::<serde_json::Value>(&row.payload_redacted).ok()
+            })
+            .any(|value| value["attempt_id"] == declared && value["outcome"] == "refused");
+        if refused {
+            break;
+        }
+        assert!(
+            Instant::now() < until,
+            "no `refused` outcome row for {declared}"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    settle(world, running).await;
+}
+
+// Story 22-9 (D-21-PF-15 A, D-22-9-10 A) — a component that has not answered its lifecycle probe
+// yet (6 s here; a TypeScript guest compiles for seconds) is waited for on the one 90 s attempt, not
+// refused with `spawned_swap_not_ready ... retry` after 5 s.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_hot_swap_of_a_still_starting_component_waits_for_readiness() {
+    let mut world = World::new().await;
+    let v1 = v(&world, "v1.toml", "1.0.0", "hostile-slow-probe.wasm", "");
+    let v2 = v(&world, "v2.toml", "1.1.0", "lifecycle_probe.wasm", "");
+    let running = world.start_unready(&v1).await;
+    let until = Instant::now() + Duration::from_secs(30);
+    while world
+        .supervisor
+        .spawned_target(ID)
+        .and_then(|target| target.lifecycle().swap_context())
+        .is_none()
+    {
+        assert!(Instant::now() < until, "the component never launched");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let began = Instant::now();
+    world
+        .upgrade(&v2, UpgradePolicy::HotSwap)
+        .await
+        .expect("the swap waits for the probe and completes with no retry");
+    assert!(
+        began.elapsed() >= Duration::from_secs(3),
+        "it really waited for the slow probe: {:?}",
+        began.elapsed()
+    );
+    assert_eq!(world.scheduler.resolve_pid(ID), Some(running.pid));
+    let report = world.turn(ID, "").await;
+    assert_eq!(World::count(&report, "swap-in"), 7, "{report}");
+    settle(world, running).await;
+}
