@@ -104,17 +104,19 @@ Run these checks against the exact commit that will be tagged:
    First dispatch the 24 h chain at the candidate and wait for it. It is the
    operator's dispatch — the release job refuses a SHA without the chain, and a tag
    push does not start it (the `v*-rc*` push trigger was removed so a tag cannot
-   start a second ~26 h chain after the tag it must precede):
+   start a second chain after the tag it must precede):
 
    ```bash
    gh workflow run fuzz-prerelease.yml --ref main
    # select the run by commit, never by recency (as in step 6b below), then:
-   gh run watch "$run_id" --exit-status   # 5 serial 5 h links + setup; `t3-ledger-collect` must be green
+   gh run watch "$run_id" --exit-status   # 5 parallel 5 h links per target + setup; `t3-ledger-collect` must be green
    ```
 
    The hosted wall time is stated as measured at the first dispatch (expected
-   about 26 h per chain [INFERENCE: 5 links x 5 h + setup]; no chain has completed
-   yet, the one dispatch so far failed). Then check both legs against the exact
+   about 6 h per chain [INFERENCE: the five links run in parallel, 5 h + setup + the
+   `corpus-merge` job, which does not gate the ledger; no chain has completed
+   yet, the one dispatch so far failed; WP-16, 2026-11-23; it needs up to 30 runners at
+   once for 5 h (6 targets x 5 links), so dispatch when the runner window is free). Then check both legs against the exact
    commit, with the ledger read from the `fuzz-ledger` branch:
 
    ```bash
