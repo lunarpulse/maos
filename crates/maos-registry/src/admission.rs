@@ -107,27 +107,6 @@ pub enum AdmissionError {
     VettingAttestationRejected(String),
 }
 
-impl AdmissionError {
-    /// The stable machine code `maos-spirit validate` reports for this refusal (Story 22-7).
-    /// Exhaustive, so a new refusal cannot ship without a code.
-    pub fn code(&self) -> &'static str {
-        match self {
-            Self::PublicVettedDeferred => "public_vetted_deferred",
-            Self::ManifestTrustTierInvalid(_) => "manifest_trust_tier_invalid",
-            Self::ClassSectionInvalid(_) => "class_section_invalid",
-            Self::FirstPartyFormFromRegistry => "first_party_form_from_registry",
-            Self::OrgSignatureInvalid => "org_signature_invalid",
-            Self::PublisherSignatureInvalid => "publisher_signature_invalid",
-            Self::ComplianceContextDrift { .. } => "compliance_context_drift",
-            Self::UnsignedLocalRejected => "unsigned_local_rejected",
-            Self::ModelProvenance(_) => "model_provenance_refused",
-            Self::ModelProvenanceMalformed(_) => "model_provenance_malformed",
-            Self::OffFrozenSurface { .. } => "off_frozen_surface",
-            Self::VettingAttestationRejected(_) => "vetting_attestation_rejected",
-        }
-    }
-}
-
 /// Admission behavior selected from a structurally validated `class.forms`
 /// declaration. `class.forms` containing `rust-inproc` is refused in
 /// [`frozen_surface_gate`] rather than represented here.

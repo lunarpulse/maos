@@ -1164,7 +1164,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-22-7-domain-spirit --timeout 1500 -- env MAOS_DOMAIN_COMPONENT="$PWD/examples/incident-triage-ts/dist/spirit.wasm" cargo test --locked -p maos-bin --test domain_spirit_22_7 -- --ignored --nocapture 2>&1 | tee domain-spirit-22-7.log
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-domain-spirit --timeout 1500 -- env MAOS_DOMAIN_COMPONENT="$PWD/examples/incident-triage-ts/dist/spirit.wasm" cargo test --locked -p maos-bin --test domain_spirit_22_7 -- --ignored --nocapture 2>&1 | tee domain-spirit-22-7.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -eq 0 ]; then
             grep -q '^test the_shipped_domain_spirit_answers_maosctl_ask \.\.\. ok$' domain-spirit-22-7.log || { echo "::error title=Domain Spirit::the witness did not run and pass"; rc=1; }

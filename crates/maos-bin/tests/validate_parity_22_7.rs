@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use maos_bin::admission::gate_manifest;
 use maos_domain::ports::registry::TrustTier;
 use maos_registry::admission::{admit_spirit, AdmissionConfig};
+use maos_registry::validate::admission_code;
 use maos_spirit_cli::publish::{build_signed_package, PublishArgs};
 use maos_spirit_cli::validate::validate_bytes;
 
@@ -167,7 +168,7 @@ fn install_gate(dir: &Path, manifest: &str) -> Option<&'static str> {
         runtime_provider_endpoint: None,
         runtime_crypto_provider: None,
     };
-    admit_spirit(&pkg, &cfg).err().map(|e| e.code())
+    admit_spirit(&pkg, &cfg).err().map(|e| admission_code(&e))
 }
 
 #[test]

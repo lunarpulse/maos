@@ -1,4 +1,4 @@
-AC2 plant B: crates/maos-registry/src/validate.rs validate(): 'if wasm {' (the component-shape check) -> 'if false && wasm {' (marked E227-PLANT). Command: cargo test --locked -p maos-spirit-cli --test validate_22_7. Result: validate_refuses_a_core_module_as_artifact FAILS (left: [] right: [("component", "component_not_a_component")]), plus validate_refuses_a_component_that_lacks_the_world_exports, validate_exit_codes_follow_the_verdict and validate_json_report_is_stable. Plant reverted.
+AC2 plant B: crates/maos-registry/src/validate.rs validate(): 'if wasm {' (the component-shape check) -> 'if false && wasm {' (marked with the plant tag). Command: cargo test --locked -p maos-spirit-cli --test validate_22_7. Result: validate_refuses_a_core_module_as_artifact FAILS (left: [] right: [("component", "component_not_a_component")]), plus validate_refuses_a_component_that_lacks_the_world_exports, validate_exit_codes_follow_the_verdict and validate_json_report_is_stable. Plant reverted.
 
 test validate_refuses_rust_inproc_from_a_registry ... ok
 test validate_exit_2_on_a_missing_file ... ok

@@ -1,4 +1,4 @@
-AC4 plant (a): xtask/src/check_third_party_trial.rs check(): inserted 'if n < 12 { failures.push(...participants_total < 12 floor) }' before the verdict (marked E227-PLANT). Command: cargo test --locked -p xtask --test story_10_2_proven_red -- trial_gate. Result: trial_gate_small_clean_cohort_is_green_with_its_n FAILS (and trial_gate_reads_a_cohort_without_strata, trial_gate_zero_participants_is_insufficient). Plant reverted.
+AC4 plant (a): xtask/src/check_third_party_trial.rs check(): inserted 'if n < 12 { failures.push(...participants_total < 12 floor) }' before the verdict (marked with the plant tag). Command: cargo test --locked -p xtask --test story_10_2_proven_red -- trial_gate. Result: trial_gate_small_clean_cohort_is_green_with_its_n FAILS (and trial_gate_reads_a_cohort_without_strata, trial_gate_zero_participants_is_insufficient). Plant reverted.
 
 332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
 332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
@@ -11,7 +11,7 @@ thread 'trial_gate_small_clean_cohort_is_green_with_its_n' (4150157) panicked at
 test result: FAILED. 20 passed; 3 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.04s
 rc=101
 
-AC4 plant (b): same file: added 'pub no_prior_contribution: i64,' back to TrialSection (marked E227-PLANT), the required strata field. Same command. Result: trial_gate_reads_a_cohort_without_strata FAILS (the file has no such key: missing field), along with 12 other trial_gate tests that read a strata-free fixture. Plant reverted.
+AC4 plant (b): same file: added 'pub no_prior_contribution: i64,' back to TrialSection (marked with the plant tag), the required strata field. Same command. Result: trial_gate_reads_a_cohort_without_strata FAILS (the file has no such key: missing field), along with 12 other trial_gate tests that read a strata-free fixture. Plant reverted.
 
 332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
 332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),

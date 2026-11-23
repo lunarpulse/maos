@@ -32,7 +32,7 @@ use maos_manifest::{
 use maos_spirit_abi::compliance::SandboxTier;
 use serde::Serialize;
 
-use crate::admission::{admit_spirit, AdmissionConfig};
+use crate::admission::{admit_spirit, AdmissionConfig, AdmissionError};
 use crate::client::RegistryClientConfig;
 
 /// One failed check: which check, the stable code the Host would print, and the detail.
@@ -98,7 +98,7 @@ pub fn validate(pkg: &SignedPackage, cfg: Option<&RegistryClientConfig>) -> Vali
         }
         Err(error) => report.findings.push(Finding {
             check: "admission",
-            code: error.code(),
+            code: admission_code(&error),
             detail: error.to_string(),
         }),
     }
@@ -108,6 +108,26 @@ pub fn validate(pkg: &SignedPackage, cfg: Option<&RegistryClientConfig>) -> Vali
         }
     }
     report
+}
+
+/// The stable machine code `maos-spirit validate` reports for an install-gate refusal. Exhaustive,
+/// so a new refusal cannot ship without a code. It lives here, not on `AdmissionError`, because
+/// `admission.rs` is a pinned FKCS admission file (`xtask/fkcs-baseline.toml`).
+pub fn admission_code(error: &AdmissionError) -> &'static str {
+    match error {
+        AdmissionError::PublicVettedDeferred => "public_vetted_deferred",
+        AdmissionError::ManifestTrustTierInvalid(_) => "manifest_trust_tier_invalid",
+        AdmissionError::ClassSectionInvalid(_) => "class_section_invalid",
+        AdmissionError::FirstPartyFormFromRegistry => "first_party_form_from_registry",
+        AdmissionError::OrgSignatureInvalid => "org_signature_invalid",
+        AdmissionError::PublisherSignatureInvalid => "publisher_signature_invalid",
+        AdmissionError::ComplianceContextDrift { .. } => "compliance_context_drift",
+        AdmissionError::UnsignedLocalRejected => "unsigned_local_rejected",
+        AdmissionError::ModelProvenance(_) => "model_provenance_refused",
+        AdmissionError::ModelProvenanceMalformed(_) => "model_provenance_malformed",
+        AdmissionError::OffFrozenSurface { .. } => "off_frozen_surface",
+        AdmissionError::VettingAttestationRejected(_) => "vetting_attestation_rejected",
+    }
 }
 
 fn tier_name(tier: TrustTier) -> &'static str {
