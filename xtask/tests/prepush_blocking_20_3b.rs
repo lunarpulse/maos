@@ -24,6 +24,10 @@ const NO_LOCAL_FORM: &[(&str, &str)] = &[
         "check-test-budget",
         "fresh junit: existing conditional prepush test_budget leg owns the local mirror",
     ),
+    (
+        "expensive-tests",
+        "nextest `expensive` profile over the registered ignored tests; the filter is derived in the job, not a standalone gate",
+    ),
 ];
 
 fn missing_local_blocking(

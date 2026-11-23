@@ -41,8 +41,8 @@ const QUERY_MARKER: &str = "// cargo-query:";
 const IGNORE: &str = "#[ignore = \"expensive:";
 /// The CI job that runs every `[[expensive]]` row without a dedicated job.
 pub const EXPENSIVE_JOB: &str = "expensive-tests";
-/// The workflows an `[[expensive]]` job may live in: the merge-path `discipline.yml` and the scheduled
-/// `ci-nightly.yml` (the CI release-ready program W3 moved `expensive-tests` there). A job is resolved
+/// The workflows an `[[expensive]]` job may live in: the merge-path `discipline.yml` (where `expensive-tests`
+/// runs, back there for GA after its W3 nightly period) and the scheduled `ci-nightly.yml`. A job is resolved
 /// in the first of them that holds it; a workflow that does not exist contributes nothing.
 pub const WORKFLOWS: [&str; 2] = [
     ".github/workflows/discipline.yml",
