@@ -47,8 +47,10 @@ fn ac1_native_deb_matrix_and_all_consumers_are_required() {
     );
 }
 
+/// Story 22-3 (D-22-3-02 A): GHCR publishes with `GITHUB_TOKEN` on every tag; every Docker Hub
+/// step keeps the `PUBLISH` secret gate. The credential-free build never pushes.
 #[test]
-fn ac5_login_push_and_sign_are_all_credential_gated() {
+fn ac5_ghcr_publishes_ungated_and_docker_hub_stays_credential_gated() {
     let workflow = load(".github/workflows/container.yml");
     assert!(workflow["on"]["push"]["tags"].is_sequence());
     assert!(workflow["on"]["pull_request_target"].is_null());
@@ -57,6 +59,8 @@ fn ac5_login_push_and_sign_are_all_credential_gated() {
         .as_str()
         .unwrap()
         .contains("DOCKERHUB_TOKEN != ''"));
+    let gate = Some("env.PUBLISH == 'true'");
+    let (mut ghcr_login, mut hub_login, mut push, mut ghcr_sign, mut hub_sign) = (0, 0, 0, 0, 0);
     for step in workflow["jobs"]
         .as_mapping()
         .into_iter()
@@ -65,18 +69,61 @@ fn ac5_login_push_and_sign_are_all_credential_gated() {
     {
         let uses = step["uses"].as_str().unwrap_or("");
         let run = step["run"].as_str().unwrap_or("");
-        if uses.starts_with("docker/login-action")
-            || uses.starts_with("docker/build-push-action")
-            || uses.starts_with("sigstore/")
-            || run.contains("cosign sign")
-        {
-            assert_eq!(step["if"].as_str(), Some("env.PUBLISH == 'true'"));
+        let with = &step["with"];
+        if uses.starts_with("docker/login-action") {
+            if with["registry"].as_str() == Some("ghcr.io") {
+                ghcr_login += 1;
+                assert!(
+                    step["if"].is_null(),
+                    "GHCR login must not wait for Docker Hub"
+                );
+                assert_eq!(
+                    with["password"].as_str(),
+                    Some("${{ secrets.GITHUB_TOKEN }}")
+                );
+            } else {
+                hub_login += 1;
+                assert_eq!(step["if"].as_str(), gate, "Docker Hub login");
+            }
+        }
+        if uses.starts_with("docker/build-push-action") {
+            push += 1;
+            assert!(
+                step["if"].is_null(),
+                "the one push serves GHCR on every tag"
+            );
+            let tags = with["tags"].as_str().unwrap();
+            assert!(tags.contains("ghcr.io/${{ github.repository }}"));
+            // The Docker Hub tag exists only when the credentials do.
+            assert!(tags.contains("env.PUBLISH == 'true' && format("), "{tags}");
+            assert!(!tags.contains("HUB_USER }}/maos:${{ github.ref_name }}\n"));
+        }
+        if uses.starts_with("sigstore/") {
+            assert!(step["if"].is_null());
+        }
+        if run.contains("cosign sign") {
+            if run.contains("HUB_USER") {
+                hub_sign += 1;
+                assert_eq!(step["if"].as_str(), gate, "Docker Hub signing");
+                assert!(!run.contains("GHCR_IMAGE"));
+            } else {
+                ghcr_sign += 1;
+                assert!(step["if"].is_null(), "GHCR signing is not gated");
+                assert!(run.contains("GHCR_IMAGE"));
+            }
         }
         if step["name"].as_str() == Some("Always build and smoke without logging in") {
             assert!(step["if"].is_null());
             assert!(run.contains("--load") && !run.contains("--push"));
+            for exe in ["maos", "maosctl", "maos-wasm-runner"] {
+                assert!(run.contains(exe), "smoke must check {exe}");
+            }
         }
     }
+    assert_eq!(
+        (ghcr_login, hub_login, push, ghcr_sign, hub_sign),
+        (1, 1, 1, 1, 1)
+    );
 }
 
 #[test]

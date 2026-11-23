@@ -1,0 +1,11 @@
+# Host file for packaging/compose/compose.yaml, mounted read-only at /etc/maos/host.toml.
+# The cast is the in-tree Spirit manifests baked into the image (nash, observer): no provider key
+# is needed. Edit [[host.spirits]] to change the standing cast; `door_bind` must stay loopback.
+[host]
+# inference_mode defaults to live (MAOS_INFERENCE_MODE). `replay` needs MAOS_REPLAY_CASSETTE, so it is not the default.
+
+[[host.spirits]]
+manifest = "/usr/share/maos/spirits/nash/manifest.toml"
+
+[[host.spirits]]
+manifest = "/usr/share/maos/spirits/observer/manifest.toml"

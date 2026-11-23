@@ -2,9 +2,17 @@
 !Dockerfile
 !packaging/
 !packaging/verify-release.py
+!packaging/container/
+!packaging/container/host.toml
+!spirits/
+spirits/**
+!spirits/*/
+!spirits/*/manifest.toml
 !dist/
 !dist/maos-linux-amd64
 !dist/maos-linux-arm64
+!dist/maosctl-linux-amd64
+!dist/maosctl-linux-arm64
 !dist/maos-wasm-runner-linux-amd64
 !dist/maos-wasm-runner-linux-arm64
 !dist/SHA256SUMS

@@ -1,0 +1,56 @@
+# MAOS standing Host chart (Story 22-3).
+#
+# T3 Workers are NOT supported in a pod. They need a rootless container runtime (the detector
+# probes /usr/bin/podman), which a pod does not provide by default. This chart mounts no container
+# socket and requests no privilege to work around that.
+#
+# The operator door stays on loopback inside the pod: the chart renders no Service and no
+# containerPort for it. Readiness and liveness are `exec: maosctl status`, which authenticates
+# with the control.json the init container minted.
+image:
+  repository: ghcr.io/lunarpulse/maos
+  # Empty means the chart appVersion prefixed with "v" (the release tag).
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# The Host file, mounted read-only at /etc/maos/host.toml. The default cast is the in-tree Spirit
+# manifests baked into the image (nash, observer); it needs no provider key.
+hostToml: |
+  [host]
+  # inference_mode defaults to live (MAOS_INFERENCE_MODE). `replay` needs MAOS_REPLAY_CASSETTE.
+
+  [[host.spirits]]
+  manifest = "/usr/share/maos/spirits/nash/manifest.toml"
+
+  [[host.spirits]]
+  manifest = "/usr/share/maos/spirits/observer/manifest.toml"
+
+# Secrets injected as environment variables. Every key must be a registered MAOS_* name.
+# Either list them here (rendered into a Secret) or name an existing Secret whose keys are
+# registered MAOS_* names (existingSecret wins; the chart then renders no Secret).
+secrets: {}
+#  MAOS_ANTHROPIC_API_KEY: "sk-..."
+existingSecret: ""
+
+persistence:
+  size: 1Gi
+  storageClassName: ""   # empty uses the cluster default
+
+terminationGracePeriodSeconds: 30
+
+probes:
+  readiness:
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  liveness:
+    initialDelaySeconds: 30
+    periodSeconds: 20
+    timeoutSeconds: 5
+    # `maosctl status` exits 74 when the audit store lock is briefly held; tolerate it.
+    failureThreshold: 3
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

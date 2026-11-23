@@ -4865,7 +4865,7 @@ jobs:
   container-build:
     needs: release-dry-run
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
@@ -4882,7 +4882,39 @@ jobs:
           docker run --rm maos:ci --version
           docker run --rm maos:ci --help
           docker run --rm maos:ci init --plain
-          docker image inspect maos:ci --format '{{.Size}}'
+          # Story 22-3: maos, maosctl and the runner sit in the image as executable regular files.
+          cid="$(docker create maos:ci)"
+          trap 'docker rm -f "$cid" >/dev/null' EXIT
+          for exe in maos maosctl maos-wasm-runner; do
+            docker cp "$cid:/usr/local/bin/$exe" - | tar -tv | grep -E '^-r[w-]x'
+          done
+      - name: Image size is measured and bounded (NFR-Ops-14)
+        run: |
+          size=$(docker image inspect maos:ci --format '{{.Size}}')
+          limit=$(tr -d '[:space:]' < tests/integration/image-size-limit)
+          echo "NFR-Ops-14 image size: measured ${size} B, bound ${limit} B (proposed bound = measured + 10 %: $((size + size / 10)))"
+          test "$size" -le "$limit"
+      - name: Pinned helm and kind (sha256-checked)
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fsSLo helm.tgz https://get.helm.sh/helm-v3.16.4-linux-amd64.tar.gz
+          echo "fc307327959aa38ed8f9f7e66d45492bb022a66c3e5da6063958254b9767d179  helm.tgz" | sha256sum -c -
+          tar xzf helm.tgz
+          sudo install linux-amd64/helm /usr/local/bin/helm
+          curl -fsSLo kind https://kind.sigs.k8s.io/dl/v0.25.0/kind-linux-amd64
+          echo "b22ff7e5c02b8011e82cc3223d069d178b9e1543f1deb21e936d11764780a3d8  kind" | sha256sum -c -
+          sudo install kind /usr/local/bin/kind
+          helm version --short
+          kind version
+      - name: Compose runs a Host with a persistent home; idle memory is bounded (NFR-Ops-14)
+        env:
+          MAOS_IMAGE: maos:ci
+        run: packaging/container/prove-compose.sh
+      - name: Helm install on kind runs the Host and a pod delete keeps the cast
+        env:
+          MAOS_IMAGE: maos:ci
+        run: packaging/container/prove-helm.sh
 
   package-recipes:
     needs: release-dry-run

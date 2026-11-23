@@ -88,21 +88,26 @@ into a temporary root, checks its workspace version and uninstalls it again.
 
 ## Container
 
-The image's verify stage checks the original signed binary. The runtime is
-`gcr.io/distroless/cc-debian13:nonroot`, with `maos` as its entrypoint and the
-source SHA label. Discipline builds and runs `--version`/`--help` without
-registry secrets. Tag builds always run; **all publication and keyless cosign
-signing wait for both Docker Hub credentials**. If absent, the job says
-`SKIPPED: DOCKERHUB_* absent (ops-provisioning-secrets-and-accounts)` after build.
-No published image or signing result is claimed until the operator lane runs.
-Publication jobs reference the `release` environment, but a reference does not
-prove protection is configured. An administrator must provision required
+The image's verify stage checks the original signed `maos`, `maosctl` and `maos-wasm-runner`
+before copying them. The runtime is `gcr.io/distroless/cc-debian13:nonroot`, with `maos` as its
+entrypoint, the in-tree Spirit manifests and a default Host file under `/usr/share/maos`, and the
+source SHA label. With no arguments it runs `maos serve --config /usr/share/maos/host.toml`
+(cast: nash and observer; no provider key needed). Discipline builds it and runs the compose file
+and the Helm chart against it on every pull request, without registry secrets.
+
+A `v*` tag publishes `ghcr.io/<owner>/maos:<tag>` (`linux/amd64`, `linux/arm64`), cosign-signed,
+with the workflow's `GITHUB_TOKEN`; it needs no operator secret. **Docker Hub publication and its
+signing still wait for both Docker Hub credentials**; if absent, the job says
+`SKIPPED: Docker Hub publication, DOCKERHUB_* absent (ops-provisioning-secrets-and-accounts)`.
+No published image is claimed until the first post-GA tag has run, and the GHCR package's
+visibility is an operator setting. Publication jobs reference the `release` environment, but a
+reference does not prove protection is configured. An administrator must provision required
 reviewers and tag/deployment protections per the provisioning checklist first.
 After publication, verify its digest with `cosign verify --certificate-identity
 <release-workflow-identity> --certificate-oidc-issuer https://token.actions.githubusercontent.com
-<registry-image>@sha256:<digest>` before running it. Use the real tag workflow
+ghcr.io/<owner>/maos@sha256:<digest>` before running it. Use the real tag workflow
 identity, never a wildcard issuer/identity. Do not infer a registry image from a
-successful local build.
+successful local build. Running it is in [Run in a container](/run-maos/#run-in-a-container).
 
 ## Remove data, then binaries
 

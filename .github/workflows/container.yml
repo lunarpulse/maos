@@ -64,12 +64,13 @@ jobs:
           # image has no shell, so inspect the filesystem entry itself; this never runs it.
           cid="$(docker create maos:tag)"
           trap 'docker rm -f "$cid" >/dev/null' EXIT
-          docker cp "$cid:/usr/local/bin/maos" - | tar -tv | grep -E '^-r[w-]x'
-          docker cp "$cid:/usr/local/bin/maos-wasm-runner" - | tar -tv | grep -E '^-r[w-]x'
+          for exe in maos maosctl maos-wasm-runner; do
+            docker cp "$cid:/usr/local/bin/$exe" - | tar -tv | grep -E '^-r[w-]x'
+          done
       - name: Publication unavailable
         if: env.PUBLISH != 'true'
         run: |
-          echo 'SKIPPED: DOCKERHUB_* absent (ops-provisioning-secrets-and-accounts)'
+          echo 'SKIPPED: Docker Hub publication, DOCKERHUB_* absent (ops-provisioning-secrets-and-accounts); GHCR publishes with GITHUB_TOKEN'
       - uses: actions/upload-artifact@v4
         with:
           name: verified-container-release
@@ -97,12 +98,11 @@ jobs:
         with:
           name: verified-container-release
           path: dist
+      # GHCR needs no operator secret: it publishes on every tag with GITHUB_TOKEN. Docker Hub keeps
+      # its credential gate (PUBLISH).
       - uses: docker/setup-buildx-action@v3
-        if: env.PUBLISH == 'true'
       - uses: docker/setup-qemu-action@v3
-        if: env.PUBLISH == 'true'
       - name: Log in to GHCR
-        if: env.PUBLISH == 'true'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
@@ -115,7 +115,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Publish the verified multi-platform image
-        if: env.PUBLISH == 'true'
         id: push
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
@@ -124,17 +123,20 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-            ${{ env.HUB_USER }}/maos:${{ github.ref_name }}
+            ${{ env.PUBLISH == 'true' && format('{0}/maos:{1}', env.HUB_USER, github.ref_name) || '' }}
           build-args: |
             RELEASE_PUBKEY=${{ env.pubkey }}
             SOURCE_SHA=${{ github.sha }}
       - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.9.1
-        if: env.PUBLISH == 'true'
-      - name: Sign both published digests
-        if: env.PUBLISH == 'true'
+      - name: Sign the GHCR digest
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
           GHCR_IMAGE: ghcr.io/${{ github.repository }}
         run: |
           cosign sign --yes "$GHCR_IMAGE@$DIGEST"
+      - name: Sign the Docker Hub digest
+        if: env.PUBLISH == 'true'
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
           cosign sign --yes "$HUB_USER/maos@$DIGEST"

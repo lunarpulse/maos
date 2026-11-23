@@ -1,0 +1,8 @@
+apiVersion: v2
+name: maos
+description: A standing MAOS Host (maos serve) with a persistent home. T3 Workers are not supported in a pod.
+type: application
+version: 0.1.0
+appVersion: "1.0.0-rc.2"
+kubeVersion: ">=1.27.0-0"
+home: https://github.com/lunarpulse/maos

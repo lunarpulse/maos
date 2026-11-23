@@ -367,6 +367,56 @@ rollback) within 3 seconds, and the capability audit channel is open. The probe 
 reads as not writable, so a liveness probe should tolerate one 74 before restarting the Host. No route is
 added and none is unauthenticated: `/v1/daemon` gains the key `audit_store_writable` and keeps every other key.
 
+## Run in a container
+
+The image holds `maos`, `maosctl`, `maos-wasm-runner`, the in-tree Spirit manifests and a default Host file
+(`/usr/share/maos/host.toml`: nash and observer, no provider key needed). Pull a tagged image from the GitHub
+registry and verify its signature first (see [Install](/install/#container)):
+
+```sh
+cosign verify --certificate-identity <release-workflow-identity> \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com ghcr.io/<owner>/maos@sha256:<digest>
+```
+
+**Compose.** `packaging/compose/compose.yaml` runs a one-shot `init` (`maos init --plain`) and then `maos serve
+--config /etc/maos/host.toml` on the named volume `maos-home` at `/var/lib/maos`, with `restart:
+unless-stopped`, a 30 s stop grace period and the healthcheck `maosctl status`:
+
+```sh
+MAOS_IMAGE=ghcr.io/<owner>/maos:<tag> docker compose -f packaging/compose/compose.yaml up -d
+docker compose -f packaging/compose/compose.yaml exec maos /usr/local/bin/maosctl agents
+```
+
+After `docker compose restart maos` the same cast is read back, and the home survives `docker compose down`
+(do not pass `-v`). Edit `packaging/compose/host.toml` to change the cast. Provider keys pass through from the
+shell (`MAOS_ANTHROPIC_API_KEY`, ...) only when set.
+
+**Helm.** `packaging/helm/maos` deploys a one-replica StatefulSet with a PersistentVolumeClaim at
+`/var/lib/maos`, the Host file from `.Values.hostToml` (a ConfigMap mounted read-only at `/etc/maos`) and
+secrets from `.Values.secrets` or `.Values.existingSecret` as `MAOS_*` environment variables. An init
+container runs `maos init --plain`; readiness and liveness are `exec: maosctl status`:
+
+```sh
+helm install maos packaging/helm/maos --set image.tag=<tag>
+kubectl exec maos-0 -c maos -- /usr/local/bin/maosctl status
+```
+
+The root filesystem is read-only, the pod runs as uid/gid 65532 with every capability dropped, and
+`HOME=/var/lib/maos` puts every data root on the volume.
+
+**The door never leaves loopback.** Neither deployment publishes a port or renders a Service. A `door_bind`
+that is not loopback is the typed refusal (exit 78) of the previous section, and an HTTP probe cannot reach
+the door, which is why the probe is an exec of `maosctl status`.
+
+**Footprint (NFR-Ops-14, proposed bounds, operator unconfirmed).** The per-PR `container-build` job asserts the
+amd64 image size <= 140,022,361 B and the default cast's idle memory <= 50,000,000 B (container cgroup
+`memory.current`, 60 s after `maosctl status` = 0). Each run prints what it measured; the bounds are the
+measurement plus 10 % and live in `tests/integration/image-size-limit` and `tests/integration/idle-memory-limit`.
+
+**T3 Workers are not supported in a container or pod.** They need a rootless container runtime (the detector
+probes `/usr/bin/podman`), which neither provides by default; neither deployment mounts a container socket or
+requests privilege to work around it. Run T3 Workers on a host install.
+
 ## Operate
 
 The kernel composition root lives in `crates/maos-bin`. Operational surfaces — the transparency log, capability mediation, sandbox tiers, ComplianceClaim admission, the registry, and yank propagation — are documented in the reference guides:

@@ -1,0 +1,66 @@
+# MAOS standing Host (Story 22-3). Compose Specification, `docker compose` v2.
+#
+#   MAOS_IMAGE=ghcr.io/lunarpulse/maos:<tag> docker compose -f packaging/compose/compose.yaml up -d
+#   docker compose -f packaging/compose/compose.yaml exec maos /usr/local/bin/maosctl status
+#
+# The image is `maos:ci` in the per-PR proof and the pulled `ghcr.io/<owner>/maos:<tag>` otherwise.
+# The home is the named volume `maos-home`; it survives `docker compose down` (do not pass -v).
+#
+# The operator door stays on loopback INSIDE the container: no port is published, and the health
+# check is the authenticated `maosctl status` (exec form; the image has no shell).
+#
+# T3 Workers are NOT supported here. They need a rootless container runtime (the detector probes
+# /usr/bin/podman), which this container does not provide. Nothing below mounts a container socket
+# or requests privilege to work around that.
+#
+# Provider keys are passed through from the shell only when set, e.g. MAOS_ANTHROPIC_API_KEY.
+name: maos
+
+x-maos-common: &maos-common
+  image: ${MAOS_IMAGE:?set MAOS_IMAGE, e.g. ghcr.io/lunarpulse/maos:v1.0.0}
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  user: "65532:65532"
+  environment:
+    HOME: /var/lib/maos
+    MAOS_HOME: /var/lib/maos
+  tmpfs:
+    - /tmp
+  volumes:
+    - maos-home:/var/lib/maos
+
+services:
+  # One-shot: the one minter of the operator door config (control.json). Idempotent.
+  init:
+    <<: *maos-common
+    command: ["init", "--plain"]
+    restart: "no"
+
+  maos:
+    <<: *maos-common
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    command: ["serve", "--config", "/etc/maos/host.toml"]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      HOME: /var/lib/maos
+      MAOS_HOME: /var/lib/maos
+      MAOS_ANTHROPIC_API_KEY:
+      MAOS_OPENAI_API_KEY:
+      MAOS_GEMINI_API_KEY:
+      MAOS_KIMI_API_KEY:
+    volumes:
+      - maos-home:/var/lib/maos
+      - ./host.toml:/etc/maos/host.toml:ro
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/maosctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  maos-home:
