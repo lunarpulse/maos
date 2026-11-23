@@ -1,0 +1,14 @@
+AC5 plant: crates/maos-bin/src/directed_task.rs accept(): key lookup bypassed ('let known: Option<String> = None') (marker PLANT22_4_RED). Command: cargo nextest run --locked -p maos-bin --test task_registry_22_4 -E 'test(a_repeated_key_returns_the_same_task)'. Result: FAILS at task_registry_22_4.rs:369 'the repeat is marked' (second ask is not replayed; a second task id appears). Plant reverted.
+
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+        FAIL [   0.182s] (1/1) maos-bin::task_registry_22_4 a_repeated_key_returns_the_same_task
+  stdout 
+    running 1 test
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.17s
+  stderr 
+    thread 'a_repeated_key_returns_the_same_task' (3842608) panicked at crates/maos-bin/tests/task_registry_22_4.rs:369:5:
+    the repeat is marked
+     Summary [   0.182s] 1 test run: 0 passed, 1 failed, 15 skipped
+        FAIL [   0.182s] (1/1) maos-bin::task_registry_22_4 a_repeated_key_returns_the_same_task
+rc=100

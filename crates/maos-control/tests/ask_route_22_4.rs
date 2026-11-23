@@ -349,12 +349,15 @@ fn task_show_renders_every_field_and_omits_the_absent_ones() {
         Some(TOKEN),
         "",
     ));
-    let keys: Vec<&str> = body
+    // Sorted: the key order of a `serde_json::Map` is alphabetical only without the
+    // `preserve_order` feature, which `cedar-policy-core` turns on for a workspace build.
+    let mut keys: Vec<&str> = body
         .as_object()
         .unwrap()
         .keys()
         .map(String::as_str)
         .collect();
+    keys.sort_unstable();
     assert_eq!(
         keys,
         ["accepted_ns", "origin", "spirit_id", "state", "task_id"],
