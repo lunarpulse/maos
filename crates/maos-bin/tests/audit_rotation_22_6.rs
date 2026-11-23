@@ -114,6 +114,23 @@ fn put_as(tl: &TransparencyLogAdapter, n: u32, pid: u32, body: &str) {
     assert_eq!(written, FrameRowWrite::Written, "frame {n}");
 }
 
+/// Append `count` copies of the first row under fresh frame ids, in one transaction.
+fn clone_filler(db: &Path, count: u32) {
+    raw(db)
+        .execute(
+            "WITH RECURSIVE seq(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM seq WHERE i < ?1) \
+             INSERT INTO transparency_log(frame_id, timestamp_ns, spirit_pid, from_spirit_id, \
+             to_spirit_id, boot_nonce, capability_token, kind, intent, correlation_id, \
+             payload_redacted, origin) \
+             SELECT randomblob(16), t.timestamp_ns, t.spirit_pid, t.from_spirit_id, t.to_spirit_id, \
+             t.boot_nonce, t.capability_token, t.kind, t.intent, t.correlation_id, \
+             t.payload_redacted, t.origin \
+             FROM seq, (SELECT * FROM transparency_log WHERE rowid = 1) t",
+            [count],
+        )
+        .expect("clone filler rows");
+}
+
 fn set_timestamp(db: &Path, rowid: i64, ts: i64) {
     raw(db)
         .execute(
@@ -741,7 +758,7 @@ fn ratification_sequence_is_one_order_across_rotation() {
 /// re-triggers every pass; with rotation disabled the live file grows past 2·B.
 #[test]
 fn live_log_stays_within_its_bound() {
-    const B: u64 = 1024 * 1024;
+    const B: u64 = 256 * 1024;
     let f = Fixture::new();
     let policy = RotationPolicy {
         rotate_bytes: B,
@@ -752,7 +769,7 @@ fn live_log_stays_within_its_bound() {
     let mut written = 0u64;
     let mut n = 0;
     while written < 10 * B {
-        for _ in 0..64 {
+        for _ in 0..16 {
             n += 1;
             put(&f.tl, n, &body(n));
             written += 4_100;
@@ -1133,14 +1150,15 @@ fn interrupted_forget_with_sealed_frames_completes_after_restart() {
 fn forget_sweep_windows_and_proof_cross_a_rotation() {
     let f = Fixture::new();
     // More rows than one scan window (4096): the principal sits on both sides of the boundary.
-    for n in 1..=4_300_u32 {
-        let body = if n == 100 || n == 4_250 {
-            r#"{"principal_id":"user:erin","note":"secret"}"#.to_string()
-        } else {
-            format!("filler-{n}")
-        };
-        put(&f.tl, n, &body);
-    }
+    // The adapter writes the two principal rows (one durable append each); the filler between
+    // them is cloned in one raw transaction, which keeps the fixture inside the 60 s budget.
+    let secret = r#"{"principal_id":"user:erin","note":"secret"}"#;
+    put(&f.tl, 1, "filler");
+    clone_filler(&f.db, 98);
+    put(&f.tl, 100, secret);
+    clone_filler(&f.db, 4_149);
+    put(&f.tl, 4_250, secret);
+    clone_filler(&f.db, 50);
     let segment = f.rotate();
     assert!(segment.last_rowid > 4_000);
     assert!(f.live_rows() < 4_300);

@@ -199,6 +199,11 @@ pub trait SegmentSealer: Send + Sync + std::fmt::Debug {
     fn seal(&self, request: &SegmentSealRequest) -> Result<SealedSegment, String>;
 }
 
+/// A segment sealer is already installed on this adapter.
+#[derive(Debug, thiserror::Error)]
+#[error("a segment sealer is already installed")]
+pub struct SealerAlreadyInstalled;
+
 #[derive(Debug, thiserror::Error)]
 pub enum RotationError {
     #[error("no segment sealer is installed: {0}")]
@@ -323,8 +328,8 @@ impl TransparencyLogAdapter {
     pub fn install_segment_sealer(
         &self,
         sealer: std::sync::Arc<dyn SegmentSealer>,
-    ) -> Result<(), ()> {
-        self.sealer.set(sealer).map_err(drop)
+    ) -> Result<(), SealerAlreadyInstalled> {
+        self.sealer.set(sealer).map_err(|_| SealerAlreadyInstalled)
     }
 
     /// Whether a segment sealer is installed (rotation is refused until one is).

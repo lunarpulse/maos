@@ -1,0 +1,12 @@
+AC2 plant: crates/maos-iac/src/adapter/transparency_log/rotation.rs merge_sources: the 'merged.sort_by_key(time_key)' of the non-insertion order removed (per-file concatenation). Command: cargo nextest run --locked -p maos-bin --test audit_rotation_22_6 -E 'cross_segment_query_equals_the_unrotated_twin | distillate_citing_a_sealed_frame_is_written'. Result: cross_segment_query_equals_the_unrotated_twin FAILS on the clock-step fixture (sealed ts 10001.. listed before live ts 521..); distillate test unaffected (passes). Plant reverted.
+
+        PASS [   0.978s] (1/2) maos-bin::audit_rotation_22_6 distillate_citing_a_sealed_frame_is_written
+        FAIL [   2.094s] (2/2) maos-bin::audit_rotation_22_6 cross_segment_query_equals_the_unrotated_twin
+  stderr 
+    thread 'cross_segment_query_equals_the_unrotated_twin' (3583508) panicked at crates/maos-bin/tests/audit_rotation_22_6.rs:300:9:
+    assertion `left == right` failed: FrameFilter { spirit_pid: None, boot_nonce: None, disclosable_kinds_only: false, intent: None, kind: None, correlation_id: None, since_ns: None, until_ns: None, limit: None, descending: false, order_by_insertion: false, fr
+      left: [(1, [0, 0, 0, 1, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238], 10001), (2, [0, 0, 0, 2, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238], 10002), (3, [0, 0, 0, 3, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238
+     right: [(21, [0, 0, 0, 21, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238], 521), (22, [0, 0, 0, 22, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238], 522), (23, [0, 0, 0, 23, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 238, 2
+     Summary [   2.097s] 2 tests run: 1 passed, 1 failed, 13 skipped
+        FAIL [   2.094s] (2/2) maos-bin::audit_rotation_22_6 cross_segment_query_equals_the_unrotated_twin
+rc=100

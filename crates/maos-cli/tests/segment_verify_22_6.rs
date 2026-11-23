@@ -300,3 +300,85 @@ fn verify_segments_reports_a_missing_middle_segment() {
     let out = verify(&host.manifest(1));
     assert_eq!(out.status.code(), Some(2));
 }
+
+/// `maosctl audit rotate` with no Host answering (no `control.json` under `MAOS_HOME`, no door
+/// override): the offline fallback opens the log itself, seals with the operator audit key and
+/// says so, with no tail cursors (D-22-6-08 A).
+fn offline_rotate(home: &Path, key: Option<&Path>) -> Output {
+    let mut command = maosctl();
+    command
+        .args(["audit", "rotate"])
+        .env_clear()
+        .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+        .env("HOME", home)
+        .env("MAOS_HOME", home);
+    if let Some(key) = key {
+        command.env("MAOS_AUDIT_KEY", key);
+    }
+    command.output().expect("run maosctl")
+}
+
+#[test]
+fn audit_rotate_offline_seals_with_the_operator_key_when_no_host_answers() {
+    let host = Host::with_three_segments();
+    // A fresh home whose log holds six unsealed rows and whose door is not configured.
+    let dir = TempDir::new().unwrap();
+    let audit = dir.path().join("audit");
+    std::fs::create_dir_all(&audit).unwrap();
+    {
+        let tl = TransparencyLogAdapter::open(&audit.join("transparency.sqlite"), 1).unwrap();
+        for n in 0..6 {
+            tl.insert_frame_event(
+                FrameKind::TaskAssign,
+                7,
+                None,
+                &format!("offline.{n}"),
+                format!("payload {n}").as_bytes(),
+                FrameOrigin::HumanAuthored,
+            );
+        }
+    }
+
+    // No key: refused (exit 1), nothing sealed.
+    let out = offline_rotate(dir.path(), Some(&dir.path().join("absent.key")));
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert!(stderr(&out).contains("refused"), "{}", stderr(&out));
+    assert!(!audit.join("segments").exists(), "nothing was sealed");
+
+    // With the key: sealed offline, and the segment verifies alone.
+    let out = offline_rotate(dir.path(), Some(&host.key));
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("no Host answered; rotating offline"),
+        "{}",
+        stderr(&out)
+    );
+    let report: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("the report is JSON on stdout");
+    assert_eq!(report["outcome"], "sealed", "{report}");
+    assert_eq!(
+        report["segment"]["rows"], 5,
+        "all but the newest row: {report}"
+    );
+    assert_eq!(report["terminal_code"], 0);
+    let manifest = audit.join("segments/0000000001.manifest.json");
+    assert!(manifest.is_file());
+    let out = host.verify_bundle(&manifest);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+
+    // A second pass has nothing below the newest row left to seal.
+    let out = offline_rotate(dir.path(), Some(&host.key));
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["outcome"], "nothing_to_seal", "{report}");
+
+    // No Transparency Log at all: an input error.
+    let empty = TempDir::new().unwrap();
+    let out = offline_rotate(empty.path(), Some(&host.key));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("no Transparency Log"),
+        "{}",
+        stderr(&out)
+    );
+}

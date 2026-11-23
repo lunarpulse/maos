@@ -1,0 +1,14 @@
+AC1 plant: crates/maos-audit/src/segment.rs verify_segment_file: 'if content != manifest.content_digest' -> 'if false && content != ...'. Command: cargo nextest run --locked -p maos-cli --test segment_verify_22_6. Result: verify_bundle_refuses_a_tampered_segment_row FAILS (verify-bundle exits 0 on the stale-content-digest segment, expected 1). Plant reverted.
+
+        PASS [   2.082s] (1/4) maos-cli::segment_verify_22_6 verify_bundle_accepts_each_segment_alone
+        FAIL [   2.205s] (2/4) maos-cli::segment_verify_22_6 verify_bundle_refuses_a_tampered_segment_row
+  stderr 
+    thread 'verify_bundle_refuses_a_tampered_segment_row' (3577986) panicked at crates/maos-cli/tests/segment_verify_22_6.rs:159:5:
+    assertion `left == right` failed: maosctl: audit verify-bundle  OK (segment 2, 6 rows, insertion ids 6..=11)
+      left: Some(0)
+     right: Some(1)
+        PASS [   3.005s] (3/4) maos-cli::segment_verify_22_6 audit_rotate_offline_seals_with_the_operator_key_when_no_host_answers
+        PASS [   4.427s] (4/4) maos-cli::segment_verify_22_6 verify_segments_reports_a_missing_middle_segment
+     Summary [   4.427s] 4 tests run: 3 passed, 1 failed, 0 skipped
+        FAIL [   2.205s] (2/4) maos-cli::segment_verify_22_6 verify_bundle_refuses_a_tampered_segment_row
+rc=100

@@ -131,7 +131,7 @@ impl SegmentSealer for DaemonSealer {
 pub fn install_sealer(tl: &TransparencyLogAdapter) -> Result<(), String> {
     let sealer = DaemonSealer::from_host()?;
     tl.install_segment_sealer(std::sync::Arc::new(sealer))
-        .map_err(|()| "a segment sealer is already installed".to_string())
+        .map_err(|error| error.to_string())
 }
 
 /// What one rotation pass did.

@@ -54,8 +54,8 @@ mod erasure_sweep;
 pub use erasure_sweep::{ErasureSweep, SweepCompletion};
 mod rotation;
 pub use rotation::{
-    group_hex, RotationError, RotationOutcome, SealedSegment, SegmentRef, SegmentSealRequest,
-    SegmentSealer, KEEP_FLOOR_DAYS, SEGMENTS_DIR_NAME, SEGMENT_EXPIRED_INTENT,
+    group_hex, RotationError, RotationOutcome, SealedSegment, SealerAlreadyInstalled, SegmentRef,
+    SegmentSealRequest, SegmentSealer, KEEP_FLOOR_DAYS, SEGMENTS_DIR_NAME, SEGMENT_EXPIRED_INTENT,
     SEGMENT_RESEALED_INTENT,
 };
 /// Frame-kind discriminator for the Transparency Log row.

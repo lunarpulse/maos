@@ -3967,7 +3967,7 @@ fn segment_verify_key(
 /// Story 22-6 — `verify-bundle` on one segment manifest: exit 0 verified, 1 verification
 /// failed (signature, file digest, content digest, Merkle root or shape), 2 input or key error.
 fn audit_verify_segment(
-    manifest_path: &PathBuf,
+    manifest_path: &std::path::Path,
     text: &str,
     pubkey_arg: Option<&str>,
     seed_path: Option<&PathBuf>,
@@ -4003,7 +4003,7 @@ fn audit_verify_segment(
 
 /// Story 22-6 (D-22-6-05 A) — `maosctl audit verify-segments <dir>`.
 fn audit_verify_segments(
-    dir: &PathBuf,
+    dir: &std::path::Path,
     log: Option<&PathBuf>,
     pubkey_arg: Option<&str>,
     seed_path: Option<&PathBuf>,
