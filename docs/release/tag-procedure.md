@@ -114,13 +114,19 @@ Run these checks against the exact commit that will be tagged:
    ```bash
    gh workflow run fuzz-prerelease.yml --ref main
    # select the run by commit, never by recency (as in step 6b below), then:
-   gh run watch "$run_id" --exit-status   # 30 link jobs (6 targets x 5 links, 5 h each) + setup; `t3-ledger-collect` must be green
+   gh run watch "$run_id" --exit-status   # 30 link jobs (6 targets x 5 links, 5 h each) + setup; `t3-ledger-collect` must be green (a red `corpus-merge` alone does not void the evidence)
    ```
 
    The hosted wall time is stated as measured at the first dispatch (expected
    about 6 h per chain with 30 free runners [INFERENCE: the five links per target run in
    parallel, 5 h + setup + the `corpus-merge` job, which does not gate the ledger; no
-   chain has completed yet, the one dispatch so far failed; WP-16, 2026-11-23]. **T3 is 30
+   chain has completed yet, the two dispatches so far failed; WP-16, 2026-11-23]. Each link
+   hands its corpus to `corpus-merge` as ONE `t3-corpus-<target>-<n>.tar.zst` archive
+   (uploading the directory of ~600k files failed in run 45152159643), after its measured
+   record is saved; `corpus-merge` is not a `needs` of `t3-ledger-collect`, so a red
+   `corpus-merge` job (its failure is shown as a warning and a summary line) never voids the
+   evidence: judge the chain by the `t3-ledger-collect` job, not by the run's overall
+   conclusion. **T3 is 30
    five-hour jobs** (6 targets x 5 links, not 15): the ledger judges only three targets
    (`manifest_parser`, `frame_deser`, `fuzz_exec_deps_parse_elf`), but the collector asserts
    every link job `success`, so the other three targets must be green too. With fewer than
