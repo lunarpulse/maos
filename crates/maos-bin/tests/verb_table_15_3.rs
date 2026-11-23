@@ -219,7 +219,7 @@ fn one_shot_mode_table_is_complete_and_frozen() {
     assert!(!verbs::MAOS_ONE_SHOT_MODES.is_empty());
     assert_eq!(
         verbs::MAOS_ONE_SHOT_MODES.len(),
-        32,
+        31,
         "exact expected MAOS_ONE_SHOT mode count — Story 16-1 (D-16-1-A) removed the 16 door/read modes; re-measure main.rs's one-shot block before bumping"
     );
     let mut sorted = verbs::MAOS_ONE_SHOT_MODES.to_vec();

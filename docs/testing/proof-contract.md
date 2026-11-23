@@ -177,21 +177,28 @@ Before **every push of a story tree**, require `cargo run -p xtask -- prepush` t
 wall-clock in the story's Dev Agent Record before the landing push. It mirrors CI's drift classes; the landing CI
 run remains authoritative, and a local pass does not prove substrate-dependent marker values.
 
-- The test leg unsets `CI` and `GITHUB_ACTIONS` and runs `cargo nextest run --workspace --locked --no-fail-fast`,
-  `cargo test -p maos-kernel-core --lib` **unconditionally**, and `cargo test --workspace --doc`. The workspace
+- **Default run is scoped (lean-gates WP-11, operator decision 6, 2026-11-23).** It runs `cargo fmt --all -- --check`, the
+  gate loop, `cargo nextest run --locked` over `-p <changed workspace members and their direct dependants>`
+  (members come from the merge-base diff; a dependant is any workspace package with a path dependency on a changed
+  member), `cargo test -p maos-kernel-core --lib` only when the kernel changed, `cargo deny check` when `Cargo.lock` or
+  `deny.toml` changed, and the docs legs when the docs trigger fires. A change no single member owns (`Cargo.toml`,
+  `Cargo.lock`, `rust-toolchain.toml`, `.config/`) scopes to the whole workspace. **The trade, stated:** a broken
+  test in a crate the diff does not touch is NOT seen by the scoped run (green scoped, red under `--full` and in CI).
+- `--full` keeps the former default: the test leg unsets `CI` and `GITHUB_ACTIONS` and runs
+  `cargo nextest run --workspace --locked --no-fail-fast`, `cargo test -p maos-kernel-core --lib` **unconditionally**,
+  and `cargo test --workspace --doc`, plus the binary-size, test-budget and CI-pin legs below. The workspace
   resolution covers cross-crate scanners; nextest excludes kernel-core lib tests and does not run doctests.
   Substrate-dependent local skips are counted and printed, not treated as CI coverage.
 - The aggregate self-executes the gates with their CI arguments: `stability-matrix --check`, `error-catalog-check`,
   `gen-abi-docs --check`, `check-serde-error-handling`, `check-workspace-count`, `check-manifest-schema-version`,
-  `check-skill-schema`, `check-epic-close-coherence`, `check-coverage-matrix-completeness`, `check-test-cost`, `check-env-contract`,
+  `check-skill-schema`, `check-coverage-matrix-completeness`, `check-test-cost`, `check-env-contract`,
   `check-unsafe`, `check-service-boundary`, `check-kernel-baseline`, `kloc-check`, `check-breaking-md`,
   `check-composition-root-completeness`, `check-pub-field-constructors`, `check-dependency-closure`,
   `coverage-matrix`, and `check-corpus`; it also runs `cargo fmt --all -- --check`.
   Story 20-3b also pins standalone Blocking aggregate invocations: `abi-diff --base abi-baseline/v1-pre-bump.txt`,
   `check-empty-kernel`, `check-loom`, `check-fr47`, `check-a2a-sender-completeness`, `check-judge-config`,
   `check-security-md`, `templates-regen --check`, `corpus-staleness`,
-  `calibrate --corpus calibration-seed-v0.1 --n 100 --p 0.95`, `check-review-findings-resolved`,
-  `check-dev-record-completeness`, `check-dev-model-tier`, `check-ship-gate-completeness`,
+  `calibrate --corpus calibration-seed-v0.1 --n 100 --p 0.95`, `check-ship-gate-completeness`,
   `check-pentest-gate`, `check-third-party-trial`, `check-trial-attestation`, `check-red-team-gate`,
   `check-migration-merkle`, `nfr-onb-1-gate --check`, and `cassette-age-gate`.
   The migration leg needs the same deterministic million-row corpus that CI generates before invoking it.
@@ -217,7 +224,7 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   and the job then fails listing each step that did not pass; no `continue-on-error`, no retry), and the `maos-bin`
   smokes as named steps of `smoke-suite`. A gate's step name is its gate name, the command and `--json` output are the
   ones the per-gate job ran, and `check-ship-gate-completeness` enrols the ship gates that live there by step name.
-  `check-workspace-count`, `check-corpus`, `check-review-findings-resolved` and `check-dev-record-completeness` stay
+  `check-workspace-count` and `check-corpus` stay
   jobs because other jobs `needs` them. The pin above reads the steps of `xtask-gates` exactly as it read the old jobs.
   Release gating (CI release-ready program W4, 2026-11-15; operator decision 1 of
   `_bmad-output/planning-artifacts/decisions-2026-11-14-release-ci.md`): `discipline.yml` has a second fan-in,
@@ -225,8 +232,8 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   unchanged. `release-ready.needs` is `aggregate.needs` (with `v1-0-ship-gate` expanded into the jobs it fans in)
   minus the exclusion table `RELEASE_READY_EXCLUDED` in `xtask/src/check_ship_gate_completeness.rs`, one reason per row
   (merge-hygiene gates the plan names: `check-fuzz-targets`, `fuzz-build`, `check-env-contract`,
-  `check-decision-register`, `check-loom-substrate-drift`, `check-ship-gate-completeness`, `check-model-currency`,
-  `check-test-cost`, `check-test-budget`, `check-exit-commands`, `multi-provider-drift-tests`);
+  `check-loom-substrate-drift`, `check-ship-gate-completeness`,
+  `check-test-cost`, `check-test-budget`, `multi-provider-drift-tests`);
   `check-ship-gate-completeness` fails when the workflow drifts from the table or when a release-critical gate
   (`RELEASE_READY_R_SET`, including `check-stability-matrix`, `check-breaking-md`, `check-export-control`,
   `check-ko-coverage` and `workspace-test-suite`) is excluded. A red excluded `xtask-gates` STEP does not red

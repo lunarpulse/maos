@@ -38,8 +38,8 @@ gates = [
     # CI release-ready program W2 (2026-11-15): the deterministic xtask gates and the maos-bin smokes named here
     # no longer run as a job each. Each is a NAMED STEP (step name == the name below) of the consolidated
     # `xtask-gates` / `smoke-suite` jobs, and THOSE are the `aggregate.needs` entries. The gate's identity (this
-    # name, its xtask subcommand, its JSON) is unchanged; `check-workspace-count`, `check-corpus`,
-    # `check-review-findings-resolved` and `check-dev-record-completeness` stay jobs because other jobs `needs` them.
+    # name, its xtask subcommand, its JSON) is unchanged; `check-workspace-count` and `check-corpus`
+    # stay jobs because other jobs `needs` them.
     "clippy-ratchet",
     "reproducible-build",
     "check-unsafe",
@@ -70,10 +70,6 @@ gates = [
     "check-a2a-sender-completeness",
     # Epic 5 retro §A3 — closes Epic 4 retro §A6 (.unwrap_or_default on serde calls).
     "check-serde-error-handling",
-    # Epic 5 retro §A5 — open Review Findings rows block sprint-status `done`; closed rows reference File List.
-    "check-review-findings-resolved",
-    # Epic 5 retro §A6 — closes Epic 4 retro §A7 (dev-record completeness + TBD-placeholder catch).
-    "check-dev-record-completeness",
     # Story 7.3 NFR-Aud-9 — CCAC N=600 ship gate (ccac-n600-ship-gate discipline job).
     "ccac-ship-gate",
     # Story 7.4 AC6 — maos.skill.v1 schema round-trip + deny_unknown_fields + semver posture.
@@ -193,22 +189,11 @@ gates = [
     # Story 13.6c — three-team/three-region CI substrate drift controls
     # (env-consistency + service-block). Structural; blocks at every phase.
     "check-loom-substrate-drift",
-    # Story 14-0 AC1 — the Epic-14 preflight decision register's reader:
-    # targets must resolve to `development_status` keys, an OPEN row past its
-    # mechanical deadline reds, a non-mechanical deadline must declare itself,
-    # and an unreadable/empty register is an error rather than a green.
-    "check-decision-register",
     # Story 14-2a AC6 — the production peer-certificate rotation trigger. The
     # CONTROL is a runtime leg: a live daemon's pin set changes on a signed
     # manifest reissue, proven-red by unwiring the set-once install. The
     # method-aware AST probe is the fast second opinion, never the proof.
     "check-cert-rotation-trigger",
-    # Story 15-3 AC5 — confidence rule 1 made mechanical: every non-`done`
-    # epic's hermetic exit block is tokenised as shell and every
-    # `maos`/`maosctl`/`xtask` verb must exist at HEAD or be owed by a named,
-    # open story that actually claims it. Before this gate nothing read the
-    # exit blocks at all.
-    "check-exit-commands",
     # Story 15-1 AC7 / D-3 — the workspace suite becomes a control. Before
     # this, no CI job ran `cargo test --workspace` unscoped: every invocation
     # was `-p`/`--test`-scoped, so the exit line's final clause was performed
@@ -349,11 +334,6 @@ disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 binding = "blocking"
 
 
-[[ship_gate]]
-name = "windows-check"
-disposition = { v1_0 = "advisory", v1_5 = "blocking" }
-binding = "blocking"
-
 # Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — pre-merge fuzz BUILD prerequisite.
 # `fuzz-build` runs the fuzz build for both targets under the nightly toolchain
 # (selected via the rustup nightly channel, not an inline toolchain override); it
@@ -421,28 +401,6 @@ name = "check-rotation-real-timing"
 disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 binding = "blocking"
 
-# Story 14-2a AC6.3 — the rotation TRIGGER gate (distinct from
-# `check-rotation-real-timing`, which measures 14-2's floors: this one proves
-# the trigger has a PRODUCTION CALLER at all). Blocking from the day it lands,
-# because a green-from-birth production-caller probe is the exact failure this
-# story was created to repair.
-[[ship_gate]]
-name = "check-cert-rotation-trigger"
-disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
-binding = "blocking"
-
-# Story 15-3 AC5 — the exit-command check. `v1_5 = "blocking"` is the key that
-# binds at today's `CURRENT_PHASE`, following the 14-2a precedent above rather
-# than architecture `15-full-spectrum-v2-2.md:130`'s "all new gates" clause:
-# that clause governs gates whose SUBJECT is a v2.2 capability (its own tail,
-# "absent-result → BLOCK at the v2.2 ship gate", only parses for
-# evidence-bearing v2.2 gates). A rule-1 gate that cannot red until v2.2 is
-# the thing this story exists to remove. Both readings are recorded (F12).
-[[ship_gate]]
-name = "check-exit-commands"
-disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
-binding = "blocking"
-
 # Story 15-1 AC7 / D-3 — the full workspace test suite as a Blocking control.
 # At HEAD before this story NO CI job ran `cargo test --workspace` unscoped
 # (every `cargo test` in discipline.yml was `-p`/`--test`-scoped; both
@@ -454,15 +412,6 @@ binding = "blocking"
 # foundation gates — there is no phase at which a red suite should pass.
 [[ship_gate]]
 name = "workspace-test-suite"
-disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
-binding = "blocking"
-
-# Story 17-5 — the model-pin currency gate. Blocking at every phase, hermetic,
-# no private `CURRENT_PHASE`: the lane it closes slipped three times (E14-A3 →
-# E15-A2 → E16-A4) precisely because nothing ever turned a stale pin red, so
-# there is no phase at which a retired vendor id should pass.
-[[ship_gate]]
-name = "check-model-currency"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 binding = "blocking"
 
@@ -485,26 +434,6 @@ binding = "blocking"
 # — four `[[exception]]` rows, `total_seconds` 800.
 [[ship_gate]]
 name = "check-test-budget"
-disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
-binding = "blocking"
-
-# Story 20-7 AC2 — `check-perf-runner-policy` (ADR-068 §4). Hermetic (reads the
-# committed workflows), BLOCKING at every phase from the day it lands: it is the
-# only control between a fork pull request and code execution on the stable
-# runner host. Proven red by four plants (`xtask/tests/perf_gates_20_7.rs`).
-[[ship_gate]]
-name = "check-perf-runner-policy"
-disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
-binding = "blocking"
-
-# Story 20-7 AC5 — `check-perf-counts`, Tier C (ADR-068 §1): instruction and
-# allocation counts per pull request against the baselines committed in
-# `xtask/perf-budgets.toml`. Deterministic, fork-safe. The ROW dispositions
-# live in that file (allocation rows blocking; instruction rows advisory until
-# their first hosted callgrind baseline is committed); the gate itself is
-# blocking at every phase.
-[[ship_gate]]
-name = "check-perf-counts"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 binding = "blocking"
 
@@ -659,15 +588,6 @@ binding = "blocking"
 # Structural (no Postgres); a substrate-config drift blocks at every phase.
 [[ship_gate]]
 name = "check-loom-substrate-drift"
-disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
-binding = "blocking"
-
-# Story 14-0 AC1 — the decision register's reader. Blocking at every phase and
-# deliberately so: every finding it raises is a governance control that has
-# stopped working, and the register's own failure mode was a row reading green
-# to every human while its deadline had passed four stories earlier.
-[[ship_gate]]
-name = "check-decision-register"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 binding = "blocking"
 

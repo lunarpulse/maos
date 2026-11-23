@@ -31,8 +31,7 @@
 //! and a control whose own doc lies is the cheapest place for the next reader to
 //! be misled):
 //!
-//! * `read_pinned` here — single-sourced for xtask, and
-//!   `check-epic-close-coherence` imports it by name (`:54`, `:124`);
+//! * `read_pinned` here — single-sourced for xtask;
 //! * `crates/maos-a2a-tcp/tests/t11_t12_chaos_absence.rs` — a kernel-adjacent
 //!   crate that must NOT grow an `xtask` dependency (`check-service-boundary` is
 //!   the control that forbids it), so its literal stays;
@@ -295,9 +294,8 @@ pub fn pin_block(src: &Path) -> Result<String, String> {
 /// regex over the raw text returns `23081` — an `fkcs-baseline.toml` value
 /// mentioned in those comments, not the assignment. Comment-skipping line
 /// parsing is therefore the only correct reader, and it is deliberately
-/// single-sourced here: `check-epic-close-coherence` (Epic-13 retro C1) resolves
-/// doc pins against this same function, because two readers of the authoritative
-/// pin would be the very drift C1 exists to stop.
+/// single-sourced here, because two readers of the authoritative pin would be the
+/// very drift Epic-13 retro C1 exists to stop.
 ///
 /// It stays a line scan after Story 16-0. `strip_prefix("src_lines")` takes the
 /// FIRST match and does NOT fall through on a near-miss — it hard-errors — and

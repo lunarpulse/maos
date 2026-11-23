@@ -23,7 +23,7 @@
 # substrate. Tests that only run `cargo tree`/`metadata`/`locate-project`/
 # `pkgid` are `// cargo-query:` instead and need no row.
 
-default_seconds = 30
+default_seconds = 60
 # 20-1b/Main calibration ruling 2026-11-07: CI max governs, not local runner speed.
 # Hosted42336032162 sum1151.8s (pre-boot-fix); local post-fix JUnit3015a808
 # sum880.766s. ceil(1151.8 * 1.25)=1440; no per-binary exception changes.
@@ -37,18 +37,7 @@ total_seconds = 2800
 # budget_thresholds_18_5 use default_seconds; no exception or extra budget.
 
 # --- Exceptions (18-0 AC5, ruling R3: ~ CI max Σ x 1.25) ---------------------
-
-[[exception]]
-binary = "maos-bin::recall_mediation_17_3d"
-seconds = 60
-reason = "17-3d recall mediation (21 tests, real wasm runners): hosted Σ 30.264 s on run 45065445151 (PR #32) versus the 30 s default; budget = observed x2 (load-dependent)"
-owner = "21-9-wasm-host-default-on"
-
-[[exception]]
-binary = "maos-bin::participant_recall_17_8"
-seconds = 50
-reason = "17-8 participant recall (8 tests, real wasm runners): hosted Σ 32.7 s on run 45048662238 (PR #43); budget = observed + 50 % (load-dependent)"
-owner = "21-9-wasm-host-default-on"
+# Lean-gates WP-06 option B (2026-11-23): `default_seconds` is 60, so a row only exists above 60 s.
 
 [[exception]]
 binary = "maos-bin::spawned_door_20_9"
@@ -81,27 +70,9 @@ reason = "17-7 terminal-facts suite (31 tests): runtime-backed scenes on the sig
 owner = "18-0-green-main-ci-baseline"
 
 [[exception]]
-binary = "maos-bin::researcher_inference_18_3"
-seconds = 47
-reason = "18-3 Researcher seam (9 tests): every bound-pass witness boots a real `maos run` root per case (boot arm, door load, successor, --live refusal); CI Σ 37.341 s on landing run 40237233599 @ b96d123a; budget = observed max + 25 %"
-owner = "18-3-researcher-replay-live-and-judged-five-metric"
-
-[[exception]]
 binary = "maos-control::post_surface_16_1"
 seconds = 81
 reason = "16-1 AC3 operator-door POST surface (bounded, typed, concurrent; read-route guards); CI Σ 64.4-64.7 s on the five post-20-12 main junits (20-12-evidence/ci-after.json + run 40080259088)"
-owner = "18-0-green-main-ci-baseline"
-
-[[exception]]
-binary = "maos-bin::worker_supervision_16_3"
-seconds = 46
-reason = "16-3 AC3 Worker supervision wiring (live Workers killed and supervised, every path); CI Σ 30.4-36.7 s on the five post-20-12 main junits (20-12-evidence/ci-after.json + run 40080259088)"
-owner = "18-0-green-main-ci-baseline"
-
-[[exception]]
-binary = "maos-eval::t3_network_escape_executor"
-seconds = 40
-reason = "20-3a AC11 versioned containment scenarios (24 executed) through verified production T3, plus the M3 socket-custody pair; CI Σ 19.9-32.1 s on the five post-20-12 main junits (20-12-evidence/ci-after.json + run 40080259088); 40 is the ruled figure (R3)"
 owner = "18-0-green-main-ci-baseline"
 
 [[exception]]
@@ -111,64 +82,16 @@ reason = "19-2 AC7 Worker pause and spawn-token revoke latency vectors: 20 door 
 owner = "19-2-fr20-enqueue-door-and-safe-point"
 
 [[exception]]
-binary = "maos-bin::epic_dispatch_19_1"
-seconds = 52
-reason = "19-1/19-6 epic dispatch and crash-disposition vectors (12 tests; the T3 Worker crash/redispatch vectors boot real containers); CI Σ 40.870 s on hosted validation run 40965829411 @ 39fe0060; budget = observed + 25 %"
-owner = "19-6-crash-originator-delivery-and-disposition"
-
-[[exception]]
-binary = "xtask::model_currency_gate"
-seconds = 42
-reason = "26 real-tree model currency vectors, including the 20-4 constructor/default scan: hosted run 42224167600 observed Σ32.983 s versus 30 s (cb0abc06 baseline29.82 s). Reusing one copied tree across 11 plants measured5.92 s before/5.96 s trial, no material saving; reverted without dropping vectors. Budget rounds observed Σ x1.25 up to42 s per R3; local trial Σ21.989 s is not hosted improvement proof."
-owner = "20-4-gemini-driver-and-endpoint-pin"
-
-[[exception]]
 binary = "maos-bin::erasure_million_20_11"
 seconds = 78
 reason = "20-11 real 100k/1M disk/WAL writer, completion and marker-scoped replay vectors, isolated from shell_host_16_2: hosted run42224167600/artifact13507273876 measured5.646+56.675=62.321 s; R3 observed Σ x1.25=77.90125 rounds up to78 s. The unchanged25% wall oracle and10 s route/observation deadlines remain independent and blocking; this finite exception does not waive AC5."
 owner = "20-11-erasure-inventory-closure"
 
 [[exception]]
-binary = "maos-registry::yank_cadence_20_1b"
-seconds = 39
-reason = "AC7 requires one real-server production poll at the unchanged 30-second clamp floor, isolated in its own binary and serial group. Local first exercised sample 30.57 s (landing-1/registry-focused-next.stdout), x1.25 rounds up to39; not a widened failure budget."
-owner = "20-1b-vetting-yank-policy-and-quarantine"
-
-[[exception]]
-binary = "maos-bin::skill_declarations_20_8"
-seconds = 31
-reason = "20-8 real filesystem discovery and admission reconciliation, isolated and serialized; local witness 0.01 s. The owned exception is the minimum whole second above the 30 s default required by check-test-cost."
-owner = "20-8-manifest-contract-completion"
-
-[[exception]]
-binary = "maos-bin::wasm_skill_authoring_20_8"
-seconds = 31
-reason = "20-8 real T2 guest, durable queue and approval receipts, isolated and serialized; local witness 1.00 s. The owned exception is the minimum whole second above the 30 s default required by check-test-cost."
-owner = "20-8-manifest-contract-completion"
-
-[[exception]]
-binary = "maos-bin::crypto_provider_t3_20_13"
-seconds = 31
-reason = "20-13 real signed-substrate T3 Worker witness is isolated and serialized; local leg skips because the T3 substrate is unavailable. The 31 s exception is the minimum above the default pending a hosted measurement."
-owner = "20-13-pluggable-crypto-provider-selection"
-
-[[exception]]
-binary = "maos-bin::crypto_real_shell_20_13"
-seconds = 60
-reason = "20-13 real shell boot, installed package, live CRL and token witness; serialized, with bounded 25+10+10 second waits. Pending hosted timing."
-owner = "20-13-pluggable-crypto-provider-selection"
-
-[[exception]]
 binary = "maos-bin::crypto_real_boot_20_13"
 seconds = 75
 reason = "20-13 real cohort mTLS boot, live CRL and governed token/seal witness; serialized, with bounded 45+10+10 second waits. Pending hosted timing."
 owner = "20-13-pluggable-crypto-provider-selection"
-
-[[exception]]
-binary = "maos-bin::hook_pump_17_4"
-seconds = 56
-reason = "17-4 hook pump + 20-9 L1 round 3-5 wall-overrun vectors (33 tests; real thread::sleep past the consolidation wall of 9.75 s and 3 s, joined-at-shutdown, finished-overrun eviction, 5 s slow-telemetry window; the pump's walls are real-time fractions of the manifest's whole-second time_cap_seconds, so no sleep can be shortened without weakening the witness): hosted run 42987393747 @ 459a606a measured Σ 44.520 s (was 15.515 s over 29 tests on 42955256177); R3 observed Σ x1.25 = 55.65 rounds up to 56 s"
-owner = "20-9-spawned-form-lifecycle-hooks"
 
 # --- Expensive tests (ignored in the default run) ---------------------------
 
@@ -181,8 +104,14 @@ owner = "20-12-test-cost-budget-and-review-execution-contract"
 [[expensive]]
 binary = "xtask::diagnostics_20_3a"
 job = "expensive-tests"
-reason = "6 composite-gate report tests run a nested `cargo test` on a witness crate (via the CARGO shim)"
+reason = "4 composite-gate report tests run a nested `cargo test` on a witness crate (via the CARGO shim)"
 owner = "20-12-test-cost-budget-and-review-execution-contract"
+
+[[expensive]]
+binary = "xtask::prepush_20_16"
+job = "expensive-tests"
+reason = "the scoped-prepush plant runs cargo metadata, generate-lockfile and nextest over a throwaway workspace"
+owner = "ops-ci-release-ready"
 
 [[expensive]]
 binary = "maos-spirit-sdk::spirit_macro_errors"

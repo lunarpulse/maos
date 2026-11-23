@@ -59,16 +59,9 @@ const CHECKLIST: &str = "| Item | Consumer | Behavior | Row | State |
 
 const DENY: &str = "[advisories]
 ignore = [
-    # serde_cbor frozen ABI.
-    \"RUSTSEC-2021-0127\",
+    { id = \"RUSTSEC-2021-0127\", reason = \"serde_cbor frozen ABI\" },
     { id = \"RUSTSEC-2025-0134\", reason = \"rustls-pemfile\" },
 ]
-";
-
-const DEFERRED: &str = "# Deferred work
-
-- **serde_cbor is archived** (RUSTSEC-2021-0127) — Ownerless and open.
-| rustls-pemfile | RUSTSEC-2025-0134 | owner A2A-TLS |
 ";
 
 /// A fixture tree where every leg passes for `--tag v1.0.0-rc.1`.
@@ -96,11 +89,6 @@ fn fixture() -> tempfile::TempDir {
     write(root, "docs/runbooks/provisioning-checklist.md", CHECKLIST);
     write(root, "docs/release/v1.0.0-rc.1.md", NOTES);
     write(root, "deny.toml", DENY);
-    write(
-        root,
-        "_bmad-output/implementation-artifacts/deferred-work.md",
-        DEFERRED,
-    );
     regenerate_stability(root);
     dir
 }
@@ -327,32 +315,41 @@ fn the_provisioning_leg_needs_every_row_present() {
 }
 
 #[test]
-fn the_deny_leg_reds_on_an_ignored_advisory_without_a_deferred_row() {
+fn the_deny_leg_reds_on_an_ignored_advisory_without_a_reason() {
     let dir = fixture();
+    // A bare id string carries no reason.
     write(
         dir.path(),
         "deny.toml",
         &DENY.replace("ignore = [\n", "ignore = [\n    \"RUSTSEC-2099-0001\",\n"),
     );
     assert_only_red(&check(dir.path(), None), "deny-ignores");
-    // A mention that is not a row (prose outside a bullet or table row) is not a row.
+    // A table without `reason`, and one with a blank reason, are no better.
     write(
         dir.path(),
-        "_bmad-output/implementation-artifacts/deferred-work.md",
-        &format!("{DEFERRED}\nSee RUSTSEC-2099-0001 in passing.\n"),
-    );
-    assert_only_red(&check(dir.path(), None), "deny-ignores");
-    // Review GLM F5: the id must match as a whole token, not as a prefix of a longer id.
-    write(
-        dir.path(),
-        "_bmad-output/implementation-artifacts/deferred-work.md",
-        &format!("{DEFERRED}- **other advisory** (RUSTSEC-2099-00012, RUSTSEC-2099-0001x) — Ownerless and open.\n"),
+        "deny.toml",
+        &DENY.replace(
+            "ignore = [\n",
+            "ignore = [\n    { id = \"RUSTSEC-2099-0001\" },\n",
+        ),
     );
     assert_only_red(&check(dir.path(), None), "deny-ignores");
     write(
         dir.path(),
-        "_bmad-output/implementation-artifacts/deferred-work.md",
-        &format!("{DEFERRED}- **new advisory** (RUSTSEC-2099-0001) — Ownerless and open.\n"),
+        "deny.toml",
+        &DENY.replace(
+            "ignore = [\n",
+            "ignore = [\n    { id = \"RUSTSEC-2099-0001\", reason = \"  \" },\n",
+        ),
+    );
+    assert_only_red(&check(dir.path(), None), "deny-ignores");
+    write(
+        dir.path(),
+        "deny.toml",
+        &DENY.replace(
+            "ignore = [\n",
+            "ignore = [\n    { id = \"RUSTSEC-2099-0001\", reason = \"new advisory\" },\n",
+        ),
     );
     assert!(check(dir.path(), None).status.success());
 }

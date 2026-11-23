@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 # Added 2026-09-21 (Epic-16 retrospective). Five consecutive pushes to `main`
 # left FIVE full 162-job runs queued simultaneously — 810 jobs contending for
@@ -100,8 +101,7 @@ jobs:
   # Membership rule: the old job's only work was `cargo run -p xtask -- <gate>` (plus xtask-only proven-red test
   # steps), the gate is one `xtask prepush` already runs locally (`xtask/src/prepush.rs` GATES; the steps keep that
   # order), it judges committed files only, and it needed no secret, service, matrix runner, extra toolchain or
-  # feature, artifact or `needs` edge. A gate another job `needs` (check-workspace-count, check-corpus,
-  # check-review-findings-resolved, check-dev-record-completeness) keeps its own job, so consolidation puts no new
+  # feature, artifact or `needs` edge. A gate another job `needs` (check-workspace-count, check-corpus) keeps its own job, so consolidation puts no new
   # edge in front of any other job.
   #
   # Identity is unchanged: step `name` == `id` == the gate's registry / old job name, running the old command and
@@ -123,7 +123,6 @@ jobs:
       check-serde-error-handling: ${{ steps.check-serde-error-handling.outcome }}
       check-manifest-schema-version: ${{ steps.check-manifest-schema-version.outcome }}
       check-skill-schema: ${{ steps.check-skill-schema.outcome }}
-      check-epic-close-coherence: ${{ steps.check-epic-close-coherence.outcome }}
       check-coverage-matrix-completeness: ${{ steps.check-coverage-matrix-completeness.outcome }}
       check-test-cost: ${{ steps.check-test-cost.outcome }}
       check-test-cost-vectors: ${{ steps.check-test-cost-vectors.outcome }}
@@ -143,7 +142,6 @@ jobs:
       check-security-md-vectors: ${{ steps.check-security-md-vectors.outcome }}
       example-spirit-drift: ${{ steps.example-spirit-drift.outcome }}
       corpus-staleness: ${{ steps.corpus-staleness.outcome }}
-      check-dev-model-tier: ${{ steps.check-dev-model-tier.outcome }}
       check-pentest-gate: ${{ steps.check-pentest-gate.outcome }}
       check-third-party-trial: ${{ steps.check-third-party-trial.outcome }}
       check-red-team-gate: ${{ steps.check-red-team-gate.outcome }}
@@ -186,11 +184,6 @@ jobs:
         id: check-skill-schema
         if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
         run: cargo run -p xtask -- check-skill-schema --json
-      # Epic-13 retro C1 + 20-3b: close-out sources agree and no workflow gate is parked.
-      - name: check-epic-close-coherence
-        id: check-epic-close-coherence
-        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
-        run: cargo run -p xtask -- check-epic-close-coherence --json
       # Story 10.1b AC3 — coverage matrix completeness: no v1.0 NFR has empty gates.
       - name: check-coverage-matrix-completeness
         id: check-coverage-matrix-completeness
@@ -282,12 +275,6 @@ jobs:
         id: corpus-staleness
         if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
         run: cargo run -p xtask -- corpus-staleness --json
-      # Epic 12 retro B3 (Option C Blocking; closes E11 retro A1) — frontier-era (epic >= 12) stories must record an
-      # allowlisted dev model + a §A6 review artifact. Makes the frontier-allowlist policy mechanical, not cultural.
-      - name: check-dev-model-tier
-        id: check-dev-model-tier
-        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
-        run: cargo run -p xtask -- check-dev-model-tier --json
       # Story 10.1b AC1 — pen-test gate: conditional per calibrate-per-commit pattern. When summary.toml exists,
       # parse and assert p0_open == 0 && p1_open == 0. When absent, report ABSENT (not a pass), advisory at v1_5.
       - name: check-pentest-gate
@@ -360,12 +347,10 @@ jobs:
   #
   # Same failure contract as `xtask-gates`: every step runs after a red one (`if: !cancelled()`, never
   # `continue-on-error`), the last step lists every step that was not `success` and fails the job, no retry, and
-  # the per-step outcomes are job `outputs`. `needs` is the old smoke-discipline-7-1-5 edge (that smoke runs the
-  # two gates inside the binary); `!cancelled()` keeps the other smokes running when those gates are red.
+  # the per-step outcomes are job `outputs`.
   smoke-suite:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    needs: [check-review-findings-resolved, check-dev-record-completeness]
     if: ${{ !cancelled() }}
     outputs:
       smoke-deps: ${{ steps.smoke-deps.outcome }}
@@ -379,7 +364,6 @@ jobs:
       server-exit-drain: ${{ steps.server-exit-drain.outcome }}
       audit-query-fr4-smoke: ${{ steps.audit-query-fr4-smoke.outcome }}
       maosctl-smoke: ${{ steps.maosctl-smoke.outcome }}
-      smoke-discipline-7-1-5: ${{ steps.smoke-discipline-7-1-5.outcome }}
       cap-registry-smoke: ${{ steps.cap-registry-smoke.outcome }}
       smoke-skill-7-4: ${{ steps.smoke-skill-7-4.outcome }}
       smoke-abi-7-5a: ${{ steps.smoke-abi-7-5a.outcome }}
@@ -492,12 +476,6 @@ jobs:
         run: |
           export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
           bash tests/integration/maosctl_smoke.sh
-      - name: smoke-discipline-7-1-5
-        id: smoke-discipline-7-1-5
-        if: ${{ !cancelled() }}
-        run: |
-          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
-          MAOS_ONE_SHOT=smoke-discipline-7-1-5 cargo run --release -p maos-bin
       - name: cap-registry-smoke
         id: cap-registry-smoke
         if: ${{ !cancelled() }}
@@ -706,117 +684,11 @@ jobs:
           cargo run --locked -p xtask -- build-test-fixtures --only maos-crypto-recording
           cargo build --locked -p maos-cli
           cargo test --locked -p maos-bin --test crypto_real_shell_20_13 --test crypto_real_boot_20_13
-
-  # Story 14-0 AC1 — the Epic-14 preflight decision register's reader.
-  #
-  # Blocking, and hermetic: it reads two committed files
-  # (`_bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md` and
-  # `_bmad-output/implementation-artifacts/sprint-status.yaml`) and nothing else,
-  # so it can never take an ABSENT branch and can never be substrate-gated.
-  #
-  # The register declared as binding rule 2 that its deadlines were "a query, not
-  # a judgement". No machine read the file, so every deadline in it WAS a
-  # judgement, and eight of nineteen rows were wrong at HEAD — including one
-  # marked RESOLVED with its substance unimplemented and its deadline four
-  # stories in the past. The proven-red vectors run in the same job as the gate
-  # deliberately: a gate whose reds are never executed is the failure mode this
-  # story exists to close.
-  check-decision-register:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-decision-register
-        run: cargo run -p xtask -- check-decision-register --json
-      - name: Run the 14-0 AC1.5 proven-red vectors
-        run: cargo test -p xtask --test decision_register_gate
-
-  # Story 14-2a AC6 — the production peer-certificate rotation trigger. The
-  # gate's CONTROL leg boots a real `maos` daemon in
-  # `MAOS_ONE_SHOT=cohort-a2a-daemon` mode, delivers a real signed
-  # `cohort:manifest-reissue` over real mTLS, and observes the pin-set change
-  # through the production operator HTTP surface — so removing the set-once
-  # install in `main.rs` reds this job while the daemon still boots and still
-  # ACKs the reissue. The gate's own unit tests run in the same job: they are
-  # what keep the method-aware AST probe from silently reverting to the
-  # `visit_expr_call`-only shape that made the obvious probe a null control.
-  check-cert-rotation-trigger:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-cert-rotation-trigger
-        run: cargo run -p xtask -- check-cert-rotation-trigger --json
-      - name: Run the gate's own oracle unit tests
-        run: cargo test -p xtask check_cert_rotation_trigger
-
-  # Story 15-3 AC5 — confidence rule 1 made mechanical. Copies the 14-2a job
-  # shape deliberately, including `timeout-minutes`: the gate SHELLS
-  # `maos --help`, which at HEAD never returned, so an untimed job hung the
-  # runner. The gate's own proven-red vectors run in this same job because
-  # `discipline.yml`'s own comment above records the doctrine — a gate whose
-  # reds are never executed is the failure mode this story exists to close —
-  # and because no job runs `cargo test -p xtask` unscoped.
-  check-exit-commands:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build every shipped binary surface the gate resolves
-        run: cargo build -p maos-bin --bin maos &&
-          cargo build -p maos-cli &&
-          cargo build -p maos-spirit-cli --bin maos-spirit &&
-          cargo build -p maos-registry --bin maos-registry-server &&
-          cargo build -p maos-wasm-host --bin maos-wasm-runner
-      - name: Run check-exit-commands
-        run: cargo run -p xtask -- check-exit-commands --json
-      - name: Run the 15-3 AC5 proven-red vectors
-        run: cargo test -p xtask --test check_exit_commands_gate
-      - name: Run the maos verb-table completeness control in both builds (AC4)
-        run: cargo build -p worker --bin worker-cli-fixture &&
-          cargo test -p maos-bin --test verb_table_15_3 -- --test-threads=1 &&
+      - name: Run the maos verb-table completeness control in both builds (21-1 AC4, kept from the retired check-exit-commands job)
+        run: |
+          cargo build -p worker --bin worker-cli-fixture
+          cargo test -p maos-bin --test verb_table_15_3 -- --test-threads=1
           cargo test -p maos-bin --no-default-features --test verb_table_15_3 -- --test-threads=1
-
-  # Story 17-5 — model-pin currency (E14-A3 → E15-A2 → E16-A4). A pin on a
-  # vendor model that the vendor already retired reds here, naming file:line,
-  # instead of surviving three retros. Offline: the gate reads only repo-local
-  # files (`xtask/model-currency.toml`, the manifests, the price book, `main.rs`),
-  # so no secret and no network leg exists to flake. The proven-red vectors run
-  # in the same job because a gate whose reds are never executed is the failure
-  # mode this lane exists to close.
-  check-model-currency:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-model-currency
-        run: cargo run -p xtask -- check-model-currency --json
-      - name: Run the 17-5 proven-red vectors
-        run: cargo test -p xtask --test model_currency_gate
 
   # Story 20-12 AC1 — every test binary in the workspace suite's nextest junit
   # keeps its Σ per-test time under its `xtask/test-budgets.toml` budget
@@ -849,80 +721,6 @@ jobs:
       - name: Run the 20-12 AC1 proven-red vectors
         if: ${{ !cancelled() }}
         run: cargo test -p xtask --test check_test_budget_proven_red
-
-  # Story 20-7 AC2 — structural runner policy, defense in depth only.
-  # Host jobs accept push-to-main, schedule and main-only dispatch; never PR
-  # or comment events. Operator environment/runner-group protections (O3) and
-  # fork approval (O7) must be verified before enabling the host. This
-  # PR-editable gate is not an immutable runner admission boundary.
-  check-perf-runner-policy:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-perf-runner-policy
-        run: cargo run -p xtask -- check-perf-runner-policy --json
-      # 18-0 AC6: runs after a red gate step too (the vectors prove the gate can red).
-      - name: Run the 20-7 proven-red vectors
-        if: ${{ !cancelled() }}
-        run: cargo test -p xtask --test perf_gates_20_7
-
-  # Story 20-7 AC5 (ADR-068 §1, D-20-7-07 A) — Tier C: deterministic instruction
-  # and allocation counts for the CPU-bound hot paths (capability-token verify,
-  # IAC routing, frame lowering), on every pull request, GitHub-hosted and
-  # fork-safe (no secret, no write token, no self-hosted runner). The harness
-  # `tier_c_harness` runs each path under `valgrind --tool=callgrind
-  # --toggle-collect=maos_tier_c_measured` (instructions, minus the empty path)
-  # and reports allocations from its counting allocator; `check-perf-counts`
-  # compares both with the baselines committed in `xtask/perf-budgets.toml`
-  # (allocation rows blocking; instruction rows advisory until the first hosted
-  # callgrind baseline is committed). A deliberate change re-baselines in the
-  # same commit with the measured figure and the reason. Toolchain, OS and
-  # valgrind changes are re-baseline events (ADR-068 §6).
-  check-perf-counts:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: perf-counts-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install valgrind
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends valgrind
-      - name: Build the Tier C harness
-        run: cargo build --locked -p maos-bench --features kernel_measurement --bin tier_c_harness
-      - name: Measure instruction and allocation counts per hot path
-        run: |
-          set -euo pipefail
-          mkdir -p tier-c
-          harness="$PWD/target/debug/tier_c_harness"
-          measure() {
-            valgrind --tool=callgrind --toggle-collect=maos_tier_c_measured \
-              --callgrind-out-file="tier-c/$1.callgrind" "$harness" "$1" "$2" \
-              > "tier-c/$1.json" 2> "tier-c/$1.valgrind.log"
-          }
-          measure empty 0
-          measure cap_token_verify 10000
-          measure iac_routing 2000
-          measure frame_lowering 10000
-      - name: Compare with the committed baselines
-        run: cargo run --locked -p xtask -- check-perf-counts --dir tier-c --json
-      - name: Upload the counts
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: tier-c-counts
-          path: tier-c
-          if-no-files-found: error
 
   # Per-push invariant-lock validation. Journal persistence is a separate
   # workflow (.github/workflows/journal-append.yml) per DF16 (Option c). This
@@ -1801,7 +1599,9 @@ jobs:
         with:
           tool: cargo-nextest@0.9.149
       - name: Install pinned WASM fixture assembler
-        run: cargo install --locked wasm-tools --version 1.259.0
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools@1.259.0
       - name: Build invocation-family nextest archives
         run: |
           set -euo pipefail
@@ -2811,8 +2611,8 @@ jobs:
 
   # RETIRED 2026-06-12 by Story 8.16 per ADR-043 — `check-epic-6-bridge` was a
   # 4504-line Epic-6 debt-visibility beacon whose §A2/§A3/§A5/§A6 enforcement was
-  # migrated to live hard-fail gates in Story 7.1.5 (check-review-findings-resolved,
-  # check-dev-record-completeness, check-serde-error-handling). Its last red
+  # migrated to live hard-fail gates in Story 7.1.5 (check-serde-error-handling; the
+  # story-record gates were deleted by lean-gates WP-06). Its last red
   # (A4-Debt-1) was a stale entry-counting predicate, not real debt; I9 holder-path
   # discipline is enforced live by check-empty-kernel + check-service-boundary.
   # Story 20-3b deletes the archived module; its live controls remain folded into
@@ -3009,51 +2809,6 @@ jobs:
         run: cargo test -p maos-spirit-abi --test manifest_n_minus_1_test --locked
       - name: Run maos-manifest v1-load-on-current-kernel compat tests
         run: cargo test -p maos-manifest --test manifest_n_minus_1_compat --locked
-
-  # §A2 FULL flip — split-flip closed in Story 7.1.6; hard-fail since 2026-06-01
-  check-review-findings-resolved:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-review-findings-resolved
-        run: cargo run -p xtask -- check-review-findings-resolved --json
-
-  # §A2 FULL flip — split-flip closed in Story 7.1.6; hard-fail since 2026-06-01
-  check-dev-record-completeness:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-dev-record-completeness
-        run: cargo run -p xtask -- check-dev-record-completeness --json
-      # D19 (14-0, option (a)), resolved by j1-crosshost-2c — the seven story-file
-      # walkers now derive their subject set from sprint-status.yaml instead of a
-      # leading-digit filename filter, which had made the entire `j1-*` lane
-      # invisible to all seven at once. THE PLANTED RED lives here: a `j1-*` story
-      # with a missing dev record must red a Blocking gate. Without this step the
-      # shared helper is a refactor, not a control.
-      - name: Run the D19 story-file governance vectors (14-0 option (a))
-        run: cargo test -p xtask --test d19_story_file_governance -- --test-threads=1
-      # Story 14-0 AC2.4 — the owner sweep's planted red. This gate is the one
-      # the Epic-14 decision register cites as its own verification, and until
-      # 14-0 it bucketed `Owner: epic-14` as OK — because `epic-14: backlog` IS
-      # a real `development_status` key. It was structurally blind to the
-      # register's founding defect, six live rows deep.
-      - name: Run the 14-0 AC2.4 owner-assertion vectors
-        run: cargo test -p xtask --test owner_assertion_epic_key_rejected
 
 
 
@@ -4355,121 +4110,6 @@ jobs:
       - name: Run check-mobile-push-on-halt
         run: cargo test -p maos-notify-push --test t_10_4b_mobile_push_halt
 
-  # Story 10.5 AC3 — Windows binary + sandbox compile and install verification.
-  windows-check:
-    runs-on: windows-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      # R1/AC3: a REAL build on Windows, not just `cargo check`. This is the only
-      # place the kernel's unsafe Windows sandbox FFI actually compiles for its
-      # target (the dev host cannot cross-build it — ring/libsqlite3-sys need a
-      # Windows C toolchain).
-      - name: Build Windows kernel-core + CLI (real compile)
-        run: cargo build -p maos-kernel-core -p maos-cli
-      # Story 21-9 AC7 — COMPILE-ONLY evidence that the default `maos-bin` (WASM
-      # host on, no opt-in feature) and the `maos-wasm-runner` binary build on
-      # Windows. It is not a runtime, containment or release claim: the runner is
-      # not published for Windows and the Windows release hold stands.
-      - name: Build default daemon and WASM runner (compile-only, no feature flags)
-        run: cargo build --locked -p maos-bin -p maos-wasm-host --bin maos --bin maos-wasm-runner
-      # R4: execute the unsafe FFI spawn path at runtime (was compile-only) —
-      # now including ENFORCEMENT negative controls (memory commit cap actually
-      # kills an over-budget child; low-integrity label actually applies). Run
-      # single-threaded: each memory test commits ~1 GiB and the tests spawn
-      # restricted-token child processes, so serialize for determinism.
-      #
-      # ⚠ DIAGNOSTIC WRAPPER (Epic-16 retrospective, 2026-09-21). These three
-      # steps used to be bare `cargo test` lines, so a Windows-only failure
-      # produced exactly one readable byte of evidence: "Process completed with
-      # exit code 1". Reading the step log requires an `actions`-scoped token,
-      # which is a strictly larger grant than reading checks — so a
-      # Windows-only regression was effectively undiagnosable from the API this
-      # project can actually authenticate against. `::error::` writes the tail
-      # into a CHECK-RUN ANNOTATION, readable with `repo:status`. The failing
-      # step is windows-check #8 (`jetbrains_acp_server`); the next run will say
-      # WHY instead of merely that. `%25`-then-`%0A` escaping order matters, and
-      # `shell: bash` is required because windows-latest defaults to pwsh.
-      #
-      # ⚠ AND `shell: bash` HAS A PRICE, paid once already: Git Bash puts
-      # `C:\Program Files\Git\usr\bin` AHEAD of System32, so any child that
-      # resolves a tool by bare name gets the MSYS build. That silently broke
-      # `windows_child_runs_at_low_integrity`, whose probe ran `whoami /groups`
-      # — MSYS `whoami.exe` cannot start at Low integrity at all
-      # (`NtCreateDirectoryObject(\BaseNamedObjects\msys-...): 0xC0000022`), so a
-      # PERFECTLY working sandbox was reported as a broken label. Fixed in the
-      # test by naming both ends of the pipe absolutely under `%SystemRoot%`.
-      # ANY new Windows probe added below MUST resolve its tools absolutely, or
-      # it will measure this runner's PATH instead of the product.
-      - name: Run Windows sandbox enforcement tests
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo test -p maos-kernel-core --test sandbox_enforcement_windows -- --nocapture --test-threads=1 2>&1 | tee win-sandbox.log && exit 0
-          echo "::error::windows-check: sandbox_enforcement_windows FAILED. Tail:%0A$(tail -80 win-sandbox.log | sed -e 's/%/%25/g' -e 's/\r$//' | awk '{printf "%s%%0A", $0}')"
-          exit 1
-      # R5: the JetBrains/ACP bridge tests were wired into NO CI job. Run them here.
-      - name: Run ACP JetBrains bridge test
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo test -p maos-acp --test jetbrains_bridge_test 2>&1 | tee win-acp-bridge.log && exit 0
-          echo "::error::windows-check: jetbrains_bridge_test FAILED. Tail:%0A$(tail -80 win-acp-bridge.log | sed -e 's/%/%25/g' -e 's/\r$//' | awk '{printf "%s%%0A", $0}')"
-          exit 1
-      - name: Run JetBrains ACP server e2e
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo test -p maos-bin --test jetbrains_acp_server -- --nocapture 2>&1 | tee win-acp-server.log && exit 0
-          echo "::error::windows-check: jetbrains_acp_server FAILED (this is the step that reds today). Tail:%0A$(tail -80 win-acp-server.log | sed -e 's/%/%25/g' -e 's/\r$//' | awk '{printf "%s%%0A", $0}')"
-          exit 1
-      # ⚠ This step tested NOTHING until 2026-09-21 (Epic-16 retrospective).
-      # `-- --exact` makes libtest match the FULL test path, and the test lives
-      # at `subcommands::tests::install_verify_local_release_artifact`
-      # (maos-cli/src/subcommands.rs:5830 — a lib unit test, not an integration
-      # target). The bare name therefore matched zero tests, and libtest exits 0
-      # on zero matches, so the step went green on every platform while
-      # verifying no signature path at all. Measured on Linux: bare name +
-      # `--exact` => "0 passed; 50 filtered out"; full path + `--exact` =>
-      # "1 passed". This is E16-A2's thesis inside E16-A2's own CI file: a step
-      # that could not run was indistinguishable from one that ran and passed.
-      # The `--list` guard below makes a future rename LOUD instead of vacuous.
-      - name: Verify Windows local release signature path
-        # `shell: bash` is REQUIRED: windows-latest defaults to pwsh, where
-        # `tee`/`grep`/`|| { …; }` are not what this script means. Git Bash ships
-        # on the runner image. The list file is workspace-relative so it needs no
-        # /tmp mapping.
-        shell: bash
-        run: |
-          cargo test -p maos-cli --lib subcommands::tests::install_verify_local_release_artifact -- --exact --list | tee win-release-test-list.txt
-          grep -q 'subcommands::tests::install_verify_local_release_artifact: test' win-release-test-list.txt || { echo "the Windows release-signature test did not resolve — it was renamed or moved, and this step must be repointed, not left to pass on an empty filter" >&2; exit 1; }
-          rm -f win-release-test-list.txt
-          cargo test -p maos-cli --lib subcommands::tests::install_verify_local_release_artifact -- --exact
-      - name: Run platform-neutral recall wire tests (Story 17-3d)
-        shell: bash
-        run: |
-          set +e
-          set -o pipefail
-          cargo test --locked -p maos-wasm-host --lib recall_wire -- --nocapture 2>&1 | tee recall-wire.log
-          rc=${PIPESTATUS[0]}
-          [ "$rc" -eq 0 ] || exit "$rc"
-          grep -q '^test result: ok\. 7 passed; 0 failed; 0 ignored;' recall-wire.log || exit 1
-          for name in empty_page_and_all_error_cases_round_trip \
-                      partial_header_is_protocol_error_not_clean_eof \
-                      tags_discriminate_requests_replies_and_iac_frames \
-                      oversized_fetch_and_body_are_refused_at_bound_plus_one \
-                      page_prefix_at_exact_expansion_budget_boundary \
-                      skill_requests_and_responses_round_trip \
-                      megabyte_payload_is_one_byte_string_not_a_sequence; do
-            grep -q "^test recall_wire::tests::$name \.\.\. ok$" recall-wire.log || exit 1
-          done
-
   # Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
   check-skill-conformance:
     runs-on: ubuntu-24.04
@@ -4788,7 +4428,9 @@ jobs:
       # (the single `build-test-fixtures` command, as workspace-test-suite), plus the pinned
       # assembler `spawned_scope_17_3c` shells out to.
       - name: Install pinned WASM fixture assembler
-        run: cargo install --locked wasm-tools --version 1.259.0
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools@1.259.0
       - name: Build every fixture for the maos-bin whole-package leg
         run: cargo run --locked -p xtask -- build-test-fixtures --only maosctl,maos-registry-server,maos-spirit,worker-cli-fixture,maos-crypto-recording,forbidden-syscall-probe,escape-forbidden-syscall-probe,maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,recall_probe.wasm,lifecycle_probe.wasm,compat_echo_2_0.wasm,equiv-native-twin
       # Operator ruling 2026-09-24: the DEDICATED CI-only evidence audit key.
@@ -5587,7 +5229,9 @@ jobs:
       # `spawned_scope_17_3c` assembles its hostile components with the real `wasm-tools`
       # (the same pin the 17-3c archive producer installs); the runner image ships none.
       - name: Install pinned WASM fixture assembler
-        run: cargo install --locked wasm-tools --version 1.259.0
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools@1.259.0
       - name: Provision the declared offline erasure and two-host Ed25519 backend
         uses: ./.github/actions/provision-erasure-verifier
       - name: Install tokei
@@ -5703,7 +5347,6 @@ jobs:
       - check-fuzz-targets
       - fuzz-build
       - check-ko-coverage
-      - windows-check
       - check-migration-merkle
       - check-live-bilateral-consent
       - check-rotation-real-timing
@@ -5728,14 +5371,8 @@ jobs:
       - check-escape-detector
       - check-vetting-attestation
       - check-loom-substrate-drift
-      - check-decision-register
-      - check-cert-rotation-trigger
-      - check-exit-commands
-      - check-model-currency
       - workspace-test-suite
       - check-test-budget
-      - check-perf-runner-policy
-      - check-perf-counts
       - air-gap-netns-witness
     if: always()
     steps:
@@ -5777,13 +5414,9 @@ jobs:
           echo "| check-escape-detector | ${{ needs.check-escape-detector.result }} | cargo run -p xtask -- check-escape-detector |"
           echo "| check-loom-substrate-drift | ${{ needs.check-loom-substrate-drift.result }} | cargo run -p xtask -- check-loom-substrate-drift |"
           echo "| check-j1-loopback-delegation | ${{ needs.check-j1-loopback-delegation.result }} | cargo run -p xtask -- check-j1-loopback-delegation |"
-          echo "| check-exit-commands | ${{ needs.check-exit-commands.result }} | cargo run -p xtask -- check-exit-commands |"
-          echo "| check-model-currency | ${{ needs.check-model-currency.result }} | cargo run -p xtask -- check-model-currency |"
           echo "| workspace-test-suite | ${{ needs.workspace-test-suite.result }} | cargo nextest run --workspace --locked --no-fail-fast --profile ci |"
           echo "| check-test-cost | ${{ needs.xtask-gates.outputs.check-test-cost }} | cargo run -p xtask -- check-test-cost (+ its proven-red vectors, step check-test-cost-vectors) |"
           echo "| check-test-budget | ${{ needs.check-test-budget.result }} | cargo run -p xtask -- check-test-budget --junit <workspace junit> |"
-          echo "| check-perf-runner-policy | ${{ needs.check-perf-runner-policy.result }} | cargo run -p xtask -- check-perf-runner-policy |"
-          echo "| check-perf-counts | ${{ needs.check-perf-counts.result }} | cargo run -p xtask -- check-perf-counts --dir tier-c |"
           echo "| xtask-gates (job) | ${{ needs.xtask-gates.result }} | one job, one xtask build, every deterministic gate a named step; the per-gate rows above read its step outputs |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
@@ -5820,13 +5453,9 @@ jobs:
           echo "  check-fkcs: ${{ needs.check-fkcs.result }}"
           echo "  check-loom-substrate-drift: ${{ needs.check-loom-substrate-drift.result }}"
           echo "  check-trial-attestation: ${{ needs.check-trial-attestation.result }}"
-          echo "  check-exit-commands: ${{ needs.check-exit-commands.result }}"
-          echo "  check-model-currency: ${{ needs.check-model-currency.result }}"
           echo "  workspace-test-suite: ${{ needs.workspace-test-suite.result }}"
           echo "  check-test-cost: ${{ needs.xtask-gates.outputs.check-test-cost }} (vectors: ${{ needs.xtask-gates.outputs.check-test-cost-vectors }})"
           echo "  check-test-budget: ${{ needs.check-test-budget.result }}"
-          echo "  check-perf-runner-policy: ${{ needs.check-perf-runner-policy.result }}"
-          echo "  check-perf-counts: ${{ needs.check-perf-counts.result }}"
           echo "  xtask-gates: ${{ needs.xtask-gates.result }}"
           exit 1
 
@@ -5888,8 +5517,6 @@ jobs:
       - nfr-scale-4-rate-limit-isolation
       - intent-lineage-6-4-extension
       - manifest-n-minus-1-test
-      - check-review-findings-resolved
-      - check-dev-record-completeness
       - check-kernel-baseline
       - journey-hermetic-tier-1
       - fr59-yank-propagation-5min
@@ -6054,11 +5681,9 @@ jobs:
             const cwc = '${{ needs.check-workspace-count.result }}';
             const cpfc = xg('check-pub-field-constructors');
             const ccrc = '${{ needs.check-composition-root-completeness.result }}';
-            const sd715 = sm('smoke-discipline-7-1-5');
             const casc = xg('check-a2a-sender-completeness');
             const safc = sm('smoke-a2a-fail-closed-8-8');
             const ckb = '${{ needs.check-kernel-baseline.result }}';
-            const ecc = xg('check-epic-close-coherence');
             const jht1 = '${{ needs.journey-hermetic-tier-1.result }}';
             const cgd = '${{ needs.cgroup-ceiling-delegated.result }}';
             const cgu = '${{ needs.cgroup-ceiling-undelegated.result }}';
@@ -6116,11 +5741,9 @@ jobs:
             | check-workspace-count | ${icon(cwc)} ${cwc} |
             | check-pub-field-constructors | ${icon(cpfc)} ${cpfc} |
             | check-composition-root-completeness | ${icon(ccrc)} ${ccrc} |
-            | smoke-discipline-7-1-5 | ${icon(sd715)} ${sd715} |
             | check-a2a-sender-completeness | ${icon(casc)} ${casc} |
             | smoke-a2a-fail-closed-8-8 | ${icon(safc)} ${safc} |
             | check-kernel-baseline | ${icon(ckb)} ${ckb} |
-            | check-epic-close-coherence | ${icon(ecc)} ${ecc} |
             | journey-hermetic-tier-1 | ${icon(jht1)} ${jht1} |
             | release-dry-run | ${icon(rdr)} ${rdr} |
             | xtask-gates (job) | ${icon(xtaskGatesResult)} ${xtaskGatesResult} |
@@ -6238,8 +5861,6 @@ jobs:
       - nfr-scale-4-rate-limit-isolation
       - intent-lineage-6-4-extension
       - manifest-n-minus-1-test
-      - check-review-findings-resolved
-      - check-dev-record-completeness
       - check-kernel-baseline
       - journey-hermetic-tier-1
       - fr59-yank-propagation-5min
@@ -6263,7 +5884,6 @@ jobs:
       - check-export-control
       - check-host-surface
       - check-ko-coverage
-      - windows-check
       - check-live-bilateral-consent
       - check-rotation-real-timing
       - check-j4-latency
@@ -6285,9 +5905,6 @@ jobs:
       - check-fkcs
       - check-escape-detector
       - check-vetting-attestation
-      - check-cert-rotation-trigger
-      - check-perf-runner-policy
-      - check-perf-counts
     if: always()
     steps:
       - name: Judge the release-critical set
@@ -6299,7 +5916,7 @@ jobs:
           # EVERY other step of `xtask-gates` (gates and vector steps, build included): each must be PRESENT in the job
           # outputs and `success`, so a dropped output is a red, never an invisible failure. Pinned by
           # `check-ship-gate-completeness` to (all `xtask-gates` step ids) minus `RELEASE_READY_EXCLUDED`.
-          REQUIRED_XTASK_STEPS: "build-xtask check-stability-matrix check-serde-error-handling check-manifest-schema-version check-skill-schema check-epic-close-coherence check-coverage-matrix-completeness check-unsafe check-service-boundary check-breaking-md check-pub-field-constructors check-dependency-closure coverage-matrix check-empty-kernel check-loom check-fr47 check-a2a-sender-completeness check-judge-config check-security-md check-security-md-vectors example-spirit-drift corpus-staleness check-dev-model-tier check-pentest-gate check-third-party-trial check-red-team-gate nfr-onb-1-gate"
+          REQUIRED_XTASK_STEPS: "build-xtask check-stability-matrix check-serde-error-handling check-manifest-schema-version check-skill-schema check-coverage-matrix-completeness check-unsafe check-service-boundary check-breaking-md check-pub-field-constructors check-dependency-closure coverage-matrix check-empty-kernel check-loom check-fr47 check-a2a-sender-completeness check-judge-config check-security-md check-security-md-vectors example-spirit-drift corpus-staleness check-pentest-gate check-third-party-trial check-red-team-gate nfr-onb-1-gate"
         run: |
           set -euo pipefail
           excluded="$(jq -c -n --arg s "$EXCLUDED_XTASK_GATES" '$s | split(" ") | map(select(length > 0))')"

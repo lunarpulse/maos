@@ -270,29 +270,3 @@ fn the_committed_register_parses() {
     // and positive (the loader enforces that; this witnesses the committed file parses).
     assert!(budgets.total_seconds > 0.0);
 }
-
-#[test]
-fn hosted_1_model_currency_calibration_changes_only_its_binary_budget() {
-    const BINARY: &str = "xtask::model_currency_gate";
-    // Replay the observed hosted aggregate as a unit input, not fabricated
-    // per-test timings or a new hosted execution.
-    let input = || parse_junit(&junit(BINARY, &[32.983])).unwrap();
-    let before = audit(&plain(), input());
-    assert!(before
-        .findings
-        .iter()
-        .any(|finding| finding.contains("budget 30.000 s")));
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-    let mut budgets = load_budgets(root).expect("real register");
-    assert!(budgets.default_seconds > 0.0);
-    assert!(budgets.total_seconds > 0.0);
-    budgets.exceptions.retain(|row| row.binary == BINARY);
-    assert_eq!(budgets.exceptions.len(), 1);
-    assert_eq!(
-        budgets.exceptions[0].owner,
-        "20-4-gemini-driver-and-endpoint-pin"
-    );
-    assert_eq!(budgets.exceptions[0].seconds, 42.0);
-    let after = audit(&budgets, input());
-    assert!(after.findings.is_empty(), "{:?}", after.findings);
-}

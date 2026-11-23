@@ -66,8 +66,6 @@ jobs = [
     "nfr-scale-4-rate-limit-isolation",
     "intent-lineage-6-4-extension",
     "manifest-n-minus-1-test",
-    "check-review-findings-resolved",
-    "check-dev-record-completeness",
     "check-kernel-baseline",
     "journey-hermetic-tier-1",
     "fr59-yank-propagation-5min",
@@ -92,7 +90,6 @@ jobs = [
     "check-export-control",
     "check-host-surface",
     "check-ko-coverage",
-    "windows-check",
     "check-live-bilateral-consent",
     "check-rotation-real-timing",
     "check-j4-latency",
@@ -114,9 +111,6 @@ jobs = [
     "check-fkcs",
     "check-escape-detector",
     "check-vetting-attestation",
-    "check-cert-rotation-trigger",
-    "check-perf-runner-policy",
-    "check-perf-counts",
 ]
 
 # Every step of the consolidated `xtask-gates` job that stays required (all step ids minus the excluded rows):
@@ -128,7 +122,6 @@ steps = [
     "check-serde-error-handling",
     "check-manifest-schema-version",
     "check-skill-schema",
-    "check-epic-close-coherence",
     "check-coverage-matrix-completeness",
     "check-unsafe",
     "check-service-boundary",
@@ -145,7 +138,6 @@ steps = [
     "check-security-md-vectors",
     "example-spirit-drift",
     "corpus-staleness",
-    "check-dev-model-tier",
     "check-pentest-gate",
     "check-third-party-trial",
     "check-red-team-gate",

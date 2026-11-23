@@ -141,7 +141,15 @@ fn engine_free_refusal_and_default_proof_are_separate_build_shapes() {
 fn portability_legs_compile_the_default_daemon_and_runner_without_runtime_claims() {
     let workflow: serde_yaml::Value =
         serde_yaml::from_str(include_str!("../../.github/workflows/discipline.yml")).unwrap();
+    // `windows-check` moved to ci-nightly.yml (lean-gates WP-06).
+    let nightly: serde_yaml::Value =
+        serde_yaml::from_str(include_str!("../../.github/workflows/ci-nightly.yml")).unwrap();
     let run_lines = |job: &str| {
+        let workflow = if job == "windows-check" {
+            &nightly
+        } else {
+            &workflow
+        };
         workflow["jobs"][job]["steps"]
             .as_sequence()
             .unwrap()

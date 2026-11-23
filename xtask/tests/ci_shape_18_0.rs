@@ -227,9 +227,13 @@ fn platform_recall_wire_gates_pin_every_source_test() {
     );
     let mut tokens = vec![format!("{} passed; 0 failed; 0 ignored;", names.len())];
     tokens.extend(names);
-    let workflow = workflow();
-    let jobs = key(&workflow, "jobs");
-    for job_name in ["windows-check", "macos-check"] {
+    let discipline = workflow();
+    let nightly = nightly_ci_workflow();
+    // `windows-check` moved to ci-nightly.yml (lean-gates WP-06); `macos-check` stays a discipline job.
+    for (job_name, jobs) in [
+        ("windows-check", key(&nightly, "jobs")),
+        ("macos-check", key(&discipline, "jobs")),
+    ] {
         let job = key(jobs, job_name);
         let step =
             &steps(job)[step_index(job, "Run platform-neutral recall wire tests (Story 17-3d)")];
@@ -2030,5 +2034,46 @@ fn parsed_workflow_output_is_colorless_without_step_overrides() {
         for run in steps(job).iter().filter_map(|step| str_of(step, "run")) {
             assert!(!run.contains("--color always") && !run.contains("--color=always"));
         }
+    }
+}
+
+/// A job-level `if:` that is the literal `false` parks a gate: it never runs and never reds. The scan
+/// reads the workflow text, so the expression form `${{ false }}` is caught as well.
+fn parked_job_lines(workflow: &str) -> Vec<usize> {
+    workflow
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| {
+            let normalized = line.split_whitespace().collect::<Vec<_>>().join(" ");
+            normalized == "if: false" || normalized == "if: ${{ false }}"
+        })
+        .map(|(index, _)| index + 1)
+        .collect()
+}
+
+#[test]
+fn no_workflow_parks_a_job_behind_a_literal_false_condition() {
+    let clean = "jobs:\n  control:\n    if: github.event_name == 'push'\n    steps:\n      - run: echo live\n";
+    assert!(parked_job_lines(clean).is_empty());
+    for condition in ["false", "${{ false }}"] {
+        let planted = clean.replace("github.event_name == 'push'", condition);
+        assert_eq!(parked_job_lines(&planted), [3], "{condition}");
+    }
+    let dir = root().join(".github/workflows");
+    for entry in fs::read_dir(dir).expect("read workflows") {
+        let path = entry.expect("workflow entry").path();
+        if !matches!(
+            path.extension().and_then(|e| e.to_str()),
+            Some("yml" | "yaml")
+        ) {
+            continue;
+        }
+        let text = fs::read_to_string(&path).expect("read workflow");
+        assert!(
+            parked_job_lines(&text).is_empty(),
+            "{} parks a job behind `if: false` at lines {:?}",
+            path.display(),
+            parked_job_lines(&text)
+        );
     }
 }

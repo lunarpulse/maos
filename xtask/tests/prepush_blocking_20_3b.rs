@@ -162,15 +162,15 @@ fn every_standalone_local_blocking_aggregate_gate_is_in_literal_gates() -> Resul
 }
 
 #[test]
-fn removing_epic_close_or_adding_a_new_blocking_local_job_reds_the_pin() -> Result<(), String> {
+fn removing_a_gate_or_adding_a_new_blocking_local_job_reds_the_pin() -> Result<(), String> {
     let mut mirrored: BTreeSet<_> = GATES.iter().map(|(i, _)| normalize_invocation(i)).collect();
-    mirrored.remove("check-epic-close-coherence");
+    mirrored.remove("check-skill-schema");
     let missing = missing_local_blocking(
         include_str!("../../.github/workflows/discipline.yml"),
         include_str!("../gate-registry.toml"),
         &mirrored.iter().map(String::as_str).collect(),
     )?;
-    assert!(missing.contains("check-epic-close-coherence"));
+    assert!(missing.contains("check-skill-schema"));
     let plant = "jobs:\n  aggregate:\n    needs: [new-gate, advisory]\n  new-gate:\n    steps:\n    - run: cargo run -q --locked -p xtask -- check-new-local --json\n  advisory:\n    continue-on-error: true\n    steps:\n    - run: cargo run -p xtask -- advisory-only\n";
     assert_eq!(
         missing_local_blocking(

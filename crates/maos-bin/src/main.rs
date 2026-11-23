@@ -9742,11 +9742,6 @@ description = "smoke test spirit successor"
             return smoke_spirit_author_7_1().await;
         }
 
-        // Story 7.1.5 AC5 — smoke-discipline-7-1-5: run all four §A2-family gates
-        if mode == "smoke-discipline-7-1-5" {
-            return smoke_discipline_7_1_5().await;
-        }
-
         // Story 7.2 AC6 — end-to-end registry round-trip smoke arms.
         if mode == "smoke-registry-7-2" {
             // D4 remediation: fast path (in-process, <100ms) by default;
@@ -15324,57 +15319,6 @@ async fn smoke_spirit_author_7_1() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "{{\"smoke\":\"7-1\",\"status\":\"ok\",\"steps\":[\"scaffold-rust\",\"test-rust\",\"scaffold-ts\",\"test-ts\",\"coverage-3-spirits\"]}}"
-    );
-    Ok(())
-}
-
-#[cfg(feature = "network")]
-/// Story 7.1.5 AC5 — `smoke-discipline-7-1-5` runs the two surviving §A2-family gates (20-3b).
-async fn smoke_discipline_7_1_5() -> Result<(), Box<dyn std::error::Error>> {
-    use std::process::Command;
-    use std::time::Duration;
-    let workspace_root = std::env::current_dir()?;
-
-    let gates = [
-        "check-review-findings-resolved",
-        "check-dev-record-completeness",
-    ];
-
-    // Pre-build xtask once so each gate subprocess hits a warm cache. The
-    // per-gate 30s timeout below is a hang-detector, NOT a compile budget — a
-    // cold `cargo run -p xtask` can take >30s to compile on CI, which would
-    // spuriously trip the timeout after the gate has already printed its result.
-    let build_status = Command::new("cargo")
-        .args(["build", "-q", "-p", "xtask"])
-        .current_dir(&workspace_root)
-        .status()
-        .map_err(|e| format!("xtask pre-build spawn failed: {e}"))?;
-    if !build_status.success() {
-        return Err("xtask pre-build failed".into());
-    }
-    for gate in &gates {
-        eprintln!("[smoke-7.1.5] Running gate: {}", gate);
-        let gate_owned = gate.to_string();
-        let dir = workspace_root.clone();
-        let status = tokio::time::timeout(
-            Duration::from_secs(30),
-            tokio::task::spawn_blocking(move || {
-                Command::new("cargo")
-                    .args(["run", "-q", "-p", "xtask", "--", &gate_owned, "--json"])
-                    .current_dir(&dir)
-                    .status()
-            }),
-        )
-        .await
-        .map_err(|_| format!("gate {} TIMED OUT after 30s", gate))??
-        .map_err(|e| format!("gate {} spawn failed: {}", gate, e))?;
-        if !status.success() {
-            return Err(format!("gate {} FAILED", gate).into());
-        }
-    }
-
-    println!(
-        r#"{{"smoke":"7-1-5","status":"ok","gates":["check-review-findings-resolved","check-dev-record-completeness"]}}"#
     );
     Ok(())
 }

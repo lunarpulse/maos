@@ -72,7 +72,7 @@ fn red(output: Output, reason: &str) {
 }
 
 #[test]
-fn real_tree_has_48_bound_and_enrolled_gates() {
+fn real_tree_has_41_bound_and_enrolled_gates() {
     let copy = tree();
     let output = run(copy.path());
     assert!(
@@ -82,7 +82,7 @@ fn real_tree_has_48_bound_and_enrolled_gates() {
     );
     let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(report["passed"], true);
-    assert_eq!(report["expected_count"], 48);
+    assert_eq!(report["expected_count"], 41);
 }
 
 #[test]
@@ -259,7 +259,7 @@ fn real_tree_release_ready_is_aggregate_minus_twelve_documented_exclusions() {
     assert_eq!(report["release_ready_needs"], listed);
     assert_eq!(
         report["release_ready_excluded"].as_array().unwrap().len(),
-        12
+        9
     );
 }
 
@@ -269,7 +269,7 @@ fn dropping_a_required_job_from_release_ready_reds() {
         "workspace-test-suite",
         "check-export-control",
         "epic-20-exit",
-        "windows-check",
+        "check-ff-j6",
     ] {
         let copy = tree();
         drop_need(copy.path(), "release-ready", job);
@@ -285,10 +285,10 @@ fn dropping_a_required_job_from_release_ready_reds() {
 #[test]
 fn keeping_an_excluded_job_in_release_ready_reds() {
     let copy = tree();
-    add_need(copy.path(), "release-ready", "check-model-currency");
+    add_need(copy.path(), "release-ready", "check-test-budget");
     red(
         run(copy.path()),
-        "check-model-currency: excluded, yet in release-ready.needs",
+        "check-test-budget: excluded, yet in release-ready.needs",
     );
 }
 
