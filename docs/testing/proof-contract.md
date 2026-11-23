@@ -53,27 +53,13 @@ on one image.**
   crates/*/tests spirits/*/tests`), `cargo test -p maos-kernel-core --test spirit_boundary_invariants` and
   `cargo run -p xtask -- check-corpus`. (17-11's review patches added `openai` to the Researcher manifest and refused
   an empty provider prefix; the focused set passed and the landing-tree workspace run found two reds.)
-- The four read-only review layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor, Test Infrastructure
-  Auditor) are unchanged.
-- **Reviewer model (operator ruling 2026-10-24).** Code-review layers run on `anthropic/claude-opus-5-5` or
-  `gpt-6.1-sol`. `anthropic/claude-fable-5-1` is reserved for plan review (PRD, architecture, epic, story and
-  decision documents) and for code review of a safety- or security-critical change — and every use of it, either
-  kind, needs the operator's permission first. 17-9, 17-10 and 17-11 were reviewed on fable-5.1 before this ruling.
-  Layer assignment is superseded by the 2026-10-26 ruling below: gpt-6.1-sol is now the dev model and never reviews
-  code it wrote.
-- **Agent models by role (operator ruling 2026-10-26, token cost).** Story creation runs on
-  `anthropic/claude-opus-5-5` (`.omp/agents/story-creator.md`); dev, finisher and review-patch passes run on
-  `openai-codex/gpt-6.1-sol` (the `task` agent; soft request budget 400); docs-only record work (ruling application,
-  done flips, deferred-work closures, tracker, CI excerpts) runs on `zai/glm-5.3` (`.omp/agents/scribe.md`).
-  Review is tiered by risk. A story is **difficult** when it grows the kernel (a measured kernel landing; since operator
-  ruling `kfree`, 2026-11-12, no FLAG-Winston grant is priced or asked inside the ADR-069 envelope), a security-critical
-  AC (auth, secrets, signatures, cross-Spirit isolation), concurrency or a new protocol. Blind and Edge always run on
-  opus-5.5; Acceptance runs on opus-5.5 for difficult stories and on `zai/glm-5.3` (`.omp/agents/review-light.md`)
-  otherwise; Test Infrastructure runs on glm-5.3 on every story. An easy story may merge Blind and Edge into one opus
-  layer. Every story keeps at least one opus layer; glm-5.3 is never a story's only reviewer.
-  *Session-only substitution (operator, latest 2026-10-27):* for the 20-15/20-16 review-correction phase coding
-  and high-risk reviews run on `anthropic/claude-opus-5-5` and light reviews/docs on Sonnet 5.5, superseding an
-  earlier temporary Terra substitution. This does not rewrite the standing policy above.
+- **Review by path (operator decision 5, 2026-11-23; replaces the reviewer-model, tiering, per-use-permission and
+  four-layer rules).** A PR whose diff matches a glob in [`trust-boundary-paths.txt`](trust-boundary-paths.txt) owes
+  one static review by a model family other than the author's, with at most two correction rounds. The PR body carries
+  a `Reviewed-by-family: <family>` line. Findings that survive the second round become issues labelled
+  `review-finding`. The operator waives the review with one PR comment. No other PR owes a review: CI is the gate.
+  Honest limit: the `Reviewed-by-family:` line proves a review was claimed, not that it was independent; that needs a
+  second identity. No CI step checks the line (no new gate).
 
 ### Retrospective size trend table
 

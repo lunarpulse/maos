@@ -362,7 +362,7 @@ fn workflows_parse_and_gate_missing_ledger_without_skip() {
         &fs::read_to_string(root().join(".github/workflows/fuzz-prerelease.yml")).unwrap(),
     )
     .unwrap();
-    assert_eq!(workflow["jobs"].as_mapping().unwrap().len(), 6);
+    assert_eq!(workflow["jobs"].as_mapping().unwrap().len(), 7);
 }
 
 #[test]
@@ -617,7 +617,7 @@ fn rto_collector_preserves_distinct_measurements_on_the_same_date() {
 #[test]
 fn ledger_workflow_uploads_overwrite_artifacts_on_rerun() {
     for (file, expected) in [
-        ("fuzz-prerelease.yml", 15),
+        ("fuzz-prerelease.yml", 17),
         ("fuzz-cadence.yml", 2),
         ("rpo-rto-cadence.yml", 1),
     ] {
