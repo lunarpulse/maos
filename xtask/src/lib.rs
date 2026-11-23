@@ -6,16 +6,6 @@ pub mod check_service_boundary;
 pub mod clippy_ratchet;
 mod fs_walk;
 pub mod invariant_lock;
-// Story 14-0 AC1 — the Epic-14 decision register's reader. Exposed so
-// `xtask/tests/` can drive the REAL audit over planted registers; a proven-red
-// vector that exercises a parallel copy of the logic proves nothing about the
-// gate CI runs.
-pub mod check_decision_register;
-// Story 15-3 AC5 — the exit-command gate's audit. Exposed for the same reason
-// `check_decision_register` is: `xtask/tests/` must drive the REAL `audit()`
-// over planted corpora, because a vector that exercised a parallel copy of the
-// tokeniser would prove nothing about the gate CI runs (F11).
-pub mod check_exit_commands;
 // Story 20-12 T1 — the escape-detector gate's `Report` → `emit` writer, exposed
 // so `kernel_pin_content_hash_16_0` proves its JSON stdout over a stub `Report`
 // instead of running all nine nested legs (1,259 s of the 1,871 s suite).
@@ -44,12 +34,6 @@ pub mod render_packages;
 // corpus_types + gate_common exposed so the lib-compiled gate modules
 // (check_fkcs, check_trial_attestation) can resolve `crate::gate_common`
 // (Option C leg-binding, Epic 12 retro B1). corpus_types is self-contained;
-// gate_common depends only on it + chrono + sprint_status.
+// gate_common depends only on it + chrono.
 pub mod corpus_types;
 pub mod gate_common;
-// D19 (14-0, option (a)) — `gate_common::governed_story_keys` derives the governed
-// story set from `development_status`, so the single-sourced sprint-status parser
-// must resolve in the lib compilation too, not just in `main.rs`. Re-parsing it
-// inside `gate_common` would create the second source of truth that D19 exists to
-// remove.
-pub mod sprint_status;

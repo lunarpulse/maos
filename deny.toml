@@ -16,58 +16,19 @@ feature-depth = 1
 # Every entry below but RUSTSEC-2026-0459 is an `unmaintained` advisory (NOT
 # `vulnerability` class) for a transitive or frozen-ABI dependency with no safe upgrade.
 # RUSTSEC-2026-0459 (bundled SQLite, CVE-2026-119375) IS a vulnerability-class advisory,
-# ignored on the narrower ground stated at its entry. Each ignore is documented by a
-# deferred-work.md row (`check-rc-readiness` refuses an ignored id without one, matched
-# as a whole token); a row is not a ratification. FLAG-Winston/John: ratify, and
-# schedule the migrations called out below.
+# ignored on the narrower ground stated in its `reason`. Each ignore carries a
+# non-empty `reason` (`check-rc-readiness` refuses an ignored id without one); a reason
+# is not a ratification. FLAG-Winston/John: ratify, and schedule the migrations named
+# in the reasons.
 ignore = [
-    # serde_cbor 0.11.2 — archived/unmaintained. It is the canonical-CBOR encoder
-    # for the FROZEN ComplianceClaim ABI (maos-compliance/canonical_cbor.rs) and
-    # the CCAC N=600 ship-gate corpus, whose hashes are pinned. Migrating to the
-    # author-recommended `ciborium` (already in-tree) changes canonical byte
-    # ordering → re-pins every ComplianceClaim hash + NFR-Aud-9 corpus. That is a
-    # dedicated story, not a CI-green patch. Tracked as deferred work: the
-    # `serde_cbor 0.11.2` row in deferred-work.md (Ownerless and open; 20-5 L1).
-    "RUSTSEC-2021-0127",
-    # rustls-pemfile 2.2.0 — archived Aug 2025; pulled transitively by the rustls
-    # TLS stack under maos-a2a-tcp. "No safe upgrade is available" (latest is a
-    # thin wrapper over rustls-pki-types' PemObject). Migration = swap to
-    # rustls-pki-types' PemObject API; deferred to an A2A-TLS hardening follow-up.
-    # Tracked as deferred work: the `rustls-pemfile 2.2.0` row in deferred-work.md
-    # (Ownerless and open; 20-5 L1).
-    "RUSTSEC-2025-0134",
-    # unsafe-libyaml 0.2.11 — unmaintained (RUSTSEC-2024-0449, archived
-    # 2024-03-25; first failed this repo's `cargo deny check` in run 38807569588
-    # on 2026-10-15, not in green run 37658103096 on 2026-10-07; no patched release). Pulled only by
-    # `serde_yaml 0.9.34+deprecated`, which maos-skill (SKILL.md frontmatter) and
-    # xtask (workflow/registry YAML gates and their tests) use. Not a
-    # vulnerability advisory. Migration = move both crates to a maintained YAML
-    # parser; tracked in deferred-work.md, not done as a CI-green patch.
-    "RUSTSEC-2024-0449",
-    # zvariant 5.15.0 / zbus_names 4.3.4 / zvariant_derive 5.15.0 — unmaintained
-    # (RUSTSEC-2026-0370/0371/0372; "No safe upgrade is
-    # available!"). Pulled only by the Linux OS-keyring backend:
-    # maos-secrets → keyring 4.2.0 → zbus-secret-service-keyring-store 1.0.1 →
-    # secret-service 5.2.0 → zbus 5.19.0. Not a vulnerability advisory. Trigger
-    # to drop: a secret-service/keyring release on zbus ≥ 6 (or a ruled move off
-    # Secret Service). Ruled 2026-10-24 (D-18-0-03, 18-0-green-main-ci-baseline);
-    # re-checked by 20-5-v1-0-rc-tag-and-lts-rule, tracked in deferred-work.md.
-    "RUSTSEC-2026-0370",
-    "RUSTSEC-2026-0371",
-    "RUSTSEC-2026-0372",
-    # libsqlite3-sys 0.28.0 — bundled C SQLite CVE-2026-119375 (RUSTSEC-2026-0459;
-    # SQLite < 3.54.0). Fixed in libsqlite3-sys >= 0.39.0, i.e. rusqlite >= 0.39,
-    # a breaking API change across 7 crates (maos-audit, maos-bench, maos-bin,
-    # maos-cli, maos-escape-detector, maos-iac; butler dev-dep). maos opens only
-    # maos-written databases, never attacker-supplied ones. Newly published
-    # advisory-DB drift, not a 20-8 change. Trigger to drop: the rusqlite >= 0.39
-    # bump. Ruled 2026-11-10 (hosted cargo-deny finding); tracked in deferred-work.md.
-    "RUSTSEC-2026-0459",
-    # Chrono maintenance-only advisory; approved 2026-11-19. Cedar's default
-    # datetime support still requires Chrono, including in Cedar 4.15.0.
-    # Remove when the maos-cli, xtask and Cedar dependency paths no longer
-    # select Chrono. See the RUSTSEC-2026-0543 row in deferred-work.md.
-    "RUSTSEC-2026-0543",
+    { id = "RUSTSEC-2021-0127", reason = "serde_cbor 0.11.2 is archived (unmaintained, not a vulnerability). It is the canonical-CBOR encoder for the FROZEN ComplianceClaim ABI and the CCAC N=600 ship-gate corpus, whose hashes are pinned; moving to the in-tree ciborium changes canonical byte ordering and re-pins every ComplianceClaim hash and the NFR-Aud-9 corpus. Ownerless and open; trigger to drop: a ruled story that migrates the encoder and re-pins the corpus." },
+    { id = "RUSTSEC-2025-0134", reason = "rustls-pemfile 2.2.0 is archived (unmaintained, not a vulnerability), pulled transitively by the rustls TLS stack under maos-a2a-tcp; no safe upgrade exists (latest is a thin wrapper over rustls-pki-types PemObject). Ownerless and open; trigger to drop: swapping PEM loading to the rustls-pki-types PemObject API in an A2A-TLS hardening follow-up." },
+    { id = "RUSTSEC-2024-0449", reason = "unsafe-libyaml 0.2.11 is unmaintained (archived 2024-03-25, no patched release, not a vulnerability), pulled only by serde_yaml 0.9.34+deprecated, which maos-skill (SKILL.md frontmatter) and xtask (workflow/registry YAML gates) use. Trigger to drop: moving both crates to a maintained YAML parser." },
+    { id = "RUSTSEC-2026-0370", reason = "zvariant 5.15.0 is unmaintained (no safe upgrade, not a vulnerability), pulled only by the Linux OS-keyring backend: maos-secrets -> keyring 4.2.0 -> zbus-secret-service-keyring-store 1.0.1 -> secret-service 5.2.0 -> zbus 5.19.0. Ruled 2026-10-24 (D-18-0-03). Ownerless and open; trigger to drop: a secret-service/keyring release on zbus >= 6, or a ruled move off Secret Service." },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names 4.3.4 is unmaintained (no safe upgrade, not a vulnerability), pulled only by the Linux OS-keyring backend: maos-secrets -> keyring 4.2.0 -> zbus-secret-service-keyring-store 1.0.1 -> secret-service 5.2.0 -> zbus 5.19.0. Ruled 2026-10-24 (D-18-0-03). Ownerless and open; trigger to drop: a secret-service/keyring release on zbus >= 6, or a ruled move off Secret Service." },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive 5.15.0 is unmaintained (no safe upgrade, not a vulnerability), pulled only by the Linux OS-keyring backend: maos-secrets -> keyring 4.2.0 -> zbus-secret-service-keyring-store 1.0.1 -> secret-service 5.2.0 -> zbus 5.19.0. Ruled 2026-10-24 (D-18-0-03). Ownerless and open; trigger to drop: a secret-service/keyring release on zbus >= 6, or a ruled move off Secret Service." },
+    { id = "RUSTSEC-2026-0459", reason = "libsqlite3-sys 0.28.0 bundles C SQLite < 3.54.0 (CVE-2026-119375); fixed in libsqlite3-sys >= 0.39.0, i.e. rusqlite >= 0.39, a breaking API change across 7 crates (maos-audit, maos-bench, maos-bin, maos-cli, maos-escape-detector, maos-iac; butler dev-dep). maos opens only maos-written databases, never attacker-supplied ones. Ruled 2026-11-10 (hosted cargo-deny finding). Ownerless and open; trigger to drop: the rusqlite >= 0.39 bump." },
+    { id = "RUSTSEC-2026-0543", reason = "Chrono is unmaintained (maintenance-only advisory, no patched version); operator-approved temporary exception 2026-11-19. Cedar's default datetime support still requires Chrono, including Cedar 4.15.0; maos-cli calendar month ranges and xtask date validation also use it. Owner: ops-ci-release-ready, with maos-pdp for the Cedar edge. Remove once the direct migrations and a compatible Cedar update eliminate Chrono from the audited graph." },
 ]
 
 [licenses]

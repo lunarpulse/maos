@@ -138,7 +138,7 @@ jobs:
     # the perf host never holds one (ADR-068 §4). Never for a pull request.
     needs: [tier-w]
     if: ${{ github.ref == 'refs/heads/main' && needs.tier-w.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -180,7 +180,7 @@ jobs:
     # ADR-068 §6: a dead machine is loud, never green — red when the newest
     # ledger entry is older than 48 hours. Hosted; reads only.
     if: ${{ vars.MAOS_PERF_RUNNER_ENABLED == 'true' && github.event_name == 'schedule' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/checkout@v5

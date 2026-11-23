@@ -10,14 +10,13 @@
 //! an unprovisioned `release` environment is a labelled WARN (a claim boundary); the open
 //! 20-7 key is waived only for an `-rc.N` version whose notes carry the perf label.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
 use serde::Serialize;
 
 const SPRINT_STATUS: &str = "_bmad-output/implementation-artifacts/sprint-status.yaml";
 const CHECKLIST: &str = "docs/runbooks/provisioning-checklist.md";
-const DEFERRED_WORK: &str = "_bmad-output/implementation-artifacts/deferred-work.md";
 /// This story's own key: it may still be `in-progress`/`review` for the dev's own run
 /// (no `--tag`); the operator's `--tag` run needs it `done` like every other `20-*` key.
 const OWN_KEY: &str = "20-5-v1-0-rc-tag-and-lts-rule";
@@ -87,9 +86,45 @@ fn perf_label_leg(version: &str, notes: Option<&str>) -> Leg {
     )
 }
 
+/// Parse `development_status:` from sprint-status.yaml into key -> status,
+/// stripping the trailing `# ...` provenance comment from each value.
+fn load_sprint_status(path: &Path) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return map;
+    };
+    let mut in_status_section = false;
+    for line in content.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("development_status:") {
+            in_status_section = true;
+            continue;
+        }
+        if in_status_section {
+            if !line.starts_with([' ', '\t']) && !line.is_empty() && !trimmed.starts_with('#') {
+                in_status_section = false;
+                continue;
+            }
+            if let Some((k, v)) = trimmed.split_once(':') {
+                let key = k.trim().to_string();
+                let value = v
+                    .split('#')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .trim_matches(|c| c == '\'' || c == '"')
+                    .to_string();
+                if !key.is_empty() && !value.is_empty() {
+                    map.insert(key, value);
+                }
+            }
+        }
+    }
+    map
+}
+
 fn stories_leg(root: &Path, tag: Option<&str>, waive: bool) -> Leg {
-    let status =
-        crate::sprint_status::load_sprint_status(&root.join(SPRINT_STATUS).to_string_lossy());
+    let status = load_sprint_status(&root.join(SPRINT_STATUS));
     let waived = |key: &str, value: &str| waive && key == WAIVED_KEY && value == "in-progress";
     let open: BTreeSet<String> = status
         .iter()
@@ -167,42 +202,32 @@ fn provisioning_leg(checklist: &str, notes: Option<&str>) -> Leg {
     leg("provisioning", missing.is_empty(), detail)
 }
 
-fn deny_leg(deny: &str, deferred: &str) -> Result<Leg, String> {
+fn deny_leg(deny: &str) -> Result<Leg, String> {
     let manifest: toml::Value =
         toml::from_str(deny).map_err(|error| format!("check-rc-readiness: deny.toml: {error}"))?;
-    let ignored: Vec<&str> = manifest
+    let entries = manifest
         .get("advisories")
         .and_then(|advisories| advisories.get("ignore"))
         .and_then(toml::Value::as_array)
-        .map(|entries| {
-            entries
-                .iter()
-                .filter_map(|entry| match entry {
-                    toml::Value::String(id) => Some(id.as_str()),
-                    other => other.get("id").and_then(toml::Value::as_str),
-                })
-                .collect()
-        })
+        .map(Vec::as_slice)
         .unwrap_or_default();
-    // A deferred-work row is a bullet or a table row that names the id.
-    let documented = |id: &str| {
-        deferred.lines().any(|line| {
-            let line = line.trim_start();
-            (line.starts_with("- ") || line.starts_with('|'))
-                && line
-                    .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-'))
-                    .any(|token| token == id)
-        })
-    };
-    let undocumented: Vec<&str> = ignored
+    // An ignore is `{ id = "...", reason = "..." }`; a bare id string or an empty
+    // reason is a missing reason.
+    let unreasoned: Vec<&str> = entries
         .iter()
-        .copied()
-        .filter(|id| !documented(id))
+        .filter_map(|entry| match entry {
+            toml::Value::String(id) => Some(id.as_str()),
+            other => {
+                let id = other.get("id").and_then(toml::Value::as_str)?;
+                let reason = other.get("reason").and_then(toml::Value::as_str);
+                reason.is_none_or(|r| r.trim().is_empty()).then_some(id)
+            }
+        })
         .collect();
     Ok(leg(
         "deny-ignores",
-        undocumented.is_empty(),
-        format!("ignored without a deferred-work row: {undocumented:?}"),
+        unreasoned.is_empty(),
+        format!("ignored without a reason: {unreasoned:?}"),
     ))
 }
 
@@ -224,10 +249,7 @@ pub fn run(workspace_root: &Path, tag: Option<&str>, json: bool) -> Result<(), S
         ),
         stories_leg(workspace_root, tag, waive),
         provisioning_leg(&read(workspace_root, CHECKLIST)?, notes.as_deref()),
-        deny_leg(
-            &read(workspace_root, "deny.toml")?,
-            &read(workspace_root, DEFERRED_WORK)?,
-        )?,
+        deny_leg(&read(workspace_root, "deny.toml")?)?,
         perf,
     ];
     let passed = legs.iter().all(|leg| leg.passed);

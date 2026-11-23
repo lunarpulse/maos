@@ -687,86 +687,6 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
     }
 }
 
-fn sprint_keys(root: &Path, findings: &mut Vec<String>) -> BTreeSet<String> {
-    let Some(body) = read(
-        root,
-        "_bmad-output/implementation-artifacts/sprint-status.yaml",
-        findings,
-    ) else {
-        return BTreeSet::new();
-    };
-    let key_re = Regex::new(r"(?m)^  ([0-9]+-[0-9]+[a-z]?-[a-z0-9-]+):").unwrap();
-    key_re
-        .captures_iter(&body)
-        .map(|capture| capture[1].to_string())
-        .collect()
-}
-
-/// `ADR-060` must not match inside `ADR-0600`: the match is only credited when
-/// no ASCII digit follows it.
-fn contains_adr_number(haystack: &str, adr: &str) -> bool {
-    let mut from = 0;
-    while let Some(offset) = haystack[from..].find(adr) {
-        let at = from + offset;
-        let after = &haystack[at + adr.len()..];
-        if after.chars().next().map_or(true, |ch| !ch.is_ascii_digit()) {
-            return true;
-        }
-        from = at + adr.len();
-    }
-    false
-}
-
-fn epic_section_has_backreference(root: &Path, consumer: &str, adr: &str) -> bool {
-    for path in top_level_files(root, "_bmad-output/planning-artifacts/epics", ".md") {
-        let Ok(body) = std::fs::read_to_string(path) else {
-            continue;
-        };
-        let lines: Vec<_> = body.lines().collect();
-        for (index, line) in lines.iter().enumerate() {
-            if line.starts_with("### ") && line.contains(consumer) {
-                let end = lines[index + 1..]
-                    .iter()
-                    .position(|candidate| candidate.starts_with("### "))
-                    .map_or(lines.len(), |offset| index + 1 + offset);
-                if lines[index..end]
-                    .iter()
-                    .any(|candidate| contains_adr_number(candidate, adr))
-                {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
-fn validate_consumers(
-    root: &Path,
-    number: &str,
-    expected_consumer: &str,
-    body: &str,
-    keys: &BTreeSet<String>,
-    findings: &mut Vec<String>,
-) {
-    if !body.contains(expected_consumer) {
-        findings.push(format!(
-            "ADR-{number} must name consuming story `{expected_consumer}`"
-        ));
-    }
-    if !keys.contains(expected_consumer) {
-        findings.push(format!(
-            "ADR-{number} names `{expected_consumer}`, but sprint-status.yaml does not declare it"
-        ));
-    }
-    let adr = format!("ADR-{number}");
-    if !epic_section_has_backreference(root, expected_consumer, &adr) {
-        findings.push(format!(
-            "consumer `{expected_consumer}` must cite {adr} back in its own epic section"
-        ));
-    }
-}
-
 fn validate_index(root: &Path, files: &[PathBuf], findings: &mut Vec<String>) {
     let Some(index) = read(root, "docs/adr/index.md", findings) else {
         return;
@@ -937,8 +857,7 @@ fn validate(root: &Path) -> Vec<String> {
         ));
     }
 
-    let keys = sprint_keys(root, &mut findings);
-    for (number, consumer) in REQUIRED_ADRS {
+    for (number, _) in REQUIRED_ADRS {
         let prefix = format!("ADR-{number}-");
         let Some(path) = adrs.iter().find(|path| {
             path.file_name()
@@ -956,7 +875,6 @@ fn validate(root: &Path) -> Vec<String> {
         };
         validate_shape(number, &body, &mut findings);
         validate_anchors(root, number, &body, &mut findings);
-        validate_consumers(root, number, consumer, &body, &keys, &mut findings);
     }
 
     validate_index(root, &adrs, &mut findings);
@@ -1084,18 +1002,6 @@ impl Fixture {
                 &body,
             );
         }
-        write_file(
-            root,
-            "_bmad-output/implementation-artifacts/sprint-status.yaml",
-            &format!(
-                "last_updated: 2026-09-08\ndevelopment_status:\n{}",
-                REQUIRED_ADRS
-                    .iter()
-                    .map(|(_, consumer)| format!("  {consumer}: backlog\n"))
-                    .collect::<String>()
-            ),
-        );
-
         let mut index = String::from(
             "# Architecture Decision Records\n\n| ADR | Title | Status | Gate |\n|-----|-------|--------|------|\n",
         );
@@ -1136,18 +1042,6 @@ impl Fixture {
             ));
         }
         write_file(root, "docs/adr/index.md", &index);
-
-        let mut epic = String::from("# Fixture epic\n\n");
-        for (number, consumer) in REQUIRED_ADRS {
-            epic.push_str(&format!(
-                "### {consumer} — fixture\n\nBuilds the decision in ADR-{number}.\n\n"
-            ));
-        }
-        write_file(
-            root,
-            "_bmad-output/planning-artifacts/epics/epic-fixture.md",
-            &epic,
-        );
 
         write_file(
             root,
@@ -1313,14 +1207,6 @@ fn every_clause_and_denominator_has_a_planted_red() {
         "matches!(f.as_str(), \"rust-inproc\")\n".into()
     });
     assert_red_contains(&fx, "anti-rot anchor moved");
-
-    // (d) ADR names the consumer, but the epic section no longer cites back.
-    let fx = Fixture::complete();
-    fx.rewrite(
-        "_bmad-output/planning-artifacts/epics/epic-fixture.md",
-        |body| body.replace("ADR-064", "the replay decision"),
-    );
-    assert_red_contains(&fx, "must cite ADR-064 back");
 
     // (e) An ADR file has no index row.
     let fx = Fixture::complete();

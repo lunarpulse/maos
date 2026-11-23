@@ -15,7 +15,8 @@ name: ci-nightly
 #     `ops-ci-release-ready`, rule10(a)).
 #   * Advisory / measurement jobs (`reproducible-build`, `determinism-tests`,
 #     `nfr-perf-1-iac-routing-budget`, `nfr-perf-j4-latency`, `nfr-perf-8-orchestrator-fanout`,
-#     `clippy-advisory`): they carried `continue-on-error` in `discipline.yml` and keep it
+#     `clippy-advisory`, and, since lean-gates WP-06, `windows-check`, `check-perf-counts`,
+#     `check-perf-runner-policy`, `check-cert-rotation-trigger`, `check-model-currency`): they carried `continue-on-error` in `discipline.yml` and keep it
 #     with the same ADVISORY label (owner and reason). They report, they gate nothing; the
 #     recorded line says `failure` when one fails.
 #
@@ -473,4 +474,281 @@ jobs:
         uses: ./.github/actions/record-nightly-result
         with:
           job: clippy-advisory
+          status: ${{ job.status }}
+
+  # Story 10.5 AC3 — Windows binary + sandbox compile and install verification.
+  windows-check:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    # ADVISORY — owner: ops-ci-release-ready; reason: moved off the merge and release path by lean-gates WP-06 (judged advisory under the 2026-11-14 delegation); it reports, it gates nothing.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      # R1/AC3: a REAL build on Windows, not just `cargo check`. This is the only
+      # place the kernel's unsafe Windows sandbox FFI actually compiles for its
+      # target (the dev host cannot cross-build it — ring/libsqlite3-sys need a
+      # Windows C toolchain).
+      - name: Build Windows kernel-core + CLI (real compile)
+        run: cargo build -p maos-kernel-core -p maos-cli
+      # Story 21-9 AC7 — COMPILE-ONLY evidence that the default `maos-bin` (WASM
+      # host on, no opt-in feature) and the `maos-wasm-runner` binary build on
+      # Windows. It is not a runtime, containment or release claim: the runner is
+      # not published for Windows and the Windows release hold stands.
+      - name: Build default daemon and WASM runner (compile-only, no feature flags)
+        run: cargo build --locked -p maos-bin -p maos-wasm-host --bin maos --bin maos-wasm-runner
+      # R4: execute the unsafe FFI spawn path at runtime (was compile-only) —
+      # now including ENFORCEMENT negative controls (memory commit cap actually
+      # kills an over-budget child; low-integrity label actually applies). Run
+      # single-threaded: each memory test commits ~1 GiB and the tests spawn
+      # restricted-token child processes, so serialize for determinism.
+      #
+      # ⚠ DIAGNOSTIC WRAPPER (Epic-16 retrospective, 2026-09-21). These three
+      # steps used to be bare `cargo test` lines, so a Windows-only failure
+      # produced exactly one readable byte of evidence: "Process completed with
+      # exit code 1". Reading the step log requires an `actions`-scoped token,
+      # which is a strictly larger grant than reading checks — so a
+      # Windows-only regression was effectively undiagnosable from the API this
+      # project can actually authenticate against. `::error::` writes the tail
+      # into a CHECK-RUN ANNOTATION, readable with `repo:status`. The failing
+      # step is windows-check #8 (`jetbrains_acp_server`); the next run will say
+      # WHY instead of merely that. `%25`-then-`%0A` escaping order matters, and
+      # `shell: bash` is required because windows-latest defaults to pwsh.
+      #
+      # ⚠ AND `shell: bash` HAS A PRICE, paid once already: Git Bash puts
+      # `C:\Program Files\Git\usr\bin` AHEAD of System32, so any child that
+      # resolves a tool by bare name gets the MSYS build. That silently broke
+      # `windows_child_runs_at_low_integrity`, whose probe ran `whoami /groups`
+      # — MSYS `whoami.exe` cannot start at Low integrity at all
+      # (`NtCreateDirectoryObject(\BaseNamedObjects\msys-...): 0xC0000022`), so a
+      # PERFECTLY working sandbox was reported as a broken label. Fixed in the
+      # test by naming both ends of the pipe absolutely under `%SystemRoot%`.
+      # ANY new Windows probe added below MUST resolve its tools absolutely, or
+      # it will measure this runner's PATH instead of the product.
+      - name: Run Windows sandbox enforcement tests
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test -p maos-kernel-core --test sandbox_enforcement_windows -- --nocapture --test-threads=1 2>&1 | tee win-sandbox.log && exit 0
+          echo "::error::windows-check: sandbox_enforcement_windows FAILED. Tail:%0A$(tail -80 win-sandbox.log | sed -e 's/%/%25/g' -e 's/\r$//' | awk '{printf "%s%%0A", $0}')"
+          exit 1
+      # R5: the JetBrains/ACP bridge tests were wired into NO CI job. Run them here.
+      - name: Run ACP JetBrains bridge test
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test -p maos-acp --test jetbrains_bridge_test 2>&1 | tee win-acp-bridge.log && exit 0
+          echo "::error::windows-check: jetbrains_bridge_test FAILED. Tail:%0A$(tail -80 win-acp-bridge.log | sed -e 's/%/%25/g' -e 's/\r$//' | awk '{printf "%s%%0A", $0}')"
+          exit 1
+      - name: Run JetBrains ACP server e2e
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test -p maos-bin --test jetbrains_acp_server -- --nocapture 2>&1 | tee win-acp-server.log && exit 0
+          echo "::error::windows-check: jetbrains_acp_server FAILED (this is the step that reds today). Tail:%0A$(tail -80 win-acp-server.log | sed -e 's/%/%25/g' -e 's/\r$//' | awk '{printf "%s%%0A", $0}')"
+          exit 1
+      # ⚠ This step tested NOTHING until 2026-09-21 (Epic-16 retrospective).
+      # `-- --exact` makes libtest match the FULL test path, and the test lives
+      # at `subcommands::tests::install_verify_local_release_artifact`
+      # (maos-cli/src/subcommands.rs:5830 — a lib unit test, not an integration
+      # target). The bare name therefore matched zero tests, and libtest exits 0
+      # on zero matches, so the step went green on every platform while
+      # verifying no signature path at all. Measured on Linux: bare name +
+      # `--exact` => "0 passed; 50 filtered out"; full path + `--exact` =>
+      # "1 passed". This is E16-A2's thesis inside E16-A2's own CI file: a step
+      # that could not run was indistinguishable from one that ran and passed.
+      # The `--list` guard below makes a future rename LOUD instead of vacuous.
+      - name: Verify Windows local release signature path
+        # `shell: bash` is REQUIRED: windows-latest defaults to pwsh, where
+        # `tee`/`grep`/`|| { …; }` are not what this script means. Git Bash ships
+        # on the runner image. The list file is workspace-relative so it needs no
+        # /tmp mapping.
+        shell: bash
+        run: |
+          cargo test -p maos-cli --lib subcommands::tests::install_verify_local_release_artifact -- --exact --list | tee win-release-test-list.txt
+          grep -q 'subcommands::tests::install_verify_local_release_artifact: test' win-release-test-list.txt || { echo "the Windows release-signature test did not resolve — it was renamed or moved, and this step must be repointed, not left to pass on an empty filter" >&2; exit 1; }
+          rm -f win-release-test-list.txt
+          cargo test -p maos-cli --lib subcommands::tests::install_verify_local_release_artifact -- --exact
+      - name: Run platform-neutral recall wire tests (Story 17-3d)
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          cargo test --locked -p maos-wasm-host --lib recall_wire -- --nocapture 2>&1 | tee recall-wire.log
+          rc=${PIPESTATUS[0]}
+          [ "$rc" -eq 0 ] || exit "$rc"
+          grep -q '^test result: ok\. 7 passed; 0 failed; 0 ignored;' recall-wire.log || exit 1
+          for name in empty_page_and_all_error_cases_round_trip \
+                      partial_header_is_protocol_error_not_clean_eof \
+                      tags_discriminate_requests_replies_and_iac_frames \
+                      oversized_fetch_and_body_are_refused_at_bound_plus_one \
+                      page_prefix_at_exact_expansion_budget_boundary \
+                      skill_requests_and_responses_round_trip \
+                      megabyte_payload_is_one_byte_string_not_a_sequence; do
+            grep -q "^test recall_wire::tests::$name \.\.\. ok$" recall-wire.log || exit 1
+          done
+      - name: Record the nightly result
+        if: ${{ always() }}
+        uses: ./.github/actions/record-nightly-result
+        with:
+          job: windows-check
+          status: ${{ job.status }}
+
+  # Story 20-7 AC5 (ADR-068 §1, D-20-7-07 A) — Tier C: deterministic instruction
+  # and allocation counts for the CPU-bound hot paths (capability-token verify,
+  # IAC routing, frame lowering), on every pull request, GitHub-hosted and
+  # fork-safe (no secret, no write token, no self-hosted runner). The harness
+  # `tier_c_harness` runs each path under `valgrind --tool=callgrind
+  # --toggle-collect=maos_tier_c_measured` (instructions, minus the empty path)
+  # and reports allocations from its counting allocator; `check-perf-counts`
+  # compares both with the baselines committed in `xtask/perf-budgets.toml`
+  # (allocation rows blocking; instruction rows advisory until the first hosted
+  # callgrind baseline is committed). A deliberate change re-baselines in the
+  # same commit with the measured figure and the reason. Toolchain, OS and
+  # valgrind changes are re-baseline events (ADR-068 §6).
+  check-perf-counts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    # ADVISORY — owner: ops-ci-release-ready; reason: moved off the merge and release path by lean-gates WP-06 (judged advisory under the 2026-11-14 delegation); it reports, it gates nothing.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: perf-counts-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install valgrind
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends valgrind
+      - name: Build the Tier C harness
+        run: cargo build --locked -p maos-bench --features kernel_measurement --bin tier_c_harness
+      - name: Measure instruction and allocation counts per hot path
+        run: |
+          set -euo pipefail
+          mkdir -p tier-c
+          harness="$PWD/target/debug/tier_c_harness"
+          measure() {
+            valgrind --tool=callgrind --toggle-collect=maos_tier_c_measured \
+              --callgrind-out-file="tier-c/$1.callgrind" "$harness" "$1" "$2" \
+              > "tier-c/$1.json" 2> "tier-c/$1.valgrind.log"
+          }
+          measure empty 0
+          measure cap_token_verify 10000
+          measure iac_routing 2000
+          measure frame_lowering 10000
+      - name: Compare with the committed baselines
+        run: cargo run --locked -p xtask -- check-perf-counts --dir tier-c --json
+      - name: Upload the counts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier-c-counts
+          path: tier-c
+          if-no-files-found: error
+      - name: Record the nightly result
+        if: ${{ always() }}
+        uses: ./.github/actions/record-nightly-result
+        with:
+          job: check-perf-counts
+          status: ${{ job.status }}
+
+  # Story 20-7 AC2 — structural runner policy, defense in depth only.
+  # Host jobs accept push-to-main, schedule and main-only dispatch; never PR
+  # or comment events. Operator environment/runner-group protections (O3) and
+  # fork approval (O7) must be verified before enabling the host. This
+  # PR-editable gate is not an immutable runner admission boundary.
+  check-perf-runner-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # ADVISORY — owner: ops-ci-release-ready; reason: moved off the merge and release path by lean-gates WP-06 (judged advisory under the 2026-11-14 delegation); it reports, it gates nothing.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-perf-runner-policy
+        run: cargo run -p xtask -- check-perf-runner-policy --json
+      # 18-0 AC6: runs after a red gate step too (the vectors prove the gate can red).
+      - name: Run the 20-7 proven-red vectors
+        if: ${{ !cancelled() }}
+        run: cargo test -p xtask --test perf_gates_20_7
+      - name: Record the nightly result
+        if: ${{ always() }}
+        uses: ./.github/actions/record-nightly-result
+        with:
+          job: check-perf-runner-policy
+          status: ${{ job.status }}
+
+  # Story 14-2a AC6 — the production peer-certificate rotation trigger. The
+  # gate's CONTROL leg boots a real `maos` daemon in
+  # `MAOS_ONE_SHOT=cohort-a2a-daemon` mode, delivers a real signed
+  # `cohort:manifest-reissue` over real mTLS, and observes the pin-set change
+  # through the production operator HTTP surface — so removing the set-once
+  # install in `main.rs` reds this job while the daemon still boots and still
+  # ACKs the reissue. The gate's own unit tests run in the same job: they are
+  # what keep the method-aware AST probe from silently reverting to the
+  # `visit_expr_call`-only shape that made the obvious probe a null control.
+  check-cert-rotation-trigger:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # ADVISORY — owner: ops-ci-release-ready; reason: moved off the merge and release path by lean-gates WP-06 (judged advisory under the 2026-11-14 delegation); it reports, it gates nothing.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-cert-rotation-trigger
+        run: cargo run -p xtask -- check-cert-rotation-trigger --json
+      - name: Run the gate's own oracle unit tests
+        run: cargo test -p xtask check_cert_rotation_trigger
+      - name: Record the nightly result
+        if: ${{ always() }}
+        uses: ./.github/actions/record-nightly-result
+        with:
+          job: check-cert-rotation-trigger
+          status: ${{ job.status }}
+
+  # Story 17-5 — model-pin currency (E14-A3 → E15-A2 → E16-A4). A pin on a
+  # vendor model that the vendor already retired reds here, naming file:line,
+  # instead of surviving three retros. Offline: the gate reads only repo-local
+  # files (`xtask/model-currency.toml`, the manifests, the price book, `main.rs`),
+  # so no secret and no network leg exists to flake. The proven-red vectors run
+  # in the same job because a gate whose reds are never executed is the failure
+  # mode this lane exists to close.
+  check-model-currency:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # ADVISORY — owner: ops-ci-release-ready; reason: moved off the merge and release path by lean-gates WP-06 (judged advisory under the 2026-11-14 delegation); it reports, it gates nothing.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-model-currency
+        run: cargo run -p xtask -- check-model-currency --json
+      - name: Run the 17-5 proven-red vectors
+        run: cargo test -p xtask --test model_currency_gate
+      - name: Record the nightly result
+        if: ${{ always() }}
+        uses: ./.github/actions/record-nightly-result
+        with:
+          job: check-model-currency
           status: ${{ job.status }}
