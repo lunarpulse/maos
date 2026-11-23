@@ -640,6 +640,8 @@ struct DoorInner {
     /// Story 22-2 (D-22-2-02 A) — the live Transparency Log file the writability probe opens
     /// its own connection to. Set once by the composition root; unset reads as not writable.
     audit_store_path: std::sync::OnceLock<std::path::PathBuf>,
+    /// Story 22-4 — the Host's directed tasks; set once by the composition root.
+    directed_tasks: Mutex<Option<Arc<crate::directed_task::DirectedTasks>>>,
 }
 
 /// Longest the writability probe waits for the audit store's write lock. Well under the
@@ -742,12 +744,23 @@ impl OperatorDoor {
             repin: Arc::new(crate::repin_door::RepinControl::new()),
             quarantine: Mutex::default(),
             audit_store_path: std::sync::OnceLock::new(),
+            directed_tasks: Mutex::default(),
         }))
     }
 
     /// Story 22-2 — name the live audit store for the `/v1/daemon` writability probe.
     pub fn set_audit_store_path(&self, path: std::path::PathBuf) {
         let _ = self.0.audit_store_path.set(path);
+    }
+
+    /// Story 22-4 — install the Host's directed-task registry (the `ask` verb and
+    /// `GET /v1/tasks/{id}`). Uninstalled, every ask is a typed `spirit_not_directable`.
+    pub fn set_directed_tasks(&self, tasks: Arc<crate::directed_task::DirectedTasks>) {
+        *self
+            .0
+            .directed_tasks
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = Some(tasks);
     }
 
     pub fn set_forget_pump(&self, pump: &Arc<crate::hook_pump::HookPump>) {
@@ -878,7 +891,6 @@ impl DoorInner {
         }
     }
 
-    #[cfg(feature = "network")]
     fn conflict(code: &str, detail: impl Into<String>) -> OperatorOutcome {
         OperatorOutcome::Conflict {
             code: code.into(),
@@ -1001,6 +1013,14 @@ impl DoorInner {
                 pick,
                 work_mode,
             } => self.option_pick_command(&spirit_id, pick, &work_mode).await,
+            OperatorCommand::Ask {
+                spirit_id,
+                text,
+                idempotency_key,
+            } => {
+                self.ask_command(&spirit_id, &text, idempotency_key.as_deref())
+                    .await
+            }
             OperatorCommand::RevokeToken { token_id } => self.revoke_token_command(&token_id).await,
             OperatorCommand::ImportRevocations { crl } => {
                 self.import_revocations_command(&crl).await
@@ -1166,6 +1186,12 @@ impl DoorInner {
         }
         if verb == "unload" {
             self.private_ops.forget_promotion_set(spirit_id, pid);
+        }
+        if verb == "unload" {
+            // Story 22-4 (AC4) — an unloaded Spirit's queued tasks end `failed/spirit_unloaded`.
+            if let Some(tasks) = installed(&self.directed_tasks) {
+                tasks.spirit_unloaded(spirit_id);
+            }
         }
 
         if let Err(error) = self
@@ -2817,6 +2843,119 @@ impl DoorInner {
         }))
     }
 
+    /// Story 22-4 (D-22-4-05 A) — `POST /v1/spirits/{id}/ask`: accept one task for a running,
+    /// directable Spirit into its bounded queue and return its id. Every refusal is typed and
+    /// mints nothing; the answer is read later through `GET /v1/tasks/{id}`.
+    async fn ask_command(
+        &self,
+        spirit_id: &str,
+        text: &str,
+        idempotency_key: Option<&str>,
+    ) -> OperatorOutcome {
+        let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
+            return Self::spirit_not_loaded(spirit_id);
+        };
+        if text.trim().is_empty() {
+            return OperatorOutcome::Invalid {
+                code: "invalid_task".into(),
+                detail: "task text must not be empty".into(),
+            };
+        }
+        let Some(tasks) = installed(&self.directed_tasks) else {
+            return Self::not_directable(spirit_id, "this daemon serves no directed tasks");
+        };
+        use maos_kernel_core::scheduler::control_block::ScbLifecycleState as Scb;
+        if self.capability.is_quarantined(pid) {
+            return Self::conflict(
+                "spirit_not_running",
+                format!("spirit '{spirit_id}' is Quarantined; release it before directing a task"),
+            );
+        }
+        match self.scb_state(spirit_id) {
+            Some(Scb::Running) => {}
+            other => {
+                return Self::conflict(
+                    "spirit_not_running",
+                    match other {
+                        Some(state) => {
+                            format!("spirit '{spirit_id}' is {state:?}, not Running")
+                        }
+                        None => format!("spirit '{spirit_id}' has no control block"),
+                    },
+                )
+            }
+        }
+        if !tasks.is_directable(spirit_id) {
+            let form = if self
+                .private_ops
+                .spawned_artifact_sha256(spirit_id)
+                .is_some()
+            {
+                "a single-session component (`maos run`), not an installed cast member"
+            } else if spirit_id.starts_with("worker-") {
+                "a cli_wrapper Worker"
+            } else {
+                "a native class"
+            };
+            return Self::not_directable(spirit_id, form);
+        }
+        let accepted = {
+            let (tasks, spirit_id, text, key) = (
+                Arc::clone(&tasks),
+                spirit_id.to_owned(),
+                text.to_owned(),
+                idempotency_key.map(str::to_owned),
+            );
+            // The accept row and the key lookup read and write the Transparency Log.
+            match tokio::task::spawn_blocking(move || {
+                tasks.accept(&spirit_id, &text, key.as_deref())
+            })
+            .await
+            {
+                Ok(accepted) => accepted,
+                Err(error) => {
+                    return OperatorOutcome::Failed {
+                        code: "task_accept_failed".into(),
+                        detail: error.to_string(),
+                    }
+                }
+            }
+        };
+        match accepted {
+            Ok(accepted) => OperatorOutcome::Completed(serde_json::json!({
+                "task_id": accepted.task_id,
+                "spirit_id": spirit_id,
+                "state": accepted.state.as_str(),
+                "replayed": accepted.replayed,
+            })),
+            Err(crate::directed_task::AcceptError::NotDirectable) => {
+                Self::not_directable(spirit_id, "no task pump serves it")
+            }
+            Err(crate::directed_task::AcceptError::QueueFull { scope, limit }) => Self::conflict(
+                "task_queue_full",
+                format!("the {scope} task queue holds {limit} queued tasks; retry later"),
+            ),
+            Err(crate::directed_task::AcceptError::ShuttingDown) => Self::conflict(
+                "host_stopping",
+                "the Host is stopping and accepts no new task; retry on its successor",
+            ),
+            Err(crate::directed_task::AcceptError::Log(error)) => OperatorOutcome::Failed {
+                code: "task_log_failed".into(),
+                detail: format!("{error}; nothing was queued"),
+            },
+        }
+    }
+
+    fn not_directable(spirit_id: &str, form: &str) -> OperatorOutcome {
+        Self::conflict(
+            "spirit_not_directable",
+            format!(
+                "spirit '{spirit_id}' is {form}; only installed WASM-component cast members \
+                 answer a directed task"
+            ),
+        )
+    }
+
     // ── shared helpers ───────────────────────────────────────────────────
 
     fn scb_state(
@@ -3007,6 +3146,11 @@ impl DoorInner {
             OperatorCommand::ForgetMemory { principal, reason } => {
                 Some(Self::forget_replay_key(principal, reason.as_deref()))
             }
+            OperatorCommand::Ask {
+                spirit_id,
+                idempotency_key: Some(key),
+                ..
+            } => Some(crate::directed_task::ask_replay_key(spirit_id, key)),
             _ => None,
         };
         let mut outcome = self.dispatch(command, pread).await;
@@ -3032,6 +3176,13 @@ impl DoorInner {
             | OperatorOutcome::Invalid { code, .. }
             | OperatorOutcome::Failed { code, .. } => code.clone(),
         };
+        let ask_receipt = match (&outcome, verb) {
+            (OperatorOutcome::Completed(report), "ask") => Some((
+                report["task_id"].as_str().map(str::to_owned),
+                report["replayed"] == true,
+            )),
+            _ => None,
+        };
         let mut completed_report = None;
         let mut replayed_operation_id = None;
         let correlation = match (replay_key, &mut outcome) {
@@ -3050,6 +3201,15 @@ impl DoorInner {
                     Some(key)
                 }
             }
+            // Story 22-4 (D-22-4-07 A) — a first accept writes the key as the row's
+            // correlation; a replay writes none, so the key keeps naming the first task.
+            (Some(key), OperatorOutcome::Completed(_))
+                if ask_receipt
+                    .as_ref()
+                    .is_some_and(|(task_id, replayed)| task_id.is_some() && !replayed) =>
+            {
+                Some(key)
+            }
             _ => None,
         };
         let intent = format!("operator.{verb}.{operation_id}:{outcome_label}");
@@ -3063,6 +3223,11 @@ impl DoorInner {
             completed_report: Option<&'a [u8]>,
             #[serde(skip_serializing_if = "Option::is_none")]
             replayed_operation_id: Option<&'a str>,
+            /// Story 22-4 — the task an `ask` accepted (or, replayed, the earlier one).
+            #[serde(skip_serializing_if = "Option::is_none")]
+            task_id: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            replayed: Option<bool>,
         }
         // Stream the byte slice; do not allocate a JSON Value for every byte.
         let bytes = match serde_json::to_vec(&CompletionReceipt {
@@ -3072,6 +3237,8 @@ impl DoorInner {
             outcome: &outcome_label,
             completed_report: completed_report.as_deref(),
             replayed_operation_id,
+            task_id: ask_receipt.as_ref().and_then(|(id, _)| id.as_deref()),
+            replayed: ask_receipt.as_ref().map(|(_, replayed)| *replayed),
         }) {
             Ok(bytes) => bytes,
             Err(error) => panic!("MAOS I2 operator completion serialization failed: {error}"),
@@ -3227,6 +3394,12 @@ impl OperatorCommandPort for OperatorDoor {
         self.0.repin.peer_pins()
     }
 
+    fn task_status(&self, task_id: &str) -> Option<maos_control::TaskStatusRow> {
+        installed(&self.0.directed_tasks)?
+            .get(task_id)
+            .map(|record| record.to_row())
+    }
+
     fn applied_revocations(&self) -> Vec<maos_control::RevocationRow> {
         let reports =
             self.0.crl_reports.lock().expect(
@@ -3273,6 +3446,8 @@ fn command_verb(command: &OperatorCommand) -> &'static str {
         // `operator.spirit-pick.<op>:<outcome>`.
         OperatorCommand::OrchestratorRecall { .. } => "orchestrator-recall",
         OperatorCommand::OptionPick { .. } => "spirit-pick",
+        // Story 22-4 — `operator.ask.<operation_id>:<outcome>`; the receipt names the task.
+        OperatorCommand::Ask { .. } => "ask",
         OperatorCommand::RevokeToken { .. } => "revoke-token",
         OperatorCommand::ImportRevocations { .. } => "revocations-import",
         OperatorCommand::ForgetMemory { .. } => "forget",

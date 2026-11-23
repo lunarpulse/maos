@@ -115,6 +115,22 @@
 | 7 | Reasoning-model handling at `v1.0.0` is manifest-pin serving (S1) and the Anthropic 5.5 compatibility stop-gap. | Model profiles, the intent and `Applied` record, or the reasoning-token breakdown. | The reasoning-model adapter epic (Epic 27; its key is filed at its preflight). |
 | 8 | Model pins are provider-scoped: a Spirit may call any model admitted for its provider. | That a Spirit is confined to the model its manifest pins. | The D-row in story S4 of the reasoning-model adapter epic (Epic 27; key filed at its preflight). |
 
+## Claim boundaries — directed tasks (Story 22-4; in force from the minor release that ships it)
+
+> Source: `22-4-directed-task-ingress` (D-22-4-10 A). Not part of the `v1.0.0` GA ledger above; the
+> release number is the one the epic's open numbering D-row assigns to the release that ships 22-4. A
+> boundary is violated by over-claiming, not by shipping.
+
+| # | Boundary | What the release may NOT claim | Successor |
+|---|---|---|---|
+| B1 | One operator: `maosctl ask` is authorized by the single door bearer (`control.json`). The task record carries `origin = "door"` and `actor = "director"`; there is no operator principal and no policy decision per verb (FR70, NFR-Ops-13). | That a directed task is attributable to a named operator, or that a Cedar decision gated it. | `24-1-operator-principal-and-door-authz` (replaces `actor` with the principal and puts the decision before `submit`). |
+| B2 | Loopback only: the door binds loopback and nothing else listens. No caller on another machine can direct a task. | That the incident tool of J5 can hand a Spirit a task from off-host in one authenticated call. | `23-5-a2a-v1-agent-card-and-jsonrpc-binding` (an A2A request enters the same task registry only after `handle_intake`'s consent chain, with its own origin). |
+| B3 | Only installed WASM-component cast members are directable. A native class (Mira, Nash, the Butler, the Observer, the Researcher), a `cli_wrapper` Worker and a single-session `maos run <component>` Spirit refuse `ask` with a typed 409 `spirit_not_directable` that names the form. | That every Spirit in the standing cast answers `maosctl ask`. | `22-8-always-on-scene` (adds the native leg for Mira and Nash). |
+| B4 | No directable form can raise a halt: `EpistemicHalt` is kernel-reserved for a component, and a guest returns a halt only as a session end. The `halted` state reports a halt the kernel recorded on the target's pid while the task ran, and no component can produce one today. | That a directed task can end `halted` through a component's own decision, or that the halt leg is exercised end to end from a Spirit. | A future story that gives a component a halt producer; the registry's correlation (`halt_for_task`) is proven in-process with a real `HaltRegistry`. |
+| B5 | Delivery is at most once. Queued work is in memory: a stop (SIGTERM or SIGKILL) leaves every queued or running task `interrupted` and never re-runs it. An idempotency key is not crash-safe between the accept row and delivery: a crash after the task's accept row and before the door's completion row loses the key, and the retry is a new task (the same shape as row 10). | Exactly-once or crash-safe delivery, or that a queued task survives a restart. | Not scheduled; a boot-time reconciliation pass over accepted-without-completion rows, in the delegation recovery lane of row 10. |
+| B6 | The task text reaches the Spirit raw (as a shell request, with the success criteria `Answer the operator's shell message`). The `TaskAssign` row and `task show`'s `result` are the Transparency Log's redacted copy. | That a task is confidential from the Spirit, or that the redacted copy equals what the Spirit received (as row 17). | Not this lane. |
+| B7 | `maosctl task show` reads the live Transparency Log segment. A task whose rows were rotated out of it reads `task_not_found`. | That a task stays readable after the log rotates. | `22-6` (AC2 reads across segments). |
+
 ## GA-tag procedure (engineering exits green; Holds 1–2 no longer gate)
 
 > **OPERATOR RULING 2026-11-12:** Holds 1–2 are claim boundaries, not GA

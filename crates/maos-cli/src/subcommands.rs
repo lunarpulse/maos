@@ -15,12 +15,12 @@ use std::collections::HashMap;
 
 use crate::accessibility::ColorChoice;
 use crate::cli::{
-    A2aArgs, A2aOp, AuditFormat, AuditQuery, BackupArgs, BackupOp, ForgetArgs, GovernanceArgs,
-    GovernanceOp, HaltArgs, HaltOp, ImportArgs, InstallArgs, LegalHoldArgs, LegalHoldOp, LoadArgs,
-    MigrateArgs, MigrateOp, OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs,
-    PostureChoice, RepinArgs, RepinOp, ResolutionKindChoice, ResumeArgs, RevocationsArgs,
-    RevocationsOp, RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp, SpiritArgs, SpiritOp,
-    Subcommand, UninstallArgs, UpgradePolicyArg,
+    A2aArgs, A2aOp, AskArgs, AuditFormat, AuditQuery, BackupArgs, BackupOp, ForgetArgs,
+    GovernanceArgs, GovernanceOp, HaltArgs, HaltOp, ImportArgs, InstallArgs, LegalHoldArgs,
+    LegalHoldOp, LoadArgs, MigrateArgs, MigrateOp, OrchestratorArgs, OrchestratorOp, PauseArgs,
+    PostureArgs, PostureChoice, RepinArgs, RepinOp, ResolutionKindChoice, ResumeArgs,
+    RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp, SpiritArgs,
+    SpiritOp, Subcommand, TaskArgs, TaskOp, UninstallArgs, UpgradePolicyArg,
 };
 use crate::door_client::{self, DoorConfig, DoorError, DEFAULT_ROUTE_BUDGET, LONG_ROUTE_BUDGET};
 
@@ -57,6 +57,8 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::A2a(args) => dispatch_a2a(args),
         Subcommand::Agents => dispatch_agents(),
         Subcommand::Status => dispatch_status(),
+        Subcommand::Ask(args) => dispatch_ask(args),
+        Subcommand::Task(args) => dispatch_task(args),
     }
 }
 
@@ -251,6 +253,157 @@ fn dispatch_status() -> ExitCode {
             }
         },
     )
+}
+
+/// Story 22-4 (AC1, AC4) — `maosctl ask <spirit> "<text>" [--wait[=SECS]] [--key K]`.
+///
+/// The door answers at once with a task id (200) or a typed refusal; none of the refusals
+/// minted an id. `task_queue_full` is the "nothing accepted, retry" family, exit 75; every
+/// other refusal is exit 1 (the door's mapping). `--wait` polls `GET /v1/tasks/{id}`.
+fn dispatch_ask(args: &AskArgs) -> ExitCode {
+    let verb = "ask";
+    if let Some(code) = checked_id(verb, &args.spirit) {
+        return code;
+    }
+    if let Some(key) = &args.key {
+        if let Some(code) = checked_id(verb, key) {
+            return code;
+        }
+    }
+    let body = match serde_json::to_vec(&door_client::AskRequest {
+        text: args.text.clone(),
+        idempotency_key: args.key.clone(),
+    }) {
+        Ok(body) => body,
+        Err(error) => {
+            eprintln!("maosctl: {verb} — {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let spirit = args.spirit.as_str();
+    let wait = args.wait;
+    door_verb_mapped(
+        verb,
+        |config| {
+            let accepted = door_client::exchange(
+                config,
+                "POST",
+                &format!("/v1/spirits/{spirit}/ask"),
+                Some(("application/json", &body)),
+                DEFAULT_ROUTE_BUDGET,
+            )?;
+            Ok(match (wait, accepted.status) {
+                (Some(secs), 200) => wait_for_task(config, &accepted, secs)?,
+                _ => accepted,
+            })
+        },
+        |response| map_ask_response(verb, wait.is_some(), response),
+    )
+}
+
+/// Poll `GET /v1/tasks/{id}` until the task ends or `secs` run out. Returns the finished task
+/// object, or a synthetic 200 marker whose `state` is still `queued`/`running` when the wait
+/// ran out (mapped to exit 75 by [`map_ask_response`]).
+fn wait_for_task(
+    config: &DoorConfig,
+    accepted: &door_client::Response,
+    secs: u64,
+) -> Result<door_client::Response, DoorError> {
+    let task_id = accepted
+        .body_json()
+        .get("task_id")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
+        .unwrap_or_default();
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(secs);
+    loop {
+        let shown = door_client::exchange(
+            config,
+            "GET",
+            &format!("/v1/tasks/{task_id}"),
+            None,
+            DEFAULT_ROUTE_BUDGET,
+        )?;
+        let ended = shown.status != 200
+            || !matches!(
+                shown
+                    .body_json()
+                    .get("state")
+                    .and_then(serde_json::Value::as_str),
+                Some("queued" | "running")
+            );
+        if ended || std::time::Instant::now() >= until {
+            return Ok(shown);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+}
+
+/// Map the answer of `ask`. Without `--wait` a 200 body is the accepted task; with it, the
+/// body is the task object and only `completed` is success.
+fn map_ask_response(verb: &str, waited: bool, response: door_client::Response) -> ExitCode {
+    if response.status == 409 && response.error_parts().0 == "task_queue_full" {
+        let (code, detail) = response.error_parts();
+        eprintln!("maosctl: {verb} — {code}: {detail}; nothing was accepted; retry");
+        return ExitCode::from(75);
+    }
+    if response.status != 200 {
+        return door_client::map_response(verb, response);
+    }
+    let body = response.body_json();
+    if !waited {
+        return match body.get("task_id").and_then(serde_json::Value::as_str) {
+            Some(task_id) => {
+                println!("{task_id}");
+                ExitCode::SUCCESS
+            }
+            None => {
+                eprintln!("maosctl: {verb} — the door's answer carries no task_id");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    door_client::print_body(&response.body);
+    let state = body.get("state").and_then(serde_json::Value::as_str);
+    let reason = body
+        .get("reason")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("none");
+    match state {
+        Some("completed") => ExitCode::SUCCESS,
+        Some("queued" | "running") => {
+            eprintln!(
+                "maosctl: {verb} — the task is still {}; read it later with: maosctl task show <id>",
+                state.unwrap_or("unknown")
+            );
+            ExitCode::from(75)
+        }
+        other => {
+            eprintln!(
+                "maosctl: {verb} — the task ended {} (reason: {reason})",
+                other.unwrap_or("unknown")
+            );
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Story 22-4 — `maosctl task show <id>`: the task object, `task_not_found` (exit 1) otherwise.
+fn dispatch_task(args: &TaskArgs) -> ExitCode {
+    let TaskOp::Show { id } = &args.op;
+    let verb = "task show";
+    if let Some(code) = checked_id(verb, id) {
+        return code;
+    }
+    door_verb(verb, |config| {
+        door_client::exchange(
+            config,
+            "GET",
+            &format!("/v1/tasks/{id}"),
+            None,
+            DEFAULT_ROUTE_BUDGET,
+        )
+    })
 }
 
 /// Story 19-7 (AC3, D-19-7-01/02/03 A) — `maosctl a2a repin`: door-class

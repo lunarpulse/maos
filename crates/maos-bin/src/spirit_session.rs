@@ -184,18 +184,18 @@ impl ShellPort {
 
     /// Wait, within the bounded startup (Ready, then the startup probe, each one turn budget),
     /// for the session's own readiness signal; returns the admitted PID and live generation.
-    pub fn await_ready(&self) -> Result<(u32, u64), String> {
+    pub fn await_ready(&self) -> Result<(u32, u64), TurnError> {
         let until = Instant::now() + self.turn_budget * 2;
         let mut state = self.lock();
         loop {
             match state.phase {
                 Phase::Ready { pid, generation } => return Ok((pid, generation)),
-                Phase::Ended => return Err("session ended before it was ready".into()),
+                Phase::Ended => return Err(TurnError::StartupEnded),
                 Phase::Starting => {}
             }
             let remaining = until.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
-                return Err("session startup deadline exceeded".into());
+                return Err(TurnError::StartupDeadline);
             }
             state = self
                 .changed
@@ -205,8 +205,8 @@ impl ShellPort {
         }
     }
 
-    /// Queue one request before its frame is delivered. `id` is the host-minted frame ID of the
-    /// outgoing `TaskAssign`; the session binds only that exact inbound frame.
+    /// Queue one shell request before its frame is delivered. `id` is the host-minted frame ID
+    /// of the outgoing `TaskAssign`; the session binds only that exact inbound frame.
     pub fn arm(
         self: &Arc<Self>,
         id: [u8; 16],
@@ -214,20 +214,41 @@ impl ShellPort {
         pid: u32,
         generation: u64,
         deadline: Instant,
-    ) -> Result<ShellTurn, String> {
+    ) -> Result<ShellTurn, TurnError> {
+        self.arm_labelled(
+            maos_iac::adapter::mailbox::ReplyLabel::Shell,
+            id,
+            sender,
+            pid,
+            generation,
+            deadline,
+        )
+    }
+
+    /// [`Self::arm`] for a caller whose reply row the audit trail labels (Story 22-4).
+    pub fn arm_labelled(
+        self: &Arc<Self>,
+        label: maos_iac::adapter::mailbox::ReplyLabel,
+        id: [u8; 16],
+        sender: &str,
+        pid: u32,
+        generation: u64,
+        deadline: Instant,
+    ) -> Result<ShellTurn, TurnError> {
         let mut state = self.lock();
         match state.phase {
             Phase::Ready {
                 pid: live,
                 generation: current,
             } if live == pid && current == generation => {}
-            Phase::Ended => return Err("session ended".into()),
-            _ => return Err("session generation changed before the turn was queued".into()),
+            Phase::Ended => return Err(TurnError::SessionEnded),
+            _ => return Err(TurnError::SessionChanged),
         }
         if state.slot.is_some() {
-            return Err("a shell turn is already queued".into());
+            return Err(TurnError::Busy);
         }
-        let (route, receiver) = maos_iac::adapter::mailbox::shell_reply_route(
+        let (route, receiver) = maos_iac::adapter::mailbox::labelled_reply_route(
+            label,
             id,
             SpiritId::from(sender),
             pid,
@@ -246,6 +267,8 @@ impl ShellPort {
         Ok(ShellTurn {
             port: Arc::clone(self),
             id,
+            pid,
+            generation,
             deadline,
             receiver,
             finished,
@@ -292,11 +315,67 @@ impl ShellPort {
     }
 }
 
-/// The shell caller's end of one queued turn. Dropping it retires the request and closes the
+/// Why a queued turn produced no answer. `Display` is the text the shell REPL has always
+/// printed; [`Self::reason`] is the typed reason a directed task records (Story 22-4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TurnError {
+    /// The session ended before it signalled readiness.
+    StartupEnded,
+    /// The session did not signal readiness inside its bounded startup.
+    StartupDeadline,
+    /// The session had ended when the turn was queued.
+    SessionEnded,
+    /// The live pid/generation moved before the turn was queued.
+    SessionChanged,
+    /// Another turn already holds the port's one slot.
+    Busy,
+    /// The turn's absolute deadline passed.
+    DeadlineExceeded,
+    /// The session ended while the turn was in flight.
+    EndedDuring,
+    /// The session was swapped to another generation while the turn was in flight.
+    ChangedDuring,
+    /// The Spirit finished its turn without an accepted answer.
+    NoAnswer,
+}
+
+impl TurnError {
+    /// The typed task reason (`reason` of `GET /v1/tasks/{id}`).
+    pub fn reason(self) -> &'static str {
+        match self {
+            Self::StartupEnded | Self::SessionEnded | Self::EndedDuring => "session_ended",
+            Self::StartupDeadline | Self::DeadlineExceeded => "deadline_exceeded",
+            Self::SessionChanged | Self::ChangedDuring => "session_changed",
+            Self::Busy => "dispatch_refused",
+            Self::NoAnswer => "no_answer",
+        }
+    }
+}
+
+impl std::fmt::Display for TurnError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::StartupEnded => "session ended before it was ready",
+            Self::StartupDeadline => "session startup deadline exceeded",
+            Self::SessionEnded => "session ended",
+            Self::SessionChanged => "session generation changed before the turn was queued",
+            Self::Busy => "a shell turn is already queued",
+            Self::DeadlineExceeded => "turn deadline exceeded",
+            Self::EndedDuring | Self::ChangedDuring => {
+                "session ended or changed before the turn completed"
+            }
+            Self::NoAnswer => "spirit completed its turn without returning an answer",
+        })
+    }
+}
+
+/// The caller's end of one queued turn. Dropping it retires the request and closes the
 /// reply route, so nothing late can satisfy it.
 pub struct ShellTurn {
     port: Arc<ShellPort>,
     id: [u8; 16],
+    pid: u32,
+    generation: u64,
     deadline: Instant,
     receiver: maos_iac::adapter::mailbox::ShellReplyReceiver,
     finished: std::sync::mpsc::Receiver<()>,
@@ -309,26 +388,36 @@ impl ShellTurn {
 
     /// Hold the routed answer until the session reports the matching clean `TurnComplete`,
     /// then release it once. Timeout, session end or a turn with no accepted answer is an error.
-    pub fn wait(mut self) -> Result<String, String> {
+    pub fn wait(mut self) -> Result<String, TurnError> {
         let remaining = self.deadline.saturating_duration_since(Instant::now());
         match self.finished.recv_timeout(remaining) {
             // A clean turn observed past the turn's own deadline publishes nothing.
             Ok(()) if Instant::now() >= self.deadline => {
                 self.receiver.close();
-                Err("turn deadline exceeded".into())
+                Err(TurnError::DeadlineExceeded)
             }
             Ok(()) => self
                 .receiver
                 .try_recv()
                 .map(|answer| answer.result)
-                .ok_or_else(|| "spirit completed its turn without returning an answer".into()),
+                .ok_or(TurnError::NoAnswer),
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                 self.receiver.close();
-                Err("turn deadline exceeded".into())
+                Err(TurnError::DeadlineExceeded)
             }
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                 self.receiver.close();
-                Err("session ended or changed before the turn completed".into())
+                let moved = match self.port.lock().phase {
+                    Phase::Ready { pid, generation } => {
+                        pid != self.pid || generation != self.generation
+                    }
+                    _ => false,
+                };
+                Err(if moved {
+                    TurnError::ChangedDuring
+                } else {
+                    TurnError::EndedDuring
+                })
             }
         }
     }

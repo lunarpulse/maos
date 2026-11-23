@@ -321,6 +321,49 @@ root, so data under a legacy location stays readable in place and a migration pl
 is still consumed. `MAOS_MEMORY_ROOT` and `MAOS_REGISTRY_YANK_CURSOR_PATH` override all three. `maos purge`
 names every location.
 
+## Hand a Spirit a task
+
+`maosctl ask <spirit> "<text>"` hands a running, installed Spirit one task through the authenticated door and
+prints its task id at once. `maosctl task show <id>` reads the Spirit's answer, or the reason it gave none.
+The Host must be a `maos serve` (or `maos shell`) root whose cast includes the installed component:
+
+```sh
+id=$(maosctl ask researcher "Summarise yesterday's incident log")   # exit 0, prints a 26-character task id
+maosctl task show "$id"
+maosctl ask researcher "Summarise it again" --wait                  # waits (default 120 s) and prints the task object
+maosctl ask researcher "Summarise it" --key nightly-2026-11-23      # a retry with this key returns the same task
+```
+
+`task show` prints one JSON object, `{task_id, spirit_id, origin, state, result?, halt?, reason?, accepted_ns,
+ended_ns?}`. The task id is also the `TaskAssign` frame id, so `maosctl audit query` finds the task's rows by it:
+the accept row `task.<id>:accepted`, the `TaskAssign` row, the reply row (correlation `maos.task-reply/<hex>`)
+and, for a task that gave no answer, the terminal row `task.<id>:<state>`.
+
+| `state` | Meaning |
+|---|---|
+| `queued`, `running` | Waiting in the Spirit's queue, or its turn is in progress. |
+| `completed` | The Spirit answered. `result` is the answer as journaled (redacted), the same bytes after a restart. |
+| `halted` | The kernel recorded a halt on the Spirit while the task ran; `halt` is `{halt_id, state}`. |
+| `failed` | No answer; `reason` is one of `deadline_exceeded`, `session_ended`, `session_changed`, `no_answer`, `dispatch_refused`, `spirit_unloaded`, `spirit_quarantined`. |
+| `orphaned` | The Spirit crashed during the task; the kernel's `task.orphaned` row names it. |
+| `interrupted` | The Host stopped (SIGTERM or SIGKILL) while the task was queued or running. It is never delivered again. |
+
+**Refusals mint no task id.** `ask` exits 1 for each of: `spirit_not_loaded` (404), `spirit_not_running` (409; the
+Spirit is Loaded, Paused or quarantined), `spirit_not_directable` (409; a native class, a `cli_wrapper` Worker or
+a `maos run` single session, the form named), `invalid_task` (400; empty text), `host_stopping` (409) and a body
+over 64 KiB (413). `task_queue_full` (409) exits **75**, as does a `--wait` that runs out: nothing was accepted,
+retry. Other exits are the door's: 2 for a local id check, 69 for no daemon, 77 for a rejected bearer and 78 for
+an uninitialised home.
+
+**Bounds.** Each Spirit holds one running task and up to 32 queued; the Host holds at most 512 queued and running.
+The door never waits on a Spirit: a full queue is refused at once. `task show` keeps the last 1024 finished
+tasks in memory and reads older ones from the audit trail.
+
+**Limits you should know.** Only the bearer holder can ask, from this machine (loopback); the task text reaches
+the Spirit raw while the audit trail keeps a redacted copy; delivery is at most once and queued work is lost,
+not re-run, when the Host stops; an idempotency key is not crash-safe between the accept row and delivery; and
+`task show` reads only the live audit segment. The release's claim boundaries B1 to B7 are in `RELEASE-HOLDS.md`.
+
 ## Run as a service
 
 The deb and the rpm install `/usr/lib/systemd/system/maos.service` and a `maos` system account (home

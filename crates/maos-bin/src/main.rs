@@ -3483,6 +3483,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         || std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("cohort-a2a-daemon");
     let mut operator_http_server: Option<maos_control::OperatorHttpServer> = None;
     let mut operator_door_port: Option<Arc<maos_bin::operator_door::OperatorDoor>> = None;
+    let mut directed_tasks: Option<Arc<maos_bin::directed_task::DirectedTasks>> = None;
     // 20-3c (member 16, D10 A) — held for the root's life; `None` for an
     // env-pair root, which has no home record to lease.
     let mut endpoint_lease: Option<maos_domain::operator_door::EndpointLease> = None;
@@ -4562,6 +4563,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &swap_slot,
         );
     }
+    // Story 22-4 — a door root with an installed cast serves directed tasks (`ask`,
+    // `GET /v1/tasks/{id}`) over it. Other roots build none, so none retains the kernel
+    // handles the audit drain waits on.
+    if let (Some(door), false) = (operator_door_port.as_ref(), installed_manifests.is_empty()) {
+        let tasks = maos_bin::directed_task::DirectedTasks::new(
+            maos_bin::directed_task::KernelTaskHost::new(
+                Arc::clone(&scheduler),
+                Arc::clone(&capability),
+                Arc::clone(&halt_registry),
+                Arc::clone(&transparency_log),
+            ),
+            maos_bin::directed_task::TaskLimits::default(),
+        );
+        door.set_directed_tasks(Arc::clone(&tasks));
+        directed_tasks = Some(tasks);
+    }
     let installed_spirits = Arc::new(
         maos_bin::installed_spirits::InstalledSpirits::boot(
             installed_manifests,
@@ -4580,6 +4597,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &selected_crypto,
             boot_nonce,
             shell_mode,
+            directed_tasks.as_ref(),
             #[cfg(feature = "wasm-host")]
             spirit_host.as_deref(),
             #[cfg(feature = "wasm-host")]
@@ -4840,6 +4858,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // races the drain) → port drop → audit-writer drain → locks. The
         // body above is one async block, so no `?` between the bind and here
         // can bypass this.
+        if let Some(tasks) = directed_tasks.as_ref() {
+            tasks.quiesce();
+        }
         if let Some(server) = operator_http_server.as_mut() {
             server.shutdown();
         }
@@ -4851,6 +4872,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         yank_poller_task.shutdown().await;
         if let Some(root) = installed_supervision.take() {
             root.stop_and_join().await;
+        }
+        if let Some(tasks) = directed_tasks.take() {
+            tasks.stop().await;
         }
         Arc::try_unwrap(installed_spirits)
             .ok()
@@ -10110,6 +10134,11 @@ description = "smoke test spirit successor"
     // that mutation or its completion row. The shared store-lock set remains
     // held through audit-writer drain so no offline child can enter while any
     // daemon-owned store writer is still alive.
+    // Story 22-4 — the Host is stopping: nothing more is accepted or delivered, and a turn the
+    // unload below cuts short is left to read `interrupted`, never journaled as a failure.
+    if let Some(tasks) = directed_tasks.as_ref() {
+        tasks.quiesce();
+    }
     if let Some(server) = operator_http_server.as_mut() {
         server.shutdown();
     }
@@ -10168,6 +10197,11 @@ description = "smoke test spirit successor"
         post_unload_stop.as_deref(),
     )
     .await;
+    // Story 22-4 — every unload has ended its Spirit's turn; the task pumps leave before the
+    // audit drain, so none holds a sender open.
+    if let Some(tasks) = directed_tasks.take() {
+        tasks.stop().await;
+    }
     Arc::try_unwrap(installed_spirits)
         .ok()
         .expect("serving root released installs")

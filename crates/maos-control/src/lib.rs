@@ -395,6 +395,15 @@ pub enum OperatorCommand {
         pick: usize,
         work_mode: String,
     },
+    /// Story 22-4 (D-22-4-05 A) — hand a running, directable Spirit one task. Completes once
+    /// the task is accepted into its bounded queue (`task_id`, `replayed`); the answer is read
+    /// later through `GET /v1/tasks/{id}`. `idempotency_key` (`[A-Za-z0-9._-]{1,128}`) makes a
+    /// client retry return the same task (D-22-4-07 A).
+    Ask {
+        spirit_id: String,
+        text: String,
+        idempotency_key: Option<String>,
+    },
     RevokeToken {
         token_id: String,
     },
@@ -469,7 +478,8 @@ impl OperatorCommand {
             | Self::OrchestratorEnqueue { spirit_id, .. }
             | Self::OrchestratorRecall { spirit_id }
             | Self::QuarantineRelease { spirit_id }
-            | Self::OptionPick { spirit_id, .. } => Some(spirit_id),
+            | Self::OptionPick { spirit_id, .. }
+            | Self::Ask { spirit_id, .. } => Some(spirit_id),
             // `Load` is `None` BY CONSTRUCTION, not by omission: the id it
             // will create lives inside a file the daemon has not opened yet,
             // so no port-level key exists at enqueue time. The handler takes
@@ -523,6 +533,9 @@ impl OperatorCommand {
             // non-blocking consent read. Story 19-2's recall is a buffer drain
             // and its Approval Decision Log rows.
             Self::RepinDecision { .. } | Self::OrchestratorRecall { .. } => DEFAULT_ROUTE_BUDGET,
+            // Story 22-4 (AC2) — explicit, never inherited from `_`: an ask is a state check,
+            // one accept row and a queue push; the turn itself runs after the 200.
+            Self::Ask { .. } => DEFAULT_ROUTE_BUDGET,
             _ => DEFAULT_ROUTE_BUDGET,
         }
     }
@@ -625,6 +638,31 @@ pub struct OrchestratorStatusRow {
     pub capacity: usize,
 }
 
+/// Story 22-4 (AC1) — one directed task as `GET /v1/tasks/{id}` reports it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskStatusRow {
+    pub task_id: String,
+    pub spirit_id: String,
+    /// Who handed the task over (`door`; 23-5 adds its own origin).
+    pub origin: String,
+    /// `queued | running | completed | halted | failed | orphaned | interrupted`.
+    pub state: String,
+    /// The Spirit's answer, as journaled (redacted), for a `completed` task.
+    pub result: Option<String>,
+    pub halt: Option<TaskHaltRow>,
+    /// Why a task that gave no answer ended (`deadline_exceeded`, `session_ended`, ...).
+    pub reason: Option<String>,
+    pub accepted_ns: u64,
+    pub ended_ns: Option<u64>,
+}
+
+/// The kernel halt recorded on the target while a task ran (D-22-4-09 A).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskHaltRow {
+    pub halt_id: String,
+    pub state: String,
+}
+
 /// One applied CRL, as `maosctl revocations list` renders it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RevocationRow {
@@ -680,6 +718,12 @@ pub trait OperatorCommandPort: Send + Sync + 'static {
     /// when this process installed no pin store: the route then answers 404,
     /// never an empty array that would read as "nothing pinned".
     fn peer_pins(&self) -> Option<PeerPinStatus> {
+        None
+    }
+
+    /// Story 22-4 (D-22-4-05 A) — one directed task by id. `None` when this process holds no
+    /// such task (or serves no tasks): the route then answers 404 `task_not_found`.
+    fn task_status(&self, _task_id: &str) -> Option<TaskStatusRow> {
         None
     }
 }
@@ -1218,6 +1262,20 @@ fn route<S: SandboxReportSource>(routes: &Routes<'_, S>, request: &mut Incoming<
                 Err(response) => response,
             }
         }
+        // Story 22-4 (AC2) — GET-only; a read writes no row. The id is validated before the
+        // method guard like every id route.
+        ["v1", "tasks", id] => {
+            let id = match validate_id(id) {
+                Ok(id) => id,
+                Err(response) => return response,
+            };
+            get_only(method, || {
+                match routes.commands.and_then(|port| port.task_status(id)) {
+                    Some(row) => task_status_response(row),
+                    None => Response::error(404, "task_not_found", "no such task"),
+                }
+            })
+        }
         ["v1", "cohort", "peer-versions"] => get_only(method, || peer_versions(routes)),
         ["v1", "cohort", "self-identity"] => get_only(method, || self_identity(routes)),
         // Story 16-6 (D-16-6-E) — the COLLECTION route. `["v1","spirits"]`
@@ -1628,6 +1686,30 @@ fn spirit_command<S: SandboxReportSource>(
                 create_plan,
             }
         }
+        // Story 22-4 (D-22-4-05 A) — `{"text": <string>, "idempotency_key"?: <id>}`. A blank
+        // `text` is the handler's typed `invalid_task`, not a malformed body.
+        "ask" => {
+            let body = match body_json(request) {
+                Ok(body) => body,
+                Err(response) => return response,
+            };
+            let Some(text) = body.get("text").and_then(serde_json::Value::as_str) else {
+                return Response::error(400, "bad_request", "field `text` must be a string");
+            };
+            let idempotency_key = match optional_str(&body, "idempotency_key") {
+                Ok(Some(key)) => match validate_id(&key) {
+                    Ok(_) => Some(key),
+                    Err(response) => return response,
+                },
+                Ok(None) => None,
+                Err(response) => return response,
+            };
+            OperatorCommand::Ask {
+                spirit_id,
+                text: text.to_owned(),
+                idempotency_key,
+            }
+        }
         "hot-swap-precheck" => {
             let body = match body_json(request) {
                 Ok(body) => body,
@@ -2003,6 +2085,29 @@ fn pending_repins<S: SandboxReportSource>(routes: &Routes<'_, S>) -> Response {
         })
         .collect();
     Response::value(200, serde_json::Value::Array(rows))
+}
+
+fn task_status_response(row: TaskStatusRow) -> Response {
+    let mut body = serde_json::json!({
+        "task_id": row.task_id,
+        "spirit_id": row.spirit_id,
+        "origin": row.origin,
+        "state": row.state,
+        "accepted_ns": row.accepted_ns,
+    });
+    if let Some(result) = row.result {
+        body["result"] = result.into();
+    }
+    if let Some(halt) = row.halt {
+        body["halt"] = serde_json::json!({ "halt_id": halt.halt_id, "state": halt.state });
+    }
+    if let Some(reason) = row.reason {
+        body["reason"] = reason.into();
+    }
+    if let Some(ended_ns) = row.ended_ns {
+        body["ended_ns"] = ended_ns.into();
+    }
+    Response::value(200, body)
 }
 
 /// Story 21-3 — `GET /v1/a2a/pins`: a JSON ARRAY sorted by peer; `boot_nonce`

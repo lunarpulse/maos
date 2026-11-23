@@ -31,6 +31,10 @@ pub mod crypto_provider;
 /// re-implementation of it.
 #[cfg(feature = "network")]
 pub mod delegation;
+/// Story 22-4 — directed task ingress: the door's per-Spirit bounded task queues, their pumps,
+/// the task records and the Transparency-Log read-back behind `GET /v1/tasks/{id}`. In the
+/// library so `crates/maos-bin/tests/` drives the real registry in-process.
+pub mod directed_task;
 #[cfg(all(feature = "network", unix))]
 pub mod egress;
 #[cfg(feature = "network")]

@@ -163,6 +163,12 @@ pub enum Subcommand {
     /// and its audit store takes a write lock, 74 when it answers and the store does not,
     /// 69 when it is unreachable, 78 when the home is not initialised (`GET /v1/daemon`).
     Status,
+    /// Story 22-4 — hand a running installed Spirit a task through the door and print its task
+    /// id (`--wait` prints the finished `task show` object instead). `--key` makes a retry
+    /// return the same task.
+    Ask(AskArgs),
+    /// Story 22-4 — read directed tasks (`task show <id>`).
+    Task(TaskArgs),
 }
 
 /// Story 10.4a — `maosctl migrate sqlite-to-postgres`.
@@ -894,6 +900,46 @@ pub enum OrchestratorOp {
 pub struct PauseArgs {
     /// Spirit ID to pause (any loaded Spirit, a Worker included).
     pub spirit: String,
+}
+
+/// Story 22-4 — hand a running installed Spirit a task.
+#[derive(clap::Args, Debug)]
+pub struct AskArgs {
+    /// Spirit ID to direct (an installed component under the daemon's door).
+    pub spirit: String,
+    /// The task text. Reaches the Spirit raw; the audit trail keeps a redacted copy.
+    pub text: String,
+    /// Wait for the task to end and print its `task show` object (default 120 s). Exit 0 only
+    /// for a completed task, 1 for any other end with the reason, 75 when the wait runs out.
+    #[arg(
+        long,
+        value_name = "SECS",
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "120"
+    )]
+    pub wait: Option<u64>,
+    /// Idempotency key (`[A-Za-z0-9._-]{1,128}`): a retry with the same key returns the same
+    /// task instead of a new one.
+    #[arg(long, value_name = "KEY")]
+    pub key: Option<String>,
+}
+
+/// Story 22-4 — `maosctl task <op>`.
+#[derive(clap::Args, Debug)]
+pub struct TaskArgs {
+    #[command(subcommand)]
+    pub op: TaskOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum TaskOp {
+    /// Print one directed task: `{task_id, spirit_id, origin, state, result?, halt?, reason?,
+    /// accepted_ns, ended_ns?}`. Reads the daemon's registry, then the audit trail.
+    Show {
+        /// The task id `maosctl ask` printed.
+        id: String,
+    },
 }
 
 /// Story 3.4 — resume a Spirit.

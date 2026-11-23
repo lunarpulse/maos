@@ -23,6 +23,12 @@ Open `src/lib.rs` and edit `on_idle` (or another lifecycle hook). The
 `#[spirit]` macro wires your `impl` block into the `SpiritVtable` the kernel
 calls.
 
+> **`maosctl ask` reaches your Spirit as the shell request shape.** A task the operator hands a running,
+> installed Spirit with `maosctl ask` arrives exactly like a shell message: a `HumanAuthored` `TaskAssign` from
+> `@maos-shell` with the success criteria `Answer the operator's shell message`. Answer it with one
+> `TaskComplete` to the sender, as the template and `example-spirit-ts` already do; no code change is needed
+> to be directable. The guest sees "shell message" wording for a door task.
+
 ## 3. Run it locally — no kernel required
 
 The `LocalRunner` (and the fuller `SpiritTest` harness) fire your Spirit's hooks

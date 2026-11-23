@@ -195,6 +195,7 @@ enum RouteState {
 /// one accepted, journaled `TaskComplete` ever reaches the paired
 /// [`ShellReplyReceiver`]; every attempt that reaches the journal spends it.
 pub struct ShellReplyRoute {
+    label: ReplyLabel,
     correlation: [u8; 16],
     sender: maos_spirit_abi::identity::SpiritId,
     sender_pid: u32,
@@ -226,9 +227,21 @@ pub fn shell_reply_route(
     sender_pid: u32,
     deadline: Instant,
 ) -> (ShellReplyRoute, ShellReplyReceiver) {
+    labelled_reply_route(ReplyLabel::Shell, correlation, sender, sender_pid, deadline)
+}
+
+/// [`shell_reply_route`] for a caller that labels its reply rows (Story 22-4).
+pub fn labelled_reply_route(
+    label: ReplyLabel,
+    correlation: [u8; 16],
+    sender: maos_spirit_abi::identity::SpiritId,
+    sender_pid: u32,
+    deadline: Instant,
+) -> (ShellReplyRoute, ShellReplyReceiver) {
     let (tx, rx) = oneshot::channel();
     (
         ShellReplyRoute {
+            label,
             correlation,
             sender,
             sender_pid,
@@ -329,22 +342,48 @@ impl ShellReplyRoute {
     /// guest data, and is written only by the scoped reply path, so it tells the
     /// shell-only row apart from a frame to a real Spirit named `operator`.
     pub(super) fn journal_correlation(&self) -> String {
-        use std::fmt::Write as _;
-        let mut out = String::with_capacity(SHELL_REPLY_CORRELATION_PREFIX.len() + 32);
-        out.push_str(SHELL_REPLY_CORRELATION_PREFIX);
-        for byte in self.correlation {
-            let _ = write!(out, "{byte:02x}");
-        }
-        out
+        reply_correlation(self.label, self.correlation)
     }
+}
+
+/// Story 22-4 (D-22-4-04 A) — which host-owned caller armed a scoped reply route. The guest
+/// sees the same `@maos-shell` reply shape either way; only the durable correlation differs,
+/// so the audit trail tells a door task from a shell turn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReplyLabel {
+    /// The interactive shell: `maos.shell-reply/<hex>`.
+    Shell,
+    /// The operator door's directed task: `maos.task-reply/<hex>`.
+    Task,
 }
 
 /// Journal `correlation_id` prefix of a scoped shell reply row.
 const SHELL_REPLY_CORRELATION_PREFIX: &str = "maos.shell-reply/";
+/// Journal `correlation_id` prefix of a scoped directed-task reply row.
+const TASK_REPLY_CORRELATION_PREFIX: &str = "maos.task-reply/";
 
-/// Whether a journaled row's `correlation_id` marks a scoped shell reply.
+/// The durable correlation of the reply row of the route armed with `correlation` (the
+/// host-minted frame id of the request) under `label`.
+pub fn reply_correlation(label: ReplyLabel, correlation: [u8; 16]) -> String {
+    use std::fmt::Write as _;
+    let prefix = match label {
+        ReplyLabel::Shell => SHELL_REPLY_CORRELATION_PREFIX,
+        ReplyLabel::Task => TASK_REPLY_CORRELATION_PREFIX,
+    };
+    let mut out = String::with_capacity(prefix.len() + 32);
+    out.push_str(prefix);
+    for byte in correlation {
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
+}
+
+/// Whether a journaled row's `correlation_id` marks a scoped reply (shell or task).
 pub(super) fn is_shell_reply_correlation(correlation_id: Option<&str>) -> bool {
-    correlation_id.is_some_and(|c| c.starts_with(SHELL_REPLY_CORRELATION_PREFIX))
+    correlation_id.is_some_and(|c| {
+        c.starts_with(SHELL_REPLY_CORRELATION_PREFIX)
+            || c.starts_with(TASK_REPLY_CORRELATION_PREFIX)
+    })
 }
 
 /// A spent route's sender, carried through the shared delivery pipeline.
