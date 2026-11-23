@@ -1,5 +1,6 @@
 #![no_main]
 
+use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope, TokenId};
 use maos_domain::invariants::i9::SandboxTier;

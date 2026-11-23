@@ -17,7 +17,7 @@ use maos_kernel_core::scheduler::control_block::{
     make_spirit_obj, ScbLifecycleState, SpiritControlBlock, SpiritManifestBundle,
 };
 use maos_kernel_core::scheduler::hook_dispatch::HookDispatcher;
-use maos_kernel_core::security::manifest::LifecycleSection;
+use maos_kernel_core::security::manifest::{HaltProtocolCompatibilitySection, LifecycleSection};
 use maos_kernel_core::telemetry::{iac_rt::IacRtMetrics, TelemetryStreamAdapter};
 use maos_spirit_abi::ctx::Ctx;
 use maos_spirit_abi::lifecycle::{Spirit, SwapInPayload};
@@ -78,6 +78,7 @@ async fn active_halt_keeps_identity_and_replay_context_across_hot_swap() {
             enabled_hooks: vec!["snapshot".into(), "on_swap_out".into(), "on_swap_in".into()],
             telemetry: None,
         },
+        halt_protocol_compatibility: Some(HaltProtocolCompatibilitySection { version: 1 }),
         ..Default::default()
     };
     let before_state = b"replay:frame:origin-203b;policy:clarify;context:original".to_vec();

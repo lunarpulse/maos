@@ -1,0 +1,6 @@
+{"attempts":[{"requested_sources":0,"requested_depth":1,"persisted":true,"persisted_sources":0,"persisted_raw_only":true,"refusal":null}]}
+{"attempts":[{"requested_sources":2,"requested_depth":0,"persisted":true,"persisted_sources":2,"persisted_raw_only":true,"refusal":null}]}
+{"attempts":[{"requested_sources":1,"requested_depth":1,"persisted":true,"persisted_sources":0,"persisted_raw_only":true,"refusal":null}]}
+{"attempts":[{"requested_sources":1,"requested_depth":2,"persisted":true,"persisted_sources":1,"persisted_raw_only":false,"refusal":null}]}
+{"attempts":[{"requested_sources":0,"requested_depth":1,"persisted":false,"persisted_sources":0,"persisted_raw_only":true,"refusal":"SourceFrameNotFound"}]}
+{"attempts":[{"requested_sources":2,"requested_depth":0,"persisted":false,"persisted_sources":0,"persisted_raw_only":true,"refusal":null}]}

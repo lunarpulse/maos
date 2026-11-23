@@ -5,7 +5,7 @@ fn no_invariant_touch_passes() {
     // When no invariant-related files are touched, gate passes immediately.
     let changed = Some("/tmp/empty_changed.txt");
     std::fs::write(changed.unwrap(), "README.md\n").unwrap();
-    let report = invariant_lock(changed, None, None)
+    let report = invariant_lock(changed, None)
         .unwrap_or_else(|e| panic!("invariant_lock failed: {e}"));
     assert!(report.passed);
     assert!(report.touched_invariants.is_empty());
@@ -20,10 +20,21 @@ fn parse_cadence_works() {
 }
 
 #[test]
-fn parse_cadence_handles_tabs() {
-    let src = "---\nenforcement_cadence:\n\tv0.1: CI\n\tv0.3: runtime\n---\n";
-    let map = parse_cadence(src).unwrap();
-    assert_eq!(map.get("v0.1"), Some(&"CI".to_string()));
+fn body_only_claim_and_removed_or_invalid_cadence_cells_are_refused() {
+    let doc = |claim: &str, cells: &str, body: &str| {
+        format!("---\nid: I1\nclaim: {claim}\nenforcement_cadence:\n{cells}---\n{body}")
+    };
+    let old = doc("asserted", "  v1.0: fuzz\n  v1.5: fuzz\n", "");
+    // Planted red: `claim: guaranteed` only in the body is no flip.
+    let body_only = doc("asserted", "  v1.0: fuzz\n  v1.5: fuzz\n", "\nclaim: guaranteed\n");
+    assert!(!phase_commitment(&old, &body_only).unwrap());
+    let removed = doc("asserted", "  v1.0: fuzz\n", "");
+    assert!(cadence_problem("I1", &old, &removed).unwrap().unwrap().contains("removed"));
+    let invalid = doc("asserted", "  v1.0: fuzz\n  v1.5: bogus\n", "");
+    assert!(cadence_problem("I1", &old, &invalid).unwrap().unwrap().contains("invalid"));
+    let regressed = doc("asserted", "  v1.0: CI\n  v1.5: fuzz\n", "");
+    assert!(cadence_problem("I1", &old, &regressed).unwrap().unwrap().contains("regressed"));
+    assert!(cadence_problem("I1", &old, &old).unwrap().is_none());
 }
 
 #[test]
@@ -34,9 +45,7 @@ fn json_output_round_trip() {
         touched_invariants: vec!["I1".into(), "I9".into()],
         missing_corpus_delta: true,
         missing_phase_commitment: false,
-        insufficient_reviews: false,
         regression_detected: vec!["ADR-037 violation: ...".into()],
-        review_count: 1,
         revert_of: None,
     };
     let json = serde_json::to_string(&report).unwrap();
@@ -175,7 +184,7 @@ fn multi_invariant_touched_set_complete() {
         .collect();
     std::fs::write(tmpfile, paths.join("\n")).unwrap();
 
-    let report = invariant_lock(Some(tmpfile), None, None)
+    let report = invariant_lock(Some(tmpfile), None)
         .unwrap_or_else(|e| panic!("invariant_lock failed: {e}"));
 
     // 14 invariants touched.
@@ -308,7 +317,7 @@ fn multi_invariant_with_corpus_delta_clears_that_leg() {
     paths.push("tests/coverage-matrix.yaml".to_string());
     std::fs::write(tmpfile, paths.join("\n")).unwrap();
 
-    let report = invariant_lock(Some(tmpfile), None, None)
+    let report = invariant_lock(Some(tmpfile), None)
         .unwrap_or_else(|e| panic!("invariant_lock failed: {e}"));
 
     assert_eq!(report.touched_invariants.len(), 14);
@@ -318,4 +327,97 @@ fn multi_invariant_with_corpus_delta_clears_that_leg() {
     );
 
     std::fs::remove_file(tmpfile).ok();
+}
+
+#[test]
+fn domain_invariant_modules_are_lock_gated() {
+    let list = "/tmp/i21_10_domain_changed.txt";
+    std::fs::write(list, "crates/maos-domain/src/invariants/i1.rs\n").unwrap();
+    let report = invariant_lock(Some(list), None).unwrap();
+    assert_eq!(report.touched_invariants, vec!["maos-domain-invariants".to_string()]);
+    assert!(!report.passed, "a domain edit without corpus delta or commitment must fail");
+    std::fs::remove_file(list).ok();
+}
+
+#[test]
+fn phase_commitment_ignores_context_and_accepts_cadence_or_validated_flip() {
+    let doc = |claim: &str, v10: &str| {
+        format!("---\nid: I1\nclaim: {claim}\nowner: x\nenforcement_cadence:\n  v1.0: {v10}\n---\nbody\n")
+    };
+    // Planted red: only the claim basis / body moved, so `enforcement_cadence` can appear
+    // as diff context but no cell changed and nothing flipped.
+    let (a, b) = (doc("asserted", "fuzz"), doc("asserted", "fuzz").replace("body", "other body"));
+    assert!(!phase_commitment(&a, &b).unwrap());
+    assert!(!phase_commitment(&doc("guaranteed", "fuzz"), &doc("guaranteed", "fuzz")).unwrap());
+    assert!(phase_commitment(&doc("asserted", "runtime"), &doc("asserted", "fuzz")).unwrap());
+    assert!(phase_commitment(&doc("asserted", "fuzz"), &doc("guaranteed", "fuzz")).unwrap());
+    assert!(!phase_commitment(&doc("guaranteed", "fuzz"), &doc("asserted", "fuzz")).unwrap());
+}
+
+#[test]
+fn phase_commitment_is_owed_only_by_guaranteed_candidates() {
+    let doc = |claim: &str, v10: &str| {
+        format!("---\nid: I1\nclaim: {claim}\nowner: x\nenforcement_cadence:\n  v1.0: {v10}\n---\nbody\n")
+    };
+    let t = |old: String, new: String, changed: bool| (old, new, changed);
+    // Non-claiming edit (asserted before and after, no cadence change): nothing owed.
+    let asserted = vec![t(doc("asserted", "fuzz"), doc("asserted", "fuzz").replace("body", "b2"), true)];
+    assert!(!phase_commitment_missing(&asserted).unwrap());
+    // Planted red: candidate claims `guaranteed`, claim and cadence unchanged vs base.
+    let unchanged = vec![t(doc("guaranteed", "fuzz"), doc("guaranteed", "fuzz").replace("body", "b2"), true)];
+    assert!(phase_commitment_missing(&unchanged).unwrap());
+    // A guaranteed candidate in a file not itself changed (witness-only touch) is still red.
+    let witness_only = vec![t(doc("guaranteed", "fuzz"), doc("guaranteed", "fuzz"), false)];
+    assert!(phase_commitment_missing(&witness_only).unwrap());
+    // A validated asserted -> guaranteed flip clears it.
+    let flip = vec![t(doc("asserted", "fuzz"), doc("guaranteed", "fuzz"), true)];
+    assert!(!phase_commitment_missing(&flip).unwrap());
+    // A changed cadence cell on a guaranteed file clears it.
+    let cell = vec![t(doc("guaranteed", "runtime"), doc("guaranteed", "fuzz"), true)];
+    assert!(!phase_commitment_missing(&cell).unwrap());
+    // Mixed: one guaranteed file unchanged plus an asserted file: the guaranteed owes.
+    let mixed = vec![
+        t(doc("asserted", "fuzz"), doc("asserted", "fuzz"), true),
+        t(doc("guaranteed", "fuzz"), doc("guaranteed", "fuzz"), true),
+    ];
+    assert!(phase_commitment_missing(&mixed).unwrap());
+}
+
+#[test]
+fn witness_files_and_ci_job_of_a_guaranteed_row_are_lock_scope() {
+    let row = |claim: &str| {
+        format!("---\nid: I1\nclaim: {claim}\nowner: x\nproperty_test: crates/a/tests/t.rs#t\nadversarial_corpus: crates/a/c.jsonl\nci_job: proofs\n---\n")
+    };
+    let wf = |step: &str| format!("jobs:\n  proofs:\n    steps:\n    - run: {step}\n  other:\n    steps:\n    - run: x\n");
+    let set = |paths: &[&str]| paths.iter().map(|p| p.to_string()).collect::<BTreeSet<_>>();
+    let (g, a) = (row("guaranteed"), row("asserted"));
+    // Planted mutation: gate only register/predicate paths (the pre-fix scope).
+    assert!(witness_touched(&set(&["crates/a/tests/t.rs"]), (&g, &g), (&wf("a"), &wf("a"))).unwrap());
+    assert!(witness_touched(&set(&["crates/a/c.jsonl"]), (&g, &g), (&wf("a"), &wf("a"))).unwrap());
+    assert!(witness_touched(&set(&[]), (&g, &g), (&wf("a"), &wf("b"))).unwrap());
+    // The BASE row counts too: downgrading and weakening the witness in one step is scoped.
+    assert!(witness_touched(&set(&["crates/a/tests/t.rs"]), (&g, &a), (&wf("a"), &wf("a"))).unwrap());
+    // Untouched witness, other job edits, and asserted rows are out of scope.
+    assert!(!witness_touched(&set(&["README.md"]), (&g, &g), (&wf("a"), &wf("a"))).unwrap());
+    assert!(!witness_touched(&set(&["crates/a/tests/t.rs"]), (&a, &a), (&wf("a"), &wf("b"))).unwrap());
+    let other = wf("a").replace("run: x", "run: y");
+    assert!(!witness_touched(&set(&[]), (&g, &g), (&wf("a"), &other)).unwrap());
+}
+
+#[test]
+fn candidate_cadence_cells_with_new_unrecognized_phase_keys_are_refused() {
+    let doc = |cells: &str| format!("---\nid: I1\nclaim: asserted\nenforcement_cadence:\n{cells}---\n");
+    let old = doc("  v1.0: fuzz\n  v1.5: fuzz\n");
+    // Planted mutation: compare only the base's keys (new candidate keys skip validation).
+    let new_key = doc("  v1.0: fuzz\n  v1.5: fuzz\n  v9.9: bogus\n");
+    assert!(cadence_problem("I1", &old, &new_key).unwrap().unwrap().contains("unrecognized"));
+    let new_phase_valid_value = doc("  v1.0: fuzz\n  v1.5: fuzz\n  v2.0: CI\n");
+    assert!(cadence_problem("I1", &old, &new_phase_valid_value).unwrap().unwrap().contains("unrecognized"));
+    let new_bad_value = doc("  v1.0: fuzz\n  v1.5: fuzz\n  v0.9: bogus\n");
+    assert!(cadence_problem("I1", &old, &new_bad_value).unwrap().unwrap().contains("invalid"));
+    // A legacy key already at the base stays valid; canonical phases may be added.
+    let legacy = doc("  v0.1-alpha: CI\n  v1.0: fuzz\n  v1.5: fuzz\n");
+    assert!(cadence_problem("I1", &legacy, &legacy).unwrap().is_none());
+    let added = doc("  v0.9: runtime\n  v1.0: fuzz\n  v1.5: fuzz\n");
+    assert!(cadence_problem("I1", &old, &added).unwrap().is_none());
 }

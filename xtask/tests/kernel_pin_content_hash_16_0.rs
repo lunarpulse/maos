@@ -28,11 +28,12 @@ const FALSIFIER_TAG: &str = "kernel-pin-falsifier-15-4";
 const FALSIFIER_SHA: &str = "843d53657f2180b56cb374d4e61875f523da7662";
 const FALSIFIER_FILE: &str = "security/sandbox/linux.rs";
 /// The file set is invariant across the falsifier — both sides are copies of the
-/// live tree (90 files since Story 21-5 moved `orchestrator/` out; 95 since Story 17-2
+/// live tree (89 files since Story 21-10 deleted `security/approval.rs`; 90 since Story 21-5
+/// moved `orchestrator/` out; 95 since Story 17-2
 /// retired `scheduler/resource_ceiling.rs`)
 /// — which is exactly why the SET half cannot carry AC2 and
 /// only the per-file hash can.
-const PINNED_ENTRIES: usize = 90;
+const PINNED_ENTRIES: usize = 89;
 
 fn workspace_root() -> PathBuf {
     // `cargo test -p xtask` runs with CWD = `xtask/`, not the workspace root.
@@ -248,7 +249,7 @@ fn a_line_neutral_kernel_edit_reds_the_gate_and_names_the_file() {
     assert!(report.removed.is_empty(), "removed: {:?}", report.removed);
     assert_eq!(
         report.file_set_entries, PINNED_ENTRIES,
-        "the SET is invariant across the falsifier — 90 files both sides"
+        "the SET is invariant across the falsifier — 89 files both sides"
     );
     assert!(
         failure_detail(&report).contains(FALSIFIER_FILE),

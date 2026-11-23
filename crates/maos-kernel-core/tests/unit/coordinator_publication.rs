@@ -306,7 +306,7 @@ async fn a_publication_reusing_the_object_between_snapshot_and_commit_refuses_th
 #[tokio::test(start_paused = true)]
 async fn the_window_keeps_the_deadline_fixed_at_publication_however_late_it_opens() {
     let rig = rig();
-    let (monitor, deadline) = rig.coordinator.prepare_monitor(PID, NONCE);
+    let (monitor, deadline) = rig.coordinator.prepare_monitor(PID, NONCE, Vec::new());
     let window = monitor.window;
     assert_eq!(deadline, tokio::time::Instant::now() + window);
 

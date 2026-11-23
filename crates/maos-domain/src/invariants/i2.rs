@@ -64,6 +64,39 @@ impl<T> LogBeforeDeliver<T> {
     }
 }
 
+/// One frame's journey: whether a Transparency Log row exists, whether that write failed,
+/// and whether the frame reached a receiver.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct FrameTrace {
+    pub logged: bool,
+    pub log_write_failed: bool,
+    pub delivered: bool,
+}
+
+/// I2 observation: the traces of every frame offered to the bus (ACK/NACK included).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub frames: Vec<FrameTrace>,
+}
+
+/// I2 predicate: no frame is delivered without a log row, or after a failed log write.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    for f in obs.frames.iter().filter(|f| f.delivered) {
+        ensure(
+            f.logged,
+            "I2",
+            "frame delivered without a Transparency Log row",
+        )?;
+        ensure(
+            !f.log_write_failed,
+            "I2",
+            "frame delivered after a failed log write",
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

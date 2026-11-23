@@ -1,0 +1,5 @@
+{"deliveries":[{"topic":"scalar.tap.entropy","subscribed":false,"delivered":true}],"halts":[]}
+{"deliveries":[{"topic":"scalar.tap.uncertainty","subscribed":true,"delivered":true},{"topic":"scalar.tap.confidence","subscribed":false,"delivered":true}],"halts":[]}
+{"deliveries":[],"halts":[{"written":3,"observed":2}]}
+{"deliveries":[],"halts":[{"written":0,"observed":0}]}
+{"deliveries":[],"halts":[{"written":2,"observed":0}]}

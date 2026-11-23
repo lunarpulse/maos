@@ -209,6 +209,41 @@ impl<K, V> KernelCaching<K, V> {
     }
 }
 
+/// One structural or persistence scan of the kernel: how many violations were planted in the
+/// subject and how many the scan reported.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Scan {
+    pub subject: String,
+    pub planted: u32,
+    pub reported: u32,
+}
+
+/// I9 observation: the scans of kernel state, secrets and statistics, clean and planted.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub scans: Vec<Scan>,
+}
+
+/// I9 predicate: every scan reports exactly the violations planted in it: none missed (persistent
+/// kernel state outside the sanctioned holders or an unregistered exemption, a persisted secret,
+/// statistical state) and none invented on the real kernel.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    for s in &obs.scans {
+        ensure(
+            s.reported >= s.planted,
+            "I9",
+            "scan missed a planted kernel-state violation",
+        )?;
+        ensure(
+            s.reported <= s.planted,
+            "I9",
+            "scan reported a violation in the kernel",
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

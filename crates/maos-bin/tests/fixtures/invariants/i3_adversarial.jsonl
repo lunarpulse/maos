@@ -1,0 +1,7 @@
+{"frames":[{"sender":"Spirit","sent":"HumanAuthored","logged":"HumanAuthored","received":"HumanAuthored"}]}
+{"frames":[{"sender":"Spirit","sent":"SpiritDraftedHumanApproved","logged":"SpiritDraftedHumanApproved","received":"SpiritDraftedHumanApproved"}]}
+{"frames":[{"sender":"Spirit","sent":"Kernel","logged":"Kernel","received":"Kernel"}]}
+{"frames":[{"sender":"Human","sent":"SpiritAuto","logged":"SpiritAuto","received":"SpiritAuto"}]}
+{"frames":[{"sender":"Kernel","sent":"HumanAuthored","logged":"HumanAuthored","received":"HumanAuthored"}]}
+{"frames":[{"sender":"Spirit","sent":"SpiritAuto","logged":"HumanAuthored","received":"SpiritAuto"}]}
+{"frames":[{"sender":"Spirit","sent":"SpiritAuto","logged":"SpiritAuto","received":"HumanAuthored"}]}

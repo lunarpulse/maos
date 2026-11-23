@@ -237,11 +237,15 @@ fn rig(swap_out_panics: bool) -> Rig {
     let journal = Arc::new(JournalAdapter::open(&tmp.path().join("journal.ndjson")).unwrap());
     let registry = Arc::new(HaltRegistry::new());
     let metrics = Arc::new(IacRtMetrics::new());
+    let policy = Arc::new(PolicyTable::new());
+    policy.mutate(|policy| {
+        policy.manifest_scopes.insert(PID, Default::default());
+    });
     let capability = Arc::new(CapabilityRegistryAdapter::new(
         Arc::new(maos_kernel_core::api::RingCryptoProvider),
         cap_tokens::Ed25519SigningKey::new([0; 32]),
         BOOT_NONCE,
-        Arc::new(PolicyTable::new()),
+        Arc::clone(&policy),
         cap_audit::channel().0,
         CapQuotaTracker::new(),
         Arc::new(WorkingMemoryStore::new()),
@@ -325,6 +329,14 @@ fn successor(version: Option<u32>) -> SpiritManifestBundle {
     }
 }
 
+/// A successor that carries the halt and differs from `successor(Some(1))` only by its hook order,
+/// so a stale revert overwriting the newer publication stays observable.
+fn successor_reordered() -> SpiritManifestBundle {
+    let mut bundle = successor(Some(1));
+    bundle.lifecycle.enabled_hooks.reverse();
+    bundle
+}
+
 fn probe() -> Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj> {
     make_spirit_obj(Probe {
         swap_out_panics: false,
@@ -365,6 +377,58 @@ async fn an_incompatible_successor_refuses_the_swap_with_the_halt_intact() {
     assert_eq!(metadata(&rig), before, "identity, owner, fire time, replay");
 }
 
+/// D-21-10-05 A (I14): a successor that declares no `halt_protocol_compatibility` is refused
+/// while the predecessor carries a halt (the pre-fix gate read the omission as version 1).
+#[tokio::test]
+async fn a_successor_declaring_no_compatibility_is_refused_while_a_halt_is_carried() {
+    let rig = rig(false);
+    let before = metadata(&rig);
+
+    let error = rig
+        .coordinator
+        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .await
+        .expect_err("an undeclared successor cannot be shown to carry the halt");
+    assert!(
+        matches!(
+            error,
+            HotSwapError::HaltContinuityViolation(
+                HaltContinuityError::MissingHaltProtocolCompatibility
+            )
+        ),
+        "{error:?}"
+    );
+    assert_eq!(
+        rig.registry.lookup_state(&rig.halt_id),
+        Some(HaltState::PendingResolution)
+    );
+    assert_eq!(metadata(&rig), before, "identity, owner, fire time, replay");
+}
+
+/// `precheck` judges the successor's own declaration with the swap gate's validator.
+#[tokio::test]
+async fn precheck_refuses_an_undeclared_or_mismatched_successor_and_admits_a_matching_one() {
+    let rig = rig(false);
+    let dir = tempfile::tempdir().unwrap();
+    for (compat, expected) in [
+        (None, PrecheckOutcome::HaltContinuityViolation),
+        (Some(2), PrecheckOutcome::HaltContinuityViolation),
+        (Some(1), PrecheckOutcome::SafeMigrated),
+    ] {
+        let mut text = "[class]\nname = \"s\"\nversion = \"0.2.0\"\nabi = \"1.0\"\nmin_substrate_version = \"0.1.0\"\nmanifest_schema_version = 1\ntrust_tier = \"local\"\nforms = [\"rust-inproc\"]\ndescription = \"d\"\n".to_string();
+        if let Some(v) = compat {
+            text += &format!("[halt_protocol_compatibility]\nversion = {v}\n");
+        }
+        let path = dir.path().join(format!("successor-{compat:?}.toml"));
+        std::fs::write(&path, text).unwrap();
+        let verdict = rig
+            .coordinator
+            .precheck(SPIRIT_ID, path.to_str().unwrap(), "0.2.0")
+            .unwrap();
+        assert_eq!(verdict.verdict, expected, "successor declaring {compat:?}");
+    }
+}
+
 #[tokio::test]
 async fn a_swap_compensated_after_the_i14_gate_leaves_the_halt_pending_with_its_metadata() {
     let _window = monitor_window(false).await;
@@ -373,7 +437,7 @@ async fn a_swap_compensated_after_the_i14_gate_leaves_the_halt_pending_with_its_
 
     let error = rig
         .coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect_err("the predecessor's swap-out panics, after the gate has passed");
     assert!(
@@ -395,7 +459,7 @@ async fn a_halt_resolved_after_the_swap_writes_exactly_one_approval_row() {
     let rig = rig(false);
     let before = metadata(&rig);
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect("a same-major swap carries the halt");
     assert_eq!(
@@ -493,7 +557,7 @@ async fn resolving_the_carried_halt_inside_the_monitor_window_is_not_a_loss() {
     let _window = monitor_window(true).await;
     let rig = rig(false);
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect("a same-major swap carries the halt");
     rig.registry
@@ -520,7 +584,7 @@ async fn a_carried_halt_that_leaves_the_registry_inside_the_window_is_still_a_lo
         .runtime_snapshot()
         .spirit_obj;
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect("a same-major swap carries the halt");
     assert_eq!(rig.registry.drain_for_spirit(PID).len(), 1);
@@ -555,7 +619,7 @@ async fn a_clean_window_releases_the_predecessor_at_its_deadline() {
         Arc::downgrade(&map.get(&PID).unwrap().runtime_snapshot().spirit_obj)
     };
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect("a same-major swap carries the halt");
 
@@ -663,7 +727,7 @@ async fn a_revert_waiting_in_swap_out_cannot_overwrite_a_newer_publication_of_th
     let rig = Arc::new(rig(false));
     let (obj, entered, release) = gate();
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), Arc::clone(&obj))
+        .initiate_swap(SPIRIT_ID, &successor_reordered(), Arc::clone(&obj))
         .await
         .expect("first swap");
     let reverting = revert_waiting_in_swap_out(&rig, entered).await;
@@ -684,8 +748,9 @@ async fn a_revert_waiting_in_swap_out_cannot_overwrite_a_newer_publication_of_th
         Arc::as_ptr(&live.spirit_obj),
         Arc::as_ptr(&obj)
     ));
-    assert!(
-        live.manifest.halt_protocol_compatibility.is_some(),
+    assert_eq!(
+        live.manifest.lifecycle.enabled_hooks,
+        hooks().lifecycle.enabled_hooks,
         "the newer publication's manifest survives the stale revert"
     );
     assert_eq!(
@@ -701,7 +766,7 @@ async fn cancelling_the_revert_future_inside_swap_out_keeps_the_rollback_claimab
     let predecessor = live_runtime(&rig).spirit_obj;
     let (obj, entered, release) = gate();
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), Arc::clone(&obj))
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), Arc::clone(&obj))
         .await
         .expect("swap");
     let reverting = revert_waiting_in_swap_out(&rig, entered).await;
@@ -733,7 +798,7 @@ async fn a_revert_claimed_the_instant_the_window_opens_is_journaled_after_the_sw
         })
     };
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect("swap");
     tokio::time::timeout(std::time::Duration::from_secs(10), hammer)
@@ -753,7 +818,7 @@ async fn a_monitor_first_polled_with_little_window_left_still_checks_before_expi
     let _window = monitor_window(false).await;
     let rig = rig(false);
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect("a same-major swap carries the halt");
     assert_eq!(rig.registry.drain_for_spirit(PID).len(), 1);
@@ -772,7 +837,7 @@ async fn a_monitor_first_polled_with_little_window_left_still_checks_before_expi
 async fn cancel_revert_in_swap_out(rig: &Arc<Rig>) {
     let (obj, entered, release) = gate();
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), obj)
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), obj)
         .await
         .expect("swap");
     let reverting = revert_waiting_in_swap_out(rig, entered).await;
@@ -821,7 +886,7 @@ async fn shutdown_cancels_a_monitor_revert_waiting_in_the_successor_hook() {
     let rig = rig(false);
     let (obj, entered, release) = gate();
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), Arc::clone(&obj))
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), Arc::clone(&obj))
         .await
         .expect("swap");
     let spirits = Arc::clone(rig.coordinator.spirits_map());

@@ -1,0 +1,6 @@
+{"granted":["skill.x@1.0.0"],"log":[]}
+{"granted":["skill.x@1.0.0"],"log":[{"actor":"alice","target":"skill.x@1.0.0","capability":"skill.admission.reject","intent":"package_shipped","decision":false,"reasoning":null}]}
+{"granted":[],"log":[{"actor":"","target":"skill.x@1.0.0","capability":"skill.admission.approve","intent":"package_shipped","decision":true,"reasoning":null}]}
+{"granted":[],"log":[{"actor":"alice","target":"","capability":"skill.admission.approve","intent":"package_shipped","decision":true,"reasoning":null}]}
+{"granted":[],"log":[{"actor":"alice","target":"skill.x@1.0.0","capability":"  ","intent":"package_shipped","decision":true,"reasoning":null}]}
+{"granted":[],"log":[{"actor":"alice","target":"skill.x@1.0.0","capability":"skill.admission.approve","intent":"","decision":false,"reasoning":"why"}]}

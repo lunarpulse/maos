@@ -49,6 +49,56 @@ impl FrameOrigin {
     }
 }
 
+/// Who caused a frame to be sent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum Sender {
+    Human,
+    Spirit,
+    Kernel,
+}
+
+/// A frame's origin stamp as the sender set it, the log recorded it and the receiver saw it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Stamp {
+    pub sender: Sender,
+    pub sent: FrameOrigin,
+    pub logged: FrameOrigin,
+    pub received: FrameOrigin,
+}
+
+/// I3 observation: the stamps of every delivered frame.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub frames: Vec<Stamp>,
+}
+
+/// I3 predicate: a Spirit's frames are always `SpiritAuto` (never a forged human or kernel
+/// origin), human frames never claim Spirit-auto, and all three sides agree on the stamp.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    for f in &obs.frames {
+        let honest = match f.sender {
+            Sender::Spirit => f.sent == FrameOrigin::SpiritAuto,
+            Sender::Human => matches!(
+                f.sent,
+                FrameOrigin::HumanAuthored | FrameOrigin::SpiritDraftedHumanApproved
+            ),
+            Sender::Kernel => f.sent == FrameOrigin::Kernel,
+        };
+        ensure(
+            honest,
+            "I3",
+            "origin stamp does not match who sent the frame",
+        )?;
+        ensure(
+            f.sent == f.logged && f.sent == f.received,
+            "I3",
+            "origin stamp differs between sender, log and receiver",
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

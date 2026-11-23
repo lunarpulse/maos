@@ -63,6 +63,49 @@ impl<S> NamespaceKey<S> {
     }
 }
 
+/// A private-tier read: who asked, and whose value (if any) it returned.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Read {
+    pub reader: String,
+    pub value_owner: Option<String>,
+}
+
+/// A namespaced write: who wrote, whether the namespace was theirs to write, and whether it landed.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Write {
+    pub writer: String,
+    pub authorized: bool,
+    pub landed: bool,
+}
+
+/// I5 observation: every read and write a Spirit attempted against kernel memory.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub reads: Vec<Read>,
+    pub writes: Vec<Write>,
+}
+
+/// I5 predicate: a read returns only the reader's own value, and a write lands only inside a
+/// namespace the writer is authorized for.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    for r in &obs.reads {
+        let own = r
+            .value_owner
+            .as_ref()
+            .is_none_or(|owner| *owner == r.reader);
+        ensure(own, "I5", "read disclosed another Spirit's private memory")?;
+    }
+    for w in &obs.writes {
+        ensure(
+            !w.landed || w.authorized,
+            "I5",
+            "write landed outside the declared namespace",
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -5,7 +5,7 @@
 //! Implements the 12-step hot-swap protocol per ADR-017 binding-v0.3:
 //! 1. resolve spirit_id → predecessor_pid
 //! 2. snapshot predecessor SCB for saga rollback
-//! 3. I14 gate — validate_swap_halt_continuity
+//! 3. I14 gate — validate_halt_set over the carried-halt snapshot
 //! 4. fire on_swap_out hook
 //! 5. call snapshot() → CBOR state blob
 //! 6. decode + validate envelope (same-major vs cross-major)
@@ -31,7 +31,7 @@ use maos_domain::invariants::i3::FrameOrigin;
 
 use crate::capability::cap_policy::{ScopeInstall, ScopeInstallError};
 use crate::capability::CapabilityRegistryAdapter;
-use crate::halt::{validate_swap_halt_continuity, HaltRegistry, SwapVerdict};
+use crate::halt::{validate_halt_set, HaltRegistry};
 use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use crate::iac::IacBusAdapter;
 use crate::journal::JournalAdapter;
@@ -256,36 +256,29 @@ impl HotSwapCoordinator {
             .map(|h| h.version)
             .unwrap_or(1u32);
 
-        // Step 3: I14 gate — validate_swap_halt_continuity.
+        // Step 3: I14 gate over the ONE carried-halt snapshot, which the post-swap monitor
+        // later inherits. A successor that declares no `halt_protocol_compatibility` is refused
+        // while the predecessor has halts to carry.
         saga.advance_to(SagaPhase::HaltContinuityChecked);
-        let successor_accepted_versions: Vec<u32> = successor_manifest
+        let carried = self.halt_registry.carried_for_spirit(predecessor_pid);
+        let successor_accepted_versions: Option<Vec<u32>> = successor_manifest
             .halt_protocol_compatibility
             .as_ref()
-            .map(|h| vec![h.version])
-            .unwrap_or_else(|| vec![1u32]);
-        match validate_swap_halt_continuity(
-            &self.halt_registry,
-            predecessor_pid,
+            .map(|h| vec![h.version]);
+        if let Err(e) = validate_halt_set(
+            &carried,
             predecessor_halt_protocol_version,
-            Some(&successor_accepted_versions),
+            successor_accepted_versions.as_deref(),
         ) {
-            Ok(SwapVerdict::SafeDrained { drained_count }) => {
-                let _ = drained_count;
-            }
-            Ok(SwapVerdict::SafeMigrated { migrated_count, .. }) => {
-                let _ = migrated_count;
-            }
-            Err(e) => {
-                saga.compensate(
-                    SagaCompensation::RestorePredecessor {
-                        reason: format!("halt-continuity violation: {e}"),
-                    },
-                    &self.tl,
-                    &self.journal,
-                )
-                .await;
-                return Err(HotSwapError::HaltContinuityViolation(e));
-            }
+            saga.compensate(
+                SagaCompensation::RestorePredecessor {
+                    reason: format!("halt-continuity violation: {e}"),
+                },
+                &self.tl,
+                &self.journal,
+            )
+            .await;
+            return Err(HotSwapError::HaltContinuityViolation(e));
         }
 
         // Story 20-8 (FR8) — the successor keeps every invariant the predecessor
@@ -502,6 +495,12 @@ impl HotSwapCoordinator {
         // live object is still the predecessor we snapshotted. An exclusive map lock
         // serializes this short section with auto-revert and unload; no hook is called
         // and no await occurs while it is held.
+        // FR53 (20-3c K1p): the halts that must SURVIVE the post-swap window are exactly the
+        // set the I14 gate judged (`carried`, one snapshot). The monitor treats one as lost only
+        // if it left the registry; an operator resolving it in the window is not a loss.
+        let pre_swap_halt_ids: Vec<String> =
+            carried.iter().map(|h| h.as_str().to_string()).collect();
+
         let published = {
             let map = self.spirits.write().expect("spirits lock poisoned");
             match map.get(&predecessor_pid) {
@@ -529,8 +528,11 @@ impl HotSwapCoordinator {
                                 // The window's deadline and the halts it must preserve are
                                 // fixed at this publication, before any registration or
                                 // journal I/O can delay the window's opening.
-                                let (monitor, deadline) = self
-                                    .prepare_monitor(predecessor_pid, predecessor_scb.boot_nonce);
+                                let (monitor, deadline) = self.prepare_monitor(
+                                    predecessor_pid,
+                                    predecessor_scb.boot_nonce,
+                                    pre_swap_halt_ids,
+                                );
                                 // Authoritative IAC registration follows the exact runtime
                                 // publication; the displaced set (matching owner only) is
                                 // kept moved, not cloned, for rollback.
@@ -705,7 +707,12 @@ impl HotSwapCoordinator {
             .as_ref()
             .map(|h| h.version)
             .unwrap_or(1u32);
-        let successor_accepted_versions = vec![predecessor_halt_protocol_version];
+        // The successor's own declaration, as the swap gate reads it; an omission accepts nothing.
+        let successor_accepted_versions: Vec<u32> = successor_manifest
+            .halt_protocol_compatibility
+            .iter()
+            .map(|h| h.version)
+            .collect();
 
         let predecessor_state_schema_version = predecessor_runtime
             .manifest
@@ -824,20 +831,16 @@ impl HotSwapCoordinator {
     }
 
     /// Capture the post-swap window of a just-published swap: the publication instant
-    /// fixes its exact deadline, and the halts the swap carried are the set that must
-    /// SURVIVE it (FR53, 20-3c K1p; one counts as lost only if it left the registry).
+    /// fixes its exact deadline, and `pre_swap_halt_ids` (the carried set the I14 gate
+    /// judged, one snapshot) are the halts that must SURVIVE it (FR53, 20-3c K1p; one
+    /// counts as lost only if it left the registry).
     fn prepare_monitor(
         &self,
         pid: u32,
         boot_nonce: u64,
+        pre_swap_halt_ids: Vec<String>,
     ) -> (PostSwapMonitor, tokio::time::Instant) {
         let started = tokio::time::Instant::now();
-        let pre_swap_halt_ids: Vec<String> = self
-            .halt_registry
-            .carried_for_spirit(pid)
-            .iter()
-            .map(|h| h.as_str().to_string())
-            .collect();
         let view = Arc::new(Self {
             spirits: Arc::clone(&self.spirits),
             journal: Arc::clone(&self.journal),

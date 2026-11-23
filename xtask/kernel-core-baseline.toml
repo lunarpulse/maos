@@ -1,12 +1,12 @@
 # Exact kernel pin: src_lines (physical, formatted), per-file digests and set_hash of crates/maos-kernel-core/src.
 # Regenerate with `xtask check-kernel-baseline --emit-pin` and `scripts/repin.py`; history is `git log -p`, not prose here.
-src_lines = 28611
+src_lines = 28324
 
 
 
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "42a36b2f45663f8c11bfd2d40390ae6487c0244856c906b378da2d2d811bffa8"
+set_hash = "a7fe3f91d00aae45ff0eb4f27fd65fb3861cc0b75165614a36e88ef63672ac3f"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -25,7 +25,7 @@ set_hash = "42a36b2f45663f8c11bfd2d40390ae6487c0244856c906b378da2d2d811bffa8"
 "halt/resolver.rs" = "522ae90543382e1aa6a17839731b48eb57c64a76255f41fbc258a8f0e91e8a08"
 "halt/termination.rs" = "ad56de586651f8f69a9c860374a0a0c0b7242501a25792a54423cfb9ec278097"
 "hot_swap/archive.rs" = "8c3cf3dbdd1b4fa926ecccf130afa2d6628d1ce7c0e257731d75fb2e23e86b7e"
-"hot_swap/coordinator.rs" = "7e55b1511c4f92b213894b95e29bac6c8cd0f9ffff225172d8a844c5ee1766f7"
+"hot_swap/coordinator.rs" = "e1f411153f8ccaa49a8c969af3dbff4696e62645cc1e895099dd659d4cf2deda"
 "hot_swap/migrator.rs" = "1c72d4b472310fcc36f80521d25ab3da72691fc99b79c1b258bdd75ab5a53b88"
 "hot_swap/mod.rs" = "d378c979b9338914bdb50d507ddc7826c0f5852a4364e4736fde3a7d9e35e5a6"
 "hot_swap/post_swap_monitor.rs" = "8ff52c742acd29339d2f37af3065f879c8a16c88481033ee810c6f374c913dc7"
@@ -70,11 +70,10 @@ set_hash = "42a36b2f45663f8c11bfd2d40390ae6487c0244856c906b378da2d2d811bffa8"
 "scheduler/schedule_watchdog.rs" = "645138be1b49327ecda0e7cba94d28525dd5adac3d2e53f64b45a14dee0372a4"
 "scheduler/scheduler_loop.rs" = "c84153bb7f85188c2c6776f60d12af886f82f2f1f9a2575023a6abf16d556c6c"
 "scheduler/verb_resolver.rs" = "114fe959e9f7b4126464b63ad51f57a374646c95dbb72c0f3d8c19dbc363ab16"
-"security/approval.rs" = "d9847e9ffbd4ef4b5f21410a7a1c24e0dbb3f57bb98eeee20ae6b2f27e670ea3"
 "security/crypto.rs" = "0301d5d0b574791bd314cdef5c9ec9c80adec58248e49dc6731e9abc5b4e38c8"
 "security/drift.rs" = "875b2c652bc10ca1aa2f4dc1f4b6bd410e5c91ef37750b98fceb6058fb926328"
 "security/manifest.rs" = "d2e02fe45059446d55437e9d9e03893c96945741ec7d9ca4b13882d2bc5a4e85"
-"security/mod.rs" = "57410c92fc2ba637b09d2a3578db174a42c81e81944b9346a3008c18f80a1d9b"
+"security/mod.rs" = "411968e277910d628d3684a750d85e6008ca0a4389a77381e5e0e7a16f6d205e"
 "security/operator_config.rs" = "a40f04a9a26c536dfa99418f73f5db3b716f14064f79f9938b70175ce0e85241"
 "security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
 "security/sandbox/linux.rs" = "c13be2ec270f91207e893b1bb695fd96c44c87beabd751cb7d0b5b8b2d8347d9"

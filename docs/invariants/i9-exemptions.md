@@ -145,12 +145,6 @@ already-exempt metrics registry.
 — both are I9-sanctioned locations. The adapter is the trait-implementation bridge between
 the domain port and the kernel runtime; no additional persistent state.
 
-### `ApprovalManager` — `crates/maos-kernel-core/src/security/approval.rs`
-
-**Reason:** Approval Manager adapter (Story 3.1). Holds `Arc<TransparencyLogAdapter>` (already I9-exempt)
-and an `AtomicU64` decision counter for auto-incrementing decision IDs. The counter is transient
-per-process state reset on restart; no persistence needed beyond the Approval Decision Log rows.
-
 ### `PostureState` — `crates/maos-kernel-core/src/security/posture.rs`
 
 **Reason:** Per-Spirit runtime posture + halt-policy state held inside
@@ -178,8 +172,6 @@ form is stored inside `PostureState`. No kernel persistence of the raw form.
 code never constructs this struct; at v0.3-β the composition root wires
 it as bootstrap scaffolding, but Story 4.1 will swap it for the production
 `KernelHaltResolver` that holds halt-state in an already-I9-exempt location.
-Parallel to the existing `CaptureChannel` exemption at
-`crates/maos-kernel-core/tests/approval_prompt_e2e.rs`.
 
 ### `OrchestratorBuffer` — `crates/maos-kernel-core/src/orchestrator/buffer.rs`
 

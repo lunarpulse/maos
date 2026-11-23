@@ -38,6 +38,8 @@ const AGGREGATE_FLOOR_S: i64 = 3_600_000;
 const WINDOW_DAYS: i64 = 90;
 /// Targets the floor applies to. A record for an unknown target is rejected.
 const REQUIRED_TARGETS: &[&str] = &["manifest_parser", "frame_deser", "fuzz_exec_deps_parse_elf"];
+/// Invariant-ledger targets (21-10, I1/I8/I11): enrolled and recorded, not part of the floor.
+const LEDGER_TARGETS: &[&str] = &["cap_token_verify", "i8_consent_intent", "i11_digest_chain"];
 
 #[derive(Debug, Default)]
 pub struct Report {
@@ -123,6 +125,9 @@ pub fn check_fuzz_floor(workspace_root: &Path, now: chrono::DateTime<chrono::Utc
                 continue;
             }
         };
+        if LEDGER_TARGETS.contains(&target.as_str()) {
+            continue;
+        }
         if !REQUIRED_TARGETS.contains(&target.as_str()) {
             failures.push(format!(
                 "record {i}: unknown target '{target}' (expected one of {REQUIRED_TARGETS:?})"

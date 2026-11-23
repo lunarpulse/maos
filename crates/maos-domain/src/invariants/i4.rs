@@ -48,6 +48,35 @@ pub struct ApprovalDecision {
     pub reasoning: Option<String>,
 }
 
+/// I4 observation: the approvals that were granted (by target) and the Approval Decision Log.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub granted: Vec<String>,
+    pub log: Vec<ApprovalDecision>,
+}
+
+/// I4 predicate: every log row carries actor, target, capability and intent, and every
+/// granted approval has a granting row for its target.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    for row in &obs.log {
+        let fields = [&row.actor, &row.target, &row.capability, &row.intent];
+        ensure(
+            fields.iter().all(|f| !f.trim().is_empty()),
+            "I4",
+            "approval row missing actor, target, capability or intent",
+        )?;
+    }
+    for target in &obs.granted {
+        ensure(
+            obs.log.iter().any(|r| r.decision && &r.target == target),
+            "I4",
+            "granted approval without a decision row",
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -2491,14 +2491,7 @@ fn authorize_and_deliver(
     } else {
         frame.frame_id = ulid::Ulid::new().to_bytes();
         frame.timestamp_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
-        frame.from = FrameAddress {
-            spirit_id: SpiritId::from(spirit_id),
-            host_id: None,
-            role: None,
-        };
-        frame.intent = IntentClass::Standard;
-        frame.auto_marker = FrameOrigin::SpiritAuto;
-        frame.intent_lineage = turn.lineage.clone();
+        frame.stamp_as_spirit(spirit_id, &turn.lineage);
         // Story 21-7 — a guest-supplied envelope is discarded; the granter stamps the one the
         // authenticated sender's declaration implies, pinned to this frame for the gate, so it
         // commits in the routed transaction. Telemetry is ungated: never "all refused". A

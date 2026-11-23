@@ -14,29 +14,8 @@ use maos_kernel_core::memory::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
 };
 
-fn make_writer(
-    nonce: u64,
-) -> (
-    DistillateWriter,
-    Arc<TransparencyLogAdapter>,
-    tempfile::TempDir,
-) {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let memory_root = tmp.path().join("memory");
-    let db_path = tmp.path().join("audit.db");
-    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(nonce));
-    let private = Arc::new(PrivateMemoryStore::new(memory_root, 4 * 1024));
-    let shared = Arc::new(SharedMemoryStore::open(&db_path).unwrap());
-    let principal_index = Arc::new(PrincipalNamespaceIndex::open(&db_path).unwrap());
-    let memory = Arc::new(MemoryManagerAdapter::new(
-        private,
-        shared,
-        principal_index,
-        Arc::clone(&tl),
-    ));
-    let writer = DistillateWriter::new(Arc::clone(&tl), memory);
-    (writer, tl, tmp)
-}
+mod common;
+use common::distill::make_writer;
 
 fn insert_raw_frame(tl: &Arc<TransparencyLogAdapter>, pid: u32, intent: &str) -> [u8; 16] {
     let _token = tl.insert_frame_event(

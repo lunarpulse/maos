@@ -93,6 +93,45 @@ impl Default for AllowedPromotionSet {
     }
 }
 
+/// One digest: the raw intents it summarises, the lineage the kernel stamped, the consumer's
+/// allowed-promotion set and whether the consumer admitted it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Digest {
+    pub source_intents: Vec<String>,
+    pub lineage: Vec<String>,
+    pub consumer_allowed: Vec<String>,
+    pub admitted: bool,
+}
+
+/// I13 observation: digests and their admission verdicts.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub digests: Vec<Digest>,
+}
+
+/// I13 predicate: a digest's lineage is exactly the union of its sources' intents, and a consumer
+/// admits it only when that lineage lies inside its allowed-promotion set.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    use std::collections::BTreeSet;
+    for d in &obs.digests {
+        let sources: BTreeSet<_> = d.source_intents.iter().collect();
+        let lineage: BTreeSet<_> = d.lineage.iter().collect();
+        let allowed: BTreeSet<_> = d.consumer_allowed.iter().collect();
+        ensure(
+            sources == lineage,
+            "I13",
+            "lineage is not the union of the source intents",
+        )?;
+        ensure(
+            !d.admitted || lineage.is_subset(&allowed),
+            "I13",
+            "consumer admitted lineage outside its allowed set",
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
