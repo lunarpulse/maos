@@ -29,9 +29,9 @@ maos-notify-push = 348
 maos-persistence = 487
 maos-secrets = 636
 maos-compliance = 2350
-maos-control = 1700
+maos-control = 1900
 maos-cli = 7300
-maos-bin = 44700
+maos-bin = 45500
 maos-topology = 1050
 maos-bench = 3100
 
