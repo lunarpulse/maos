@@ -8,13 +8,13 @@
 //!
 //! ## Anti-fake control
 //!
-//! The `ConsentRupture` oracle (`j4_earned_consent_rupture_typed_oracle_deferred`)
-//! must go RED (fail) if production rupture emission is removed. Currently deferred
-//! because the J4 topology run does not trigger a real ConsentRupture through the
-//! `A2ARouterCore::handle_intake` deny path. When the topology is wired to exercise
-//! a deny-path intake, un-ignore this test and assert on the production
+//! The `ConsentRupture` oracle (`j4_earned_consent_rupture_typed_oracle`) runs the deny
+//! topology (`j4-mira-nash-deny.toml`: Nash's accept list admits nothing) as a serving root,
+//! asks Mira once through the operator door, and reads the kind-22 row the production deny
+//! path (`A2ARouterCore::handle_intake`, through the rupture sink the router installs) wrote
+//! before it refused. It must go RED if that emission is removed. It imports the production
 //! `ConsentRupturePayload` + `RuptureReason::IntentAllowlistMismatch` types from
-//! `maos_domain::frame`. The test must import production types — never local fakes.
+//! `maos_domain::frame` — never local fakes.
 
 #[path = "support/binaries.rs"]
 mod binaries;
@@ -103,63 +103,137 @@ fn j4_mira_nash_topology_run_once() {
 
 /// ConsentRupture oracle — uses production types from `maos_domain::frame`.
 ///
-/// Runs the J4 topology and queries the transparency log for a
-/// `ConsentRupture` row (kind=22). Currently `#[ignore]` because the J4
-/// topology does not trigger the `A2ARouterCore::handle_intake` deny path.
-/// When the topology is wired to exercise the classified-but-policy-denied
-/// (`-32001`) intake leg, un-ignore this test.
-///
-/// This oracle MUST go RED if production rupture emission is removed — it
-/// imports production types, never local fakes, and asserts on transparency-log
-/// rows that only the deny path can produce.
+/// Serves the deny topology, hands Mira one incident and reads the transparency log: exactly one
+/// `ConsentRupture` row (kind 22) whose payload is a `ConsentRupturePayload` rejecting the
+/// recipient with `IntentAllowlistMismatch`, and Mira's answer says the advisory was denied.
 #[test]
-#[ignore = "ConsentRupture oracle deferred: J4 topology does not yet trigger a deny-path intake; \
-            un-ignore when the topology exercises A2ARouterCore::handle_intake rejection"]
-fn j4_earned_consent_rupture_typed_oracle_deferred() {
+fn j4_earned_consent_rupture_typed_oracle() {
     // Production type imports — compile-error if the types are removed/renamed.
-    use maos_domain::frame::RuptureReason;
+    use maos_domain::frame::{ConsentRupturePayload, FramePayload, RuptureReason};
 
     // ConsentRupture = kind discriminator 22 in the transparency log.
     const CONSENT_RUPTURE_KIND: i64 = 22;
+    const INCIDENT: &str =
+        r#"{"subject":"payments-api","metric":"error_rate","observed":0.42,"baseline":0.02}"#;
+
+    /// The serving root, killed on every exit path.
+    struct Serving(std::process::Child);
+    impl Drop for Serving {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
 
     let audit = AuditDb::temp();
     let tl_path = audit.transparency_log_path();
-    let output = Command::new(maos_bin())
-        .args(["run", "spirits/topologies/j4-mira-nash.toml", "--once"])
-        .env("XDG_DATA_HOME", audit.path())
-        .env("MAOS_HOME", audit.path())
-        .env_remove("MAOS_INFERENCE_MODE")
-        .current_dir(workspace_root())
+    let command = |program: &str| {
+        let mut command = Command::new(program);
+        command
+            .env("HOME", audit.path())
+            .env("XDG_DATA_HOME", audit.path().join("xdg"))
+            .env("MAOS_HOME", audit.path())
+            .env("MAOS_NOTIFY_DISABLE", "1")
+            .env_remove("MAOS_INFERENCE_MODE")
+            .current_dir(workspace_root());
+        command
+    };
+    let maosctl = binaries::resolve("maosctl", None);
+    let init = command(&maos_bin())
+        .arg("init")
         .output()
-        .expect("failed to spawn mira-nash topology");
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
+        .expect("maos init");
     assert!(
-        output.status.success(),
-        "mira-nash topology should exit 0; stderr:\n{stderr}\nstdout:\n{stdout}"
+        init.status.success(),
+        "{}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+
+    let stderr_path = audit.path().join("serve.stderr");
+    let mut serving = Serving(
+        command(&maos_bin())
+            .args(["run", "spirits/topologies/j4-mira-nash-deny.toml"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::fs::File::create(&stderr_path).unwrap())
+            .spawn()
+            .expect("failed to spawn the deny topology"),
+    );
+    let stderr = || std::fs::read_to_string(&stderr_path).unwrap_or_default();
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(90);
+    loop {
+        let agents = command(&maosctl)
+            .arg("agents")
+            .output()
+            .expect("maosctl agents");
+        let listing = String::from_utf8_lossy(&agents.stdout);
+        if agents.status.success()
+            && ["mira", "nash"].iter().all(|id| {
+                listing
+                    .lines()
+                    .any(|line| line.starts_with(&format!("{id}\t")) && line.contains("Running"))
+            })
+        {
+            break;
+        }
+        if let Some(status) = serving.0.try_wait().unwrap() {
+            panic!("the deny topology exited early: {status}\n{}", stderr());
+        }
+        assert!(
+            std::time::Instant::now() < until,
+            "the cast never came up\n{}",
+            stderr()
+        );
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+
+    let ask = command(&maosctl)
+        .args(["ask", "mira", INCIDENT, "--wait"])
+        .output()
+        .expect("maosctl ask");
+    let shown: serde_json::Value =
+        serde_json::from_slice(&ask.stdout).expect("ask --wait prints the task");
+    assert_eq!(ask.status.code(), Some(0), "{shown}\n{}", stderr());
+    let answer: serde_json::Value =
+        serde_json::from_str(shown["result"].as_str().expect("a result")).expect("Mira's JSON");
+    assert!(
+        answer["advisory"]
+            .as_str()
+            .is_some_and(|advisory| advisory.starts_with("denied:")),
+        "Mira reports the denied advisory: {answer}"
     );
 
     // Query the transparency log for ConsentRupture rows (kind=22).
-    // When the deny-path intake is wired, this count must be >= 1.
     assert!(
         tl_path.exists(),
         "transparency log must be created by the topology run at {tl_path:?}"
     );
-    let conn = rusqlite::Connection::open(&tl_path)
-        .expect("open transparency log for ConsentRupture query");
-    let rupture_count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM transparency_log WHERE kind = ?1",
-            [CONSENT_RUPTURE_KIND],
-            |row| row.get(0),
-        )
-        .expect("query ConsentRupture count");
-    assert!(
-        rupture_count >= 1,
-        "transparency log must contain at least 1 ConsentRupture row (kind={CONSENT_RUPTURE_KIND}) \
-         with reason {:?} from production site A2ARouterCore::handle_intake; \
-         found {rupture_count} rows",
-        RuptureReason::IntentAllowlistMismatch,
+    let conn =
+        rusqlite::Connection::open_with_flags(&tl_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .expect("open transparency log for ConsentRupture query");
+    let rows: Vec<Vec<u8>> = conn
+        .prepare("SELECT payload_redacted FROM transparency_log WHERE kind = ?1")
+        .unwrap()
+        .query_map([CONSENT_RUPTURE_KIND], |row| row.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(
+        rows.len(),
+        1,
+        "exactly one ConsentRupture row (kind={CONSENT_RUPTURE_KIND}) from the production deny \
+         path A2ARouterCore::handle_intake; stderr:\n{}",
+        stderr()
     );
+    let payload: FramePayload =
+        serde_json::from_slice(&rows[0]).expect("the row is a typed FramePayload");
+    let FramePayload::ConsentRupture(rupture) = payload else {
+        panic!("kind-22 row is not a ConsentRupture payload");
+    };
+    let rupture: ConsentRupturePayload = rupture;
+    assert_eq!(rupture.rejected.len(), 1);
+    assert_eq!(
+        rupture.rejected[0].reason,
+        RuptureReason::IntentAllowlistMismatch
+    );
+    assert_eq!(rupture.rejected[0].address.spirit_id.as_str(), "nash");
 }

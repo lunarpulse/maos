@@ -51,6 +51,9 @@ pub mod enterprise_identity;
 pub mod enterprise_pdp_runtime;
 /// Read-only sandbox-anomaly consumer, shared with actual process-boundary proofs.
 pub mod escape_detector_consumer;
+/// Story 22-8 — an unresolved halt survives a restart of the standing cast: the boot-time
+/// carry-over scan, the `halt.carried` row and the re-admission.
+pub mod halt_carry;
 /// Story 17-4 — the telemetry hook pump, the consolidation watchdog and the
 /// Observer activity writer: the first production callers of
 /// `fire_on_telemetry_event` and `fire_on_consolidate`. In the library beside
@@ -67,6 +70,13 @@ pub mod inference_mode;
 pub mod installed_spirits;
 /// Story 20-9 — one pump dispatch as its spawned session's link sees it (started or dropped).
 pub mod invocation;
+/// Story 22-8 — the in-process A2A cast: the Host's router over the declared
+/// `[[topology.a2a_peers]]`, Mira's advisory route and Nash's intake consumer.
+#[cfg(feature = "network")]
+pub mod loopback_cast;
+/// Story 22-8 — the native directed leg: Mira's door-task runner, her pid-bound diagnosis
+/// memory and the minted Inference Port of a native Spirit.
+pub mod native_task;
 /// Story 16-1 (D-16-1-N) — the operator door's port implementation over the
 /// daemon's real kernel objects, plus the store lock set (D-16-1-D). In the
 /// library, not `main.rs`, so `tests/operator_door_16_1.rs` drives the REAL

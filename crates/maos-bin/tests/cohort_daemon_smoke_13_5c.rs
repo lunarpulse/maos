@@ -933,7 +933,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 20-9 — 39 → 40: `spawned_lifecycle.rs` joins it.
     // Story 20-9 (round 4) — 40 → 41: `invocation.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 46] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 49] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("workflow.rs", include_str!("../src/workflow.rs")),
         ("invocation.rs", include_str!("../src/invocation.rs")),
@@ -1117,6 +1117,16 @@ fn composition_root_does_not_seed_manifest_scopes() {
             "audit_rotation.rs",
             include_str!("../src/audit_rotation.rs"),
         ),
+        // Story 22-8 — the native directed leg (Mira's runner, her pid-bound memory, the minted
+        // Inference Port). It reads only its own pid-bound memory and never seeds the
+        // manifest-derived policy table.
+        ("native_task.rs", include_str!("../src/native_task.rs")),
+        // Story 22-8 — the in-process A2A cast. It reads only declared peers and journals only
+        // the advisory rows; it never seeds the manifest-derived policy table.
+        ("loopback_cast.rs", include_str!("../src/loopback_cast.rs")),
+        // Story 22-8 — the boot-time halt carry-over. It reads only audit rows and never seeds
+        // the manifest-derived policy table.
+        ("halt_carry.rs", include_str!("../src/halt_carry.rs")),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

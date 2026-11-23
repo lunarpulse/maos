@@ -31,7 +31,7 @@ maos-secrets = 636
 maos-compliance = 2350
 maos-control = 1900
 maos-cli = 7700
-maos-bin = 45500
+maos-bin = 46500
 maos-topology = 1050
 maos-bench = 3100
 

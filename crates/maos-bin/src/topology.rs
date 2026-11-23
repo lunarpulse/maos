@@ -108,3 +108,76 @@ pub fn topology_manifest_entries(root: &toml::Value) -> Result<Option<Vec<Topolo
     }
     Ok(Some(entries))
 }
+
+/// The ONLY keys a `[[topology.a2a_peers]]` entry may declare (Story 22-8, D-22-8-07 A).
+pub const TOPOLOGY_A2A_PEER_KEYS: &[&str] = &["spirit", "send_allowlist", "accept_allowlist"];
+
+/// One parsed `[[topology.a2a_peers]]` entry: the operator's ADR-012 consent for one member of
+/// the in-process cast. `send_allowlist` is the typed intents the Host lets that Spirit send;
+/// `accept_allowlist` the typed intents it accepts. An absent or empty list admits nothing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct A2aPeerEntry {
+    pub spirit: String,
+    pub send_allowlist: Vec<String>,
+    pub accept_allowlist: Vec<String>,
+}
+
+/// Parse `[[topology.a2a_peers]]`. Unknown keys are refused, as for `[[topology.spirits]]`; a
+/// spirit named twice, an empty name and an empty intent string are refused. No `[topology]`
+/// section, or no `a2a_peers` array, is no peers (the Host builds no router).
+pub fn topology_a2a_peers(root: &toml::Value) -> Result<Vec<A2aPeerEntry>, String> {
+    let Some(peers) = root
+        .get("topology")
+        .and_then(|topology| topology.get("a2a_peers"))
+    else {
+        return Ok(Vec::new());
+    };
+    let peers = peers
+        .as_array()
+        .ok_or("maos run: [[topology.a2a_peers]] must be an array of tables")?;
+    let mut entries: Vec<A2aPeerEntry> = Vec::with_capacity(peers.len());
+    for (idx, peer) in peers.iter().enumerate() {
+        let bad = |why: String| format!("maos run: [[topology.a2a_peers]] entry {idx}: {why}");
+        let table = peer
+            .as_table()
+            .ok_or_else(|| bad("must be a table".into()))?;
+        for key in table.keys() {
+            if !TOPOLOGY_A2A_PEER_KEYS.contains(&key.as_str()) {
+                return Err(bad(format!(
+                    "unknown key '{key}' (known: {TOPOLOGY_A2A_PEER_KEYS:?})"
+                )));
+            }
+        }
+        let spirit = table
+            .get("spirit")
+            .and_then(toml::Value::as_str)
+            .filter(|name| !name.trim().is_empty())
+            .ok_or_else(|| bad("must name a `spirit`".into()))?;
+        if entries.iter().any(|entry| entry.spirit == spirit) {
+            return Err(bad(format!("spirit '{spirit}' is declared twice")));
+        }
+        let list = |key: &str| -> Result<Vec<String>, String> {
+            let Some(value) = table.get(key) else {
+                return Ok(Vec::new());
+            };
+            value
+                .as_array()
+                .ok_or_else(|| bad(format!("`{key}` must be an array of strings")))?
+                .iter()
+                .map(|intent| {
+                    intent
+                        .as_str()
+                        .filter(|intent| !intent.trim().is_empty())
+                        .map(str::to_owned)
+                        .ok_or_else(|| bad(format!("`{key}` holds a non-string or empty intent")))
+                })
+                .collect()
+        };
+        entries.push(A2aPeerEntry {
+            spirit: spirit.to_owned(),
+            send_allowlist: list("send_allowlist")?,
+            accept_allowlist: list("accept_allowlist")?,
+        });
+    }
+    Ok(entries)
+}
