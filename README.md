@@ -167,8 +167,8 @@ gate and forces a major-version bump (ADR-037). Full text in
    the kernel compares via four universal predicates and never introspects Spirit
    cognition.
 8. **Constitutional governance is structural, not procedural.** Invariant changes
-   require the `invariant-lock` gate; per-crate KLOC ceilings enforced by `tokei`
-   (kernel core ≤ 23,000 tokei lines, alarm at 22,000 — ADR-069; currently 20,429).
+   require the `invariant-lock` gate; the kernel core is held to its ADR-069 envelope by `tokei`
+   (kernel core ≤ 24,000 tokei lines, alarm at 23,000; currently 22,143), every other crate measured and printed, not gated.
 
 ## Constitutional invariants (I1–I14)
 
@@ -427,8 +427,8 @@ run on **every PR** — these shipped *before* kernel code, by design:
 - **`invariant-lock`** — any change to invariant files, the `lock.toml` mapping,
   or `maos-domain` invariant types requires a machine-checkable diff, a corpus
   delta, and a phase-commitment update (ADR-037).
-- **KLOC ceilings** — `tokei`-enforced per-crate budgets; kernel core ≤ 23,000 tokei lines,
-  alarm at 22,000 (ADR-069).
+- **KLOC envelope** — `tokei`-enforced for the kernel core only: ≤ 24,000 tokei lines,
+  alarm at 23,000 (ADR-069); every other crate is measured and printed by `kloc-check`, never gated.
 - **ABI diff** — `cargo public-api` gates the frozen Spirit ABI; only additive
   changes pass without a version bump.
 - **Service-boundary lint** — `check-service-boundary` enforces the

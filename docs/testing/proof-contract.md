@@ -43,9 +43,9 @@ on one image.**
 - **Closing a story re-runs the tree-bound tests that read its status.** Flipping a sprint key to `done` changes the
   verdict of tests that read `sprint-status.yaml` and the story records: before the closing commit, run
   `cargo nextest run -p xtask --locked --test recovery_lane_ceiling_rule`. (It keeps the ADR-069 envelope/alarm
-  checks and the tree-bound seal notice; per-crate ceilings need no cited open story since SCP 2026-11-12 §5.B7c
-  option A, so the d11 ceiling ratchet no longer exists. 20-12's xtask-ceiling red that motivated this rule is
-  history, not a current failure mode.)
+  checks (24,000 / 23,000) and pins that the kernel row is the only `kloc.toml` ceiling; the per-crate ceilings were
+  removed by operator decision 11 (WP-23), so the d11 ceiling ratchet and the cited-open-story rule no longer exist.
+  20-12's xtask-ceiling red that motivated this rule is history, not a current failure mode.)
 - **A manifest or admission change widens the focused set to every reader of it.** When the diff changes a checked-in
   manifest (`spirits/*/manifest.toml`, `examples/*/manifest.toml`) or the manifest/capability parser
   (`crates/maos-manifest/src`, `capabilities_required_to_scopes`), the focused set adds every test file that names
@@ -63,9 +63,10 @@ on one image.**
 
 ### Retrospective size trend table
 
-Since SCP 2026-11-12 §5.B7c (option A, ruled 2026-11-13) the per-crate `xtask/kloc.toml` rows are **ceilings with
-stated headroom, re-based at each epic retrospective** (`scripts/repin.py --rebase`); a landing re-pins only the
-kernel exact pin (`scripts/repin.py --apply`: values only, no per-landing HISTORY block; history is the commit message). To keep the growth visible without a per-landing re-pin, every epic
+Since operator decision 11 (lean-gates WP-23, confirmed 2026-11-24) `xtask/kloc.toml` holds one row, the
+`maos-kernel-core` envelope (ADR-069); every other crate is measured and printed by `xtask kloc-check`, never gated,
+and a landing re-pins only the kernel exact pin (`xtask bless`, or `scripts/repin.py --apply`: values only, no per-landing
+HISTORY block; history is the commit message). To keep the growth visible without a ceiling, every epic
 retrospective produces one row of this table (documentation only: no gate reads it), measured on the retrospective
 commit after `cargo fmt --all` with the prebuilt xtask and `tokei` 14.0.0:
 

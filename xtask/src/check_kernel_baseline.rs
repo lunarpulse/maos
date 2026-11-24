@@ -152,7 +152,7 @@ pub fn failure_detail(report: &Report) -> String {
     }
     detail.push_str(
         "A kernel change requires an AUTHORIZED delta (charter amendment + FLAG-Winston); \
-         if intended, re-pin with `cargo run -p xtask -- check-kernel-baseline --emit-pin` \
+         if intended, re-pin with `cargo run -p xtask -- bless` \
          and record the measured value, the driver and the story key in the same commit.",
     );
     detail
@@ -203,7 +203,7 @@ pub fn check_at(src: &Path, baseline: &Path) -> Result<Report, String> {
     if pinned_set_hash != pin.set_hash {
         return Err(format!(
             "{}: [kernel_src] set_hash {} does not match its own pinned file map ({}); \
-             re-pin with `--emit-pin` rather than hand-editing either half",
+             re-pin with `cargo run -p xtask -- bless` rather than hand-editing either half",
             baseline.display(),
             pin.set_hash,
             pinned_set_hash
@@ -243,15 +243,63 @@ pub fn check_at(src: &Path, baseline: &Path) -> Result<Report, String> {
     })
 }
 
-/// Print the paste-ready `[kernel_src]` block to stdout. The human commits it —
-/// there is no in-place rewriter, and no hold, waiver or known-mismatch
-/// constant of any kind. `check_corpus::register_corpus` (`:204-242`) is the
-/// repo's only baseline-re-pin precedent and this follows it: a gate that can
-/// heal itself is not a gate.
+/// Print the paste-ready `[kernel_src]` block to stdout, read-only. The pin is
+/// rewritten only by `xtask bless` (`bless_pin`, lean-gates WP-23), which
+/// derives it from the tree on disk and never from a hold, waiver or
+/// known-mismatch constant of any kind: source to derived, one direction.
 fn emit_pin_block() -> Result<(), String> {
     let root = workspace_root()?;
     print!("{}", pin_block(&root.join(KERNEL_SRC))?);
     Ok(())
+}
+
+/// `xtask bless` leg: rewrite `src_lines` and the whole `[kernel_src]` block of the baseline from the
+/// kernel tree under `root`. Everything before `[kernel_src]` other than the `src_lines` assignment is
+/// kept byte for byte. Returns whether the file changed.
+pub fn bless_pin(root: &Path) -> Result<bool, String> {
+    let src = root.join(KERNEL_SRC);
+    let baseline = root.join(BASELINE_TOML);
+    let text =
+        fs::read_to_string(&baseline).map_err(|e| format!("read {}: {e}", baseline.display()))?;
+    let blessed = blessed_baseline(&text, count_rs_lines(&src)?, &pin_block(&src)?)
+        .map_err(|e| format!("{}: {e}", baseline.display()))?;
+    if blessed == text {
+        return Ok(false);
+    }
+    fs::write(&baseline, blessed).map_err(|e| format!("write {}: {e}", baseline.display()))?;
+    Ok(true)
+}
+
+/// The baseline text with `src_lines` set to `lines` and everything from the `[kernel_src]` header on
+/// replaced by `block`. The `src_lines` assignment is located the way `read_pinned` reads it, so exactly
+/// one assignment before the header is required.
+fn blessed_baseline(text: &str, lines: usize, block: &str) -> Result<String, String> {
+    let mut out = String::with_capacity(text.len());
+    let mut assignments = 0;
+    let mut header_seen = false;
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim();
+        if trimmed == "[kernel_src]" {
+            header_seen = true;
+            break;
+        }
+        if !trimmed.starts_with('#') && trimmed.starts_with("src_lines") {
+            assignments += 1;
+            out.push_str(&format!("src_lines = {lines}\n"));
+        } else {
+            out.push_str(line);
+        }
+    }
+    if assignments != 1 {
+        return Err(format!(
+            "expected exactly one `src_lines = N` assignment before `[kernel_src]`, found {assignments}"
+        ));
+    }
+    if !header_seen {
+        return Err("no `[kernel_src]` header to rewrite".into());
+    }
+    out.push_str(block);
+    Ok(out)
 }
 
 /// The paste-ready `[kernel_src]` block for an arbitrary root.
@@ -334,7 +382,7 @@ fn load_kernel_src(path: &Path) -> Result<KernelSrc, String> {
     baseline.kernel_src.ok_or_else(|| {
         format!(
             "no `[kernel_src]` table in {} — the file set and per-file content hash are the \
-             kernel's drift tripwire; re-pin with `--emit-pin`",
+             kernel's drift tripwire; re-pin with `cargo run -p xtask -- bless`",
             path.display()
         )
     })

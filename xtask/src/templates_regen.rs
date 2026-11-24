@@ -130,7 +130,10 @@ pub fn run(
     }
 
     if check_mode && !all_mismatches.is_empty() {
-        let msg = all_mismatches.join("\n");
+        let msg = format!(
+            "{}\nregenerate the examples from the templates with `cargo run -p xtask -- bless`",
+            all_mismatches.join("\n")
+        );
         if json_mode {
             let payload = serde_json::json!({
                 "passed": false,
