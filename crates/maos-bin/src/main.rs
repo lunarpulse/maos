@@ -2328,17 +2328,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // unreachable endpoint is not a boot refusal: health recovers by probe and
     // sealed writes are refused until then.
     if let Some(probe) = enterprise_runtime.as_ref().and_then(|rt| rt.kms_probe()) {
-        let reachable = tokio::task::spawn_blocking(move || probe())
+        let outcome = tokio::task::spawn_blocking(move || probe())
             .await
-            .unwrap_or(false);
-        eprintln!(
-            "maos: external KMS endpoint {}",
-            if reachable {
-                "reachable at boot"
-            } else {
-                "UNREACHABLE at boot; sealed writes are refused until a probe succeeds"
-            }
-        );
+            .unwrap_or(maos_bin::enterprise_identity::KmsProbeOutcome::Unreachable);
+        eprintln!("{}", outcome.line(true));
     }
 
     // The shutdown token of the serve loop, created here so the KMS probe task
@@ -3942,15 +3935,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 secret_store.as_ref()
             };
         match bearer_source.get(maos_domain::ports::SecretKey::KmsBearer) {
-            Ok(bearer) => kms.provision_bearer(
-                bearer
+            Ok(bearer) => {
+                let bearer = bearer
                     .map(|value| value.trim().to_owned())
-                    .filter(|value| !value.is_empty()),
-            ),
-            Err(error) => eprintln!(
-                "maos: the external KMS bearer could not be read ({error}); the KMS stays \
-                 unavailable and sealed writes are refused"
-            ),
+                    .filter(|value| !value.is_empty());
+                eprintln!(
+                    "maos: external KMS bearer {}; wrap and unwrap calls are now sent",
+                    if bearer.is_some() {
+                        "read"
+                    } else {
+                        "not configured (none is sent)"
+                    }
+                );
+                kms.provision_bearer(bearer);
+            }
+            Err(error) => {
+                kms.bearer_unreadable();
+                eprintln!(
+                    "maos: the external KMS bearer could not be read ({error}); every wrap and \
+                     unwrap is refused until restart and sealed writes are refused"
+                );
+            }
         }
     }
 

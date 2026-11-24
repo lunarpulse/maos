@@ -63,17 +63,21 @@ The daemon evaluates one issuance per collective operation with the authenticate
 |---|---|---|
 | `MAOS_KMS_MASTER_KEY` | yes, unless `MAOS_KMS_ENDPOINT` | hex-encoded 32-byte org master key (dev/CI custody; absent, malformed or all-zero refuses the boot) |
 
-The daemon takes its sealer from the *same* hook the collective store uses. Unset ⇒ the governed record is byte-identical plaintext (the v1.5 default). Set-but-unhealthy ⇒ the read is refused; a sealed posture never degrades to plaintext. An invalid KMS configuration refuses the boot (exit 78). An external endpoint that is down at boot does not refuse the boot: sealed writes are refused until a probe succeeds. Sealed Collective rows are write-only until a reader exists (`RELEASE-HOLDS.md` row 23-8.a).
+The daemon takes its sealer from the *same* hook the collective store uses. Unset ⇒ the governed record is byte-identical plaintext (the v1.5 default). Set-but-unhealthy ⇒ the read is refused; a sealed posture never degrades to plaintext. An invalid KMS configuration refuses the boot (exit 78). An external endpoint that is down at boot does not refuse the boot: sealed writes are refused until a probe succeeds. Sealed Collective rows are write-only until a reader exists (`RELEASE-HOLDS.md` row 23-8.a). **Identity assertions in the Transparency Log are not sealed by this story:** the `identity.asserted` row is plain JSON.
 
 Instead of the local key, an operator who runs a KMS or HSM sets `MAOS_KMS_ENDPOINT` to a `maos.kms.v1` sidecar (wire: `docs/reference/kms-wire-v1.md`; reference sidecar for OpenBao Transit: `examples/kms-sidecar-openbao/`, not a release artifact, not security-reviewed):
 
 | Variable | Required | Meaning |
 |---|---|---|
 | `MAOS_KMS_ENDPOINT` | instead of `MAOS_KMS_MASTER_KEY` | base URL of the sidecar: `https`, or `http` only to a literal loopback address. Setting both variables refuses the boot. Needs the default (`online-adapters`) build |
-| `MAOS_KMS_BEARER` | no | bearer sent on wrap and unwrap to that endpoint; read through the credential store (the environment under `MAOS_SECRETS_BACKEND=encrypted-file`); never logged |
-| `MAOS_KMS_ALLOW_PRIVATE` | no | `1` admits an RFC 1918 / fc00::/7 endpoint address |
+| `MAOS_KMS_BEARER` | no | bearer sent on wrap and unwrap to that endpoint; read through the credential store (the environment under `MAOS_SECRETS_BACKEND=encrypted-file`); never logged. While it is pending or unreadable every call is refused and the boot says so |
+| `MAOS_KMS_ALLOW_PRIVATE` | no | `1` admits private (RFC 1918 / fc00::/7) **and loopback** addresses for the endpoint, including a name that resolves to them (the connection resolves the name again, so it can move between them); link-local and reserved never |
 
-The endpoint is vetted once at boot. A host **name** is not SSRF-protected (the connection is not bound to the vetted addresses, `RELEASE-HOLDS.md` row 23-8.c): prefer a literal address.
+The endpoint is vetted once at boot. A host **name** is not SSRF-protected (the connection is not bound to the vetted addresses, `RELEASE-HOLDS.md` row 23-8.c): prefer a literal address. Three deployment conditions:
+
+- **Loopback `http` does not authenticate the listener** (row 23-8.b). MAOS sends the data key (base64) and the bearer to whatever process listens on that port; if the sidecar is down another local user can bind the port, answer `/health`, collect data keys and the bearer, and replay the bearer to the real sidecar. Run the sidecar on a privileged or otherwise unclaimable port, or under the same OS user with the port bound before MAOS starts, or put TLS in front and use `https`. A Unix-domain-socket owner check is not implemented.
+- **No private-CA `https`** (row 23-8.g): the transport trusts the bundled webpki roots only. Use a loopback sidecar or a publicly-trusted certificate; a CA-bundle setting is a follow-up decision.
+- **Timeouts hold for a literal IP only** (row 23-8.d): 5 s per wrap/unwrap and 2 s per probe. For a host name the DNS lookup is not bounded, so a call can block longer; writes are still refused once health goes stale (30 s).
 
 ### SIEM — exported
 

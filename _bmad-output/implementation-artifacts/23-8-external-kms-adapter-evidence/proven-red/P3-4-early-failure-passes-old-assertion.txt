@@ -1,0 +1,11 @@
+Review finding P3-4 (the down-endpoint boot of the encrypted-file test only asserted that "Anthropic provider registered" is absent).
+
+Plant  crates/maos-bin/tests/external_kms_wiring_23_8.rs  encrypted_file_works_over_the_endpoint_...:
+    down_vars.push(("MAOS_KMS_MASTER_KEY", "4242...ab")); // E238-PLANT P3-4
+  This makes the second boot a configuration conflict (exit 78) before any provider is resolved: an unrelated early failure.
+  The old assertion (provider line absent) is true for it; the new ones are not.
+  command: cargo test --locked -p maos-bin --test external_kms_wiring_23_8
+  fails:
+    encrypted_file_works_over_the_endpoint_and_a_down_endpoint_never_falls_back_to_the_environment
+      "the second boot must have probed the dead endpoint: maos: crypto provider = ring 0.17.14 ..."
+Reverted; green again.

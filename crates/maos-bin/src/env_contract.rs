@@ -570,7 +570,7 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     },
     EnvVar {
         name: "MAOS_KMS_ALLOW_PRIVATE",
-        purpose: "1 or true admits an RFC 1918 / fc00::/7 address for MAOS_KMS_ENDPOINT; link-local, reserved and name-resolved loopback stay refused (Story 23-8)",
+        purpose: "1 or true admits private (RFC 1918 / fc00::/7) and loopback addresses for MAOS_KMS_ENDPOINT, including a host name that resolves to them (the connection resolves the name again); link-local and reserved stay refused (Story 23-8)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {

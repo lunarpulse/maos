@@ -1,0 +1,10 @@
+Review finding P3-2 (a probe in flight can clear a `down` set by a call that failed after the probe started).
+
+Plant  crates/maos-secrets/src/http_kms.rs  mark_ok:
+    if health.epoch == epoch || true /* E238-PLANT P3-2 */ {     (the ordering token is ignored)
+  command: cargo test --locked -p maos-secrets --features http-kms --test external_kms_23_8 -- --skip the_probe_has_its_own
+  fails:
+    a_probe_in_flight_cannot_clear_a_failure_recorded_after_it_started
+      "a failure recorded while the probe was in flight must stand"
+  The test is deterministic: the failing wrap runs inside the probe's own scripted transport (no thread, no sleep).
+Reverted; green again.

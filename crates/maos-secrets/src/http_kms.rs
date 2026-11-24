@@ -15,6 +15,12 @@
 //!   one payload, not of the endpoint, and leaves the state as it is.
 //! - No error, `Debug` output or log line carries the bearer, a data key, a
 //!   wrapped key or a response body.
+//!
+//! Limits of the transport (Story 23-8 review): [`TimedHttp`] trusts the
+//! webpki root set only and has no CA-bundle setting, so an `https` endpoint
+//! behind a private CA fails the handshake and reads as unavailable; and ureq
+//! applies none of its timeouts to the DNS lookup, so for a host-name endpoint
+//! a call can outlast them (it stays fail-closed: health goes stale).
 
 use maos_domain::ports::io_subsystem::{HttpExchange, IoError};
 use maos_domain::ports::{IoSubsystemPort, KeyManagementPort, KmsError};
@@ -77,11 +83,18 @@ impl KmsClock for MonotonicClock {
 }
 
 /// Transport timeouts (D-23-8-06 A). The kernel `IoSubsystemAdapter` has none.
+///
+/// For a literal-IP endpoint these bound a call. ureq 2.12 applies none of
+/// them to the DNS lookup, so for a host name the lookup is not bounded here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Timeouts {
     pub connect: Duration,
     pub io: Duration,
+    /// Overall limit of a `POST` (wrap, unwrap).
     pub overall: Duration,
+    /// Overall limit of the health probe (`GET`): shorter than `overall`, so
+    /// a probe that nobody can cancel cannot hold a shutdown for 5 s.
+    pub probe: Duration,
 }
 
 impl Default for Timeouts {
@@ -90,6 +103,7 @@ impl Default for Timeouts {
             connect: Duration::from_secs(2),
             io: Duration::from_secs(2),
             overall: Duration::from_secs(5),
+            probe: Duration::from_secs(2),
         }
     }
 }
@@ -97,10 +111,12 @@ impl Default for Timeouts {
 /// An [`IoSubsystemPort`] over its own `ureq` agent with bounded timeouts, no
 /// redirects and a 64 KiB response cap (D-23-8-06 A). A 3xx is a refusal that
 /// is returned as a status and never followed; a bad header value is withheld
-/// from the error. Errors never carry the URL, a header or a body.
+/// from the error. Errors never carry the URL, a header or a body. `https`
+/// trusts the webpki root set only: there is no CA-bundle setting.
 #[derive(Debug, Clone)]
 pub struct TimedHttp {
     agent: ureq::Agent,
+    probe_overall: Duration,
 }
 
 impl TimedHttp {
@@ -114,6 +130,7 @@ impl TimedHttp {
                 .timeout_write(timeouts.io)
                 .timeout(timeouts.overall)
                 .build(),
+            probe_overall: timeouts.probe,
         }
     }
 }
@@ -153,7 +170,7 @@ fn transport_error(error: &ureq::Transport) -> IoError {
 
 impl IoSubsystemPort for TimedHttp {
     fn http_get(&self, url: &str) -> Result<Vec<u8>, IoError> {
-        let response = match self.agent.get(url).call() {
+        let response = match self.agent.get(url).timeout(self.probe_overall).call() {
             Ok(response) => response,
             Err(ureq::Error::Status(status, _)) => {
                 return Err(IoError::Transport(format!("status {status}")))
@@ -219,14 +236,91 @@ impl IoSubsystemPort for TimedHttp {
 enum BearerState {
     /// Constructed without a bearer decision; wrap, unwrap and health refuse.
     Pending,
+    /// The bearer was read and could not be: wrap, unwrap and health refuse.
+    Unreadable,
     Absent,
     Token(String),
+}
+
+/// Where the bearer decision of an adapter stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BearerStatus {
+    /// Not provisioned yet: every call is refused.
+    Pending,
+    /// The read failed: every call is refused until restart.
+    Unreadable,
+    /// Decided (a token, or none): calls are sent.
+    Settled,
 }
 
 #[derive(Debug, Default)]
 struct Health {
     last_ok: Option<Duration>,
     down: bool,
+    /// Bumped by every `mark_down`. A probe takes it before its I/O and may
+    /// only mark the endpoint up if no failure happened since.
+    epoch: u64,
+}
+
+/// Why the adapter last refused or failed a call. Logged once per change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Failure {
+    BearerPending,
+    BearerUnreadable,
+    Unauthorized,
+    Forbidden,
+    Redirect,
+    ClientError,
+    Server,
+    OtherStatus,
+    Transport,
+    Malformed,
+}
+
+impl Failure {
+    fn of_status(status: u16) -> Self {
+        match status {
+            401 => Self::Unauthorized,
+            403 => Self::Forbidden,
+            300..=399 => Self::Redirect,
+            400..=499 => Self::ClientError,
+            500..=599 => Self::Server,
+            _ => Self::OtherStatus,
+        }
+    }
+
+    /// A line without any value: no bearer, key, URL or body.
+    fn notice(self) -> &'static str {
+        match self {
+            Self::BearerPending => {
+                "maos: external KMS call refused: the bearer is not provisioned yet; sealed writes are refused until it is"
+            }
+            Self::BearerUnreadable => {
+                "maos: external KMS call refused: the bearer could not be read at boot; every wrap and unwrap is refused until restart (check MAOS_KMS_BEARER and the secret store)"
+            }
+            Self::Unauthorized => {
+                "maos: external KMS answered HTTP 401: the sidecar rejected the bearer (check MAOS_KMS_BEARER); sealed writes are refused"
+            }
+            Self::Forbidden => {
+                "maos: external KMS answered HTTP 403: the sidecar forbids this caller (check MAOS_KMS_BEARER); sealed writes are refused"
+            }
+            Self::Redirect => {
+                "maos: external KMS answered an HTTP redirect, which is never followed; sealed writes are refused"
+            }
+            Self::ClientError | Self::OtherStatus => {
+                "maos: external KMS answered an unexpected HTTP status; sealed writes are refused"
+            }
+            Self::Server => {
+                "maos: external KMS answered HTTP 5xx: the sidecar or its KMS is failing; sealed writes are refused"
+            }
+            Self::Transport => {
+                "maos: external KMS could not be reached on wrap/unwrap (connection, timeout or TLS failure); sealed writes are refused"
+            }
+            Self::Malformed => {
+                "maos: external KMS answered something that is not a maos.kms.v1 message; sealed writes are refused"
+            }
+        }
+    }
 }
 
 /// [`KeyManagementPort`] over `maos.kms.v1`.
@@ -237,12 +331,15 @@ pub struct HttpKms {
     clock: Arc<dyn KmsClock>,
     probe_interval: Duration,
     health: Mutex<Health>,
+    notice: Arc<dyn Fn(&str) + Send + Sync>,
+    last_failure: Mutex<Option<Failure>>,
 }
 
 impl fmt::Debug for HttpKms {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let bearer = match &*lock(&self.bearer) {
             BearerState::Pending => "pending",
+            BearerState::Unreadable => "unreadable",
             BearerState::Absent => "absent",
             BearerState::Token(_) => "set (withheld)",
         };
@@ -318,6 +415,8 @@ impl HttpKms {
             clock,
             probe_interval: DEFAULT_PROBE_INTERVAL,
             health: Mutex::new(Health::default()),
+            notice: Arc::new(|line| eprintln!("{line}")),
+            last_failure: Mutex::new(None),
         })
     }
 
@@ -328,12 +427,45 @@ impl HttpKms {
         self
     }
 
+    /// Replace where the adapter's one-line notices go (default: stderr). A
+    /// notice is logged once per change of failure class and never carries
+    /// the bearer, a key, a URL or a response body.
+    #[must_use]
+    pub fn with_notice_sink(mut self, sink: Arc<dyn Fn(&str) + Send + Sync>) -> Self {
+        self.notice = sink;
+        self
+    }
+
     /// Settle the bearer of a [`Self::pending_bearer`] adapter (`None` = none).
+    /// A refusal logged while the bearer was pending no longer describes the
+    /// adapter, so it is forgotten (and not reported as a recovery).
     pub fn provision_bearer(&self, bearer: Option<String>) {
         *lock(&self.bearer) = match bearer {
             Some(token) => BearerState::Token(token),
             None => BearerState::Absent,
         };
+        *lock(&self.last_failure) = None;
+    }
+
+    /// Record that the bearer could not be read: every call stays refused.
+    pub fn bearer_unreadable(&self) {
+        *lock(&self.bearer) = BearerState::Unreadable;
+        *lock(&self.last_failure) = None;
+    }
+
+    /// Where the bearer decision stands.
+    pub fn bearer_status(&self) -> BearerStatus {
+        match &*lock(&self.bearer) {
+            BearerState::Pending => BearerStatus::Pending,
+            BearerState::Unreadable => BearerStatus::Unreadable,
+            BearerState::Absent | BearerState::Token(_) => BearerStatus::Settled,
+        }
+    }
+
+    /// Whether the last wrap or unwrap was refused or failed (the bearer
+    /// states and every availability failure). Cleared by the next success.
+    pub fn calls_failing(&self) -> bool {
+        lock(&self.last_failure).is_some()
     }
 
     fn staleness_bound(&self) -> Duration {
@@ -341,20 +473,50 @@ impl HttpKms {
     }
 
     fn mark_down(&self) {
-        lock(&self.health).down = true;
+        let mut health = lock(&self.health);
+        health.down = true;
+        health.epoch = health.epoch.wrapping_add(1);
     }
 
-    fn mark_ok(&self) {
+    fn epoch(&self) -> u64 {
+        lock(&self.health).epoch
+    }
+
+    /// Apply a successful probe that started at `epoch`. A failure recorded
+    /// since (a call that failed while the probe was in flight) wins.
+    fn mark_ok(&self, epoch: u64) {
         let now = self.clock.now();
         let mut health = lock(&self.health);
-        health.last_ok = Some(now);
-        health.down = false;
+        if health.epoch == epoch {
+            health.last_ok = Some(now);
+            health.down = false;
+        }
     }
 
-    /// Run one `GET /health`. A success refreshes the cached state; any
-    /// failure marks the endpoint down. Returns whether the endpoint answered
+    fn note_failure(&self, failure: Failure) {
+        let changed = {
+            let mut last = lock(&self.last_failure);
+            let changed = *last != Some(failure);
+            *last = Some(failure);
+            changed
+        };
+        if changed {
+            (self.notice)(failure.notice());
+        }
+    }
+
+    fn note_success(&self) {
+        if lock(&self.last_failure).take().is_some() {
+            (self.notice)("maos: external KMS wrap/unwrap answered again");
+        }
+    }
+
+    /// Run one `GET /health`. A success refreshes the cached state unless a
+    /// call failed while it was in flight; any failure marks the endpoint
+    /// down. Returns whether the endpoint answered
     /// `{"version":"maos.kms.v1","status":"ok"}`.
     pub fn probe(&self) -> bool {
+        let epoch = self.epoch();
         let ok = self
             .io
             .http_get(&format!("{}/health", self.base))
@@ -364,7 +526,7 @@ impl HttpKms {
                 value.get("status").and_then(serde_json::Value::as_str) == Some("ok")
             });
         if ok {
-            self.mark_ok();
+            self.mark_ok(epoch);
         } else {
             self.mark_down();
         }
@@ -372,13 +534,21 @@ impl HttpKms {
     }
 
     fn authorization(&self) -> Result<Option<String>, KmsError> {
-        match &*lock(&self.bearer) {
-            BearerState::Pending => Err(KmsError::Unavailable(
-                "KMS bearer is not provisioned yet".to_owned(),
-            )),
-            BearerState::Absent => Ok(None),
-            BearerState::Token(token) => Ok(Some(format!("Bearer {token}"))),
-        }
+        let refused = match &*lock(&self.bearer) {
+            BearerState::Pending => Failure::BearerPending,
+            BearerState::Unreadable => Failure::BearerUnreadable,
+            BearerState::Absent => return Ok(None),
+            BearerState::Token(token) => return Ok(Some(format!("Bearer {token}"))),
+        };
+        self.note_failure(refused);
+        Err(KmsError::Unavailable(
+            if refused == Failure::BearerPending {
+                "KMS bearer is not provisioned yet"
+            } else {
+                "KMS bearer could not be read"
+            }
+            .to_owned(),
+        ))
     }
 
     /// POST `body` to `path` and classify the answer. `Ok` is a parsed 2xx
@@ -397,6 +567,7 @@ impl HttpKms {
             Ok(exchange) => exchange,
             Err(_) => {
                 self.mark_down();
+                self.note_failure(Failure::Transport);
                 return Err(KmsError::Unavailable("KMS endpoint unreachable".to_owned()));
             }
         };
@@ -411,6 +582,7 @@ impl HttpKms {
             },
             status => {
                 self.mark_down();
+                self.note_failure(Failure::of_status(status));
                 Err(KmsError::Unavailable(format!(
                     "KMS endpoint answered status {status}"
                 )))
@@ -420,6 +592,7 @@ impl HttpKms {
 
     fn malformed_answer(&self) -> KmsError {
         self.mark_down();
+        self.note_failure(Failure::Malformed);
         KmsError::MalformedPayload("KMS answer is not a valid maos.kms.v1 message")
     }
 }
@@ -462,6 +635,7 @@ impl KeyManagementPort for HttpKms {
         let answer = self.call("/wrap", &request.to_string())?;
         match b64_field(&answer, "wrapped") {
             Some(wrapped) if !wrapped.is_empty() && wrapped.len() <= MAX_WRAPPED_BYTES => {
+                self.note_success();
                 Ok(wrapped)
             }
             _ => Err(self.malformed_answer()),
@@ -478,13 +652,16 @@ impl KeyManagementPort for HttpKms {
         });
         let answer = self.call("/unwrap", &request.to_string())?;
         match b64_field(&answer, "plaintext") {
-            Some(plaintext) if plaintext.len() == DATA_KEY_LEN => Ok(plaintext),
+            Some(plaintext) if plaintext.len() == DATA_KEY_LEN => {
+                self.note_success();
+                Ok(plaintext)
+            }
             _ => Err(self.malformed_answer()),
         }
     }
 
     fn is_healthy(&self) -> bool {
-        if matches!(&*lock(&self.bearer), BearerState::Pending) {
+        if !matches!(self.bearer_status(), BearerStatus::Settled) {
             return false;
         }
         let health = lock(&self.health);

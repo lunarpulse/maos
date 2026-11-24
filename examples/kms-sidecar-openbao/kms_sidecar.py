@@ -25,6 +25,12 @@ file or argument, and is never logged):
     SIDECAR_BEARER         optional. When set, wrap and unwrap require
                            "Authorization: Bearer <value>"; set MAOS_KMS_BEARER
                            to the same value on the MAOS side.
+
+The call to OpenBao never follows a redirect (the token would travel to the
+redirect target; a 3xx is an upstream failure) and ignores HTTP_PROXY /
+HTTPS_PROXY / ALL_PROXY (the token and the data key would pass through the
+proxy). Each client connection has a socket timeout, so a client that stalls
+cannot hold a handler thread.
 """
 
 import base64
@@ -42,6 +48,18 @@ VERSION = "maos.kms.v1"
 MAX_BODY = 16 * 1024
 MAX_WRAPPED = 4096
 UPSTREAM_TIMEOUT = 3
+HANDLER_TIMEOUT = 10
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None  # the 3xx surfaces as an HTTPError: an upstream failure
+
+
+def opener():
+    """An opener with no redirect handling and no proxy, built per call so a
+    proxy variable set later is still ignored."""
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
 
 
 class Config:
@@ -87,7 +105,7 @@ def transit(config, operation, payload):
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=UPSTREAM_TIMEOUT) as response:
+        with opener().open(request, timeout=UPSTREAM_TIMEOUT) as response:
             return json.load(response)["data"]
     except urllib.error.HTTPError as error:
         # 400 is OpenBao saying that this ciphertext or plaintext is invalid.
@@ -104,7 +122,7 @@ def transit_ready(config):
         headers={"X-Vault-Token": config.token},
     )
     try:
-        with urllib.request.urlopen(request, timeout=UPSTREAM_TIMEOUT) as response:
+        with opener().open(request, timeout=UPSTREAM_TIMEOUT) as response:
             return response.status == 200
     except (urllib.error.URLError, OSError):
         return False
@@ -120,9 +138,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
     config = None  # set by make_server
     server_version = "maos-kms-sidecar"
     protocol_version = "HTTP/1.1"
+    timeout = HANDLER_TIMEOUT  # socket timeout of each client connection
 
-    def log_message(self, fmt, *args):  # method, path and status only
-        sys.stderr.write("sidecar: %s %s\n" % (self.command, self.path))
+    def log_message(self, fmt, *args):  # method and path only
+        sys.stderr.write(
+            "sidecar: %s %s\n" % (getattr(self, "command", "-"), getattr(self, "path", "-"))
+        )
 
     def reply(self, status, body):
         data = json.dumps(body).encode()
@@ -209,8 +230,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return self.reply(200, {"version": VERSION, "plaintext": base64.b64encode(plaintext).decode()})
 
 
-def make_server(config, host="127.0.0.1", port=8300):
-    handler = type("BoundHandler", (Handler,), {"config": config})
+def make_server(config, host="127.0.0.1", port=8300, timeout=HANDLER_TIMEOUT):
+    handler = type("BoundHandler", (Handler,), {"config": config, "timeout": timeout})
     return http.server.ThreadingHTTPServer((host, port), handler)
 
 

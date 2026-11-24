@@ -208,6 +208,97 @@ mod online {
         }
     }
 
+    /// `MAOS_KMS_ALLOW_PRIVATE` is not "private only": the shared policy admits
+    /// loopback whenever `allow_private` is set (`OutboundPolicy::admit`), by
+    /// any route, so a name that resolves to loopback, to a private address or
+    /// to both boots. Without the opt-in a name that resolves to loopback is
+    /// refused. Link-local and reserved stay refused either way, and plain
+    /// `http` stays loopback-literal only.
+    #[test]
+    fn with_the_opt_in_private_and_loopback_addresses_are_admitted_including_names() {
+        let loopback_name = || Some(vec!["127.0.0.1".parse().unwrap()]);
+        let private_name = || Some(vec!["10.1.2.3".parse().unwrap()]);
+        let mixed = || {
+            Some(vec![
+                "10.1.2.3".parse().unwrap(),
+                "127.0.0.1".parse().unwrap(),
+            ])
+        };
+        assert_eq!(
+            refused("https://localhost:8443", false, loopback_name()),
+            "outbound_loopback_refused"
+        );
+        for names in [loopback_name(), private_name(), mixed()] {
+            assert!(
+                select(Some("https://localhost:8443"), None, true, names.clone()).is_ok(),
+                "the opt-in admits {names:?}"
+            );
+        }
+        assert!(select(Some("https://127.0.0.1:8443"), None, true, None).is_ok());
+        assert_eq!(
+            refused(
+                "https://localhost:8443",
+                true,
+                Some(vec!["169.254.169.254".parse().unwrap()])
+            ),
+            "outbound_link_local_refused",
+            "link-local is never admitted"
+        );
+        assert_eq!(
+            refused("http://localhost:8443", true, loopback_name()),
+            "outbound_http_refused",
+            "plain http is a literal loopback only, opt-in or not"
+        );
+    }
+
+    /// P3-1: no probe line claims that sealed writes resume while the bearer is
+    /// pending or unreadable, or while calls fail; the probe outcome follows the
+    /// bearer state and an unreadable bearer sends nothing.
+    #[test]
+    fn the_probe_outcome_follows_the_bearer_and_no_line_claims_writes_resume_until_calls_work() {
+        use maos_bin::enterprise_identity::KmsProbeOutcome as Outcome;
+
+        let fixture = KmsFixture::start();
+        let kms = external(&fixture.url());
+        let probe = kms.probe().expect("external endpoint");
+        assert_eq!(probe(), Outcome::ReachableBearerPending);
+        kms.bearer_unreadable();
+        assert_eq!(probe(), Outcome::ReachableBearerUnreadable);
+        let posts_before = fixture.count("POST", "/wrap");
+        assert!(kms.port().wrap_data_key(&[1u8; 32]).is_err());
+        assert!(
+            !kms.port().is_healthy(),
+            "an unreadable bearer is never healthy"
+        );
+        assert_eq!(
+            fixture.count("POST", "/wrap"),
+            posts_before,
+            "nothing is sent"
+        );
+        kms.provision_bearer(None);
+        assert_eq!(probe(), Outcome::Ready);
+
+        for outcome in [
+            Outcome::Unreachable,
+            Outcome::ReachableBearerPending,
+            Outcome::ReachableBearerUnreadable,
+            Outcome::ReachableCallsFailing,
+        ] {
+            for boot in [true, false] {
+                let line = outcome.line(boot);
+                assert!(
+                    !line.contains("resume"),
+                    "{outcome:?} must not claim writes resume: {line}"
+                );
+            }
+        }
+        assert!(Outcome::Ready.line(false).contains("resume"));
+        assert!(Outcome::ReachableBearerPending
+            .line(true)
+            .contains("stay refused"));
+        assert!(!Outcome::Unreachable.reachable() && Outcome::Ready.reachable());
+    }
+
     fn runtime_over(kms: &ConfiguredKms) -> EnterpriseRuntime {
         kms.provision_bearer(None);
         let runtime = EnterpriseRuntime::from_ports(
@@ -237,7 +328,7 @@ mod online {
         let kms = external(&fixture.url());
         let runtime = runtime_over(&kms);
         let probe = runtime.kms_probe().unwrap();
-        assert!(probe(), "the endpoint is up");
+        assert!(probe().reachable(), "the endpoint is up");
 
         let sealed = runtime
             .seal_row_at_rest(PLAINTEXT)
@@ -247,7 +338,10 @@ mod online {
 
         // (d) the fixture stopped and one probe run.
         fixture.stop();
-        assert!(!probe(), "the probe of a stopped endpoint fails");
+        assert!(
+            !probe().reachable(),
+            "the probe of a stopped endpoint fails"
+        );
         assert!(matches!(
             runtime.seal_row_at_rest(PLAINTEXT),
             Err(EnterpriseFailure::KmsSealedWriteRefused { .. })
@@ -272,7 +366,7 @@ mod online {
             sealer.seal(PLAINTEXT),
             Err(StoreError::AtRestSeal(_))
         ));
-        assert!(probe());
+        assert!(probe().reachable());
         let again = runtime
             .seal_row_at_rest(PLAINTEXT)
             .expect("sealing resumes");
@@ -319,7 +413,7 @@ mod online {
 
         // "...and succeeds once a probe sees the endpoint."
         let _up = KmsFixture::restart(&dead);
-        assert!(runtime.kms_probe().unwrap()());
+        assert!(runtime.kms_probe().unwrap()().reachable());
         let sealed = sealer.seal(PLAINTEXT).expect("sealed after the probe");
         assert_ne!(sealed, PLAINTEXT);
     }
@@ -418,13 +512,13 @@ fn the_reference_sidecar_passes_its_own_self_test() {
 /// outer deadline, cancels, and waits for the task to stop.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn the_probe_task_runs_until_the_shutdown_token_fires() {
-    use maos_bin::enterprise_identity::{spawn_kms_probe, KmsProbeFn};
+    use maos_bin::enterprise_identity::{spawn_kms_probe, KmsProbeFn, KmsProbeOutcome};
     use std::time::Duration;
 
     let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
     let probe: KmsProbeFn = Arc::new(move || {
         let _ = sender.send(());
-        true
+        KmsProbeOutcome::Ready
     });
     let cancel = tokio_util::sync::CancellationToken::new();
     let handle = spawn_kms_probe(probe, Duration::from_millis(5), cancel.clone());
@@ -649,6 +743,10 @@ fn encrypted_file_works_over_the_endpoint_and_a_down_endpoint_never_falls_back_t
     let text = stderr(&up);
     assert!(up.status.success(), "{text}");
     assert!(
+        text.contains("external KMS bearer read"),
+        "the boot says the bearer was settled: {text}"
+    );
+    assert!(
         text.contains("maos: Anthropic provider registered"),
         "the credential must open through /unwrap: {text}"
     );
@@ -676,6 +774,17 @@ fn encrypted_file_works_over_the_endpoint_and_a_down_endpoint_never_falls_back_t
     assert!(
         !text.contains("maos: Anthropic provider registered"),
         "no provider may register from the environment fallback: {text}"
+    );
+    // The absence above must not pass on an unrelated early failure: this
+    // boot got through the KMS boot probe (which found the endpoint down),
+    // the secret store and provider resolution, to the inference port.
+    assert!(
+        text.contains("external KMS endpoint UNREACHABLE at boot"),
+        "the second boot must have probed the dead endpoint: {text}"
+    );
+    assert!(
+        text.contains("maos: ProviderRateLimiter initialized"),
+        "the second boot must have passed provider resolution: {text}"
     );
     assert!(!text.contains("sk-ant-environment-fallback") && !text.contains(CREDENTIAL));
 }

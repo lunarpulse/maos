@@ -399,6 +399,7 @@ fn a_peer_that_never_answers_makes_wrap_unavailable() {
             connect: Duration::from_millis(300),
             io: Duration::from_millis(300),
             overall: Duration::from_secs(2),
+            probe: Duration::from_secs(2),
         })),
         &fixture.url(),
         None,
@@ -539,4 +540,300 @@ fn an_endpoint_must_be_a_plain_base_url() {
         Arc::new(MonotonicClock::new())
     )
     .is_ok());
+}
+
+// ── Review fixes: logging, probe ordering, probe timeout, echoing endpoints ──
+
+type Notices = Arc<std::sync::Mutex<Vec<String>>>;
+
+fn with_notices(kms: HttpKms) -> (HttpKms, Notices) {
+    let notices: Notices = Arc::default();
+    let sink = Arc::clone(&notices);
+    let kms = kms.with_notice_sink(Arc::new(move |line| {
+        sink.lock().unwrap().push(line.to_owned());
+    }));
+    (kms, notices)
+}
+
+/// P3-1: a wrap or unwrap that fails is logged once per change of class, with
+/// the status class and no secret, URL or body; recovery is logged once.
+#[test]
+fn a_failed_call_is_logged_once_per_change_with_its_status_class_and_never_a_secret() {
+    let mut fixture = KmsFixture::start();
+    let clock = FakeClock::new();
+    let (kms, notices) = with_notices(adapter(&fixture.url(), Some(BEARER), &clock));
+    assert!(kms.probe());
+    assert!(!kms.calls_failing());
+
+    fixture.set_mode(Mode::Fixed(401, "{}".to_owned()));
+    for _ in 0..3 {
+        assert!(matches!(
+            kms.wrap_data_key(&[1u8; 32]),
+            Err(KmsError::Unavailable(_))
+        ));
+    }
+    assert!(kms.calls_failing());
+    assert_eq!(notices.lock().unwrap().len(), 1, "once per state change");
+    assert!(notices.lock().unwrap()[0].contains("401"));
+
+    fixture.set_mode(Mode::Fixed(503, "{}".to_owned()));
+    let _ = kms.wrap_data_key(&[1u8; 32]);
+    let _ = kms.wrap_data_key(&[1u8; 32]);
+    fixture.set_mode(Mode::Fixed(403, "{}".to_owned()));
+    let _ = kms.wrap_data_key(&[1u8; 32]);
+    {
+        let seen = notices.lock().unwrap();
+        assert_eq!(seen.len(), 3, "{seen:?}");
+        assert!(seen[1].contains("5xx"), "{}", seen[1]);
+        assert!(seen[2].contains("403"), "{}", seen[2]);
+    }
+
+    // A typed 422 is a refusal of one payload, not a failure of the endpoint.
+    fixture.set_mode(Mode::Fixed(422, r#"{"error":"wrap_failed"}"#.to_owned()));
+    assert!(matches!(
+        kms.wrap_data_key(&[1u8; 32]),
+        Err(KmsError::Crypto(_))
+    ));
+    assert_eq!(notices.lock().unwrap().len(), 3);
+
+    fixture.set_mode(Mode::Normal);
+    kms.wrap_data_key(&[1u8; 32])
+        .expect("the endpoint answers again");
+    assert!(!kms.calls_failing());
+    kms.wrap_data_key(&[1u8; 32]).unwrap();
+    assert_eq!(notices.lock().unwrap().len(), 4, "recovery is logged once");
+    assert!(notices.lock().unwrap()[3].contains("answered again"));
+
+    let url = fixture.url();
+    fixture.stop();
+    let _ = kms.wrap_data_key(&[1u8; 32]);
+    let seen = notices.lock().unwrap();
+    assert_eq!(seen.len(), 5, "{seen:?}");
+    assert!(seen[4].contains("could not be reached"), "{}", seen[4]);
+    for line in seen.iter() {
+        assert!(
+            !line.contains(BEARER) && !line.contains(&url) && !line.contains("127.0.0.1"),
+            "a notice must carry no secret or address: {line}"
+        );
+    }
+}
+
+/// P3-1: a bearer that is pending or unreadable refuses every call, sends
+/// nothing, and says so once.
+#[test]
+fn a_pending_or_unreadable_bearer_is_logged_once_and_sends_nothing() {
+    use maos_secrets::http_kms::BearerStatus;
+
+    let fixture = KmsFixture::start();
+    let clock = FakeClock::new();
+    let (kms, notices) = with_notices(
+        HttpKms::pending_bearer(
+            Arc::new(TimedHttp::default()),
+            &fixture.url(),
+            Arc::clone(&clock) as Arc<dyn KmsClock>,
+        )
+        .unwrap(),
+    );
+    assert_eq!(kms.bearer_status(), BearerStatus::Pending);
+    for _ in 0..2 {
+        assert!(kms.wrap_data_key(&[1u8; 32]).is_err());
+    }
+    assert_eq!(notices.lock().unwrap().len(), 1);
+    assert!(notices.lock().unwrap()[0].contains("not provisioned"));
+
+    kms.bearer_unreadable();
+    assert_eq!(kms.bearer_status(), BearerStatus::Unreadable);
+    assert!(kms.probe(), "a probe carries no credential");
+    assert!(!kms.is_healthy(), "an unreadable bearer is never healthy");
+    for _ in 0..2 {
+        assert!(kms.unwrap_data_key(&[1u8; 16]).is_err());
+    }
+    assert_eq!(notices.lock().unwrap().len(), 2);
+    assert!(notices.lock().unwrap()[1].contains("could not be read"));
+    assert_eq!(
+        fixture.count("POST", "/wrap") + fixture.count("POST", "/unwrap"),
+        0
+    );
+
+    kms.provision_bearer(Some(BEARER.to_owned()));
+    assert_eq!(kms.bearer_status(), BearerStatus::Settled);
+    assert!(kms.probe() && kms.is_healthy());
+    assert!(
+        !kms.calls_failing(),
+        "a refusal from before the bearer was settled no longer describes the adapter"
+    );
+}
+
+/// An endpoint that reflects the `Authorization` it was sent in its body and
+/// headers, for every status class, must not get that value into any error,
+/// `Debug` output or notice (P3-5).
+#[test]
+fn a_response_that_echoes_the_bearer_never_reaches_an_error_a_debug_or_a_log_line() {
+    use maos_domain::ports::IoSubsystemPort;
+
+    let fixture = KmsFixture::start();
+    let clock = FakeClock::new();
+    let (kms, notices) = with_notices(adapter(&fixture.url(), Some(BEARER), &clock));
+    assert!(kms.probe());
+    let wrapped = kms.wrap_data_key(&[4u8; 32]).unwrap();
+
+    let mut rendered = vec![format!("{kms:?}")];
+    for status in [200u16, 401, 403, 422, 500, 302] {
+        fixture.set_mode(Mode::EchoAuthorization(status));
+        for result in [kms.wrap_data_key(&[4u8; 32]), kms.unwrap_data_key(&wrapped)] {
+            let error = result.expect_err("a reflected header is never a good answer");
+            rendered.push(format!("{error:?}"));
+            rendered.push(error.to_string());
+        }
+    }
+    // The transport on its own, for a non-2xx and a 3xx.
+    let io = TimedHttp::default();
+    let authorization = format!("Bearer {BEARER}");
+    for status in [500u16, 302] {
+        fixture.set_mode(Mode::EchoAuthorization(status));
+        let url = format!("{}/wrap", fixture.url());
+        let result = io.http_post(&url, b"{}", &[("Authorization", authorization.as_str())]);
+        rendered.push(format!("{:?}", result.expect_err("non-2xx")));
+    }
+    rendered.extend(notices.lock().unwrap().iter().cloned());
+
+    let echoing_requests = fixture
+        .requests()
+        .into_iter()
+        .filter(|r| r.path == "/wrap" || r.path == "/unwrap")
+        .count();
+    assert!(
+        echoing_requests >= 14,
+        "the fixture was asked {echoing_requests} times"
+    );
+    assert!(
+        fixture
+            .requests()
+            .last()
+            .and_then(|r| r.authorization.clone())
+            .is_some_and(|value| value.contains(BEARER)),
+        "the echoed value really was the bearer"
+    );
+    assert!(
+        notices.lock().unwrap().len() >= 3,
+        "the failures were logged"
+    );
+    for text in rendered {
+        assert!(!text.contains(BEARER), "the bearer leaked into: {text}");
+    }
+}
+
+/// A scripted transport: `http_get` runs a one-shot hook before it answers
+/// healthy; every POST is a 503.
+#[derive(Default)]
+struct ScriptedIo {
+    during_probe: std::sync::Mutex<Option<Box<dyn FnOnce() + Send>>>,
+}
+
+impl maos_domain::ports::IoSubsystemPort for ScriptedIo {
+    fn http_get(&self, _url: &str) -> Result<Vec<u8>, maos_domain::ports::io_subsystem::IoError> {
+        let hook = self.during_probe.lock().unwrap().take();
+        if let Some(hook) = hook {
+            hook();
+        }
+        Ok(br#"{"version":"maos.kms.v1","status":"ok"}"#.to_vec())
+    }
+
+    fn http_post(
+        &self,
+        _url: &str,
+        _body: &[u8],
+        _headers: &[(&str, &str)],
+    ) -> Result<Vec<u8>, maos_domain::ports::io_subsystem::IoError> {
+        Err(maos_domain::ports::io_subsystem::IoError::Transport(
+            "scripted".to_owned(),
+        ))
+    }
+
+    fn http_post_exchange(
+        &self,
+        _url: &str,
+        _body: &[u8],
+        _headers: &[(&str, &str)],
+        _response_header: &str,
+    ) -> Result<
+        maos_domain::ports::io_subsystem::HttpExchange,
+        maos_domain::ports::io_subsystem::IoError,
+    > {
+        Ok(maos_domain::ports::io_subsystem::HttpExchange {
+            status: 503,
+            body: Vec::new(),
+            header: None,
+        })
+    }
+}
+
+/// P3-2: a probe that started before a call failed must not clear the `down`
+/// that call set. Deterministic: the failing call runs inside the probe's own
+/// transport, so no thread, sleep or race is involved.
+#[test]
+fn a_probe_in_flight_cannot_clear_a_failure_recorded_after_it_started() {
+    let io = Arc::new(ScriptedIo::default());
+    let clock = FakeClock::new();
+    let kms = Arc::new(
+        HttpKms::new(
+            Arc::clone(&io) as Arc<dyn maos_domain::ports::IoSubsystemPort>,
+            "http://127.0.0.1:1",
+            None,
+            Arc::clone(&clock) as Arc<dyn KmsClock>,
+        )
+        .unwrap()
+        .with_notice_sink(Arc::new(|_| {})),
+    );
+    let inner = Arc::clone(&kms);
+    *io.during_probe.lock().unwrap() = Some(Box::new(move || {
+        assert!(matches!(
+            inner.wrap_data_key(&[1u8; 32]),
+            Err(KmsError::Unavailable(_))
+        ));
+    }));
+
+    assert!(kms.probe(), "the probe itself saw a healthy answer");
+    assert!(
+        !kms.is_healthy(),
+        "a failure recorded while the probe was in flight must stand"
+    );
+    assert!(
+        kms.probe(),
+        "a probe that starts afterwards restores health"
+    );
+    assert!(kms.is_healthy());
+}
+
+/// P3-3: the probe has its own overall limit, shorter than a POST's. With the
+/// other limits far out of reach, only the probe limit can end this probe;
+/// the outer deadline is a failure bound, not an elapsed-time assertion.
+#[test]
+fn the_probe_has_its_own_overall_limit_and_a_hanging_endpoint_fails_it() {
+    assert_eq!(Timeouts::default().probe, Duration::from_secs(2));
+    assert!(Timeouts::default().probe < Timeouts::default().overall);
+
+    let fixture = KmsFixture::start();
+    fixture.set_mode(Mode::Hang);
+    let clock = FakeClock::new();
+    let kms = HttpKms::new(
+        Arc::new(TimedHttp::new(Timeouts {
+            connect: Duration::from_secs(120),
+            io: Duration::from_secs(120),
+            overall: Duration::from_secs(120),
+            probe: Duration::from_millis(400),
+        })),
+        &fixture.url(),
+        None,
+        Arc::clone(&clock) as Arc<dyn KmsClock>,
+    )
+    .unwrap();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = sender.send((kms.probe(), kms.is_healthy()));
+    });
+    let (reachable, healthy) = receiver
+        .recv_timeout(Duration::from_secs(30))
+        .expect("the probe must end under its own limit, not the 120 s ones");
+    assert!(!reachable && !healthy);
 }

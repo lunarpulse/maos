@@ -8,7 +8,9 @@
 //!   SSO posture, and an out-of-kernel `identity.asserted` (kind 30) provenance
 //!   row is persisted to the Transparency Log.
 //! - **KMS** — `maos_secrets` envelope AEAD via `seal_at_rest_opt`. Sealed rows
-//!   are real ciphertext (not passthrough plaintext).
+//!   are real ciphertext (not passthrough plaintext). The `identity.asserted`
+//!   row above is plain JSON and is NOT sealed by Story 23-8:
+//!   `EnterpriseRuntime::seal_row_at_rest` has no production caller.
 //! - **SIEM** — `maos_siem::SiemExporter` + localhost file sink; redaction is
 //!   applied before projection; sink-down fails closed.
 //!
@@ -554,8 +556,63 @@ fn any_env_with_prefix(prefix: &str) -> bool {
     std::env::vars_os().any(|(name, _)| name.to_string_lossy().starts_with(prefix))
 }
 
-/// A probe of the external KMS endpoint: `true` when it answered healthy.
-pub type KmsProbeFn = Arc<dyn Fn() -> bool + Send + Sync>;
+/// What one probe of the external KMS endpoint found.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KmsProbeOutcome {
+    /// `GET /health` failed or did not answer healthy.
+    Unreachable,
+    /// The endpoint answers, but no call can be sent yet: the bearer has not
+    /// been provisioned from the secret store.
+    ReachableBearerPending,
+    /// The endpoint answers, but the bearer could not be read: every wrap and
+    /// unwrap is refused until restart.
+    ReachableBearerUnreadable,
+    /// The endpoint answers, but the last wrap or unwrap was refused or failed.
+    ReachableCallsFailing,
+    /// The endpoint answers and calls are being sent and accepted.
+    Ready,
+}
+
+impl KmsProbeOutcome {
+    /// Whether `GET /health` answered.
+    #[must_use]
+    pub fn reachable(self) -> bool {
+        !matches!(self, Self::Unreachable)
+    }
+
+    /// The log line for this outcome (never carries a value). `boot` is the
+    /// first probe, which runs before the bearer is read from the secret store.
+    #[must_use]
+    pub fn line(self, boot: bool) -> &'static str {
+        match (self, boot) {
+            (Self::Unreachable, true) => {
+                "maos: external KMS endpoint UNREACHABLE at boot; sealed writes are refused until a probe succeeds"
+            }
+            (Self::Unreachable, false) => {
+                "maos: external KMS endpoint is now UNREACHABLE; sealed writes are refused until a probe succeeds"
+            }
+            (Self::ReachableBearerPending, true) => {
+                "maos: external KMS endpoint reachable at boot; sealed writes stay refused until the bearer is read from the secret store"
+            }
+            (Self::ReachableBearerPending, false) => {
+                "maos: external KMS endpoint is reachable, but the bearer is not provisioned; sealed writes stay refused"
+            }
+            (Self::ReachableBearerUnreadable, _) => {
+                "maos: external KMS endpoint is reachable, but the bearer could not be read; every wrap and unwrap is refused until restart (check MAOS_KMS_BEARER and the secret store)"
+            }
+            (Self::ReachableCallsFailing, _) => {
+                "maos: external KMS endpoint is reachable, but its wrap/unwrap calls are failing (see the earlier 'external KMS answered' line); sealed writes may be refused"
+            }
+            (Self::Ready, true) => "maos: external KMS endpoint reachable at boot",
+            (Self::Ready, false) => {
+                "maos: external KMS endpoint is now reachable; sealed writes resume"
+            }
+        }
+    }
+}
+
+/// A probe of the external KMS endpoint.
+pub type KmsProbeFn = Arc<dyn Fn() -> KmsProbeOutcome + Send + Sync>;
 
 /// How often the composition root probes an external KMS endpoint (D-23-8-03 A).
 pub const KMS_PROBE_INTERVAL: Duration = Duration::from_secs(10);
@@ -670,6 +727,15 @@ impl ConfiguredKms {
         }
         #[cfg(not(feature = "online-adapters"))]
         let _ = bearer;
+    }
+
+    /// Record that the bearer could not be read: the adapter keeps refusing
+    /// every call and the probe line says so. A local master key: no-op.
+    pub fn bearer_unreadable(&self) {
+        #[cfg(feature = "online-adapters")]
+        if let Some(http) = &self.http {
+            http.bearer_unreadable();
+        }
     }
 }
 
@@ -798,7 +864,20 @@ fn external_kms(
     let probe_target = Arc::clone(&kms);
     Ok(ConfiguredKms {
         port: Arc::clone(&kms) as Arc<dyn KeyManagementPort>,
-        probe: Some(Arc::new(move || probe_target.probe())),
+        probe: Some(Arc::new(move || {
+            use maos_secrets::http_kms::BearerStatus;
+            if !probe_target.probe() {
+                return KmsProbeOutcome::Unreachable;
+            }
+            match probe_target.bearer_status() {
+                BearerStatus::Pending => KmsProbeOutcome::ReachableBearerPending,
+                BearerStatus::Unreadable => KmsProbeOutcome::ReachableBearerUnreadable,
+                BearerStatus::Settled if probe_target.calls_failing() => {
+                    KmsProbeOutcome::ReachableCallsFailing
+                }
+                BearerStatus::Settled => KmsProbeOutcome::Ready,
+            }
+        })),
         http: Some(kms),
     })
 }
@@ -824,25 +903,18 @@ pub fn spawn_kms_probe(
         let mut ticker = tokio::time::interval(interval);
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         ticker.tick().await;
-        let mut last: Option<bool> = None;
+        let mut last: Option<KmsProbeOutcome> = None;
         loop {
             tokio::select! {
                 _ = cancel.cancelled() => break,
                 _ = ticker.tick() => {
                     let probe = Arc::clone(&probe);
-                    let reachable = tokio::task::spawn_blocking(move || probe())
+                    let outcome = tokio::task::spawn_blocking(move || probe())
                         .await
-                        .unwrap_or(false);
-                    if last != Some(reachable) {
-                        last = Some(reachable);
-                        eprintln!(
-                            "maos: external KMS endpoint is now {}",
-                            if reachable {
-                                "reachable; sealed writes resume"
-                            } else {
-                                "UNREACHABLE; sealed writes are refused until a probe succeeds"
-                            }
-                        );
+                        .unwrap_or(KmsProbeOutcome::Unreachable);
+                    if last != Some(outcome) {
+                        last = Some(outcome);
+                        eprintln!("{}", outcome.line(false));
                     }
                 }
             }

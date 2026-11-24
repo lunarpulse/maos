@@ -8,6 +8,10 @@
 //! The local master-key adapter is **dev/CI-only**. Vendor KMS support is a
 //! sidecar the operator runs (ADR-051, Story 23-8 amendment); the binary
 //! carries no vendor API. Keyring adapters are additive per `KeyManagementPort`.
+//!
+//! Scope of sealing (Story 23-8): Collective `val_data` and, under
+//! `MAOS_SECRETS_BACKEND=encrypted-file`, credentials are sealed through the
+//! KMS. Identity assertions in the Transparency Log are not sealed by this story.
 
 #[cfg(all(feature = "kms-fault-inject", not(debug_assertions)))]
 compile_error!("kms-fault-inject is dev/CI-only and MUST NOT ship in release builds");

@@ -65,6 +65,10 @@ pub enum Mode {
     Fixed(u16, String),
     /// Correct answers that carry a different `version`.
     WrongVersion,
+    /// A fixed status whose body, `X-Echo` header and `Location` header all
+    /// copy the request's `Authorization` value (a hostile or sloppy endpoint
+    /// that reflects what it was sent).
+    EchoAuthorization(u16),
 }
 
 #[derive(Clone, Debug)]
@@ -258,6 +262,20 @@ fn handle(state: &State, mut stream: TcpStream) {
     match mode {
         Mode::Hang => {
             state.held.lock().unwrap().push(stream);
+            return;
+        }
+        Mode::EchoAuthorization(status) => {
+            let echoed = request.authorization.clone().unwrap_or_default();
+            let body = serde_json::json!({
+                "version": version,
+                "error": echoed,
+                "detail": echoed,
+                "wrapped": echoed,
+                "plaintext": echoed,
+            })
+            .to_string();
+            let extra = format!("X-Echo: {echoed}\r\nLocation: /echo/{echoed}\r\n");
+            respond(&mut stream, status, &extra, &body);
             return;
         }
         Mode::Redirect => {

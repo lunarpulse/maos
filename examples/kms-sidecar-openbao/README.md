@@ -80,12 +80,40 @@ The MAOS test suite runs it
   record of who decrypted what.
 - **A host name for `BAO_ADDR` is resolved by the operating system on every
   call**; use a literal address or a name you control.
+- **The call to OpenBao never follows a redirect and ignores proxy variables.**
+  `urllib`'s default opener follows redirects (the token would travel to the
+  redirect target) and honours `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` (the
+  token and the data key would pass the proxy). The sidecar builds an opener
+  with neither; a 3xx from OpenBao is a `502`. Each client connection has a
+  10 s socket timeout, so a client that stalls cannot hold a handler thread.
+  `selftest.py` asserts all three.
 - Rotating the Transit key (`bao write -f transit/keys/maos/rotate`) keeps old
   wrapped keys readable; re-wrapping existing rows is not done by MAOS (story
   23-8 does not rotate).
 
-MAOS side of the same limits: `MAOS_KMS_ENDPOINT` is operator configuration and
-is never read from a peer; for a host **name** MAOS's outbound policy does not
-bind the connection to the addresses it vetted (RELEASE-HOLDS 23-0.a), so a name
-is not SSRF-protected: prefer a literal address. Sealed Collective rows are
-write-only until a reader exists (RELEASE-HOLDS, Epic 23, row 23-8.a).
+MAOS side of the same limits (details: `docs/reference/kms-wire-v1.md`,
+RELEASE-HOLDS rows 23-8.a to 23-8.g):
+
+- `MAOS_KMS_ENDPOINT` is operator configuration and is never read from a peer;
+  for a host **name** MAOS's outbound policy does not bind the connection to the
+  addresses it vetted (RELEASE-HOLDS 23-0.a), so a name is not SSRF-protected:
+  prefer a literal address. `MAOS_KMS_ALLOW_PRIVATE=1` admits private **and
+  loopback** addresses, including a name that resolves to them (the connection
+  resolves the name again, so it can move between them).
+- **Loopback `http` does not authenticate the sidecar.** MAOS sends the data key
+  and the bearer to whatever process listens on the port. If the sidecar is
+  down, another local user can bind the port, answer `/health`, collect data
+  keys and the bearer and replay the bearer to the real sidecar. Run the sidecar
+  on a privileged or otherwise unclaimable port, or under the same OS user with
+  the port bound before MAOS starts, or put TLS in front and use `https`. A
+  Unix-domain-socket owner check is not implemented.
+- **No private-CA `https`:** MAOS trusts the bundled webpki roots only, so an
+  `https` endpoint behind an internal PKI fails the handshake and writes are
+  refused. Use a loopback sidecar or a publicly-trusted certificate; a
+  CA-bundle setting is a follow-up decision.
+- The 5 s call timeout and the 2 s probe timeout hold for a literal-IP endpoint;
+  for a host name the DNS lookup is not bounded by them (writes are still
+  refused once health goes stale, 30 s).
+- Sealed Collective rows are write-only until a reader exists (RELEASE-HOLDS,
+  Epic 23, row 23-8.a). Identity assertions in the Transparency Log are not
+  sealed by this story.
