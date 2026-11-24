@@ -2206,6 +2206,14 @@ pub(crate) fn journal_guest_diagnostic(
     line: &[u8],
     phase: Option<&str>,
 ) {
+    // The runner's stage-end sentinel (Story 22-9 F2) is a control marker on the same stderr
+    // stream, never a diagnostic: a serving session sees it after every lifecycle reply. Guest
+    // bytes that preceded it on an unterminated line still are one.
+    let line = match maos_frame_codec::split_stage_end(line) {
+        Some([]) => return,
+        Some(guest) => guest,
+        None => line,
+    };
     let mut record =
         if budget.rows >= MAX_DIAGNOSTIC_ROWS || line.len() > MAX_DIAGNOSTIC_BYTES - budget.bytes {
             *dropped += 1;

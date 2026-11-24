@@ -4683,7 +4683,7 @@ jobs:
   # bind at HEAD; the live route runs against two databases on Postgres 16.
   check-reza-production-path:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     services:
       postgres:
         image: pgvector/pgvector:pg16

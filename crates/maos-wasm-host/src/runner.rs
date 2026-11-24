@@ -843,6 +843,10 @@ fn serve_lifecycle<S>(
             lifecycle_wire::encode_reply(&LifecycleReply::Failed("reply_too_large".into()))
         })
         .map_err(|e| RunError::Other(format!("lifecycle reply encode error: {e}")))?;
+    // Story 22-9 F2: everything the guest wrote to fd 2 while serving this request precedes this
+    // line (guest stdio and this write are synchronous on the same fd). The host drains stderr to
+    // it after the reply, so no guest line is lost to the two reader threads' arrival order.
+    eprintln!("{}", maos_frame_codec::STAGE_END_SENTINEL);
     maos_frame_codec::write_frame(&mut store.data_mut().writer, &encoded)
         .map_err(|e| RunError::Other(format!("lifecycle reply write: {e}")))
 }
