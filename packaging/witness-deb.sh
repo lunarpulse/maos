@@ -79,11 +79,18 @@ for row in receipt['roots']:
         assert not pathlib.Path(row['path']).exists(), row
 PY
 sudo dpkg -r maos
-for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do test ! -e "/usr/bin/$bin"; done
+for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do
+  if [[ -e "/usr/bin/$bin" ]]; then
+    echo "still present after dpkg -r: /usr/bin/$bin" >&2; ls -l "/usr/bin/$bin" >&2; exit 1
+  fi
+done
 set +e
 dpkg -L maos > "$scratch/list" 2> "$scratch/list.err"
 rc=$?
 set -e
 # dpkg -L may report not-installed with exit 1; it must never list retained files.
 [[ $rc == 0 || $rc == 1 ]]
-test ! -s "$scratch/list"
+if [[ -s "$scratch/list" ]]; then
+  echo 'dpkg -L lists retained files after removal:' >&2; cat "$scratch/list" >&2
+  dpkg -s maos >&2 || true; exit 1
+fi
