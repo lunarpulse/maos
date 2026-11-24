@@ -160,6 +160,20 @@
 | 22-6.d | **Purge.** `maos purge` removes the segment directory that it resolves at run time. It does not remove segments in a directory configured earlier and since changed, or segments moved elsewhere. | That `maos purge` removes every segment a Host ever wrote. | None; the same shape as the OQ-10 ruling on pre-16-4 CRL files. |
 | 22-6.e | **Backup and migration.** `maosctl backup` and `maosctl migrate sqlite-to-postgres` cover the live log only; sealed segments are neither backed up nor migrated by them. `backup verify` compares live roots and fails if a rotation ran between backup and verify. | That a backup or a Postgres migration carries the sealed part of the audit store. | None scheduled; copy the segment directory with the log. |
 
+## Claim boundaries — Epic 23 release (standards interop)
+
+> Source: Story `23-0-online-adapters-skeleton-and-outbound-policy`, preflight `epic-23-preflight-2026-11-24.md`,
+> decisions D-23-6-02 A, D-23-6-01 A, D-23-0-02 A, D-23-1-04 A and D-23-0-03 A (operator 2026-11-24/25). Later
+> Epic 23 stories add their rows to this section in landing order, through the integration owner. The rows carry
+> the story key, not a release number. Each row is also one line of that release's notes. A boundary is violated
+> by over-claiming, not by shipping.
+
+| # | Boundary | What the release may NOT claim | Successor |
+|---|---|---|---|
+| 23-0.a | **DNS rebinding window.** The outbound policy resolves a host name itself and requires every answer to pass. The IO adapter then resolves the name again for the connection, and the IO port has no resolver hook. A name whose answers change between the two lookups can pass the check and connect to an address the check never saw. A literal IP address has no such window. | That a URL which passed the outbound policy cannot connect to a loopback, link-local, private or reserved address, or that the policy pins the connection to the vetted address. | Closing the window means changing the IO port or the kernel adapter, which needs a new operator decision (not scheduled). |
+| 23-0.b | **Scope.** The shared policy (`maos_domain::outbound`) governs the URLs that servers hand the Epic 23 online adapters, and Worker egress's upstream classification (ADR-061, D-23-0-03 A). It does not govern provider endpoints, the registry endpoint, or operator-configured MCP URIs. | That every outbound connection MAOS makes is vetted by the shared policy. | None; those endpoints are operator-pinned and keep their own rules. |
+| 23-0.c | **Compile-time switch, not an air gap.** `online-adapters` is a compile-time feature. It is on in the default build and gates no code until the first adapter lands. The air-gap boundary is still the network namespace (D-20-2-01 A); `--no-default-features --features air-gap` is a compile-shape control. | That the default build makes no outbound connection, or that building without `online-adapters` is an air-gapped deployment. | `23-6` (removability proof and the namespace witness). |
+
 ## GA-tag procedure (engineering exits green; Holds 1–2 no longer gate)
 
 > **OPERATOR RULING 2026-11-12:** Holds 1–2 are claim boundaries, not GA

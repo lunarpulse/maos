@@ -35,6 +35,7 @@ pub mod notification;
 /// and one custody rule, and this is the only crate all three depend on.
 pub mod operator_door;
 pub mod orchestrator;
+pub mod outbound; // NEW — Story 23-0 shared outbound-endpoint policy (D-23-0-02 A)
 pub mod ports;
 pub mod provenance; // NEW — Story 9.4b AC-6 model-provenance admission error taxonomy (D5/D6)
 pub mod region; // NEW — Story 9.4b AC-5/AC-12 region-pinning jurisdiction label

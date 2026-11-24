@@ -178,3 +178,7 @@ the guard inversion in the same commit).
   two dead T3 emitters deleted, D-16) and kloc 19513. It also pins `maos-domain`
   9329, `maos-bin` 25247, `maos-egress` 1716, `xtask` 44370, and
   `_aggregate_hardfail` 173290 against a measured aggregate of 173289.
+
+## Amendment — Story 23-0 (one outbound classifier; 2026-11-24)
+
+Decided by the operator on 2026-11-24 (D-23-0-03 A). The egress proxy's private `public_ip` is deleted. `maos_domain::outbound::classify_ip` carries its true-set bit for bit as `IpClass::Public`, and the proxy admits an upstream address only when `classify_ip(ip) == IpClass::Public`, at the same two call sites (the literal-IPv4 check and the check of every resolved answer). The rest of the old refusal set is partitioned into `Loopback`, `LinkLocal`, `Private` and `Reserved`. Nothing else in egress changes: the literal-loopback `http` rule, the 10 s bounded resolver and the refusal code `unsafe-upstream-resolution` stay in `maos-egress`. A test in `maos-domain` pins the new classifier to a verbatim copy of the old predicate over every IPv4 /16, every IPv6 first segment and the v4-mapped forms. Why: ADR-051's amendment for Story 23-0 adds a shared outbound policy, and two classifiers would drift.
