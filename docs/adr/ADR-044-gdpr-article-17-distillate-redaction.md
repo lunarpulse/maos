@@ -297,3 +297,15 @@ it. That named limitation is not erased by a successful verification result.
   state-bearing structs outside it.
 - `maos-audit` remains read-only: all writes stay in `maos-kernel-core` /
   `maos-iac` / `maos-bin`.
+
+## Amendment — Story 22-6: sealed audit segments (ADR-072)
+
+The Transparency Log can move its oldest rows into sealed segments. A forget reaches them: the adapter's sweep
+scrubs the principal's frames, and the distillates that cite a scrubbed frame, in every sealed segment
+(`scrub_forget_frames` keeps its 5-tuple), re-seals each affected segment with a manifest that names the
+digest it supersedes and the scrubbed frame ids, journals `audit.segment.resealed`, and issues the same
+re-distillation requests as the live pass. An open `principal.forget.intent` is never sealed (the rotation cut
+stays below it), so an interrupted forget still completes forward after a restart. A re-sealed segment
+proves who re-sealed it and which frames were scrubbed, not the original bytes. A forget does not reach
+copies outside the resolved segment directory: backups, operator copies, SIEM sinks or a Postgres migration
+target.

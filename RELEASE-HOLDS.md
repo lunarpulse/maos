@@ -128,6 +128,38 @@
 | 20 | 21-3 residual: the durable pin file is not integrity-protected against a local writer holding the operator's file permissions, and a failed fence write leaves a restart unprotected (row 12 of the v2.2 Reza table above). The pin file is `$MAOS_HOME/a2a-pins-<hex(local_host)>.json`, one per local host identity. | That the pin file resists a local writer, or that a failed fence write cannot let a restart revive a retired pin. | `23-7-peer-identity-rotation`. |
 | 21 | 21-10 F2/F7/F9: `invariant-lock` runs from the PR's own revision (the job checks out and builds the PR's `xtask`) until moved to a protected revision. | That the `invariant-lock` gate is tamper-resistant against the PR it judges. | The `lean-gates` work-package owner (CI architecture; operator decision). |
 
+## Claim boundaries — directed tasks (Story 22-4; in force from the minor release that ships it)
+
+> Source: `22-4-directed-task-ingress` (D-22-4-10 A). Not part of the `v1.0.0` GA ledger above; the
+> release number is the one the epic's open numbering D-row assigns to the release that ships 22-4. A
+> boundary is violated by over-claiming, not by shipping.
+
+| # | Boundary | What the release may NOT claim | Successor |
+|---|---|---|---|
+| B1 | One operator: `maosctl ask` is authorized by the single door bearer (`control.json`). The task record carries `origin = "door"` and `actor = "director"`; there is no operator principal and no policy decision per verb (FR70, NFR-Ops-13). | That a directed task is attributable to a named operator, or that a Cedar decision gated it. | `24-1-operator-principal-and-door-authz` (replaces `actor` with the principal and puts the decision before `submit`). |
+| B2 | Loopback only: the door binds loopback and nothing else listens. No caller on another machine can direct a task. | That the incident tool of J5 can hand a Spirit a task from off-host in one authenticated call. | `23-5-a2a-v1-agent-card-and-jsonrpc-binding` (an A2A request enters the same task registry only after `handle_intake`'s consent chain, with its own origin). |
+| B3 | Only installed WASM-component cast members are directable. A native class (Mira, Nash, the Butler, the Observer, the Researcher), a `cli_wrapper` Worker and a single-session `maos run <component>` Spirit refuse `ask` with a typed 409 `spirit_not_directable` that names the form. | That every Spirit in the standing cast answers `maosctl ask`. | `22-8-always-on-scene` (adds the native leg for Mira and Nash). |
+| B4 | No directable form can raise a halt: `EpistemicHalt` is kernel-reserved for a component, and a guest returns a halt only as a session end. The `halted` state reports a halt the kernel recorded on the target's pid while the task ran, and no component can produce one today. | That a directed task can end `halted` through a component's own decision, or that the halt leg is exercised end to end from a Spirit. | A future story that gives a component a halt producer; the registry's correlation (`halt_for_task`) is proven in-process with a real `HaltRegistry`. |
+| B5 | Delivery is at most once. Queued work is in memory: a stop (SIGTERM or SIGKILL) leaves every queued or running task `interrupted` and never re-runs it. An idempotency key is not crash-safe between the accept row and delivery: a crash after the task's accept row and before the door's completion row loses the key, and the retry is a new task (the same shape as row 10). | Exactly-once or crash-safe delivery, or that a queued task survives a restart. | Not scheduled; a boot-time reconciliation pass over accepted-without-completion rows, in the delegation recovery lane of row 10. |
+| B6 | The task text reaches the Spirit raw (as a shell request, with the success criteria `Answer the operator's shell message`). The `TaskAssign` row and `task show`'s `result` are the Transparency Log's redacted copy. | That a task is confidential from the Spirit, or that the redacted copy equals what the Spirit received (as row 17). | Not this lane. |
+| B7 | `maosctl task show` reads the live Transparency Log segment. A task whose rows were rotated out of it reads `task_not_found`. | That a task stays readable after the log rotates. | `22-6` (AC2 reads across segments). |
+
+## Claim boundaries — Epic 22 release (bounded audit store)
+
+> Source: Story `22-6-bounded-audit-store`, ADR-072, decisions D-22-6-01…10 taken at their
+> recommended answers (operator not yet confirmed). The release these rows belong to is numbered by the
+> epic's open release-numbering D-row (`epic-22-always-on-host-w7.md:151`); the rows carry the story key,
+> not a release number. Each row is also one line of that release's notes. A boundary is violated by
+> over-claiming, not by shipping.
+
+| # | Boundary | What the release may NOT claim | Successor |
+|---|---|---|---|
+| 22-6.a | **Seal.** A segment signature proves that the holder of the operator audit key sealed these bytes. It does not prove that the rows are complete or that they were written at their stated times. The chain detects a missing, reordered or forked segment only between segments that are present. Removing the newest segments together with the live log is not detected: there is no external anchor (NFR-Aud-4 anchoring is optional and not built). | That a verified segment, or a verified chain, proves the audit trail is complete or unaltered since it was written, or that it is anchored outside the Host. | An external anchor or transparency service for segment digests (not scheduled). |
+| 22-6.b | **Bound.** The live log is bounded by the rotation policy. The segment directory is bounded only when `audit_keep_days` is set. By default MAOS deletes no audit record. | That the audit store's total disk use is bounded by default, or that an audit record is ever deleted unless the operator set `audit_keep_days`. | None; `audit_keep_days` (at least 90) is the bound. |
+| 22-6.c | **Forget.** A forget reaches the live log and the sealed segments in the resolved segment directory. It does not reach copies outside it: backups, operator copies, SIEM sinks or a Postgres migration target. A re-sealed segment proves who re-sealed it and which frames were scrubbed, not the original bytes. Spirit-uninstall lineage that sits inside a sealed segment is not scrubbed (the segment sweep matches principal subjects only). | That a forget or an uninstall erases a principal from every copy of the audit store, or that a re-sealed segment proves what the scrubbed bytes were. | None scheduled; the backup and migration rows below name the copies. |
+| 22-6.d | **Purge.** `maos purge` removes the segment directory that it resolves at run time. It does not remove segments in a directory configured earlier and since changed, or segments moved elsewhere. | That `maos purge` removes every segment a Host ever wrote. | None; the same shape as the OQ-10 ruling on pre-16-4 CRL files. |
+| 22-6.e | **Backup and migration.** `maosctl backup` and `maosctl migrate sqlite-to-postgres` cover the live log only; sealed segments are neither backed up nor migrated by them. `backup verify` compares live roots and fails if a rotation ran between backup and verify. | That a backup or a Postgres migration carries the sealed part of the audit store. | None scheduled; copy the segment directory with the log. |
+
 ## GA-tag procedure (engineering exits green; Holds 1–2 no longer gate)
 
 > **OPERATOR RULING 2026-11-12:** Holds 1–2 are claim boundaries, not GA

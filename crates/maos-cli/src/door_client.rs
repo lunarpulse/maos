@@ -521,10 +521,20 @@ pub fn offline_unsupported(verb: &str) -> ExitCode {
 }
 
 /// Print a door body to stdout verbatim (compact JSON in, compact JSON out).
-fn print_body(body: &[u8]) {
+pub fn print_body(body: &[u8]) {
     let mut out = std::io::stdout();
     let _ = out.write_all(body);
     let _ = out.write_all(b"\n");
+}
+
+/// Story 22-4 (D-22-4-05 A) — `POST /v1/spirits/<id>/ask` body, twin of the maos-control
+/// `"ask"` arm.
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AskRequest {
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idempotency_key: Option<String>,
 }
 
 /// Story 19-2 (D-19-2-07 A) — `POST /v1/spirits/<id>/pick` body, twin of the

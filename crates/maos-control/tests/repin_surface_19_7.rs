@@ -88,6 +88,7 @@ impl OperatorCommandPort for RepinPort {
             lifecycle_states: Vec::new(),
             audit_degraded: false,
             audit_drop_count: 0,
+            audit_store_writable: true,
         }
     }
 

@@ -1,0 +1,13 @@
+AC4 plant: rotation.rs expire_segments: the legal-hold list removed from 'protected'. Command: cargo nextest run ... -E 'expiry_is_off_by_default | live_log_stays_within | rotation_never_seals_an_open'. Result: expiry_is_off_by_default_and_never_removes_a_held_or_young_segment FAILS (expired [1,2], expected [2]); the other two pass. Plant reverted.
+
+        PASS [   1.313s] (1/3) maos-bin::audit_rotation_22_6 rotation_never_seals_an_open_forget_intent
+        FAIL [   1.878s] (2/3) maos-bin::audit_rotation_22_6 expiry_is_off_by_default_and_never_removes_a_held_or_young_segment
+  stderr 
+    thread 'expiry_is_off_by_default_and_never_removes_a_held_or_young_segment' (3590156) panicked at crates/maos-bin/tests/audit_rotation_22_6.rs:853:5:
+    assertion `left == right` failed: the held and the young segments stay
+      left: [1, 2]
+     right: [2]
+        PASS [   9.909s] (3/3) maos-bin::audit_rotation_22_6 live_log_stays_within_its_bound
+     Summary [   9.910s] 3 tests run: 2 passed, 1 failed, 12 skipped
+        FAIL [   1.878s] (2/3) maos-bin::audit_rotation_22_6 expiry_is_off_by_default_and_never_removes_a_held_or_young_segment
+rc=100

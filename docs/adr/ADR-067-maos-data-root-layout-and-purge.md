@@ -168,3 +168,12 @@ The verb-table tests bind `purge` in network and air-gap builds. The environment
 contract gate binds `MAOS_SECRETS_BACKEND` and `MAOS_CRL_PATH` at the composition
 root. The kernel baseline must remain byte-identical because enumeration,
 locking orchestration, and deletion live outside `maos-kernel-core`.
+
+## Amendment — Story 22-6: the audit segment directory (ADR-072)
+
+`maos_roots()` enumerates `<audit dir>/segments` (beside the resolved Transparency Log, the default log and a
+`MAOS_AUDIT_DB` override) as a `WrittenBy::Maos`, `RootKind::Directory` root. A plain `maos purge --yes`
+removes it. `--keep-log` protects it with the log "as a unit", and the dry run and the receipt disclose the
+segment count and bytes. The audit sidecar sweep never matches a segment file (its pattern is the SIEM
+snapshot name). Like the pre-16-4 CRL files, a segment directory configured earlier and since changed, or
+segments moved elsewhere, are outside what purge resolves at run time.

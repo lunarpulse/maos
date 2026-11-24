@@ -226,17 +226,15 @@ pub fn example(scratch: &Scratch) -> PathBuf {
 }
 
 pub fn installed_version(scratch: &Scratch) -> PathBuf {
-    maos_registry::storage::LocalFsRegistryStorage::at_path(
-        scratch.0.join("home/.local/share/maos/registry"),
-    )
-    .unwrap()
-    .installed_manifests()
-    .unwrap()
-    .into_iter()
-    .find(|(name, _)| name == "example-spirit-ts")
-    .unwrap()
-    .1
-    .parent()
-    .unwrap()
-    .to_owned()
+    maos_registry::storage::LocalFsRegistryStorage::at_path(scratch.0.join("home/.maos/registry"))
+        .unwrap()
+        .installed_manifests()
+        .unwrap()
+        .into_iter()
+        .find(|(name, _)| name == "example-spirit-ts")
+        .unwrap()
+        .1
+        .parent()
+        .unwrap()
+        .to_owned()
 }

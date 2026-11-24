@@ -54,12 +54,13 @@ fn expected_argv(name: verbs::VerbName) -> &'static str {
         verbs::VerbName::Purge => "purge",
         verbs::VerbName::Eval => "eval",
         verbs::VerbName::Workflow => "workflow",
+        verbs::VerbName::Serve => "serve",
     }
 }
 
 /// Every variant, spelled out — kept in sync with [`expected_argv`] (the
 /// compiler enforces both against the enum).
-const ALL_NAMES: [verbs::VerbName; 10] = [
+const ALL_NAMES: [verbs::VerbName; 11] = [
     verbs::VerbName::Init,
     verbs::VerbName::Run,
     verbs::VerbName::Shell,
@@ -70,6 +71,7 @@ const ALL_NAMES: [verbs::VerbName; 10] = [
     verbs::VerbName::Purge,
     verbs::VerbName::Eval,
     verbs::VerbName::Workflow,
+    verbs::VerbName::Serve,
 ];
 
 fn maos() -> Command {
@@ -138,7 +140,7 @@ fn table_is_non_empty_and_exactly_the_expected_surface() {
         !verbs::VERBS.is_empty(),
         "the verb table must not be empty — a vacuous green is the failure mode"
     );
-    assert_eq!(verbs::VERBS.len(), 10, "exact expected verb count");
+    assert_eq!(verbs::VERBS.len(), 11, "exact expected verb count");
     for name in ALL_NAMES {
         let rows: Vec<&verbs::Verb> = verbs::VERBS
             .iter()
@@ -175,6 +177,7 @@ fn table_is_non_empty_and_exactly_the_expected_surface() {
             "init",
             "purge",
             "run",
+            "serve",
             "shell",
             "traceback",
             "workflow"

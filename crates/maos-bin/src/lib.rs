@@ -7,6 +7,9 @@
 /// than a re-implementation of them.
 #[cfg(feature = "network")]
 pub mod admission;
+/// Story 22-6 (ADR-072) — audit-store rotation on the Host: the cut-floor registry, the 60 s
+/// policy task and the `audit rotate` door verb.
+pub mod audit_rotation;
 /// Story 18-1 — the `--once` Butler pass verdict.
 #[cfg(feature = "network")]
 pub mod butler_root;
@@ -31,6 +34,10 @@ pub mod crypto_provider;
 /// re-implementation of it.
 #[cfg(feature = "network")]
 pub mod delegation;
+/// Story 22-4 — directed task ingress: the door's per-Spirit bounded task queues, their pumps,
+/// the task records and the Transparency-Log read-back behind `GET /v1/tasks/{id}`. In the
+/// library so `crates/maos-bin/tests/` drives the real registry in-process.
+pub mod directed_task;
 #[cfg(all(feature = "network", unix))]
 pub mod egress;
 #[cfg(feature = "network")]
@@ -49,6 +56,9 @@ pub mod escape_detector_consumer;
 /// `fire_on_telemetry_event` and `fire_on_consolidate`. In the library beside
 /// `admission`, so `crates/maos-bin/tests/` drives the real pump.
 pub mod hook_pump;
+/// Story 22-1 — the Host configuration file and the standing cast (`maos serve`).
+#[cfg(feature = "network")]
+pub mod host_config;
 /// Story 15-6 — the one authoritative live/record/replay selector. Public so
 /// integration tests execute the production lattice; an in-`src` test module
 /// would be budget-charged and CI-invisible.

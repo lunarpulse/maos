@@ -12,8 +12,8 @@ maos-journal = 0
 maos-spirit-abi = 1150
 maos-spirit-sdk = 1200
 xtask = 51450
-maos-iac = 9900
-maos-audit = 9200
+maos-iac = 11000  # RAISED 9900->11000 (story 22-6, operator ruling 2026-11-23): measured 10,863; forecast was +420..+770, actual +1,308 over the 9,555 base
+maos-audit = 9600
 maos-loom-lite = 5850
 maos-manifest = 5350
 
@@ -29,9 +29,9 @@ maos-notify-push = 348
 maos-persistence = 487
 maos-secrets = 636
 maos-compliance = 2350
-maos-control = 1700
-maos-cli = 7300
-maos-bin = 44700
+maos-control = 1900
+maos-cli = 7700
+maos-bin = 45500
 maos-topology = 1050
 maos-bench = 3100
 

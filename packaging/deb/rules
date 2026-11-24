@@ -21,5 +21,15 @@ override_dh_auto_configure:
 override_dh_auto_install:
 	set -e; for bin in $(BINS); do install -Dm755 $$bin-$(SUFFIX) debian/maos/usr/bin/$$bin; done
 
+# Story 22-2 (D-22-2-05 A): the unit is installed but neither enabled nor started; the
+# operator writes /etc/maos/host.toml first. dh_installsysusers is NOT in the compat 13
+# default sequence (hosted run 138281238898 built the deb with no such step and the maos
+# account was never created), so it is run explicitly here: it installs
+# debian/maos.sysusers as /usr/lib/sysusers.d/maos.conf and adds the postinst code that
+# runs systemd-sysusers (its dependency arrives through ${misc:Depends}).
+override_dh_installsystemd:
+	dh_installsystemd --no-enable --no-start
+	dh_installsysusers
+
 override_dh_auto_build override_dh_auto_test override_dh_strip override_dh_dwz:
 	:

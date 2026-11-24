@@ -64,6 +64,10 @@ fn branch(condition: &syn::Expr) -> Option<String> {
     match strip(condition) {
         syn::Expr::Let(binding) => match strip(&binding.expr) {
             syn::Expr::MethodCall(call) if named(&call.receiver, "run_args") => Some("run".into()),
+            // 22-1: the topology arm's entries come from the Host file under `serve`.
+            syn::Expr::Path(_) if named(&binding.expr, "topology_entries") => {
+                Some("topology".into())
+            }
             syn::Expr::Call(call) => {
                 if matches!(call.func.as_ref(), syn::Expr::Path(path) if path.path.segments.last().is_some_and(|part| part.ident == "topology_manifest_entries"))
                 {

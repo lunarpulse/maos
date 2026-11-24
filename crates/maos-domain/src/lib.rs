@@ -17,6 +17,7 @@ pub use invariants::*;
 
 pub mod cli_wrapper; // NEW — Story 6.2 AC5 CliWrapperSpirit admission errors
 pub mod cost; // NEW — Story 9.3b FR64 cost attribution (ADR-046)
+pub mod data_root;
 pub mod distillation; // NEW — Story 4.4 distillation domain types
 pub mod frame;
 pub mod governance; // NEW — Story 9.3b FR62 governance audit artifacts (ADR-045)

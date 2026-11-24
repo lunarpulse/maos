@@ -266,6 +266,276 @@ the resolved team's log — and the dry run and receipt name every sibling team
 log with its row counts. This retention is an operator-chosen, documented
 exception to FR2's clean-uninstall guarantee; deletion is the default.
 
+## Serve a standing Host
+
+`maos serve --config <host.toml>` starts a Host from one file. The file declares the Host's settings and the
+standing cast; every boot brings the same cast back, because the file names it. `maos run <manifest>` is
+unchanged and reads no Host file.
+
+```toml
+[host]
+home = "/srv/maos"                 # MAOS_HOME (absolute)
+door_bind = "127.0.0.1:7600"       # MAOS_OPERATOR_HTTP_BIND (loopback only)
+region = "eu-west"                 # MAOS_REGION_HOME
+crypto_provider = "ring"           # MAOS_CRYPTO_PROVIDER
+inference_mode = "replay"          # MAOS_INFERENCE_MODE: live, record or replay
+audit_rotate_bytes = 268435456     # MAOS_AUDIT_ROTATE_BYTES (default 256 MiB)
+audit_rotate_days = 30             # MAOS_AUDIT_ROTATE_DAYS (default 30)
+# audit_keep_days = 365            # MAOS_AUDIT_KEEP_DAYS (default unset; at least 90)
+
+[[host.spirits]]
+manifest = "spirits/butler/manifest.toml"   # relative to this file; `path` is an alias
+
+[[host.spirits]]
+installed = "researcher"                    # a registry-installed Spirit
+```
+
+| Key | Environment name | Rule |
+|---|---|---|
+| `home` | `MAOS_HOME` | Absolute path. |
+| `door_bind` | `MAOS_OPERATOR_HTTP_BIND` | Loopback socket address; the door still needs `MAOS_OPERATOR_BEARER_TOKEN` (both or neither). |
+| `region` | `MAOS_REGION_HOME` | An `ascii-v1` region tag. |
+| `crypto_provider` | `MAOS_CRYPTO_PROVIDER` | Must equal the provider recorded in `<home>/config.toml` (default `ring`). |
+| `inference_mode` | `MAOS_INFERENCE_MODE` | `live`, `record` or `replay`. |
+| `audit_rotate_bytes` | `MAOS_AUDIT_ROTATE_BYTES` | Positive whole number of bytes; default 268435456 (256 MiB). When the live Transparency Log holds this many bytes, its oldest rows are sealed into a signed segment. |
+| `audit_rotate_days` | `MAOS_AUDIT_ROTATE_DAYS` | Positive whole number of days; default 30. Live rows older than this are sealed into a signed segment. |
+| `audit_keep_days` | `MAOS_AUDIT_KEEP_DAYS` | Positive whole number of days, **at least 90** (a lower value refuses the boot with `host_config_setting`, exit 78). Default unset: MAOS deletes no audit record. |
+
+A set environment variable overrides its key for the process; a key fills only a name that is unset. The
+environment never stands in for a missing or invalid file. The cast is exactly the `[[host.spirits]]` list:
+installed Spirits the file does not name, and Spirits added with `maosctl load`, do not boot. An entry takes
+`manifest` (or `path`) or `installed`, never `host`. `maosctl agents` reads the running cast back.
+
+A missing file, a TOML error, an unknown key, an invalid setting, a cast entry that cannot be admitted, or an
+older file that disagrees with a key the Host file sets (`operator.toml` `[region]`, the provider in
+`<home>/config.toml`) refuses the boot with exit 78 and one of the kinds `host_config_missing`,
+`host_config_parse`, `host_config_cast_entry`, `host_config_cast_host_key`, `host_config_setting`,
+`host_config_older_file_disagrees`, `host_config_installed_missing` or `host_config_installed_refused`.
+
+**Region is an integrity setting.** `MAOS_REGION_HOME` stamps every memory write. On a cohort host the daemon
+refuses to boot when this tag disagrees with the `region` the signed cohort manifest declares for the host's
+team, or when a region is set and the manifest declares no team for the host. The check compares what is
+deployed with what the signed manifest says; it does not stop an operator who controls both the process and the
+manifest from choosing a tag. Unset the tag to turn region pinning off.
+
+### Bound the audit store
+
+The Transparency Log no longer grows without limit. By policy the oldest rows move out of the live log into a
+sealed, signed segment, `<audit dir>/segments/<seq>.sqlite` with a `<seq>.manifest.json` beside it
+(`maos.audit-segment.v1`). The Host checks the policy at boot and every 60 seconds; `maosctl audit rotate`
+asks for one now. Queries, recall and citation read across the live log and every segment as if nothing had
+moved. Rotation needs the operator audit key (`MAOS_AUDIT_KEY`, then `~/.config/maos/audit-signing.key`), the
+same key `sealed-export` uses, and is region-derived when the Host has a region. With no key, rotation is
+refused with one `maos: audit rotation refused` line and the live log keeps growing: logging never fails
+because of sealing.
+
+A rotation never seals a row that something still needs: not the newest row, not an open forget intent, an
+outstanding re-distillation request or the completed-forget marker the door re-checks, and not a row the
+escape-anomaly tail or the Worker progress stamper has yet to read. A segment is deleted from the live log
+only after it is sealed and every copied row has been re-verified against its live twin. Nothing else is
+deleted unless you set `audit_keep_days`: then a whole segment older than that many days (never fewer than
+90) is removed, and never one that holds a frame of a principal under legal hold or with an open erasure.
+Each expiry is journaled as an `audit.segment.expired` row before the file is removed. A forget scrubs the
+principal's frames in the segments too; each affected segment is re-sealed with a manifest that names the
+digest it supersedes and the frames it scrubbed.
+
+| Command | What it does | Exit codes |
+|---|---|---|
+| `maosctl audit rotate` | Seal the oldest prefix now, over the operator door; with no Host answering, offline. Prints the outcome as JSON. | 0 sealed or nothing to seal; 1 refused (no audit key, bad policy); 75 the door is busy |
+| `maosctl audit verify-bundle <manifest> --seed <key>` (or `--pubkey <hex>`) | Verify one segment from its manifest and the segment file beside it: the signature, the file digest, the content digest, the Merkle root and the claimed shape. Works on one segment copied alone. | 0 verified; 1 verification failed; 2 input or key error |
+| `maosctl audit verify-segments <dir> [--seed <key>] [--log <db>]` | Check the chain of a segment directory: a missing, reordered or forked segment, each file digest and, with a key, each signature. A gap is explained only by an `audit.segment.expired` row in the log (`--log`, default `transparency.sqlite` beside the directory). | 0 intact; 1 broken; 2 input error |
+
+Back up the segment directory with the log: `maosctl backup` and `maosctl migrate sqlite-to-postgres` cover the
+live log only, and `maos purge` removes the segment directory it resolves at run time (`--keep-log` keeps it
+with the log and discloses the segment count and bytes).
+
+### Where data lives
+
+The private memory root, the registry store, the registry yank cursor and the migration plans share one
+precedence: an explicitly set `MAOS_HOME`, then `$XDG_DATA_HOME/maos`, then the legacy
+`$HOME/.local/share/maos`. A store lives under the highest root that already holds it, else under the highest
+root, so data under a legacy location stays readable in place and a migration plan written under another root
+is still consumed. `MAOS_MEMORY_ROOT` and `MAOS_REGISTRY_YANK_CURSOR_PATH` override all three. `maos purge`
+names every location.
+
+## Hand a Spirit a task
+
+`maosctl ask <spirit> "<text>"` hands a running, installed Spirit one task through the authenticated door and
+prints its task id at once. `maosctl task show <id>` reads the Spirit's answer, or the reason it gave none.
+The Host must be a `maos serve` (or `maos shell`) root whose cast includes the installed component:
+
+```sh
+id=$(maosctl ask researcher "Summarise yesterday's incident log")   # exit 0, prints a 26-character task id
+maosctl task show "$id"
+maosctl ask researcher "Summarise it again" --wait                  # waits (default 120 s) and prints the task object
+maosctl ask researcher "Summarise it" --key nightly-2026-11-23      # a retry with this key returns the same task
+```
+
+`task show` prints one JSON object, `{task_id, spirit_id, origin, state, result?, halt?, reason?, accepted_ns,
+ended_ns?}`. The task id is also the `TaskAssign` frame id, so `maosctl audit query` finds the task's rows by it:
+the accept row `task.<id>:accepted`, the `TaskAssign` row, the reply row (correlation `maos.task-reply/<hex>`)
+and, for a task that gave no answer, the terminal row `task.<id>:<state>`.
+
+| `state` | Meaning |
+|---|---|
+| `queued`, `running` | Waiting in the Spirit's queue, or its turn is in progress. |
+| `completed` | The Spirit answered. `result` is the answer as journaled (redacted), the same bytes after a restart. |
+| `halted` | The kernel recorded a halt on the Spirit while the task ran; `halt` is `{halt_id, state}`. |
+| `failed` | No answer; `reason` is one of `deadline_exceeded`, `session_ended`, `session_changed`, `no_answer`, `dispatch_refused`, `spirit_unloaded`, `spirit_quarantined`. |
+| `orphaned` | The Spirit crashed during the task; the kernel's `task.orphaned` row names it. |
+| `interrupted` | The Host stopped (SIGTERM or SIGKILL) while the task was queued or running. It is never delivered again. |
+
+**Refusals mint no task id.** `ask` exits 1 for each of: `spirit_not_loaded` (404), `spirit_not_running` (409; the
+Spirit is Loaded, Paused or quarantined), `spirit_not_directable` (409; a native class, a `cli_wrapper` Worker or
+a `maos run` single session, the form named), `invalid_task` (400; empty text), `host_stopping` (409) and a body
+over 64 KiB (413). `task_queue_full` (409) exits **75**, as does a `--wait` that runs out: nothing was accepted,
+retry. Other exits are the door's: 2 for a local id check, 69 for no daemon, 77 for a rejected bearer and 78 for
+an uninitialised home.
+
+**Bounds.** Each Spirit holds one running task and up to 32 queued; the Host holds at most 512 queued and running.
+The door never waits on a Spirit: a full queue is refused at once. `task show` keeps the last 1024 finished
+tasks in memory and reads older ones from the audit trail.
+
+**Limits you should know.** Only the bearer holder can ask, from this machine (loopback); the task text reaches
+the Spirit raw while the audit trail keeps a redacted copy; delivery is at most once and queued work is lost,
+not re-run, when the Host stops; an idempotency key is not crash-safe between the accept row and delivery; and
+`task show` reads only the live audit segment. The release's claim boundaries B1 to B7 are in `RELEASE-HOLDS.md`.
+
+## Agents and sessions
+
+`maosctl agents` lists every Spirit the running Host holds; `maosctl agents show <id>` reads one Spirit's session
+from what the Host already journaled. Both are authenticated reads through the loopback door (`GET /v1/agents`,
+`GET /v1/spirits/<id>/session`). They write nothing, and polling them never grows the audit log.
+
+```sh
+maosctl agents                       # one line per Spirit, sorted by id, no header
+maosctl agents show researcher       # the newest 50 rows of this boot, oldest first
+maosctl agents show researcher --limit 500 --follow --interval 1000
+```
+
+`agents` prints eight tab-separated columns, `-` for an empty value; the id is always the first:
+
+| Column | Source |
+|---|---|
+| `id`, `pid` | The scheduler's control block (the pid the audit trail journals). |
+| `state` | The Spirit's lifecycle state. |
+| `form` | `in-process`, `wasm`, `native` or `worker`, recorded when the Spirit was admitted; `unknown` for a pid no admission recorded. |
+| `originator` | The Spirit that handed over its current task; `-` when idle. For a Worker, the Orchestrator that assigned it. |
+| `task` | The first in-flight task id, `+N` when more are in flight; `-` when none. |
+| `age` | Whole seconds (`41s`) since the Spirit's first audit row of this boot; `-` before it has one. |
+| `spend` | `in/out` tokens summed from this boot's cost frames. Tokens only, no money. |
+
+`agents show` prints the Spirit's current-boot rows, oldest first: the frames it emitted, the frames it received
+(for example its `task.assign`), and the halt resolutions recorded against it. A row is `<rowid>`
+(`a<n>` for an approval row), time as `seconds.millis`, kind, intent (at most 64 characters), the 8-character
+frame id, `from->to`, origin and a typed summary (halt: `record`, `halt_id`, `tag`; cost: the token counts;
+approval: the decision and the resolution kind). **Never printed:** payload bytes, a halt's Spirit-supplied
+`derived_from`, and the text an operator typed when resolving a halt. `maosctl audit query --spirit <id>` prints
+full rows when you need them, and reads the store directly.
+
+`--follow` polls with a cursor of what it printed (`--interval` is in milliseconds, default 1000, floor 100). It
+exits 0, saying why on stderr, when the id stops resolving or its boot or pid changes (the Spirit was unloaded or
+reloaded, or the Host restarted); it exits 69 when the daemon becomes unreachable. Other exits are the door's: 1
+for an unknown id, 2 for a local id or `--limit` check, 75 for an unreadable audit store, 77 for a rejected
+bearer and 78 for an uninitialised home. Rows of an earlier boot of the same id are not shown; use
+`maosctl audit query --spirit <id> --all-boots`.
+
+## Run as a service
+
+The deb and the rpm install `/usr/lib/systemd/system/maos.service` and a `maos` system account (home
+`/var/lib/maos`, created by `sysusers.d` on the deb and a `%pre` scriptlet on the rpm). Neither package enables
+or starts the unit. They ship an example Host file at `/usr/share/doc/maos/examples/host.toml`, not at
+`/etc/maos/host.toml`; you write that file:
+
+```sh
+sudo install -d /etc/maos
+sudo cp /usr/share/doc/maos/examples/host.toml /etc/maos/host.toml   # then declare your cast
+sudo systemctl enable --now maos
+```
+
+The unit runs as `maos` with `MAOS_HOME=/var/lib/maos`. Before each start it runs `maos init --plain`, the one
+minter of the operator door config (`control.json`); `init` is idempotent. It then runs `maos serve --config
+/etc/maos/host.toml`. A missing or invalid file is the typed refusal of the previous section (exit 78),
+visible in `systemctl status maos`; the unit does not restart on 78, because restarting cannot fix the file,
+and restarts on any other failure. `systemctl stop maos` sends SIGTERM and the Host drains; systemd waits up
+to `TimeoutStopSec=30`.
+
+**Known limit.** A local Worker that never exits is not joined with a bound at shutdown
+(`RELEASE-HOLDS.md` row 11, open). systemd kills the Host at `TimeoutStopSec` and the unit ends `failed`.
+
+### `maosctl status`
+
+`maosctl status` is one authenticated read of `GET /v1/daemon` with the `control.json` bearer, and prints
+one line: `pid=<pid> version=<version> spirits=<n> audit_store_writable=<true|false>`. It must run as the
+Host's user, because `control.json` is refused when another uid owns it:
+
+```sh
+sudo -u maos env MAOS_HOME=/var/lib/maos maosctl status
+```
+
+| Exit | Meaning |
+|---|---|
+| 0 | The daemon answers and its audit store is writable. |
+| 74 | The daemon answers and its audit store is not writable. |
+| 69 | The daemon is unreachable. |
+| 77 | The operator bearer was rejected. |
+| 78 | The home is not initialised. |
+
+Writable means a separate connection to the live audit store takes a write lock (`BEGIN IMMEDIATE`, then
+rollback) within 3 seconds, and the capability audit channel is open. The probe writes no row. A held lock
+reads as not writable, so a liveness probe should tolerate one 74 before restarting the Host. No route is
+added and none is unauthenticated: `/v1/daemon` gains the key `audit_store_writable` and keeps every other key.
+
+## Run in a container
+
+The image holds `maos`, `maosctl`, `maos-wasm-runner`, the in-tree Spirit manifests and a default Host file
+(`/usr/share/maos/host.toml`: nash and observer, no provider key needed). Pull a tagged image from the GitHub
+registry and verify its signature first (see [Install](/install/#container)):
+
+```sh
+cosign verify --certificate-identity <release-workflow-identity> \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com ghcr.io/<owner>/maos@sha256:<digest>
+```
+
+**Compose.** `packaging/compose/compose.yaml` runs a one-shot `init` (`maos init --plain`) and then `maos serve
+--config /etc/maos/host.toml` on the named volume `maos-home` at `/var/lib/maos`, with `restart:
+unless-stopped`, a 30 s stop grace period and the healthcheck `maosctl status`:
+
+```sh
+MAOS_IMAGE=ghcr.io/<owner>/maos:<tag> docker compose -f packaging/compose/compose.yaml up -d
+docker compose -f packaging/compose/compose.yaml exec maos /usr/local/bin/maosctl agents
+```
+
+After `docker compose restart maos` the same cast is read back, and the home survives `docker compose down`
+(do not pass `-v`). Edit `packaging/compose/host.toml` to change the cast. Provider keys pass through from the
+shell (`MAOS_ANTHROPIC_API_KEY`, ...) only when set.
+
+**Helm.** `packaging/helm/maos` deploys a one-replica StatefulSet with a PersistentVolumeClaim at
+`/var/lib/maos`, the Host file from `.Values.hostToml` (a ConfigMap mounted read-only at `/etc/maos`) and
+secrets from `.Values.secrets` or `.Values.existingSecret` as `MAOS_*` environment variables. An init
+container runs `maos init --plain`; readiness and liveness are `exec: maosctl status`:
+
+```sh
+helm install maos packaging/helm/maos --set image.tag=<tag>
+kubectl exec maos-0 -c maos -- /usr/local/bin/maosctl status
+```
+
+The root filesystem is read-only, the pod runs as uid/gid 65532 with every capability dropped, and
+`HOME=/var/lib/maos` puts every data root on the volume.
+
+**The door never leaves loopback.** Neither deployment publishes a port or renders a Service. A `door_bind`
+that is not loopback is the typed refusal (exit 78) of the previous section, and an HTTP probe cannot reach
+the door, which is why the probe is an exec of `maosctl status`.
+
+**Footprint (NFR-Ops-14, proposed bounds, operator unconfirmed).** The per-PR `container-build` job asserts the
+amd64 image size <= 140,022,361 B and the default cast's idle memory <= 50,000,000 B (container cgroup
+`memory.current`, 60 s after `maosctl status` = 0). Each run prints what it measured; the bounds are the
+measurement plus 10 % and live in `tests/integration/image-size-limit` and `tests/integration/idle-memory-limit`.
+
+**T3 Workers are not supported in a container or pod.** They need a rootless container runtime (the detector
+probes `/usr/bin/podman`), which neither provides by default; neither deployment mounts a container socket or
+requests privilege to work around it. Run T3 Workers on a host install.
+
 ## Operate
 
 The kernel composition root lives in `crates/maos-bin`. Operational surfaces — the transparency log, capability mediation, sandbox tiers, ComplianceClaim admission, the registry, and yank propagation — are documented in the reference guides:

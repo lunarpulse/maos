@@ -1467,7 +1467,8 @@ fn main() {
             verbs::VerbName::Shell
             | verbs::VerbName::Traceback
             | verbs::VerbName::Eval
-            | verbs::VerbName::Workflow => unreachable!("network-only verb in the air-gap table"),
+            | verbs::VerbName::Workflow
+            | verbs::VerbName::Serve => unreachable!("network-only verb in the air-gap table"),
         },
     }
 }
@@ -1791,6 +1792,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut plain_flag = false;
     let (mut eval_record, mut distill_record) = (None, false);
     let mut workflow = None;
+    let mut host_boot = None;
     let verb_args = if std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("registry-server")
         && argv
             .first()
@@ -1908,6 +1910,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     return Ok(());
                 }
             }
+            // Story 22-1 — the Host file is read, validated and overlaid BEFORE the crypto
+            // provider, the stores or any Spirit is selected: a bad file refuses the boot here.
+            verbs::VerbName::Serve => host_boot = Some(boot_host_config(&argv[1..])),
             // Story 18-2 (CR-1) — replay runs now; `record` needs the
             // root's shared router and runs once it is built (D-18-2-06 A).
             verbs::VerbName::Eval => {
@@ -1978,11 +1983,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // production run surface FIRST. The action is dispatched after the full
     // composition root is built (it reuses the root's scheduler/inference/etc.).
     // When absent, the existing `MAOS_ONE_SHOT` / Spirit-less serving paths win.
-    let run_args = match parse_run_args(std::env::args().skip(1)) {
-        Ok(args) => args,
-        Err(e) => {
-            eprintln!("{e}");
-            std::process::exit(1);
+    let run_args = if let Some((host, _)) = host_boot.as_ref() {
+        // Story 22-1 — the Host file stands for the manifest; `maos run` reads no Host file.
+        Some(host.run_args())
+    } else {
+        match parse_run_args(std::env::args().skip(1)) {
+            Ok(args) => args,
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
         }
     };
     let cross_wall_traceback = match parse_cross_wall_traceback_args(std::env::args().skip(1)) {
@@ -2348,6 +2358,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?;
     }
     maos_bin::crypto_provider::journal(&transparency_log, &selected_crypto);
+    // Story 22-6 (ADR-072, D-22-6-08 A) — bound the audit store by policy: one check at boot,
+    // then one every 60 s. Rotation seals a prefix below every registered floor; with no audit
+    // key it is refused with a typed line and the log keeps growing.
+    let _audit_rotation = maos_bin::audit_rotation::spawn_rotation_task(
+        Arc::clone(&transparency_log),
+        tokio_util::sync::CancellationToken::new(),
+    );
 
     // Story 13.5c — single composition root.  A `cohort-a2a-daemon` process
     // already ran this entire root; it must NOT open a second Transparency Log
@@ -2605,10 +2622,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Story 9.4b AC-5 — pin the memory manager to the operator's home region
         // (None = pinning disabled). Routes every store write through the
         // WriteEntryPoint region chokepoint.
-        .with_home_region(
-            maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
-                .home_region,
-        )
+        .with_home_region(maos_bin::host_config::stamped_home_region())
         // Sec-redteam SR-1: enable principal namespace write enforcement.
         // Only spirit pids registered via authorize_principal_writes() may
         // write to Principal namespaces.
@@ -3476,6 +3490,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         || std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("cohort-a2a-daemon");
     let mut operator_http_server: Option<maos_control::OperatorHttpServer> = None;
     let mut operator_door_port: Option<Arc<maos_bin::operator_door::OperatorDoor>> = None;
+    let mut directed_tasks: Option<Arc<maos_bin::directed_task::DirectedTasks>> = None;
     // 20-3c (member 16, D10 A) — held for the root's life; `None` for an
     // env-pair root, which has no home record to lease.
     let mut endpoint_lease: Option<maos_domain::operator_door::EndpointLease> = None;
@@ -3636,6 +3651,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
         door.set_forget_pump(&hook_pump);
         door.set_quarantine(Arc::clone(&quarantine));
+        door.set_audit_store_path(audit_db_path.clone());
         operator_door_port = Some(door);
         if let Some(config) = operator_http_config {
             let bind_door = |bind: std::net::SocketAddr| {
@@ -4483,12 +4499,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return result;
     }
     // 20-1a: only serving/shell roots enumerate installs, never diagnostic one-shots.
-    let installed_manifests =
-        if shell_mode || (run_args.is_none() && std::env::var_os("MAOS_ONE_SHOT").is_none()) {
-            maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()?
-        } else {
-            Vec::new()
-        };
+    let installed_manifests = if let Some((_, installed)) = host_boot.as_ref() {
+        // Story 22-1 (D-22-1-03 A) — under `serve` the boot set is exactly the file's list.
+        installed.clone()
+    } else if shell_mode || (run_args.is_none() && std::env::var_os("MAOS_ONE_SHOT").is_none()) {
+        maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()?
+    } else {
+        Vec::new()
+    };
     // Story 20-9 — builds what a spawned session's dependencies hang on, for every root that
     // arms swap handles. It only borrows: the handles that keep the result are owned by the
     // supervisor, so no composition-root local outlives the audit drain through it.
@@ -4552,6 +4570,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &swap_slot,
         );
     }
+    // Story 22-4 — a door root with an installed cast serves directed tasks (`ask`,
+    // `GET /v1/tasks/{id}`) over it. Other roots build none, so none retains the kernel
+    // handles the audit drain waits on.
+    if let (Some(door), false) = (operator_door_port.as_ref(), installed_manifests.is_empty()) {
+        let tasks = maos_bin::directed_task::DirectedTasks::new(
+            maos_bin::directed_task::KernelTaskHost::new(
+                Arc::clone(&scheduler),
+                Arc::clone(&capability),
+                Arc::clone(&halt_registry),
+                Arc::clone(&transparency_log),
+            ),
+            maos_bin::directed_task::TaskLimits::default(),
+        );
+        door.set_directed_tasks(Arc::clone(&tasks));
+        directed_tasks = Some(tasks);
+    }
     let installed_spirits = Arc::new(
         maos_bin::installed_spirits::InstalledSpirits::boot(
             installed_manifests,
@@ -4570,6 +4604,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &selected_crypto,
             boot_nonce,
             shell_mode,
+            directed_tasks.as_ref(),
             #[cfg(feature = "wasm-host")]
             spirit_host.as_deref(),
             #[cfg(feature = "wasm-host")]
@@ -4591,6 +4626,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await,
     );
+    if let Some((host, _)) = host_boot.as_ref() {
+        if let Err(error) = host.installed_refusal(&|name| installed_spirits.refusal_code(name)) {
+            eprintln!("maos serve: {error}");
+            std::process::exit(78);
+        }
+    }
     let mut yank_poller_task = {
         let observer = Arc::new(
             maos_bin::yank_policy::YankRuntime::new(
@@ -4698,6 +4739,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .await
                 .map_err(|e| format!("shell: scheduler.load failed: {e}"))?;
+            maos_bin::operator_door::record_form(hello_pid, "in-process");
             // 2. Admit at the real pid through the canonical path. The
             //    journal is the daemon's `shared_journal` — the block's own
             //    `JournalAdapter::open` is deleted (one journal handle per
@@ -4824,6 +4866,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // races the drain) → port drop → audit-writer drain → locks. The
         // body above is one async block, so no `?` between the bind and here
         // can bypass this.
+        if let Some(tasks) = directed_tasks.as_ref() {
+            tasks.quiesce();
+        }
         if let Some(server) = operator_http_server.as_mut() {
             server.shutdown();
         }
@@ -4835,6 +4880,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         yank_poller_task.shutdown().await;
         if let Some(root) = installed_supervision.take() {
             root.stop_and_join().await;
+        }
+        if let Some(tasks) = directed_tasks.take() {
+            tasks.stop().await;
         }
         Arc::try_unwrap(installed_spirits)
             .ok()
@@ -5123,12 +5171,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // 1. Read + parse the manifest.
         let manifest_path = std::path::PathBuf::from(&run.manifest_path);
-        let manifest_toml = std::fs::read_to_string(&manifest_path).map_err(|e| {
-            format!(
-                "maos run: failed to read manifest {}: {e}",
-                manifest_path.display()
-            )
-        })?;
+        let manifest_toml = match host_boot.as_ref() {
+            Some((host, _)) => host.topology_toml(),
+            None => std::fs::read_to_string(&manifest_path).map_err(|e| {
+                format!(
+                    "maos run: failed to read manifest {}: {e}",
+                    manifest_path.display()
+                )
+            })?,
+        };
         let manifest_root: toml::Value = toml::from_str(&manifest_toml)
             .map_err(|e| format!("maos run: manifest TOML parse error: {e}"))?;
         // Story 18-4 (CR-2) — the compressed scene drives Butler only.
@@ -5156,9 +5207,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .into());
         }
-        if let Some(topology_entries) =
-            maos_bin::topology::topology_manifest_entries(&manifest_root)?
-        {
+        let topology_entries = match host_boot.as_ref() {
+            Some((host, _)) => Some(host.manifest_entries()),
+            None => maos_bin::topology::topology_manifest_entries(&manifest_root)?,
+        };
+        if let Some(topology_entries) = topology_entries {
             let topology_base = manifest_path
                 .parent()
                 .unwrap_or_else(|| std::path::Path::new("."));
@@ -10089,6 +10142,11 @@ description = "smoke test spirit successor"
     // that mutation or its completion row. The shared store-lock set remains
     // held through audit-writer drain so no offline child can enter while any
     // daemon-owned store writer is still alive.
+    // Story 22-4 — the Host is stopping: nothing more is accepted or delivered, and a turn the
+    // unload below cuts short is left to read `interrupted`, never journaled as a failure.
+    if let Some(tasks) = directed_tasks.as_ref() {
+        tasks.quiesce();
+    }
     if let Some(server) = operator_http_server.as_mut() {
         server.shutdown();
     }
@@ -10147,6 +10205,11 @@ description = "smoke test spirit successor"
         post_unload_stop.as_deref(),
     )
     .await;
+    // Story 22-4 — every unload has ended its Spirit's turn; the task pumps leave before the
+    // audit drain, so none holds a sender open.
+    if let Some(tasks) = directed_tasks.take() {
+        tasks.stop().await;
+    }
     Arc::try_unwrap(installed_spirits)
         .ok()
         .expect("serving root released installs")
@@ -13601,7 +13664,68 @@ fn reconcile_transport_identity_with_manifest(
             &env_team,
         )?;
     }
+    // (e) Story 22-1 / AC4 (21-3 AC6, D4a) — THE REGION AXIS: the value that stamps rows
+    // (the one `.with_home_region` receives) against the signed `TeamEntry.region` of this
+    // host's team. Same doctrine, same hermetic home in `cross_team_crossing`.
+    maos_bin::cross_team_crossing::reconcile_home_region_with_manifest(
+        &manifest,
+        state.local_host().as_str(),
+        maos_bin::host_config::stamped_home_region()
+            .as_ref()
+            .map(|region| region.as_str()),
+    )?;
     Ok(())
+}
+
+/// Story 22-1 — read, validate and apply the Host file for `maos serve`. Every failure is a
+/// typed refusal (exit 78, like a bad crypto selection) before any store or Spirit opens.
+/// Returns the file and the installed members of its cast.
+#[cfg(feature = "network")]
+fn boot_host_config(
+    args: &[String],
+) -> (
+    maos_bin::host_config::HostConfig,
+    Vec<(String, std::path::PathBuf)>,
+) {
+    use maos_bin::host_config::{HostConfig, HostConfigError};
+    fn refuse(error: HostConfigError) -> ! {
+        eprintln!("maos serve: {error}");
+        std::process::exit(78)
+    }
+    let path = maos_bin::host_config::parse_serve_args(args).unwrap_or_else(|usage| {
+        eprintln!("{usage}");
+        std::process::exit(2)
+    });
+    let config = HostConfig::load(&path).unwrap_or_else(|error| refuse(error));
+    // The environment overrides a key for this process; a key fills only an unset name.
+    // Done before any worker task reads the environment, while the runtime is idle.
+    for (name, value) in config.env_overlay(&|name| std::env::var_os(name).is_some()) {
+        std::env::set_var(name, value);
+    }
+    let operator_toml = std::env::var_os("HOME").and_then(|home| {
+        std::fs::read_to_string(std::path::PathBuf::from(home).join(".config/maos/operator.toml"))
+            .ok()
+    });
+    let config_toml = match maos_domain::operator_door::maos_home() {
+        Ok(Some(home)) => std::fs::read_to_string(home.join("config.toml")).ok(),
+        _ => None,
+    };
+    config
+        .reconcile_older_files(
+            &|name| std::env::var(name).ok(),
+            operator_toml.as_deref(),
+            config_toml.as_deref(),
+        )
+        .unwrap_or_else(|error| refuse(error));
+    let inventory = maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()
+        .unwrap_or_else(|error| {
+            eprintln!("maos serve: cannot read the installed inventory: {error}");
+            std::process::exit(78)
+        });
+    let installed = config
+        .select_installed(inventory)
+        .unwrap_or_else(|error| refuse(error));
+    (config, installed)
 }
 
 #[cfg(feature = "network")]

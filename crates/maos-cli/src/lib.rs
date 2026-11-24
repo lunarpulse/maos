@@ -11,6 +11,7 @@ use std::ffi::OsString;
 use std::process::ExitCode;
 
 pub mod accessibility;
+pub mod audit_rotation;
 pub mod backup;
 pub mod cli;
 pub mod door_client;

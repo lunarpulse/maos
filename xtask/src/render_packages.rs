@@ -52,6 +52,24 @@ pub fn render(template: &str, values: &BTreeMap<String, String>) -> Result<Strin
     Ok(text)
 }
 
+/// Story 22-2 — the bytes of `packaging/systemd/*`, keyed by the token the rpm spec embeds
+/// them under. The deb installs the same source files verbatim, so both packages carry
+/// byte-equal copies of one source.
+pub fn service_values(root: &Path) -> Result<BTreeMap<String, String>, String> {
+    [
+        ("SERVICE_UNIT", "maos.service"),
+        ("SYSUSERS_CONF", "maos.sysusers"),
+        ("HOST_EXAMPLE", "host.toml"),
+    ]
+    .into_iter()
+    .map(|(key, file)| {
+        let text = fs::read_to_string(root.join("packaging/systemd").join(file))
+            .map_err(|e| format!("{file}: {e}"))?;
+        Ok((key.to_owned(), text))
+    })
+    .collect()
+}
+
 /// `maosctl` must be the locally built trusted tool, not an unverified download.
 pub fn run(dist: &str, output: &str, maosctl: &str, base_url: Option<&str>) -> Result<(), String> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -135,6 +153,7 @@ pub fn run(dist: &str, output: &str, maosctl: &str, base_url: Option<&str>) -> R
         ("SIGNATURE_HASH".into(), sha256_hex(&signature)),
         ("VERIFIER_HASH".into(), sha256_hex(&verifier)),
     ]);
+    values.extend(service_values(root)?);
     let mut brew = String::new();
     let mut sources = String::new();
     let mut arches = Vec::new();
@@ -203,6 +222,12 @@ pub fn run(dist: &str, output: &str, maosctl: &str, base_url: Option<&str>) -> R
         ("deb/control", "debian/control"),
         ("deb/changelog", "debian/changelog"),
         ("deb/source/format", "debian/source/format"),
+        // Story 22-2: the service unit, account and example Host file. The deb takes them
+        // as files; the rpm spec embeds the same bytes through `service_values`.
+        ("systemd/maos.service", "debian/maos.service"),
+        ("systemd/maos.sysusers", "debian/maos.sysusers"),
+        ("systemd/host.toml", "debian/host.toml"),
+        ("deb/maos.examples", "debian/maos.examples"),
         ("rpm/maos.spec", "maos.spec"),
         ("aur/PKGBUILD", "PKGBUILD"),
         ("homebrew/maos.rb", "maos.rb"),

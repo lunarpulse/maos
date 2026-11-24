@@ -2337,6 +2337,7 @@ mod worker {
                 )
                 .map_err(|e| WorkerSupervisionError::Load(e.to_string()))?;
             core.bind_scheduler_pid(pid);
+            crate::operator_door::record_form(pid, "worker");
 
             if let Err(e) = self.exec.handle.block_on(self.exec.scheduler.start(pid)) {
                 // Story 16-6 — this used to read "the SCB is `Loaded` and
@@ -3250,8 +3251,10 @@ mod worker {
     ///
     /// **The cursor is insertion-ordered and exclusive.** Wall-clock
     /// timestamps can move backwards under NTP, so `(timestamp_ns, frame_id)`
-    /// can permanently skip a later insert. SQLite `rowid` is monotonic for
-    /// this append-only table and returns each output row exactly once.
+    /// can permanently skip a later insert. The insertion id (SQLite `rowid`)
+    /// only grows, and returns each output row exactly once: rotation (Story
+    /// 22-6) removes only a sealed prefix, below the cursor this stamper
+    /// publishes as a rotation floor ([`ProgressCursor`]).
     fn spawn_progress_stamper(
         transparency_log: Arc<TransparencyLogAdapter>,
         spirits: Arc<
@@ -3265,7 +3268,7 @@ mod worker {
         cancel: tokio_util::sync::CancellationToken,
     ) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
-            let mut cursor: Option<i64> = None;
+            let mut cursor = ProgressCursor::new(&transparency_log);
             let mut ticker = tokio::time::interval(STAMPER_TICK);
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
             loop {
@@ -3273,30 +3276,15 @@ mod worker {
                     _ = cancel.cancelled() => return,
                     _ = ticker.tick() => {}
                 }
-                let rows = match transparency_log.query_frames(FrameFilter {
-                    kind: Some(FrameKind::CliSubprocessOutput),
-                    cursor_insertion_id: cursor,
-                    order_by_insertion: true,
-                    ..Default::default()
-                }) {
-                    Ok(rows) => rows,
+                let progressed = match cursor.poll(&transparency_log) {
+                    Ok(progressed) => progressed,
                     Err(error) => {
                         eprintln!("maos: worker progress stamper query failed: {error}");
                         continue;
                     }
                 };
-                if rows.is_empty() {
+                if progressed.is_empty() {
                     continue;
-                }
-                // Both streams count as progress: a Worker printing to stderr
-                // is a Worker doing something.
-                let mut progressed: std::collections::BTreeSet<u32> =
-                    std::collections::BTreeSet::new();
-                for row in &rows {
-                    progressed.insert(row.spirit_pid);
-                    cursor = Some(
-                        cursor.map_or(row.insertion_id, |current| current.max(row.insertion_id)),
-                    );
                 }
                 let now_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
                 let guard = match spirits.read() {
@@ -3310,6 +3298,54 @@ mod worker {
                 }
             }
         })
+    }
+
+    /// The progress stamper's insertion cursor and the rotation floor it publishes (Story 22-6,
+    /// D-22-6-10 A): every output row at or below the cursor has been polled, so rotation may
+    /// seal up to it and no further.
+    pub struct ProgressCursor {
+        cursor: Option<i64>,
+        floor: crate::audit_rotation::RotationFloor,
+    }
+
+    impl ProgressCursor {
+        pub fn new(transparency_log: &TransparencyLogAdapter) -> Self {
+            Self {
+                cursor: None,
+                floor: crate::audit_rotation::register_floor_for(transparency_log, 0),
+            }
+        }
+
+        /// One poll: the pids that wrote output since the last poll. Both streams count as
+        /// progress: a Worker printing to stderr is a Worker doing something.
+        pub fn poll(
+            &mut self,
+            transparency_log: &TransparencyLogAdapter,
+        ) -> Result<std::collections::BTreeSet<u32>, String> {
+            // High-water FIRST: the query below covers everything at or below it, so the
+            // cursor may move there even when no output row exists (a log with no Worker
+            // output must not pin the floor at 0 forever).
+            let high = transparency_log
+                .max_insertion_id()
+                .map_err(|error| error.to_string())?;
+            let rows = transparency_log
+                .query_frames(FrameFilter {
+                    kind: Some(FrameKind::CliSubprocessOutput),
+                    cursor_insertion_id: self.cursor,
+                    order_by_insertion: true,
+                    ..Default::default()
+                })
+                .map_err(|error| error.to_string())?;
+            let mut progressed = std::collections::BTreeSet::new();
+            let mut next = self.cursor.unwrap_or(0).max(high);
+            for row in &rows {
+                progressed.insert(row.spirit_pid);
+                next = next.max(row.insertion_id);
+            }
+            self.cursor = Some(next);
+            self.floor.publish(next);
+            Ok(progressed)
+        }
     }
 
     /// The root's signal listener (D-16-3-M).
@@ -3809,9 +3845,9 @@ pub mod exit_observation {
 #[cfg(feature = "network")]
 pub use worker::{
     ActivePathCount, BindingAction, BindingCore, BindingExecutor, BindingPhase, CrashHandlerHandle,
-    CrashOutcome, LiveWorker, ObserverGate, OnUnloadFault, PhaseRefusal, RootSupervision,
-    SupervisorCounters, SupervisorSeams, WorkerBinding, WorkerBindingView, WorkerSpirit,
-    WorkerSupervision, WorkerSupervisionError, WorkerSupervisor, WorkerTask, ARMED_MARKER,
-    CRASH_HANDLER_JOIN_BUDGET, DEFAULT_PROGRESS_THRESHOLD_MS, ROOT_GRACE, STAMPER_TICK,
-    WORKER_FREEZE_ENABLED,
+    CrashOutcome, LiveWorker, ObserverGate, OnUnloadFault, PhaseRefusal, ProgressCursor,
+    RootSupervision, SupervisorCounters, SupervisorSeams, WorkerBinding, WorkerBindingView,
+    WorkerSpirit, WorkerSupervision, WorkerSupervisionError, WorkerSupervisor, WorkerTask,
+    ARMED_MARKER, CRASH_HANDLER_JOIN_BUDGET, DEFAULT_PROGRESS_THRESHOLD_MS, ROOT_GRACE,
+    STAMPER_TICK, WORKER_FREEZE_ENABLED,
 };

@@ -678,6 +678,171 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         purpose: "Credential source selected at the composition root: keyring (default, with bounded env fallback), env (CI), or encrypted-file (requires MAOS_KMS_MASTER_KEY) (Story 16-4)",
         stability: EnvStability::UserFacing,
     },
+    EnvVar {
+        name: "MAOS_REGION_HOME",
+        purpose: "Operator home region tag (ascii-v1) stamped on every memory write. Integrity-relevant: a cohort host's tag must equal the signed manifest's TeamEntry.region of its team, and a disagreement refuses the boot (Story 22-1); empty disables pinning",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CRYPTO_PROVIDER",
+        purpose: "Crypto provider the Host file's crypto_provider key names; read by the serve verb only and must equal the provider recorded in <home>/config.toml (default ring), else the boot is refused (Story 22-1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_OPERATOR_HTTP_ENDPOINT",
+        purpose: "maosctl endpoint override for the loopback operator door; valid only together with MAOS_OPERATOR_BEARER_TOKEN (Story 16-1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_MEMORY_ROOT",
+        purpose: "Override the private memory root (default MAOS_HOME, then XDG_DATA_HOME/maos/memory, then the legacy HOME/.local/share/maos/memory)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_JOURNAL_PATH",
+        purpose: "Override the lifecycle journal file when MAOS_HOME is unset; an empty value is refused",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_ERASURE_PROOFS_DIR",
+        purpose: "Override the erasure-proofs directory (default under the memory data root)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_AUDIT_KEY",
+        purpose: "Path of the audit signing key, below an explicit argument and above the default location",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_AUDIT_ROTATE_BYTES",
+        purpose: "Live Transparency Log size in bytes at which the Host seals its oldest rows into a signed segment (default 268435456; the Host file's audit_rotate_bytes key; Story 22-6)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_AUDIT_ROTATE_DAYS",
+        purpose: "Age in days at which live Transparency Log rows are sealed into a signed segment (default 30; the Host file's audit_rotate_days key; Story 22-6)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_AUDIT_KEEP_DAYS",
+        purpose: "Opt-in expiry: sealed audit segments older than this many days (at least 90) are deleted, never one holding a legal-held or open-erasure principal; unset deletes nothing (the Host file's audit_keep_days key; Story 22-6)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_REGISTRY_TIER_FLOOR",
+        purpose: "Override the registry trust-tier floor of operator.toml for one boot",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_REGISTRY_T3_FOR_PUBLIC_UNTRUSTED",
+        purpose: "Override whether public-untrusted registry content must run at T3, over operator.toml",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_REGISTRY_ALLOW_UNSIGNED_LOCAL",
+        purpose: "Override whether unsigned local registry content is allowed, over operator.toml",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_REGISTRY_ORG_SIGNING_PUBKEY",
+        purpose: "Override the organisation registry signing public key, over operator.toml",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_REGISTRY_REQUIRE_SERVER_TIER_SIGNATURE",
+        purpose: "Override whether a registry server tier signature is required, over operator.toml",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_REGISTRY_ALLOW_FORCE_TIER_AT_IMPORT",
+        purpose: "Override whether an import may force its tier, over operator.toml",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_POSTURE_CEILING",
+        purpose: "Override the operator posture ceiling of operator.toml for one boot",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_T3_RUNTIME",
+        purpose: "T3 sandbox container runtime selection (auto by default)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_T3_IMAGE_LOCK_PATH",
+        purpose: "Override the T3 image lock file path",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX",
+        purpose: "Hex public key of the T3 image trust anchor",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SIEM_HOSTNAME",
+        purpose: "Hostname stamped on SIEM records (default localhost)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_TRIAL_PRODUCER_SEED",
+        purpose: "Trial attestation producer signing seed (hex) for production CI; unset uses the dev seed",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_TRIAL_PRODUCER_PUBKEY",
+        purpose: "Trial attestation producer public key (hex) matching the production CI seed",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_BENCH_SPIRIT_BINARY",
+        purpose: "Spirit binary the section 13.1 benchmark runner launches",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_ACCESSIBILITY_SMOKE",
+        purpose: "maosctl verbs short-circuit to a smoke line so the accessibility cascade test runs fast",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_INSTALL_DRY_RUN",
+        purpose: "maosctl install stops after the compile step, for the accessibility smoke",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_BIN_PATH",
+        purpose: "Explicit maos binary path maosctl launches, ahead of the sibling executable and PATH",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_REPO_ROOT",
+        purpose: "Repository root whose _bmad/skills the shell stages into a fresh home",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_AUTO_REVERT_FAST",
+        purpose: "Shorten the post-swap monitor window to 300 ms for tests",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_REVOCATION_FAST",
+        purpose: "Shorten the revocation poller cadence for tests",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_SUPERVISION_FAST",
+        purpose: "Shorten the supervision watchdog cadence for tests",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_SCHEDULE_FAST",
+        purpose: "Shorten the schedule watchdog cadence for tests",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_FIXTURE_SHAPE_VERSION",
+        purpose: "Output shape version the worker CLI fixture reports",
+        stability: EnvStability::HarnessOnly,
+    },
 ];
 
 pub fn lookup(name: &str) -> Option<&'static EnvVar> {

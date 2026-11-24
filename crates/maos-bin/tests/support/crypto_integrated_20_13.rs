@@ -108,6 +108,7 @@ async fn crypto_provider_one_boot_reaches_all_four_surfaces() {
         &selected,
         DAEMON_BOOT_NONCE,
         false,
+        None,
         #[cfg(feature = "wasm-host")]
         None,
         #[cfg(feature = "wasm-host")]

@@ -616,6 +616,37 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
             ("original_kind", PayloadType::Num),
         ]),
     },
+    // Story 22-6: the same markers, written when a forget scrubs a sealed segment.
+    WriterShapeEntry {
+        site: ("rotation.rs", "scrub_segment", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("distillate.redacted"),
+        shape: Some(&[
+            ("principal_id", PayloadType::Str),
+            ("redacted_distillate_frame_id", PayloadType::Str),
+        ]),
+    },
+    WriterShapeEntry {
+        site: ("rotation.rs", "scrub_segment", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("frame.redacted"),
+        shape: Some(&[
+            ("redacted_frame_id", PayloadType::Str),
+            ("original_kind", PayloadType::Num),
+        ]),
+    },
+    WriterShapeEntry {
+        site: ("rotation.rs", "scrub_segment", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("distillate.redacted"),
+        shape: Some(&[
+            ("redacted_frame_id", PayloadType::Str),
+            ("original_kind", PayloadType::Num),
+        ]),
+    },
     WriterShapeEntry {
         site: ("transparency_log.rs", "write_erasure_body", 0),
         kind: 1,

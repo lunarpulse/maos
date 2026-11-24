@@ -14,19 +14,20 @@ pub struct InstalledSpirits {
     ports: BTreeMap<String, std::sync::Arc<crate::spirit_session::ShellPort>>,
 }
 impl InstalledSpirits {
-    /// Boot installed roots; only a `shell` boot gives each loaded root its shell port and
-    /// shell-session wrapper.
+    /// Boot installed roots; a `shell` boot, or a boot under a door that serves directed tasks
+    /// (`directed`, Story 22-4), gives each loaded root its turn port and shell-session wrapper.
     pub async fn boot(
         manifests: Vec<(String, PathBuf)>,
         deps: &AdmissionDeps<'_>,
         crypto: &crate::crypto_provider::SelectedCrypto,
         boot_nonce: u64,
         shell: bool,
+        directed: Option<&std::sync::Arc<crate::directed_task::DirectedTasks>>,
         #[cfg(feature = "wasm-host")] host: Option<&dyn maos_host::SpiritHostPort>,
         #[cfg(feature = "wasm-host")] session_deps: Option<crate::spirit_session::SessionDeps>,
     ) -> Self {
         #[cfg(not(feature = "wasm-host"))]
-        let _ = shell;
+        let _ = (shell, directed);
         let mut result = Self::default();
         for (name, path) in manifests {
             let (text, publisher, held) = match maos_registry::install::verify_installed_launch(
@@ -120,12 +121,24 @@ impl InstalledSpirits {
                     .await?;
                     let session_deps = session_deps.clone();
                     let id = name.clone();
-                    let port =
-                        shell.then(|| crate::spirit_session::ShellPort::new(launch.turn_budget));
+                    let port = (shell || directed.is_some())
+                        .then(|| crate::spirit_session::ShellPort::new(launch.turn_budget));
                     if let Some(port) = &port {
                         result
                             .ports
                             .insert(name.clone(), std::sync::Arc::clone(port));
+                        // Story 22-4 — the door's directed tasks share the shell's one port.
+                        if let Some(directed) = directed {
+                            directed.register(
+                                &name,
+                                std::sync::Arc::new(PortRunner {
+                                    port: std::sync::Arc::clone(port),
+                                    name: name.clone(),
+                                    iac: std::sync::Arc::clone(&session_deps.iac),
+                                    runtime: tokio::runtime::Handle::current(),
+                                }),
+                            );
+                        }
                     }
                     result.sessions.push(tokio::spawn(async move {
                         let ran = match port {
@@ -178,6 +191,10 @@ impl InstalledSpirits {
         }
         result
     }
+    /// The stable admission code that refused `name` at this boot, if it was refused.
+    pub fn refusal_code(&self, name: &str) -> Option<&'static str> {
+        self.refusals.get(name).map(AdmissionRefusal::code)
+    }
     /// `None` alone means the name was neither loaded nor refused at this boot. A dispatched
     /// turn returns the Spirit's own answer, or the typed reason it produced none.
     pub fn dispatch(
@@ -223,57 +240,21 @@ impl InstalledSpirits {
     ) -> Result<String, String> {
         let runtime = tokio::runtime::Handle::current();
         tokio::task::block_in_place(|| {
-            let _serial = port.serialize();
-            let (pid, generation) = port
-                .await_ready()
-                .map_err(|error| format!("spirit '{name}': {error}"))?;
-            let deadline = std::time::Instant::now() + port.turn_budget();
-            let frame_id = ulid::Ulid::new().to_bytes();
-            let turn = port
-                .arm(frame_id, name, pid, generation, deadline)
-                .map_err(|error| format!("spirit '{name}': {error}"))?;
-            let frame = maos_domain::frame::IacFrame {
-                frame_id,
-                timestamp_ns: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
-                logical_clock: 0,
-                from: maos_domain::frame::FrameAddress {
-                    spirit_id: maos_iac::adapter::mailbox::SHELL_REPLY_DESTINATION.into(),
-                    host_id: None,
-                    role: None,
-                },
-                to: smallvec::smallvec![maos_domain::frame::FrameAddress {
-                    spirit_id: name.into(),
-                    host_id: None,
-                    role: None
-                }],
-                kind: maos_spirit_abi::identity::FrameKind::TaskAssign,
-                intent: maos_domain::invariants::i1::IntentClass::Standard,
-                payload: maos_domain::frame::FramePayload::TaskAssign(
-                    maos_domain::frame::TaskAssignPayload {
-                        goal: message.to_owned(),
-                        scope: Vec::new(),
-                        success_criteria: "Answer the operator's shell message".into(),
-                        posture_preferences: Default::default(),
-                        prior_distillate_ref: None,
-                    },
-                ),
-                auto_marker: maos_domain::invariants::i3::FrameOrigin::HumanAuthored,
-                consent_envelope: None,
-                intent_lineage: Default::default(),
-            };
-            let remaining = turn
-                .deadline()
-                .saturating_duration_since(std::time::Instant::now());
-            match runtime.block_on(tokio::time::timeout(
-                remaining,
-                iac.deliver_typed(frame, 0, None),
-            )) {
-                Ok(Ok(_)) => {}
-                Ok(Err(error)) => return Err(format!("spirit '{name}' dispatch refused: {error}")),
-                Err(_) => return Err(format!("spirit '{name}': turn deadline exceeded")),
+            run_turn(
+                port,
+                name,
+                ulid::Ulid::new().to_bytes(),
+                message,
+                maos_iac::adapter::mailbox::ReplyLabel::Shell,
+                iac,
+                &runtime,
+            )
+        })
+        .map_err(|failure| match failure {
+            TurnFailure::Turn(error) => format!("spirit '{name}': {error}"),
+            TurnFailure::DispatchRefused(error) => {
+                format!("spirit '{name}' dispatch refused: {error}")
             }
-            turn.wait()
-                .map_err(|error| format!("spirit '{name}': {error}"))
         })
     }
     pub async fn join(self) {
@@ -292,6 +273,123 @@ fn session_end(error: &crate::spirit_session::SessionError) -> &'static str {
         "ended"
     } else {
         "refused"
+    }
+}
+
+/// Why one turn produced no answer (Story 22-4): the typed port error, or the bus refusing the
+/// request frame.
+#[cfg(feature = "wasm-host")]
+pub enum TurnFailure {
+    Turn(crate::spirit_session::TurnError),
+    DispatchRefused(String),
+}
+
+#[cfg(feature = "wasm-host")]
+impl TurnFailure {
+    pub fn reason(&self) -> &'static str {
+        match self {
+            Self::Turn(error) => error.reason(),
+            Self::DispatchRefused(_) => "dispatch_refused",
+        }
+    }
+}
+
+/// The one turn: wait for the session's readiness, queue `message` under the host-minted
+/// `frame_id`, deliver its `HumanAuthored` `TaskAssign` from the host pseudo-address, and hold
+/// the routed answer until the matching clean turn completion. Blocks; call it off the async
+/// workers. The port's `serialize()` makes the shell REPL and the door take turns.
+#[cfg(feature = "wasm-host")]
+pub fn run_turn(
+    port: &std::sync::Arc<crate::spirit_session::ShellPort>,
+    name: &str,
+    frame_id: [u8; 16],
+    message: &str,
+    label: maos_iac::adapter::mailbox::ReplyLabel,
+    iac: &maos_iac::adapter::IacBusAdapter,
+    runtime: &tokio::runtime::Handle,
+) -> Result<String, TurnFailure> {
+    use crate::spirit_session::TurnError;
+    let _serial = port.serialize();
+    let (pid, generation) = port.await_ready().map_err(TurnFailure::Turn)?;
+    let deadline = std::time::Instant::now() + port.turn_budget();
+    let turn = port
+        .arm_labelled(label, frame_id, name, pid, generation, deadline)
+        .map_err(TurnFailure::Turn)?;
+    let frame = maos_domain::frame::IacFrame {
+        frame_id,
+        timestamp_ns: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+        logical_clock: 0,
+        from: maos_domain::frame::FrameAddress {
+            spirit_id: maos_iac::adapter::mailbox::SHELL_REPLY_DESTINATION.into(),
+            host_id: None,
+            role: None,
+        },
+        to: smallvec::smallvec![maos_domain::frame::FrameAddress {
+            spirit_id: name.into(),
+            host_id: None,
+            role: None
+        }],
+        kind: maos_spirit_abi::identity::FrameKind::TaskAssign,
+        intent: maos_domain::invariants::i1::IntentClass::Standard,
+        payload: maos_domain::frame::FramePayload::TaskAssign(
+            maos_domain::frame::TaskAssignPayload {
+                goal: message.to_owned(),
+                scope: Vec::new(),
+                success_criteria: "Answer the operator's shell message".into(),
+                posture_preferences: Default::default(),
+                prior_distillate_ref: None,
+            },
+        ),
+        auto_marker: maos_domain::invariants::i3::FrameOrigin::HumanAuthored,
+        consent_envelope: None,
+        intent_lineage: Default::default(),
+    };
+    let remaining = turn
+        .deadline()
+        .saturating_duration_since(std::time::Instant::now());
+    // The timer is built inside the future: a pump thread has no ambient runtime until `block_on`.
+    match runtime.block_on(async {
+        tokio::time::timeout(remaining, iac.deliver_typed(frame, 0, None)).await
+    }) {
+        Ok(Ok(_)) => {}
+        Ok(Err(error)) => return Err(TurnFailure::DispatchRefused(error.to_string())),
+        Err(_) => return Err(TurnFailure::Turn(TurnError::DeadlineExceeded)),
+    }
+    turn.wait().map_err(TurnFailure::Turn)
+}
+
+/// A loaded installed Spirit's door-task runner: one directed task is one [`run_turn`].
+#[cfg(feature = "wasm-host")]
+struct PortRunner {
+    port: std::sync::Arc<crate::spirit_session::ShellPort>,
+    name: String,
+    iac: std::sync::Arc<maos_iac::adapter::IacBusAdapter>,
+    runtime: tokio::runtime::Handle,
+}
+
+#[cfg(feature = "wasm-host")]
+impl crate::directed_task::TaskRunner for PortRunner {
+    fn run(
+        &self,
+        task_id: [u8; 16],
+        text: &str,
+    ) -> Result<String, crate::directed_task::RunFailure> {
+        run_turn(
+            &self.port,
+            &self.name,
+            task_id,
+            text,
+            maos_iac::adapter::mailbox::ReplyLabel::Task,
+            &self.iac,
+            &self.runtime,
+        )
+        .map_err(|failure| crate::directed_task::RunFailure {
+            reason: failure.reason(),
+            detail: match failure {
+                TurnFailure::Turn(error) => error.to_string(),
+                TurnFailure::DispatchRefused(error) => error,
+            },
+        })
     }
 }
 

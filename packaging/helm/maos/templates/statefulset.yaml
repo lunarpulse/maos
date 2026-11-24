@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "maos.fullname" . }}
+  labels:
+    {{- include "maos.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  # A StatefulSet requires a serviceName. No Service is rendered: the door is loopback-only.
+  serviceName: {{ include "maos.fullname" . }}
+  selector:
+    matchLabels:
+      {{- include "maos.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "maos.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/host-toml: {{ .Values.hostToml | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      initContainers:
+        - name: init
+          image: {{ include "maos.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["init", "--plain"]
+          env:
+            - name: HOME
+              value: /var/lib/maos
+            - name: MAOS_HOME
+              value: /var/lib/maos
+          securityContext:
+            {{- include "maos.securityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: home
+              mountPath: /var/lib/maos
+            - name: tmp
+              mountPath: /tmp
+      containers:
+        - name: maos
+          image: {{ include "maos.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["serve", "--config", "/etc/maos/host.toml"]
+          env:
+            - name: HOME
+              value: /var/lib/maos
+            - name: MAOS_HOME
+              value: /var/lib/maos
+          {{- if or .Values.secrets .Values.existingSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ include "maos.secretName" . }}
+          {{- end }}
+          securityContext:
+            {{- include "maos.securityContext" . | nindent 12 }}
+          readinessProbe:
+            exec:
+              command: ["/usr/local/bin/maosctl", "status"]
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          livenessProbe:
+            exec:
+              command: ["/usr/local/bin/maosctl", "status"]
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: home
+              mountPath: /var/lib/maos
+            - name: host
+              mountPath: /etc/maos
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: host
+          configMap:
+            name: {{ include "maos.fullname" . }}-host
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: home
+        labels:
+          {{- include "maos.selectorLabels" . | nindent 10 }}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.persistence.storageClassName }}
+        storageClassName: {{ .Values.persistence.storageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size | quote }}

@@ -156,6 +156,20 @@ pub enum Subcommand {
     Cohort(CohortArgs),
     /// Story 19-7 (AC3) — A2A trust operations on this host's daemon door.
     A2a(A2aArgs),
+    /// Story 22-1/22-5 — the agents the running Host holds: one tab-separated line per Spirit
+    /// (`id pid state form originator task age spend`, `-` when empty; `GET /v1/agents`).
+    /// `agents show <id>` prints one Spirit's session.
+    Agents(AgentsArgs),
+    /// Story 22-2 — one health line for a supervisor or probe: exit 0 when the daemon answers
+    /// and its audit store takes a write lock, 74 when it answers and the store does not,
+    /// 69 when it is unreachable, 78 when the home is not initialised (`GET /v1/daemon`).
+    Status,
+    /// Story 22-4 — hand a running installed Spirit a task through the door and print its task
+    /// id (`--wait` prints the finished `task show` object instead). `--key` makes a retry
+    /// return the same task.
+    Ask(AskArgs),
+    /// Story 22-4 — read directed tasks (`task show <id>`).
+    Task(TaskArgs),
 }
 
 /// Story 10.4a — `maosctl migrate sqlite-to-postgres`.
@@ -622,6 +636,32 @@ pub enum AuditQuery {
         #[arg(long)]
         seed: Option<std::path::PathBuf>,
     },
+    /// Story 22-6 — seal the oldest prefix of the Transparency Log into a signed segment now.
+    ///
+    /// Asks the running Host over the operator door; with no Host running it rotates the
+    /// log offline. Seals only rows below every floor (the newest row, open forgets,
+    /// outstanding redistills and each tail's cursor), deletes nothing that is not sealed and
+    /// verified, and needs the operator audit key. Exit 0 sealed or nothing to seal, 1 refused.
+    Rotate,
+    /// Story 22-6 — verify the segment chain of an audit segment directory.
+    ///
+    /// Reports a missing, reordered or forked segment, a digest that does not match its file
+    /// and, when a key is given, a signature that does not verify. A gap is explained only by
+    /// an `audit.segment.expired` row in the Transparency Log (`--log`, default the
+    /// `transparency.sqlite` beside the directory). Exit 0 intact, 1 broken, 2 input error.
+    VerifySegments {
+        /// The `segments` directory (manifests and segment files).
+        dir: std::path::PathBuf,
+        /// Transparency Log whose `audit.segment.expired` rows explain expired segments.
+        #[arg(long)]
+        log: Option<std::path::PathBuf>,
+        /// Hex-encoded Ed25519 public key, or path to a .hex file (the signing key).
+        #[arg(long, conflicts_with = "seed")]
+        pubkey: Option<String>,
+        /// Path to the base audit signing key; each manifest's key is derived from its region.
+        #[arg(long)]
+        seed: Option<std::path::PathBuf>,
+    },
     /// `j1-crosshost-2c` AC2.2 — reconcile two independently-signed halves of one
     /// cross-host run and, optionally, emit a signed two-host receipt.
     ///
@@ -887,6 +927,73 @@ pub enum OrchestratorOp {
 pub struct PauseArgs {
     /// Spirit ID to pause (any loaded Spirit, a Worker included).
     pub spirit: String,
+}
+
+/// Story 22-4 — hand a running installed Spirit a task.
+#[derive(clap::Args, Debug)]
+pub struct AskArgs {
+    /// Spirit ID to direct (an installed component under the daemon's door).
+    pub spirit: String,
+    /// The task text. Reaches the Spirit raw; the audit trail keeps a redacted copy.
+    pub text: String,
+    /// Wait for the task to end and print its `task show` object (default 120 s). Exit 0 only
+    /// for a completed task, 1 for any other end with the reason, 75 when the wait runs out.
+    #[arg(
+        long,
+        value_name = "SECS",
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "120"
+    )]
+    pub wait: Option<u64>,
+    /// Idempotency key (`[A-Za-z0-9._-]{1,128}`): a retry with the same key returns the same
+    /// task instead of a new one.
+    #[arg(long, value_name = "KEY")]
+    pub key: Option<String>,
+}
+
+/// Story 22-4 — `maosctl task <op>`.
+#[derive(clap::Args, Debug)]
+pub struct TaskArgs {
+    #[command(subcommand)]
+    pub op: TaskOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum TaskOp {
+    /// Print one directed task: `{task_id, spirit_id, origin, state, result?, halt?, reason?,
+    /// accepted_ns, ended_ns?}`. Reads the daemon's registry, then the audit trail.
+    Show {
+        /// The task id `maosctl ask` printed.
+        id: String,
+    },
+}
+
+/// Story 22-5 — `maosctl agents [show <id> ...]`.
+#[derive(clap::Args, Debug)]
+pub struct AgentsArgs {
+    #[command(subcommand)]
+    pub op: Option<AgentsOp>,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum AgentsOp {
+    /// One Spirit's session for the current boot, oldest first, header fields only (never
+    /// payload bytes or halt context). `GET /v1/spirits/{id}/session`.
+    Show {
+        /// The Spirit id.
+        id: String,
+        /// Rows to print (newest `N`), 1..=500.
+        #[arg(long, default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=500))]
+        limit: u16,
+        /// Keep polling for new rows. Exits 0 when the id stops resolving or its boot or pid
+        /// changes, 69 when the daemon becomes unreachable.
+        #[arg(long)]
+        follow: bool,
+        /// Poll interval in milliseconds (floor 100).
+        #[arg(long, value_name = "MS", default_value_t = 1000)]
+        interval: u64,
+    },
 }
 
 /// Story 3.4 — resume a Spirit.
