@@ -373,10 +373,14 @@ async fn exercise_unload(
     );
 
     // wait_and_finalize persists the real T3 terminal row after the planned stop.
-    let run_result = tokio::time::timeout(Duration::from_secs(30), run_task)
-        .await
-        .expect("the over-budget hook must not block runtime teardown")
-        .expect("worker blocking task joined");
+    let run_result = match tokio::time::timeout(Duration::from_secs(30), run_task).await {
+        Ok(joined) => joined.expect("worker blocking task joined"),
+        Err(_) => panic!(
+            "the failed on_unload hook must not block runtime teardown: \
+             run_cli_wrapper_manifest did not return within 30s of unload returning\n{}",
+            stall_diagnostics(&runtime, &cid, binding.child_pid)
+        ),
+    };
     assert!(
         run_result.is_ok(),
         "real run_cli_wrapper_manifest should finalize: {run_result:?}"
@@ -520,6 +524,130 @@ fn cid_from_lifecycle(path: &Path) -> Option<String> {
     }
     None
 }
+
+/// What a stalled `run_cli_wrapper_manifest` is waiting on, captured at the
+/// moment the join bound expires: this test process's threads (kernel wait
+/// channel), every other process that holds one of this process's pipes (the
+/// bridge reader threads block until the last holder of a child pipe closes
+/// it), the runtime client's `/proc` state, the process tree and the CID's
+/// runtime state. Best effort and bounded; every probe failure is reported,
+/// never hidden.
+fn stall_diagnostics(runtime: &str, cid: &str, child_pid: Option<u32>) -> String {
+    use std::fmt::Write as _;
+    let mut report = String::new();
+    let own = std::process::id();
+    let _ = writeln!(report, "-- test process {own} threads (comm: wchan) --");
+    match std::fs::read_dir("/proc/self/task") {
+        Ok(tasks) => {
+            for task in tasks.flatten() {
+                let path = task.path();
+                let read = |name: &str| {
+                    std::fs::read_to_string(path.join(name))
+                        .map(|text| text.trim().to_owned())
+                        .unwrap_or_else(|error| format!("<{error}>"))
+                };
+                let _ = writeln!(
+                    report,
+                    "{}: {} : {}",
+                    task.file_name().to_string_lossy(),
+                    read("comm"),
+                    read("wchan")
+                );
+            }
+        }
+        Err(error) => {
+            let _ = writeln!(report, "<cannot list threads: {error}>");
+        }
+    }
+    let pipe_ends: std::collections::BTreeSet<String> = std::fs::read_dir("/proc/self/fd")
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|fd| std::fs::read_link(fd.path()).ok())
+        .map(|target| target.to_string_lossy().into_owned())
+        .filter(|target| target.starts_with("pipe:["))
+        .collect();
+    let _ = writeln!(
+        report,
+        "-- other processes sharing this process's {} pipe(s) --",
+        pipe_ends.len()
+    );
+    for process in std::fs::read_dir("/proc").into_iter().flatten().flatten() {
+        let Some(pid) = process
+            .file_name()
+            .to_str()
+            .and_then(|name| name.parse::<u32>().ok())
+            .filter(|pid| *pid != own)
+        else {
+            continue;
+        };
+        let Ok(fds) = std::fs::read_dir(process.path().join("fd")) else {
+            continue;
+        };
+        let held: Vec<String> = fds
+            .flatten()
+            .filter_map(|fd| {
+                let target = std::fs::read_link(fd.path())
+                    .ok()?
+                    .to_string_lossy()
+                    .into_owned();
+                pipe_ends
+                    .contains(&target)
+                    .then(|| format!("fd{}={target}", fd.file_name().to_string_lossy()))
+            })
+            .collect();
+        if !held.is_empty() {
+            let cmdline = std::fs::read(process.path().join("cmdline"))
+                .map(|bytes| String::from_utf8_lossy(&bytes).replace('\0', " "))
+                .unwrap_or_default();
+            let _ = writeln!(
+                report,
+                "pid {pid} [{}] holds {}",
+                cmdline.chars().take(240).collect::<String>(),
+                held.join(", ")
+            );
+        }
+    }
+    if let Some(pid) = child_pid {
+        let _ = writeln!(
+            report,
+            "-- runtime client pid {pid} /proc stat --\n{}",
+            std::fs::read_to_string(format!("/proc/{pid}/stat"))
+                .unwrap_or_else(|error| format!("<{error}>"))
+        );
+    }
+    let probe = |program: &str, args: &[&str]| {
+        let output = std::process::Command::new("timeout")
+            .arg("5s")
+            .arg(program)
+            .args(args)
+            .output();
+        match output {
+            Ok(output) => format!(
+                "{:?}\n{}{}",
+                output.status.code(),
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ),
+            Err(error) => format!("<cannot run {program}: {error}>"),
+        }
+    };
+    let _ = writeln!(
+        report,
+        "-- process tree --\n{}",
+        probe("ps", &["-eo", "pid,ppid,stat,etime,args", "--forest"])
+            .chars()
+            .take(12_000)
+            .collect::<String>()
+    );
+    let _ = writeln!(
+        report,
+        "-- CID state ({cid}) --\n{}",
+        probe(runtime, &["inspect", "--format", "{{json .State}}", cid])
+    );
+    report
+}
+
 async fn wait_for(budget: Duration, mut predicate: impl FnMut() -> bool) -> bool {
     let deadline = Instant::now() + budget;
     while Instant::now() < deadline {
@@ -531,18 +659,52 @@ async fn wait_for(budget: Duration, mut predicate: impl FnMut() -> bool) -> bool
     predicate()
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn s5_on_unload_panic_before_stop_keeps_planned_container_ownership() {
-    exercise_unload(OnUnloadFault::Panic, None, false, "S5 on_unload panic").await;
+/// Hang guard for one whole scene (setup, the 60 s bind wait, teardown, the
+/// 30 s run join and the CID probes sum to well under half of this). It
+/// bounds a scene that blocks, it is not an expectation about a healthy one.
+const SCENE_HARD_BOUND: Duration = Duration::from_secs(240);
+
+/// How long a failed scene waits for its blocking threads before abandoning
+/// them. A `#[tokio::test]` runtime's `Drop` waits for every `spawn_blocking`
+/// task with no bound, so a failure while `run_cli_wrapper_manifest` is still
+/// blocked kept the test process alive until the CI job's own timeout (hosted
+/// run 45447011202: the assertion failed at +30 s and the test was still
+/// "running" 1000+ s later). Owning the runtime lets a failure return promptly.
+const FAILED_SCENE_RUNTIME_REAP: Duration = Duration::from_secs(5);
+
+fn run_scene(fault: OnUnloadFault, cap: Option<u32>, expected_budget_row: bool, scene_name: &str) {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build()
+        .expect("build the S5 scene runtime");
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        runtime.block_on(async {
+            tokio::time::timeout(
+                SCENE_HARD_BOUND,
+                exercise_unload(fault, cap, expected_budget_row, scene_name),
+            )
+            .await
+            .expect("S5 scene exceeded its hard bound");
+        })
+    }));
+    runtime.shutdown_timeout(FAILED_SCENE_RUNTIME_REAP);
+    if let Err(panic) = outcome {
+        std::panic::resume_unwind(panic);
+    }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn s5_on_unload_over_budget_keeps_planned_container_ownership() {
-    exercise_unload(
+#[test]
+fn s5_on_unload_panic_before_stop_keeps_planned_container_ownership() {
+    run_scene(OnUnloadFault::Panic, None, false, "S5 on_unload panic");
+}
+
+#[test]
+fn s5_on_unload_over_budget_keeps_planned_container_ownership() {
+    run_scene(
         OnUnloadFault::Sleep(Duration::from_secs(3)),
         Some(1),
         true,
         "S5 on_unload over-budget",
-    )
-    .await;
+    );
 }
