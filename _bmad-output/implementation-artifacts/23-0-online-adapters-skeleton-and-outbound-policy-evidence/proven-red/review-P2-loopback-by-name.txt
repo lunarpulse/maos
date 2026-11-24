@@ -1,0 +1,3 @@
+plant (E230-PLANT): admit() treats every Loopback answer as admitted under allow_loopback_http (literal_host || true)
+command: cargo test --locked -p maos-domain --test outbound_policy_23_0
+failed: loopback_by_name_is_refused_under_the_loopback_knob_alone (only; 17 passed)

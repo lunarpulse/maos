@@ -92,20 +92,26 @@ fn no_feature_but_default_reaches_the_umbrella() {
     }
 }
 
+/// Compiled only in the `network,wasm-host`-without-umbrella shape (AC2, AC6).
+/// CI runs it by name and requires `1 passed`, so a build that silently
+/// enables the umbrella (the test then does not exist) turns the step red.
+#[cfg(all(
+    feature = "network",
+    feature = "wasm-host",
+    not(feature = "online-adapters")
+))]
 #[test]
-fn the_compiled_shape_matches_the_features() {
-    // The umbrella implies `network`. The `network,wasm-host`-only build CI adds
-    // (AC6) has `network` on and the umbrella off, and must stay a distinct shape.
-    let (network, wasm_host, umbrella) = (
-        cfg!(feature = "network"),
-        cfg!(feature = "wasm-host"),
-        cfg!(feature = "online-adapters"),
+fn the_profile_without_online_adapters_has_network_and_wasm_host() {
+    assert!(!cfg!(feature = "online-adapters"));
+    assert!(cfg!(feature = "network") && cfg!(feature = "wasm-host"));
+}
+
+/// Compiled only when the umbrella is on: it must have brought `network` in.
+#[cfg(feature = "online-adapters")]
+#[test]
+fn the_umbrella_build_has_network() {
+    assert!(
+        reaches(&features(), UMBRELLA).contains("network"),
+        "online-adapters without network"
     );
-    assert!(network || !umbrella, "online-adapters without network");
-    let without_umbrella = cfg!(all(
-        feature = "network",
-        feature = "wasm-host",
-        not(feature = "online-adapters")
-    ));
-    assert_eq!(without_umbrella, network && wasm_host && !umbrella);
 }

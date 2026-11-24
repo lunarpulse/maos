@@ -480,7 +480,7 @@ impl IoSubsystemPort for &InnerPort {
         self.calls.lock().unwrap().push(format!("exchange {url}"));
         Ok(HttpExchange {
             status: self.exchange_status,
-            body: b"redirect-body".to_vec(),
+            body: b"exchange-body".to_vec(),
             header: Some("https://elsewhere.example/".to_owned()),
         })
     }
@@ -497,7 +497,7 @@ fn a_redirect_answer_is_refused_and_not_followed() {
     );
     let text = format!("{result:?}");
     assert!(
-        !text.contains("elsewhere") && !text.contains("redirect-body"),
+        !text.contains("elsewhere") && !text.contains("exchange-body"),
         "{text}"
     );
     assert_eq!(
@@ -552,7 +552,91 @@ fn a_refused_url_never_reaches_the_inner_port() {
     assert_eq!(io.http_get("https://1.1.1.1/").unwrap(), b"get-body");
     assert_eq!(
         io.http_post("https://1.1.1.1/", b"", &[]).unwrap(),
-        b"post-body"
+        b"exchange-body"
     );
     assert_eq!(inner.calls().len(), 2);
+}
+
+#[test]
+fn a_redirect_is_refused_on_post_and_a_failing_get_is_not_passed_as_bytes() {
+    // http_post reads the exchange status, so a 3xx is refused here, not only
+    // by the inner adapter.
+    for status in [301, 302, 307, 308] {
+        let inner = InnerPort::new(status);
+        let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict());
+        assert_eq!(
+            io.http_post("https://1.1.1.1/", b"", &[]),
+            Err(IoError::Transport("outbound_redirect_refused".to_owned())),
+            "{status}"
+        );
+    }
+    // Other non-2xx stays an error, never a body.
+    let inner = InnerPort::new(500);
+    let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict());
+    assert!(io.http_post("https://1.1.1.1/", b"", &[]).is_err());
+    // http_get gets bytes only: the inner adapter's refusal of a 3xx (the
+    // kernel adapter's contract) comes through unchanged and no body does.
+    struct RedirectingGet;
+    impl IoSubsystemPort for RedirectingGet {
+        fn http_get(&self, _url: &str) -> Result<Vec<u8>, IoError> {
+            Err(IoError::Transport("status 302".to_owned()))
+        }
+        fn http_post(&self, _: &str, _: &[u8], _: &[(&str, &str)]) -> Result<Vec<u8>, IoError> {
+            Err(IoError::Transport("status 302".to_owned()))
+        }
+    }
+    let io = PolicedIo::new(
+        RedirectingGet,
+        FakeResolver::none(),
+        OutboundPolicy::strict(),
+    );
+    assert_eq!(
+        io.http_get("https://1.1.1.1/"),
+        Err(IoError::Transport("status 302".to_owned()))
+    );
+}
+
+#[test]
+fn loopback_by_name_is_refused_under_the_loopback_knob_alone() {
+    let resolver = FakeResolver::with("sneaky.example", &["127.0.0.1"]);
+    let knob = OutboundPolicy::strict().allow_loopback_http();
+    for url in ["https://sneaky.example/", "http://sneaky.example/"] {
+        assert!(knob.vet_url(url, &resolver).is_err(), "{url}");
+    }
+    assert_eq!(
+        knob.vet_url("https://sneaky.example/", &resolver).err(),
+        Some(OutboundRefusal::Loopback)
+    );
+    assert_eq!(
+        knob.vet_host_port("sneaky.example", 6514, &resolver),
+        Err(OutboundRefusal::Loopback)
+    );
+    // A literal loopback still passes, over http and https.
+    for url in [
+        "http://127.0.0.1:9000/",
+        "https://127.0.0.1/",
+        "http://[::1]:9000/",
+    ] {
+        assert!(knob.vet_url(url, &FakeResolver::none()).is_ok(), "{url}");
+    }
+    // `allow_private` keeps its wider meaning: loopback by name too.
+    assert!(OutboundPolicy::strict()
+        .allow_private()
+        .vet_url("https://sneaky.example/", &resolver)
+        .is_ok());
+}
+
+#[test]
+fn the_vetted_url_debug_shows_no_userinfo_path_or_query() {
+    let vetted = OutboundPolicy::strict()
+        .vet_url(
+            "https://user:p4ssw0rd@1.1.1.1:8443/secret-path?token=t0k3n#frag",
+            &FakeResolver::none(),
+        )
+        .unwrap();
+    let text = format!("{vetted:?}");
+    for leak in ["user", "p4ssw0rd", "secret-path", "t0k3n", "frag"] {
+        assert!(!text.contains(leak), "{text}");
+    }
+    assert!(text.contains("1.1.1.1") && text.contains("8443"), "{text}");
 }

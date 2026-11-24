@@ -1,0 +1,3 @@
+plant (E230-PLANT): proxy.rs vetted_addresses literal-IPv4 site: 'if false && classify_ip(IpAddr::V4(ip)) != IpClass::Public'
+command: cargo test --locked -p maos-egress --test proxy_edges_17_1 granted
+failed: a_granted_private_or_link_local_literal_is_refused (only; the proxy tried to connect, 30 s)

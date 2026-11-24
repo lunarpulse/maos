@@ -6,9 +6,14 @@
 //! itself (`ResolveHost` is injected), reads no environment and no clock.
 //!
 //! A refusal is typed by its class and never carries any part of the input.
-//! Known boundary (RELEASE-HOLDS 23-0.a): a host name is resolved here before
-//! the IO adapter resolves it again, so a rebinding window exists between the
-//! two lookups. Closing it needs an IO-port change, which is not in scope.
+//! Known limit (RELEASE-HOLDS 23-0.a): for a host NAME, `PolicedIo` vets every
+//! DNS answer but does not bind the connection to them. `IoSubsystemPort`
+//! takes a URL string, so the inner adapter resolves the name again, and a
+//! rebinding answer (TTL 0: public first, private second) is not stopped.
+//! Consumer stories must not count `PolicedIo` as SSRF protection for host
+//! names until the port can bind the connection to the vetted addresses.
+//! Literal-IP URLs are not affected. Worker egress connects to the vetted
+//! addresses and has no such gap.
 
 use crate::ports::io_subsystem::{HttpExchange, IoError, IoSubsystemPort};
 use std::fmt;
@@ -165,18 +170,23 @@ impl OutboundPolicy {
         self
     }
 
-    /// Also admit loopback destinations, and plain `http` to a literal
-    /// loopback address.
+    /// Also admit a literal loopback address (not a name that resolves to
+    /// one), and plain `http` to it. `allow_private` admits loopback by any
+    /// route.
     #[must_use]
     pub fn allow_loopback_http(mut self) -> Self {
         self.allow_loopback_http = true;
         self
     }
 
-    fn admit(&self, ip: IpAddr) -> Result<(), OutboundRefusal> {
+    fn admit(&self, ip: IpAddr, literal_host: bool) -> Result<(), OutboundRefusal> {
         match classify_ip(ip) {
             IpClass::Public => Ok(()),
-            IpClass::Loopback if self.allow_private || self.allow_loopback_http => Ok(()),
+            IpClass::Loopback
+                if self.allow_private || (self.allow_loopback_http && literal_host) =>
+            {
+                Ok(())
+            }
             IpClass::Loopback => Err(OutboundRefusal::Loopback),
             IpClass::LinkLocal => Err(OutboundRefusal::LinkLocal),
             IpClass::Private if self.allow_private => Ok(()),
@@ -202,8 +212,9 @@ impl OutboundPolicy {
             return Err(OutboundRefusal::Unresolved);
         }
         // Every answer must pass; a mixed answer fails closed.
+        let literal_host = !matches!(host, Host::Domain(_));
         for ip in &addresses {
-            self.admit(*ip)?;
+            self.admit(*ip, literal_host)?;
         }
         Ok(addresses)
     }
@@ -262,10 +273,22 @@ impl OutboundPolicy {
 }
 
 /// A URL that passed the policy, with the addresses it was vetted against.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// `Debug` shows scheme, host and port only: never userinfo, path or query.
+#[derive(Clone, PartialEq, Eq)]
 pub struct VettedUrl {
     url: Url,
     addresses: Vec<IpAddr>,
+}
+
+impl fmt::Debug for VettedUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("VettedUrl")
+            .field("scheme", &self.url.scheme())
+            .field("host", &self.url.host_str())
+            .field("port", &self.url.port_or_known_default())
+            .field("addresses", &self.addresses)
+            .finish()
+    }
 }
 
 impl VettedUrl {
@@ -280,8 +303,11 @@ impl VettedUrl {
     }
 }
 
-/// An [`IoSubsystemPort`] that vets every URL before it delegates and refuses
-/// a 3xx answer. A refused URL never reaches the inner port.
+/// An [`IoSubsystemPort`] that vets every URL before it delegates. A refused
+/// URL never reaches the inner port. A 3xx answer is refused here for
+/// `http_post` and `http_post_exchange` (both read the exchange status);
+/// `http_get` returns bytes only, so a GET redirect is refused by the inner
+/// adapter (the kernel adapter never follows and fails a non-2xx).
 pub struct PolicedIo<P: IoSubsystemPort, R: ResolveHost> {
     inner: P,
     resolver: R,
@@ -318,8 +344,11 @@ impl<P: IoSubsystemPort, R: ResolveHost> IoSubsystemPort for PolicedIo<P, R> {
         body: &[u8],
         headers: &[(&str, &str)],
     ) -> Result<Vec<u8>, IoError> {
-        self.vet(url)?;
-        self.inner.http_post(url, body, headers)
+        let exchange = self.http_post_exchange(url, body, headers, "")?;
+        match exchange.status {
+            200..=299 => Ok(exchange.body),
+            status => Err(IoError::Transport(format!("status {status}"))),
+        }
     }
 
     fn http_post_exchange(
