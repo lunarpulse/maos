@@ -88,9 +88,14 @@ set +e
 dpkg -L maos > "$scratch/list" 2> "$scratch/list.err"
 rc=$?
 set -e
-# dpkg -L may report not-installed with exit 1; it must never list retained files.
+# dpkg -L may report not-installed with exit 1. Since 22-2 the package ships maintainer scripts
+# (dh_installsystemd, dh_installsysusers), so after `dpkg -r` it stays in the config-files state
+# ('rc') until purged and dpkg -L prints the message "Package 'maos' does not contain any files
+# (!)" instead of failing; what must never appear is a listed path.
 [[ $rc == 0 || $rc == 1 ]]
-if [[ -s "$scratch/list" ]]; then
+if grep -q '^/' "$scratch/list"; then
   echo 'dpkg -L lists retained files after removal:' >&2; cat "$scratch/list" >&2
   dpkg -s maos >&2 || true; exit 1
 fi
+state=$(dpkg-query -W -f='${db:Status-Abbrev}' maos 2>/dev/null || true)
+[[ -z "$state" || "$state" == rc* ]] || { echo "unexpected package state after dpkg -r: '$state'" >&2; exit 1; }
