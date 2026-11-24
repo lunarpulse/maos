@@ -239,6 +239,63 @@ impl Host {
         let _ = child.wait();
     }
 
+    /// The host's descendant `maos-wasm-runner` processes (the Spirit sessions).
+    fn runners(&self) -> Vec<u32> {
+        let root = self.child.as_ref().expect("a running host").id();
+        let mut parent_of = std::collections::HashMap::new();
+        let mut comm_of = std::collections::HashMap::new();
+        for entry in std::fs::read_dir("/proc").unwrap().flatten() {
+            let Some(pid) = entry
+                .file_name()
+                .to_str()
+                .and_then(|n| n.parse::<u32>().ok())
+            else {
+                continue;
+            };
+            let Ok(stat) = std::fs::read_to_string(entry.path().join("stat")) else {
+                continue;
+            };
+            // `pid (comm) state ppid ...`: the comm may hold spaces, so split after the last `)`.
+            let Some(rest) = stat.rsplit_once(')').map(|(_, rest)| rest) else {
+                continue;
+            };
+            if let Some(ppid) = rest
+                .split_whitespace()
+                .nth(1)
+                .and_then(|p| p.parse::<u32>().ok())
+            {
+                parent_of.insert(pid, ppid);
+                comm_of.insert(
+                    pid,
+                    std::fs::read_to_string(entry.path().join("comm")).unwrap_or_default(),
+                );
+            }
+        }
+        parent_of
+            .keys()
+            .copied()
+            .filter(|pid| comm_of[pid].starts_with("maos-wasm-runn"))
+            .filter(|pid| {
+                let mut at = *pid;
+                while let Some(&up) = parent_of.get(&at) {
+                    if up == root {
+                        return true;
+                    }
+                    at = up;
+                }
+                false
+            })
+            .collect()
+    }
+
+    fn signal_pids(pids: &[u32], signal: &str) {
+        for pid in pids {
+            let _ = Command::new("kill")
+                .args([signal, &pid.to_string()])
+                .status();
+        }
+    }
+
     /// `maosctl ask`, expecting acceptance; the printed task id.
     fn ask(&self, args: &[&str]) -> String {
         let mut full = vec!["ask", ID];
@@ -536,7 +593,19 @@ fn task_show_reads_the_audit_trail_after_a_restart() {
     assert_eq!(code, Some(0));
     assert_eq!(printed, done_printed, "after a SIGTERM drain");
 
-    // A long task holds the Spirit; a second waits behind it; then SIGKILL.
+    // A long task holds the Spirit; a second waits behind it; then SIGKILL. The turn must still
+    // be running when the kill lands, and nothing about `recalls N` guarantees that: the session
+    // protocol caps a turn at 64 recalls (`MAX_RECALLS_PER_TURN`), so a quick Host serves them,
+    // ends the session on `recall budget exceeded`, and the task reads `orphaned` (AC7) before
+    // the test's next `maosctl` spawn returns. Freeze the runner so the turn can neither finish
+    // nor fail until the Host is killed.
+    // The session must be ready (probe answered) before it is frozen, or the turn is never
+    // delivered at all: one finished ask proves it.
+    let warm = host.ask(&["warm the session"]);
+    assert_eq!(host.finished(&warm).1["state"], "completed");
+    let runners = host.runners();
+    assert!(!runners.is_empty(), "no runner under the Host");
+    Host::signal_pids(&runners, "-STOP");
     let slow = host.ask(&["recalls 300000"]);
     let until = Instant::now() + WAIT;
     while host.show(&slow).2["state"] != "running" {
@@ -555,6 +624,7 @@ fn task_show_reads_the_audit_trail_after_a_restart() {
     let queued = host.ask(&["never delivered"]);
     assert_eq!(host.show(&queued).2["state"], "queued");
     host.stop("-KILL");
+    Host::signal_pids(&runners, "-KILL");
     host.boot();
     let (_, after_kill, _) = host.show(&done);
     assert_eq!(after_kill, done_printed, "after a SIGKILL");

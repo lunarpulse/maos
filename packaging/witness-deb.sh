@@ -43,8 +43,11 @@ if [[ $ready != 1 ]]; then
 fi
 cat "$scratch/status"
 grep -F 'spirits=2 audit_store_writable=true' "$scratch/status"
-as_maos maosctl agents | sort > "$scratch/agents"
-cat "$scratch/agents"
+as_maos maosctl agents > "$scratch/agents.raw"
+cat "$scratch/agents.raw"
+# Story 22-5 widened the table (id, pid, state, form, task, originator, age, spend); the
+# witness compares id and state only, the contract it has always meant.
+awk -F'\t' '{print $1 "\t" $3}' "$scratch/agents.raw" | sort > "$scratch/agents"
 printf 'nash\tRunning\nobserver\tRunning\n' | cmp - "$scratch/agents"
 sudo systemctl stop maos
 if systemctl is-failed --quiet maos; then
