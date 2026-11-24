@@ -403,3 +403,70 @@ fn fuzz_prerelease_is_dispatched_before_the_tag_not_started_by_it() {
         "a v*-rc* push trigger would start a duplicate ~26 h chain after the tag it must precede"
     );
 }
+
+#[test]
+fn t3_corpus_hand_off_is_one_archive_and_never_voids_the_measured_record() {
+    let fuzz = workflow("fuzz-prerelease.yml");
+    for link in 1..=5 {
+        let job = format!("fuzz-link-{link}");
+        let steps = steps(&fuzz, &job);
+        let (fuzz_step, _) = steps
+            .iter()
+            .enumerate()
+            .find(|(_, s)| {
+                s["name"]
+                    .as_str()
+                    .is_some_and(|n| n.starts_with(&format!("T3 link {link} ")))
+            })
+            .unwrap_or_else(|| panic!("{job}: fuzz step"));
+        let (minimize, _) = step_named(&steps, "Minimize corpus before hand-off");
+        let (record, record_step) =
+            step_named(&steps, "Save one measured record per target and link");
+        let (pack, pack_step) = step_named(
+            &steps,
+            "Pack corpus into one archive (one artifact file, never one file per input)",
+        );
+        let (save, save_step) = step_named(&steps, "Save corpus for next link");
+        // The record runs on the default success() of the fuzz and minimizer steps (a crash or a
+        // confirmed merge crash leaves no record) and sits BEFORE the hand-off, so a pack or
+        // upload failure cannot skip it. It carries no `if`, in particular no `always()`.
+        assert!(fuzz_step < minimize && minimize < record, "{job}");
+        assert!(
+            record < pack && pack < save,
+            "{job}: record before the hand-off"
+        );
+        assert!(
+            record_step.get("if").is_none(),
+            "{job}: record must not be forced"
+        );
+        assert!(
+            pack_step.get("if").is_none() && save_step.get("if").is_none(),
+            "{job}"
+        );
+        let run = pack_step["run"].as_str().unwrap();
+        assert!(run.contains("tar ") && run.contains("zstd"), "{job}: {run}");
+        assert!(
+            run.contains("corpus files to pack"),
+            "{job}: logs the file count"
+        );
+        let path = save_step["with"]["path"].as_str().unwrap();
+        assert!(
+            path.ends_with(&format!("-{link}.tar.zst")) && !path.ends_with('/'),
+            "{job}: the hand-off uploads ONE archive file, not the directory: {path}"
+        );
+    }
+    // corpus-merge never gates the evidence: t3-ledger-collect needs the five links only.
+    let needs: Vec<&str> = fuzz["jobs"]["t3-ledger-collect"]["needs"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .filter_map(|n| n.as_str())
+        .collect();
+    assert_eq!(needs.len(), 5, "{needs:?}");
+    assert!(!needs.contains(&"corpus-merge"), "{needs:?}");
+    let merge = steps(&fuzz, "corpus-merge");
+    let (_, extract) = step_named(&merge, "Extract and union the five shard corpora");
+    assert!(extract["run"].as_str().unwrap().contains("tar --zstd"));
+    let (_, save) = step_named(&merge, "Save merged corpus as the next chain seed");
+    assert!(save["with"]["path"].as_str().unwrap().ends_with(".tar.zst"));
+}

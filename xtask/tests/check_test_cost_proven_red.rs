@@ -444,7 +444,7 @@ jobs:
       - run: cargo run -p xtask -- check-foo --json
 ";
 
-/// The scheduled workflow the register's `expensive-tests` job moved to (CI release-ready program W3).
+/// A scheduled workflow an `[[expensive]]` job may also live in (`ci-nightly.yml`).
 const NIGHTLY: &str = "\
 jobs:
   nightly-expensive:

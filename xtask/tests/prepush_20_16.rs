@@ -724,6 +724,14 @@ fn scoped_run_sees_the_changed_crate_and_misses_an_unrelated_one() {
     let run = |scope: &Scope| {
         let mut report = Report::default();
         let mut cmd = command(root, "cargo", &SCOPED_NEXTEST["cargo ".len()..]);
+        // The plant is itself run by nextest in CI (profile `expensive`): an inherited
+        // NEXTEST_* variable (profile, run id) makes the inner run fail on the throwaway
+        // workspace, which has no such profile, so every inner run would read "red".
+        for (key, _) in std::env::vars() {
+            if key.starts_with("NEXTEST") {
+                cmd.env_remove(key);
+            }
+        }
         cmd.args(scope.nextest_selection())
             .env("CARGO_TARGET_DIR", root.join("target"));
         report.command("scoped-nextest", "plant", &mut cmd);

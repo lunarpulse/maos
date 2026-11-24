@@ -1,13 +1,18 @@
-# Signed pre-release tag procedure
+# Signed release tag procedure (release candidates and GA)
 
 > Canonical signing and key-management runbook: [`docs/runbooks/release-signing.md`](../runbooks/release-signing.md)
 > The LTS rule and what a release candidate does and does not promise: [`docs/release/lts-policy.md`](lts-policy.md)
 
-This procedure cuts a pre-release tag: `vX.Y.Z-rc.N` (the `v1.0.0-rc.N` line), and
-it is the procedure that cut `v0.1.0-alpha.1` (Story 15-4; the alpha-specific
-history is kept below and marked). A pre-release is not the GA tag; Holds 1–2 in
+This procedure cuts a release tag: a pre-release `vX.Y.Z-rc.N` (the `v1.0.0-rc.N`
+line) or the GA tag `v1.0.0` (`release.yml` `kind=ga`), and it is the procedure that
+cut `v0.1.0-alpha.1` (Story 15-4; the alpha-specific history is kept below and
+marked). A pre-release is not the GA tag; Holds 1–2 in
 [`RELEASE-HOLDS.md`](../../RELEASE-HOLDS.md) are claim boundaries (no GA effect)
-and a release candidate starts no LTS clock.
+and a release candidate starts no LTS clock. The GA tag differs in four ways: it
+skips `check-rc-readiness` (rc-only), it needs the T3 chain and the `aggregate` and
+`release-ready` check-runs on the exact tagged SHA, its notes are
+`docs/release/v1.0.0.md` with the exact line `Perf verdicts: ABSENT`, and it
+publishes as `latest` and starts the LTS clock (`lts-policy.md`).
 
 **Who runs this.** Every step is the operator's: agents never tag, sign, dispatch a
 workflow, write a ledger or publish. Nothing below was exercised by the Story 20-5
@@ -109,14 +114,24 @@ Run these checks against the exact commit that will be tagged:
    ```bash
    gh workflow run fuzz-prerelease.yml --ref main
    # select the run by commit, never by recency (as in step 6b below), then:
-   gh run watch "$run_id" --exit-status   # 5 parallel 5 h links per target + setup; `t3-ledger-collect` must be green
+   gh run watch "$run_id" --exit-status   # 30 link jobs (6 targets x 5 links, 5 h each) + setup; `t3-ledger-collect` must be green (a red `corpus-merge` alone does not void the evidence)
    ```
 
    The hosted wall time is stated as measured at the first dispatch (expected
-   about 6 h per chain [INFERENCE: the five links run in parallel, 5 h + setup + the
-   `corpus-merge` job, which does not gate the ledger; no chain has completed
-   yet, the one dispatch so far failed; WP-16, 2026-11-23; it needs up to 30 runners at
-   once for 5 h (6 targets x 5 links), so dispatch when the runner window is free). Then check both legs against the exact
+   about 6 h per chain with 30 free runners [INFERENCE: the five links per target run in
+   parallel, 5 h + setup + the `corpus-merge` job, which does not gate the ledger; no
+   chain has completed yet, the two dispatches so far failed; WP-16, 2026-11-23]. Each link
+   hands its corpus to `corpus-merge` as ONE `t3-corpus-<target>-<n>.tar.zst` archive
+   (uploading the directory of ~600k files failed in run 45152159643), after its measured
+   record is saved; `corpus-merge` is not a `needs` of `t3-ledger-collect`, so a red
+   `corpus-merge` job (its failure is shown as a warning and a summary line) never voids the
+   evidence: judge the chain by the `t3-ledger-collect` job, not by the run's overall
+   conclusion. **T3 is 30
+   five-hour jobs** (6 targets x 5 links, not 15): the ledger judges only three targets
+   (`manifest_parser`, `frame_deser`, `fuzz_exec_deps_parse_elf`), but the collector asserts
+   every link job `success`, so the other three targets must be green too. With fewer than
+   30 concurrent runners the wall time grows accordingly, so dispatch when the runner
+   window is free. Then check both legs against the exact
    commit, with the ledger read from the `fuzz-ledger` branch:
 
    ```bash
@@ -158,17 +173,34 @@ Run these checks against the exact commit that will be tagged:
    never matches (a green `aggregate` is not a `release-ready`), and an unclassified
    `--kind` is refused before anything is read.
 
-3. Confirm the regenerated lockfiles and stability contract are current, and
-   that the tree is a release candidate (Story 20-5; offline, reads committed
-   files only, never tags):
+   **Evidence filed outside `main`.** No gate reads the re-promotion evidence
+   (`repromotion.yml`: run id, SHA, attempt, artifact `repromotion-result-<run_id>`) or the
+   E20-A8 re-measure report; they are operator-presented evidence. Filing either on `main`
+   after the candidate SHA is chosen moves the SHA and voids the exact-SHA proof, so file
+   them on the process/course branch or worktree (never on `main`) and cite the run ids in
+   the post-tag record commit.
+
+3. Confirm the regenerated lockfiles and stability contract are current (offline,
+   reads committed files only, never tags):
 
    ```bash
    cargo metadata --locked --offline --format-version 1 >/dev/null
    cargo run --locked -p xtask -- stability-matrix --check --json
+   ```
+
+   **Release candidates only (`vX.Y.Z-rc.N`):** also confirm the tree is a release
+   candidate (Story 20-5):
+
+   ```bash
    cargo run --locked -p xtask -- check-rc-readiness --tag "$tag" --json
    ```
 
-   `check-rc-readiness` is green only when: the workspace version is `X.Y.Z-rc.N`
+   **GA (`vX.Y.Z`) never runs `check-rc-readiness`:** its `version` leg requires
+   `X.Y.Z-rc.N`, so for `v1.0.0` that leg is red by construction, and `release.yml` runs
+   it only for `kind == 'rc'`. If it is run for GA at all, it is a tree-state probe in
+   which exactly one red leg (`version`) is expected, not a gate.
+
+   `check-rc-readiness` (rc only) is green only when: the workspace version is `X.Y.Z-rc.N`
    and equals `$tag` sans the `v`; STABILITY.md is in sync; every `20-*` story in
    `sprint-status.yaml` is `done` (with `--tag`, Story 20-5's own key included) — except
    `20-7-stable-runner-perf-gates`, accepted at `in-progress` and reported `WAIVED` for an
@@ -184,8 +216,8 @@ Run these checks against the exact commit that will be tagged:
    signing when the ref is an rc tag. See
    [`decisions-2026-11-12.md`](decisions-2026-11-12.md).
 
-   **GA notes checklist (operator ruling 2026-11-12, third set, B1; GA is not cut by this
-   procedure).** `check-rc-readiness` does not run for GA (its `version` leg requires
+   **GA notes checklist (operator ruling 2026-11-12, third set, B1).**
+   `check-rc-readiness` does not run for GA (its `version` leg requires
    `X.Y.Z-rc.N`), so `release.yml` enforces the label itself for a `vX.Y.Z` tag:
    `docs/release/v<version>.md` must exist and carry the exact line
    `Perf verdicts: ABSENT` (unconditionally; there is no all-PASS exception), and the
@@ -258,6 +290,11 @@ Run these checks against the exact commit that will be tagged:
    the run if any of them did not succeed, listing each outcome in the run summary. A rehearsal on
    a branch commit is therefore expected to be red on the ancestry and ledger guards; at the
    candidate `origin/main` tip, with the T3 chain present, it must be fully green.
+   **Order for GA:** the rehearsal that counts is a dispatch made **after** the discipline
+   run (`aggregate` and `release-ready`) and the T3 chain are green on that exact SHA. A
+   rehearsal dispatched earlier (for example concurrently with T3) is red by design on the
+   `aggregate and ledgers` guard and is useful only as an early packaging, signing and
+   macOS signal; it does not satisfy this step.
    `dry_run` defaults to `true`; `dry_run=false` fails the run by design (a dispatch cannot publish).
    The step needs the `release` environment to accept the dispatched ref and the `MAOS_RELEASE_PUBKEY`
    / `RELEASE_SIGNING_KEY` secrets (as `sign-and-publish` already does).
@@ -328,9 +365,9 @@ to the tap/AUR. Packages disable stripping and carry exactly the signed bytes.
 - The first alpha release did not ship working package recipes. Only a release
   produced by the corrected pipeline can claim the rendered package routes;
   tap/AUR accounts remain `ops-brew-tap-and-aur-publication`.
-- This procedure does not cut a GA tag. Per the operator ruling of 2026-11-12,
-  RELEASE-HOLDS Holds 1–2 (pen-test, ECCN) are claim boundaries, not GA
-  preconditions; `v1.0.0` needs the engineering exits green plus the signed-tag
-  step by whoever holds the key (an operator action AI agents cannot perform),
-  `ops-ga-tag-after-holds`, and is the only tag that starts the LTS clock
-  ([`lts-policy.md`](lts-policy.md)).
+- The GA tag `v1.0.0` is cut with this same procedure (`kind=ga`). Per the operator
+  ruling of 2026-11-12, RELEASE-HOLDS Holds 1–2 (pen-test, ECCN) are claim
+  boundaries, not GA preconditions; `v1.0.0` needs the engineering exits green on
+  the frozen SHA and the operator's explicit per-tag authorization, the tag push is
+  an operator action AI agents cannot perform, and it is the only tag that starts
+  the LTS clock ([`lts-policy.md`](lts-policy.md)).

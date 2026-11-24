@@ -284,8 +284,8 @@ fn proven_red_steps_run_after_a_red_gate_step() {
 
 #[test]
 fn expensive_tests_uploads_its_junit_and_builds_no_fixtures() {
-    // W3: the job runs nightly in `ci-nightly.yml`, no longer on the merge path.
-    let workflow = nightly_ci_workflow();
+    // GA: the job is back in `discipline.yml` as an ordinary job (it ran nightly in W3).
+    let workflow = workflow();
     let jobs = key(&workflow, "jobs");
     let job = key(jobs, "expensive-tests");
     assert_no_continue_on_error(job, "expensive-tests");
@@ -337,8 +337,8 @@ fn expensive_tests_uploads_its_junit_and_builds_no_fixtures() {
 fn unregistered_jobs_are_enrolled_in_aggregate_only() {
     let workflow = workflow();
     let jobs = key(&workflow, "jobs");
-    // `expensive-tests` left this list in W3 (nightly); `ci_nightly_w3.rs` pins where it lives now.
-    for unregistered in ["cargo-deny", "epic-18-exit"] {
+    // `expensive-tests` is enrolled in `aggregate.needs` (and `release-ready.needs`) again for GA.
+    for unregistered in ["cargo-deny", "epic-18-exit", "expensive-tests"] {
         assert!(
             needs(jobs, "aggregate").contains(&unregistered.to_string()),
             "{unregistered} is in aggregate.needs"

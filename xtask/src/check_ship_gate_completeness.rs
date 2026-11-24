@@ -1032,6 +1032,8 @@ jobs:
             "nfr-rel-1-crash-detection-2s",
             "nfr-rel-2-hang-detection-60s",
             "nfr-rel-9-revocation-5s-p99",
+            "nfr-rel-11-halt-receipt-999pct",
+            "expensive-tests",
             "workspace-test-suite",
             "epic-20-exit",
             "cgroup-ceiling-delegated",

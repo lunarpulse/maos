@@ -20,8 +20,8 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 
 | Leg | Live value |
 |---|---|
-| `kernel_version` | `1.0.0-rc.2` |
-| release channel | release candidate — pre-release; LTS clock not started |
+| `kernel_version` | `1.0.0` |
+| release channel | GA |
 | `abi_version` | `1` |
 | `manifest_schema_version` (current) | `8` |
 | supported schema window | `1..=8` |
@@ -70,7 +70,7 @@ is a v1.5 decision, taken once support load is known. A release candidate
 ([`docs/release/lts-policy.md`](docs/release/lts-policy.md)).
 
 <!-- lts-clock-start: read from the committed `xtask/release-channel.toml`, which `ops-ga-tag-after-holds` writes when it cuts `v1.0.0`; placeholder until then — do NOT fabricate a SHA/tag. -->
-- **LTS clock-start:** pending — `v1.0.0` is cut by `ops-ga-tag-after-holds` (RELEASE-HOLDS Holds 1–2 are explicit claim boundaries, not preconditions), which writes `xtask/release-channel.toml`; no clock runs before then.
+- **LTS clock-start:** `518435c3e1f0f5da13cd9fd10232d2e0073c647a` (tag `v1.0.0`)
 
 ## Substrate-Self Compliance Scope
 

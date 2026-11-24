@@ -200,7 +200,24 @@ async fn t_21_3_a_promotion_not_carried_into_config_refuses_to_boot() {
 }
 
 async fn boot_pins(config: &TcpA2AConfig, file: &Path) -> Arc<InMemoryTofuPinStore> {
-    let port = Arc::new(FilePinStore::open(file).expect("open the pin file"));
+    // A previous run's store is dropped just before this call, but a task of its consent door
+    // can still hold its last Arc for a moment on a loaded runner (hosted loom leg, PR #46):
+    // the lock then reads `Held`. That is the lock working, so wait for the release (bounded)
+    // instead of failing; any other open error, and a lock that is never released, still fail.
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    let store = loop {
+        match FilePinStore::open(file) {
+            Ok(store) => break store,
+            Err(error)
+                if format!("{error:?}").starts_with("Held")
+                    && std::time::Instant::now() < deadline =>
+            {
+                tokio::time::sleep(Duration::from_millis(25)).await;
+            }
+            Err(error) => panic!("open the pin file: {error:?}"),
+        }
+    };
+    let port = Arc::new(store);
     config
         .build_pin_store(Some(port as Arc<dyn PinPersistence>))
         .await

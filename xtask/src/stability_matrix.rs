@@ -533,15 +533,15 @@ mod tests {
     }
 
     #[test]
-    fn lts_clock_is_placeholder_without_v1_tag() {
+    fn lts_clock_reads_the_committed_repo_record() {
         let root = std::env::current_dir()
             .unwrap()
             .parent()
             .unwrap()
             .to_path_buf();
-        // No 1.0.0 tag exists before `ops-ga-tag-after-holds` → deterministic placeholder.
-        let clock = lts_clock_start(&root).expect("no record, or a well-formed one");
-        assert!(clock.contains("ops-ga-tag-after-holds") || clock.contains("tag `"));
+        // The committed record names the v1.0.0 tag commit → the clock renders it.
+        let clock = lts_clock_start(&root).expect("committed record is well-formed");
+        assert!(clock.contains("(tag `v1.0.0`)") && !clock.contains("ops-ga-tag-after-holds"));
     }
 
     /// Story 20-5 (D-20-5-06 B) — the clock reads a committed record, never `git`: a
