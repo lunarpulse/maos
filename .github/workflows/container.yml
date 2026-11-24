@@ -1,7 +1,25 @@
 name: container
+# Publishes ONLY to GHCR (`ghcr.io/<owner>/maos`, owner lowercased) with the workflow's GITHUB_TOKEN;
+# there is no Docker Hub path and no registry secret. A new package starts PRIVATE: the operator
+# makes it public once in the GitHub UI (docs/runbooks/provisioning-checklist.md, "GHCR package").
+#  * push of a `v*` tag  — builds, smokes and PUBLISHES; `latest` only for a GA tag (vX.Y.Z). It
+#    never skips publication: if it cannot publish, the run fails (the v1.0.0 silent skip was the defect).
+#  * workflow_dispatch   — rehearsal. `release_tag` names an EXISTING signed release whose assets
+#    are built into the image. `publish=false` builds and smokes only; `publish=true` pushes the
+#    non-release tag `main-<short-sha>` (never `latest`, never a version tag).
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing signed release tag (vX.Y.Z, vX.Y.Z-rc.N, v0.x.y-alpha.N) whose assets are built into the image'
+        type: string
+        required: true
+      publish:
+        description: 'Push ghcr.io/<owner>/maos:main-<short-sha> (never latest, never a version tag). false = build and smoke only'
+        type: boolean
+        default: false
 jobs:
   build-and-push:
     runs-on: ubuntu-24.04
@@ -9,8 +27,11 @@ jobs:
     permissions:
       contents: read
       actions: read
+    outputs:
+      publish: ${{ steps.classify.outputs.publish }}
+      tags: ${{ steps.classify.outputs.tags }}
+      image: ${{ steps.classify.outputs.image }}
     env:
-      PUBLISH: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
       MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
     steps:
       - uses: actions/checkout@v5
@@ -21,14 +42,59 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
+      - name: Classify what this run publishes
+        id: classify
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+          INPUT_PUBLISH: ${{ inputs.publish }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${OWNER,,}/maos"
+          if [[ "$EVENT" == push ]]; then
+            release_tag="$REF_NAME"
+          else
+            release_tag="$INPUT_TAG"
+          fi
+          # Same grammar as release.yml (`Classify the tag`).
+          if [[ "$release_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then kind=rc
+          elif [[ "$release_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then kind=ga
+          elif [[ "$release_tag" =~ ^v0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]; then kind=alpha
+          else
+            echo "refused: '$release_tag' is not vX.Y.Z, vX.Y.Z-rc.N or the v0.x.y-alpha.N line"; exit 1
+          fi
+          if [[ "$EVENT" == push ]]; then
+            publish=true
+            tags="$image:$release_tag"
+            if [[ "$kind" == ga ]]; then tags="$tags,$image:latest"; fi
+          else
+            publish="$INPUT_PUBLISH"
+            tags="$image:main-${GITHUB_SHA::7}"
+          fi
+          {
+            echo "release_tag=$release_tag"
+            echo "kind=$kind"
+            echo "publish=$publish"
+            echo "image=$image"
+            echo "tags=$tags"
+          } >> "$GITHUB_OUTPUT"
+          echo "event=$EVENT kind=$kind publish=$publish tags=$tags"
       - name: Wait for the signed tag release (never build from an unsigned download)
         id: release
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.classify.outputs.release_tag }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          packaging/wait-release.sh "$GITHUB_SHA" "$TAG"
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            packaging/wait-release.sh "$GITHUB_SHA" "$TAG"
+          else
+            # Rehearsal: the dispatched commit is not the tag's commit, so the run binding cannot
+            # apply; the release must already exist. The signature check below still gates every byte.
+            gh release view "$TAG" >/dev/null
+          fi
           test -n "$MAOS_RELEASE_PUBKEY"
           cargo build --locked -p maos-cli -p xtask
           pubkey=$(target/debug/maosctl release-pubkey)
@@ -67,10 +133,10 @@ jobs:
           for exe in maos maosctl maos-wasm-runner; do
             docker cp "$cid:/usr/local/bin/$exe" - | tar -tv | grep -E '^-r[w-]x'
           done
-      - name: Publication unavailable
-        if: env.PUBLISH != 'true'
+      - name: Publication not requested
+        if: steps.classify.outputs.publish != 'true'
         run: |
-          echo 'SKIPPED: Docker Hub publication, DOCKERHUB_* absent (ops-provisioning-secrets-and-accounts); GHCR publishes with GITHUB_TOKEN'
+          echo 'NOT PUBLISHED: rehearsal dispatch with publish=false; the image was built and smoked only'
       - uses: actions/upload-artifact@v4
         with:
           name: verified-container-release
@@ -78,6 +144,7 @@ jobs:
           retention-days: 1
   publication:
     needs: build-and-push
+    if: needs.build-and-push.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: release
@@ -86,8 +153,6 @@ jobs:
       packages: write
       id-token: write
     env:
-      PUBLISH: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
-      HUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
       pubkey: ${{ secrets.MAOS_RELEASE_PUBKEY }}
     steps:
       - uses: actions/checkout@v5
@@ -98,8 +163,8 @@ jobs:
         with:
           name: verified-container-release
           path: dist
-      # GHCR needs no operator secret: it publishes on every tag with GITHUB_TOKEN. Docker Hub keeps
-      # its credential gate (PUBLISH).
+      # GHCR needs no operator secret: GITHUB_TOKEN with `packages: write` on this job only.
+      # `id-token: write` is for keyless cosign signing.
       - uses: docker/setup-buildx-action@v3
       - uses: docker/setup-qemu-action@v3
       - name: Log in to GHCR
@@ -108,12 +173,8 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Log in to Docker Hub
-        if: env.PUBLISH == 'true'
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Refuse to publish without the verified release key
+        run: test -n "$pubkey"
       - name: Publish the verified multi-platform image
         id: push
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
@@ -121,9 +182,9 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-            ${{ env.PUBLISH == 'true' && format('{0}/maos:{1}', env.HUB_USER, github.ref_name) || '' }}
+          tags: ${{ needs.build-and-push.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           build-args: |
             RELEASE_PUBKEY=${{ env.pubkey }}
             SOURCE_SHA=${{ github.sha }}
@@ -131,12 +192,7 @@ jobs:
       - name: Sign the GHCR digest
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
-          GHCR_IMAGE: ghcr.io/${{ github.repository }}
+          IMAGE: ${{ needs.build-and-push.outputs.image }}
         run: |
-          cosign sign --yes "$GHCR_IMAGE@$DIGEST"
-      - name: Sign the Docker Hub digest
-        if: env.PUBLISH == 'true'
-        env:
-          DIGEST: ${{ steps.push.outputs.digest }}
-        run: |
-          cosign sign --yes "$HUB_USER/maos@$DIGEST"
+          test -n "$DIGEST"
+          cosign sign --yes "$IMAGE@$DIGEST"

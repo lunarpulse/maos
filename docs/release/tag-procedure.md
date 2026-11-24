@@ -356,8 +356,13 @@ to the tap/AUR. Packages disable stripping and carry exactly the signed bytes.
 ## Expected boundary conditions
 
 - `container.yml` waits for the signed release, always builds and smokes the
-  verified runtime image, then publishes/signs only with both Docker Hub
-  credentials present. Otherwise it explicitly skips publication, not building.
+  verified runtime image, then publishes and cosign-signs it on GHCR only
+  (`ghcr.io/lunarpulse/maos:<tag>`, plus `latest` for a GA `vX.Y.Z` tag) with
+  `GITHUB_TOKEN`. A tag push that cannot publish fails the run; it never skips.
+  A `workflow_dispatch` rehearsal (`release_tag=<existing release>`,
+  `publish=true`) pushes only `main-<short-sha>`. The first publication creates
+  a private package: the operator makes it public once
+  (`docs/runbooks/provisioning-checklist.md`, "GHCR package").
 - Before the rc tag, the operator must run the 20-2 branch-only verify recipe
   from the story's evidence `ci/ci-20-2-verify.yml` on `ci/20-2-verify`, recording
   native deb, Fedora/Arch/Homebrew, netns, container and Cargo results and
