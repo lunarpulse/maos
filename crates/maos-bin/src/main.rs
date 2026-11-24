@@ -4507,6 +4507,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         Vec::new()
     };
+    if let Some((host, _)) = host_boot.as_ref() {
+        maos_bin::admission::declare_manifest_ids(
+            host.manifest_entries()
+                .into_iter()
+                .map(|entry| std::path::PathBuf::from(entry.manifest)),
+        );
+    }
     // Story 20-9 — builds what a spawned session's dependencies hang on, for every root that
     // arms swap handles. It only borrows: the handles that keep the result are owned by the
     // supervisor, so no composition-root local outlives the audit drain through it.
@@ -5215,6 +5222,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let topology_base = manifest_path
                 .parent()
                 .unwrap_or_else(|| std::path::Path::new("."));
+            maos_bin::admission::declare_manifest_ids(
+                topology_entries
+                    .iter()
+                    .map(|entry| topology_base.join(&entry.manifest)),
+            );
             let mut loaded_pids: Vec<(String, u32)> = Vec::with_capacity(topology_entries.len());
             // T1 — host-authorized CliWrapper Developer-Workers admitted as
             // topology members (not scheduler class Spirits). Tracked separately

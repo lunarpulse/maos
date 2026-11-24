@@ -384,10 +384,18 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
     // host bindings, which run through `in_tokio`. With no ambient tokio runtime that helper
     // lazily builds its own multi-thread runtime with an I/O driver, whose `epoll_create1` /
     // `eventfd2` the T2 seccomp allow-list refuses with EPERM: the build `unwrap` panicked and
-    // killed the runner on a guest's first `console.log`. A current-thread runtime with no
-    // driver needs no syscall and spawns no thread; wasmtime-wasi finds it ambient and drives
-    // its always-ready stdio futures on this thread. The sandbox allow-list stays as it is.
-    let ambient = tokio::runtime::Builder::new_current_thread()
+    // killed the runner on a guest's first `console.log`. An ambient runtime built here, with no
+    // I/O driver, needs no such syscall; wasmtime-wasi finds it ambient and drives its
+    // always-ready stdio futures on this thread. The sandbox allow-list stays as it is.
+    // Story 22-9 F5: a guest timer (`setTimeout` lowers to a `wasi:clocks/monotonic-clock`
+    // pollable) reaches `tokio::time::sleep`, which panicked ("timers are disabled") on a runtime
+    // with no time driver. A current-thread runtime with `enable_time` is not enough: nothing
+    // turns its driver while this thread is parked in `block_on`, so the timer never fires. One
+    // worker thread owns the time driver; it parks on a futex and needs no `epoll_create1` /
+    // `eventfd2`, and thread creation is already inside the allow-list (the compile watchdog).
+    let ambient = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_time()
         .build()
         .map_err(|e| RunError::Other(format!("ambient runtime: {e}")))?;
     let _ambient = ambient.enter();

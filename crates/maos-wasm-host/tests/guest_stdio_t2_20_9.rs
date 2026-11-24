@@ -248,7 +248,15 @@ fn the_same_guest_without_writes_runs_the_same_exports_under_t2() {
     );
     let (code, stderr) = s.finish();
     assert_eq!(code, Some(0), "{stderr}");
-    assert!(!stderr.contains("lifecycle-probe stdout"), "{stderr}");
+    // Story 22-9: the probe's `swap-in` always says what it restored (the pre-warm diagnostic
+    // witness); that line is the one write it makes unscripted, and every other export stays silent.
+    assert!(
+        stderr
+            .lines()
+            .filter(|line| line.contains("lifecycle-probe stdout"))
+            .all(|line| line.contains("lifecycle-probe stdout swap-in: restored counter")),
+        "{stderr}"
+    );
 }
 
 /// A write in the shutdown hook (the runner's last guest call, after the input closes) is

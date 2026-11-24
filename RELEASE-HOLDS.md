@@ -174,6 +174,30 @@
 | K4 | A capped component needs a delegated cgroup v2: the kit launches `maos serve` under `systemd-run --user --scope -p Delegate=yes`. The packaged `packaging/systemd/maos.service` does not delegate, so a capped component in that unit's cast is refused at launch `[INFERENCE: not run]`. | That the packaged service runs a Spirit that declares `cpu_max_pct` or `pids_max` without a unit change. | A unit change in the packaging lane (reported against story 22-2; not fixed by 22-7). |
 | K5 | `maos-spirit validate` mirrors the boot gate's manifest checks (`maos_registry::validate`, over the same `maos_manifest` parsers) and runs the install gate itself; it is held to the boot gate by a parity test (`validate_parity_22_7`). It cannot check what needs a running Host: the provider catalog pins, the model-provenance policy, yank status, and the runner's own compile of the component at launch. | That a package `validate` accepts will launch on every Host. | Not scheduled. |
 
+## Claim boundaries — Epic 22 release (WASM form residuals)
+
+> Source: Story `22-9-wasm-form-residuals`, decisions D-22-9-01…13 taken at their recommended
+> answers (operator not yet confirmed), with the deviations the story record lists. The release these
+> rows belong to is numbered by the epic's open release-numbering D-row; the rows carry the story
+> key. Each row is also one line of that release's notes. A boundary is violated by over-claiming, not
+> by shipping.
+>
+> **Lifted by 22-9** (the `v1.0.0` rows themselves stay as the GA notes): rows 13 and 14 of "Claim
+> boundaries — v1.0.0 scope" are replaced by 22-9.a and 22-9.b below; row 17 by 22-9.f; and of row 5
+> the closed parts: the pre-warm `console.log` drop, a trigger after its session ended, guest timers, the
+> `DiscardSuccessor` phase label, the still-starting component refusal, the `LifecycleCallers` unwind
+> cleanup and the swap-invariant component witness. Row 5 still holds for 22-9.c and 22-9.d.
+
+| # | Boundary | What the release may NOT claim | Successor |
+|---|---|---|---|
+| 22-9.a | **Consent after an auto-revert (was row 13).** An auto-reverted hot swap restores the predecessor's `[consent.recall]` declaration together with its scopes and promotion set, but only while the id's declaration is still the one that swap installed: a declaration another incarnation installed since is never overwritten. Keep-or-narrow is enforced by the spawned swap factory (`swap_consent_widened`); the hot-swap coordinator does not enforce it for native or kernel swaps. | That a hot swap of a native or kernel Spirit is held to keep-or-narrow consent by the coordinator. | None scheduled. |
+| 22-9.b | **Consent schema and roster (was row 14).** A `[consent]` table needs manifest schema 9 (proposed, awaiting operator ratification as `22-9-manifest-schema-9`), and its recipient ids must be known to the Host at admission: installed, in the host-file cast or topology, or loaded. The check runs at admission and at a swap; nothing re-validates a recipient that is uninstalled later. | That a recipient in a standing `[consent.recall]` declaration still exists, or that schema 9 is ratified. | `22-9-manifest-schema-9` ratification (operator). |
+| 22-9.c | **`idle` fires once per quiescence.** After a Spirit's `idle` has fired it does not fire again while no inbound frame arrives; an inbound frame followed by a full idle window arms it again. A `maos run` component receives no inbound frame, so its `idle` fires once. `consolidate` is the periodic cadence (D-22-9-07 B). | That `idle` repeats on a Spirit that receives no frames. | None; a re-arm changes the firing rate of compiled-in Spirits too (D-22-9-07 A). |
+| 22-9.d | **Per-turn fuel of a TypeScript component (F1).** The hosted `OutOfFuel` of a denied `author()` was not reproduced: at the shipped 10,000,000 fuel the example's first turn completes for a denied and for an accepted `author()` alike, and the turn needs between 7,000,000 and 8,000,000 (fully populated frame, release runner, measured at 1,000,000 steps). A guest turn that spends more ends its session `OutOfFuel` (runner exit 4), fail-closed. Fuel was not raised (D-22-9-05 A fallback). | That a component turn is bounded below 10,000,000 fuel for every frame, or that the hosted `OutOfFuel` is explained. | Returns with a figure if the hosted run reproduces it. |
+| 22-9.e | **Consent refusal in the guest (row 15, unchanged).** 21-7 F7: guests observe a consent refusal as `IntentAllowlistMismatch` (`crates/maos-wasm-host/src/frame_bridge.rs`); the WIT enum has no `ConsentNotGranted` variant. The dedicated variant ships with the next ABI revision. | That a WASM guest can distinguish a consent refusal from an intent-allowlist mismatch. | The next ABI revision batch (D-22-9-02 B); the operator names its key. |
+| 22-9.f | **Installed boot and the durable publisher pin (was row 17).** Installed-Spirit boot compares the verified package's publisher with `default_installed_publisher`; a mismatch refuses that Spirit (`installed_publisher_mismatch`, journaled) and the others boot. A Spirit with no pin boots and the boot journals the absent pin (`installed_publisher_pin_absent`). A writer who rewrites both the package and `installed-pins.json` in the registry root is outside the guarantee. | That installed-Spirit boot resists a writer to the registry root who rewrites both the package and its pin. | None (the pin sits in the same root, `storage.rs`). |
+| 22-9.g | **Retract across a delivery failure (row 16, unchanged).** 21-7 F3 residual: cross-incarnation retract is best-effort across a post-commit delivery failure (a retry answers `Already`; there is a resolver→prepare window); the journal rows are the only retained record of undelivered recipients. | That a retract reaches every recipient across a post-commit delivery failure. | Owner not yet ruled (D-22-9-12 B): the operator names it. |
+
 ## GA-tag procedure (engineering exits green; Holds 1–2 no longer gate)
 
 > **OPERATOR RULING 2026-11-12:** Holds 1–2 are claim boundaries, not GA

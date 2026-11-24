@@ -15,9 +15,9 @@ MAOS는 Spirit manifest 포맷의 변경을 추적하기 위해 **manifest 스�
 |---|---|
 | `MANIFEST_SCHEMA_VERSION` (비준 완료) | `8` |
 | `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` | `1` |
-| `MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION` | `8` |
+| `MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION` | `9` |
 
-최신 비준 스키마는 8이며 지원 범위는 `1..=8`입니다.
+최신 비준 스키마는 8이며, [스키마 9](../manifest/v9)는 제안 중(Story 22-9)으로 운영자 비준을 기다립니다. 지원 범위는 `1..=9`입니다.
 `MIN_SUPPORTED` 미만의 매니페스트는 `SecurityError::EAbiTooOld`로, `MAX_SUPPORTED` 초과는 `SecurityError::EAbiTooNew`로 거부됩니다.
 
 ## 마이그레이션 경로
@@ -31,15 +31,17 @@ MAOS는 Spirit manifest 포맷의 변경을 추적하기 위해 **manifest 스�
 | v5 | v6 | [Native skill 선언](../manifest/v6) | ✅ 로드(지원 윈도우 내) |
 | v6 | v7 | [FR8 선언](../manifest/v7) | ✅ 구독하지 않는 경우 로드(지원 범위 내) |
 | v7 | v8 | [명시적 텔레메트리 구독](../manifest/v8) | 텔레메트리 구독에 필수 |
+| v8 | v9 | [consent 스키마 하한](../manifest/v9) | `[consent]` 선언에 필수(제안 중) |
 
 ## 호환성 정책
 
 MAOS는 manifest 스키마 경계로 구성된 포괄 범위를 어드미션합니다:
 
-- 후보 kernel의 `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`은 현재 `1..=8`입니다.
+- 후보 kernel의 `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`은 현재 `1..=9`입니다.
 - 최솟값 미만 manifest는 어드미션 시점에 `SecurityError::EAbiTooOld`로 거부됩니다.
 - 최댓값 초과 manifest는 어드미션 시점에 `SecurityError::EAbiTooNew`로 거부됩니다.
 - 구독하지 않는 스키마 1–7은 계속 지원합니다. 스키마 8 미만에서는 `on_telemetry_event` 나열이나 `[lifecycle.telemetry]` 테이블을 경고만 내고 무시하는 대신 거부합니다.
+- `[consent]` 테이블을 선언하지 않는 스키마 1–8은 계속 지원합니다. 스키마 9 미만에서 `[consent]` 테이블을 선언하면 경고만 내고 무시하는 대신 거부합니다.
 
 향후 kernel은 두 경계 중 하나를 변경할 수 있습니다. 대상 kernel의 지원 범위에 manifest 버전이 더 이상 포함되지 않기 전에 마이그레이션하세요.
 

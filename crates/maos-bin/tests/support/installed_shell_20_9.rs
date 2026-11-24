@@ -19,24 +19,15 @@ pub struct Shell {
 }
 
 impl Shell {
-    /// The door answers `spawned_swap_not_ready ... retry` until the running guest has started
-    /// (a debug runner compiles its component slowly on a hosted core); the typed refusal says
-    /// to retry, so the witness retries it within one bound and judges only the settled answer.
+    /// One `maosctl` call. A component that is still starting is waited for by the door itself
+    /// (Story 22-9: the readiness wait rides the swap's 90 s attempt), so no caller retries.
     pub fn ctl(&self, args: &[&str]) -> std::process::Output {
-        let until = Instant::now() + Duration::from_secs(90);
-        loop {
-            let output = self
-                .scratch
-                .command(&sibling("maosctl"))
-                .env("MAOS_NOTIFY_DISABLE", "1")
-                .args(args)
-                .output()
-                .expect("maosctl");
-            if !text(&output).contains("spawned_swap_not_ready") || Instant::now() >= until {
-                return output;
-            }
-            std::thread::sleep(Duration::from_millis(500));
-        }
+        self.scratch
+            .command(&sibling("maosctl"))
+            .env("MAOS_NOTIFY_DISABLE", "1")
+            .args(args)
+            .output()
+            .expect("maosctl")
     }
 
     /// One `key: value` line of `maosctl spirit inspect <id>`.
@@ -150,6 +141,34 @@ pub fn text(output: &std::process::Output) -> String {
 /// every one is `Running`. Returns the shell and each package directory (manifest + artifact
 /// copy, where a successor manifest can sit).
 pub fn boot_installed(components: &[(&str, String)], fixture: &str) -> (Shell, Vec<PathBuf>) {
+    boot_installed_pinned(components, fixture, &[])
+}
+
+/// What happens to a component's durable publisher pin between its install and the boot: a
+/// different publisher (`Some`), or the pin absent as for an install made before pins (`None`).
+pub fn edit_pins(scratch: &Scratch, edits: &[(&str, Option<[u8; 32]>)]) {
+    if edits.is_empty() {
+        return;
+    }
+    let path = scratch.0.join("home/.maos/registry/installed-pins.json");
+    let mut pins: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).expect("the install wrote its pins")).unwrap();
+    for (id, publisher) in edits {
+        match publisher {
+            Some(publisher) => pins[*id]["publisher"] = serde_json::json!(publisher.to_vec()),
+            None => drop(pins.as_object_mut().unwrap().remove(*id)),
+        }
+    }
+    std::fs::write(&path, serde_json::to_vec(&pins).unwrap()).unwrap();
+}
+
+/// [`boot_installed`] with `pin_edits` applied to the durable pins before the shell boots. A
+/// component whose pin was edited is not waited for: its boot may be refused.
+pub fn boot_installed_pinned(
+    components: &[(&str, String)],
+    fixture: &str,
+    pin_edits: &[(&str, Option<[u8; 32]>)],
+) -> (Shell, Vec<PathBuf>) {
     let scratch = Scratch::new();
     let server = InProcessServer::start(&scratch);
     let artifact = sibling(fixture);
@@ -197,6 +216,7 @@ pub fn boot_installed(components: &[(&str, String)], fixture: &str) -> (Shell, V
         assert!(install.status.success(), "install {id}: {}", text(&install));
         packages.push(package);
     }
+    edit_pins(&scratch, pin_edits);
     let maos = Path::new(env!("CARGO_BIN_EXE_maos"));
     let _ = sibling("maos-wasm-runner");
     let init = scratch
@@ -234,7 +254,10 @@ pub fn boot_installed(components: &[(&str, String)], fixture: &str) -> (Shell, V
         server,
     };
     let until = Instant::now() + Duration::from_secs(90);
-    for (id, _) in components {
+    for (id, _) in components
+        .iter()
+        .filter(|(id, _)| !pin_edits.iter().any(|(edited, _)| edited == id))
+    {
         while shell.field(id, "lifecycle_state").as_deref() != Some("Running") {
             assert!(
                 Instant::now() < until,

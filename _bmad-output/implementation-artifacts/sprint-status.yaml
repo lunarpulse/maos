@@ -433,7 +433,7 @@ development_status:
   22-6-bounded-audit-store: backlog  # Closes FR79 (SCP 2026-11-13 §6)
   22-7-domain-spirit-kit: backlog  # Closes NFR-Onb-1 for agent authors (ex 21-11) (SCP 2026-11-13 §6)
   22-8-always-on-scene: backlog  # Closes J5; first 30 minutes; J4 pair from the binary (ex 21-1, 21-13); creates the Epic 22 exit (SCP 2026-11-13 §6)
-  22-9-wasm-form-residuals: backlog  # Closes the 21-9 rows moved by SCP 2026-11-13 §2 (21-9 AC10 and the rest of AC11) (SCP 2026-11-13 §6)
+  22-9-wasm-form-residuals: in-progress  # Closes the 21-9 rows moved by SCP 2026-11-13 §2 (21-9 AC10 and the rest of AC11) (SCP 2026-11-13 §6)
   epic-22-retrospective: backlog  # NOT optional: a REFINEMENT session that preflights Epic 23 before its first story is created (lane rule 6)
   epic-23: backlog  # Standards Interop (W8) — epic-23-standards-interop-w8.md; hermetic exit interop_session_23, created by 23-5; it absorbs 21-8.
   23-1-mcp-oauth-client: backlog  # Closes FR67, NFR-Sec-20 (SCP 2026-11-13 §6)

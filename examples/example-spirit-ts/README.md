@@ -119,7 +119,12 @@ halt shape. Guest WASI stdout/stderr (including `console.log`) is routed to the
 runner's stderr and journaled as `spirit.diagnostic` rows, separate from framed
 output. Diagnostics are untrusted guest text, bounded per session (256 rows /
 64 KiB; overflow counted in `dropped_diagnostics`); over-long lines are
-truncated with a marker.
+truncated with a marker. Output written while a hot-swap successor is pre-warmed
+(`swap-in`) is journaled the same way, tagged `"phase": "prewarm"`, under the same bound.
+
+`idle` fires once per quiescence: it fires again only after an inbound frame
+followed by a full idle window, and a `maos run` component receives no inbound
+frame, so its `idle` fires once. Use `consolidate` for a periodic cadence.
 
 Generated bindings, dependencies, and build output are ignored so the template
 drift check reads only committed scaffold inputs.

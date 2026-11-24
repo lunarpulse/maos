@@ -383,6 +383,10 @@ pub enum AdmissionRefusal {
     ScheduleEntryLimit { limit: usize, actual: usize },
     /// `[[schedule]]` payloads decode to more than the per-manifest total cap (AC8.7).
     ScheduleDecodedBytesLimit { limit: usize, actual: usize },
+    /// Story 22-9 — `[consent.recall]` names a recipient id the Host does not know.
+    ConsentRecipientUnknown { recipient: String },
+    /// Story 22-9 — an installed package's publisher is not the durable pin's.
+    InstalledPublisherMismatch { detail: String },
 }
 
 impl AdmissionRefusal {
@@ -428,6 +432,8 @@ impl AdmissionRefusal {
             Self::SkillEscalation { .. } => "skill_escalation",
             Self::ScheduleEntryLimit { .. } => "schedule_entry_limit",
             Self::ScheduleDecodedBytesLimit { .. } => "schedule_decoded_bytes_limit",
+            Self::ConsentRecipientUnknown { .. } => "consent_recipient_unknown",
+            Self::InstalledPublisherMismatch { .. } => "installed_publisher_mismatch",
         }
     }
 
@@ -517,11 +523,71 @@ impl std::fmt::Display for AdmissionRefusal {
                 f,
                 "schedule_decoded_bytes_limit: [[schedule]] payloads decode to {actual} bytes in total, at most {limit} allowed"
             ),
+            Self::ConsentRecipientUnknown { recipient } => write!(
+                f,
+                "consent_recipient_unknown: [consent.recall] names '{recipient}', which this Host does not know (not installed, not in its cast or topology, not loaded)"
+            ),
+            Self::InstalledPublisherMismatch { detail } => {
+                write!(f, "installed_publisher_mismatch: {detail}")
+            }
         }
     }
 }
 
 impl std::error::Error for AdmissionRefusal {}
+
+/// Story 22-9 (D-22-9-04 A) — spirit ids the Host declared before any admission (the host
+/// file's cast and the topology's members), so install and load order never decide a roster.
+static DECLARED_SPIRITS: std::sync::Mutex<std::collections::BTreeSet<String>> =
+    std::sync::Mutex::new(std::collections::BTreeSet::new());
+
+/// Record ids the Host knows by declaration (a poisoned lock is still a usable set).
+pub fn declare_known_spirits(ids: impl IntoIterator<Item = String>) {
+    DECLARED_SPIRITS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .extend(ids);
+}
+
+/// Declare the ids of the manifests a cast or topology will load (an unreadable one declares
+/// nothing: its own load refuses it).
+pub fn declare_manifest_ids(paths: impl IntoIterator<Item = PathBuf>) {
+    declare_known_spirits(
+        paths
+            .into_iter()
+            .filter_map(|path| peek_spirit_id_from_str(&read_manifest(&path).ok()?)),
+    );
+}
+
+/// Whether the Host knows `id`: loaded now (`loaded`), declared in its cast or topology, or an
+/// installed package, whatever order they arrived in.
+pub fn host_knows(id: &str, loaded: &dyn Fn(&str) -> bool) -> bool {
+    loaded(id)
+        || DECLARED_SPIRITS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .contains(id)
+        || maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()
+            .is_ok_and(|held| held.iter().any(|(name, _)| name == id))
+}
+
+/// Refuse a `[consent.recall]` recipient the Host does not know (its own id always counts).
+pub fn check_consent_recipients(
+    gated: &GatedManifest,
+    known: &dyn Fn(&str) -> bool,
+) -> Result<(), AdmissionRefusal> {
+    let unknown = gated
+        .consent
+        .iter()
+        .flat_map(|c| c.recall.keys())
+        .find(|id| id.as_str() != gated.spirit_id && !known(id));
+    match unknown {
+        Some(recipient) => Err(AdmissionRefusal::ConsentRecipientUnknown {
+            recipient: recipient.clone(),
+        }),
+        None => Ok(()),
+    }
+}
 
 // One declaration generates the enum, its exhaustive enumeration, and the names
 // quoted by admission refusals. Adding a class also extends every exhaustive
@@ -983,11 +1049,10 @@ pub fn gate_manifest(
         }
         (None, None, None, None)
     };
-    let consent = optional_section(
-        &root,
-        "consent",
-        maos_manifest::ConsentSection::from_toml_str,
-    )?;
+    let consent_schema = class_section.manifest_schema_version;
+    let consent = optional_section(&root, "consent", |text| {
+        maos_manifest::ConsentSection::from_toml_str_at(consent_schema, text)
+    })?;
     // Story 20-9 — the array-of-tables, wrapped as the kernel's successor parser wraps it
     // (`lifecycle/upgrade.rs`), so an admitted Spirit's schedule fires, not only a swapped one's.
     let schedules = match root.get("schedule") {
@@ -1255,7 +1320,7 @@ pub fn check_provider_pins(
 fn optional_section<T, E: std::fmt::Display>(
     root: &toml::Value,
     name: &'static str,
-    parse: fn(&str) -> Result<T, E>,
+    parse: impl Fn(&str) -> Result<T, E>,
 ) -> Result<Option<T>, AdmissionRefusal> {
     root.get(name)
         .map(|value| {
@@ -1486,6 +1551,9 @@ async fn admit_inner(
     let early_gates = (|| {
         check_gated_pins(gated, deps.providers)?;
         check_declared_skills(gated, deps.transparency_log)?;
+        check_consent_recipients(gated, &|id| {
+            host_knows(id, &|loaded| deps.scheduler.resolve_pid(loaded).is_some())
+        })?;
         if gated.intent_promotion_set.is_some() && deps.iac.is_none() {
             return Err(AdmissionRefusal::Admission {
                 detail: "intent promotion bus unavailable".into(),

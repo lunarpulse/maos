@@ -1,0 +1,11 @@
+AC8 plant: crates/maos-bin/src/supervision.rs lifecycle_until: the NOT_ENTERED arm removed. Command: cargo nextest run --locked -p maos-bin --test wasm_form_residuals_22_9 -E 'test(a_trigger_after_the_session_ended_is_dropped_not_panicked)'. Result: FAILS (the firing panics 'lifecycle_session_ended_not_entered'). Plant reverted.
+
+        FAIL [   0.673s] (1/1) maos-bin::wasm_form_residuals_22_9 a_trigger_after_the_session_ended_is_dropped_not_panicked
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.66s
+    thread 'tokio-rt-worker' (691018) panicked at crates/maos-bin/src/supervision.rs:2907:30:
+    thread 'a_trigger_after_the_session_ended_is_dropped_not_panicked' (691011) panicked at crates/maos-bin/tests/wasm_form_residuals_22_9.rs:207:5:
+    an idle trigger after the session ended is dropped, not a panic: Panicked { panic_payload_preview: "lifecycle_session_ended_not_entered" }
+     Summary [   0.674s] 1 test run: 0 passed, 1 failed, 5 skipped
+        FAIL [   0.673s] (1/1) maos-bin::wasm_form_residuals_22_9 a_trigger_after_the_session_ended_is_dropped_not_panicked
+error: test run failed
+rc=100
