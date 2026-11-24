@@ -1,15 +1,10 @@
 # kloc.toml schema
 #
-# Root keys are crate names (matching Cargo.toml package.name).
-# Values are integer line-of-code ceilings for production Rust code.
+# `xtask kloc-check` measures every crate (tokei, production Rust only) and prints the size table. The
+# only gated row is the kernel envelope, keyed by the crate name `maos-kernel-core` (matching Cargo.toml
+# package.name); the value is an integer line-of-code ceiling. A config carrying any other numeric row, or the
+# retired `_aggregate_alarm` / `_aggregate_hardfail`, is refused (operator decision 11, lean-gates WP-23).
 # Special keys prefixed with '_' are meta-configuration.
 #
-# _aggregate_alarm    — aggregate LOC at which a CI warning (non-blocking) is emitted.
-# (`_aggregate_hardfail` was retired by SCP 2026-11-12 §5.B7c option A, ruled
-#  2026-11-13; a config carrying it is refused. Per-crate ceilings are the only
-#  blocking rows.)
-#
 # Example:
-#   maos-kernel-core = 6000
-#   maos-cap-registry = 3000
-#   _aggregate_alarm = 16000
+#   maos-kernel-core = 24000

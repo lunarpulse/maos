@@ -1,5 +1,5 @@
 ---
-Status: binding-v0.1
+Status: binding-v0.1; per-crate ceilings and the aggregate alarm REMOVED 2026-11-24 (operator decision 11, lean-gates WP-23): `xtask/kloc.toml` gates only the `maos-kernel-core` row (ADR-069); every other crate is measured and printed by `xtask kloc-check`
 Gate: xtask/kloc.toml enforced by tokei in CI; aggregate ≤20 KLOC, alarm at 16
 Decided: 2026-04-15
 Accepted-in-PR: <PR_NUMBER>
