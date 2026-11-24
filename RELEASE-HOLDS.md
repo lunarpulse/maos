@@ -184,7 +184,7 @@
 >
 > **Lifted by 22-9** (the `v1.0.0` rows themselves stay as the GA notes): rows 13 and 14 of "Claim
 > boundaries — v1.0.0 scope" are replaced by 22-9.a and 22-9.b below; row 17 by 22-9.f; and of row 5
-> the closed parts: the pre-warm `console.log` drop, a trigger after its session ended, guest timers, the
+> the closed parts: the pre-warm `console.log` drop, a trigger after its session ended, the
 > `DiscardSuccessor` phase label, the still-starting component refusal, the `LifecycleCallers` unwind
 > cleanup and the swap-invariant component witness. Row 5 still holds for 22-9.c and 22-9.d.
 
@@ -197,6 +197,7 @@
 | 22-9.e | **Consent refusal in the guest (row 15, unchanged).** 21-7 F7: guests observe a consent refusal as `IntentAllowlistMismatch` (`crates/maos-wasm-host/src/frame_bridge.rs`); the WIT enum has no `ConsentNotGranted` variant. The dedicated variant ships with the next ABI revision. | That a WASM guest can distinguish a consent refusal from an intent-allowlist mismatch. | The next ABI revision batch (D-22-9-02 B); the operator names its key. |
 | 22-9.f | **Installed boot and the durable publisher pin (was row 17).** Installed-Spirit boot compares the verified package's publisher with `default_installed_publisher`; a mismatch refuses that Spirit (`installed_publisher_mismatch`, journaled) and the others boot. A Spirit with no pin boots and the boot journals the absent pin (`installed_publisher_pin_absent`). A writer who rewrites both the package and `installed-pins.json` in the registry root is outside the guarantee. | That installed-Spirit boot resists a writer to the registry root who rewrites both the package and its pin. | None (the pin sits in the same root, `storage.rs`). |
 | 22-9.g | **Retract across a delivery failure (row 16, unchanged).** 21-7 F3 residual: cross-incarnation retract is best-effort across a post-commit delivery failure (a retry answers `Already`; there is a resolver→prepare window); the journal rows are the only retained record of undelivered recipients. | That a retract reaches every recipient across a post-commit delivery failure. | Owner not yet ruled (D-22-9-12 B): the operator names it. |
+| 22-9.h | **Guest timers are unsupported (F5, D-22-9-09 fallback B).** A guest that waits on a monotonic-clock timer (a TypeScript `setTimeout`, `std::thread::sleep` in a Rust guest) ends its runner with the typed refusal `guest_timers_unsupported` on stderr and runner exit status 7; the guest's timer never fires. Fallback A (a one-worker multi-thread runtime with `enable_time`) fired timers but, on hosted CI (run 45401774560), every `spawned_scope_17_3c` test that spawned the real release runner under T2 died with SIGSEGV, so it was withdrawn. Locally the same runtime aborted ("memory allocation failed") at `RLIMIT_AS` 64 MiB (`memory_max_mb = 64`) where the current-thread runtime starts; the hosted SIGSEGV itself was not reproduced here. | That a guest `setTimeout` or any guest timer completes on this release, or that the one-worker runtime is safe under the T2 memory cap. | A timer design that runs without a second thread under the T2 address-space cap (operator); witness `wasm_form_residuals_22_9::a_guest_timer_is_refused_typed_under_t2_within_an_external_deadline`. |
 
 ## GA-tag procedure (engineering exits green; Holds 1–2 no longer gate)
 

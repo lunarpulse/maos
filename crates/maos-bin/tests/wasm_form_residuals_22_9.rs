@@ -57,13 +57,14 @@ fn probe_frame(script: &str) -> IacFrame {
     }
 }
 
-/// AC9 / D-22-9-09 A — a guest that waits on a monotonic-clock timer (what a TypeScript
-/// `setTimeout` lowers to) completes its turn under the real T2 sandbox. The runner is launched
-/// through the kernel's own `spawn_sandboxed`; an external 30 s deadline captures its exit status
-/// and stderr, and the test asserts both: a clean exit 0, the guest's own "elapsed" line, and no
-/// panic (the driverless ambient runtime panicked a timer with "timers are disabled").
+/// AC9 / D-22-9-09 B — a guest that waits on a monotonic-clock timer (what a TypeScript
+/// `setTimeout` lowers to) is refused typed under the real T2 sandbox: guest timers are not
+/// supported on this release (the one-worker runtime that fired them died with SIGSEGV under the
+/// T2 limits on hosted CI). The runner is launched through the kernel's own `spawn_sandboxed`; an
+/// external 30 s deadline captures its exit status and stderr, and the test asserts both: exit
+/// status 7, the `guest_timers_unsupported` refusal, no answer, no hang and no raw panic.
 #[test]
-fn a_guest_timer_completes_under_t2_within_an_external_deadline() {
+fn a_guest_timer_is_refused_typed_under_t2_within_an_external_deadline() {
     let runner = fixtures::fixture("maos-wasm-runner");
     let probe = fixtures::fixture("lifecycle_probe.wasm");
     let spec = SandboxSpec {
@@ -148,38 +149,30 @@ fn a_guest_timer_completes_under_t2_within_an_external_deadline() {
     )
     .expect("the runner reads the frame");
     let answer = record(&mut child);
-    if answer.is_none() {
-        // The runner left without answering: its status and stderr are the evidence.
-        let status = child.wait().unwrap();
-        stderr_reader.join().unwrap();
-        panic!(
-            "the runner ended without answering a turn that waited on a timer: status {status:?}; stderr:\n{}",
-            said.lock().unwrap()
-        );
-    }
-    let emitted: IacFrame = codec::decode_cbor(&answer.unwrap()).unwrap();
-    assert!(
-        matches!(emitted.payload, FramePayload::TelemetryEvent(_)),
-        "the probe's report: {emitted:?}"
-    );
-    assert_eq!(record(&mut child), Some(vec![]), "TurnComplete");
-    child.child_mut().stdin.take();
-    assert_eq!(record(&mut child), None, "no stray records after the turn");
+    // Under B the runner answers nothing: it ends the turn with the typed refusal.
     let status = child.wait().unwrap();
     stderr_reader.join().unwrap();
     let stderr = said.lock().unwrap().clone();
     assert_eq!(
+        answer, None,
+        "a refused timer ends the runner without an answer; stderr:\n{stderr}"
+    );
+    assert_eq!(
         status.code(),
-        Some(0),
-        "runner exit status; stderr:\n{stderr}"
+        Some(7),
+        "runner exit status (GuestTimersUnsupported); stderr:\n{stderr}"
     );
     assert!(
-        stderr.contains("lifecycle-probe stderr frame: timer 200 ms elapsed"),
-        "the guest's timer elapsed inside the turn:\n{stderr}"
+        stderr.contains("guest_timers_unsupported"),
+        "the typed refusal is on stderr:\n{stderr}"
     );
     assert!(
-        !stderr.contains("panicked") && !stderr.contains("timers are disabled"),
-        "no runner panic:\n{stderr}"
+        !stderr.contains("panicked"),
+        "a refused timer is not a runner panic:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("timer 200 ms elapsed"),
+        "the guest's timer must not have fired:\n{stderr}"
     );
 }
 
