@@ -1,0 +1,16 @@
+AC2 plant (JSON signals also go to the provider): spirits/mira/src/task.rs signal_of(): the JSON short-circuit filtered with '|_| false /* E228-PLANT AC2a */', so a JSON signal falls through to port.complete. Command: cargo nextest run --locked -p mira --test task_handler_22_8. Result: a_json_signal_makes_no_inference_call FAILS (the fake provider is asked about a JSON signal: 'a JSON signal is answered: Inference("the completion holds no JSON object")'); two more tests fail for the same cause. Plant reverted.
+
+        PASS [   0.003s] (1/6) mira::task_handler_22_8 a_subject_with_path_characters_gets_a_legal_distinct_key
+        PASS [   0.003s] (2/6) mira::task_handler_22_8 a_refused_completion_is_a_typed_failure
+        PASS [   0.003s] (3/6) mira::task_handler_22_8 free_text_is_turned_into_a_signal_through_the_port
+        FAIL [   0.016s] (4/6) mira::task_handler_22_8 a_json_signal_makes_no_inference_call
+    thread 'a_json_signal_makes_no_inference_call' (130036) panicked at spirits/mira/tests/task_handler_22_8.rs:127:10:
+        FAIL [   0.016s] (5/6) mira::task_handler_22_8 the_halt_boundary_raises_the_scalar_and_the_route_verdict_is_the_answer
+    thread 'the_halt_boundary_raises_the_scalar_and_the_route_verdict_is_the_answer' (130037) panicked at spirits/mira/tests/task_handler_22_8.rs:255:10:
+        FAIL [   0.017s] (6/6) mira::task_handler_22_8 the_prior_count_comes_from_the_memory_port
+    thread 'the_prior_count_comes_from_the_memory_port' (130038) panicked at spirits/mira/tests/task_handler_22_8.rs:203:62:
+     Summary [   0.017s] 6 tests run: 3 passed, 3 failed, 0 skipped
+        FAIL [   0.016s] (4/6) mira::task_handler_22_8 a_json_signal_makes_no_inference_call
+        FAIL [   0.016s] (5/6) mira::task_handler_22_8 the_halt_boundary_raises_the_scalar_and_the_route_verdict_is_the_answer
+        FAIL [   0.017s] (6/6) mira::task_handler_22_8 the_prior_count_comes_from_the_memory_port
+rc=100

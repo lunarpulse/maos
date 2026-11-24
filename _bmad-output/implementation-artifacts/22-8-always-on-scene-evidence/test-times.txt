@@ -1,0 +1,21 @@
+Per-test wall times (cargo nextest, debug profile, local host, one run each; MAOS_FIXTURE_DIR built first).
+Command: cargo nextest run --locked --no-fail-fast -p maos-bin --test native_task_22_8 --test halt_carry_22_8 --test directed_task_22_4 --test cohort_daemon_smoke_13_5c --test agents_session_22_5 --test audit_rotation_22_6 -p maos-journey-test --test journey_always_on --test journey_j4
+Result: 47 tests run, 47 passed, Summary [40.549s] (whole set, parallel).
+
+maos-journey-test::journey_always_on  the_standing_cast_takes_a_task_and_survives_a_restart   1.865s
+maos-journey-test::journey_j4         j4_earned_consent_rupture_typed_oracle                  0.693s
+maos-journey-test::journey_j4         j4_mira_nash_topology_run_once                          0.634s
+maos-bin::halt_carry_22_8             a_pending_halt_is_carried_after_sigterm_and_sigkill     3.098s
+maos-bin::halt_carry_22_8             a_resolved_halt_is_not_carried                          1.233s
+maos-bin::halt_carry_22_8             a_loaded_spirit_carries_nothing                         1.130s
+maos-bin::native_task_22_8            (6 tests)                                               0.253s .. 0.497s each
+maos-bin::directed_task_22_4          task_show_reads_the_audit_trail_after_a_restart         8.567s (slowest)
+maos-bin::directed_task_22_4          a_key_survives_a_restart                                7.240s
+maos-bin::audit_rotation_22_6         live_log_stays_within_its_bound                         16.693s (slowest of the set)
+maos-bin::audit_rotation_22_6         log_before_deliver_holds_across_rotation                7.200s
+maos-bin::cohort_daemon_smoke_13_5c   (10 tests)                                              0.006s .. 0.627s each
+maos-bin::agents_session_22_5         (6 tests)                                               0.627s .. 1.307s each
+maos-audit::halts_22_8                (9 tests, new direct unit test)                         0.003s .. 0.491s each
+mira / nash / maos-a2a (cargo test)                                                           every binary under 1 s
+
+Budget: every test and every test binary is under the 60 s default (`xtask/test-budgets.toml:26`); no fixture shrink and no [[exception]] row needed.

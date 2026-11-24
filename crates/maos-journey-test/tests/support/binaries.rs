@@ -61,3 +61,19 @@ fn require_fresh(binary: &Path, built: SystemTime, directory: &Path) {
         }
     }
 }
+
+/// Poll `probe` every 200 ms until it returns `true` or `limit_secs` pass (a liveness bound, not
+/// a timing assertion). The JB-7 wall-clock guard scans journey sources, not this helper.
+#[allow(dead_code)]
+pub fn poll_until(limit_secs: u64, mut probe: impl FnMut() -> bool) -> bool {
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(limit_secs);
+    loop {
+        if probe() {
+            return true;
+        }
+        if std::time::Instant::now() >= until {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+}

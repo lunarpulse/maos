@@ -253,8 +253,25 @@ no operator POST mutation route. Directing a task is not an identity mutation.
 - **`serve` is a door root.** The door binds when the root is a shell, a run or the cohort daemon. `maos serve`
   is a run root (its Host file supplies the run arguments), so it binds the door and serves these routes; the
   "Door roots" list of Amendment 16-1 predates it.
-- **Directable forms (D-22-4-03 A).** Installed WASM-component cast members. A native class, a `cli_wrapper`
-  Worker and a single-session `maos run` component are refused with a typed 409 `spirit_not_directable`.
+- **Directable forms (D-22-4-03 A; Story 22-8 D-22-8-02/03 A).** Installed WASM-component cast members, and
+  Mira. Mira is a native class: no mailbox turn answers a task frame, so a native `TaskRunner` hands the text
+  to her own task handler in-process (`spirits/mira`: prompt adapter, deterministic diagnosis, per-subject
+  memory, advisory) and journals the answer as the `TaskComplete` reply row (`maos.task-reply/<hex>`) before
+  `completed`. The registry is the same one: bounds, accept row, idempotency key, halt correlation and
+  restart read-back apply unchanged, and the runner acts with operator authority, as any directed task. Nash
+  and every other native class, a `cli_wrapper` Worker and a single-session `maos run` component are refused
+  with a typed 409 `spirit_not_directable`. A directed task to Mira ends `halted` through her own
+  diagnostic-confidence scalar, which fires the `[epistemic_policy]` halt on her pid while the task runs.
+- **A carried halt is resolvable only by the operator (Story 22-8, D-22-8-05 A).** Every Spirit termination
+  still writes its halt receipt (NFR-Rel-11), and the pending-halt registry is in memory. Once per boot, after
+  the Host file's (or topology's) manifest cast is admitted, `halt_carry` scans the Transparency Log, sealed
+  segments included, for halts the cast member's admitted identity raised and no `halt.resolve` decision
+  closed, journals one `halt.carried` row (kind 3, at the new pid, naming the old boot and pid) and re-admits
+  it as `PendingResolution` under the same halt id. The old incarnation's receipt stays: the incarnation
+  ended, the decision did not. A halt a `maosctl halt resolve` closed is never carried; a Spirit outside the
+  cast (`maosctl load`, an installed component) carries nothing. The carried halt resolves through the same
+  door route as any pending halt, once (`halt_already_resolved` after), so nothing but the bearer holder can
+  resolve it. A `--once` run carries nothing.
 - **Log before deliver; bounded; at most once.** The accept row precedes the 200 and the delivery; delivery
   happens only from the Spirit's own pump, one task at a time, so the door handler never waits on the mailbox
   channel. One running plus 32 queued per Spirit and 512 host-wide; a full queue is a typed refusal that mints

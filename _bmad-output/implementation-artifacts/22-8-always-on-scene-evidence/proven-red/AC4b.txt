@@ -1,0 +1,12 @@
+AC4 plant (answer returned without the reply row): crates/maos-bin/src/native_task.rs MiraRunner::run: early 'return Ok(answer)' (marked E228-PLANT AC4b) before the TaskComplete reply-row insert. Command: cargo nextest run --locked -p maos-bin --test native_task_22_8. Result: mira_answers_a_directed_task_and_its_reply_row_is_journaled FAILS at the read-back ('the reply row precedes the answer'); others green. Plant reverted.
+
+        PASS [   0.247s] (1/6) maos-bin::native_task_22_8 a_low_confidence_task_ends_halted
+        PASS [   0.258s] (2/6) maos-bin::native_task_22_8 a_task_that_is_not_a_signal_ends_failed_with_a_typed_reason
+        FAIL [   0.405s] (3/6) maos-bin::native_task_22_8 mira_answers_a_directed_task_and_its_reply_row_is_journaled
+    thread 'mira_answers_a_directed_task_and_its_reply_row_is_journaled' (128444) panicked at crates/maos-bin/tests/native_task_22_8.rs:264:10:
+        PASS [   0.199s] (4/6) maos-bin::native_task_22_8 nash_stays_not_directable
+        PASS [   0.546s] (5/6) maos-bin::native_task_22_8 the_default_cast_boots_keyless_in_deterministic_mode
+        PASS [   0.238s] (6/6) maos-bin::native_task_22_8 the_registry_exists_without_installed_members
+     Summary [   1.894s] 6 tests run: 5 passed, 1 failed, 0 skipped
+        FAIL [   0.405s] (3/6) maos-bin::native_task_22_8 mira_answers_a_directed_task_and_its_reply_row_is_journaled
+rc=100

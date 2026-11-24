@@ -5228,6 +5228,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // signal must exit NON-ZERO: the `--once` pass never completed, and
             // an exit 0 there is the 2a AC1.5 false-success shape.
             let mut topology_interrupted = false;
+            // Story 22-8 (D-22-8-07 A) — the Host's in-process A2A router, when the topology
+            // declares `[[topology.a2a_peers]]`. Held here, beyond the load block, for the
+            // root's life: Nash's intake consumer lives in it.
+            let mut a2a_cast: Option<Arc<maos_bin::loopback_cast::LoopbackCast>> = None;
             // Story 17-10 review D2 — the whole load runs in ONE async block
             // whose result the teardown below takes (the 16-3 funnel of the
             // standalone arm): a Worker that did not complete, a refused
@@ -5291,6 +5295,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut section_instruction: Option<
                     maos_domain::orchestrator::OrchestratorInstruction,
                 > = None;
+                let a2a_peers = maos_bin::topology::topology_a2a_peers(&manifest_root)?;
+                if !a2a_peers.is_empty() {
+                    a2a_cast = Some(
+                        maos_bin::loopback_cast::LoopbackCast::build(
+                            a2a_peers,
+                            Arc::clone(&transparency_log),
+                        )
+                        .await?,
+                    );
+                }
                 let mut entries = topology_entries.into_iter().enumerate();
                 // Story 16-3 (D-16-3-E) — the entry INDEX is the task id of a
                 // topology Worker with no `host`; `TopologyEntry` carries only
@@ -6013,6 +6027,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     let needs_port = requires_epistemic_halt_port(epistemic_policy.as_ref());
                     let strip_port = std::env::var_os("MAOS_TEST_ONLY_STRIP_SCALAR_PORT").is_some();
+                    // Story 22-8 — Mira's door-task runner, registered once she is admitted.
+                    let mut native_runner: Option<maos_bin::native_task::MiraRunner> = None;
                     let mut pid_fixups: Vec<Box<dyn FnMut(u32) + Send>> = Vec::new();
                     let spirit_obj: Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj> =
                         match kind {
@@ -6115,15 +6131,76 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 pid_fixups.push(Box::new(move |pid| {
                                     pid_binding.store(pid, std::sync::atomic::Ordering::Release);
                                 }));
-                                maos_kernel_core::scheduler::make_spirit_obj(
-                                    mira::Mira::default()
-                                        .with_id(&spirit_id)
-                                        .with_scalar_port(adapter),
+                                // Story 22-8 (D-22-8-02/04/06/07 A) — the native directed
+                                // leg: her task handler's ports are the host's (the minted
+                                // Inference Port under an explicit mode, her pid-bound
+                                // memory, the cast's advisory route).
+                                let pid_of = maos_bin::native_task::scheduler_pid_source(
+                                    &scheduler, &spirit_id,
+                                );
+                                let seam = butler_seam
+                                    .lock()
+                                    .unwrap_or_else(|error| error.into_inner())
+                                    .clone()
+                                    .ok_or("maos run: butler seam not ready")?;
+                                let inference = maos_bin::native_task::bind_inference(
+                                    &seam,
+                                    &maos_bin::admission::declared_pins(&gated),
+                                    pid_of.clone(),
                                 )
+                                .map_err(|error| format!("maos run: {error}"))?;
+                                let mira_obj = mira::Mira::default()
+                                    .with_id(&spirit_id)
+                                    .with_scalar_port(adapter);
+                                native_runner = Some(maos_bin::native_task::MiraRunner::new(
+                                    mira_obj.clone(),
+                                    inference,
+                                    maos_bin::native_task::PidBoundDiagnosisMemory::new(
+                                        Arc::downgrade(&memory),
+                                        pid_of.clone(),
+                                    ),
+                                    a2a_cast
+                                        .as_ref()
+                                        .and_then(|cast| cast.route_for(&spirit_id)),
+                                    Arc::clone(&transparency_log),
+                                    pid_of,
+                                ));
+                                maos_kernel_core::scheduler::make_spirit_obj(mira_obj)
                             }
-                            LoadedSpiritKind::Nash => maos_kernel_core::scheduler::make_spirit_obj(
-                                nash::Nash::default().with_id(&spirit_id),
-                            ),
+                            LoadedSpiritKind::Nash => {
+                                // Story 22-8 (D-22-8-04/07 A) — Nash's phrasing seam and his
+                                // intake consumer (journal the admitted advisory, architect,
+                                // journal the proposal). He is not directable (D-22-8-03 A).
+                                let pid_of = maos_bin::native_task::scheduler_pid_source(
+                                    &scheduler, &spirit_id,
+                                );
+                                let seam = butler_seam
+                                    .lock()
+                                    .unwrap_or_else(|error| error.into_inner())
+                                    .clone()
+                                    .ok_or("maos run: butler seam not ready")?;
+                                let mut nash_obj = nash::Nash::default().with_id(&spirit_id);
+                                if let Some(port) = maos_bin::native_task::bind_inference(
+                                    &seam,
+                                    &maos_bin::admission::declared_pins(&gated),
+                                    pid_of.clone(),
+                                )
+                                .map_err(|error| format!("maos run: {error}"))?
+                                {
+                                    nash_obj = nash_obj.with_inference_port(port);
+                                }
+                                if let Some(cast) = a2a_cast.as_ref() {
+                                    cast.attach_consumer(
+                                        &spirit_id,
+                                        maos_bin::loopback_cast::architect_handler(
+                                            nash_obj.clone(),
+                                            Arc::clone(&transparency_log),
+                                            pid_of,
+                                        ),
+                                    );
+                                }
+                                maos_kernel_core::scheduler::make_spirit_obj(nash_obj)
+                            }
                             LoadedSpiritKind::Digest => maos_kernel_core::scheduler::make_spirit_obj(
                                 maos_digest::DigestSpirit::default(),
                             ),
@@ -6171,6 +6248,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .await
                     .map_err(|refusal| format!("maos run: topology entry '{spirit_id}': {refusal}"))?;
                     let pid = admitted.pid;
+                    if let (Some(runner), Some(door)) =
+                        (native_runner.take(), operator_door_port.as_ref())
+                    {
+                        // Story 22-8 (D-22-8-02 A) — a door root directs Mira whether or not it
+                        // serves installed members: the registry exists as soon as one native
+                        // runner needs it.
+                        let tasks = directed_tasks.get_or_insert_with(|| {
+                            let tasks = maos_bin::directed_task::DirectedTasks::new(
+                                maos_bin::directed_task::KernelTaskHost::new(
+                                    Arc::clone(&scheduler),
+                                    Arc::clone(&capability),
+                                    Arc::clone(&halt_registry),
+                                    Arc::clone(&transparency_log),
+                                ),
+                                maos_bin::directed_task::TaskLimits::default(),
+                            );
+                            door.set_directed_tasks(Arc::clone(&tasks));
+                            tasks
+                        });
+                        tasks.register(&spirit_id, Arc::new(runner));
+                    }
                     println!(
                         "{}",
                         serde_json::json!({
@@ -6182,6 +6280,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         })
                     );
                     loaded_pids.push((spirit_id, pid));
+                }
+                if let Some(cast) = a2a_cast.as_ref() {
+                    if let Some(name) = cast
+                        .peer_names()
+                        .find(|name| !loaded_pids.iter().any(|(id, _)| id == name))
+                    {
+                        return Err(format!(
+                            "maos run: [[topology.a2a_peers]] names '{name}', which is not a \
+                             loaded cast member"
+                        )
+                        .into());
+                    }
+                }
+                // Story 22-8 (D-22-8-05 A) — a serving root re-admits the halts its cast left
+                // unresolved; a `--once` pass restarts nothing and carries nothing.
+                if !run.once {
+                    let report = maos_bin::halt_carry::carry_over(
+                        &audit_db_path,
+                        &transparency_log,
+                        &halt_registry,
+                        &loaded_pids,
+                        boot_nonce,
+                    )
+                    .map_err(|error| format!("maos run: halt carry-over: {error}"))?;
+                    for carried in &report.carried {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "event": "halt_carried",
+                                "halt_id": carried.halt_id,
+                                "spirit_id": carried.spirit_id,
+                                "from_boot": carried.from_boot,
+                                "from_pid": carried.from_pid,
+                                "to_pid": carried.to_pid,
+                            })
+                        );
+                    }
+                    for gap in &report.gaps {
+                        eprintln!("maos run: halt carry-over: {gap}");
+                    }
                 }
                 Ok(())
             }
@@ -6308,6 +6446,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .await;
                 unload_report.render(&mut std::io::stderr());
+                // Story 22-8 — a door root that directed Mira: the pump leaves before the audit
+                // drain, so none holds a sender open.
+                if let Some(tasks) = directed_tasks.take() {
+                    tasks.stop().await;
+                }
                 drop(audit_tx);
                 drop(inference);
                 drop(capability);
