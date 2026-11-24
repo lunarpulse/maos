@@ -44,7 +44,9 @@ commitment.
 The clock-start is a **committed record**, never a `git` lookup at render time (a
 `git archive` copy or a shallow clone would otherwise render a different
 `STABILITY.md` than the tagged commit, and `--check` could not be byte-for-byte for
-both). Until GA the record is **absent** and `STABILITY.md` renders the placeholder.
+both). Before the record exists `STABILITY.md` renders a placeholder; the record was
+committed after `v1.0.0` was published (tag commit
+`518435c3e1f0f5da13cd9fd10232d2e0073c647a`), so the clock is running.
 
 `ops-ga-tag-after-holds`, in a commit **after** the `v1.0.0` tag exists (the record
 names the tag commit, so it cannot be inside it), writes `xtask/release-channel.toml`:
@@ -66,7 +68,7 @@ cargo run --locked -p xtask -- stability-matrix --check
 
 A malformed record (a non-hex SHA, a missing key) is a loud `--check` error — never
 the placeholder. The record is written by the operator lane; an agent never invents a
-SHA or a tag, and no part of this repository writes the file before the tag exists.
+SHA or a tag.
 
 ## Operator-lane status (unverified here)
 
