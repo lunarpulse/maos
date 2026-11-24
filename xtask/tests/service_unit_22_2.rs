@@ -100,6 +100,10 @@ fn packages_install_the_unit_without_enabling_it_or_owning_a_conffile() {
     assert!(
         rules.contains("override_dh_installsystemd:\n\tdh_installsystemd --no-enable --no-start")
     );
+    assert!(
+        rules.contains("\n\tdh_installsysusers\n"),
+        "dh_installsysusers is not in the compat 13 default sequence; rules must call it"
+    );
     let spec = read("packaging/rpm/maos.spec");
     assert!(spec.contains("%pre\ngetent group maos"));
     for forbidden in ["systemctl enable", "%systemd_post", "/etc/maos/host.toml\n"] {

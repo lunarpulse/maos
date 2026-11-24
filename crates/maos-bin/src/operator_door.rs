@@ -2919,11 +2919,16 @@ impl DoorInner {
             }
         }
         if !tasks.is_directable(spirit_id) {
-            let form = if self
+            // `spawned_artifact_sha256` exists only in `network` builds (the spawned component
+            // session is a network-build form); a default build has no such session.
+            #[cfg(feature = "network")]
+            let single_session = self
                 .private_ops
                 .spawned_artifact_sha256(spirit_id)
-                .is_some()
-            {
+                .is_some();
+            #[cfg(not(feature = "network"))]
+            let single_session = false;
+            let form = if single_session {
                 "a single-session component (`maos run`), not an installed cast member"
             } else if spirit_id.starts_with("worker-") {
                 "a cli_wrapper Worker"
