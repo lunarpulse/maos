@@ -546,11 +546,11 @@ pub fn run(catalog_path: &str, json: bool) -> Result<(), String> {
         let detail = match std::fs::read(&artifact_path) {
             Ok(actual) if actual == expected.as_bytes() => None,
             Ok(_) => Some(format!(
-                "{} differs from generated output; run `cargo xtask error-catalog-generate`",
+                "{} differs from generated output; run `cargo run -p xtask -- bless`",
                 artifact_path.display()
             )),
             Err(error) => Some(format!(
-                "could not read {}: {}; run `cargo xtask error-catalog-generate`",
+                "could not read {}: {}; run `cargo run -p xtask -- bless`",
                 artifact_path.display(),
                 error
             )),
@@ -1132,7 +1132,7 @@ mod tests {
             .expect("committed error catalog must exist");
         assert!(
             generated.as_bytes() == committed,
-            "committed JSON must equal generated catalog; run `cargo xtask error-catalog-generate`"
+            "committed JSON must equal generated catalog; run `cargo run -p xtask -- bless`"
         );
     }
 

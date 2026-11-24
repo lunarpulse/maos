@@ -1,24 +1,15 @@
 #!/usr/bin/env python3
-"""repin.py -- re-pin the kernel exact pin per landing; re-base the per-crate ceilings.
+"""repin.py -- re-pin the kernel exact pin per landing (story-gated).
 
-Two jobs (SCP 2026-11-12 section 5.B7c, option A):
-
-1. PER LANDING (`--check` / `--apply`): the kernel EXACT pin, after `cargo fmt --all`.
+PER LANDING (`--check` / `--apply`): the kernel EXACT pin, after `cargo fmt --all`.
 
   xtask/kernel-core-baseline.toml        src_lines, [kernel_src] set_hash + per-file
                                          digests (values only; no comment is written)
 
-2. AT A RETROSPECTIVE / THE B7c-A LANDING (`--rebase`): the per-crate CEILINGS.
-
-  xtask/kloc.toml                        every crate row := measured + max(100,
-                                         ceil(0.02 * measured)); only the value
-                                         changes, comments are kept as they are.
-                                         Per-crate rows are ceilings with
-                                         stated headroom, NOT per-landing exact pins:
-                                         `--check`/`--apply` never touch them. The
-                                         zero-headroom `maos-kernel-core` row is HELD
-                                         (never raised; `--lower-kernel` lowers it to
-                                         its measured value).
+`cargo run -p xtask -- bless` regenerates the same pin (and the other derived artefacts) from the source tree
+without the story gate or the refusals below; this script is the guarded path. The per-crate `kloc.toml`
+ceilings and `--rebase` were removed by operator decision 11 (lean-gates WP-23): only the `maos-kernel-core` row
+remains, and this script never writes it.
 
 History is the commit message: `--note` is accepted and printed to stdout, never written to a file.
 
@@ -28,7 +19,6 @@ cargo. Python 3, standard library only. See scripts/README-repin.md.
 
   scripts/repin.py --check                         # table pin vs measured, rc != 0 on drift
   scripts/repin.py --apply --story 20-13 [--note "TEXT"]   # rewrite the kernel pin values, print diff
-  scripts/repin.py --rebase [--note "REASON"] [--measure-root DIR | --measure-json FILE] [--lower-kernel] [--dry-run]
 
 Exit codes: 0 in sync / applied / nothing to do; 1 drift (--check) or a post-write
 verification failure (rolled back); 2 a HUMAN decision is needed (nothing written);
@@ -58,13 +48,9 @@ TRACKER = "_bmad-output/implementation-artifacts/sprint-status.yaml"
 OWNED_FILES = (BASELINE,)
 
 # ADR-069 (see recovery_lane_ceiling_rule.rs): the alarm needs `ENVELOPE ALARM` in the kernel ROW comment.
-ADR_069_ALARM = 22_000
-ADR_069_ENVELOPE = 23_000
-# Mirrors ZERO_HEADROOM_CRATES in xtask/tests/recovery_lane_ceiling_rule.rs: `--rebase` never raises these.
-ZERO_HEADROOM_CRATES = (KERNEL_CRATE,)
-# ceiling(crate) = measured + max(REBASE_FLOOR, ceil(REBASE_PCT * measured)), PCT as a percentage.
-REBASE_FLOOR = 100
-REBASE_PCT = 2
+# Raised by the operator on 2026-11-24 (alarm 22,000 -> 23,000, envelope 23,000 -> 24,000).
+ADR_069_ALARM = 23_000
+ADR_069_ENVELOPE = 24_000
 LIVE_STATUSES = ("in-progress", "review", "ready-for-dev")
 EXIT_OK, EXIT_DRIFT, EXIT_HUMAN, EXIT_TOOL = 0, 1, 2, 3
 DIFF_LINE_CAP = 240
@@ -321,7 +307,7 @@ def analyze(root: Path, m: dict):
     want["added"], want["removed"] = added, removed
 
     # (no test-file literals: `kernel_pin_content_hash_16_0.rs` asserts the readers agree with `read_pinned`)
-    # -- kernel ceiling row (read-only here: ceilings move only via --rebase) + ADR-069 envelope
+    # -- kernel ceiling row (read-only here: only a human moves it) + ADR-069 envelope
     row = rows[KERNEL_CRATE][1]
     tokei = m["kernel_tokei"]
     if tokei > row:
@@ -413,220 +399,22 @@ def print_diff(root: Path, new_texts: dict[str, str]):
             print(cap(l))
 
 
-# ------------------------------------------------------------------------------ rebase
-
-
-def ceiling_for(measured: int) -> int:
-    """measured + max(100, ceil(0.02 * measured)), in integers."""
-    return measured + max(REBASE_FLOOR, -(-measured * REBASE_PCT // 100))
-
-
-def rebase_row(line: str, new_val: int) -> str:
-    """The row with only its value replaced; the inline comment is kept byte for byte."""
-    m = ROW_RE.match(line)
-    if not m:
-        raise ToolError(f"row does not parse: {line[:80]}")
-    return f"{m['key']}{m['eq']}{new_val}{m['gap']}{m['comment'] or ''}"
-
-
-def load_measure_json(path: Path) -> dict[str, int]:
-    """The `per_crate` map of a `kloc-check --json` report (any xtask build; a `passed: false` report and
-    extra keys are fine). A report without a usable `per_crate` map is refused as a tool error."""
-    import json
-
-    try:
-        with open(path, encoding="utf-8") as f:
-            report = json.load(f)
-    except (OSError, ValueError) as e:
-        raise ToolError(f"--measure-json {path}: {e}") from e
-    per_crate = report.get("per_crate") if isinstance(report, dict) else None
-    if not isinstance(per_crate, dict) or not per_crate or not all(
-            isinstance(k, str) and isinstance(v, int) and not isinstance(v, bool) and v >= 0
-            for k, v in per_crate.items()):
-        raise ToolError(f"--measure-json {path}: not a `kloc-check --json` report with a `per_crate` "
-                        "map of crate -> tokei lines")
-    return per_crate
-
-
-def rebase_plan(root: Path, measure_root: Path | None, measure_json: Path | None, xtask: Path,
-                lower_kernel: bool):
-    """Returns (table, new text or None, refusals). The kloc.toml of `root` is the one rewritten;
-    the measurement comes from `measure_json` (a saved `kloc-check --json` report) or `measure_root`
-    (measured with `xtask`), floored at what `root` measures itself with `xtask`.
-    ZERO_HEADROOM_CRATES rows are held (never raised); `lower_kernel` lets them drop to measured."""
-    kloc_text = read(root, KLOC)
-    rows = kloc_rows(kloc_text)
-    if measure_json is not None:
-        meas = load_measure_json(measure_json)
-    else:
-        _, mk = gate_json(xtask, measure_root, ["kloc-check", "--json"])
-        meas = mk["per_crate"]
-    if measure_json is None and measure_root == root:
-        floor = meas
-    else:
-        _, fk = gate_json(xtask, root, ["kloc-check", "--json"])
-        floor = fk["per_crate"]
-
-    refusals: list[str] = []
-    missing = sorted(c for c in set(meas) | set(floor) if c not in rows)
-    if missing:
-        refusals.append("measured crate(s) with no kloc.toml row: " + ", ".join(missing)
-                        + " (a new row is a budget decision)")
-
-    lines = kloc_text.split("\n")
-    table: list[tuple[str, int, int, int, int, str]] = []  # crate, before, measured, floor, after, status
-    for crate, (idx, old) in rows.items():
-        if crate.startswith("_"):
-            continue  # `_aggregate_alarm` is a warning threshold, not a crate ceiling
-        if crate not in meas:
-            table.append((crate, old, 0, 0, old, "not measured (kept)"))
-            continue
-        m, fl = meas[crate], floor.get(crate, 0)
-        if m == 0 and fl == 0:
-            table.append((crate, old, m, fl, old, "no code (kept)"))  # phantom/tripwire row stays
-            continue
-        if crate in ZERO_HEADROOM_CRATES:
-            held = max(m, fl)  # zero headroom: the only move a re-base may make is down, to measured
-            if held > old:
-                refusals.append(f"{crate} measures {held}, over its zero-headroom ceiling {old}: it is raised "
-                                "only with its own measured grant, never by a re-base")
-            if not lower_kernel or held >= old:
-                table.append((crate, old, m, fl, old, "held (zero headroom)"))
-                continue
-            new = held
-        else:
-            new = max(ceiling_for(m), fl)
-        if new == old:
-            table.append((crate, old, m, fl, old, "ok"))
-            continue
-        lines[idx] = rebase_row(lines[idx], new)
-        table.append((crate, old, m, fl, new, "RE-BASED " + signed(new - old)))
-
-    new_text = "\n".join(lines)
-    k = next((r for r in table if r[0] == KERNEL_CRATE), None)
-    if k is not None:
-        after = k[4]
-        if after > ADR_069_ENVELOPE:
-            refusals.append(f"{KERNEL_CRATE} row {after} is above the ADR-069 envelope "
-                            f"{ADR_069_ENVELOPE}: a new operator decision, not a re-base")
-        elif after > ADR_069_ALARM:
-            if "ENVELOPE ALARM" not in row_comment(new_text, KERNEL_CRATE):
-                refusals.append(f"{KERNEL_CRATE} row {after} is above the ADR-069 alarm {ADR_069_ALARM}: add "
-                                f"`ENVELOPE ALARM` (the operator's ack) to the {KERNEL_CRATE} row comment in "
-                                f"{KLOC} first, then re-run")
-    return table, (new_text if new_text != kloc_text else None), refusals
-
-
-def print_rebase_table(table):
-    hdr = ("CRATE", "BEFORE", "MEASURED", "ROOT-FLOOR", "AFTER", "STATUS")
-    body = [(c, str(b), str(m), str(f), str(a), st) for c, b, m, f, a, st in table]
-    w = [max(len(r[i]) for r in body + [hdr]) for i in range(5)]
-    for r in [hdr] + body:
-        print("  ".join(r[i].ljust(w[i]) if i == 0 else r[i].rjust(w[i]) for i in range(5)) + "  " + r[5])
-
-
-def rebase(root: Path, xtask: Path, args) -> int:
-    measure_root = None if args.measure_json else (Path(args.measure_root).resolve() if args.measure_root else root)
-    measure_json = Path(args.measure_json).resolve() if args.measure_json else None
-    measured_in = measure_json if measure_json else measure_root
-    try:
-        if measure_root is not None and not (measure_root / KLOC).is_file():
-            raise ToolError(f"{measure_root} is not a maos tree: missing {KLOC}")
-        if not (root / KLOC).is_file():
-            raise ToolError(f"{root} is not a maos repo root: missing {KLOC}")
-        reason = " ".join((args.note or "").split())
-        if reason:
-            print(f"note (stdout only; history is the commit message): {reason}")
-        table, new_text, refusals = rebase_plan(root, measure_root, measure_json, xtask, args.lower_kernel)
-    except Refuse as r:
-        print("REFUSED -- a human decision is needed; nothing was written:", file=sys.stderr)
-        print(f"  - {r}", file=sys.stderr)
-        return EXIT_HUMAN
-    except ToolError as e:
-        print(f"repin: ERROR: {e}", file=sys.stderr)
-        return EXIT_TOOL
-
-    print_rebase_table(table)
-    changed = sum(1 for r in table if r[5].startswith("RE-BASED"))
-    print(f"\n{changed} of {len(table)} crate row(s) change; measured in {measured_in}, "
-          f"floored at the measurement of {root}; ceiling = measured + max({REBASE_FLOOR}, ceil({REBASE_PCT}%)); "
-          f"zero-headroom rows ({', '.join(ZERO_HEADROOM_CRATES)}) are held"
-          + (", lowered to measured (--lower-kernel)" if args.lower_kernel else ""))
-    if refusals:
-        print("\nREFUSED -- a human decision is needed; nothing was written:", file=sys.stderr)
-        for r in refusals:
-            print(f"  - {r}", file=sys.stderr)
-        return EXIT_HUMAN
-    if new_text is None:
-        print("\nnothing to do: every crate row already equals its re-based ceiling")
-        return EXIT_OK
-    if args.dry_run:
-        print("\n--dry-run: nothing written")
-        return EXIT_OK
-
-    print("\n--- diff ---")
-    print_diff(root, {KLOC: new_text})
-    original = read(root, KLOC)
-    try:
-        write_atomic(root / KLOC, new_text)
-        after = kloc_rows(read(root, KLOC))
-        for crate, _, _, _, new, _ in table:
-            if after[crate][1] != new:
-                raise ToolError(f"internal: row {crate} reads back {after[crate][1]}, expected {new}")
-        rc, k = gate_json(xtask, root, ["kloc-check", "--json"])
-        if rc != 0 or not k.get("passed"):
-            raise ToolError(f"post-write verification failed: kloc-check passed={k.get('passed')} "
-                            f"over_budget={k.get('over_budget')}")
-    except (ToolError, OSError) as e:
-        write_atomic(root / KLOC, original)
-        print(f"repin: ERROR: {e}; {KLOC} restored", file=sys.stderr)
-        return EXIT_DRIFT
-    print(f"\nAPPLIED to {KLOC}: {changed} row(s) re-based")
-    print("verified: kloc-check PASSED; the kernel exact pin is untouched (run `repin.py --check`)")
-    return EXIT_OK
-
-
 # ------------------------------------------------------------------------------ main
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
-        description="Re-pin the kernel exact pin per landing, or re-base the per-crate ceilings, "
-                    "from the prebuilt xtask gates (no cargo).")
+        description="Re-pin the kernel exact pin per landing from the prebuilt xtask gates (no cargo).")
     mode = ap.add_mutually_exclusive_group(required=True)
     mode.add_argument("--check", action="store_true", help="print kernel pin vs measured; rc != 0 on drift")
     mode.add_argument("--apply", action="store_true", help="rewrite the kernel pin and print the diff")
-    mode.add_argument("--rebase", action="store_true",
-                      help="re-base every kloc.toml crate row to measured + max(100, ceil(2%%)) "
-                           "(retrospectives / the B7c-A landing only); the kernel row is held")
     ap.add_argument("--story", help="live tracker story key (or unique prefix, e.g. 20-13); --apply only")
     ap.add_argument("--note", help="free text, printed to stdout only (history is the commit message)")
-    src = ap.add_mutually_exclusive_group()
-    src.add_argument("--measure-root", metavar="DIR",
-                     help="--rebase: tree measured by the prebuilt `xtask kloc-check --json` (default --root; that "
-                          "tree's kloc.toml must satisfy the xtask's gate); rows are never lowered below what "
-                          "--root itself measures")
-    src.add_argument("--measure-json", metavar="FILE",
-                     help="--rebase: per-crate measurements read from a `kloc-check --json` report made by any "
-                          "xtask build (its `per_crate` map; a passed:false report is fine); --root is still "
-                          "measured with --xtask and acts as the floor")
-    ap.add_argument("--lower-kernel", action="store_true",
-                    help="--rebase: lower the zero-headroom `maos-kernel-core` row to its measured value "
-                         "(default off: the kernel row is held, never raised by a re-base)")
-    ap.add_argument("--dry-run", action="store_true", help="--rebase: print the table, write nothing")
     ap.add_argument("--root", help="repo root (default: parent of scripts/)")
     ap.add_argument("--xtask", help="prebuilt xtask binary (default: $REPIN_XTASK, $CARGO_TARGET_DIR, <root>/target)")
     args = ap.parse_args(argv)
 
     root = Path(args.root).resolve() if args.root else Path(__file__).resolve().parent.parent
-    if args.measure_json and not args.rebase:
-        ap.error("--measure-json is only valid with --rebase")
-    if args.rebase:
-        try:
-            return rebase(root, find_xtask(root, args.xtask), args)
-        except ToolError as e:
-            print(f"repin: ERROR: {e}", file=sys.stderr)
-            return EXIT_TOOL
     try:
         for rel in OWNED_FILES + (KLOC, TRACKER):
             if not (root / rel).is_file():

@@ -48,7 +48,7 @@ pub fn run(workspace_root: &Path, check: bool, json: bool) -> Result<(), String>
     if check {
         let committed = std::fs::read_to_string(&path).map_err(|e| {
             format!(
-                "STABILITY.md not found ({e}); run `cargo run -p xtask -- stability-matrix` to generate it"
+                "STABILITY.md not found ({e}); run `cargo run -p xtask -- bless` to generate it"
             )
         })?;
         let in_sync = committed == rendered;
@@ -94,10 +94,7 @@ pub fn run(workspace_root: &Path, check: bool, json: bool) -> Result<(), String>
         if in_sync && deprecation_issues.is_empty() && export_issue.is_none() {
             Ok(())
         } else if !in_sync {
-            Err(
-                "STABILITY.md drift: regenerate with `cargo run -p xtask -- stability-matrix`"
-                    .into(),
-            )
+            Err("STABILITY.md drift: regenerate with `cargo run -p xtask -- bless`".into())
         } else if let Some(issue) = export_issue {
             Err(issue)
         } else {
