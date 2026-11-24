@@ -28,11 +28,18 @@
 //! read-only `maos-audit` crate (Story 9.2 Decision A.2 / `maos-audit-read-only`
 //! gate).
 
+use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use maos_audit::AuditError;
 pub use maos_audit::AuditFilter;
+#[cfg(feature = "online-adapters")]
+use maos_domain::outbound::OutboundPolicy;
+use maos_domain::outbound::{ResolveFailed, ResolveHost};
+#[cfg(feature = "online-adapters")]
+use maos_domain::ports::KmsError;
 use maos_domain::ports::{
     AuthenticatedPrincipal, CryptoProvider, IdentityAssertionPort, KeyManagementPort,
     SiemProjectionPort,
@@ -42,6 +49,7 @@ use maos_secrets::{seal_at_rest_opt, LocalMasterKeyKms};
 use maos_siem::{export_report_from_tl, forward_to_file_with_port, SiemExporter};
 use maos_sso::{OidcAlgorithm, OidcVerifier};
 use rusqlite::OpenFlags;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SubsystemState {
@@ -149,6 +157,8 @@ pub struct EnterpriseRuntime {
     audit_db_path: Option<PathBuf>,
     siem_sink_path: Option<PathBuf>,
     boot_nonce: u64,
+    /// Probe of the external KMS endpoint (`None` for a local master key).
+    kms_probe: Option<KmsProbeFn>,
 }
 
 impl EnterpriseRuntime {
@@ -165,16 +175,19 @@ impl EnterpriseRuntime {
             audit_db_path: None,
             siem_sink_path: None,
             boot_nonce: 0,
+            kms_probe: None,
         })
     }
 
     /// Production constructor: builds the REAL adapters from env and demotes any
     /// subsystem that cannot be built or is unhealthy to `ConfiguredDown`
-    /// (runtime-detected, not just a test fixture).
+    /// (runtime-detected, not just a test fixture). The KMS is the one
+    /// `configure_kms_from_env` selected at boot (Story 23-8, D-23-8-08 A).
     pub fn from_env(
         crypto: Arc<dyn CryptoProvider>,
         audit_db_path: PathBuf,
         boot_nonce: u64,
+        kms: Option<&ConfiguredKms>,
     ) -> Result<Self, EnterpriseFailure> {
         let mut config = EnterpriseConfig::from_env();
         let mut identity_port: Option<Arc<dyn IdentityAssertionPort>> = None;
@@ -191,12 +204,13 @@ impl EnterpriseRuntime {
             }
         }
 
+        // The KMS is selected and validated at boot (`configure_kms_from_env`);
+        // a configured KMS with no adapter here is a latched ConfiguredDown. An
+        // endpoint that is unhealthy is NOT demoted: health is per call.
         if config.kms_configured() {
-            match build_local_kms() {
-                Ok(kms) if kms.is_healthy() => {
-                    kms_port = Some(Arc::new(kms));
-                }
-                _ => config = config.with_kms_down(),
+            match kms {
+                Some(kms) => kms_port = Some(kms.port()),
+                None => config = config.with_kms_down(),
             }
         }
 
@@ -210,7 +224,7 @@ impl EnterpriseRuntime {
             }
         }
 
-        Ok(Self::from_ports(
+        let runtime = Self::from_ports(
             config,
             identity_port,
             kms_port,
@@ -219,7 +233,11 @@ impl EnterpriseRuntime {
             Some(audit_db_path),
             siem_sink_path,
             boot_nonce,
-        ))
+        );
+        Ok(match kms.and_then(ConfiguredKms::probe) {
+            Some(probe) => runtime.with_kms_probe(probe),
+            None => runtime,
+        })
     }
 
     /// Story 13.5a — port-injection constructor. The production `from_env`
@@ -247,6 +265,7 @@ impl EnterpriseRuntime {
             audit_db_path,
             siem_sink_path,
             boot_nonce,
+            kms_probe: None,
         }
     }
 
@@ -460,24 +479,65 @@ impl EnterpriseRuntime {
     }
 
     /// Build the loom-lite at-rest seal hook from the configured KMS + crypto.
-    /// `None` when KMS is unconfigured/unhealthy (loom-lite then writes
-    /// byte-identical Option-A plaintext). `Some(closure)` when KMS is
-    /// `Available` + healthy — the closure produces real AEAD ciphertext and
-    /// fails closed on any seal error (loom-lite refuses the write).
+    ///
+    /// `None` only when KMS is not configured (loom-lite then writes
+    /// byte-identical Option-A plaintext). Whenever KMS IS configured the hook
+    /// exists (Story 23-8, D-23-8-07 A): `Available` returns a closure that
+    /// seals and fails closed on every write, including when the KMS is down
+    /// or unhealthy (`seal_at_rest` checks `is_healthy` per call), and
+    /// `ConfiguredDown` (or a missing port) returns a closure that always
+    /// refuses. A configured posture therefore never falls back to plaintext.
     pub fn at_rest_seal_hook(&self) -> Option<AtRestSeal> {
-        if !matches!(self.config.kms, SubsystemState::Available) {
-            return None;
+        match self.config.kms {
+            SubsystemState::Disabled => None,
+            SubsystemState::ConfiguredDown => Some(refusing_seal()),
+            SubsystemState::Available => match (self.kms_port.clone(), self.crypto.clone()) {
+                (Some(kms), Some(crypto)) => Some(Arc::new(move |plaintext: &[u8]| {
+                    seal_at_rest_opt(Some(kms.as_ref()), crypto.as_ref(), plaintext)
+                        .map_err(|e| e.to_string())
+                })),
+                _ => Some(refusing_seal()),
+            },
         }
-        let kms = self.kms_port.clone()?;
-        let crypto = self.crypto.clone()?;
-        if !kms.is_healthy() {
-            return None;
-        }
-        Some(Arc::new(move |plaintext: &[u8]| {
-            seal_at_rest_opt(Some(kms.as_ref()), crypto.as_ref(), plaintext)
-                .map_err(|e| e.to_string())
-        }))
     }
+
+    /// KMS is configured but has no usable adapter or crypto provider (a
+    /// latched `ConfiguredDown`, or `Available` with nothing behind it). The
+    /// cohort daemon refuses to start in this state. An external endpoint that
+    /// is merely unhealthy is not this: it recovers by probe.
+    pub fn kms_unbuilt(&self) -> bool {
+        match self.config.kms {
+            SubsystemState::Disabled => false,
+            SubsystemState::ConfiguredDown => true,
+            SubsystemState::Available => self.kms_port.is_none() || self.crypto.is_none(),
+        }
+    }
+
+    /// The probe of the external KMS endpoint, when there is one.
+    pub fn kms_probe(&self) -> Option<KmsProbeFn> {
+        self.kms_probe.clone()
+    }
+
+    /// Attach the endpoint probe (`ConfiguredKms::probe`).
+    #[must_use]
+    pub fn with_kms_probe(mut self, probe: KmsProbeFn) -> Self {
+        self.kms_probe = Some(probe);
+        self
+    }
+
+    /// Spawn the periodic endpoint probe (every [`KMS_PROBE_INTERVAL`]), if the
+    /// KMS is an external endpoint. Stopped by `cancel`.
+    pub fn spawn_kms_probe_task(
+        &self,
+        cancel: CancellationToken,
+    ) -> Option<tokio::task::JoinHandle<()>> {
+        self.kms_probe()
+            .map(|probe| spawn_kms_probe(probe, KMS_PROBE_INTERVAL, cancel))
+    }
+}
+
+fn refusing_seal() -> AtRestSeal {
+    Arc::new(|_: &[u8]| Err("MAOS_KMS_* configured but KMS is unavailable".to_string()))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -494,12 +554,300 @@ fn any_env_with_prefix(prefix: &str) -> bool {
     std::env::vars_os().any(|(name, _)| name.to_string_lossy().starts_with(prefix))
 }
 
-/// Decode the hex-encoded 32-byte org master key from `MAOS_KMS_MASTER_KEY`.
-pub fn build_local_kms() -> Result<LocalMasterKeyKms, String> {
-    let raw = std::env::var("MAOS_KMS_MASTER_KEY").map_err(|_| "MAOS_KMS_MASTER_KEY absent")?;
-    let bytes =
-        hex::decode(raw.trim()).map_err(|e| format!("master key hex decode failed: {e}"))?;
-    LocalMasterKeyKms::from_master_key(&bytes).map_err(|e| e.to_string())
+/// A probe of the external KMS endpoint: `true` when it answered healthy.
+pub type KmsProbeFn = Arc<dyn Fn() -> bool + Send + Sync>;
+
+/// How often the composition root probes an external KMS endpoint (D-23-8-03 A).
+pub const KMS_PROBE_INTERVAL: Duration = Duration::from_secs(10);
+
+/// Why the KMS configuration is refused at boot (exit 78, Story 23-8). Each
+/// variant names the variables involved and never a value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KmsBootRefusal {
+    /// Both `MAOS_KMS_ENDPOINT` and `MAOS_KMS_MASTER_KEY` are set (D-23-8-04 A).
+    Conflict,
+    /// `MAOS_KMS_ENDPOINT` is set in a build without `online-adapters` (D-23-8-09 A).
+    UnsupportedBuild,
+    /// The endpoint failed the outbound policy or is not a plain base URL.
+    EndpointRefused(&'static str),
+    /// `MAOS_KMS_MASTER_KEY` is not 64 hex characters, or is all zero.
+    MasterKeyInvalid,
+    /// Some `MAOS_KMS_*` variable is set but no key source is (D-23-8-07 A).
+    Incomplete,
+}
+
+impl KmsBootRefusal {
+    #[must_use]
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Conflict => "kms_config_conflict",
+            Self::UnsupportedBuild => "kms_endpoint_unsupported_build",
+            Self::EndpointRefused(_) => "kms_endpoint_refused",
+            Self::MasterKeyInvalid => "kms_master_key_invalid",
+            Self::Incomplete => "kms_config_incomplete",
+        }
+    }
+}
+
+impl std::fmt::Display for KmsBootRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let code = self.code();
+        match self {
+            Self::Conflict => write!(
+                f,
+                "{code}: MAOS_KMS_ENDPOINT and MAOS_KMS_MASTER_KEY are both set; set exactly one"
+            ),
+            Self::UnsupportedBuild => write!(
+                f,
+                "{code}: MAOS_KMS_ENDPOINT is set but this build has no online adapters"
+            ),
+            Self::EndpointRefused(detail) => {
+                write!(f, "{code}: MAOS_KMS_ENDPOINT refused ({detail})")
+            }
+            Self::MasterKeyInvalid => write!(
+                f,
+                "{code}: MAOS_KMS_MASTER_KEY must be 64 hex characters (32 bytes) and not all zero"
+            ),
+            Self::Incomplete => write!(
+                f,
+                "{code}: a MAOS_KMS_* variable is set but neither MAOS_KMS_ENDPOINT nor \
+                 MAOS_KMS_MASTER_KEY is"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for KmsBootRefusal {}
+
+/// The KMS the composition root selected (Story 23-8, D-23-8-08 A): built once
+/// at boot and handed to both the enterprise runtime and the secret store, so
+/// there is one adapter and one health state.
+pub struct ConfiguredKms {
+    port: Arc<dyn KeyManagementPort>,
+    probe: Option<KmsProbeFn>,
+    #[cfg(feature = "online-adapters")]
+    http: Option<Arc<maos_secrets::http_kms::HttpKms>>,
+}
+
+impl std::fmt::Debug for ConfiguredKms {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConfiguredKms")
+            .field("kind", &self.kind())
+            .finish_non_exhaustive()
+    }
+}
+
+impl ConfiguredKms {
+    /// The port every seal and open goes through.
+    #[must_use]
+    pub fn port(&self) -> Arc<dyn KeyManagementPort> {
+        Arc::clone(&self.port)
+    }
+
+    /// `Some` for an external endpoint: one `GET /health`.
+    #[must_use]
+    pub fn probe(&self) -> Option<KmsProbeFn> {
+        self.probe.clone()
+    }
+
+    /// `"external endpoint"` or `"local master key"`.
+    #[must_use]
+    pub fn kind(&self) -> &'static str {
+        if self.probe.is_some() {
+            "external endpoint"
+        } else {
+            "local master key"
+        }
+    }
+
+    /// Settle the endpoint bearer (`None` = no bearer). The adapter refuses
+    /// every call until this runs, so no request leaves without the operator's
+    /// bearer decision. A local master key has no bearer: no-op.
+    pub fn provision_bearer(&self, bearer: Option<String>) {
+        #[cfg(feature = "online-adapters")]
+        if let Some(http) = &self.http {
+            http.provision_bearer(bearer);
+        }
+        #[cfg(not(feature = "online-adapters"))]
+        let _ = bearer;
+    }
+}
+
+/// The KMS-related environment, read once (so tests drive selection without
+/// mutating the process environment).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct KmsEnv<'a> {
+    pub endpoint: Option<&'a str>,
+    pub master_key: Option<&'a str>,
+    /// `MAOS_KMS_ALLOW_PRIVATE`: admit RFC 1918 / fc00::/7 endpoints.
+    pub allow_private: bool,
+    /// Whether any `MAOS_KMS_*` variable is set.
+    pub any_kms_variable: bool,
+}
+
+/// Name resolution for the boot-time endpoint check, bounded by a 2 s deadline.
+struct SystemResolver;
+
+impl ResolveHost for SystemResolver {
+    fn resolve(&self, host: &str, port: u16) -> Result<Vec<IpAddr>, ResolveFailed> {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let host = host.to_owned();
+        std::thread::spawn(move || {
+            let answers = (host.as_str(), port)
+                .to_socket_addrs()
+                .map(|addresses| addresses.map(|address| address.ip()).collect::<Vec<_>>());
+            let _ = sender.send(answers);
+        });
+        match receiver.recv_timeout(Duration::from_secs(2)) {
+            Ok(Ok(addresses)) => Ok(addresses),
+            _ => Err(ResolveFailed),
+        }
+    }
+}
+
+/// Select the KMS (D-23-8-04 A, D-23-8-07 A). `Ok(None)` only when no
+/// `MAOS_KMS_*` variable is set (the byte-identical Option-A plaintext
+/// default). An invalid configuration is a refusal, never a silent downgrade:
+/// this is the Story 23-8 fix for the serve path that used to boot with an
+/// unusable local key and write plaintext Collective rows. An endpoint that is
+/// merely unreachable is not a refusal; its health recovers by probe.
+///
+/// The endpoint is operator configuration, never a value read from a peer. The
+/// outbound policy vets it here, once; for a host NAME that does not bind the
+/// connection to the vetted addresses (RELEASE-HOLDS 23-0.a), so this makes no
+/// SSRF claim for names.
+///
+/// # Errors
+/// The [`KmsBootRefusal`] of the first check that fails.
+pub fn configure_kms(
+    env: &KmsEnv<'_>,
+    resolver: &dyn ResolveHost,
+) -> Result<Option<ConfiguredKms>, KmsBootRefusal> {
+    match (env.endpoint, env.master_key) {
+        (Some(_), Some(_)) => Err(KmsBootRefusal::Conflict),
+        (Some(endpoint), None) => external_kms(endpoint, env.allow_private, resolver).map(Some),
+        (None, Some(key)) => local_kms(key).map(Some),
+        (None, None) if env.any_kms_variable => Err(KmsBootRefusal::Incomplete),
+        (None, None) => Ok(None),
+    }
+}
+
+/// [`configure_kms`] over the process environment.
+///
+/// # Errors
+/// As [`configure_kms`].
+pub fn configure_kms_from_env() -> Result<Option<ConfiguredKms>, KmsBootRefusal> {
+    let var = |name: &str| std::env::var_os(name).map(|value| value.to_string_lossy().into_owned());
+    let endpoint = var("MAOS_KMS_ENDPOINT");
+    let master_key = var("MAOS_KMS_MASTER_KEY");
+    let allow_private = var("MAOS_KMS_ALLOW_PRIVATE")
+        .is_some_and(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true"));
+    configure_kms(
+        &KmsEnv {
+            endpoint: endpoint.as_deref(),
+            master_key: master_key.as_deref(),
+            allow_private,
+            any_kms_variable: any_env_with_prefix("MAOS_KMS_"),
+        },
+        &SystemResolver,
+    )
+}
+
+fn local_kms(raw: &str) -> Result<ConfiguredKms, KmsBootRefusal> {
+    let bytes = hex::decode(raw.trim()).map_err(|_| KmsBootRefusal::MasterKeyInvalid)?;
+    let kms =
+        LocalMasterKeyKms::from_master_key(&bytes).map_err(|_| KmsBootRefusal::MasterKeyInvalid)?;
+    if !kms.is_healthy() {
+        return Err(KmsBootRefusal::MasterKeyInvalid);
+    }
+    Ok(ConfiguredKms {
+        port: Arc::new(kms),
+        probe: None,
+        #[cfg(feature = "online-adapters")]
+        http: None,
+    })
+}
+
+#[cfg(feature = "online-adapters")]
+fn external_kms(
+    endpoint: &str,
+    allow_private: bool,
+    resolver: &dyn ResolveHost,
+) -> Result<ConfiguredKms, KmsBootRefusal> {
+    use maos_secrets::http_kms::{HttpKms, MonotonicClock, TimedHttp};
+
+    // `http` only to a literal loopback address; any other host needs `https`.
+    // Private ranges need the operator's explicit `MAOS_KMS_ALLOW_PRIVATE`.
+    let mut policy = OutboundPolicy::strict().allow_loopback_http();
+    if allow_private {
+        policy = policy.allow_private();
+    }
+    let vetted = policy
+        .vet_url(endpoint.trim(), resolver)
+        .map_err(|refusal| KmsBootRefusal::EndpointRefused(refusal.code()))?;
+    let kms = HttpKms::pending_bearer(
+        Arc::new(TimedHttp::default()),
+        vetted.as_str(),
+        Arc::new(MonotonicClock::new()),
+    )
+    .map_err(|error| match error {
+        KmsError::MalformedKey(detail) => KmsBootRefusal::EndpointRefused(detail),
+        _ => KmsBootRefusal::EndpointRefused("endpoint unusable"),
+    })?;
+    let kms = Arc::new(kms);
+    let probe_target = Arc::clone(&kms);
+    Ok(ConfiguredKms {
+        port: Arc::clone(&kms) as Arc<dyn KeyManagementPort>,
+        probe: Some(Arc::new(move || probe_target.probe())),
+        http: Some(kms),
+    })
+}
+
+#[cfg(not(feature = "online-adapters"))]
+fn external_kms(
+    _endpoint: &str,
+    _allow_private: bool,
+    _resolver: &dyn ResolveHost,
+) -> Result<ConfiguredKms, KmsBootRefusal> {
+    Err(KmsBootRefusal::UnsupportedBuild)
+}
+
+/// Run `probe` on a blocking thread every `interval` until `cancel` fires
+/// (Story 23-8 AC5). The boot path has already probed once, so the first tick
+/// is skipped. A change of answer is logged; nothing else is.
+pub fn spawn_kms_probe(
+    probe: KmsProbeFn,
+    interval: Duration,
+    cancel: CancellationToken,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(interval);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        ticker.tick().await;
+        let mut last: Option<bool> = None;
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => break,
+                _ = ticker.tick() => {
+                    let probe = Arc::clone(&probe);
+                    let reachable = tokio::task::spawn_blocking(move || probe())
+                        .await
+                        .unwrap_or(false);
+                    if last != Some(reachable) {
+                        last = Some(reachable);
+                        eprintln!(
+                            "maos: external KMS endpoint is now {}",
+                            if reachable {
+                                "reachable; sealed writes resume"
+                            } else {
+                                "UNREACHABLE; sealed writes are refused until a probe succeeds"
+                            }
+                        );
+                    }
+                }
+            }
+        }
+    })
 }
 
 /// Build the static-JWKS OIDC verifier from `MAOS_SSO_JWKS` /
@@ -741,6 +1089,7 @@ mod available_arm_tests {
             audit_db_path,
             siem_sink_path,
             boot_nonce: 7,
+            kms_probe: None,
         }
     }
 

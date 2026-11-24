@@ -559,6 +559,21 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_KMS_ENDPOINT",
+        purpose: "Base URL of an operator-run maos.kms.v1 sidecar that wraps and unwraps at-rest data keys; https, or http only to a literal loopback address; setting it together with MAOS_KMS_MASTER_KEY refuses the boot; absent keeps byte-identical Option-A plaintext; needs the online-adapters build (Story 23-8)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_KMS_BEARER",
+        purpose: "Optional bearer token sent to MAOS_KMS_ENDPOINT on wrap and unwrap; read through the credential store (the environment under MAOS_SECRETS_BACKEND=encrypted-file); never logged (Story 23-8)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_KMS_ALLOW_PRIVATE",
+        purpose: "1 or true admits an RFC 1918 / fc00::/7 address for MAOS_KMS_ENDPOINT; link-local, reserved and name-resolved loopback stay refused (Story 23-8)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_SSO_JWKS",
         purpose: "Static JWKS document for the OIDC assertion verifier (Story 11.4c)",
         stability: EnvStability::UserFacing,
@@ -675,7 +690,7 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     },
     EnvVar {
         name: "MAOS_SECRETS_BACKEND",
-        purpose: "Credential source selected at the composition root: keyring (default, with bounded env fallback), env (CI), or encrypted-file (requires MAOS_KMS_MASTER_KEY) (Story 16-4)",
+        purpose: "Credential source selected at the composition root: keyring (default, with bounded env fallback), env (CI), or encrypted-file (requires a configured KMS: MAOS_KMS_MASTER_KEY or MAOS_KMS_ENDPOINT; the KMS bearer is then read from the environment) (Story 16-4, Story 23-8)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {

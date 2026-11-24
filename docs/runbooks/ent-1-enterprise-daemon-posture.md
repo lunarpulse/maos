@@ -19,7 +19,7 @@ flowchart LR
   C --> D["Enterprise PDP<br/>MAOS_PDP_POLICY*"]
   D --> E["kernel mint<br/>Scope::LoomRead"]
   E --> F["identity.asserted<br/>kind-30 TL row"]
-  F --> G["at-rest seal<br/>MAOS_KMS_MASTER_KEY"]
+  F --> G["at-rest seal<br/>MAOS_KMS_MASTER_KEY or MAOS_KMS_ENDPOINT"]
   G --> H["SIEM forward<br/>MAOS_SIEM_FILE"]
   H --> I["request admitted<br/>reply obligation minted"]
 ```
@@ -61,9 +61,19 @@ The daemon evaluates one issuance per collective operation with the authenticate
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `MAOS_KMS_MASTER_KEY` | yes | hex-encoded 32-byte org master key |
+| `MAOS_KMS_MASTER_KEY` | yes, unless `MAOS_KMS_ENDPOINT` | hex-encoded 32-byte org master key (dev/CI custody; absent, malformed or all-zero refuses the boot) |
 
-The daemon takes its sealer from the *same* hook the collective store uses. Unset ⇒ the governed record is byte-identical plaintext (the v1.5 default). Set-but-unhealthy ⇒ the read is refused; a sealed posture never degrades to plaintext.
+The daemon takes its sealer from the *same* hook the collective store uses. Unset ⇒ the governed record is byte-identical plaintext (the v1.5 default). Set-but-unhealthy ⇒ the read is refused; a sealed posture never degrades to plaintext. An invalid KMS configuration refuses the boot (exit 78). An external endpoint that is down at boot does not refuse the boot: sealed writes are refused until a probe succeeds. Sealed Collective rows are write-only until a reader exists (`RELEASE-HOLDS.md` row 23-8.a).
+
+Instead of the local key, an operator who runs a KMS or HSM sets `MAOS_KMS_ENDPOINT` to a `maos.kms.v1` sidecar (wire: `docs/reference/kms-wire-v1.md`; reference sidecar for OpenBao Transit: `examples/kms-sidecar-openbao/`, not a release artifact, not security-reviewed):
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `MAOS_KMS_ENDPOINT` | instead of `MAOS_KMS_MASTER_KEY` | base URL of the sidecar: `https`, or `http` only to a literal loopback address. Setting both variables refuses the boot. Needs the default (`online-adapters`) build |
+| `MAOS_KMS_BEARER` | no | bearer sent on wrap and unwrap to that endpoint; read through the credential store (the environment under `MAOS_SECRETS_BACKEND=encrypted-file`); never logged |
+| `MAOS_KMS_ALLOW_PRIVATE` | no | `1` admits an RFC 1918 / fc00::/7 endpoint address |
+
+The endpoint is vetted once at boot. A host **name** is not SSRF-protected (the connection is not bound to the vetted addresses, `RELEASE-HOLDS.md` row 23-8.c): prefer a literal address.
 
 ### SIEM — exported
 
@@ -169,7 +179,8 @@ maosctl audit query --intent-contains cohort:digest-read-governed
 | Every collective read NACKs with `kernel capability mediation failed` | control Spirit does not declare `[capabilities.required.loom] read = true` | add the grant, re-admit |
 | Every collective read NACKs with `enterprise SSO is configured but MAOS_SSO_ASSERTION is absent` | SSO group set without an assertion | supply `MAOS_SSO_ASSERTION` |
 | Every collective read NACKs with `enterprise PDP denied capability issuance for loom.read` | a Cedar `forbid` fires for the control-Spirit subject | fix the policy, or accept the deny |
-| Every collective read NACKs with `at-rest seal refused` | `MAOS_KMS_MASTER_KEY` set but the KMS is unhealthy | repair the KMS; the daemon will not write plaintext under a sealed posture |
+| Every collective read NACKs with `at-rest seal refused` | the KMS is unhealthy: with `MAOS_KMS_ENDPOINT`, the sidecar or its KMS is down, answered 5xx or something other than `maos.kms.v1`, or no probe succeeded in the last 30 s; with `MAOS_KMS_MASTER_KEY`, the key is unusable | repair the KMS or the sidecar; sealing resumes at the next successful probe (every 10 s). The daemon will not write plaintext under a sealed posture |
+| Boot exits 78 with `kms_config_conflict`, `kms_config_incomplete`, `kms_master_key_invalid`, `kms_endpoint_refused` or `kms_endpoint_unsupported_build` | `MAOS_KMS_ENDPOINT` and `MAOS_KMS_MASTER_KEY` both set; a `MAOS_KMS_*` variable with neither; a master key that is not 64 hex characters or is all zero; an endpoint that is `http` to a non-loopback host, a private/link-local address without `MAOS_KMS_ALLOW_PRIVATE`, or carries userinfo/query/fragment; the endpoint in a build without `online-adapters` | fix the variables named in the message (no value is printed); an endpoint that is merely unreachable is not a boot refusal |
 | `SIEM export ... failed — records buffered` | snapshot, projection, or sink I/O failed | repair the local sink or inspect filesystem/SQLite health; reads keep flowing and records remain buffered |
 
 ---

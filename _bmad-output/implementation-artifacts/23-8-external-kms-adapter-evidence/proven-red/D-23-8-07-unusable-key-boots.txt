@@ -1,0 +1,13 @@
+plant (E238-PLANT): crates/maos-bin/src/enterprise_identity.rs configure_kms: `(None, Some(key)) => local_kms(key).map(Some).or(Ok(None))`
+(an unusable MAOS_KMS_MASTER_KEY no longer refuses the boot: the Host boots again with a half-configured KMS, the old behaviour)
+command: cargo test --locked -p maos-bin --test external_kms_wiring_23_8
+(applied with the AC1d health plant and the AC3 loopback plant, disjoint tests)
+
+test an_unusable_master_key_is_a_refusal_not_a_silent_downgrade ... FAILED
+thread 'an_unusable_master_key_is_a_refusal_not_a_silent_downgrade' panicked at crates/maos-bin/tests/external_kms_wiring_23_8.rs:82:61:
+called `Result::unwrap_err()` on an `Ok` value: None
+test a_malformed_master_key_refuses_the_boot_instead_of_booting_plaintext ... FAILED
+thread 'a_malformed_master_key_refuses_the_boot_instead_of_booting_plaintext' panicked at crates/maos-bin/tests/external_kms_wiring_23_8.rs:410:5:
+assertion `left == right` failed: maos: crypto provider = ring 0.17.14        (the booted Host did not exit 78; stderr is the normal boot log)
+
+The plant was reverted (enterprise_identity.rs restored).

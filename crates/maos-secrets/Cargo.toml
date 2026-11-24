@@ -13,6 +13,10 @@ getrandom = "0.3"
 ring = "0.17"
 sha2 = "0.10"
 tempfile = { version = "3.8", optional = true }
+# Story 23-8 (D-23-8-06 A, D-23-8-09 A) — the external KMS adapter and its timed transport. Enabled only by maos-bin's `online-adapters`.
+ureq = { version = "2", default-features = false, features = ["tls"], optional = true }
+serde_json = { version = "1.0", optional = true }
+base64 = { version = "0.22", optional = true }
 
 [dev-dependencies]
 tempfile = "3.8"
@@ -22,6 +26,7 @@ maos-kernel-core = { path = "../maos-kernel-core" }
 default = ["keyring"]
 keyring = ["dep:keyring"]
 encrypted-file = ["dep:tempfile"]
+http-kms = ["dep:ureq", "dep:serde_json", "dep:base64", "encrypted-file"]  # the external KMS's production reader is the encrypted-file store (D-23-8-05 A)
 kms-fault-inject = []
 
 [target.'cfg(target_os = "linux")'.dependencies]

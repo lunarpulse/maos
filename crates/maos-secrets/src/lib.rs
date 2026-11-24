@@ -1,13 +1,19 @@
 #![forbid(unsafe_code)]
 
-//! `maos-secrets` — secret-provider adapters (NFR-Sec-16) and the Story 11.4c
-//! reference local-master-key KMS for opt-in at-rest AEAD.
+//! `maos-secrets` — secret-provider adapters (NFR-Sec-16), the Story 11.4c
+//! reference local-master-key KMS for opt-in at-rest AEAD, and (feature
+//! `http-kms`, Story 23-8) `http_kms::HttpKms`, the adapter for an external
+//! KMS or HSM that the operator runs behind a `maos.kms.v1` sidecar.
 //!
-//! The local master-key adapter is **dev/CI-only**. Production KMS/keyring/cloud
-//! adapters are additive per `KeyManagementPort` and deferred by ADR-051.
+//! The local master-key adapter is **dev/CI-only**. Vendor KMS support is a
+//! sidecar the operator runs (ADR-051, Story 23-8 amendment); the binary
+//! carries no vendor API. Keyring adapters are additive per `KeyManagementPort`.
 
 #[cfg(all(feature = "kms-fault-inject", not(debug_assertions)))]
 compile_error!("kms-fault-inject is dev/CI-only and MUST NOT ship in release builds");
+
+#[cfg(feature = "http-kms")]
+pub mod http_kms;
 
 use maos_domain::ports::{
     CryptoProvider, KeyManagementPort, KmsError, SecretDeleteStatus, SecretKey, SecretStore,

@@ -1,0 +1,14 @@
+plant (E238-PLANT): crates/maos-bin/src/enterprise_identity.rs EnterpriseRuntime::at_rest_seal_hook, Available arm: the old early return restored,
+    (Some(kms), Some(crypto)) => { if !kms.is_healthy() { return None; } Some(Arc::new(move |plaintext| ...)) }
+(None means loom-lite keeps the Option-A plaintext default and writes the row: the serve-path fail-open)
+command: cargo test --locked -p maos-bin --test external_kms_wiring_23_8
+result: exit 101; 14 passed, 2 failed
+
+test online::a_kms_down_at_boot_never_yields_a_plaintext_collective_row ... FAILED
+thread 'online::a_kms_down_at_boot_never_yields_a_plaintext_collective_row' panicked at crates/maos-bin/tests/external_kms_wiring_23_8.rs:266:9:
+a configured KMS always yields a hook; None would mean plaintext
+test online::with_the_endpoint_down_sealed_writes_are_refused_and_resume_when_it_returns ... FAILED
+thread 'online::with_the_endpoint_down_sealed_writes_are_refused_and_resume_when_it_returns' panicked at crates/maos-bin/tests/external_kms_wiring_23_8.rs:233:9:
+assertion failed: sealer.is_configured()
+
+The plant was reverted (enterprise_identity.rs restored to the pre-plant text).

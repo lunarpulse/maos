@@ -1,0 +1,18 @@
+plant (E238-PLANT): crates/maos-domain/src/outbound.rs vet_url: the plain-http refusal made `if false && !(self.allow_loopback_http && loopback_literal)`
+(the loopback check for http is dropped, so http to any host passes the scheme rule)
+command: cargo test --locked -p maos-bin --test external_kms_wiring_23_8
+(applied with the AC1d health plant and the D-23-8-07 bad-key plant, disjoint tests)
+
+test online::http_is_admitted_only_to_a_literal_loopback_host ... FAILED
+thread 'online::http_is_admitted_only_to_a_literal_loopback_host' panicked at crates/maos-bin/tests/external_kms_wiring_23_8.rs:148:13:
+assertion `left == right` failed: http://10.0.0.5:8200
+test boot_refuses_a_conflict_a_remote_http_endpoint_and_a_stray_variable ... FAILED
+thread 'boot_refuses_a_conflict_a_remote_http_endpoint_and_a_stray_variable' panicked at crates/maos-bin/tests/external_kms_wiring_23_8.rs:450:9:
+assertion failed: text.contains("outbound_http_refused")      (the booted Host did not refuse http://10.9.9.9:8200)
+
+The outbound.rs hash after revert is F8EF, equal to the hash before the plant.
+
+----------------------------------------------------------------------------------------------------------------------------
+Timeout half of AC3 ("removing the timeout makes the never-answering test hit its outer deadline"): see
+AC1a-wrap-returns-the-data-key.txt, plant 2: a_peer_that_never_answers_makes_wrap_unavailable FAILED,
+"wrap_data_key must return under the configured timeout: Timeout" (the 30 s outer deadline).

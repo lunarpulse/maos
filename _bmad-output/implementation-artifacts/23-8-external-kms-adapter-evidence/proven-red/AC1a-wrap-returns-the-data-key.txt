@@ -1,0 +1,29 @@
+plant (E238-PLANT), three plants applied together in crates/maos-secrets/src/http_kms.rs, disjoint tests:
+  1. HttpKms::wrap_data_key: after the endpoint answers, `return Ok(data_key.to_vec())` (wrap returns the data key unchanged)
+  2. TimedHttp::new: the agent is built with `.redirects(0).build()` only (no connect/read/write/overall timeouts)
+  3. HttpKms::call: a typed 422 also calls mark_down() (D-23-8-10 B: every failure flips health)
+command: cargo test --locked -p maos-secrets --features http-kms --test external_kms_23_8
+result: exit 101, 10 passed, 7 failed, finished in 30.00s (the 30 s is plant 2: the outer deadline)
+
+test a_typed_422_is_a_crypto_refusal_and_leaves_health_alone ... FAILED                 <- plant 3
+test a_malformed_answer_is_a_malformed_payload_and_flips_health ... FAILED              <- plant 1
+test requests_carry_the_version_and_a_32_byte_key_and_compare_by_key ... FAILED         <- plant 1
+test the_bearer_goes_only_on_wrap_and_unwrap_and_never_into_errors_or_debug ... FAILED  <- plant 1
+test seal_wraps_through_the_endpoint_once_and_open_unwraps_through_it ... FAILED        <- plant 1
+test an_encrypted_file_store_over_the_endpoint_round_trips_a_credential ... FAILED      <- plant 1
+test a_peer_that_never_answers_makes_wrap_unavailable ... FAILED                        <- plant 2
+
+thread 'a_typed_422_is_a_crypto_refusal_and_leaves_health_alone' panicked at crates/maos-secrets/tests/external_kms_23_8.rs:245:5:
+D-23-8-10 A: a 422 does not flip health
+thread 'a_peer_that_never_answers_makes_wrap_unavailable' panicked at crates/maos-secrets/tests/external_kms_23_8.rs:383:10:
+wrap_data_key must return under the configured timeout: Timeout      (outer 30 s deadline hit: the call never returned)
+
+AC1 (a) specifically, after adding the envelope-length assertion to seal_wraps_through_the_endpoint_once_and_open_unwraps_through_it
+(plant 1 only), command: cargo test --locked -p maos-secrets --features http-kms --test external_kms_23_8 seal_wraps
+  test seal_wraps_through_the_endpoint_once_and_open_unwraps_through_it ... FAILED
+  panicked at crates/maos-secrets/tests/external_kms_23_8.rs:81:5:
+  the wrapped data key must not be the 32-byte data key itself (len 32)
+  (before that assertion existed, plant 1 failed the same test one step later, at open_at_rest: Crypto("unwrap_failed"),
+   because the sealed bytes were still real ciphertext of the row: "sealed != plaintext" alone cannot see this plant)
+
+All three plants were reverted; the file hash after revert equals the hash before (AEA4).
