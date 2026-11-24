@@ -160,6 +160,20 @@
 | 22-6.d | **Purge.** `maos purge` removes the segment directory that it resolves at run time. It does not remove segments in a directory configured earlier and since changed, or segments moved elsewhere. | That `maos purge` removes every segment a Host ever wrote. | None; the same shape as the OQ-10 ruling on pre-16-4 CRL files. |
 | 22-6.e | **Backup and migration.** `maosctl backup` and `maosctl migrate sqlite-to-postgres` cover the live log only; sealed segments are neither backed up nor migrated by them. `backup verify` compares live roots and fails if a rotation ran between backup and verify. | That a backup or a Postgres migration carries the sealed part of the audit store. | None scheduled; copy the segment directory with the log. |
 
+## Claim boundaries — Spirit authoring kit (Story 22-7; in force from the minor release that ships it)
+
+> Source: `22-7-domain-spirit-kit` (AC5; operator ruling `authors`, 2026-11-12; D-21-PF-04 A; D-22-7-09 A). Not
+> part of the `v1.0.0` GA ledger above; the release number is the one the epic's open numbering D-row assigns
+> to the release that ships 22-7. A boundary is violated by over-claiming, not by shipping.
+
+| # | Boundary | What the release may NOT claim | Successor |
+|---|---|---|---|
+| K1 | **k of 3 agent runs succeeded with the kit.** The three runs (`docs/agent-runs/22-7/`) are agent-authored (`author_kind = "agent"`), were run against the final kit commit in a clean container, and were not repeated by humans. `k` is the number of records whose `outcome` is `succeeded`; `agent_runs_22_7` holds this row to the records. **Status: the three runs are an operator-lane step and have not been recorded yet (`docs/agent-runs/22-7/README.md` says `status=pending`); until they are, the release states no `k`.** | That a human author, or any particular agent, can write a Spirit from the kit, or that more than `k` of 3 runs succeeded. | Not scheduled. |
+| K2 | NFR-Onb-1 and NFR-Test-8 are **not measured for human authors**; `check-third-party-trial` no longer has a human-author denominator (no N = 12, no ≥ 10 successes, no strata, no Wilson interval), so a green `check-third-party-trial` does not claim the N = 12 cohort. | That a stratified N = 12 third-party trial was run, passed, or is implied by a green gate. | `v2.5` external N = 12 (Epic 14), as `tests/coverage-matrix.yaml` NFR-Test-8 records. |
+| K3 | The worked example (`examples/incident-triage-ts`) is deterministic: a component has no inference import, so a domain Spirit answers from code in its own source, never from a model. | That a component Spirit can call a model, the network or a file. | Not scheduled (a component inference import is a WIT change). |
+| K4 | A capped component needs a delegated cgroup v2: the kit launches `maos serve` under `systemd-run --user --scope -p Delegate=yes`. The packaged `packaging/systemd/maos.service` does not delegate, so a capped component in that unit's cast is refused at launch `[INFERENCE: not run]`. | That the packaged service runs a Spirit that declares `cpu_max_pct` or `pids_max` without a unit change. | A unit change in the packaging lane (reported against story 22-2; not fixed by 22-7). |
+| K5 | `maos-spirit validate` mirrors the boot gate's manifest checks (`maos_registry::validate`, over the same `maos_manifest` parsers) and runs the install gate itself; it is held to the boot gate by a parity test (`validate_parity_22_7`). It cannot check what needs a running Host: the provider catalog pins, the model-provenance policy, yank status, and the runner's own compile of the component at launch. | That a package `validate` accepts will launch on every Host. | Not scheduled. |
+
 ## GA-tag procedure (engineering exits green; Holds 1–2 no longer gate)
 
 > **OPERATOR RULING 2026-11-12:** Holds 1–2 are claim boundaries, not GA

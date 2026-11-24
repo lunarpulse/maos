@@ -1,0 +1,5 @@
+# Operator policy for a disposable author home: copy to $XDG_CONFIG_HOME/maos/operator.toml.
+# `development_http` lets the client talk to a loopback development registry over plain HTTP
+# (`maos-registry-server --dev-http --bind 127.0.0.1:6789`). Never use it for a real registry.
+[registry]
+development_http = true

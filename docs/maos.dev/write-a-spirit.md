@@ -45,6 +45,25 @@ smoke test passes, and it behaves correctly against the Butler-class regression
 scenarios (the NFR-Onb-1 corpus). The 30-Minute First Spirit Validation Gate
 scores exactly this.
 
+## 5. Write a domain Spirit with the kit
+
+A **domain Spirit** is a TypeScript WebAssembly component that answers one kind of request from code in its own
+source (a component has no inference import, so it is deterministic). The authoring kit takes a coding agent, or
+you, from nothing to a signed, installed Spirit that answers `maosctl ask`, using only the release binaries,
+Node and `cargo-generate`:
+
+- [`kit/spirit-author/AGENTS.md`](../../kit/spirit-author/AGENTS.md): the whole path as one instruction file
+  (scaffold from `templates/spirit-ts`, build, `maos-spirit validate`, publish to a loopback dev registry,
+  `maosctl spirit install`, `maos serve` with `[[host.spirits]] installed = "<name>"` under a delegated cgroup,
+  `maosctl ask <name> "<text>" --wait`).
+- [`kit/spirit-author/skills/maos-spirit-author/SKILL.md`](../../kit/spirit-author/skills/maos-spirit-author/SKILL.md):
+  the same steps as an Agent Skill.
+- [`examples/incident-triage-ts`](../../examples/incident-triage-ts/): a worked domain Spirit.
+
+Only `templates/spirit-ts` works for this path: `templates/spirit-rust` builds an in-process first-party Spirit
+that a registry refuses and `maosctl ask` cannot reach. The kit's evidence is agent runs, not a human trial; see
+`RELEASE-HOLDS.md`, "Claim boundaries — Spirit authoring kit".
+
 ---
 
 > **Status (v0.3):** functional path; WCAG-AA polish + canonical publication are
