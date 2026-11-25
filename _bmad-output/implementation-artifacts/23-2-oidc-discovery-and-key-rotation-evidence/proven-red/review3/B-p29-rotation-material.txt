@@ -1,0 +1,15 @@
+Review round 3 / Lane B - P1-9 (AC1 rotation proven with DIFFERENT signing material)
+Marker: E232-PLANT-r3-p29
+Plant: crates/maos-sso/src/discovery.rs, refresher publish (`Ok((keys, completed)) =>`): for every newly
+published key, overwrite the Jwk with a clone of a boot-set key but keep the new `kid`
+("refresh the identifiers, keep the boot key material").
+Command: cargo test -p maos-sso --features discovery --test oidc_discovery_23_2
+Result: 2 failed, 37 passed.
+- an_unknown_kid_refreshes_once_and_then_verifies:
+  oidc_discovery_23_2.rs:300  `.expect("the rotated-in key verifies without a restart")` on verify(TOKEN_KEY_C_NEW)
+  (new kid `key-c` now carries keyA's material, so keyC's signature is refused)
+- a_replacement_key_under_the_same_kid_replaces_the_material:
+  oidc_discovery_23_2.rs:343  assert!(verifier.verify(TOKEN_KEY_C_AS_KEY_A).is_ok(), "the replacement material verifies")
+Before this round the rotation test reused keyA's material under both kids, so this plant passed it.
+The fixtures are keyC (RSA-2048, public half in KEY_C_N; private key discarded) and two assertions it signed.
+Plant removed afterwards.

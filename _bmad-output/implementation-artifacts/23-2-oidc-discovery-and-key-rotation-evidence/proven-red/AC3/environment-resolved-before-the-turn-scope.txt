@@ -1,0 +1,11 @@
+Plant E232-PLANT-env-first: crates/maos-bin/src/assertion_supply.rs `supply` read `MAOS_SSO_ASSERTION` before the pid's turn scope.
+Command: cargo test --locked -p maos-bin --test directed_task_22_4 -- an_ask_with an_ask_without an_invalid an_asks a_replay
+Failing lines (2 failed, 3 passed):
+
+test an_ask_with_its_own_assertion_mints_under_that_principal ... FAILED
+  panicked at crates/maos-bin/tests/directed_task_22_4.rs:779:9: left: "env-principal@maos.example", right: "alice@maos.example"
+test a_replay_with_a_different_assertion_returns_the_first_task ... FAILED
+  panicked at crates/maos-bin/tests/directed_task_22_4.rs:904:9: left: "env-principal@maos.example", right: "alice@maos.example"
+test result: FAILED. 3 passed; 2 failed
+
+The in-process `assertion_scope_23_2` tests do not set `MAOS_SSO_ASSERTION` (no unsafe env mutation), so this plant is witnessed by the daemon tests only.

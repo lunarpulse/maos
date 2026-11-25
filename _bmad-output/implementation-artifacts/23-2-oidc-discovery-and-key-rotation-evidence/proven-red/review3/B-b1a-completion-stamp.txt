@@ -1,0 +1,13 @@
+Review round 3 / Lane B - B1a made deterministic (an answer completed after the fetch bound is refused)
+Marker: E232-PLANT-r3-b1a
+Plant: crates/maos-sso/src/discovery.rs, run_fetch's `settle` closure:
+    `if completed.saturating_sub(started) >= bound {`  became  `if false && ... {  // E232-PLANT-r3-b1a`
+(the completion stamp is not checked when the answer is consumed).
+Command: cargo test -p maos-sso --features discovery --test oidc_discovery_23_2 an_answer_that_completed
+Result: failed 5 runs out of 5:
+  oidc_discovery_23_2.rs:1711  assert_eq!(verdict, Err(JwksUnavailable))  left: Ok(AuthenticatedPrincipal{..})
+Why it is now deterministic: the injected clock (LateClock) reads 0 on every thread except the fetch worker, and on the
+worker only once the key set was served. The watchdog therefore never sees the bound pass and cannot abandon the round
+between a clock advance and the reply (the old Advancing fetcher moved a shared clock inside the document GET, so the
+watchdog could win and the plant could pass). Only the worker's completion stamp can make the answer overdue.
+Plant removed afterwards.

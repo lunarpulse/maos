@@ -1,0 +1,19 @@
+F13 (lane Fix232Scope): `SsoEnv::from_process` read the seven MAOS_SSO_* variables with `std::env::var(..).ok()`, so a PRESENT variable holding non-UTF-8 bytes was read as ABSENT (SSO silently off, or a tuning knob/discovery issuer silently dropped). Now `SsoEnv::from_lookup` (from_process = from_lookup(var_os)) records the first such variable in `SsoEnv.invalid` (its NAME only); `any()` counts it as configured; `build_sso_identity` refuses first with `SsoDownReason::EnvNotUnicode(name)` = "sso_env_not_unicode: <NAME>" (configured-down, issuance denied; the value is never in the reason).
+Test: enterprise_identity_wiring `a_non_utf8_sso_variable_is_configured_down_never_absent` (each of the seven names, both beside a valid static configuration and entirely alone: configured, down with the typed reason, issuance denied with that code, nothing of the value in Debug/reason, discovery never built; the valid configuration is unharmed).
+Plant E232-PLANT-F13 (`Err(_) => None` in the lookup closure) -> that test FAILED; removed.
+Same defect class elsewhere in the touched file: `configure_kms_from_env` reads MAOS_KMS_* with `to_string_lossy`; a non-UTF-8 master key/endpoint becomes U+FFFD text and fails closed (hex decode -> MasterKeyInvalid; the endpoint policy refuses), and a non-UTF-8 MAOS_KMS_ALLOW_PRIVATE reads as false (stricter). MAOS_SIEM_FILE uses `env::var`: Err(NotUnicode) -> `with_siem_down()`. All three fail closed already; not changed (limit: their refusal text does not say "not UTF-8").
+
+F14 (lane Fix232Scope): crates/maos-control/src/lib.rs "ask": a SUPPLIED assertion (anything except absent or null) that is empty, whitespace-only, oversize, outside the compact-JWT alphabet or not a string is now 400 `sso_assertion_invalid` with fixed non-echoing text (`malformed_assertion()`), not `bad_request`. Same code a failed verification returns (operator_door.rs).
+Test: ask_route_22_4 `a_malformed_assertion_is_refused_without_echo` (11 shapes incl. 16385 bytes, `7`, `true`, `[]`, `{}`; absent/null still accepted).
+Plant E232-PLANT-F14 (code back to "bad_request") -> FAILED; removed.
+Limit: this route-level refusal never reaches the port, so it writes no `operator.ask.%:sso_assertion_invalid` receipt row (a verification failure does). `maosctl` itself validates the alphabet client-side (exit 2) before it sends.
+
+F16a (lane Fix232Scope): plants for the unplanted reader and the Debug redaction; canary search widened.
+Plants (each red, removed): 
+ - E232-PLANT-F16a-alphabet (`if false && !compact_jwt`) -> maos-cli `read_assertion_file_refuses_bad_files_without_echo` FAILED.
+ - E232-PLANT-F16a-echo (error text appends the file content) -> same test FAILED ("... nothing else: canary one two").
+ - E232-PLANT-F16a-cap (both size checks off) -> same test FAILED (the 16 KiB+1 file is accepted).
+ - E232-PLANT-F16a-carried (`CarriedAssertion` Debug prints the token) -> maos-cli `ask_assertion_file_is_read_into_the_body_and_never_into_argv_or_debug` FAILED.
+ - E232-PLANT-F16a-debug (`maos_control::Assertion` Debug prints the token) -> `ask_route_22_4::ask_carries_an_assertion_that_debug_never_prints` and `assertion_scope_23_2::the_assertion_appears_in_no_record_row_or_debug` FAILED.
+ - E232-PLANT-F16a-files (accept writes the token to $HOME/e232-leak) -> daemon `an_asks_assertion_appears_in_no_row_reply_or_error` FAILED ("a file under the Host's tree carries the assertion: .../home/e232-leak"), which the old column search could not see.
+Canary search: `rows_containing` now compares EVERY column of EVERY table of the audit store as bytes (`CAST(col AS BLOB)`, schema read from sqlite_master/PRAGMA table_info), and the new `files_containing` scans the raw bytes of every file under the Host's scratch tree (audit store and WAL, journals, stderr log, home), leaving out only the test's own `*.jwt` files. The needles are the whole token, its claims segment and its signature segment.

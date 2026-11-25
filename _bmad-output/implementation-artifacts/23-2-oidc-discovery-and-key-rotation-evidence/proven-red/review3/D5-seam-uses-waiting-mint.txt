@@ -1,0 +1,10 @@
+Review round 3, Lane D — plant D5 (marker E232-PLANT-r3-D5), removed after the run.
+Env: CARGO_TARGET_DIR=/mnt/build/cargo-maos-e232D
+
+Plant: crates/maos-bin/src/main.rs `EnterpriseDaemonGovernance::govern_collective_read`:
+  issue_enterprise_governed_capability_no_wait(  ->  issue_enterprise_governed_capability(   // the waiting mint inside the cohort guard
+
+cargo test -p maos-bin --test enterprise_daemon_seam_13_5a
+  FAILED. 0 passed; 1 failed
+  enterprise_daemon_seam_13_5a.rs:120:9  "the daemon governance seam must run `issue_enterprise_governed_capability_no_wait(`"
+(The test also carries a negative assertion, lines 127-130, that the seam text never contains `issue_enterprise_governed_capability(`.)

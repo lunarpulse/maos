@@ -1,0 +1,23 @@
+Review round 4, Lane Q (Rev232G4 P1-4) — plants Q1, Q2, Q3 (markers E232-PLANT-r4-Q1..Q3), one at a time, each removed after its run.
+Env: env -u CI -u GITHUB_ACTIONS ... CARGO_TARGET_DIR=/mnt/build/cargo-maos-e232q (CI=unset checked inside the command)
+Test: crates/maos-bin/tests/governed_digest_read_23_2.rs::a_reissue_concurrent_with_an_admission_leaves_no_grant_or_obligation
+(contended: the admission is held in its commit hook until the reissue's `MemberReissueAccepted{version:2}` audit append, under `cached`, has been
+reported by the `CheckpointSink`; the reissue must be unfinished then; only then is the admission released.)
+Control: ::a_reissue_after_an_admission_leaves_no_grant_or_obligation (serial; same final-state assertions via `assert_purged`).
+
+Q1 — crates/maos-cohort/src/state.rs `apply_reissue`: the final `.clear()` of `pending_digest_replies` -> `.len()`.
+  cargo test -p maos-bin --test governed_digest_read_23_2 a_reissue   -> 2 failed (contended AND serial control)
+  contended: governed_digest_read_23_2.rs:683:5  assert!(idp.pending().is_empty(), "the purge removed the reply obligation with the grant")
+  (the contended run reached the checkpoint with the admission held: the failure is after the join, in the final-state check)
+
+Q2 — same function: the `.clear()` of `admitted_digest_reads` -> `.len()`.
+  -> 2 failed
+  contended: governed_digest_read_23_2.rs:691:14  `idp.admit(..).expect("capacity was freed")` ->
+    "cohort digest-read capacity exceeded: target has too many admitted digest reads"
+
+Q3 — the OLD proof's ordering planted into the new test: release the admission (flag + send) right after `entered_rx`, before the reissue thread is
+  spawned (and the later send made `let _ =` so the plant fails for the stated reason, not a SendError).
+  cargo test -p maos-bin --test governed_digest_read_23_2 a_reissue_concurrent   -> 1 failed
+  governed_digest_read_23_2.rs:761:5  assert!(!sink.released_at_checkpoint..., "the admission was already released when the reissue reached its checkpoint: not contended")
+
+Baseline with all plants removed: 8 passed (governed_digest_read_23_2).

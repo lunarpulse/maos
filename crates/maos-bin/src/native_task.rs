@@ -172,6 +172,12 @@ pub struct MiraRunner {
     route: Option<Arc<dyn mira::AdvisoryRoute>>,
     log: Arc<TransparencyLogAdapter>,
     pid_of: PidSource,
+    /// One Mira turn at a time (Story 23-2 F2c): the assertion scope is keyed by Mira's pid, so
+    /// two overlapping turns would either be refused or mix principals. A second caller waits.
+    serial: std::sync::Mutex<()>,
+    /// How many callers found the turn already taken and waited for it (Story 23-2 round 3, P1-11).
+    /// Counted at the lock itself, so a test can observe a second caller blocked behind the first.
+    contended: std::sync::atomic::AtomicUsize,
 }
 
 impl MiraRunner {
@@ -190,15 +196,46 @@ impl MiraRunner {
             route,
             log,
             pid_of,
+            serial: std::sync::Mutex::new(()),
+            contended: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 }
 
+impl MiraRunner {
+    /// Callers that found Mira's turn taken and waited for it so far (a diagnostic, read by the
+    /// overlap proof in `native_task_22_8.rs`).
+    pub fn contended_turns(&self) -> usize {
+        self.contended.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
 impl TaskRunner for MiraRunner {
-    fn run(&self, task_id: [u8; 16], text: &str) -> Result<String, RunFailure> {
+    fn run(
+        &self,
+        task_id: [u8; 16],
+        text: &str,
+        assertion: Option<&maos_control::Assertion>,
+    ) -> Result<String, RunFailure> {
+        let _serial = match self.serial.try_lock() {
+            Ok(guard) => guard,
+            Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
+            Err(std::sync::TryLockError::WouldBlock) => {
+                self.contended
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                self.serial
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner())
+            }
+        };
         let pid = (self.pid_of)().ok_or_else(|| RunFailure {
             reason: "dispatch_refused",
             detail: "Mira has no admitted pid".into(),
+        })?;
+        // The task's assertion governs the mints for Mira's pid for this turn (Story 23-2).
+        let _scope = crate::assertion_supply::enter(pid, assertion).map_err(|_| RunFailure {
+            reason: "dispatch_refused",
+            detail: "an assertion scope is already active for this Spirit".into(),
         })?;
         let answer = self
             .mira

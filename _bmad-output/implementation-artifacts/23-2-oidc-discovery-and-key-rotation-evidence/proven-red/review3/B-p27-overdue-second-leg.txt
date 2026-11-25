@@ -1,0 +1,13 @@
+Review round 3 / Lane B - P2-7 (an overdue round makes no key-set request)
+Marker: E232-PLANT-r3-p27
+Plant: crates/maos-sso/src/discovery.rs, run_fetch's begin closure: the second-leg deadline test
+    `} else if worker.clock.now_millis().saturating_sub(started) >= bound {`
+became `} else if false && ... {  // E232-PLANT-r3-p27` (begin(false) checks only shutdown/abandoned).
+Command: cargo test -p maos-sso --features discovery --test oidc_discovery_23_2
+Result: 1 failed, 38 passed.
+- an_overdue_round_does_not_start_the_key_set_request:
+  oidc_discovery_23_2.rs:1581  assert_eq!(script.count(JWKS_URL), 0, "an overdue round made the key-set request")
+  left: 1, right: 0
+Scenario (gated, no sleeps): fetch #1 abandoned (slot occupied), fetch #2 begins at 100 s, clock moved to 131 s while its
+document is held, document released; worker 2 must not GET the key set.
+Plant removed afterwards.

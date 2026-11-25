@@ -199,6 +199,7 @@ fn ask_parses_into_one_ask_command_keyed_on_the_spirit() {
             spirit_id: "probe".into(),
             text: "summarise the queue".into(),
             idempotency_key: Some("retry-1.a_b".into()),
+            assertion: None,
         }
     );
     // The per-Spirit serialization key, and an explicit (never inherited) route budget.
@@ -231,6 +232,7 @@ fn ask_without_a_key_carries_none_and_a_blank_text_reaches_the_handler_typed() {
             spirit_id: "probe".into(),
             text: "   ".into(),
             idempotency_key: None,
+            assertion: None,
         }]
     );
 }
@@ -258,6 +260,72 @@ fn a_malformed_ask_body_never_reaches_the_port() {
     );
     assert_eq!(status_of(&response), 400, "{response}");
     assert!(port.submitted.lock().unwrap().is_empty());
+}
+
+/// Story 23-2 (D-23-2-01 A): the optional `assertion` rides in the body, reaches the port as a
+/// redacting wrapper, and never appears in a `Debug` rendering of the command.
+#[test]
+fn ask_carries_an_assertion_that_debug_never_prints() {
+    const CANARY: &str = "canary-header.canary-claims.canary-signature";
+    let (server, port) = serve(accepted(), None);
+    let body = format!(r#"{{"text":"x","assertion":"{CANARY}"}}"#);
+    let response = request(&server, "POST", "/v1/spirits/probe/ask", Some(TOKEN), &body);
+    assert_eq!(status_of(&response), 200, "{response}");
+    let submitted = port.submitted.lock().unwrap();
+    assert_eq!(submitted.len(), 1);
+    let OperatorCommand::Ask { assertion, .. } = &submitted[0] else {
+        panic!("not an ask");
+    };
+    assert_eq!(
+        assertion.as_ref().map(maos_control::Assertion::expose),
+        Some(CANARY)
+    );
+    let rendered = format!("{:?} {:#?}", submitted[0], submitted[0]);
+    assert!(rendered.contains("<redacted>"), "{rendered}");
+    assert!(!rendered.contains("canary"), "{rendered}");
+}
+
+/// An assertion outside the compact-JWT alphabet, empty, oversize or not a string is a 400 that
+/// never reaches the port and never echoes the value.
+#[test]
+fn a_malformed_assertion_is_refused_without_echo() {
+    let (server, port) = serve(accepted(), None);
+    let oversize = "a".repeat(maos_control::Assertion::MAX_BYTES + 1);
+    for value in [
+        r#""has space""#.to_owned(),
+        r#""line\nbreak""#.to_owned(),
+        r#""caf\u00e9.x.y""#.to_owned(),
+        r#""bad/slash""#.to_owned(),
+        r#""""#.to_owned(),
+        r#""   ""#.to_owned(),
+        "7".to_owned(),
+        "true".to_owned(),
+        "[]".to_owned(),
+        r#"{"a":"b"}"#.to_owned(),
+        format!("\"{oversize}\""),
+    ] {
+        let body = format!(r#"{{"text":"x","assertion":{value}}}"#);
+        let response = request(&server, "POST", "/v1/spirits/probe/ask", Some(TOKEN), &body);
+        // Story 23-2 F14: the same typed refusal a failed verification is, never `bad_request`.
+        assert_eq!(status_of(&response), 400, "{response}");
+        assert_eq!(
+            json_of(&response)["error"],
+            "sso_assertion_invalid",
+            "{response}"
+        );
+        assert!(
+            !response.contains("has space")
+                && !response.contains("bad/slash")
+                && !response.contains("aaaaaaaa"),
+            "{response}"
+        );
+    }
+    assert!(port.submitted.lock().unwrap().is_empty());
+    // An absent or `null` assertion is no assertion: the ask is accepted.
+    for body in [r#"{"text":"x"}"#, r#"{"text":"x","assertion":null}"#] {
+        let response = request(&server, "POST", "/v1/spirits/probe/ask", Some(TOKEN), body);
+        assert_eq!(status_of(&response), 200, "{body}: {response}");
+    }
 }
 
 #[test]

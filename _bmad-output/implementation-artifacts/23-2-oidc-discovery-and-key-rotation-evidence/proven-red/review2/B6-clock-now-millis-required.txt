@@ -1,0 +1,7 @@
+B6 (marker E232-PLANT-r2-B6) — lane B
+Change: `Clock::now_millis` is the only (required) method; the default and `now_secs` are gone. Implementors migrated: MonotonicClock (discovery.rs) and the test ManualClock (oidc_discovery_23_2.rs). Grep over crates/, tests/, xtask/ found no other `maos_sso::discovery::Clock` implementor (maos-bin uses MonotonicClock only; the other `now_secs` clocks are CohortClock / QuotaClock, different traits).
+Plant: a test-file `impl Clock for SecsOnly { fn now_secs(..) }` (the old "seconds-only" implementor shape).
+Result (compile-time, the proof for a trait contract): `cargo test -p maos-sso --features discovery --test oidc_discovery_23_2 --no-run` ->
+  error[E0407]: method `now_secs` is not a member of trait `Clock` (oidc_discovery_23_2.rs:1717)
+  error[E0046]: not all trait items implemented, missing: `now_millis` (oidc_discovery_23_2.rs:1716)
+Plant removed.

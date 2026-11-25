@@ -1,0 +1,8 @@
+Lane P, P2-2: an RSA exponent with a leading zero byte (ring rejects it) is a MALFORMED replacement.
+Marker: E232-PLANT-r4-P10 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, rsa_material_usable: `&& exponent.first() != Some(&0)` -> `&& true`.
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Observed: 41 passed, 1 FAILED: a_malformed_replacement_key_set_keeps_the_populated_cache
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:1945:9: assertion `left == right` failed:
+  {"keys":[{... "kid":"key-b","n":"snStwHTA0...","e":"AAEAAQ"}]} (e = 00 01 00 01)  left: None, right: Some(JwksMalformed).
+(P9's record cites line 1942:9; the file had 3 more lines by P9's run, so its line is 1945:9.)

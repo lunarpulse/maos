@@ -1,0 +1,5 @@
+B4 (marker E232-PLANT-r2-B4) — lane B
+Plant: discovery.rs: the worker no longer publishes `last_attempt` (`if first && false`), the refresher stamps `state.last_attempt = Some(started)` before spawning (the round-1 behaviour).
+Test: `... --test oidc_discovery_23_2 the_refresh_interval` -> the_refresh_interval_starts_when_the_fetch_worker_starts (SkewClock: the worker thread reads 5 s later than the refresher).
+Failing assertion: oidc_discovery_23_2.rs:1567 `assert_eq!(script.count(DOC_URL), 1, "29.999 s after the worker began (at 5 s) is inside the interval")` left: 2.
+Plant removed.

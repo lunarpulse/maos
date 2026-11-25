@@ -1,0 +1,20 @@
+Review round 3, Lane D — plants D4 and D4b (markers E232-PLANT-r3-D4, E232-PLANT-r3-D4b), each removed after its run.
+Env: CARGO_TARGET_DIR=/mnt/build/cargo-maos-e232D
+Test: crates/maos-bin/tests/governed_digest_read_23_2.rs::a_reissue_concurrent_with_an_admission_leaves_no_grant_or_obligation
+(an admission holds the cohort guard; a signed v2 reissue is started meanwhile and waits for it; after both finish the
+purge must have removed the admission's reply obligation AND its grant — the grant's capacity is free again).
+
+D4 — crates/maos-cohort/src/state.rs `apply_reissue`: the final `.clear()` of `pending_digest_replies` -> `.len()`.
+  cargo test -p maos-bin --test governed_digest_read_23_2   FAILED. 6 passed; 1 failed
+  governed_digest_read_23_2.rs:692:5  assert!(idp.pending().is_empty(), "the purge removed the reply obligation with the grant")
+
+D4b — same function: the `.clear()` of `admitted_digest_reads` -> `.len()`.
+  cargo test -p maos-bin --test governed_digest_read_23_2   FAILED. 6 passed; 1 failed
+  governed_digest_read_23_2.rs:699:42  `idp.admit(..).expect("capacity was freed")` ->
+    "cohort digest-read capacity exceeded: target has too many admitted digest reads"
+
+Why (d) holds without a version stamp or an index: `admit` samples the manifest version under `cached`, which `apply_reissue`
+holds for its whole purge, so a request that samples the NEW version samples it after the purge finished; one that sampled the
+old version is stamped with it and `authorize_reply_send` refuses a grant whose stamp is not the live version. The one residual
+(an admission that sampled v1, then inserts after the purge) leaves a v1-stamped grant that is refused at send; this is the
+pre-existing behaviour of main (state.rs is byte-identical to main's again), not widened by 23-2.

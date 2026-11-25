@@ -130,6 +130,57 @@ speaks MCP 2026-07-28 first and falls back to the `initialize` handshake and
 `Mcp-Session-Id` of a 2025-11-25 server. `maos purge` removes the bearer entries
 with the provider keys.
 
+### Enterprise identity (SSO) key sources
+
+The SSO key source and its tuning are set with these variables (every variable and typed
+reason is in `docs/runbooks/ent-1-enterprise-daemon-posture.md` in the source tree):
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `MAOS_SSO_JWKS` | yes, unless `MAOS_SSO_DISCOVERY_ISSUER` | a static JWKS document: the air-gap key source |
+| `MAOS_SSO_DISCOVERY_ISSUER` | no (`online-adapters` build) | an https OIDC issuer whose rotating keys the Host follows instead of `MAOS_SSO_JWKS`; setting both leaves SSO configured-down |
+| `MAOS_SSO_JWKS_TTL_SECS` | no, default 3600 (1 to 604800) | how long a discovered key set is trusted; past it assertions fail closed |
+| `MAOS_SSO_JWKS_MIN_REFRESH_SECS` | no, default 30, at most the TTL | minimum time between two refreshes |
+| `MAOS_SSO_ISSUERS` | yes | trusted `iss` values; with discovery it must hold exactly the discovery issuer |
+| `MAOS_SSO_AUDIENCE` | yes | expected `aud` |
+| `MAOS_SSO_ALGS` | no, default `RS256,ES256` | allowed algorithms |
+| `MAOS_SSO_ASSERTION` | yes | the assertion the daemon presents at issuance; a task that carries its own (`maosctl ask --assertion-file`) overrides it for its turn |
+
+Setting both key sources leaves SSO configured-down, which denies issuance and never
+falls open. A key is revoked only by a successful refresh whose published set omits it:
+a fetch can obtain a set that contains the key, the issuer can then withdraw it, and that
+in-flight fetch still completes and renews the key's TTL. A withdrawn key therefore
+verifies until the first successful refresh that returns a set without it, and never past
+the TTL counted from the completion of the last successful fetch whose set contained it
+(at most 7 days at the maximum TTL, in monotonic time, plus any time the host is
+suspended). Half the TTL plus the idle tick is a scheduling target, not a completion
+bound: it needs a refresh to start and succeed and a minimum refresh of at most half the
+TTL, and when the minimum refresh equals the TTL the idle-only path can expire the keys
+(fail closed) before the next fetch completes. Anyone who can block the fetch (without
+breaking TLS) can keep a withdrawn key valid for the full TTL. A key set that is
+malformed (as opposed to validly empty) keeps the old keys. A fetch that does not answer
+within 30 s is abandoned; an issuer that never answers at all leaves discovery down until
+it does. A cohort digest read is verified inside the cohort lock without ever waiting for
+the identity provider, so the first digest request after an IdP key rotation can be refused
+(unless a refresh has already published the key).
+A retry usually recovers only after the refresh limiter has reopened (a new key id that
+arrives within the minimum refresh interval of the previous refresh is refused without
+scheduling a refresh) and a refresh has started and published, so repeated refusals are
+possible, and every retry is made by the caller; the daemon does not retry. The sequence
+can end sooner: if an already-running refresh publishes the new key before the limiter
+reopens, a retry can succeed while the limiter is still closed, and if the idle refresh
+published it before the first request, the first request can succeed. If the issuer reuses
+a key id with new key material, the refusal does not itself ask for a refresh: recovery is
+on the next successful publication, normally the half-TTL idle refresh (about half
+`MAOS_SSO_JWKS_TTL_SECS` plus the idle tick, a scheduling target gated by the limiter, not
+a completion bound). A token's key is rechecked just before it is minted; a key withdrawn
+by a publication after that check and before the token is stored (the duration of the
+mint, with no fixed bound) is not detected, which is small against the TTL-long
+revocation window above; this residual needs operator acceptance (item I, not yet ruled). A `MAOS_SSO_*`
+variable that is not valid UTF-8 leaves SSO configured-down
+(`sso_env_not_unicode: <NAME>`). The principal is asserted, not authenticated, at the
+door.
+
 ### Remove MAOS state
 
 `maos purge` is a dry run unless `--yes` is present. It names each MAOS-owned

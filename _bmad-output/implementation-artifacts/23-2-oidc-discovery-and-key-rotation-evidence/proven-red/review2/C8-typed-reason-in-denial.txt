@@ -1,0 +1,7 @@
+C8 (marker E232-PLANT-r2-C8) — lane C
+Change: `EnterpriseRuntime` keeps a `SsoDiagnostic` (a closure over `DiscoveringVerifier::last_error()`, built beside the verifier in `build_sso_wired`; `build_sso_identity` keeps its signature). While the verifier is unhealthy, `verify_principal_for_issuance` names the typed reason (`sso_discovery_*`, fixed codes: no URL, userinfo or body) in the denial text, which is what the callers log/return.
+Test: crates/maos-bin/src/enterprise_identity.rs `discovery_denial_tests::a_denial_while_discovery_is_down_names_the_typed_reason_and_no_url` (fetcher always fails, fixed clock; polls the denial until the refresher has recorded the failure, fails at a 30 s deadline; asserts the issuer host is never in the text).
+Plant: the denial ignores the diagnostic (`typed = None`).
+Failing assertion: enterprise_identity.rs:1791 `assert!(Instant::now() < until, "the typed reason never surfaced: MAOS_SSO_* configured but identity provider is unavailable")` (30 s run).
+Plant removed.
+Not covered: `reverify_principal_no_wait` (lane A's) answers the generic text; the typed reason appears on the first-verification path only.

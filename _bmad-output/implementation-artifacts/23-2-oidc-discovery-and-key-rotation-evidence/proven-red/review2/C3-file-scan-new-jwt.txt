@@ -1,0 +1,6 @@
+C3 (marker E232-PLANT-r2-C3) — lane C
+Change: `Host::files_containing(needle, input)` excludes ONLY the exact input fixture path (the assertion file the test wrote); a `.jwt` extension no longer exempts a file.
+Test: crates/maos-bin/tests/directed_task_22_4.rs `an_asks_assertion_appears_in_no_row_reply_or_error`.
+Plant (test side, before the scan): write the carried token to a NEW file `<scratch>/home/carried.jwt`.
+Failing assertion: directed_task_22_4.rs:1016 `assert!(host.files_containing(needle, &file).is_empty(), "a file under the Host's tree carries the assertion: [".../home/carried.jwt"]")`.
+Plant removed.

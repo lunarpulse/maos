@@ -1,0 +1,21 @@
+Review round 3, Lane D — plant D2 (marker E232-PLANT-r3-D2), removed after the run.
+Env: CARGO_TARGET_DIR=/mnt/build/cargo-maos-e232D
+
+Plant: crates/maos-sso/src/discovery.rs `Shared::cached_key`: the call
+  self.nudge_refresh_locked(&mut state, now);
+replaced by a no-op (a refusal for want of a key no longer nudges the refresher).
+
+Commands and results:
+- cargo test -p maos-sso --features discovery --test verify_without_refresh_23_2
+  FAILED. 3 passed; 2 failed (20.01s):
+    an_unknown_kid_is_refused_without_waiting_nudges_one_refresh_and_a_retry_succeeds
+      verify_without_refresh_23_2.rs:82:9  "no refresh was requested (1 document fetches)"
+    an_expired_key_set_refuses_without_waiting_and_recovers_after_the_refresh
+      verify_without_refresh_23_2.rs:82:9  "no refresh was requested (1 document fetches)"
+  (request_refresh_starts_one_refresh_and_does_not_wait stays green: it calls the nudge directly.)
+- cargo test -p maos-bin --test governed_digest_read_23_2
+  FAILED. 5 passed; 2 failed (40.40s):
+    an_unknown_kid_is_refused_without_waiting_and_a_retry_after_the_refresh_succeeds
+      governed_digest_read_23_2.rs:221:9  "no refresh was requested (1 document fetches)"
+    a_stale_key_set_refuses_under_the_guard_and_recovers_after_the_refresh
+      governed_digest_read_23_2.rs:221:9  "no refresh was requested (1 document fetches)"

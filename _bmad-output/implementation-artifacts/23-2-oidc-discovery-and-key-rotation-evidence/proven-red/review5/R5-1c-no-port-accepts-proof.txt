@@ -1,0 +1,7 @@
+Round 5, R5-1: a runtime with no identity port must refuse a supplied proof (the old `Ok(())` fallback).
+Marker: E232-PLANT-r5-1c (removed; grep-verified empty).
+Plant: crates/maos-bin/src/enterprise_identity.rs, EnterpriseRuntime::ensure_key_fresh: added the arm `None => Ok(()),` before `_ => Err(..)`.
+Command: cargo test -p maos-bin --features network,online-adapters --test issuance_key_freshness_23_2 (CARGO_TARGET_DIR=/mnt/build/cargo-maos-e232r, fixtures built, random 0600 MAOS_AUDIT_KEY)
+Observed: 3 passed, 1 FAILED:
+  a_supplied_proof_is_refused_where_nothing_can_validate_it  panicked at crates/maos-bin/tests/issuance_key_freshness_23_2.rs:349:18
+  "the mint was not refused with the generic denial: Ok(())" (the no-port iteration, call at :433)

@@ -1,0 +1,4 @@
+F1 (review round 1): discovery mode trusts ONLY the discovery issuer; a second issuer in MAOS_SSO_ISSUERS makes `DiscoveringVerifier::start` fail with `IssuersNotExclusive` (sso_discovery_issuers_not_exclusive), which the maos-bin builder turns into configured-down with that typed reason (SsoDownReason::Discovery). Static mode unchanged.
+Plant E232-PLANT-f1 (`if false && ...` on the check): cargo test -p maos-sso --features discovery --test oidc_discovery_23_2 -> discovered_keys_are_bound_to_the_discovery_issuer FAILED (18 passed, 1 failed). Plant removed; the test passes (19 passed).
+Note: the forged-iss token (TOKEN_BAD_ISS, signed by the discovered key, iss = attacker) is also refused IssuerUntrusted by the single-issuer verifier.
+NOT DONE in this round: F2..F17 (budget exhausted). The runbook/ADR sentence that discovery works with several listed issuers does not exist; MAOS_SSO_ISSUERS must now hold exactly the discovery issuer.

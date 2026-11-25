@@ -29,6 +29,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 const PID: u32 = 7;
+/// The pid of the scope-attribution test's own Mira: the scope registry is process-wide.
+const SCOPE_PID: u32 = 8;
 const WAIT: Duration = Duration::from_secs(20);
 const KNOWN: &str =
     r#"{"subject":"payments-api","metric":"error_rate","observed":0.42,"baseline":0.02}"#;
@@ -184,6 +186,17 @@ impl Kernel {
     }
 
     fn mira_runner(&self, inference: Option<Arc<dyn InferencePort + Send + Sync>>) -> MiraRunner {
+        self.mira_runner_at(PID, inference)
+    }
+
+    /// Mira's runner whose turns are scoped (and logged) under `pid`. The assertion scope is a
+    /// process-wide registry keyed by pid, and a turn without an assertion is refused while
+    /// another scope holds its pid: tests that hold scopes in parallel need their own pid.
+    fn mira_runner_at(
+        &self,
+        pid: u32,
+        inference: Option<Arc<dyn InferencePort + Send + Sync>>,
+    ) -> MiraRunner {
         let mira = mira::Mira::default()
             .with_id("mira")
             .with_scalar_port(Arc::new(HaltingScalar {
@@ -197,7 +210,7 @@ impl Kernel {
             PidBoundDiagnosisMemory::new(Arc::downgrade(&self.memory), Self::pid_of()),
             None,
             Arc::clone(&self.tl),
-            Self::pid_of(),
+            Arc::new(move || Some(pid)),
         )
     }
 
@@ -243,6 +256,7 @@ fn mira_answers_a_directed_task_and_its_reply_row_is_journaled() {
             "mira",
             "payments-api is throwing errors since the deploy",
             None,
+            None,
         )
         .expect("mira is directable");
     let record = finished(&tasks, &accepted.task_id);
@@ -269,7 +283,7 @@ fn mira_answers_a_directed_task_and_its_reply_row_is_journaled() {
     assert_eq!(again.result, record.result);
 
     // The second diagnosis of the subject counts the first (her own pid-bound memory).
-    let second = tasks.accept("mira", KNOWN, None).unwrap();
+    let second = tasks.accept("mira", KNOWN, None, None).unwrap();
     let second = finished(&tasks, &second.task_id);
     let answer: serde_json::Value =
         serde_json::from_str(second.result.as_deref().unwrap()).unwrap();
@@ -286,7 +300,7 @@ fn a_low_confidence_task_ends_halted() {
     let kernel = Kernel::new();
     let tasks = kernel.tasks();
     tasks.register("mira", Arc::new(kernel.mira_runner(None)));
-    let accepted = tasks.accept("mira", SEVERE_UNKNOWN, None).unwrap();
+    let accepted = tasks.accept("mira", SEVERE_UNKNOWN, None, None).unwrap();
     let record = finished(&tasks, &accepted.task_id);
     assert_eq!(record.state, TaskState::Halted, "{record:?}");
     let halt = record.halt.expect("the task names its halt");
@@ -312,9 +326,9 @@ fn the_registry_exists_without_installed_members() {
     assert!(!tasks.is_directable("mira"));
     tasks.register("mira", Arc::new(kernel.mira_runner(None)));
     assert!(tasks.is_directable("mira"));
-    let accepted = tasks.accept("mira", KNOWN, Some("idem-1")).unwrap();
+    let accepted = tasks.accept("mira", KNOWN, Some("idem-1"), None).unwrap();
     assert!(!accepted.replayed);
-    let replayed = tasks.accept("mira", KNOWN, Some("idem-1")).unwrap();
+    let replayed = tasks.accept("mira", KNOWN, Some("idem-1"), None).unwrap();
     assert!(
         replayed.replayed,
         "22-4's idempotency key applies unchanged"
@@ -328,7 +342,9 @@ fn a_task_that_is_not_a_signal_ends_failed_with_a_typed_reason() {
     let kernel = Kernel::new();
     let tasks = kernel.tasks();
     tasks.register("mira", Arc::new(kernel.mira_runner(None)));
-    let accepted = tasks.accept("mira", "the database is slow", None).unwrap();
+    let accepted = tasks
+        .accept("mira", "the database is slow", None, None)
+        .unwrap();
     let record = finished(&tasks, &accepted.task_id);
     assert_eq!(record.state, TaskState::Failed);
     assert_eq!(record.reason.as_deref(), Some("invalid_task"));
@@ -341,7 +357,7 @@ fn nash_stays_not_directable() {
     tasks.register("mira", Arc::new(kernel.mira_runner(None)));
     assert!(!tasks.is_directable("nash"));
     assert_eq!(
-        tasks.accept("nash", "architect something", None),
+        tasks.accept("nash", "architect something", None, None),
         Err(AcceptError::NotDirectable)
     );
 }
@@ -431,5 +447,154 @@ fn the_default_cast_boots_keyless_in_deterministic_mode() {
         running,
         "the default cast must boot with no key and no mode; stderr:\n{}",
         String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// Story 23-2 F2c (round 2, C1; round 3, P1-11): Mira's turns are serialised AND each caller's
+/// mints see its own assertion. Overlapping callers of one runner each wait for the turn before
+/// them; none is refused with a busy scope, none mints under another's assertion (the probe
+/// records, per invocation, which caller it served and the principal its supply resolved), and no
+/// scope outlives its turn.
+///
+/// The overlap is synchronised at Mira's serialisation point, not before it. The first invocation
+/// is HELD at a gate that opens only when `MiraRunner::contended_turns()` shows that every OTHER
+/// caller found the turn taken and is waiting for it (the counter is incremented at the lock,
+/// `try_lock` failing while the first call owns the turn). Without the serial lock nobody ever
+/// finds the turn taken, the gate never opens and the test fails by its own deadline: no
+/// scheduling decides the verdict.
+struct ScopeProbe {
+    /// (caller index parsed from the prompt, the principal the supply resolved) per invocation.
+    seen: Mutex<Vec<(usize, Option<String>)>>,
+    /// The runner under test, set once it exists (weak: the runner owns this probe).
+    runner: std::sync::OnceLock<std::sync::Weak<maos_bin::native_task::MiraRunner>>,
+    /// How many other callers must be observed waiting for the turn before the first is released.
+    others: usize,
+    /// The first invocation takes the gate; later ones pass straight through.
+    held: std::sync::atomic::AtomicBool,
+    in_flight: std::sync::atomic::AtomicUsize,
+    max_in_flight: std::sync::atomic::AtomicUsize,
+}
+
+impl InferencePort for ScopeProbe {
+    fn complete(&self, request: InferenceRequest) -> Result<InferenceResponse, InferenceError> {
+        use std::sync::atomic::Ordering::SeqCst;
+        let caller: usize = request
+            .prompt
+            .split("(caller ")
+            .nth(1)
+            .and_then(|tail| tail.split(')').next())
+            .and_then(|digits| digits.parse().ok())
+            .expect("the prompt carries the caller index");
+        let inside = self.in_flight.fetch_add(1, SeqCst) + 1;
+        self.max_in_flight.fetch_max(inside, SeqCst);
+        let seen = maos_bin::assertion_supply::supply(SCOPE_PID);
+        if !self.held.swap(true, SeqCst) {
+            // Hold the first turn open until every other caller is observed blocked at Mira's
+            // serial lock while this turn owns it; a gate that never opens fails the test.
+            let runner = self
+                .runner
+                .get()
+                .and_then(std::sync::Weak::upgrade)
+                .expect("the runner is registered with its probe");
+            let until = Instant::now() + WAIT;
+            while runner.contended_turns() < self.others {
+                assert!(
+                    Instant::now() < until,
+                    "the other callers never found Mira's turn taken ({} of {}): \
+                     the turns are not serialised",
+                    runner.contended_turns(),
+                    self.others
+                );
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
+        self.seen.lock().unwrap().push((caller, seen));
+        self.in_flight.fetch_sub(1, SeqCst);
+        Ok(InferenceResponse {
+            text: KNOWN.into(),
+            stop_reason: StopReason::StopSequence,
+            usage: TokenUsage {
+                input_tokens: 1,
+                output_tokens: 1,
+            },
+            provider_attribution: ProviderAttribution {
+                provider_id: "fake".into(),
+                endpoint_url: "fake://".into(),
+                model_id: None,
+            },
+        })
+    }
+}
+
+#[test]
+fn overlapping_mira_turns_are_serialised_and_never_share_a_scope() {
+    use maos_bin::directed_task::TaskRunner;
+    use std::sync::atomic::Ordering::SeqCst;
+    let kernel = Kernel::new();
+    let tokens: Vec<String> = (0..6)
+        .map(|n| format!("t{n}-head.t{n}-claims.t{n}-sig"))
+        .collect();
+    let probe = Arc::new(ScopeProbe {
+        seen: Mutex::new(Vec::new()),
+        runner: std::sync::OnceLock::new(),
+        others: tokens.len() - 1,
+        held: std::sync::atomic::AtomicBool::new(false),
+        in_flight: std::sync::atomic::AtomicUsize::new(0),
+        max_in_flight: std::sync::atomic::AtomicUsize::new(0),
+    });
+    let runner = Arc::new(kernel.mira_runner_at(SCOPE_PID, Some(probe.clone())));
+    probe.runner.set(Arc::downgrade(&runner)).unwrap();
+    let results: Vec<Result<String, &'static str>> = std::thread::scope(|scope| {
+        let workers: Vec<_> = tokens
+            .iter()
+            .enumerate()
+            .map(|(n, token)| {
+                let runner = &runner;
+                scope.spawn(move || {
+                    let assertion = maos_control::Assertion::parse(token).unwrap();
+                    runner
+                        .run(
+                            [n as u8 + 1; 16],
+                            &format!(
+                                "payments-api is throwing errors since the deploy (caller {n})"
+                            ),
+                            Some(&assertion),
+                        )
+                        .map_err(|failure| failure.reason)
+                })
+            })
+            .collect();
+        workers.into_iter().map(|w| w.join().unwrap()).collect()
+    });
+    assert_eq!(
+        runner.contended_turns(),
+        tokens.len() - 1,
+        "every caller but the first found the turn taken and waited for it"
+    );
+    for result in &results {
+        assert!(
+            result.is_ok(),
+            "no overlapping turn is refused: {results:?}"
+        );
+    }
+    assert_eq!(
+        probe.max_in_flight.load(SeqCst),
+        1,
+        "two Mira turns never ran at once"
+    );
+    let mut seen = probe.seen.lock().unwrap().clone();
+    assert_eq!(seen.len(), tokens.len(), "every caller was served once");
+    seen.sort_by_key(|(caller, _)| *caller);
+    for (position, (caller, supplied)) in seen.iter().enumerate() {
+        assert_eq!(*caller, position, "each caller was served exactly once");
+        assert_eq!(
+            supplied.as_deref(),
+            Some(tokens[*caller].as_str()),
+            "caller {caller} minted under its own assertion, not another caller's"
+        );
+    }
+    assert!(
+        !maos_bin::assertion_supply::is_scoped(SCOPE_PID),
+        "no scope outlives its turns"
     );
 }

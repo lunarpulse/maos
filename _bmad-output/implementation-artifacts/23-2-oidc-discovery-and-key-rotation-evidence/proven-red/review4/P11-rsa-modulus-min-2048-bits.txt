@@ -1,0 +1,7 @@
+Lane P, P2-2: an RSA modulus below ring's 2,048-bit floor for RS256 is a MALFORMED replacement (round 3 accepted 1,024 bits+).
+Marker: E232-PLANT-r4-P11 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs: RSA_MODULUS_BYTES `256..=1_024` -> `128..=1_024`.
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Observed: 41 passed, 1 FAILED: a_malformed_replacement_key_set_keeps_the_populated_cache
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:1945:9: assertion `left == right` failed: the body is rsa_short_modulus
+  ("n":"dK3AdMDROSky..." = keyC's modulus without its first byte, 255 bytes, e = "AQAB")  left: None, right: Some(JwksMalformed).

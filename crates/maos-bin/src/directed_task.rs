@@ -18,6 +18,8 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::Duration;
 
+use maos_control::Assertion;
+
 /// `origin` of a task handed over the operator door (23-5 adds its own origin).
 pub const ORIGIN_DOOR: &str = "door";
 /// `actor` of a door task until 24-1 replaces it with the operator principal.
@@ -141,9 +143,29 @@ pub struct RunFailure {
 
 /// One Spirit's turn-and-answer contract. `run` blocks until the Spirit's answer, or the typed
 /// reason it gave none; it is only ever called from that Spirit's pump, one task at a time.
-/// `task_id` is the host-minted `TaskAssign` frame id.
+/// `task_id` is the host-minted `TaskAssign` frame id. `assertion` is the asserting principal's
+/// own assertion when the task carried one (Story 23-2, D-23-2-04 A): the runner makes it the
+/// assertion of every capability mint for its Spirit's pid for exactly the duration of the turn
+/// ([`crate::assertion_supply::enter`]), and never delivers it to the Spirit.
 pub trait TaskRunner: Send + Sync {
-    fn run(&self, task_id: [u8; 16], text: &str) -> Result<String, RunFailure>;
+    fn run(
+        &self,
+        task_id: [u8; 16],
+        text: &str,
+        assertion: Option<&Assertion>,
+    ) -> Result<String, RunFailure>;
+}
+
+/// A carried assertion was refused. Carries nothing: the door answers a typed
+/// `sso_assertion_invalid` that never echoes the assertion or the reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AssertionRefused;
+
+/// Story 23-2 (D-23-2-04 A) — verifies a carried assertion at accept.
+pub trait AssertionCheck: Send + Sync {
+    /// # Errors
+    /// [`AssertionRefused`] for every refusal.
+    fn check(&self, assertion: &Assertion) -> Result<(), AssertionRefused>;
 }
 
 /// What the pump needs to know about a Spirit before it delivers the next task.
@@ -211,12 +233,18 @@ pub enum AcceptError {
     ShuttingDown,
     /// The accept row could not be journaled; nothing was enqueued.
     Log(String),
+    /// A carried assertion failed verification (or this Host has nothing to verify it with);
+    /// nothing was queued. Carries nothing.
+    AssertionInvalid,
 }
 
 struct Live {
     record: TaskRecord,
     /// The request text, held until the task starts.
     text: Option<String>,
+    /// The asserting principal's assertion (Story 23-2): in memory only, never in `record`, a
+    /// row or `to_row`; dropped when the task starts, ends or is drained.
+    assertion: Option<Assertion>,
     key_hash: Option<String>,
 }
 
@@ -252,6 +280,7 @@ pub struct DirectedTasks {
     inner: Mutex<Inner>,
     wake: Condvar,
     threads: Mutex<Vec<std::thread::JoinHandle<()>>>,
+    assertion_check: Mutex<Option<Arc<dyn AssertionCheck>>>,
 }
 
 /// How long an idle or held pump sleeps between checks of its queue and its Spirit.
@@ -265,11 +294,21 @@ impl DirectedTasks {
             inner: Mutex::new(Inner::default()),
             wake: Condvar::new(),
             threads: Mutex::new(Vec::new()),
+            assertion_check: Mutex::new(None),
         })
     }
 
     fn lock(&self) -> MutexGuard<'_, Inner> {
         self.inner.lock().unwrap_or_else(|error| error.into_inner())
+    }
+
+    /// Install the verifier a carried assertion is checked with at accept. Until it is set,
+    /// every task that carries an assertion is refused (`AssertionInvalid`): nothing can verify it.
+    pub fn set_assertion_check(&self, check: Arc<dyn AssertionCheck>) {
+        *self
+            .assertion_check
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = Some(check);
     }
 
     /// Make `spirit_id` directable: start its pump over `runner`. A second registration (a
@@ -337,6 +376,10 @@ impl DirectedTasks {
         let mut inner = self.lock();
         inner.shutdown = true;
         inner.spirits.clear();
+        // No task will start again: drop every assertion still held in memory.
+        for live in inner.tasks.values_mut() {
+            live.assertion = None;
+        }
         drop(inner);
         self.wake.notify_all();
     }
@@ -362,12 +405,30 @@ impl DirectedTasks {
 
     /// Accept one task: refuse past the bounds, replay a repeated key, journal the accept row,
     /// then queue it. Never waits on the Spirit.
+    ///
+    /// A carried `assertion` (Story 23-2) is verified first, before anything is reserved or
+    /// journaled: one that fails (or finds no verifier installed) is `AssertionInvalid` and
+    /// queues nothing. A replay under a known key returns the first task and never re-binds it
+    /// to a different assertion; the replay's own assertion is still verified, so an invalid one
+    /// is refused. Verification may wait on the identity provider's refresh, so call this off
+    /// the async workers.
     pub fn accept(
         &self,
         spirit_id: &str,
         text: &str,
         key: Option<&str>,
+        assertion: Option<&Assertion>,
     ) -> Result<Accepted, AcceptError> {
+        if let Some(assertion) = assertion {
+            let check = self
+                .assertion_check
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .clone();
+            if !check.is_some_and(|check| check.check(assertion).is_ok()) {
+                return Err(AcceptError::AssertionInvalid);
+            }
+        }
         let key_hash = key.map(|key| ask_replay_key(spirit_id, key));
         // An earlier boot's task under this key: the audit trail, then the live registry.
         let journaled = key_hash
@@ -436,6 +497,7 @@ impl DirectedTasks {
                 Live {
                     record: record.clone(),
                     text: Some(text.to_owned()),
+                    assertion: assertion.cloned(),
                     key_hash: key_hash.clone(),
                 },
             );
@@ -532,7 +594,7 @@ impl DirectedTasks {
                 }
             }
             let started_ns = self.host.now_ns();
-            let text = {
+            let (text, assertion) = {
                 let mut inner = self.lock();
                 let Some(slot) = inner.spirits.get_mut(spirit_id) else {
                     return;
@@ -547,7 +609,7 @@ impl DirectedTasks {
                     continue;
                 };
                 live.record.state = TaskState::Running;
-                live.text.take().unwrap_or_default()
+                (live.text.take().unwrap_or_default(), live.assertion.take())
             };
             let Ok(ulid) = ulid::Ulid::from_string(&task_id) else {
                 self.finish(
@@ -562,7 +624,7 @@ impl DirectedTasks {
                 continue;
             };
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                runner.run(ulid.to_bytes(), &text)
+                runner.run(ulid.to_bytes(), &text, assertion.as_ref())
             }))
             .unwrap_or_else(|_| {
                 Err(RunFailure {
@@ -693,6 +755,7 @@ impl DirectedTasks {
         if let Some(live) = inner.tasks.get_mut(&task_id) {
             live.record = record;
             live.text = None;
+            live.assertion = None;
         }
         inner.finished.push_back(task_id);
         while inner.finished.len() > self.limits.finished {

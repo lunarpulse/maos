@@ -1,0 +1,6 @@
+Lane P, P2-2 control: material at the backend's limits (e = 3, 65537, 2^33 - 1, 2,048- and 8,192-bit moduli) is PUBLISHED, so "reject unusable material" cannot be met by rejecting everything.
+Marker: E232-PLANT-r4-P19 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, rsa_material_usable: `(3..=RSA_EXPONENT_MAX)` -> `(65_537..=RSA_EXPONENT_MAX)`.
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Observed: 41 passed, 1 FAILED: key_material_at_the_backends_limits_is_published
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:2093:9: assertion `left == right` failed (body = keyC modulus, e = "Aw" = 3)  left: Some(JwksMalformed), right: None.

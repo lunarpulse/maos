@@ -1,0 +1,9 @@
+Round 5, R5-2 control: a retired/absent kid (or a stale/absent set) must still nudge a refresh.
+Marker: E232-PLANT-r5-2b (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, DiscoveringVerifier::key_still_fresh, the `None` arm:
+  `self.shared.nudge_refresh_locked(&mut state, now);`  ->  `let _ = (&mut state, now);`  (no refusal ever nudges).
+Command: cargo test -p maos-sso --features discovery --test key_freshness_23_2 (CARGO_TARGET_DIR=/mnt/build/cargo-maos-e232r)
+Observed: 7 passed, 2 FAILED:
+  an_epoch_only_refusal_schedules_no_refresh_but_a_retired_kid_does  panicked at crates/maos-sso/tests/key_freshness_23_2.rs:288:5
+    (left == right: a retired kid asks for a refresh; left: 2, right: 3)
+  a_refused_recheck_nudges_the_refresher_and_never_waits  panicked at :111:9 (the refresher never finished, 20 s SAFETY bound)

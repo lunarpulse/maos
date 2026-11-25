@@ -36,3 +36,7 @@ default = []
 # this feature on, and the `check-enterprise-identity` gate's release-graph-
 # absence leg is the belt-and-suspenders graph guard (SHIP-BLOCKER).
 sso-fault-inject = []
+# Story 23-2 (D-23-6-02 A) - OIDC discovery and key rotation. Off by default;
+# maos-bin's `online-adapters` turns it on. No new dependency: the module does
+# no I/O of its own (an injected `Fetcher` and `Clock`).
+discovery = []

@@ -1,0 +1,6 @@
+B5 (marker E232-PLANT-r2-B5) — lane B
+Plant: discovery.rs usable(): `ops_agree` always true (a `use: sig` key with `key_ops` [verify, decrypt] / [verify, encrypt] / [verify, wrapKey] loads and verifies).
+Test: `... --test oidc_discovery_23_2 conflict` -> a_key_whose_use_and_key_ops_conflict_loads_nothing.
+Failing assertion: oidc_discovery_23_2.rs:454 (inside `assert_refused`, first conflicting case) `assert_eq!(verifier.verify(TOKEN_GOOD_RS256), Err(JwksUnavailable))` left: Ok(AuthenticatedPrincipal{ subject: "reza@maos.example" ...}).
+Consistent signing pair [sign, verify] stays supported (existing keys_that_may_not_verify... test, unchanged and green).
+Plant removed.

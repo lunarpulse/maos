@@ -378,6 +378,69 @@ fn dispatch_status() -> ExitCode {
     )
 }
 
+/// Story 23-2 (D-23-2-09 A) — the longest assertion file `--assertion-file` reads.
+const MAX_ASSERTION_FILE_BYTES: u64 = 16 * 1024;
+
+/// Read one compact JWT from `path`: a regular file, at most [`MAX_ASSERTION_FILE_BYTES`],
+/// surrounding whitespace trimmed, the compact-JWT alphabet only. The file is OPENED first
+/// (non-blocking where the platform has it, so a FIFO swapped in at the path cannot park the
+/// CLI in `open`), and every check (regular file, size cap, permissions) is made on the OPENED
+/// descriptor, never on the path, so a swap between a check and the open cannot be read. A
+/// symlink is followed (a mounted secret is usually one); what it resolves to must pass the
+/// same checks. No error text carries the file's content, and the content is never printed.
+fn read_assertion_file(path: &std::path::Path) -> Result<String, String> {
+    use std::io::Read;
+    let unreadable =
+        |error: std::io::Error| format!("cannot read the assertion file: {}", error.kind());
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(rustix::fs::OFlags::NONBLOCK.bits() as i32);
+    }
+    let file = options.open(path).map_err(unreadable)?;
+    let meta = file.metadata().map_err(unreadable)?;
+    if !meta.is_file() {
+        return Err("the assertion file is not a regular file".to_owned());
+    }
+    if meta.len() > MAX_ASSERTION_FILE_BYTES {
+        return Err(format!(
+            "the assertion file is larger than {MAX_ASSERTION_FILE_BYTES} bytes"
+        ));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if meta.permissions().mode() & 0o077 != 0 {
+            eprintln!("maosctl: ask — warning: the assertion file is readable by group or others");
+        }
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_ASSERTION_FILE_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(unreadable)?;
+    if bytes.len() as u64 > MAX_ASSERTION_FILE_BYTES {
+        return Err(format!(
+            "the assertion file is larger than {MAX_ASSERTION_FILE_BYTES} bytes"
+        ));
+    }
+    let text =
+        String::from_utf8(bytes).map_err(|_| "the assertion file is not UTF-8 text".to_owned())?;
+    let text = text.trim();
+    let compact_jwt = !text.is_empty()
+        && text
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'));
+    if !compact_jwt {
+        return Err(
+            "the assertion file must hold one compact JWT (A-Z a-z 0-9 . _ -) and nothing else"
+                .to_owned(),
+        );
+    }
+    Ok(text.to_owned())
+}
+
 /// Story 22-4 (AC1, AC4) — `maosctl ask <spirit> "<text>" [--wait[=SECS]] [--key K]`.
 ///
 /// The door answers at once with a task id (200) or a typed refusal; none of the refusals
@@ -393,9 +456,18 @@ fn dispatch_ask(args: &AskArgs) -> ExitCode {
             return code;
         }
     }
+    let assertion = match args.assertion_file.as_deref().map(read_assertion_file) {
+        Some(Ok(assertion)) => Some(door_client::CarriedAssertion(assertion)),
+        Some(Err(reason)) => {
+            eprintln!("maosctl: {verb} — {reason}");
+            return ExitCode::from(2);
+        }
+        None => None,
+    };
     let body = match serde_json::to_vec(&door_client::AskRequest {
         text: args.text.clone(),
         idempotency_key: args.key.clone(),
+        assertion,
     }) {
         Ok(body) => body,
         Err(error) => {
@@ -5817,6 +5889,213 @@ mod tests {
     use crate::accessibility::ColorChoice;
     use crate::cli::{Cli, ForgetArgs, InstallArgs, RunArgs, Subcommand};
     use clap::Parser;
+
+    const CANARY_JWT: &str = "canary-head.canary-claims.canary-sig";
+
+    fn assertion_file(contents: &[u8], mode: u32) -> (tempfile::TempDir, std::path::PathBuf) {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("assertion");
+        std::fs::write(&path, contents).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).unwrap();
+        (dir, path)
+    }
+
+    /// Story 23-2 AC3 (D-23-2-09 A): `maosctl ask --assertion-file` carries the file's JWT in the
+    /// body; the value is neither in argv nor in any `Debug` rendering.
+    #[test]
+    fn ask_assertion_file_is_read_into_the_body_and_never_into_argv_or_debug() {
+        let (dir, path) = assertion_file(format!("{CANARY_JWT}\n").as_bytes(), 0o600);
+        let path_text = path.to_str().unwrap().to_owned();
+        let cli = Cli::try_parse_from([
+            "maosctl",
+            "ask",
+            "mira",
+            "do the thing",
+            "--assertion-file",
+            &path_text,
+        ])
+        .unwrap();
+        let Subcommand::Ask(args) = &cli.command else {
+            panic!("expected Ask");
+        };
+        assert_eq!(args.assertion_file.as_deref(), Some(path.as_path()));
+        assert!(!format!("{args:?}").contains("canary"), "{args:?}");
+        let assertion = read_assertion_file(path.as_path()).unwrap();
+        assert_eq!(assertion, CANARY_JWT);
+        let request = door_client::AskRequest {
+            text: "do the thing".into(),
+            idempotency_key: None,
+            assertion: Some(door_client::CarriedAssertion(assertion)),
+        };
+        let body: serde_json::Value = serde_json::to_value(&request).unwrap();
+        assert_eq!(body["assertion"], CANARY_JWT);
+        assert!(!format!("{request:?}").contains("canary"), "{request:?}");
+        // Without the flag the body has no `assertion` member at all.
+        let bare = serde_json::to_value(door_client::AskRequest {
+            text: "t".into(),
+            idempotency_key: None,
+            assertion: None,
+        })
+        .unwrap();
+        assert!(bare.get("assertion").is_none());
+        drop(dir);
+    }
+
+    /// The reader refuses what is not one bounded compact JWT in a regular file, and never
+    /// echoes the content.
+    #[test]
+    fn read_assertion_file_refuses_bad_files_without_echo() {
+        let (_dir, empty) = assertion_file(b"  \n", 0o600);
+        let (_dir2, spaced) = assertion_file(b"canary one two", 0o600);
+        let (_dir3, binary) = assertion_file(&[0xff, 0xfe, b'c'], 0o600);
+        let (_dir4, oversize) = assertion_file(&vec![b'a'; 16 * 1024 + 1], 0o600);
+        let (_dir5, exactly) = assertion_file(&vec![b'a'; 16 * 1024], 0o600);
+        for path in [&empty, &spaced, &binary, &oversize] {
+            let error = read_assertion_file(path).unwrap_err();
+            assert!(!error.contains("canary"), "{error}");
+        }
+        assert_eq!(read_assertion_file(&exactly).unwrap().len(), 16 * 1024);
+        let missing = empty.with_file_name("absent");
+        assert!(read_assertion_file(&missing).is_err());
+        // A directory is not a regular file; so is no path at all.
+        assert!(read_assertion_file(empty.parent().unwrap()).is_err());
+    }
+
+    /// A FIFO at `dir/name`.
+    fn fifo(dir: &std::path::Path, name: &str) -> std::path::PathBuf {
+        let path = dir.join(name);
+        // `mkfifo(1)` exists on every Unix this crate builds on; `rustix::fs::mknodat` does not
+        // exist on macOS.
+        let status = std::process::Command::new("mkfifo")
+            .arg(&path)
+            .status()
+            .expect("run mkfifo");
+        assert!(status.success(), "mkfifo failed: {status}");
+        path
+    }
+
+    /// Run `read_assertion_file(path)` on a worker and fail (instead of hanging the suite) when
+    /// it does not return in time; `release` frees a worker parked in `open`.
+    fn read_within(
+        path: &std::path::Path,
+        limit: std::time::Duration,
+        release: impl FnOnce(),
+    ) -> Result<String, String> {
+        let (send, receive) = std::sync::mpsc::channel();
+        let path = path.to_owned();
+        std::thread::spawn(move || {
+            let _ = send.send(read_assertion_file(&path));
+        });
+        match receive.recv_timeout(limit) {
+            Ok(result) => result,
+            Err(_) => {
+                release();
+                panic!("read_assertion_file blocked on a FIFO");
+            }
+        }
+    }
+
+    /// Story 23-2 F12: a FIFO is never read, even one with a writer and a perfect token in it,
+    /// and never blocks the CLI in `open` when no writer exists.
+    #[test]
+    fn a_fifo_is_refused_and_never_blocks_the_cli() {
+        let dir = tempfile::tempdir().unwrap();
+
+        // No writer: a blocking open would park here forever.
+        let idle = fifo(dir.path(), "idle.fifo");
+        let release = idle.clone();
+        let refused = read_within(&idle, std::time::Duration::from_secs(10), move || {
+            let _ = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(release);
+        })
+        .unwrap_err();
+        assert!(refused.contains("not a regular file"), "{refused}");
+
+        // A writer holds the FIFO open and has written a valid token: still not a regular file.
+        let loaded = fifo(dir.path(), "loaded.fifo");
+        let mut writer = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&loaded)
+            .unwrap();
+        std::io::Write::write_all(&mut writer, format!("{CANARY_JWT}\n").as_bytes()).unwrap();
+        let refused = read_within(&loaded, std::time::Duration::from_secs(10), || {}).unwrap_err();
+        assert!(refused.contains("not a regular file"), "{refused}");
+        assert!(!refused.contains("canary"), "{refused}");
+    }
+
+    /// Story 23-2 F12: the check is on the opened descriptor, so a path flipped between a
+    /// regular file and a FIFO while the reader runs is never able to park it: every read ends,
+    /// with the token (it opened the file) or a typed refusal (it opened the FIFO).
+    #[test]
+    fn a_path_swapped_to_a_fifo_mid_read_never_blocks() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let regular = dir.path().join("real.jwt");
+        std::fs::write(&regular, format!("{CANARY_JWT}\n")).unwrap();
+        std::fs::set_permissions(&regular, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let pipe = fifo(dir.path(), "swap.fifo");
+        let path = dir.path().join("assertion.jwt");
+        std::os::unix::fs::symlink(&regular, &path).unwrap();
+
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flipper = {
+            let (stop, dir, path) = (stop.clone(), dir.path().to_owned(), path.clone());
+            let targets = [regular.clone(), pipe.clone()];
+            std::thread::spawn(move || {
+                let mut turn = 0usize;
+                while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    let staged = dir.join("staged");
+                    let _ = std::fs::remove_file(&staged);
+                    std::os::unix::fs::symlink(&targets[turn % 2], &staged).unwrap();
+                    std::fs::rename(&staged, &path).unwrap();
+                    turn += 1;
+                }
+            })
+        };
+        let reader = {
+            let path = path.clone();
+            std::thread::spawn(move || {
+                let (mut read, mut refused) = (0u32, 0u32);
+                for _ in 0..4000 {
+                    match read_assertion_file(&path) {
+                        Ok(token) => {
+                            assert_eq!(token, CANARY_JWT);
+                            read += 1;
+                        }
+                        Err(error) => {
+                            assert!(!error.contains("canary"), "{error}");
+                            refused += 1;
+                        }
+                    }
+                }
+                (read, refused)
+            })
+        };
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+        while !reader.is_finished() {
+            if std::time::Instant::now() >= deadline {
+                stop.store(true, std::sync::atomic::Ordering::Relaxed);
+                let _ = std::fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(&pipe);
+                panic!("a swapped-in FIFO parked the reader");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        let (read, refused) = reader.join().unwrap();
+        flipper.join().unwrap();
+        assert_eq!(read + refused, 4000);
+        assert!(
+            read > 0 && refused > 0,
+            "the flip reached both targets: read {read}, refused {refused}"
+        );
+    }
 
     #[test]
     fn dispatch_run_hello_spirit() {

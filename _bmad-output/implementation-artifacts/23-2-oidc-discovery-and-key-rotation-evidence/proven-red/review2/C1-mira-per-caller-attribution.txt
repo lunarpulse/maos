@@ -1,0 +1,7 @@
+C1 (marker E232-PLANT-r2-C1) — lane C
+Test: crates/maos-bin/tests/native_task_22_8.rs `overlapping_mira_turns_are_serialised_and_never_share_a_scope`
+  (probe records (caller index, supplied principal) per invocation; the first invocation is held at a channel gate until a DIFFERENT caller has announced its `run`; max in-flight asserted 1; Mira runs at its own pid SCOPE_PID=8).
+Plant: assertion_supply::enter stores the PREVIOUS caller's assertion in the scope (one-lag leak via a static PREV), the current one in PREV.
+Failing assertion: native_task_22_8.rs:569 `assert_eq!(supplied.as_deref(), Some(tokens[*caller]), "caller {caller} minted under its own assertion, not another caller's")`
+  left: Some("t0-head.t0-claims.t0-sig") right: Some("t1-head.t1-claims.t1-sig") (caller 1 saw caller 0's assertion).
+Plant removed (grep-verified at the end).

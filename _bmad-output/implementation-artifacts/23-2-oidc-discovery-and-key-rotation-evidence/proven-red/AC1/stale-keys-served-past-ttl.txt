@@ -1,0 +1,11 @@
+Plant E232-PLANT-ttl: crates/maos-sso/src/discovery.rs `Shared::fresh` returned `true` (keys never expire).
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Failing lines of that run (the only failure; 17 others passed):
+
+test past_the_ttl_every_assertion_fails_closed_until_the_fetch_recovers ... FAILED
+thread 'past_the_ttl_every_assertion_fails_closed_until_the_fetch_recovers' panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:283:5:
+  left: Ok(AuthenticatedPrincipal { subject: "reza@maos.example", ... })
+ right: Err(JwksUnavailable)
+test result: FAILED. 17 passed; 1 failed
+
+Plant removed afterwards (see the grep note in README.md).

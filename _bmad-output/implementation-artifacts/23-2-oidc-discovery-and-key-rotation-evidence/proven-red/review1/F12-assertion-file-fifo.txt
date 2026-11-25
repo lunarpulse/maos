@@ -1,0 +1,9 @@
+F12 (review round 1; lane Fix232Scope): `maosctl ask --assertion-file` opens FIRST (`O_NONBLOCK` via `rustix::fs::OFlags::NONBLOCK`), then checks the OPENED descriptor (`File::metadata` = fstat: regular file, size cap, permissions), then reads at most cap+1 bytes. A FIFO, device or directory at the path is refused "not a regular file"; a FIFO swapped in between a path check and the open cannot be read or park the CLI. File: crates/maos-cli/src/subcommands.rs `read_assertion_file`.
+
+Deviation from the brief (1): NO `O_NOFOLLOW`. A symlink is followed on purpose (a mounted secret is usually one); safety comes from checking what the descriptor resolved to, so a symlink to a FIFO/device is refused like the FIFO itself.
+
+Tests: maos-cli lib `a_fifo_is_refused_and_never_blocks_the_cli` (FIFO with no writer, 10 s watchdog; FIFO holding a valid token and an open writer: refused, nothing echoed) and `a_path_swapped_to_a_fifo_mid_read_never_blocks` (a symlink atomically re-pointed between a regular file and a FIFO while 4000 reads run, 60 s watchdog; both outcomes must occur: read>0 and refused>0).
+Plants (one at a time, red, removed):
+ - E232-PLANT-F12a: open without `O_NONBLOCK` (`custom_flags(0)`) -> both FIFO tests FAILED (the first "read_assertion_file blocked on a FIFO" after 10 s, the second after the 60 s watchdog).
+ - E232-PLANT-F12b: `if false && !meta.is_file()` -> `a_fifo_is_refused_and_never_blocks_the_cli` FAILED (the FIFO is no longer refused as "not a regular file").
+Note: the old path-check-before-open code already refused a static FIFO; the race test is the one that distinguishes it, probabilistically; the plants above prove the new code's two mechanisms.

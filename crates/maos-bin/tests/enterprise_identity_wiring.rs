@@ -187,3 +187,270 @@ fn siem_configured_but_down_surfaces_an_operator_error_and_never_drops() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Story 23-2 AC4 — static keys remain; discovery configuration is typed.
+//
+// `from_env_with` is the production constructor with the `MAOS_SSO_*` values
+// injected, so no test mutates the process environment.
+// ---------------------------------------------------------------------------
+
+#[path = "../../maos-sso/tests/fixtures.rs"]
+mod sso_fixtures;
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
+use maos_bin::enterprise_identity::{DiscoveryWiring, SsoDownReason, SsoEnv};
+use maos_domain::ports::CryptoProvider;
+use maos_kernel_core::security::RingCryptoProvider;
+
+fn sso_runtime(
+    env: &SsoEnv,
+    discovery: &dyn Fn() -> Result<DiscoveryWiring, SsoDownReason>,
+) -> EnterpriseRuntime {
+    let crypto: Arc<dyn CryptoProvider> = Arc::new(RingCryptoProvider);
+    EnterpriseRuntime::from_env_with(
+        env,
+        discovery,
+        crypto,
+        std::env::temp_dir().join("maos-23-2-wiring-never-written.sqlite"),
+        1,
+        None,
+    )
+    .expect("a runtime always builds; a refused SSO configuration is ConfiguredDown")
+}
+
+fn static_env() -> SsoEnv {
+    SsoEnv {
+        jwks: Some(sso_fixtures::JWKS_KEY_A.to_owned()),
+        issuers: Some(sso_fixtures::ISS_GOOD.to_owned()),
+        audience: Some(sso_fixtures::AUD_EXPECTED.to_owned()),
+        ..SsoEnv::default()
+    }
+}
+
+fn assert_denied_with(runtime: &EnterpriseRuntime, code: &str) {
+    match runtime.verify_principal_for_issuance(42, sso_fixtures::TOKEN_GOOD_RS256) {
+        Err(EnterpriseFailure::SsoIssuanceDenied { reason, .. }) => {
+            assert!(reason.contains(code), "{reason}");
+        }
+        other => panic!("a valid assertion must still be denied; got {other:?}"),
+    }
+}
+
+/// AC4: with only `MAOS_SSO_JWKS`, the static verifier is built exactly as
+/// before and discovery is never touched.
+#[test]
+fn static_jwks_still_verifies_without_discovery() {
+    let touched = AtomicBool::new(false);
+    let runtime = sso_runtime(&static_env(), &|| {
+        touched.store(true, Ordering::SeqCst);
+        Err(SsoDownReason::DiscoveryUnsupportedBuild)
+    });
+    assert!(runtime.sso_configured());
+    assert_eq!(runtime.sso_down_reason(), None);
+    let principal = runtime
+        .verify_principal_for_issuance(42, sso_fixtures::TOKEN_GOOD_RS256)
+        .expect("the static key verifies")
+        .expect("SSO is configured, so a principal is returned");
+    assert_eq!(principal.subject, sso_fixtures::PRINCIPAL_SUB);
+    assert!(matches!(
+        runtime.verify_principal_for_issuance(42, sso_fixtures::TOKEN_WRONG_KEY),
+        Err(EnterpriseFailure::SsoIssuanceDenied { .. })
+    ));
+    assert!(
+        !touched.load(Ordering::SeqCst),
+        "no discovery wiring was built"
+    );
+}
+
+/// AC4: `MAOS_SSO_JWKS` and `MAOS_SSO_DISCOVERY_ISSUER` together leave SSO
+/// configured-down with a typed reason; issuance is denied even for an
+/// assertion the static key would verify, and discovery is not taken.
+#[test]
+fn jwks_and_discovery_together_are_configured_down() {
+    let touched = AtomicBool::new(false);
+    let mut env = static_env();
+    env.discovery_issuer = Some(sso_fixtures::ISS_GOOD.to_owned());
+    let runtime = sso_runtime(&env, &|| {
+        touched.store(true, Ordering::SeqCst);
+        Err(SsoDownReason::DiscoveryUnsupportedBuild)
+    });
+    assert!(runtime.sso_configured());
+    assert_eq!(
+        runtime.sso_down_reason(),
+        Some(&SsoDownReason::KeySourcesConflict)
+    );
+    assert_denied_with(&runtime, "sso_key_sources_exclusive");
+    assert!(!touched.load(Ordering::SeqCst), "discovery was not taken");
+}
+
+/// AC4: a tuning knob without `MAOS_SSO_DISCOVERY_ISSUER` is configured-down,
+/// alone or beside the static keys.
+#[test]
+fn a_tuning_knob_alone_is_configured_down() {
+    for knob in ["ttl", "min_refresh"] {
+        for with_static_keys in [false, true] {
+            let mut env = if with_static_keys {
+                static_env()
+            } else {
+                SsoEnv::default()
+            };
+            match knob {
+                "ttl" => env.jwks_ttl_secs = Some("600".to_owned()),
+                _ => env.jwks_min_refresh_secs = Some("10".to_owned()),
+            }
+            let runtime = sso_runtime(&env, &|| Err(SsoDownReason::DiscoveryUnsupportedBuild));
+            assert!(runtime.sso_configured(), "{knob} {with_static_keys}");
+            assert_eq!(
+                runtime.sso_down_reason(),
+                Some(&SsoDownReason::TuningWithoutDiscovery),
+                "{knob} {with_static_keys}"
+            );
+            assert_denied_with(&runtime, "sso_tuning_without_discovery");
+        }
+    }
+}
+
+/// Story 23-2 F13: a `MAOS_SSO_*` variable that is PRESENT but not valid UTF-8 is never read as
+/// absent. Whichever of the seven it is, and whether or not anything else is configured, SSO is
+/// configured-down with a typed reason that names the variable and never echoes the value.
+#[cfg(unix)]
+#[test]
+fn a_non_utf8_sso_variable_is_configured_down_never_absent() {
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt;
+    const NAMES: [&str; 7] = [
+        "MAOS_SSO_JWKS",
+        "MAOS_SSO_ISSUERS",
+        "MAOS_SSO_AUDIENCE",
+        "MAOS_SSO_ALGS",
+        "MAOS_SSO_DISCOVERY_ISSUER",
+        "MAOS_SSO_JWKS_TTL_SECS",
+        "MAOS_SSO_JWKS_MIN_REFRESH_SECS",
+    ];
+    let bad = || OsString::from_vec(b"canary-value-\xff\xfe".to_vec());
+    let good = |name: &str| -> Option<OsString> {
+        Some(OsString::from(match name {
+            "MAOS_SSO_JWKS" => sso_fixtures::JWKS_KEY_A,
+            "MAOS_SSO_ISSUERS" => sso_fixtures::ISS_GOOD,
+            "MAOS_SSO_AUDIENCE" => sso_fixtures::AUD_EXPECTED,
+            _ => return None,
+        }))
+    };
+    for name in NAMES {
+        // Beside an otherwise valid static configuration, and entirely alone.
+        type Lookup = Box<dyn Fn(&str) -> Option<OsString>>;
+        let surroundings: [(&str, Lookup); 2] = [
+            ("beside a valid configuration", Box::new(good)),
+            ("alone", Box::new(|_| None)),
+        ];
+        for (label, others) in surroundings {
+            let env = SsoEnv::from_lookup(|asked| {
+                if asked == name {
+                    Some(bad())
+                } else {
+                    others(asked)
+                }
+            });
+            assert_eq!(env.invalid, Some(name), "{name} {label}");
+            assert!(env.any(), "{name} {label}: present counts as configured");
+
+            let touched = AtomicBool::new(false);
+            let runtime = sso_runtime(&env, &|| {
+                touched.store(true, Ordering::SeqCst);
+                Err(SsoDownReason::DiscoveryUnsupportedBuild)
+            });
+            assert!(runtime.sso_configured(), "{name} {label}");
+            assert_eq!(
+                runtime.sso_down_reason(),
+                Some(&SsoDownReason::EnvNotUnicode(name)),
+                "{name} {label}"
+            );
+            assert_denied_with(&runtime, &format!("sso_env_not_unicode: {name}"));
+            let shown = format!("{:?} {env:?}", runtime.sso_down_reason());
+            assert!(!shown.contains("canary"), "{name} {label}: {shown}");
+            assert!(!touched.load(Ordering::SeqCst), "{name} {label}");
+        }
+    }
+    // The valid configuration without the bad variable is unharmed.
+    let env = SsoEnv::from_lookup(good);
+    assert_eq!(env.invalid, None);
+    assert_eq!(
+        sso_runtime(&env, &|| unreachable!()).sso_down_reason(),
+        None
+    );
+}
+
+#[cfg(feature = "online-adapters")]
+mod discovery_mode {
+    use super::*;
+    use maos_sso::discovery::{DiscoveryError, FetchError, Fetcher, MonotonicClock};
+
+    /// An issuer that never answers: every fetch fails.
+    struct Unreachable;
+
+    impl Fetcher for Unreachable {
+        fn get(&self, _url: &str) -> Result<Vec<u8>, FetchError> {
+            Err(FetchError::Unavailable)
+        }
+    }
+
+    fn unreachable_wiring() -> Result<DiscoveryWiring, SsoDownReason> {
+        Ok(DiscoveryWiring::new(
+            Arc::new(Unreachable),
+            Arc::new(MonotonicClock::new()),
+        ))
+    }
+
+    fn discovery_env(issuers: &str) -> SsoEnv {
+        SsoEnv {
+            issuers: Some(issuers.to_owned()),
+            audience: Some(sso_fixtures::AUD_EXPECTED.to_owned()),
+            discovery_issuer: Some(sso_fixtures::ISS_GOOD.to_owned()),
+            ..SsoEnv::default()
+        }
+    }
+
+    /// AC4: a discovery issuer that `MAOS_SSO_ISSUERS` does not list is
+    /// configured-down.
+    #[test]
+    fn a_discovery_issuer_missing_from_the_trusted_list_is_configured_down() {
+        let runtime = sso_runtime(&discovery_env(sso_fixtures::ISS_BAD), &unreachable_wiring);
+        assert_eq!(
+            runtime.sso_down_reason(),
+            Some(&SsoDownReason::Discovery(DiscoveryError::IssuerNotTrusted))
+        );
+        assert_denied_with(&runtime, "sso_discovery_issuer_not_trusted");
+    }
+
+    /// AC4: out-of-range or non-numeric tuning is a typed refusal.
+    #[test]
+    fn invalid_tuning_is_configured_down() {
+        let mut env = discovery_env(sso_fixtures::ISS_GOOD);
+        env.jwks_ttl_secs = Some("soon".to_owned());
+        let runtime = sso_runtime(&env, &unreachable_wiring);
+        assert_eq!(
+            runtime.sso_down_reason(),
+            Some(&SsoDownReason::TuningInvalid("MAOS_SSO_JWKS_TTL_SECS"))
+        );
+        env.jwks_ttl_secs = Some("0".to_owned());
+        let runtime = sso_runtime(&env, &unreachable_wiring);
+        assert_eq!(
+            runtime.sso_down_reason(),
+            Some(&SsoDownReason::Discovery(DiscoveryError::ConfigInvalid))
+        );
+    }
+
+    /// D-23-2-08 A: an unreachable issuer at boot is NOT configured-down; the
+    /// verifier stays and reports unhealthy, so issuance is denied until keys
+    /// arrive.
+    #[test]
+    fn an_unreachable_issuer_at_boot_denies_issuance_without_demoting_sso() {
+        let runtime = sso_runtime(&discovery_env(sso_fixtures::ISS_GOOD), &unreachable_wiring);
+        assert!(runtime.sso_configured());
+        assert_eq!(runtime.sso_down_reason(), None);
+        assert_denied_with(&runtime, "unavailable");
+    }
+}

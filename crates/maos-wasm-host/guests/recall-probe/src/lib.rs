@@ -19,6 +19,11 @@
 //! - `to SPIRIT`: address the emitted report to this Spirit instead of the input
 //!   recipients. Session send authorization sees these claims; telemetry delivery
 //!   itself uses the bus's broadcast subscription.
+//! - `inbound`: report what this guest was handed (Story 23-2 round 3): `inbound H H H ...`, the
+//!   H the lowercase hex, in groups of 16 digits, of the `Debug` text of the received sender,
+//!   recipients, kind, intent, payload, origin, consent envelope and lineage (not the frame id
+//!   or clocks, which differ per frame). Hex in short groups, so the journal's redaction of long
+//!   hex runs and secret-looking prefixes cannot hide a byte the guest received.
 //!
 //! Output is one TelemetryEvent (`event-type = recall.probe`), preserving the
 //! input envelope/id except explicit `to`, with LF-separated data:
@@ -171,6 +176,33 @@ impl Guest for RecallProbe {
             FramePayload::TaskComplete(body) => body.result_text.clone(),
             _ => String::new(),
         };
+        // Only a task that asks for it pays for the report (an oversized frame would otherwise
+        // spend the guest's fuel on a Debug dump nobody reads).
+        let asks_inbound = matches!(frame.payload, FramePayload::TaskAssign(_))
+            && script
+                .lines()
+                .any(|line| line.split_whitespace().next() == Some("inbound"));
+        let received = if asks_inbound {
+            hex(format!(
+                "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+                frame.frame_from,
+                frame.to,
+                frame.kind,
+                frame.intent,
+                frame.payload,
+                frame.auto_marker,
+                frame.consent_envelope,
+                frame.intent_lineage
+            )
+            .as_bytes())
+            .as_bytes()
+            .chunks(16)
+            .map(|group| String::from_utf8_lossy(group).into_owned())
+            .collect::<Vec<_>>()
+            .join(" ")
+        } else {
+            String::new()
+        };
         let mut last = None;
         let mut cursor = None;
         let mut promotion = None;
@@ -239,6 +271,12 @@ impl Guest for RecallProbe {
                             } else { report.push_str("script err invalid-request\n"); }
                         }
                         _ => report.push_str("script err invalid-request\n"),
+                    }
+                }
+                Some("inbound") => {
+                    // Only a task reports itself: the emitted report is data, never a script.
+                    if matches!(frame.payload, FramePayload::TaskAssign(_)) {
+                        writeln!(report, "inbound {received}").unwrap();
                     }
                 }
                 Some("fetch") => {

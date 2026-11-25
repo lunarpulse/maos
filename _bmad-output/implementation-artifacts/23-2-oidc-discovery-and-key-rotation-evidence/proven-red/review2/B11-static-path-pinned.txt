@@ -1,0 +1,5 @@
+B11 (marker E232-PLANT-r2-B11) — lane B
+Test: the_static_source_is_stricter_on_keys_but_still_ignores_use (oidc_discovery_23_2.rs): static EC key without `crv` -> AlgorithmRejected; static key_ops [sign] -> JwksUnavailable (both verified on main, refused now); `use: enc` and `use: sig` + key_ops [verify, decrypt] still verify on the static path (the static path does not read `use`; only discovery refuses them).
+Plant: maos-sso/src/lib.rs Rules::verify: after `allows_verify`, `if jwk.key_use is not "sig" { return Err(JwksUnavailable) }` (the static path starts reading `use`).
+Failing assertion: oidc_discovery_23_2.rs:1708 `assert!(verify_with(&jwks, Rs256, TOKEN_GOOD_RS256).is_ok(), "the static path does not read `use`")`.
+Plant removed.

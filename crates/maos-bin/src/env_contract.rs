@@ -599,6 +599,21 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_SSO_DISCOVERY_ISSUER",
+        purpose: "OIDC issuer URL (https, no userinfo/query/fragment) whose discovery document and rotating keys the verifier follows instead of MAOS_SSO_JWKS; MAOS_SSO_ISSUERS must hold exactly this one issuer; setting it together with MAOS_SSO_JWKS leaves SSO configured-down; needs the online-adapters build (Story 23-2)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SSO_JWKS_TTL_SECS",
+        purpose: "Seconds a discovered key set is trusted (default 3600, 1..=604800); past it assertions fail closed; a key is dropped only by a successful refresh whose set omits it, never verifies past the TTL from the last fetch whose set held it; only with MAOS_SSO_DISCOVERY_ISSUER (Story 23-2)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SSO_JWKS_MIN_REFRESH_SECS",
+        purpose: "Minimum seconds between two discovery refresh attempts (default 30, at most the TTL); an unknown-kid refresh nudge that arrives inside the interval is dropped, not queued, so the read is refused again; an already-running refresh may publish the key earlier, and a retry after publication succeeds; a reused kid on a fresh cache does not itself nudge (recovery is on the next successful publication); only with MAOS_SSO_DISCOVERY_ISSUER (Story 23-2)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_PDP_POLICY_FILE",
         purpose: "Explicit path to a Cedar (.cedar) PDP policy file (Story 11.4a)",
         stability: EnvStability::UserFacing,

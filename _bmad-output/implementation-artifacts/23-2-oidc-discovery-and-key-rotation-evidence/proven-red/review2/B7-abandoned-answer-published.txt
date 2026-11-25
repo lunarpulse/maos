@@ -1,0 +1,5 @@
+B7 (marker E232-PLANT-r2-B7) — lane B
+Plant: discovery.rs worker closure: when `reply.send(..)` fails (the round was abandoned and its receiver dropped) the worker publishes its own key set into `state.keys` (a late abandoned answer replaces the cache).
+Test: `... --test oidc_discovery_23_2 a_fetch_that_never` -> a_fetch_that_never_answers_is_abandoned_and_discovery_recovers (abandoned worker holds the key-set GET and answers `key-a`; the replacement serves only `missing-key`; the test waits until `abandoned_fetches() == 0`, i.e. after the answer was discarded).
+Failing assertion: oidc_discovery_23_2.rs:1335 `assert!(verifier.verify(TOKEN_UNKNOWN_KID).is_ok(), "the replacement's key is still served")` (the replacement's key was overwritten by the abandoned worker's set).
+Plant removed.

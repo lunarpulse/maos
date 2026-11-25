@@ -1,0 +1,5 @@
+C2 (marker E232-PLANT-r2-C2) — lane C
+Test: crates/maos-bin/tests/directed_task_22_4.rs `an_ask_with_its_own_assertion_mints_under_that_principal` (daemon). The same Host (SSO static JWKS, MAOS_SSO_ASSERTION = the environment principal, MAOS_IDLE_FAST=1) loads and starts Butler over the door (`maosctl load spirits/butler/manifest.toml`, `maosctl start butler`); Butler's idle pass mints a ProviderInfer token through the root's governed issuance for Butler's own pid while no task runs. The test waits (WAIT deadline, fails on timeout) for the first `identity.asserted` row and requires subject = SUB_ENV, issuer = ISS. A Host at rest is asserted to have zero such rows first.
+Plant: assertion_supply::supply returns None instead of falling back to the environment's MAOS_SSO_ASSERTION (every mint outside a directed turn refused).
+Failing assertion: directed_task_22_4.rs:866 `assert!(Instant::now() < until, "no mint outside a directed turn produced an identity.asserted row")` (after the full WAIT deadline, 91 s run).
+Plant removed.

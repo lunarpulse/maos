@@ -403,6 +403,18 @@ impl From<GovernedMintError> for String {
     }
 }
 
+/// Whether the SSO verification step of a governed mint may wait on key discovery.
+#[cfg(feature = "network")]
+#[derive(Clone, Copy)]
+enum IdentityWait {
+    /// The verifier may wait for a refresh, bounded by its own `verify_wait` (every caller that
+    /// holds no lock).
+    Bounded,
+    /// Never wait: an unknown `kid` or a stale key set is refused at once and a non-blocking
+    /// refresh nudge is fired (a caller inside a cohort critical section, Story 23-2).
+    Never,
+}
+
 #[cfg(feature = "network")]
 pub fn issue_enterprise_governed_capability(
     capability: &CapabilityRegistryAdapter,
@@ -414,21 +426,83 @@ pub fn issue_enterprise_governed_capability(
     posture_hash: [u8; 32],
     intent_class: IntentClass,
 ) -> Result<CapabilityToken, GovernedMintError> {
+    issue_governed_capability(
+        capability,
+        enterprise_runtime,
+        enterprise_pdp_runtime,
+        spirit_pid,
+        scope,
+        ttl_secs,
+        posture_hash,
+        intent_class,
+        IdentityWait::Bounded,
+    )
+}
+
+/// [`issue_enterprise_governed_capability`] for a caller that holds a lock across the mint
+/// (the daemon's cohort digest-admission guard): the SSO verification NEVER waits on key
+/// discovery. An unknown `kid` or a stale/expired key set is refused, fail-closed and with the
+/// same generic denial, and fires a non-blocking refresh nudge so that a retry after the
+/// refresher finished succeeds. Everything else is identical.
+#[cfg(feature = "network")]
+pub fn issue_enterprise_governed_capability_no_wait(
+    capability: &CapabilityRegistryAdapter,
+    enterprise_runtime: Option<&enterprise_identity::EnterpriseRuntime>,
+    enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    spirit_pid: u32,
+    scope: Scope,
+    ttl_secs: u32,
+    posture_hash: [u8; 32],
+    intent_class: IntentClass,
+) -> Result<CapabilityToken, GovernedMintError> {
+    issue_governed_capability(
+        capability,
+        enterprise_runtime,
+        enterprise_pdp_runtime,
+        spirit_pid,
+        scope,
+        ttl_secs,
+        posture_hash,
+        intent_class,
+        IdentityWait::Never,
+    )
+}
+
+#[cfg(feature = "network")]
+#[allow(clippy::too_many_arguments)]
+fn issue_governed_capability(
+    capability: &CapabilityRegistryAdapter,
+    enterprise_runtime: Option<&enterprise_identity::EnterpriseRuntime>,
+    enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    spirit_pid: u32,
+    scope: Scope,
+    ttl_secs: u32,
+    posture_hash: [u8; 32],
+    intent_class: IntentClass,
+    wait: IdentityWait,
+) -> Result<CapabilityToken, GovernedMintError> {
     let capability_key = scope_action_key(&scope).to_string();
-    let principal = match enterprise_runtime {
+    let verified = match enterprise_runtime {
         Some(runtime) if runtime.sso_configured() => {
-            let assertion = std::env::var("MAOS_SSO_ASSERTION").map_err(|_| {
+            let assertion = crate::assertion_supply::supply(spirit_pid).ok_or_else(|| {
                 GovernedMintError::SsoAssertionMissing(format!(
                     "enterprise SSO is configured but MAOS_SSO_ASSERTION is absent for {capability_key}"
                 ))
             })?;
             runtime
-                .verify_principal_for_issuance(spirit_pid, &assertion)
+                .verify_principal_with_freshness(
+                    spirit_pid,
+                    &assertion,
+                    matches!(wait, IdentityWait::Bounded),
+                )
                 .map_err(|e| GovernedMintError::SsoAssertionMissing(e.to_string()))?
         }
         _ => None,
     };
-
+    let (principal, freshness) = match verified {
+        Some((principal, freshness)) => (Some(principal), freshness),
+        None => (None, None),
+    };
     if let Some(pdp) = enterprise_pdp_runtime {
         let principal_attributes = principal.as_ref().map(principal_attributes_for_pdp);
         match pdp
@@ -447,6 +521,21 @@ pub fn issue_enterprise_governed_capability(
         }
     }
 
+    // Story 23-2 (round 5): the discovered key the verification used must still be published and
+    // unexpired AT the authorization point, after PDP and immediately before the mint. Never
+    // waits for discovery and holds no discovery lock across PDP, sealing or audit; both the
+    // bounded-wait callers and the no-wait caller (the digest admission guard) pass through here.
+    // Residual (item I, operator acceptance NEEDED): the token is inserted inside the kernel capability registry,
+    // so a key retired after this check and before the insert is not detected. That window is
+    // the duration of `issue_with_mediation` (policy, context, quota-shard wait, store), not a
+    // fixed small time; it is small against the revocation semantics (a withdrawn key verifies
+    // until the next successful refresh, up to the TTL) and the token's own lifetime does not
+    // depend on the key's later retirement.
+    if let (Some(runtime), Some(proof)) = (enterprise_runtime, freshness.as_ref()) {
+        runtime
+            .ensure_key_fresh(spirit_pid, proof)
+            .map_err(|e| GovernedMintError::SsoAssertionMissing(e.to_string()))?;
+    }
     let token = capability
         .issue_with_mediation(spirit_pid, scope, ttl_secs, posture_hash, intent_class)
         .map_err(|e| match e {

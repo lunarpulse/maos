@@ -1,0 +1,10 @@
+Review round 3, Lane D — plant D6 (marker E232-PLANT-r3-D6), removed after the run.
+Env: CARGO_TARGET_DIR=/mnt/build/cargo-maos-e232D
+
+Plant: crates/maos-sso/src/discovery.rs `Shared::nudge_refresh_locked`: the limiter check
+  self.limiter_open(state, now)   ->   (self.limiter_open(state, now) || true)
+
+cargo test -p maos-sso --features discovery --test verify_without_refresh_23_2
+  FAILED. 4 passed; 1 failed: a_refusal_inside_the_refresh_interval_asks_for_nothing
+  verify_without_refresh_23_2.rs:257:5  assertion `left == right` failed: "nothing was pending, so the waiting verify did not wait"
+    left: 2   right: 1   (the nudge inside the refresh interval left a refresh pending, so the waiting `verify` waited)

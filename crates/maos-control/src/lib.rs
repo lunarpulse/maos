@@ -321,6 +321,42 @@ pub enum UpgradePolicyRequest {
     Migrator,
 }
 
+/// Story 23-2 (D-23-2-01 A, D-23-2-03) — an identity assertion (a compact JWT) carried by a door
+/// request. It is a credential: `Debug` prints `<redacted>`, there is no `Display` and no
+/// `Serialize`, and the only way to read it is the explicit [`Assertion::expose`].
+/// Parsing admits only the compact-JWT alphabet (`[A-Za-z0-9._-]`) up to
+/// [`Assertion::MAX_BYTES`], so it can carry no control byte or whitespace.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Assertion(String);
+
+impl Assertion {
+    /// The longest assertion accepted.
+    pub const MAX_BYTES: usize = 16 * 1024;
+
+    /// `None` when `raw` is empty, too long or outside the compact-JWT alphabet.
+    #[must_use]
+    pub fn parse(raw: &str) -> Option<Self> {
+        let admissible = !raw.is_empty()
+            && raw.len() <= Self::MAX_BYTES
+            && raw
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'));
+        admissible.then(|| Self(raw.to_owned()))
+    }
+
+    /// The assertion text. Hand it to a verifier and nowhere else.
+    #[must_use]
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for Assertion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("<redacted>")
+    }
+}
+
 /// Every state-changing operation the door carries.
 ///
 /// One enum rather than one trait method per verb: the port implementation in
@@ -403,6 +439,9 @@ pub enum OperatorCommand {
         spirit_id: String,
         text: String,
         idempotency_key: Option<String>,
+        /// Story 23-2 (D-23-2-01 A) — the asserting principal's own assertion; `None` keeps the
+        /// environment assertion (D-23-2-05 A).
+        assertion: Option<Assertion>,
     },
     RevokeToken {
         token_id: String,
@@ -1770,10 +1809,23 @@ fn spirit_command<S: SandboxReportSource>(
                 Ok(None) => None,
                 Err(response) => return response,
             };
+            // Story 23-2: an assertion that is SUPPLIED (anything but absent or `null`) and is
+            // not one admissible compact JWT (alphabet, empty, oversize, not a string) is the
+            // same typed refusal as one that fails verification, `sso_assertion_invalid`, and
+            // never `bad_request`: the client cannot tell the two apart, and neither echoes it.
+            let assertion = match body.get("assertion") {
+                None | Some(serde_json::Value::Null) => None,
+                Some(serde_json::Value::String(raw)) => match Assertion::parse(raw) {
+                    Some(assertion) => Some(assertion),
+                    None => return malformed_assertion(),
+                },
+                Some(_) => return malformed_assertion(),
+            };
             OperatorCommand::Ask {
                 spirit_id,
                 text: text.to_owned(),
                 idempotency_key,
+                assertion,
             }
         }
         "hot-swap-precheck" => {
@@ -1967,6 +2019,16 @@ fn required_str(body: &serde_json::Value, key: &str) -> Result<String, Response>
             &format!("field `{key}` must be a non-empty string"),
         )),
     }
+}
+
+/// The typed 400 for a supplied `assertion` that is not one admissible compact JWT. The text is
+/// fixed: it never carries the value or which rule it broke.
+fn malformed_assertion() -> Response {
+    Response::error(
+        400,
+        "sso_assertion_invalid",
+        "the carried assertion is not one compact JWT (A-Z a-z 0-9 . _ -, at most 16384 bytes); nothing was queued",
+    )
 }
 
 fn optional_str(body: &serde_json::Value, key: &str) -> Result<Option<String>, Response> {

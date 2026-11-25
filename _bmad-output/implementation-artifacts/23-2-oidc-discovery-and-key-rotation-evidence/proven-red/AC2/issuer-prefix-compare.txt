@@ -1,0 +1,9 @@
+Plant E232-PLANT-issuer-prefix: crates/maos-sso/src/discovery.rs `fetch_keys` compared `document.issuer.starts_with(&config.issuer)` instead of `!=`.
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Failing lines of that run (1 failed, 17 passed):
+
+test a_document_issuer_that_differs_by_any_byte_is_refused ... FAILED
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:349:5:
+  left: Ok(AuthenticatedPrincipal { subject: "reza@maos.example", ... })   <- the trailing-slash plant "https://idp.maos.example/" (the first entry of the loop) verified
+ right: Err(JwksUnavailable)
+test result: FAILED. 17 passed; 1 failed

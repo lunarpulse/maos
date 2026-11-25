@@ -1,0 +1,9 @@
+Lane P, P2-2: an even RSA exponent is a MALFORMED replacement (populated cache kept).
+Marker: E232-PLANT-r4-P6 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, rsa_material_usable: `&& exponent_value & 1 == 1` -> `&& true`.
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Observed: 41 passed, 1 FAILED: a_malformed_replacement_key_set_keeps_the_populated_cache
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:1942:9: assertion `left == right` failed:
+  {"keys":[{"kty":"RSA",...,"kid":"key-b","n":"snStwHTA0..." (keyC's modulus, e = 4: rsa_exponent_four)}]}
+  left: None, right: Some(JwksMalformed)  (the even exponent was published as a healthy set).
+Note: the issue's own case (old modulus, e="Ag" = 2) is refused by the `>= 3` bound (plant P8), not by parity.

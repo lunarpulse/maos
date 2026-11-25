@@ -1,0 +1,7 @@
+Lane P, P1-1: the recheck requires the kid to be in the current set.
+Marker: E232-PLANT-r4-P3 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, key_still_fresh: `&& keys.keys.contains_key(&proof.kid)` -> `&& true`.
+Command: cargo test --locked -p maos-sso --features discovery --test key_freshness_23_2
+Observed: 5 passed, 1 FAILED: a_forged_proof_is_refused panicked at crates/maos-sso/tests/key_freshness_23_2.rs:194:5
+  (assert!(!verifier.key_still_fresh(&forged_kid)), "a kid the set lacks").
+Note: the stamp check alone already refuses a retired kid (a_proof_does_not_hold_once_its_kid_was_retired stays green under this plant); the kid check is the defence against a proof that names a kid of the CURRENT set's stamp that the set lacks.

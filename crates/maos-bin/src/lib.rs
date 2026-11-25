@@ -7,9 +7,14 @@
 /// than a re-implementation of them.
 #[cfg(feature = "network")]
 pub mod admission;
+/// Story 23-2 (D-23-2-04 A) — the `SupplyAssertion` seam: per-pid turn scope, then the environment.
+pub mod assertion_supply;
 /// Story 22-6 (ADR-072) — audit-store rotation on the Host: the cut-floor registry, the 60 s
 /// policy task and the `audit rotate` door verb.
 pub mod audit_rotation;
+/// Story 23-2 — the production bounded `ResolveHost` (one worker, bounded queue, deadline,
+/// capped answers) shared by every caller that resolves a name the outbound policy vets.
+pub mod bounded_resolver;
 /// Story 18-1 — the `--once` Butler pass verdict.
 #[cfg(feature = "network")]
 pub mod butler_root;
@@ -51,6 +56,10 @@ pub mod enterprise_identity;
 pub mod enterprise_pdp_runtime;
 /// Read-only sandbox-anomaly consumer, shared with actual process-boundary proofs.
 pub mod escape_detector_consumer;
+/// Story 13.5a / 23-2 — the governed decorator over the daemon's collective-serve seam; its
+/// governance chain runs in the cohort admission guard and never waits on key discovery.
+#[cfg(feature = "network")]
+pub mod governed_digest_read;
 /// Story 22-8 — an unresolved halt survives a restart of the standing cast: the boot-time
 /// carry-over scan, the `halt.carried` row and the re-admission.
 pub mod halt_carry;

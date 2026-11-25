@@ -1,0 +1,9 @@
+Plant E232-PLANT-mixed-algs: crates/maos-sso/src/lib.rs `Rules::verify` set `validation.algorithms` to the WHOLE allowlist (the pre-23-2 code).
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Failing lines of that run (1 failed, 17 passed):
+
+test a_mixed_algorithm_allowlist_verifies_an_rs256_assertion ... FAILED
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:762:5 (the discovering verifier, allowlist [RS256, ES256], a good RS256 assertion, did not verify)
+test result: FAILED. 17 passed; 1 failed
+
+Observed independently before the fix: `enterprise_identity_wiring::static_jwks_still_verifies_without_discovery` (default allowlist `RS256,ES256`, static JWKS) failed with `SsoIssuanceDenied { reason: "identity assertion algorithm rejected" }` on the first run. That is the evidence for RELEASE-HOLDS 23-2.e (7).
