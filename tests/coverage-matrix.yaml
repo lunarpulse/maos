@@ -889,6 +889,12 @@ coverage:
       crates/maos-kernel-core/tests/routed_halt_swap_20_3b.rs
       (active_halt_keeps_identity_and_replay_context_across_hot_swap) and
       crates/maos-kernel-core/tests/halt_carry_20_3c.rs.
+      2026-11-25 (Epic 21 close, S-1): the I14 production hot-swap cutover race and the two other
+      open I14 rows are owned by `later-i14-hot-swap-cutover` (formerly named under
+      `21-9-wasm-host-default-on`); I14 stays `asserted` (docs/invariants/I14.md). The I14 adversarial
+      corpus gains one case: a swap that drains every halt but receipts only part of them is refused
+      (receipted_drains < halts_before). The corpus still cannot express the cutover race itself (the
+      predicate judges only swaps whose gate snapshot held halts); that stays with the owning key.
   FR54:
     gates: [check-cohort-mesh]
     enforcement: advisory-until-engagement
