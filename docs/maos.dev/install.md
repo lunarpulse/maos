@@ -95,12 +95,13 @@ source SHA label. With no arguments it runs `maos serve --config /usr/share/maos
 (cast: nash and observer; no provider key needed). Discipline builds it and runs the compose file
 and the Helm chart against it on every pull request, without registry secrets.
 
-A `v*` tag publishes `ghcr.io/<owner>/maos:<tag>` (`linux/amd64`, `linux/arm64`), cosign-signed,
-with the workflow's `GITHUB_TOKEN`; it needs no operator secret. **Docker Hub publication and its
-signing still wait for both Docker Hub credentials**; if absent, the job says
-`SKIPPED: Docker Hub publication, DOCKERHUB_* absent (ops-provisioning-secrets-and-accounts)`.
-No published image is claimed until the first post-GA tag has run, and the GHCR package's
-visibility is an operator setting. Publication jobs reference the `release` environment, but a
+A `v*` tag publishes `ghcr.io/lunarpulse/maos:<tag>` (`linux/amd64`, `linux/arm64`), cosign-signed,
+with the workflow's `GITHUB_TOKEN`; it needs no operator secret, and `latest` moves only for a GA `vX.Y.Z` tag.
+GHCR is the only registry. A tag push that cannot publish fails the run. No published image is
+claimed until a run has pushed it, and a package created by `GITHUB_TOKEN` starts private: the
+operator makes it public once in the GitHub package settings before anonymous pulls work. A
+`workflow_dispatch` rehearsal can publish `main-<short-sha>` (never `latest` or a version tag).
+Publication jobs reference the `release` environment, but a
 reference does not prove protection is configured. An administrator must provision required
 reviewers and tag/deployment protections per the provisioning checklist first.
 After publication, verify its digest with `cosign verify --certificate-identity

@@ -47,20 +47,40 @@ fn ac1_native_deb_matrix_and_all_consumers_are_required() {
     );
 }
 
-/// Story 22-3 (D-22-3-02 A): GHCR publishes with `GITHUB_TOKEN` on every tag; every Docker Hub
-/// step keeps the `PUBLISH` secret gate. The credential-free build never pushes.
+/// GHCR is the only registry: no Docker Hub name survives, `packages: write` is held by the
+/// publication job alone, a tag push always publishes (the publication job is not gated on a
+/// secret), and a dispatch publishes only when asked, under a non-release tag.
 #[test]
-fn ac5_ghcr_publishes_ungated_and_docker_hub_stays_credential_gated() {
+fn ac5_ghcr_is_the_only_registry_and_a_tag_push_never_skips_publication() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let text = std::fs::read_to_string(root.join(".github/workflows/container.yml")).unwrap();
+    assert!(!text.to_ascii_lowercase().contains("dockerhub"));
+    assert!(!text.to_ascii_lowercase().contains("hub_user"));
     let workflow = load(".github/workflows/container.yml");
     assert!(workflow["on"]["push"]["tags"].is_sequence());
     assert!(workflow["on"]["pull_request_target"].is_null());
-    let job = &workflow["jobs"]["build-and-push"];
-    assert!(job["env"]["PUBLISH"]
-        .as_str()
-        .unwrap()
-        .contains("DOCKERHUB_TOKEN != ''"));
-    let gate = Some("env.PUBLISH == 'true'");
-    let (mut ghcr_login, mut hub_login, mut push, mut ghcr_sign, mut hub_sign) = (0, 0, 0, 0, 0);
+    let inputs = &workflow["on"]["workflow_dispatch"]["inputs"];
+    assert_eq!(inputs["publish"]["type"].as_str(), Some("boolean"));
+    assert_eq!(inputs["publish"]["default"].as_bool(), Some(false));
+    assert!(inputs["release_tag"].is_mapping());
+
+    let build = &workflow["jobs"]["build-and-push"];
+    assert!(build["permissions"]["packages"].is_null());
+    assert!(build["permissions"]["id-token"].is_null());
+    let publication = &workflow["jobs"]["publication"];
+    assert_eq!(
+        publication["permissions"]["packages"].as_str(),
+        Some("write")
+    );
+    assert_eq!(
+        publication["permissions"]["id-token"].as_str(),
+        Some("write")
+    );
+    let condition = publication["if"].as_str().unwrap();
+    assert!(condition.contains("outputs.publish"));
+    assert!(!condition.contains("secrets."));
+
+    let (mut ghcr_login, mut push, mut sign) = (0, 0, 0);
     for step in workflow["jobs"]
         .as_mapping()
         .into_iter()
@@ -71,46 +91,25 @@ fn ac5_ghcr_publishes_ungated_and_docker_hub_stays_credential_gated() {
         let run = step["run"].as_str().unwrap_or("");
         let with = &step["with"];
         if uses.starts_with("docker/login-action") {
-            if with["registry"].as_str() == Some("ghcr.io") {
-                ghcr_login += 1;
-                assert!(
-                    step["if"].is_null(),
-                    "GHCR login must not wait for Docker Hub"
-                );
-                assert_eq!(
-                    with["password"].as_str(),
-                    Some("${{ secrets.GITHUB_TOKEN }}")
-                );
-            } else {
-                hub_login += 1;
-                assert_eq!(step["if"].as_str(), gate, "Docker Hub login");
-            }
+            ghcr_login += 1;
+            assert_eq!(with["registry"].as_str(), Some("ghcr.io"));
+            assert!(step["if"].is_null());
+            assert_eq!(
+                with["password"].as_str(),
+                Some("${{ secrets.GITHUB_TOKEN }}")
+            );
         }
         if uses.starts_with("docker/build-push-action") {
             push += 1;
-            assert!(
-                step["if"].is_null(),
-                "the one push serves GHCR on every tag"
-            );
-            let tags = with["tags"].as_str().unwrap();
-            assert!(tags.contains("ghcr.io/${{ github.repository }}"));
-            // The Docker Hub tag exists only when the credentials do.
-            assert!(tags.contains("env.PUBLISH == 'true' && format("), "{tags}");
-            assert!(!tags.contains("HUB_USER }}/maos:${{ github.ref_name }}\n"));
+            assert!(step["if"].is_null(), "the one push is never skipped");
+            assert!(with["tags"].as_str().unwrap().contains("outputs.tags"));
         }
         if uses.starts_with("sigstore/") {
             assert!(step["if"].is_null());
         }
         if run.contains("cosign sign") {
-            if run.contains("HUB_USER") {
-                hub_sign += 1;
-                assert_eq!(step["if"].as_str(), gate, "Docker Hub signing");
-                assert!(!run.contains("GHCR_IMAGE"));
-            } else {
-                ghcr_sign += 1;
-                assert!(step["if"].is_null(), "GHCR signing is not gated");
-                assert!(run.contains("GHCR_IMAGE"));
-            }
+            sign += 1;
+            assert!(step["if"].is_null(), "signing is not gated");
         }
         if step["name"].as_str() == Some("Always build and smoke without logging in") {
             assert!(step["if"].is_null());
@@ -120,10 +119,22 @@ fn ac5_ghcr_publishes_ungated_and_docker_hub_stays_credential_gated() {
             }
         }
     }
-    assert_eq!(
-        (ghcr_login, hub_login, push, ghcr_sign, hub_sign),
-        (1, 1, 1, 1, 1)
-    );
+    assert_eq!((ghcr_login, push, sign), (1, 1, 1));
+
+    // The classification: a push publishes under the release tag, `latest` only for a GA tag;
+    // a dispatch publishes `main-<short-sha>` only, never `latest` or a version tag.
+    let classify = build["steps"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .find(|step| step["id"].as_str() == Some("classify"))
+        .expect("classify step");
+    let run = classify["run"].as_str().unwrap();
+    assert!(run.contains("ghcr.io/${OWNER,,}/maos"));
+    let (push_branch, dispatch_branch) = run.split_once("else\n  publish=").unwrap();
+    assert!(push_branch.contains("$image:latest") && push_branch.contains("kind\" == ga"));
+    assert!(dispatch_branch.contains("main-${GITHUB_SHA::7}"));
+    assert!(!dispatch_branch.contains("latest"));
 }
 
 #[test]
