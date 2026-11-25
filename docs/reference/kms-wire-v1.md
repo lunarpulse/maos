@@ -77,8 +77,11 @@ contains the request's data key bytes, is a prefix or suffix of them, or
 contains their base64 (standard or URL-safe, padded or not) or hex text is
 refused with `KmsError::Crypto` (no envelope, no plaintext fallback, no bytes in
 the error, health unchanged). A trivially derived value (reversed, XORed,
-truncated and re-keyed) is not detected. MAOS does not unwrap-verify a fresh
-`wrapped` either (RELEASE-HOLDS 23-8.h).
+truncated and re-keyed) is not detected. `EncryptedFileSecretStore::store`
+(credentials) does unwrap-verify what it sealed before it writes: it sends one
+extra `POST /unwrap`, and an envelope that does not open to the stored value is
+refused, leaving the existing file untouched. loom-lite Collective rows are not
+unwrap-verified at seal time (RELEASE-HOLDS 23-8.h).
 
 ## Errors
 

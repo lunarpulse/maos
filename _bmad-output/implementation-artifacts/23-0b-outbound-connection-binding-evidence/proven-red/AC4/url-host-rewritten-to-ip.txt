@@ -1,0 +1,20 @@
+warning: unexpected `cfg` condition value: `test-introspection`
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = note: `#[warn(unexpected_cfgs)]` on by default
+a_bound_port_refuses_a_different_host_or_port --- FAILED
+an_untrusted_certificate_for_the_name_is_refused --- FAILED
+the_tls_name_is_the_original_host --- FAILED
+failures:
+thread 'a_bound_port_refuses_a_different_host_or_port' (3043184) panicked at crates/maos-kernel-core/tests/io_binding_23_0b.rs:246:17:
+https://127.0.0.1:46803/: ureq GET https://127.0.0.1:46803/: https://127.0.0.1:46803/: Connection Failed: tls connection init failed: unexpected end of file
+thread 'an_untrusted_certificate_for_the_name_is_refused' (3043188) panicked at crates/maos-kernel-core/tests/io_binding_23_0b.rs:282:5:
+assertion `left == right` failed
+  left: [None]
+ right: [Some("rebind.maos.test")]
+thread 'the_tls_name_is_the_original_host' (3043191) panicked at crates/maos-kernel-core/tests/io_binding_23_0b.rs:267:5:
+assertion `left == right` failed
+  left: [None]
+ right: [Some("rebind.maos.test")]
+failures:
+test result: FAILED. 3 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+error: test failed, to rerun pass `-p maos-kernel-core --test io_binding_23_0b`

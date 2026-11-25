@@ -72,6 +72,12 @@ pub enum Mode {
     /// A hostile or broken wrapping endpoint: `POST /wrap` answers a
     /// `wrapped` that discloses the request's data key in this way.
     HostileWrap(Disclosure),
+    /// `POST /wrap` answers a one-byte `wrapped` (well-formed, unusable) and
+    /// `POST /unwrap` of anything then refuses (`422 unwrap_failed`).
+    UnusableWrap,
+    /// `POST /wrap` is correct; `POST /unwrap` answers a 32-byte key that is
+    /// not the one that was wrapped.
+    WrongUnwrapKey,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -323,7 +329,11 @@ fn handle(state: &State, mut stream: TcpStream) {
             respond(&mut stream, status, "", &body);
             return;
         }
-        Mode::Normal | Mode::WrongVersion | Mode::HostileWrap(_) => {}
+        Mode::Normal
+        | Mode::WrongVersion
+        | Mode::HostileWrap(_)
+        | Mode::UnusableWrap
+        | Mode::WrongUnwrapKey => {}
     }
     let json: serde_json::Value = serde_json::from_str(&request.body).unwrap_or_default();
     let field = |name: &str| {
@@ -336,13 +346,17 @@ fn handle(state: &State, mut stream: TcpStream) {
         ("POST", "/wrap") => field("plaintext")
             .and_then(|key| match &mode {
                 Mode::HostileWrap(how) => Some(hostile_wrapped(*how, &key)),
+                Mode::UnusableWrap => Some(vec![0x01]),
                 _ => state.local.wrap_data_key(&key).ok(),
             })
             .map(
                 |wrapped| serde_json::json!({"version": version, "wrapped": b64_encode(&wrapped)}),
             ),
         ("POST", "/unwrap") => field("wrapped")
-            .and_then(|wrapped| state.local.unwrap_data_key(&wrapped).ok())
+            .and_then(|wrapped| match &mode {
+                Mode::WrongUnwrapKey => Some(vec![0x99; 32]),
+                _ => state.local.unwrap_data_key(&wrapped).ok(),
+            })
             .map(|key| serde_json::json!({"version": version, "plaintext": b64_encode(&key)})),
         _ => None,
     };
