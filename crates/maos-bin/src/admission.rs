@@ -444,6 +444,29 @@ impl AdmissionRefusal {
     }
 }
 
+/// The longest manifest-supplied identifier a refusal message echoes: the cap
+/// `provider.complete` entries already carry. `[providers].primary.model_id` is
+/// uncapped, so its echo is bounded here.
+const ECHOED_ID_LIMIT: usize = 128;
+
+/// A manifest-supplied identifier made safe to print: at most [`ECHOED_ID_LIMIT`]
+/// characters (an ellipsis marks a cut) with control characters escaped.
+fn echoed(value: &str) -> String {
+    let mut out = String::with_capacity(value.len().min(ECHOED_ID_LIMIT + 3));
+    for (index, c) in value.chars().enumerate() {
+        if index == ECHOED_ID_LIMIT {
+            out.push('…');
+            break;
+        }
+        if c.is_control() {
+            out.extend(c.escape_default());
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 impl std::fmt::Display for AdmissionRefusal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -511,7 +534,7 @@ impl std::fmt::Display for AdmissionRefusal {
             ),
             Self::ProviderUnavailable { provider } => write!(f, "provider_unavailable: '{provider}' is undeclared, unregistered, or its model assertion differs"),
             Self::EndpointPinMismatch { provider } => write!(f, "endpoint_pin_mismatch: '{provider}' does not match the configured endpoint"),
-            Self::ModelNotAdmitted { provider, model } => write!(f, "model_not_admitted: '{provider}' does not admit the pinned model '{model}'"),
+            Self::ModelNotAdmitted { provider, model } => write!(f, "model_not_admitted: '{}' does not admit the pinned model '{}'", echoed(provider), echoed(model)),
             Self::FallbackUnsupported => f.write_str("fallback_unsupported: a primary token cannot authorise fallback providers"),
             Self::SkillUnavailable { skill } => write!(f, "skill_unavailable: {skill}"),
             Self::SkillEscalation { skill } => write!(f, "skill_escalation: {skill}"),
@@ -1194,12 +1217,19 @@ pub fn declared_pins(gated: &GatedManifest) -> Vec<String> {
 /// The first declared binding choice, split into provider and pinned model.
 pub fn first_declared_pin(gated: &GatedManifest) -> Option<(String, Option<String>)> {
     let pins = declared_pins(gated);
-    let (provider, model) = maos_manifest::split_provider_pin(pins.first()?);
-    Some((provider.to_owned(), model.map(str::to_owned)))
+    let (provider, _) = maos_manifest::split_provider_pin(pins.first()?);
+    let model = pin_for(
+        gated.providers.as_ref(),
+        &gated.caps_required.provider.complete,
+        provider,
+    );
+    Some((provider.to_owned(), model))
 }
 
-/// S1 (Q6) — a pinned model must be admitted for a provider the root has
-/// registered; refused here, before any token or transport call.
+/// S1 (Q6) — a pinned model must be admitted for any provider present in the
+/// boot catalog, whether or not it is registered on this host (a retired pin
+/// must not ride through on a keyless host); refused here, before any token or
+/// transport call.
 pub fn check_declared_pins(
     declared: &[String],
     catalog: Option<&ProviderCatalog>,
@@ -1208,9 +1238,7 @@ pub fn check_declared_pins(
         let (provider, Some(model)) = maos_manifest::split_provider_pin(entry) else {
             continue;
         };
-        let configured = catalog
-            .and_then(|c| c.get(provider))
-            .filter(|p| p.registered);
+        let configured = catalog.and_then(|c| c.get(provider));
         if configured.is_some_and(|c| {
             !admitted_models(provider, c.model)
                 .iter()
@@ -1288,13 +1316,14 @@ pub fn check_provider_pins(
             })?;
         // S1: the assertion names any admitted model of the provider, not
         // only the configured default.
-        if config.model_id.as_deref().is_some_and(|m| {
+        if let Some(model) = config.model_id.as_deref().filter(|m| {
             !admitted_models(&config.id, registered.model)
                 .iter()
                 .any(|admitted| admitted == m)
         }) {
-            return Err(AdmissionRefusal::ProviderUnavailable {
+            return Err(AdmissionRefusal::ModelNotAdmitted {
                 provider: config.id.clone(),
+                model: model.to_owned(),
             });
         }
         let pin_ok = config.provider_endpoint_pin.as_deref().is_none_or(|pin| {

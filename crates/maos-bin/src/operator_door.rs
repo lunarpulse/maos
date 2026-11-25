@@ -543,10 +543,11 @@ pub type WorkerRevokeStopHook =
 ///
 /// The kernel factory signature (`SuccessorSpiritFactory::create`) receives
 /// only the PARSED bundle, which carries no source path — but the butler arm
-/// must re-parse `[epistemic_policy]` from the target file to build a FAITHFUL
+/// must re-parse `[epistemic_policy]` from the target manifest to build a FAITHFUL
 /// successor (a bare `Butler::new()` completes the swap and silently loses the
 /// halt — the AC4 root-E falsifier). The door stages the path here just before
-/// invoking the upgrade and clears it after.
+/// invoking the upgrade and clears it after; the in-process factory reads that
+/// staged file ONCE and builds from the same text it pin-checked.
 #[derive(Clone, Default)]
 pub struct SuccessorManifestSlot {
     path: Arc<Mutex<Option<PathBuf>>>,
@@ -1752,8 +1753,9 @@ impl DoorInner {
                 ),
             };
         }
-        // Constructors re-read behavioural sections from a path. Materialize
-        // the retained bytes, never the old mutable admission pathname.
+        // The in-process constructors build from gated TEXT, but the spawned restore and the
+        // registry-sidecar lookup still locate the manifest by path. Materialize the retained
+        // bytes, never the old mutable admission pathname.
         let restore_manifest = match ManifestSnapshot::new(predecessor_manifest.as_bytes()) {
             Ok(manifest) => manifest,
             Err(error) => {

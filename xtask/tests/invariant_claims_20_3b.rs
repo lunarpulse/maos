@@ -285,7 +285,7 @@ fn routed_witness_binaries_and_labelled_red_owners_remain_enrolled() -> Result<(
         .values()
         .all(|c| matches!(c.claim, ClaimState::Asserted)));
     assert!(continuity.requirement_claims["FR53"]
-        .contains("production cutover race open (owner: 21-9 hot-swap)"));
+        .contains("production cutover race open (owner: later-i14-hot-swap-cutover)"));
     let ledger = include_str!("../../docs/invariants/README.md");
     assert!(ledger.contains("FR34 | asserted; owner: none (trigger-owned; see deferred-work)"));
     Ok(())

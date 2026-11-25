@@ -78,16 +78,28 @@ fn one_shot_hello_spirit_produces_valid_json() {
 /// Proven red: delete the one-shot's `check_gated_pins` call ⇒ the retired pin
 /// is admitted and the refusal assertion fails.
 fn one_shot_with_hello_pin(model: &str) -> std::process::Output {
+    one_shot_with_declaration(
+        "anthropic.claude-haiku-5-5",
+        &format!("anthropic.{model}"),
+        true,
+    )
+}
+
+/// The one-shot run with one `provider.complete` entry of the CWD hello
+/// manifest replaced; `replay` selects explicit replay or the keyless live
+/// (non-replay) mode.
+fn one_shot_with_declaration(from: &str, to: &str, replay: bool) -> std::process::Output {
     let root = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
     let source = std::fs::read_to_string(root.join("spirits/hello-spirit/manifest.toml"))
         .expect("read the hello manifest");
-    let pinned = source.replace("anthropic.claude-haiku-5-5", &format!("anthropic.{model}"));
+    let pinned = source.replace(from, to);
     assert_ne!(pinned, source, "the fixture must really change the pin");
     let world = tempfile::tempdir().expect("scratch world");
     let cwd = world.path().join("cwd");
     std::fs::create_dir_all(cwd.join("spirits/hello-spirit")).expect("cwd");
     std::fs::write(cwd.join("spirits/hello-spirit/manifest.toml"), pinned).expect("manifest");
-    Command::new(env!("CARGO_BIN_EXE_maos"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
+    command
         .env_clear()
         .env("PATH", std::env::var_os("PATH").unwrap_or_default())
         .env("HOME", world.path())
@@ -95,12 +107,14 @@ fn one_shot_with_hello_pin(model: &str) -> std::process::Output {
         .env("XDG_DATA_HOME", world.path().join("xdg"))
         .env("MAOS_SECRETS_BACKEND", "env")
         .env("MAOS_OLLAMA_URL", "skip")
-        .env("MAOS_ONE_SHOT", "hello-spirit")
-        .env("MAOS_INFERENCE_MODE", "replay")
-        .env(
+        .env("MAOS_ONE_SHOT", "hello-spirit");
+    if replay {
+        command.env("MAOS_INFERENCE_MODE", "replay").env(
             "MAOS_REPLAY_CASSETTE",
             root.join("crates/maos-journey-test/cassettes/j0/shell-intro.json"),
-        )
+        );
+    }
+    command
         .current_dir(&cwd)
         .output()
         .expect("failed to execute maos-bin")
@@ -123,9 +137,53 @@ fn one_shot_hello_refuses_a_retired_model_pin_under_explicit_replay() {
     );
 
     let admitted = one_shot_with_hello_pin("claude-sonnet-5-5");
+    let stderr = String::from_utf8_lossy(&admitted.stderr);
     assert!(
-        !String::from_utf8_lossy(&admitted.stderr).contains("model_not_admitted"),
-        "an allowed pin is not refused for its model: {}",
-        String::from_utf8_lossy(&admitted.stderr)
+        admitted.status.success(),
+        "an allowed pin must run the one-shot to success: {} {stderr}",
+        admitted.status
     );
+    let stdout = String::from_utf8_lossy(&admitted.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(stdout.trim()).expect("the admitted run prints valid JSON");
+    assert!(
+        parsed.get("introduction").is_some(),
+        "the admitted run must produce an introduction: {stdout}"
+    );
+}
+
+/// S-7a A — keyless, NON-replay, Ollama skipped: OpenAI is known to the boot
+/// catalog but not registered. A retired OpenAI declaration is still refused
+/// before the Spirit runs; an allowed OpenAI id runs to success.
+///
+/// Proven red: restore the `.filter(|p| p.registered)` in
+/// `check_declared_pins` ⇒ the retired id is waved through and the refusal
+/// assertion fails.
+#[test]
+fn keyless_one_shot_validates_an_unregistered_providers_declared_pin() {
+    let refused = one_shot_with_declaration("openai.gpt-4o-mini", "openai.gpt-4", false);
+    let stderr = String::from_utf8_lossy(&refused.stderr);
+    assert!(
+        !refused.status.success()
+            && stderr.contains("model_not_admitted")
+            && stderr.contains("pinned model 'gpt-4'"),
+        "a retired id on an unregistered provider must refuse: {} {stderr}",
+        refused.status
+    );
+    assert!(
+        !String::from_utf8_lossy(&refused.stdout).contains("introduction"),
+        "the Spirit must not have run"
+    );
+
+    let admitted = one_shot_with_declaration("openai.gpt-4o-mini", "openai.gpt-6-sol", false);
+    let stderr = String::from_utf8_lossy(&admitted.stderr);
+    assert!(
+        admitted.status.success(),
+        "an allowed id must exit successfully: {} {stderr}",
+        admitted.status
+    );
+    let stdout = String::from_utf8_lossy(&admitted.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(stdout.trim()).expect("the admitted run prints valid JSON");
+    assert!(parsed.get("introduction").is_some(), "{stdout}");
 }

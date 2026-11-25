@@ -1273,14 +1273,7 @@ impl SpawnedBridge {
         let container = self.child.as_ref().and_then(|child| match child {
             BridgeChild::Container(guard, _) => {
                 let terminal = guard.terminal();
-                let facts = terminal
-                    .facts_by(terminal_deadline, true)
-                    .unwrap_or_else(|| {
-                        std::sync::Arc::new(maos_domain::sandbox::ContainerTerminalFacts::new(
-                            Err(maos_domain::sandbox::TerminalUnavailable::DeadlineExpired),
-                            None,
-                        ))
-                    });
+                let facts = terminal.facts_capped(terminal_deadline);
                 let verdict = guard.teardown(terminal_deadline);
                 Some((facts, verdict))
             }
