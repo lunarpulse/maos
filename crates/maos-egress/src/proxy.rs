@@ -5,6 +5,7 @@ use crate::{
     upstream::{Connection, Response},
 };
 use maos_domain::host_grant::EgressDestination;
+use maos_domain::outbound::{classify_ip, IpClass};
 use parking_lot::{Condvar, Mutex};
 use std::{
     collections::HashMap,
@@ -1047,7 +1048,7 @@ fn vetted_addresses(
                 vec![SocketAddr::new(IpAddr::V4(ip), destination.port)],
             ));
         }
-        if !public_ip(IpAddr::V4(ip)) {
+        if classify_ip(IpAddr::V4(ip)) != IpClass::Public {
             return Err(invalid("unsafe upstream address"));
         }
         return Ok((
@@ -1062,7 +1063,11 @@ fn vetted_addresses(
     // request instead of pinning this worker and stop_and_join. A timed-out
     // helper thread is abandoned (bounded by the distinct granted hostnames).
     let addresses = resolve_bounded(&destination.host, destination.port)?;
-    if addresses.is_empty() || addresses.iter().any(|address| !public_ip(address.ip())) {
+    if addresses.is_empty()
+        || addresses
+            .iter()
+            .any(|address| classify_ip(address.ip()) != IpClass::Public)
+    {
         return Err(invalid("unsafe upstream resolution"));
     }
     Ok(("https", addresses))
@@ -1082,36 +1087,4 @@ fn resolve_bounded(host: &str, port: u16) -> io::Result<Vec<SocketAddr>> {
     receiver
         .recv_timeout(RESOLVE_TIMEOUT)
         .map_err(|_| invalid("dns resolution deadline exceeded"))
-}
-
-fn public_ip(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(ip) => {
-            let [a, b, _, _] = ip.octets();
-            !ip.is_private()
-                && !ip.is_loopback()
-                && !ip.is_link_local()
-                && !ip.is_multicast()
-                && !ip.is_broadcast()
-                && !ip.is_unspecified()
-                && a != 0
-                && a < 240
-                && !(a == 100 && (64..=127).contains(&b))
-                && !(a == 192 && (b == 0 || b == 2))
-                && !(a == 198 && (b == 18 || b == 19 || b == 51))
-                && !(a == 203 && b == 0)
-        }
-        IpAddr::V6(ip) => {
-            if let Some(mapped) = ip.to_ipv4_mapped() {
-                return public_ip(IpAddr::V4(mapped));
-            }
-            let segments = ip.segments();
-            // Only global unicast; refuse unique-local, link/site-local, multicast,
-            // IPv4 translations, documentation and other special-use blocks.
-            segments[0] & 0xe000 == 0x2000
-                && !(segments[0] == 0x2001 && segments[1] < 0x0200)
-                && !(segments[0] == 0x2001 && segments[1] == 0x0db8)
-                && !(segments[0] == 0x2002)
-        }
-    }
 }

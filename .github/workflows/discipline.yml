@@ -677,6 +677,14 @@ jobs:
           cargo build -p worker --bin worker-cli-fixture
           cargo test -p maos-bin --test verb_table_15_3 -- --test-threads=1
           cargo test -p maos-bin --no-default-features --test verb_table_15_3 -- --test-threads=1
+      - name: Build and test the maos-bin profile without online-adapters (23-0 AC6, D-23-6-01 A iii)
+        run: |
+          cargo check --locked -p maos-bin --lib --bins --tests --no-default-features --features network,wasm-host
+          cargo test --locked -p maos-bin --no-default-features --features network,wasm-host --test online_adapters_23_0
+          # the shape-only test must exist and pass in this build (it is cfg-compiled out when the umbrella is on)
+          cargo test --locked -p maos-bin --no-default-features --features network,wasm-host --test online_adapters_23_0 -- --exact the_profile_without_online_adapters_has_network_and_wasm_host 2>&1 | tee "$RUNNER_TEMP/online-shape.log"
+          grep -q "test result: ok. 1 passed" "$RUNNER_TEMP/online-shape.log"
+          cargo test --locked -p maos-bin --test online_adapters_23_0
 
   # Story 20-12 AC1 — every test binary in the workspace suite's nextest junit
   # keeps its Σ per-test time under its `xtask/test-budgets.toml` budget
