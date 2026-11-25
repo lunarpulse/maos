@@ -18243,7 +18243,7 @@ mod story_13_5a_enterprise_daemon_seam {
             )
             .map_err(|error| format!("query governed row: {error}"))?;
             let needle = format!(
-                " externalId={} ",
+                " externalId={}\n",
                 governed
                     .first()
                     .ok_or("the governed collective read journaled no row")?

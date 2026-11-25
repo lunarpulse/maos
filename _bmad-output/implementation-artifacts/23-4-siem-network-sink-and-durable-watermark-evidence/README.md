@@ -111,3 +111,28 @@ and the ADR-051 amendment.
 | **A (recommended)** | Accept the documented residual. | Rows are lost only when a collector closes first, or at the same instant, without reading the batch. |
 | B | Application-level acknowledgement (for example RELP). | New wire format, new story; no residual. |
 | C | The collector answers on a separate acknowledgement channel. | Not standard; collector-side work. |
+
+## OPERATOR DECISION D-23-4-17 — a frame over 1 MiB, and the backlog count (review round 5, R5-9; NOT decided by the implementer)
+
+AC5 as written bounds a batch at 1 MiB. A single log row whose projected frame is larger than that cannot be split (an
+RFC 5425 frame is one whole line), so the exporter sends it ALONE in its own batch: a single frame over the literal ceiling
+(proved by `a_real_frame_over_one_mebibyte_is_sent_alone_and_the_next_row_follows` over TLS and
+`a_frame_over_one_mebibyte_is_sent_alone_and_the_next_row_follows` on the file sink). The "records remain" figure of a failed sink is
+counted up to 5,000 rows and printed as "at least N".
+
+| Option | What it is | Exposure |
+|---|---|---|
+| **A (recommended)** | Accept: a row whose projected frame exceeds 1 MiB is sent alone, never dropped or truncated; the backlog count is capped at 5,000 and reported as "at least N". | The 1 MiB bound has one documented exception; a collector with a smaller frame limit refuses such a row and the export stalls on it (typed error each tick). |
+| B | Refuse such rows with a typed gap-like diagnostic and skip them. | Loses data (a skipped row never reaches the SIEM). |
+
+AC9 reconciliation: RELEASE-HOLDS 23-4.c no longer says "the collector read the batch"; it now points to 23-4.i (the delivery
+contract, D-23-4-16).
+
+## AC1c — the root-store witness (review round 5, R5-8d)
+
+`maos_siem::tls_sink::root_store` (doc-hidden) builds the store `client_config` uses; the test
+`the_root_store_holds_exactly_the_anchors_of_the_configured_bundle` asserts it holds EXACTLY the bundle's anchors (1 and 2).
+Plant P6 (an extra anchor pushed into the store) FAILED it. This models "additive roots" as an extra anchor: the literal
+plant "webpki-roots added" still cannot be built offline (the crate is not a dependency). If the reviewer wants the literal
+wording kept, the evidence needs an acceptance change from the operator ("AC1c is witnessed by the exact-anchor-set
+assertion"); I did not reword the AC.

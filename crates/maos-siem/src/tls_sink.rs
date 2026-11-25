@@ -73,16 +73,13 @@ impl std::fmt::Display for SetupError {
 
 impl std::error::Error for SetupError {}
 
-/// The TLS client configuration: trust anchors from `ca_pem` only, TLS 1.3 and 1.2 over
-/// `ring`, and the optional client certificate (RFC 9662 §4: rustls offers
-/// `TLS_ECDHE_*_WITH_AES_128_GCM_SHA256` and TLS 1.3; it does not offer static-RSA CBC).
+/// The root store the sink trusts: EXACTLY the anchors of `ca_pem` (no system or bundled roots).
+/// Doc-hidden so a test can compare it with the bundle (the AC1c witness).
 ///
 /// # Errors
-/// [`SetupError`] for a bundle with no certificate, or an unusable client certificate or key.
-pub fn client_config(
-    ca_pem: &[u8],
-    client: Option<(&[u8], &[u8])>,
-) -> Result<Arc<ClientConfig>, SetupError> {
+/// [`SetupError::CaInvalid`] for a bundle with no usable certificate.
+#[doc(hidden)]
+pub fn root_store(ca_pem: &[u8]) -> Result<RootCertStore, SetupError> {
     let mut roots = RootCertStore::empty();
     let mut anchors = 0_usize;
     for cert in CertificateDer::pem_slice_iter(ca_pem) {
@@ -93,6 +90,20 @@ pub fn client_config(
     if anchors == 0 {
         return Err(SetupError::CaInvalid);
     }
+    Ok(roots)
+}
+
+/// The TLS client configuration: trust anchors from `ca_pem` only, TLS 1.3 and 1.2 over
+/// `ring`, and the optional client certificate (RFC 9662 §4: rustls offers
+/// `TLS_ECDHE_*_WITH_AES_128_GCM_SHA256` and TLS 1.3; it does not offer static-RSA CBC).
+///
+/// # Errors
+/// [`SetupError`] for a bundle with no certificate, or an unusable client certificate or key.
+pub fn client_config(
+    ca_pem: &[u8],
+    client: Option<(&[u8], &[u8])>,
+) -> Result<Arc<ClientConfig>, SetupError> {
+    let roots = root_store(ca_pem)?;
     let builder =
         ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
             .with_safe_default_protocol_versions()
@@ -131,6 +142,11 @@ pub enum CloseStage {
 #[doc(hidden)]
 pub type CloseHook = Arc<dyn Fn(&TcpStream, CloseStage) + Send + Sync>;
 
+/// Opens the TCP connection to one vetted address within the given bound (a test seam: the
+/// default is `TcpStream::connect_timeout`).
+#[doc(hidden)]
+pub type Connector = Arc<dyn Fn(&SocketAddr, Duration) -> std::io::Result<TcpStream> + Send + Sync>;
+
 /// The syslog-over-TLS [`BatchSink`].
 pub struct TlsSink {
     host: String,
@@ -141,6 +157,7 @@ pub struct TlsSink {
     timeouts: Timeouts,
     cancel: Option<Arc<AtomicBool>>,
     hook: Option<CloseHook>,
+    connector: Option<Connector>,
 }
 
 impl std::fmt::Debug for TlsSink {
@@ -177,8 +194,17 @@ impl TlsSink {
             timeouts,
             cancel: None,
             hook: None,
+            connector: None,
         }
     }
+    /// Install a test hook that runs on each side of the pre-close look (ordering fixtures).
+    #[doc(hidden)]
+    #[must_use]
+    pub fn with_connector(mut self, connector: Connector) -> Self {
+        self.connector = Some(connector);
+        self
+    }
+
     /// Install a test hook that runs on each side of the pre-close look (ordering fixtures).
     #[doc(hidden)]
     #[must_use]
@@ -202,7 +228,11 @@ impl TlsSink {
             let Some(remaining) = remaining(deadline) else {
                 return Err(SinkFailure::new("siem_sink_timeout"));
             };
-            match TcpStream::connect_timeout(&SocketAddr::new(*ip, self.port), remaining) {
+            let attempt = match &self.connector {
+                Some(connector) => connector(&SocketAddr::new(*ip, self.port), remaining),
+                None => TcpStream::connect_timeout(&SocketAddr::new(*ip, self.port), remaining),
+            };
+            match attempt {
                 Ok(stream) => return Ok(stream),
                 Err(error) if is_timeout(&error) => refused = SinkFailure::new("siem_sink_timeout"),
                 Err(_) => refused = SinkFailure::new("siem_sink_connect_failed"),

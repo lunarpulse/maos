@@ -175,7 +175,7 @@ fn to_cef(entry: &AuditEntry) -> String {
     let payload = cef_escape(&entry.payload);
     let severity = derive_cef_severity(&entry.kind);
     format!(
-        "CEF:0|MAOS|maos-siem|0.1|{signature}|{name}|{severity}|rt={} sproc={} cs1Label=kind cs1={} externalId={} msg={payload}",
+        "CEF:0|MAOS|maos-siem|0.1|{signature}|{name}|{severity}|rt={} sproc={} cs1Label=kind cs1={} msg={payload} externalId={}",
         entry.timestamp_ns, entry.spirit_pid, signature, entry.frame_id_hex,
     )
 }
@@ -485,6 +485,10 @@ mod tests {
             .split("msg=")
             .nth(1)
             .expect("CEF must carry a msg= extension");
+        let msg = msg
+            .rsplit_once(" externalId=")
+            .expect("externalId is the LAST key of the line")
+            .0;
         assert!(
             !msg.contains(' '),
             "CEF msg= must not contain a raw unescaped space (space → \\s): {msg:?}"

@@ -718,3 +718,116 @@ fn gap_and_reset_transitions_hold_no_wal_reader_while_they_journal() {
         drop(tl);
     }
 }
+
+// ── review round 5 ───────────────────────────────────────────────────────────
+
+/// R5-1: `externalId` is the LAST token of every line, so no proper prefix of a record (what a
+/// short write leaves) contains a complete `externalId=<id>`: a deduplicating reader keyed on it
+/// never keeps a torn record and drops the intact retry.
+#[test]
+fn no_proper_prefix_of_a_record_carries_a_complete_external_id() {
+    let rig = Rig::new();
+    seed(&rig.db, 3);
+    assert_eq!(rig.tick().unwrap().delivered, 3);
+    for line in records(&rig.sink_path) {
+        let (_, id) = line
+            .rsplit_once(" externalId=")
+            .expect("the id is the last key");
+        assert!(!id.contains(' '), "the id is the final token: {line}");
+        let id = id.to_owned();
+        for cut in 0..line.len() {
+            if !line.is_char_boundary(cut) {
+                continue;
+            }
+            let prefix = &line[..cut];
+            assert!(
+                !prefix.contains(&format!("externalId={id}")),
+                "a torn prefix of {cut} bytes carries the complete id"
+            );
+            if let Some((_, partial)) = prefix.rsplit_once(" externalId=") {
+                assert!(id.starts_with(partial) && partial.len() < id.len());
+            }
+        }
+    }
+}
+
+/// R5-2: a rotator that truncates the file between our write and our sync (copytruncate is
+/// NOT supported) leaves the batch in neither file: the detectable case is not acknowledged.
+#[cfg(unix)]
+#[test]
+fn a_file_truncated_between_the_write_and_the_sync_does_not_advance_the_cursor() {
+    use std::io::Write;
+    let rig = Rig::new();
+    seed(&rig.db, 3);
+    let truncating = std::sync::atomic::AtomicBool::new(true);
+    let mut sink = rig.sink().with_writer(Arc::new(move |file, bytes| {
+        file.write_all(bytes)?;
+        if truncating.swap(false, std::sync::atomic::Ordering::SeqCst) {
+            file.set_len(0)?; // the rotator's truncate lands before our sync
+        }
+        file.sync_data()
+    }));
+    let failure = rig.tick_using(&mut sink).expect_err("truncated under us");
+    assert_eq!(failure.code(), "siem_file_truncated_during_append");
+    assert!(!cursor_for(&rig, &sink).exists(), "the cursor stayed");
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 3);
+    assert_eq!(records(&rig.sink_path).len(), 3);
+}
+
+/// R5-3: the directory-sync obligation survives a restart: a pre-existing file found on the
+/// first use of a new process syncs its parent exactly once, before the first cursor advance.
+#[test]
+fn a_pre_existing_file_syncs_its_parent_once_per_process_start() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let rig = Rig::new();
+    seed(&rig.db, 2);
+    std::fs::write(&rig.sink_path, "").unwrap();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = Arc::clone(&calls);
+    let mut sink = rig.sink().with_dir_sync(Arc::new(move |_| {
+        counter.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }));
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 2);
+    assert_eq!(calls.load(Ordering::SeqCst), 1, "once at first use");
+    seed(&rig.db, 1);
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 1);
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        1,
+        "not again for the same file"
+    );
+}
+
+/// R5-4: `MAOS_SIEM_FILE` may be a symlink whose target does not exist yet: the target is
+/// created, and the directory that CONTAINS the new entry is the one synced.
+#[cfg(unix)]
+#[test]
+fn a_dangling_symlink_is_followed_and_its_targets_directory_is_synced() {
+    let rig = Rig::new();
+    seed(&rig.db, 2);
+    let data = rig.sink_path.with_file_name("data");
+    std::fs::create_dir(&data).unwrap();
+    let link = rig.sink_path.with_file_name("link.log");
+    std::os::unix::fs::symlink("data/real.log", &link).unwrap();
+    let synced = Arc::new(Mutex::new(Vec::<PathBuf>::new()));
+    let seen = Arc::clone(&synced);
+    let mut sink =
+        FileSink::new(link.clone(), Arc::new(SiemExporter)).with_dir_sync(Arc::new(move |entry| {
+            seen.lock().unwrap().push(entry.to_path_buf());
+            Ok(())
+        }));
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 2);
+    assert_eq!(
+        records(&data.join("real.log")).len(),
+        2,
+        "the target was created"
+    );
+    let synced = synced.lock().unwrap().clone();
+    assert_eq!(synced.len(), 1);
+    assert_eq!(
+        synced[0].parent().unwrap(),
+        data,
+        "the target's own directory"
+    );
+}

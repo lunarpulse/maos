@@ -167,7 +167,8 @@ pub enum Event {
     Unacked { bytes: Vec<u8> },
     /// The TLS handshake or a record was refused (the server's reason, for diagnosis only).
     Refused(String),
-    /// A connection was accepted in [`Mode::HoldHandshake`] and is being held.
+    /// A connection is being held: accepted in [`Mode::HoldHandshake`] with its ClientHello
+    /// read, or (in [`Mode::StopReading`]) past its handshake with reads stopped.
     Held,
 }
 
@@ -180,6 +181,9 @@ pub struct Options {
     /// Start with the ack gate closed: the server reads a batch but does not answer its
     /// `close_notify` until the test opens `ack_gate`.
     pub hold_ack: bool,
+    /// Send no TLS 1.3 session tickets: the only bytes after the handshake are then the ones
+    /// the test scripts (the alert), so their size is known.
+    pub no_tickets: bool,
 }
 
 pub struct FakeSiem {
@@ -228,14 +232,16 @@ impl FakeSiem {
             }
             None => builder.with_no_client_auth(),
         };
-        Arc::new(
-            builder
-                .with_single_cert(
-                    vec![leaf.der.clone()],
-                    PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(leaf.key_der.clone())),
-                )
-                .expect("server cert"),
-        )
+        let mut config = builder
+            .with_single_cert(
+                vec![leaf.der.clone()],
+                PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(leaf.key_der.clone())),
+            )
+            .expect("server cert");
+        if options.no_tickets {
+            config.send_tls13_tickets = 0;
+        }
+        Arc::new(config)
     }
 
     pub fn start(leaf: &Leaf, options: Options) -> Self {
@@ -378,6 +384,10 @@ fn serve(
             }
         }
     }
+    if mode == Mode::CloseWithoutReading {
+        serve_close_without_reading(tcp, conn, gates, events);
+        return;
+    }
     let mut bytes = Vec::new();
     loop {
         match conn.read_tls(&mut tcp) {
@@ -404,37 +414,9 @@ fn serve(
                     return;
                 }
             }
+            // The handshake is complete and reads have stopped: the test may now rely on both.
+            let _ = events.send(Event::Held);
             let _ = gates.alert_hold.wait_open();
-            let _ = events.send(Event::Unacked { bytes });
-            return;
-        }
-        if mode == Mode::CloseWithoutReading && !conn.is_handshaking() {
-            // Handshake complete: the collector closes WITHOUT reading anything. This is
-            // decided BEFORE any application read (TLS 1.3 can deliver the client's Finished
-            // and its first data in one read), so `bytes` is what was really captured: nothing.
-            // It waits for the test to release the alert (open by default), writes close_notify
-            // (a failed write is reported and `alert_sent` stays closed), half-closes, and only
-            // drains the socket so the close is not a reset.
-            // The server's own final flight (TLS 1.2: CCS and Finished) goes out first, so the
-            // client can finish its handshake whatever the alert gate does.
-            while conn.wants_write() {
-                if conn.write_tls(&mut tcp).is_err() {
-                    let _ = events.send(Event::Unacked { bytes });
-                    return;
-                }
-            }
-            gates.alert_hold.wait();
-            conn.send_close_notify();
-            while conn.wants_write() {
-                if conn.write_tls(&mut tcp).is_err() {
-                    let _ = events.send(Event::Unacked { bytes });
-                    return;
-                }
-            }
-            gates.alert_sent.open();
-            let _ = tcp.shutdown(std::net::Shutdown::Write);
-            let mut sink = [0_u8; 4096];
-            while matches!(std::io::Read::read(&mut tcp, &mut sink), Ok(n) if n > 0) {}
             let _ = events.send(Event::Unacked { bytes });
             return;
         }
@@ -523,10 +505,10 @@ pub fn external_ids(frames: &[String]) -> Vec<String> {
         .iter()
         .map(|frame| {
             let rest = frame
-                .split(" externalId=")
-                .nth(1)
+                .rsplit(" externalId=")
+                .next()
                 .expect("every frame carries externalId");
-            rest.split(' ').next().expect("externalId value").to_owned()
+            rest.trim_end().to_owned()
         })
         .collect()
 }
@@ -569,4 +551,80 @@ impl ResolveHost for StubResolver {
         let index = call.min(self.answers.len() - 1);
         Ok(self.answers[index].clone())
     }
+}
+
+/// `Mode::CloseWithoutReading`. The handshake is completed ONE TLS RECORD AT A TIME (the raw
+/// bytes are buffered here and rustls is fed a single record per step), and feeding stops the
+/// moment `is_handshaking()` turns false: whatever application data the client sent behind its
+/// Finished (TLS 1.3 may put both in one TCP read) is never given to rustls, so it is never
+/// decrypted. The step's `plaintext_bytes_to_read()` must be ZERO before the alert is released,
+/// else this is a FIXTURE DEFECT and the connection ends as `Event::Refused`.
+fn serve_close_without_reading(
+    mut tcp: TcpStream,
+    mut conn: ServerConnection,
+    gates: &Gates,
+    events: &Sender<Event>,
+) {
+    let unacked = || Event::Unacked { bytes: Vec::new() };
+    let mut raw: Vec<u8> = Vec::new();
+    let mut chunk = [0_u8; 4096];
+    let mut pending = 0_usize;
+    while conn.is_handshaking() {
+        let len = loop {
+            if raw.len() >= 5 {
+                let len = 5 + usize::from(u16::from_be_bytes([raw[3], raw[4]]));
+                if raw.len() >= len {
+                    break len;
+                }
+            }
+            match tcp.read(&mut chunk) {
+                Ok(0) | Err(_) => {
+                    let _ = events.send(unacked());
+                    return;
+                }
+                Ok(n) => raw.extend_from_slice(&chunk[..n]),
+            }
+        };
+        let record: Vec<u8> = raw.drain(..len).collect();
+        let mut input = std::io::Cursor::new(record);
+        while (input.position() as usize) < len {
+            if conn.read_tls(&mut input).is_err() {
+                let _ = events.send(unacked());
+                return;
+            }
+        }
+        match conn.process_new_packets() {
+            Ok(state) => pending = state.plaintext_bytes_to_read(),
+            Err(error) => {
+                let _ = conn.write_tls(&mut tcp);
+                let _ = events.send(Event::Refused(error.to_string()));
+                return;
+            }
+        }
+        while conn.wants_write() {
+            if conn.write_tls(&mut tcp).is_err() {
+                let _ = events.send(unacked());
+                return;
+            }
+        }
+    }
+    if pending != 0 {
+        let _ = events.send(Event::Refused(format!(
+            "fixture defect: {pending} application byte(s) were decrypted before the alert"
+        )));
+        return;
+    }
+    gates.alert_hold.wait();
+    conn.send_close_notify();
+    while conn.wants_write() {
+        if conn.write_tls(&mut tcp).is_err() {
+            let _ = events.send(unacked());
+            return;
+        }
+    }
+    gates.alert_sent.open();
+    let _ = tcp.shutdown(std::net::Shutdown::Write);
+    let mut sink = [0_u8; 4096];
+    while matches!(tcp.read(&mut sink), Ok(n) if n > 0) {}
+    let _ = events.send(unacked());
 }

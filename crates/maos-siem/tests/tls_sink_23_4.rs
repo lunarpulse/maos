@@ -25,7 +25,7 @@ use maos_siem::export::{
     run_tick, run_tick_cancellable, BatchSink, Frame, Tick, TickFailure, MAX_BATCH_BYTES,
     MAX_BATCH_FRAMES,
 };
-use maos_siem::tls_sink::{client_config, SetupError, Timeouts, TlsSink};
+use maos_siem::tls_sink::{client_config, root_store, SetupError, Timeouts, TlsSink};
 use tempfile::TempDir;
 
 const HOST: &str = "siem.test";
@@ -1219,6 +1219,28 @@ fn steady_progress_beyond_the_handshake_deadline_is_a_timeout_on_an_injected_clo
     assert_eq!(io.timeouts, 0);
 }
 
+/// Waits until the collector's whole close_notify record is readable on `tcp` (or its EOF is
+/// visible, which means everything before it was already consumed): with no TLS 1.3 tickets
+/// the alert is the only thing after the handshake, 24 bytes in TLS 1.3 (31 in 1.2).
+/// Loopback delivery can lag the sender's `write` under CPU load, so a single `peek` proves
+/// nothing; this polls until the bytes are there.
+fn alert_is_queued(tcp: &std::net::TcpStream) -> bool {
+    let mut buffer = [0_u8; 256];
+    for _ in 0..1_000_000 {
+        match tcp.peek(&mut buffer) {
+            Ok(0) => return true,
+            Ok(n) if n >= 24 => return true,
+            Ok(_) => std::thread::yield_now(),
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::yield_now();
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::TimedOut => {}
+            Err(_) => return false,
+        }
+    }
+    false
+}
+
 /// R3-7: the collector's alert is on the wire BEFORE our pre-close look (the fake proves it
 /// has written it; the client proves it can read it), so it is refused, in TLS 1.3 and 1.2.
 #[test]
@@ -1226,6 +1248,7 @@ fn an_alert_readable_before_our_pre_close_look_is_refused_in_tls_13_and_12() {
     for tls12 in [false, true] {
         let rig = Rig::with(Options {
             tls12_ecdhe_gcm_only: tls12,
+            no_tickets: true,
             ..Options::default()
         });
         rig.fake.set_mode(Mode::CloseWithoutReading);
@@ -1233,12 +1256,9 @@ fn an_alert_readable_before_our_pre_close_look_is_refused_in_tls_13_and_12() {
         let mut sink = rig.sink().with_close_hook(Arc::new(move |tcp, stage| {
             if stage == CloseStage::BeforeEarlyCheck {
                 assert!(sent.wait_open(), "the collector never sent its alert");
-                let peeked = tcp.peek(&mut [0_u8; 1]);
-                // TLS 1.3: the alert is queued, unread. TLS 1.2: it may already have been
-                // consumed together with the server's final flight (peek then sees EOF).
                 assert!(
-                    matches!(peeked, Ok(n) if n > 0 || tls12),
-                    "the collector's bytes are readable: {peeked:?}"
+                    alert_is_queued(tcp),
+                    "the collector's alert never became readable"
                 );
             }
         }));
@@ -1263,6 +1283,7 @@ fn an_alert_that_arrives_after_our_pre_close_look_is_accepted_though_nothing_was
     for tls12 in [false, true] {
         let rig = Rig::with(Options {
             tls12_ecdhe_gcm_only: tls12,
+            no_tickets: true,
             ..Options::default()
         });
         rig.fake.set_mode(Mode::CloseWithoutReading);
@@ -1273,10 +1294,9 @@ fn an_alert_that_arrives_after_our_pre_close_look_is_accepted_though_nothing_was
                 // The look found nothing; only now does the collector's alert leave.
                 hold.open();
                 assert!(sent.wait_open(), "the collector never sent its alert");
-                let peeked = tcp.peek(&mut [0_u8; 1]);
                 assert!(
-                    matches!(peeked, Ok(n) if n > 0),
-                    "the collector's bytes are readable: {peeked:?}"
+                    alert_is_queued(tcp),
+                    "the collector's alert never became readable"
                 );
             }
         }));
@@ -1338,22 +1358,54 @@ fn a_real_frame_over_one_mebibyte_is_sent_alone_and_the_next_row_follows() {
 /// and no connection is attempted.
 #[test]
 fn the_connect_phase_has_its_own_bound() {
+    // An exhausted budget never reaches the connector.
     let rig = Rig::new();
-    let mut sink = TlsSink::new(
-        HOST,
-        rig.fake.addr.port(),
-        client_config(rig.ca.pem.as_bytes(), None).unwrap(),
-        OutboundPolicy::strict().allow_private(),
-        rig.resolver.clone(),
-        Timeouts {
-            connect: Duration::ZERO,
-            ..Timeouts::default()
-        },
-    );
-    let failure = sink
+    let calls = Arc::new(AtomicU64::new(0));
+    let counter = Arc::clone(&calls);
+    let make = |connect: Duration, seen: Arc<Mutex<Vec<Duration>>>| {
+        let counter = Arc::clone(&counter);
+        TlsSink::new(
+            HOST,
+            rig.fake.addr.port(),
+            client_config(rig.ca.pem.as_bytes(), None).unwrap(),
+            OutboundPolicy::strict().allow_private(),
+            rig.resolver.clone(),
+            Timeouts {
+                connect,
+                ..Timeouts::default()
+            },
+        )
+        .with_connector(Arc::new(move |_, bound| {
+            counter.fetch_add(1, Ordering::SeqCst);
+            seen.lock().unwrap().push(bound);
+            // A socket that never completes: the connector is handed the bound and times out.
+            Err(std::io::ErrorKind::TimedOut.into())
+        }))
+    };
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let failure = make(Duration::ZERO, Arc::clone(&seen))
         .deliver(&[dummy_frame()])
         .expect_err("no connect budget");
     assert_eq!(failure.code, "siem_sink_timeout");
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        0,
+        "the connector was never reached"
+    );
+
+    // A NONZERO budget reaches the real connect path with a positive bound no larger than it.
+    let budget = Duration::from_secs(5);
+    let failure = make(budget, Arc::clone(&seen))
+        .deliver(&[dummy_frame()])
+        .expect_err("the connector never completes");
+    assert_eq!(failure.code, "siem_sink_timeout");
+    let bounds = seen.lock().unwrap().clone();
+    assert_eq!(bounds.len(), 1);
+    assert!(
+        !bounds[0].is_zero() && bounds[0] <= budget,
+        "the connect attempt was bounded by the connect budget: {:?}",
+        bounds[0]
+    );
     assert!(rig.fake.drain().is_empty(), "nothing connected");
 }
 
@@ -1362,6 +1414,12 @@ fn the_connect_phase_has_its_own_bound() {
 #[test]
 fn a_collector_that_stops_reading_turns_the_write_phase_into_a_timeout() {
     let rig = Rig::new();
+    seed(&rig.db, 1, "schema");
+    // One real row whose projected frame is far larger than any loopback socket buffering.
+    raw(&rig.db)
+        .execute("DELETE FROM transparency_log", [])
+        .unwrap();
+    raw_insert(&rig.db, 1, "huge.row", &vec![b'x'; 48 << 20]);
     rig.fake.set_mode(Mode::StopReading);
     rig.fake.alert_hold.close();
     let mut sink = TlsSink::new(
@@ -1375,14 +1433,37 @@ fn a_collector_that_stops_reading_turns_the_write_phase_into_a_timeout() {
             ..Timeouts::default()
         },
     );
-    // Larger than any loopback socket buffering, so the write cannot complete unread.
-    let huge = Frame {
-        syslog: "x".repeat(48 << 20),
-        ..dummy_frame()
-    };
-    let failure = sink.deliver(&[huge]).expect_err("the write blocks");
-    assert_eq!(failure.code, "siem_sink_timeout");
+    let store = rig.store();
+    // Through the EXPORTER: nothing is acknowledged (the collector never reads), so the cursor
+    // must not exist afterwards.
+    let failure = rig.tick(&mut sink, &store).expect_err("the write blocks");
+    assert_eq!(failure.code(), "siem_sink_timeout");
+    assert!(!rig.cursor_path().exists(), "the cursor stayed");
+    assert_eq!(failure.buffered(), Some(1));
+    // The collector signalled that the handshake COMPLETED and that it stopped reading.
+    assert!(
+        matches!(rig.fake.next_event(), Event::Held),
+        "handshake done, reads stopped"
+    );
     drop(sink);
     rig.fake.alert_hold.open();
     assert!(matches!(rig.fake.next_event(), Event::Unacked { .. }));
+}
+
+/// AC1c (offline witness): the sink's root store holds EXACTLY the anchors of the configured
+/// bundle, so system or bundled (webpki) roots added to it would change the count. The
+/// positive control (`a_widened_root_store_is_detected_by_the_ca_only_witness`) shows a widened
+/// store verifies a server the bundle does not name; this one pins the store's contents.
+#[test]
+fn the_root_store_holds_exactly_the_anchors_of_the_configured_bundle() {
+    let one = Ca::new("anchor-one");
+    let two = Ca::new("anchor-two");
+    assert_eq!(root_store(one.pem.as_bytes()).unwrap().roots.len(), 1);
+    let both = format!("{}{}", one.pem, two.pem);
+    let store = root_store(both.as_bytes()).unwrap();
+    assert_eq!(
+        store.roots.len(),
+        2,
+        "exactly the two anchors, nothing added"
+    );
 }

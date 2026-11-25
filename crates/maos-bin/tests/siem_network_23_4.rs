@@ -835,7 +835,9 @@ mod online {
         host.rotate();
         host.put(4);
         assert_eq!(mine(&host.export().unwrap()).len(), 4);
-        std::fs::remove_file(host.segments().join("0000000001.sqlite")).unwrap();
+        let segment = host.segments().join("0000000001.sqlite");
+        let backup = std::fs::read(&segment).unwrap();
+        std::fs::remove_file(&segment).unwrap();
         for tick in 1..=59 {
             let idle = host
                 .runtime
@@ -843,12 +845,31 @@ mod online {
                 .unwrap_or_else(|failure| panic!("idle tick {tick} must stay cheap: {failure}"));
             assert_eq!(idle.delivered, 0);
         }
-        match host.runtime.forward_audit_to_siem() {
+        let mut report = SiemReport::default();
+        let failing = host.runtime.forward_audit_to_siem();
+        match &failing {
             Err(EnterpriseFailure::SiemSinkDown { reason, .. }) => {
-                assert_eq!(reason, "siem_source_unavailable")
+                assert_eq!(*reason, "siem_source_unavailable")
             }
             other => panic!("the 60th idle tick runs the full path, got {other:?}"),
         }
+        assert_eq!(report.lines(&failing).len(), 1, "one line for the outage");
+        // R5-6: the failure is LATCHED: a cheap idle tick cannot verify the segment, so the
+        // next ticks keep failing (and print nothing new) until a full check succeeds.
+        for _ in 0..3 {
+            let again = host.runtime.forward_audit_to_siem();
+            assert!(again.is_err(), "a cheap tick must not clear the failure");
+            assert!(report.lines(&again).is_empty());
+        }
+        std::fs::write(&segment, backup).unwrap();
+        let recovered = host.runtime.forward_audit_to_siem();
+        assert!(
+            recovered.is_ok(),
+            "the full check passes once the segment is back"
+        );
+        let lines = report.lines(&recovered);
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("acknowledged again"), "{lines:?}");
     }
 
     /// AC6: after a run that USES the client key (a real mutual-TLS export), the key's material
@@ -859,7 +880,12 @@ mod online {
         let dir = tempfile::tempdir().expect("fixture dir");
         let db = dir.path().join("audit").join("transparency.sqlite");
         std::fs::create_dir_all(db.parent().unwrap()).unwrap();
-        let tl = Arc::new(TransparencyLogAdapter::open(&db, NONCE).expect("open log"));
+        let tl = Arc::new(
+            TransparencyLogAdapter::open_with_global_legal_holds(&db, &db, NONCE)
+                .expect("open log"),
+        );
+        tl.install_segment_sealer(Arc::new(DaemonSealer::new(SEED, None, None)))
+            .expect("one sealer");
         let ca = Ca::new("mtls-ca");
         let client = ca.client("maos-host");
         let fake = FakeSiem::start(
@@ -908,6 +934,19 @@ mod online {
                 FrameOrigin::HumanAuthored,
             );
         }
+        // A SEALED SEGMENT exists too (the key canary is searched there as well).
+        match tl.rotate_through(ALL, ALL).expect("rotation") {
+            RotationOutcome::Sealed(_) => {}
+            other => panic!("expected a sealed segment, got {other:?}"),
+        }
+        tl.insert_frame_event(
+            FrameKind::TaskAssign,
+            7,
+            None,
+            "mtls.row.after",
+            b"payload",
+            FrameOrigin::HumanAuthored,
+        );
         let tick = runtime
             .forward_audit_to_siem()
             .expect("export over mutual TLS");
@@ -937,8 +976,20 @@ mod online {
                 .flatten()
                 .map(|entry| entry.path()),
         );
+        assert!(
+            files
+                .iter()
+                .any(|file| file.parent().is_some_and(|dir| dir.ends_with("segments"))),
+            "a sealed segment was created and is inspected"
+        );
         for file in files {
-            let bytes = std::fs::read(&file).unwrap_or_default();
+            let bytes = std::fs::read(&file)
+                .unwrap_or_else(|error| panic!("{} must be readable: {error}", file.display()));
+            assert!(
+                !bytes.is_empty() || file.to_string_lossy().ends_with("-wal"),
+                "{} is empty",
+                file.display()
+            );
             for needle in &needles {
                 assert!(
                     !bytes
@@ -1236,20 +1287,17 @@ mod online {
 /// value of `MAOS_AUDIT_KEY`. Random per call, never a constant.
 #[cfg(feature = "online-adapters")]
 fn audit_key_file(root: &Path, name: &str) -> String {
-    use std::io::{Read, Write};
-    use std::os::unix::fs::OpenOptionsExt;
+    use std::io::Write;
 
     let mut bytes = [0_u8; 32];
-    std::fs::File::open("/dev/urandom")
-        .and_then(|mut random| random.read_exact(&mut bytes))
-        .expect("read random bytes");
+    getrandom::fill(&mut bytes).expect("random bytes");
     let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
     let path = root.join(format!("audit-key-{name}"));
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(&path)
+    let mut open = std::fs::OpenOptions::new();
+    open.write(true).create_new(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut open, 0o600);
+    open.open(&path)
         .and_then(|mut file| file.write_all(hex.as_bytes()))
         .expect("write the audit key");
     path.to_string_lossy().into_owned()

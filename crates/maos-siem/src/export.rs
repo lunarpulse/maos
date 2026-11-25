@@ -96,8 +96,11 @@ pub struct FileSink {
     lead_newline: bool,
     /// The file the previous append went to.
     last_file: Option<FileId>,
-    /// A directory entry whose parent sync is owed: (file, created by this sink).
-    owed_dir_sync: Option<(FileId, bool)>,
+    /// A directory entry whose parent sync is owed: (file, created by this sink, the entry's
+    /// own path: its parent is the directory to sync).
+    owed_dir_sync: Option<(FileId, bool, PathBuf)>,
+    /// The parent directory was synced since this process started.
+    session_synced: bool,
     dir_sync: DirSync,
     writer: Writer,
 }
@@ -117,6 +120,7 @@ impl FileSink {
             lead_newline: true,
             last_file: None,
             owed_dir_sync: None,
+            session_synced: false,
             dir_sync: Arc::new(sync_parent),
             writer: Arc::new(write_and_sync),
         }
@@ -142,20 +146,35 @@ fn write_and_sync(file: &mut std::fs::File, bytes: &[u8]) -> std::io::Result<()>
     file.sync_data()
 }
 
-/// Open for append, creating atomically: `(file, created by this call)`.
-fn open_append(path: &Path) -> std::io::Result<(std::fs::File, bool)> {
-    for _ in 0..3 {
-        match std::fs::OpenOptions::new()
+/// Open for append, creating atomically: `(file, created by this call, the path of the entry
+/// whose directory must be synced)`. A symlink whose target does not exist yet is followed:
+/// the target is created (`O_EXCL`) and its own directory is the one to sync.
+fn open_append(path: &Path) -> std::io::Result<(std::fs::File, bool, PathBuf)> {
+    let create = |target: &Path| {
+        std::fs::OpenOptions::new()
             .append(true)
             .create_new(true)
-            .open(path)
-        {
-            Ok(file) => return Ok((file, true)),
+            .open(target)
+    };
+    for _ in 0..3 {
+        match create(path) {
+            Ok(file) => return Ok((file, true, path.to_path_buf())),
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
                 match std::fs::OpenOptions::new().append(true).open(path) {
-                    Ok(file) => return Ok((file, false)),
-                    // Moved away between the two opens: create it on the next pass.
-                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Ok(file) => return Ok((file, false, path.to_path_buf())),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        // Either moved away between the two opens (create it on the next
+                        // pass) or a dangling symlink (create its target).
+                        if let Ok(link) = std::fs::read_link(path) {
+                            let target = path.parent().unwrap_or_else(|| Path::new(".")).join(link);
+                            match create(&target) {
+                                Ok(file) => return Ok((file, true, target)),
+                                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                                }
+                                Err(error) => return Err(error),
+                            }
+                        }
+                    }
                     Err(error) => return Err(error),
                 }
             }
@@ -195,12 +214,17 @@ impl BatchSink for FileSink {
             out.push(b'\n');
         }
 
-        let (mut file, created) = open_append(&self.path).map_err(io)?;
+        let (mut file, created, entry) = open_append(&self.path).map_err(io)?;
         let meta = file.metadata().map_err(io)?;
         let id = file_id(&meta);
         let replaced = self.last_file.is_some_and(|last| last != id);
         if created || replaced {
-            self.owed_dir_sync = Some((id, created));
+            self.owed_dir_sync = Some((id, created, entry.clone()));
+        } else if self.owed_dir_sync.is_none() && !self.session_synced {
+            // ONE parent-directory sync per process start before the first cursor advance, for
+            // a file found existing too: a previous process may have died between creating
+            // the entry and syncing its directory.
+            self.owed_dir_sync = Some((id, false, entry.clone()));
         }
         if replaced {
             self.lead_newline = true;
@@ -217,13 +241,22 @@ impl BatchSink for FileSink {
             self.lead_newline = true; // a fragment may now end the file
             return Err(io(error));
         }
+        // A rotator that TRUNCATED the file under us (copytruncate, unsupported) leaves it
+        // shorter than what we knew plus what we wrote: the batch is in neither file, so it is
+        // not acknowledged. Only this detectable case is caught (fstat on the same fd).
+        let end = meta.len().saturating_add(payload.len() as u64);
+        if file.metadata().map_err(io)?.len() < end {
+            self.lead_newline = true;
+            return Err(SinkFailure::new("siem_file_truncated_during_append"));
+        }
         self.lead_newline = false;
 
         // The cursor syncs the audit directory, not this one: a directory entry this sink
-        // created (or a replacement) is durable only once its parent was synced.
-        if let Some((owed, ours)) = self.owed_dir_sync {
+        // created, a replacement, and the first use after a process start are durable only
+        // once the directory that CONTAINS the entry was synced.
+        if let Some((owed, ours, entry)) = self.owed_dir_sync.clone() {
             if owed == id {
-                match (self.dir_sync)(&self.path) {
+                match (self.dir_sync)(&entry) {
                     Ok(()) => {}
                     Err(error) if !ours && error.kind() == std::io::ErrorKind::PermissionDenied => {
                     }
@@ -231,6 +264,7 @@ impl BatchSink for FileSink {
                 }
             }
             self.owed_dir_sync = None;
+            self.session_synced = true;
         }
         Ok(())
     }
@@ -426,16 +460,23 @@ pub const FULL_CHECK_EVERY_IDLE_TICKS: u32 = 60;
 /// At most this many rows are counted for the "records remain" figure of a sink failure.
 pub const BACKLOG_COUNT_CAP: u64 = 5_000;
 
-/// Counts idle ticks so the cheap probe cannot hide a diagnostic forever.
+/// Counts idle ticks so the cheap probe cannot hide a diagnostic forever, and latches a
+/// failing full path: while the last FULL check failed, every tick takes the full path (the
+/// cheap probe verifies nothing, so it must not report recovery).
 #[derive(Debug, Default)]
-pub struct IdleGuard(std::sync::atomic::AtomicU32);
+pub struct IdleGuard {
+    ticks: std::sync::atomic::AtomicU32,
+    failing: AtomicBool,
+    last_cheap: AtomicBool,
+}
 
 impl IdleGuard {
-    /// `true` when this idle tick may take the cheap path; every
-    /// [`FULL_CHECK_EVERY_IDLE_TICKS`]-th one must not.
-    fn skip_this_tick(&self) -> bool {
-        self.0.fetch_add(1, Ordering::Relaxed) % FULL_CHECK_EVERY_IDLE_TICKS
-            != FULL_CHECK_EVERY_IDLE_TICKS - 1
+    /// `true` when this idle tick may take the cheap path: not while a full check is failing,
+    /// and never on every [`FULL_CHECK_EVERY_IDLE_TICKS`]-th one.
+    fn may_skip(&self) -> bool {
+        !self.failing.load(Ordering::Relaxed)
+            && self.ticks.fetch_add(1, Ordering::Relaxed) % FULL_CHECK_EVERY_IDLE_TICKS
+                != FULL_CHECK_EVERY_IDLE_TICKS - 1
     }
 }
 
@@ -449,7 +490,18 @@ fn run_with(
     cancel: &AtomicBool,
 ) -> Result<Tick, TickFailure> {
     let mut tick = Tick::default();
-    match drive(source, live, idle, store, sink, journal, cancel, &mut tick) {
+    let outcome = drive(source, live, idle, store, sink, journal, cancel, &mut tick);
+    if let (true, Some(idle)) = (live, idle) {
+        // A cheap idle tick verified nothing: it neither clears nor sets the latch. Only a
+        // FULL path success clears a failure only the full path could have found.
+        let cheap = idle.last_cheap.swap(false, Ordering::Relaxed);
+        match &outcome {
+            Ok(()) if !cheap => idle.failing.store(false, Ordering::Relaxed),
+            Ok(()) => {}
+            Err(_) => idle.failing.store(true, Ordering::Relaxed),
+        }
+    }
+    match outcome {
         Ok(()) => Ok(tick),
         Err(error) => Err(TickFailure { error, tick }),
     }
@@ -486,7 +538,8 @@ fn drive(
             if let (Some(frame), Some((id, latest))) =
                 (&cursor.frame_id, LogView::live_latest(source)?)
             {
-                if id == cursor.insertion_id && &latest == frame && idle.skip_this_tick() {
+                if id == cursor.insertion_id && &latest == frame && idle.may_skip() {
+                    idle.last_cheap.store(true, Ordering::Relaxed);
                     return Ok(());
                 }
             }
