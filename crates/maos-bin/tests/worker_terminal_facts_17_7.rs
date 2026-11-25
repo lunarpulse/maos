@@ -408,13 +408,29 @@ fn s3_diagnostics(run: &TerminalRun, elapsed: Duration, version: &str) -> String
             .collect::<Vec<_>>()
             .join(" | ")
     };
-    let exit_rows = run
-        .rows
-        .iter()
-        .filter(|(_, intent, _)| intent == "cli.subprocess.exit")
-        .map(|(_, _, payload)| payload.to_string())
-        .collect::<Vec<_>>()
-        .join(" | ");
+    let exit_rows = {
+        const EXIT_ROWS_CAP: usize = 8 * 1024;
+        let joined = run
+            .rows
+            .iter()
+            .filter(|(_, intent, _)| intent == "cli.subprocess.exit")
+            .map(|(_, _, payload)| payload.to_string())
+            .collect::<Vec<_>>()
+            .join(" | ");
+        if joined.len() <= EXIT_ROWS_CAP {
+            joined
+        } else {
+            let mut end = EXIT_ROWS_CAP;
+            while !joined.is_char_boundary(end) {
+                end -= 1;
+            }
+            format!(
+                "{}…[truncated {} bytes]",
+                &joined[..end],
+                joined.len() - end
+            )
+        }
+    };
     let kernel = Command::new("uname")
         .arg("-r")
         .output()

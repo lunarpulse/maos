@@ -1,12 +1,12 @@
 # Exact kernel pin: src_lines (physical, formatted), per-file digests and set_hash of crates/maos-kernel-core/src.
 # Regenerate with `xtask check-kernel-baseline --emit-pin` and `scripts/repin.py`; history is `git log -p`, not prose here.
-src_lines = 28390
+src_lines = 28394
 
 
 
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "1baed7c4af214af8d29480423ef641c994cec728967940c348f0c49256e92471"
+set_hash = "9437c81eb6e2b06a28baf063e83363984b039edf15ba1c2b60db5d10b737be9c"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -81,7 +81,7 @@ set_hash = "1baed7c4af214af8d29480423ef641c994cec728967940c348f0c49256e92471"
 "security/sandbox/mod.rs" = "99c8c618600a4f80db6553b906bccdc50af2469fe480613dfff7f94e926d4ba5"
 "security/sandbox/t3-image.lock" = "028858c187bcfe77bde8e996866da0fcba3388cc6d81a96c2a2588cb5d94ac64"
 "security/sandbox/t3/argv.rs" = "1824511ac85216b961e517e5fdfd58ce3d30656a7be8c1adcf2b317b17707139"
-"security/sandbox/t3/child.rs" = "86b1e61c1f9903b679c1d3e3631c01c06195e6a91867a77542f89c034c0bfa64"
+"security/sandbox/t3/child.rs" = "3f89691cff5bf628a9ee5795c9c1a113d0499b68a1915011f6be81e64738b398"
 "security/sandbox/t3/image_lock.rs" = "1ae4cc7db0290d62de482d50bf7e4cc97c672e85a32b06ffdae37823a5461b09"
 "security/sandbox/t3/image_verify.rs" = "28125115858f49ad5784c19e3baaf0088f90f5c007eeb69976836d2b1a13873b"
 "security/sandbox/t3/mod.rs" = "ec392fc9de34dcabbe3c3bb63697df32d5f373986f11b2ae79841975deaaec2d"

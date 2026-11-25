@@ -248,6 +248,10 @@ impl ContainerTerminal {
             progress.snapshot_inflight = true;
             drop(progress);
             let observed = Arc::new(self.observe(deadline));
+            // Test seam: holds the owner after its observation and before it
+            // publishes, so a test can force the follower branches.
+            #[cfg(all(test, target_os = "linux"))]
+            follower_pidfd_tests::hold_owner_before_publish();
             let mut progress = self.lock();
             progress.snapshot_inflight = false;
             let facts = Arc::clone(progress.facts.get_or_insert(observed));
@@ -896,6 +900,6 @@ impl Drop for SandboxedContainerChild {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 #[path = "../../../../tests/unit/child_follower_pidfd.rs"]
 mod follower_pidfd_tests;

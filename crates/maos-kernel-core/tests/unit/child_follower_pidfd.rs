@@ -2,152 +2,239 @@
 //! `ContainerTerminal::facts_by` that expires at the snapshot deadline (or a
 //! capped follower that gives up) must keep the verified payload pidfd fact
 //! instead of freezing `payload_exit = unknown`. Compiled into the lib test
-//! binary through `#[path]` so it can reach the crate-private `arm`.
+//! binary through `#[path]` (Linux only) so it can reach the crate-private
+//! `arm`.
 //!
-//! No sleeps are an oracle and no assertion reads a clock: the stub runtime's
-//! `inspect` hangs, the gate is the stub's own call log, and the assertion is
-//! on the frozen facts only. With the fix both orderings (follower or owner
-//! publishes first) yield `Signaled(9)`; without it the follower publishes
-//! `Unknown` whenever it wins, which the owner's `DRAIN_GRACE` after the
-//! deadline makes the usual outcome.
+//! The branches are FORCED, not raced: the owner is held by a test gate
+//! (`hold_owner_before_publish`, the one `cfg(test)` hook in `facts_by`)
+//! after its observation and before it publishes, for as long as the test
+//! needs the follower to run. The stub `inspect` fails fast, so no test depends
+//! on a stalled runtime, a sleep or a wall-clock window; the only hang guards
+//! are 10 s upper bounds that fail loudly.
 
 use super::*;
-use maos_domain::sandbox::{ContainerRuntimeKind, PayloadExitSource};
+use maos_domain::sandbox::{ContainerRuntimeKind, PayloadExitSource, TerminalUnavailable};
+use std::cell::RefCell;
 use std::io::{BufRead, BufReader};
-use std::os::fd::AsFd;
-use std::process::{Command, Stdio};
+use std::os::fd::{AsFd, OwnedFd};
+use std::process::{Child, Command, Stdio};
+use std::sync::mpsc;
 
 #[path = "../../../../tests/harness/ci.rs"]
 mod ci;
 
-/// Kernel releases below 6.15 have no `PIDFD_INFO_EXIT`. Returns `false`
-/// (after printing one `SKIP:` line) only on an undeclared-CI host; a
-/// declared-CI host with an old kernel panics rather than pass vacuously.
-fn require_pidfd_exit(test: &str) -> bool {
-    let release = std::fs::read_to_string("/proc/sys/kernel/osrelease")
+const HANG_GUARD: Duration = Duration::from_secs(10);
+
+/// Two-phase gate: the owner announces it reached the hold, then waits for release.
+struct Gate {
+    state: Mutex<(bool, bool)>,
+    changed: Condvar,
+}
+
+impl Gate {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            state: Mutex::new((false, false)),
+            changed: Condvar::new(),
+        })
+    }
+
+    /// Owner side. The bound only keeps a failed test from leaking a thread.
+    fn hold(&self) {
+        let mut state = self.state.lock().unwrap();
+        state.0 = true;
+        self.changed.notify_all();
+        let _ = self
+            .changed
+            .wait_timeout_while(state, Duration::from_secs(60), |state| !state.1)
+            .unwrap();
+    }
+
+    fn wait_reached(&self) {
+        let state = self.state.lock().unwrap();
+        let (state, _) = self
+            .changed
+            .wait_timeout_while(state, HANG_GUARD, |state| !state.0)
+            .unwrap();
+        assert!(
+            state.0,
+            "hang guard (10 s): the owner never reached the publish hold"
+        );
+    }
+
+    fn release(&self) {
+        self.state.lock().unwrap().1 = true;
+        self.changed.notify_all();
+    }
+}
+
+/// Releases the owner even when an assertion unwinds.
+struct ReleaseOnDrop(Arc<Gate>);
+
+impl Drop for ReleaseOnDrop {
+    fn drop(&mut self) {
+        self.0.release();
+    }
+}
+
+thread_local! {
+    static OWNER_GATE: RefCell<Option<Arc<Gate>>> = const { RefCell::new(None) };
+}
+
+/// Called by `facts_by` on the owner path; a no-op on every thread that did
+/// not install a gate.
+pub(super) fn hold_owner_before_publish() {
+    let gate = OWNER_GATE.with(|gate| gate.borrow().clone());
+    if let Some(gate) = gate {
+        gate.hold();
+    }
+}
+
+type OwnerFacts = std::thread::JoinHandle<Option<Arc<ContainerTerminalFacts>>>;
+
+fn spawn_held_owner(
+    terminal: &Arc<ContainerTerminal>,
+    cap: Instant,
+    gate: &Arc<Gate>,
+) -> OwnerFacts {
+    let terminal = Arc::clone(terminal);
+    let gate = Arc::clone(gate);
+    std::thread::spawn(move || {
+        OWNER_GATE.with(|slot| *slot.borrow_mut() = Some(gate));
+        terminal.facts_by(cap, false)
+    })
+}
+
+/// The kernel release, for the RUN/SKIP evidence line.
+fn kernel_release() -> String {
+    std::fs::read_to_string("/proc/sys/kernel/osrelease")
         .unwrap_or_default()
         .trim()
-        .to_owned();
-    let mut parts = release
-        .split('.')
-        .filter_map(|part| part.split('-').next()?.parse::<u32>().ok());
-    let supported = matches!(
-        (parts.next(), parts.next()),
-        (Some(major), Some(minor)) if major > 6 || (major == 6 && minor >= 15)
-    );
-    if supported {
-        eprintln!("{test}: RUN (kernel {release} supports PIDFD_INFO_EXIT)");
+        .to_owned()
+}
+
+/// Capability probe, not a version check: `payload_pidfd` is a killed and
+/// reaped payload's pidfd, and the kernel must report its wait status
+/// (`PIDFD_INFO_EXIT`). Returns `false` (after one `SKIP:` line) only on an
+/// undeclared-CI host; a declared-CI host without the capability panics.
+fn require_pidfd_exit(test: &str, payload_pidfd: &OwnedFd) -> bool {
+    let release = kernel_release();
+    let status = crate::security::sandbox::linux::pidfd_exit_status(payload_pidfd.as_fd());
+    if matches!(status, Ok(Some(raw)) if PayloadExit::from_wait_status(raw) == Some(PayloadExit::Signaled(9)))
+    {
+        eprintln!("{test}: RUN (kernel {release}: PIDFD_INFO_EXIT probe returned signaled(9))");
         return true;
     }
     if ci::skip_unless(
-        &format!("{test}: Linux >= 6.15 PIDFD_INFO_EXIT (kernel {release} predates it)"),
+        &format!(
+            "{test}: PIDFD_INFO_EXIT capability probe failed ({status:?}) on kernel {release}"
+        ),
         false,
     ) {
         return false;
     }
-    panic!("{test}: PIDFD_INFO_EXIT requires Linux >= 6.15; kernel is {release}");
+    panic!("{test}: PIDFD_INFO_EXIT capability probe failed ({status:?}) on kernel {release}");
 }
 
-/// A stub runtime whose `inspect` logs and then hangs; `container exists`
-/// reports absence (so teardown's removal check passes); the rest exit 0.
-fn hanging_inspect_runtime(dir: &Path) -> (ContainerRuntime, PathBuf) {
+/// A stub runtime: `inspect` fails fast, `container exists` reports absence
+/// (so teardown's removal check passes), every other verb exits 0.
+fn failing_inspect_runtime(dir: &Path) -> ContainerRuntime {
     use std::os::unix::fs::PermissionsExt;
     let executable = dir.join("stub-runtime");
-    let log = dir.join("runtime.log");
-    let script = format!(
-        "#!/bin/sh\nprintf '%s\\n' \"$1\" >> '{}'\ncase \"$1\" in inspect) exec sleep 30 ;; container) exit 1 ;; esac\n",
-        log.display()
-    );
-    std::fs::write(&executable, script).unwrap();
-    std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700)).unwrap();
-    (
-        ContainerRuntime {
-            kind: ContainerRuntimeKind::Podman,
-            path: executable,
-            version: "stub".into(),
-        },
-        log,
+    std::fs::write(
+        &executable,
+        "#!/bin/sh\ncase \"$1\" in inspect) exit 1 ;; container) exit 1 ;; esac\n",
     )
+    .unwrap();
+    std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700)).unwrap();
+    ContainerRuntime {
+        kind: ContainerRuntimeKind::Podman,
+        path: executable,
+        version: "stub".into(),
+    }
 }
 
-/// A payload that is not our child (an owner shell reaps it), SIGKILLed after
-/// its pidfd is open. Returns the owner and the armed-ready pidfd; the exit
-/// data is final once the owner acknowledges the reap.
-fn killed_external_payload() -> (std::process::Child, u32, std::os::fd::OwnedFd) {
-    let mut owner = Command::new("sh")
+/// The owner shell of an external payload. Dropping it kills the payload
+/// through its pidfd, then kills and reaps the shell, even when a test
+/// assertion unwinds.
+struct PayloadShell {
+    shell: Child,
+    pidfd: Option<OwnedFd>,
+}
+
+impl Drop for PayloadShell {
+    fn drop(&mut self) {
+        if let Some(pidfd) = &self.pidfd {
+            let _ =
+                rustix::process::pidfd_send_signal(pidfd.as_fd(), rustix::process::Signal::KILL);
+        }
+        let _ = self.shell.kill();
+        let _ = self.shell.wait();
+    }
+}
+
+/// An external payload (a grandchild, never our child) with its pidfd open,
+/// SIGKILLed through that pidfd and reaped by its owner shell. The two pipe
+/// reads are bounded by [`HANG_GUARD`].
+fn killed_external_payload() -> (PayloadShell, u32, OwnedFd) {
+    let mut shell = Command::new("sh")
         .arg("-c")
         .arg("sleep 30 & p=$!; echo $p; wait $p; echo reaped")
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
-    let mut stdout = BufReader::new(owner.stdout.take().unwrap());
-    let mut line = String::new();
-    stdout.read_line(&mut line).unwrap();
-    let pid: u32 = line.trim().parse().unwrap();
+    let stdout = shell.stdout.take().unwrap();
+    let mut guard = PayloadShell { shell, pidfd: None };
+    let (lines_tx, lines) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        for _ in 0..2 {
+            let mut line = String::new();
+            if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                break;
+            }
+            let _ = lines_tx.send(line);
+        }
+    });
+    let pid_line = lines
+        .recv_timeout(HANG_GUARD)
+        .expect("hang guard (10 s): the owner shell never printed the payload pid");
+    let pid: u32 = pid_line.trim().parse().unwrap();
     let pidfd = crate::security::sandbox::linux::pidfd_open(pid).unwrap();
-    assert!(
-        Command::new("kill")
-            .args(["-KILL", &pid.to_string()])
-            .status()
-            .unwrap()
-            .success(),
-        "SIGKILL the external payload"
-    );
-    let mut ack = String::new();
-    stdout.read_line(&mut ack).unwrap();
+    guard.pidfd = Some(pidfd.try_clone().unwrap());
+    rustix::process::pidfd_send_signal(pidfd.as_fd(), rustix::process::Signal::KILL)
+        .expect("SIGKILL the external payload through its pidfd");
+    let ack = lines
+        .recv_timeout(HANG_GUARD)
+        .expect("hang guard (10 s): the owner shell never acknowledged the reap");
     assert_eq!(ack.trim(), "reaped", "the owner shell reaps, then says so");
     assert!(
-        crate::security::sandbox::linux::readable(pidfd.as_fd(), Duration::from_secs(10)),
+        crate::security::sandbox::linux::readable(pidfd.as_fd(), HANG_GUARD),
         "hang guard (10 s): the killed payload's pidfd never became readable"
     );
-    (owner, pid, pidfd)
+    (guard, pid, pidfd)
 }
 
-/// One armed terminal over a hanging `inspect`, plus the wait for the stub to
-/// have entered `inspect` (the owner is then inside `observe`). Field order is
-/// drop order: the child's teardown still needs the stub, so the tempdir last.
+/// One terminal armed with the payload pidfd over the stub runtime. Field
+/// order is drop order: the child's teardown still needs the stub, so the
+/// tempdir goes last.
 struct Armed {
     child: SandboxedContainerChild,
-    log: PathBuf,
     _temp: tempfile::TempDir,
 }
 
-fn armed_terminal(pid: u32, pidfd: std::os::fd::OwnedFd) -> Armed {
+fn armed_terminal(pid: u32, pidfd: OwnedFd) -> Armed {
     let temp = tempfile::tempdir().unwrap();
-    let (runtime, log) = hanging_inspect_runtime(temp.path());
+    let runtime = failing_inspect_runtime(temp.path());
     let state_dir = temp.path().join("state");
     std::fs::create_dir(&state_dir).unwrap();
     let mut child = SandboxedContainerChild::adopt(runtime, "ab".repeat(32), &state_dir);
     child.arm(pid, Some(pidfd));
-    Armed {
-        _temp: temp,
-        child,
-        log,
-    }
-}
-
-fn await_inspect_entered(log: &Path) {
-    let guard = Instant::now() + Duration::from_secs(10);
-    while !std::fs::read_to_string(log)
-        .unwrap_or_default()
-        .lines()
-        .any(|call| call == "inspect")
-    {
-        assert!(
-            Instant::now() < guard,
-            "hang guard (10 s): the owner never entered inspect"
-        );
-        std::thread::yield_now();
-    }
+    Armed { child, _temp: temp }
 }
 
 fn assert_sigkill_pidfd_facts(facts: &ContainerTerminalFacts, who: &str) {
-    assert!(
-        facts.state.is_err(),
-        "{who}: the hung inspect leaves typed unavailable runtime state, got {:?}",
-        facts.state
-    );
     assert_eq!(
         (facts.payload, facts.source),
         (PayloadExit::Signaled(9), PayloadExitSource::Pidfd),
@@ -155,76 +242,86 @@ fn assert_sigkill_pidfd_facts(facts: &ContainerTerminalFacts, who: &str) {
     );
 }
 
+/// The follower expiry branch of `facts_by`: the owner is held after its
+/// observation, the snapshot deadline (the owner's own cap) is already past, so
+/// the follower MUST take the expiry branch and freeze `DeadlineExpired`.
 #[test]
 fn expired_snapshot_follower_keeps_the_pidfd_fact_s3() {
-    const INSTANCES: usize = 8;
-    if !require_pidfd_exit("expired_snapshot_follower_keeps_the_pidfd_fact_s3") {
-        return;
-    }
+    const INSTANCES: usize = 4;
     for instance in 0..INSTANCES {
-        let (mut owner_shell, pid, pidfd) = killed_external_payload();
+        let (_shell, pid, pidfd) = killed_external_payload();
+        if !require_pidfd_exit("expired_snapshot_follower_keeps_the_pidfd_fact_s3", &pidfd) {
+            return;
+        }
         let armed = armed_terminal(pid, pidfd);
         let terminal = Arc::clone(armed.child.terminal());
-        // Owner: a short cap, so the snapshot deadline is the owner's cap.
-        let owner = {
-            let terminal = Arc::clone(&terminal);
-            std::thread::spawn(move || {
-                terminal.facts_by(Instant::now() + Duration::from_millis(300), false)
-            })
-        };
-        // Gate: the owner is inside `observe`, so the snapshot deadline is set
-        // and the next caller is a follower.
-        await_inspect_entered(&armed.log);
-        // Follower: a longer cap, uncapped by its own cap, waits to the
-        // owner's deadline and expires there.
+        let gate = Gate::new();
+        let _release = ReleaseOnDrop(Arc::clone(&gate));
+        // An owner cap of "now" makes the snapshot deadline already expired.
+        let owner = spawn_held_owner(&terminal, Instant::now(), &gate);
+        gate.wait_reached();
         let follower = terminal
             .facts_by(Instant::now() + Duration::from_secs(20), false)
             .expect("an uncapped follower always returns facts");
+        // The INTENDED branch: only the follower expiry branch builds
+        // `DeadlineExpired`; the owner's own observation can only be a
+        // runtime-derived state.
+        assert!(
+            matches!(follower.state, Err(TerminalUnavailable::DeadlineExpired)),
+            "instance {instance}: the follower took the expiry branch, got {:?}",
+            follower.state
+        );
+        assert_sigkill_pidfd_facts(&follower, &format!("instance {instance} follower"));
+        gate.release();
         let owner = owner
             .join()
             .unwrap()
             .expect("an uncapped owner always returns facts");
         assert!(
             Arc::ptr_eq(&owner, &follower),
-            "instance {instance}: one immutable snapshot"
+            "instance {instance}: the owner returns the frozen follower snapshot"
         );
-        assert_sigkill_pidfd_facts(&follower, &format!("instance {instance} follower"));
-        assert_sigkill_pidfd_facts(&owner, &format!("instance {instance} owner"));
-        let _ = owner_shell.wait();
     }
 }
 
+/// The bridge's capped fallback: the owner is held across BOTH the `None`
+/// answer and the `facts_capped` fallback, then publishes its own snapshot.
 #[test]
 fn capped_follower_fallback_keeps_the_pidfd_fact_s3() {
-    if !require_pidfd_exit("capped_follower_fallback_keeps_the_pidfd_fact_s3") {
+    let (_shell, pid, pidfd) = killed_external_payload();
+    if !require_pidfd_exit("capped_follower_fallback_keeps_the_pidfd_fact_s3", &pidfd) {
         return;
     }
-    let (mut owner_shell, pid, pidfd) = killed_external_payload();
     let armed = armed_terminal(pid, pidfd);
     let terminal = Arc::clone(armed.child.terminal());
-    // The owner cap is generous so the shared snapshot is still in flight when
-    // the capped follower asks, even on a loaded host; the test then waits for
-    // the owner's deadline once.
-    let owner = {
-        let terminal = Arc::clone(&terminal);
-        std::thread::spawn(move || {
-            terminal.facts_by(Instant::now() + Duration::from_secs(3), false)
-        })
-    };
-    await_inspect_entered(&armed.log);
-    // A capped follower whose own cap is already past, with the shared
-    // snapshot still in flight: `None`, the bridge's fallback path.
+    let gate = Gate::new();
+    let _release = ReleaseOnDrop(Arc::clone(&gate));
+    // A far owner cap: the snapshot deadline is the 10 s SNAPSHOT_BUDGET
+    // ahead, a precondition (never asserted on a clock) that is not reached
+    // while the owner is held.
+    let owner = spawn_held_owner(&terminal, Instant::now() + Duration::from_secs(3600), &gate);
+    gate.wait_reached();
     assert!(
         terminal.facts_by(Instant::now(), true).is_none(),
-        "a capped follower returns None before ownership publishes"
+        "a capped follower returns None while the owner is in flight"
     );
-    // The bridge's helper (the one `wait_and_finalize` calls) returns the same
-    // local unavailable record, carrying the pidfd fact.
-    assert_sigkill_pidfd_facts(
-        &terminal.facts_capped(Instant::now()),
-        "capped-follower fallback",
+    let local = terminal.facts_capped(Instant::now());
+    assert!(
+        matches!(local.state, Err(TerminalUnavailable::DeadlineExpired)),
+        "the local fallback record is DeadlineExpired, got {:?}",
+        local.state
     );
+    assert_sigkill_pidfd_facts(&local, "capped-follower fallback");
+    gate.release();
     let owner = owner.join().unwrap().expect("owner facts");
+    assert!(
+        matches!(owner.state, Err(TerminalUnavailable::InspectFailed)),
+        "the owner published its own observation, got {:?}",
+        owner.state
+    );
     assert_sigkill_pidfd_facts(&owner, "owner");
-    let _ = owner_shell.wait();
+    assert!(
+        !Arc::ptr_eq(&local, &owner) && Arc::ptr_eq(&terminal.facts(), &owner),
+        "the capped fallback is local and never frozen"
+    );
 }
