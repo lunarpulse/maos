@@ -16,7 +16,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use maos_eval::distill_replay::{
-    FAITHFULNESS_FLOOR, HEDGE_PRESERVATION_FLOOR, RECALL_FLOOR, SECRET_LEAKAGE_CEILING,
+    DistillFloorRecord, DistillFloors, JudgeConfig, JudgeEvidence, FAITHFULNESS_FLOOR, FLOORS_FILE,
+    HEDGE_PRESERVATION_FLOOR, MAX_ARTIFACT_BYTES, RECALL_FLOOR, SECRET_LEAKAGE_CEILING,
     TRACEABILITY_FLOOR,
 };
 use maos_eval::halt_replay::round_down_hundredth;
@@ -67,8 +68,10 @@ pub struct Args {
     /// Compare: the candidate `maos.eval.live/v1` file.
     #[arg(long, requires = "reference")]
     candidate: Option<PathBuf>,
-    /// Calibrate a floor from the `maos.eval.live/v1` file `--result` (D-28-1-03 A).
-    #[arg(long, requires_all = ["spec", "metric", "result"])]
+    /// Calibrate a floor (D-28-1-03 A) from the `maos.eval.live/v1` file
+    /// `--result`, or — preferred, nothing hand-edited in between — recomputed
+    /// from the digest-checked result lines `--results`.
+    #[arg(long, requires_all = ["spec", "metric"])]
     calibrate: bool,
     /// Calibrate: the spec minimum of the metric.
     #[arg(long)]
@@ -79,6 +82,17 @@ pub struct Args {
     /// Calibrate: the `maos.eval.live/v1` file.
     #[arg(long)]
     result: Option<PathBuf>,
+    /// Calibrate: also emit the floor record's `[judge]` stanza from this
+    /// judge-only result line (`maos eval distill --judge-repeat` stdout): its
+    /// artifacts are re-hashed, its counts recomputed from its verdicts and the
+    /// file's SHA-256 recorded as `result_sha256` — no human types a count.
+    #[arg(long)]
+    judge_result: Option<PathBuf>,
+    /// The floor record named by `--root` must be present together with its
+    /// archived judge result and match it (the PROMOTING command only; an
+    /// ordinary run passes without the archive).
+    #[arg(long)]
+    require_archive: bool,
     /// Validate only the SET of result lines (exactly `--repeats` lines, each
     /// digest-checked against its cassette, consistent, undecided duplicates
     /// refused) and exit 0 whatever the metrics say: a genuine floor miss is a
@@ -109,8 +123,60 @@ pub fn run(args: Args) -> Result<(), String> {
     }
 }
 
+/// Read at most [`MAX_ARTIFACT_BYTES`] of `path`: a larger file is refused, not
+/// slurped (the length is checked on the opened handle, so a file that grows
+/// between a stat and the read cannot slip past).
 fn read(path: &Path) -> Result<Vec<u8>, String> {
-    std::fs::read(path).map_err(|e| format!("eval-report: {}: {e}", path.display()))
+    use std::io::Read;
+    let shown = |e: &dyn std::fmt::Display| format!("eval-report: {}: {e}", path.display());
+    let file = std::fs::File::open(path).map_err(|e| shown(&e))?;
+    let mut bytes = Vec::new();
+    file.take(MAX_ARTIFACT_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| shown(&e))?;
+    if bytes.len() as u64 > MAX_ARTIFACT_BYTES {
+        return Err(shown(&format!("larger than {MAX_ARTIFACT_BYTES} bytes")));
+    }
+    Ok(bytes)
+}
+
+/// `rel` under `root`, refused when it is absolute or climbs (`..`): a result
+/// line names its artifacts, so it cannot point outside the workspace.
+fn under_root(root: &Path, rel: &str, what: &str) -> Result<PathBuf, String> {
+    let path = Path::new(rel);
+    if rel.is_empty()
+        || path.is_absolute()
+        || path.components().any(|c| {
+            !matches!(
+                c,
+                std::path::Component::Normal(_) | std::path::Component::CurDir
+            )
+        })
+    {
+        return Err(format!(
+            "eval-report: {what} `{rel}` must be a relative path inside the workspace (no \
+             absolute path, no `..`) unless --cassettes names the directory"
+        ));
+    }
+    Ok(root.join(path))
+}
+
+/// The identity of an existing file: its canonical path and, on unix, its
+/// device and inode (two names, symlinks or hard links, are one artifact).
+fn identity(path: &Path) -> Result<(PathBuf, Option<(u64, u64)>), String> {
+    let canonical = path
+        .canonicalize()
+        .map_err(|e| format!("eval-report: {}: {e}", path.display()))?;
+    #[cfg(unix)]
+    let inode = {
+        use std::os::unix::fs::MetadataExt;
+        std::fs::metadata(&canonical)
+            .ok()
+            .map(|m| (m.dev(), m.ino()))
+    };
+    #[cfg(not(unix))]
+    let inode = None;
+    Ok((canonical, inode))
 }
 
 fn json_lines(bytes: &[u8], what: &str) -> Result<Vec<Value>, String> {
@@ -603,7 +669,7 @@ fn majority_counts(runs: &[ClaimDecisions]) -> Result<[(usize, usize); 5], Strin
 /// miss may average out over the repeats; a structural failure of any repeat
 /// (a stale judge prompt, a changed frozen survey, a writer/cite disagreement)
 /// or an undetected control never does.
-fn distill_body(lines: &[Value], corpus: &[Value]) -> Result<Body, String> {
+fn distill_body(lines: &[Value], corpus: &[Value], floors: &DistillFloors) -> Result<Body, String> {
     let decided = lines
         .iter()
         .map(decisions_of)
@@ -680,26 +746,19 @@ fn distill_body(lines: &[Value], corpus: &[Value]) -> Result<Body, String> {
         .sum();
     let mut metrics = Map::new();
     let mut failures = Vec::new();
-    // The numeric floors are the ones the CLI applied (its `floors` object,
-    // agreed across the lines): an operator-ruled floor passes the aggregate
-    // exactly when it passes each run. A line without one (archived before
-    // 28-3) is held to the compiled constants. Leakage stays at its fixed zero
-    // ceiling: it is not calibrated.
-    let applied = lines[0].get("floors").filter(|f| f.is_object());
+    // The numeric floors are the ones the VALIDATED floor record resolves to
+    // (or the compiled defaults), never the ones a result line names: the
+    // lines' own `floors` were already required to equal them. Traceability and
+    // leakage keep their fixed bounds.
     for (i, (name, compiled, ceiling)) in DISTILL.into_iter().enumerate() {
-        let bound = if ceiling {
-            compiled
-        } else {
-            applied
-                .and_then(|f| f.get(name))
-                .map_or(Ok(compiled), |v| {
-                    v.as_f64()
-                        .filter(|b| (0.0..=1.0).contains(b))
-                        .ok_or_else(|| {
-                            format!("eval-report: floor `{name}` is not a number in [0, 1]")
-                        })
-                })?
+        let bound = match name {
+            "recall" => floors.recall,
+            "faithfulness" => floors.faithfulness,
+            "hedge_preservation" => floors.hedge_preservation,
+            "traceability" => floors.traceability,
+            _ => compiled,
         };
+        debug_assert!(!ceiling || bound == compiled);
         let values = lines
             .iter()
             .map(|l| num(field(field(l, "score")?, "metrics")?, name))
@@ -795,16 +854,31 @@ fn distill_body(lines: &[Value], corpus: &[Value]) -> Result<Body, String> {
     })
 }
 
+/// A digest-checked cassette and what identifies it as ONE artifact.
+struct Loaded {
+    value: Value,
+    canonical: PathBuf,
+    inode: Option<(u64, u64)>,
+    sha: String,
+}
+
+impl Loaded {
+    fn same_artifact(&self, other: &Loaded) -> bool {
+        self.canonical == other.canonical || (self.inode.is_some() && self.inode == other.inode)
+    }
+}
+
 /// A recorded cassette named by `rel`, refused unless its bytes are `want` (the
-/// result line's `key`).
-fn artifact(rel: &str, want: &str, key: &str, args: &Args) -> Result<Value, String> {
+/// result line's `key`). Without `--cassettes` the path must stay inside the
+/// workspace; with it only the file name is used, as before.
+fn artifact(rel: &str, want: &str, key: &str, args: &Args) -> Result<Loaded, String> {
     let path = match &args.cassettes {
         Some(dir) => dir.join(
             Path::new(rel)
                 .file_name()
                 .ok_or("eval-report: cassette has no file name")?,
         ),
-        None => args.root.join(rel),
+        None => under_root(&args.root, rel, "cassette")?,
     };
     let bytes = read(&path)?;
     if hex(&bytes) != want {
@@ -813,33 +887,115 @@ fn artifact(rel: &str, want: &str, key: &str, args: &Args) -> Result<Value, Stri
             path.display()
         ));
     }
-    serde_json::from_slice(&bytes).map_err(|e| format!("eval-report: {}: {e}", path.display()))
+    let value = serde_json::from_slice(&bytes)
+        .map_err(|e| format!("eval-report: {}: {e}", path.display()))?;
+    let (canonical, inode) = identity(&path)?;
+    Ok(Loaded {
+        value,
+        canonical,
+        inode,
+        sha: want.to_owned(),
+    })
 }
 
 /// The cassette of `line`, refused unless its bytes are the line's `cassette_sha256`.
 /// A judge-only repeat line's `cassette` is the judge replies it recorded; the
-/// survey it replayed is its `judge_repeat.survey_cassette`, digest-checked too.
-fn cassette(line: &Value, args: &Args) -> Result<Value, String> {
-    if let Some(repeat) = line.get("judge_repeat").filter(|v| !v.is_null()) {
-        artifact(
+/// survey it replayed is its `judge_repeat.survey_cassette`, digest-checked too
+/// and never the same artifact as the output.
+fn cassette(line: &Value, args: &Args) -> Result<Loaded, String> {
+    let survey = match line.get("judge_repeat").filter(|v| !v.is_null()) {
+        Some(repeat) => Some(artifact(
             text(repeat, "survey_cassette")?,
             text(repeat, "survey_cassette_sha256")?,
             "judge_repeat.survey_cassette_sha256",
             args,
-        )?;
-    }
-    artifact(
+        )?),
+        None => None,
+    };
+    let output = artifact(
         text(line, "cassette")?,
         text(line, "cassette_sha256")?,
         "cassette_sha256",
         args,
-    )
+    )?;
+    if survey.as_ref().is_some_and(|s| s.same_artifact(&output)) {
+        return Err("eval-report: a judge-only line's survey and judge output are one file".into());
+    }
+    Ok(output)
+}
+
+/// The floors the runs were held to, resolved from the validated floor record
+/// `spirits/researcher/eval/floors.toml` under `--root` (schema, evidence,
+/// ruling shape and hash, pinned judge, archive when present — mandatory with
+/// `--require-archive`) or the compiled defaults, and the lines' own `floors`
+/// refused unless they are exactly those: an edited line cannot lower a floor.
+fn resolve_distill_floors(args: &Args, lines: &[Value]) -> Result<DistillFloors, String> {
+    let path = args.root.join(FLOORS_FILE);
+    let record = match std::fs::read_to_string(&path) {
+        Ok(text) => Some(
+            toml::from_str::<DistillFloorRecord>(&text)
+                .map_err(|e| format!("eval-report: floor record {}: {e}", path.display()))?,
+        ),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(format!("eval-report: floor record {}: {e}", path.display())),
+    };
+    let model = if record.is_some() || args.require_archive {
+        judge_model(args)?
+    } else {
+        String::new()
+    };
+    let floors =
+        maos_eval::distill_replay::resolve_floors(record, &args.root, &model, args.require_archive)
+            .map_err(|e| format!("eval-report: floor record {}: {e}", path.display()))?;
+    let expected = json!({
+        "recall": floors.recall, "faithfulness": floors.faithfulness,
+        "hedge_preservation": floors.hedge_preservation, "traceability": floors.traceability,
+    });
+    for (i, line) in lines.iter().enumerate() {
+        let Some(named) = line.get("floors").filter(|f| !f.is_null()) else {
+            continue; // archived before 28-3: held to the resolved floors anyway
+        };
+        let same = named.as_object().is_some_and(|n| {
+            n.len() == 4
+                && expected.as_object().into_iter().flatten().all(|(k, v)| {
+                    n.get(k)
+                        .and_then(Value::as_f64)
+                        .zip(v.as_f64())
+                        .is_some_and(|(a, b)| (a - b).abs() < 1e-12)
+                })
+        });
+        if !same {
+            return Err(format!(
+                "eval-report: result line {} names floors {named} that disagree with the \
+                 validated floor record (expected {expected}); a line cannot set its own floors",
+                i + 1
+            ));
+        }
+    }
+    Ok(floors)
+}
+
+/// The pinned judge's wire model, from `tests/judge-config.toml` under `--root`.
+fn judge_model(args: &Args) -> Result<String, String> {
+    let path = args.root.join(maos_eval::distill_replay::JUDGE_CONFIG);
+    let text = String::from_utf8(read(&path)?).map_err(|e| format!("eval-report: {e}"))?;
+    toml::from_str::<JudgeConfig>(&text)
+        .map_err(|e| e.to_string())
+        .and_then(|config| config.wire_model())
+        .map_err(|e| format!("eval-report: {}: {e}", path.display()))
+}
+
+/// A token count of a cassette entry: a non-negative integer, never a float.
+fn tokens(usage: &Value, key: &str) -> Result<u64, String> {
+    field(usage, key)?
+        .as_u64()
+        .ok_or_else(|| format!("eval-report: `{key}` is not a token count"))
 }
 
 /// Input/output tokens per (provider, model) over every cassette entry, priced
 /// from the book; a model the book lacks is an error, never 0 (AC8).
 /// Returns `(provider, model_id, input, output, cost_usd)`.
-fn spend(cassettes: &[Value], book: &Path) -> Result<(String, String, u64, u64, f64), String> {
+fn spend(cassettes: &[&Value], book: &Path) -> Result<(String, String, u64, u64, f64), String> {
     let mut by_model: BTreeMap<(String, String), (u64, u64)> = BTreeMap::new();
     for c in cassettes {
         for entry in field(c, "entries")?.as_array().into_iter().flatten() {
@@ -852,8 +1008,15 @@ fn spend(cassettes: &[Value], book: &Path) -> Result<(String, String, u64, u64, 
                     text(who, "model_id")?.to_owned(),
                 ))
                 .or_default();
-            slot.0 += num(usage, "input_tokens")? as u64;
-            slot.1 += num(usage, "output_tokens")? as u64;
+            let over = || "eval-report: token counts overflow".to_owned();
+            slot.0 = slot
+                .0
+                .checked_add(tokens(usage, "input_tokens")?)
+                .ok_or_else(over)?;
+            slot.1 = slot
+                .1
+                .checked_add(tokens(usage, "output_tokens")?)
+                .ok_or_else(over)?;
         }
     }
     if by_model.is_empty() {
@@ -896,13 +1059,13 @@ fn spend(cassettes: &[Value], book: &Path) -> Result<(String, String, u64, u64, 
             .collect();
         set.into_iter().cloned().collect::<Vec<_>>().join("+")
     };
-    Ok((
-        names(0),
-        names(1),
-        by_model.values().map(|t| t.0).sum(),
-        by_model.values().map(|t| t.1).sum(),
-        micro / 1e6,
-    ))
+    let sum = |side: usize| {
+        by_model.values().try_fold(0u64, |acc, t| {
+            acc.checked_add(if side == 0 { t.0 } else { t.1 })
+                .ok_or_else(|| "eval-report: token counts overflow".to_owned())
+        })
+    };
+    Ok((names(0), names(1), sum(0)?, sum(1)?, micro / 1e6))
 }
 
 fn aggregate(args: &Args) -> Result<(Value, Vec<String>), String> {
@@ -948,7 +1111,7 @@ fn aggregate(args: &Args) -> Result<(Value, Vec<String>), String> {
             return Err(format!("eval-report: the result lines disagree on `{key}`"));
         }
     }
-    let corpus_bytes = read(&args.root.join(text(first, "corpus")?))?;
+    let corpus_bytes = read(&under_root(&args.root, text(first, "corpus")?, "corpus")?)?;
     if hex(&corpus_bytes) != text(first, "corpus_sha256")? {
         return Err(
             "eval-report: the corpus is not the one the result lines scored (corpus_sha256)".into(),
@@ -964,10 +1127,32 @@ fn aggregate(args: &Args) -> Result<(Value, Vec<String>), String> {
         *corpus_families.entry(&r.family).or_default() += 1;
     }
 
-    let cassettes = lines
+    let loaded = lines
         .iter()
         .map(|l| cassette(l, args))
         .collect::<Result<Vec<_>, _>>()?;
+    // One repeat is one artifact: two lines may not resolve (symlink, hard
+    // link, `--cassettes` file-name flattening) to the same file, and k distill
+    // recordings are never byte-identical.
+    for (i, later) in loaded.iter().enumerate() {
+        for earlier in &loaded[..i] {
+            if later.same_artifact(earlier) {
+                return Err(format!(
+                    "eval-report: result lines {} and {} load the same artifact {}: one run counted twice",
+                    loaded.iter().position(|c| std::ptr::eq(c, earlier)).map_or(0, |p| p + 1),
+                    i + 1,
+                    later.canonical.display()
+                ));
+            }
+            if kind == "distill" && later.sha == earlier.sha {
+                return Err(format!(
+                    "eval-report: two result lines carry byte-identical cassettes (sha256 {})",
+                    later.sha
+                ));
+            }
+        }
+    }
+    let cassettes: Vec<&Value> = loaded.iter().map(|c| &c.value).collect();
     let prompts = |c: &Value| -> Result<Vec<String>, String> {
         field(c, "entries")?
             .as_array()
@@ -976,7 +1161,7 @@ fn aggregate(args: &Args) -> Result<(Value, Vec<String>), String> {
             .map(|e| text(e, "prompt_sha256").map(str::to_owned))
             .collect()
     };
-    let prompt_hashes = prompts(&cassettes[0])?;
+    let prompt_hashes = prompts(cassettes[0])?;
     if kind == "halt" {
         for c in &cassettes[1..] {
             if prompts(c)? != prompt_hashes {
@@ -996,7 +1181,7 @@ fn aggregate(args: &Args) -> Result<(Value, Vec<String>), String> {
     let body = if kind == "halt" {
         halt_body(&lines, &corpus_rows)?
     } else {
-        distill_body(&lines, &corpus_json)?
+        distill_body(&lines, &corpus_json, &resolve_distill_floors(args, &lines)?)?
     };
     let runs: Vec<Value> = lines
         .iter()
@@ -1045,8 +1230,13 @@ fn aggregate(args: &Args) -> Result<(Value, Vec<String>), String> {
     });
     // `--structure-only` reports a valid set (reaching here means every check
     // above held) and leaves the verdict to the report step.
+    // `--structure-only` exits 0 for numeric floor misses ONLY: every
+    // structural failure (a format error, a refused or drifted run, an
+    // undetected control) is a failure here too, so the paid steps behind it
+    // never run on an unsound set. (A bad digest, k mismatch, duplicate or
+    // invalid floor record already returned an error above.)
     let failures = if args.structure_only {
-        Vec::new()
+        body.structural
     } else {
         body.failures
     };
@@ -1133,10 +1323,17 @@ fn compare(reference: &Path, candidate: &Path) -> Result<(Value, Vec<String>), S
 /// baseline rounded down to 0.01). A mean below the spec minimum never lowers
 /// the floor: it fails and asks for an operator spec-change D-row.
 fn calibrate(args: &Args) -> Result<(Value, Vec<String>), String> {
-    let (Some(spec), Some(name), Some(path)) = (args.spec, &args.metric, &args.result) else {
-        return Err("eval-report: --calibrate needs --spec, --metric and --result".into());
+    let (Some(spec), Some(name)) = (args.spec, &args.metric) else {
+        return Err("eval-report: --calibrate needs --spec and --metric".into());
     };
-    let live = live(path)?;
+    let live = match (&args.result, &args.results) {
+        (Some(path), _) => live(path)?,
+        // Every hop re-verified: lines, cassette digests, corpus, floors, decisions.
+        (None, Some(_)) => aggregate(args)?.0,
+        (None, None) => {
+            return Err("eval-report: --calibrate needs --result or --results".into());
+        }
+    };
     // A green verdict, and a floor taken from it, need structurally valid
     // evidence: a distill report carrying format errors or any failure no
     // averaging hides (refused/drifted run, undetected control) calibrates
@@ -1182,5 +1379,77 @@ fn calibrate(args: &Args) -> Result<(Value, Vec<String>), String> {
         "rule": "D-28-1-03 A: max(spec minimum, Wilson lower bound of the measured baseline rounded down to 0.01)",
         "spec_change_required": below,
     });
+    let mut report = report;
+    if let Some(judge_result) = &args.judge_result {
+        let (evidence, stanza) = judge_stanza(args, judge_result)?;
+        report["judge_evidence"] = json!(evidence);
+        report["judge_stanza"] = json!(stanza);
+    }
     Ok((report, failures))
+}
+
+/// The floor record's `[judge]` stanza, emitted from a verified judge-only
+/// result line (`maos eval distill --judge-repeat` stdout): both artifacts
+/// re-hashed against their digests, every recorded judge reply attributed to the
+/// pinned model (an unverified or other-model reply refuses), the counts
+/// recomputed from the verdicts, the judge prompt the pinned one, and the file's
+/// own SHA-256 recorded — so the stanza is copied, never typed.
+fn judge_stanza(args: &Args, path: &Path) -> Result<(JudgeEvidence, String), String> {
+    let bytes = read(path)?;
+    let line: Value = serde_json::from_slice(&bytes)
+        .map_err(|e| format!("eval-report: {}: {e}", path.display()))?;
+    let counts = maos_eval::distill_replay::judge_repeat_counts(&line)
+        .map_err(|e| format!("eval-report: {}: {e}", path.display()))?;
+    let prompt = maos_eval::onboarding_gate_corpus::sha256_hex(
+        maos_eval::distill_replay::JUDGE_PROMPT.as_bytes(),
+    );
+    if counts.prompt_sha256 != prompt {
+        return Err("eval-report: the judge-only line was judged under another prompt".into());
+    }
+    let model = judge_model(args)?;
+    let output = cassette(&line, args)?;
+    let entries = output.value["entries"].as_array().map_or(0, Vec::len);
+    if entries != counts.calls {
+        return Err(format!(
+            "eval-report: the judge output holds {entries} replies for {} judge calls",
+            counts.calls
+        ));
+    }
+    for entry in output.value["entries"].as_array().into_iter().flatten() {
+        let served = entry["response"]["provider_attribution"]["model_id"].as_str();
+        if served != Some(model.as_str()) {
+            return Err(format!(
+                "eval-report: a recorded judge reply is attributed to {served:?}, not the pinned \
+                 {model} (unverified attribution is not pinned-judge evidence)"
+            ));
+        }
+    }
+    let result_file = path
+        .strip_prefix(&args.root)
+        .map_err(|_| {
+            "eval-report: --judge-result must lie under --root (the loader finds it there)"
+        })?
+        .to_string_lossy()
+        .into_owned();
+    let evidence = JudgeEvidence {
+        model,
+        prompt_sha256: prompt,
+        k: counts.k,
+        findings: counts.findings,
+        calls: counts.calls,
+        agree: counts.agree,
+        result_file,
+        result_sha256: hex(&bytes),
+        rule: "agree = judge repeats equal to their finding's first verdict, summed".into(),
+        rationale: "emitted by xtask eval-report --calibrate --judge-result from the verified \
+                    judge-only result line; disclosure only, it sets no floor"
+            .into(),
+    };
+    #[derive(serde::Serialize)]
+    struct Stanza<'a> {
+        judge: &'a JudgeEvidence,
+    }
+    let stanza =
+        toml::to_string(&Stanza { judge: &evidence }).map_err(|e| format!("eval-report: {e}"))?;
+    Ok((evidence, stanza))
 }

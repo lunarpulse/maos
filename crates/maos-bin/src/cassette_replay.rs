@@ -330,13 +330,32 @@ impl CassetteRecorder {
         });
         let serialized = serde_json::to_string_pretty(&cassette)
             .map_err(|error| format!("cassette serialization failed: {error}"))?;
-        std::fs::write(&self.path, serialized)
+        write_replacing(&self.path, &serialized)
             .map_err(|error| format!("cassette record write failed: {error}"))?;
         state.flushed_entries = state.entries.len();
         Ok(FlushOutcome::Written {
             entries: state.entries.len(),
         })
     }
+}
+
+/// Write `bytes` to `path` through a fresh temp file and a rename: the rename
+/// replaces whatever sits at `path` — a symlink included, dangling or not —
+/// instead of following it, so a link planted after the destination was checked
+/// cannot redirect (or truncate) another file.
+fn write_replacing(path: &std::path::Path, bytes: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let temp = path.with_file_name(format!(".{name}.{}.tmp", std::process::id()));
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp)?;
+    file.write_all(bytes.as_bytes())?;
+    file.sync_all()?;
+    std::fs::rename(&temp, path).inspect_err(|_| {
+        let _ = std::fs::remove_file(&temp);
+    })
 }
 
 impl Drop for CassetteRecorder {

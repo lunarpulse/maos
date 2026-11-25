@@ -52,7 +52,7 @@ const USAGE: &str = "usage: maos eval distill --class researcher [--cassette <pa
                      [--judge-repeat <k>]";
 const INTENT: &str = "researcher:corpus_claim";
 /// The Researcher's calibrated-floor record, read when present.
-const FLOORS_FILE: &str = "spirits/researcher/eval/floors.toml";
+const FLOORS_FILE: &str = scorer::FLOORS_FILE;
 /// The hosted dispatch bound on repeats, shared with the floor record's judge
 /// evidence: a judge-only repeat is `1..=MAX_JUDGE_REPEAT` live judge calls per
 /// finding (see [`scorer::MIN_AGREEMENT_REPEAT`] for what one repeat cannot say).
@@ -160,12 +160,33 @@ fn check_repeat_count(k: usize) -> Result<(), String> {
     }
 }
 
-/// `p` resolved as far as the file system lets it: made absolute, then its
-/// nearest existing ancestor canonicalised (symlinks followed) and the missing
-/// tail appended.
+/// `p` resolved as far as the file system lets it: made absolute, a final
+/// symlink followed even when it dangles (its target need not exist yet),
+/// `.`/`..` removed lexically, then the nearest existing ancestor canonicalised
+/// (symlinks followed) and the missing tail appended.
 fn resolved(p: &Path) -> PathBuf {
-    let absolute = std::path::absolute(p).unwrap_or_else(|_| p.to_path_buf());
-    let (mut tail, mut at) = (Vec::new(), absolute.as_path());
+    let mut current = std::path::absolute(p).unwrap_or_else(|_| p.to_path_buf());
+    for _ in 0..40 {
+        let is_link = std::fs::symlink_metadata(&current).is_ok_and(|m| m.file_type().is_symlink());
+        let Some(target) = is_link.then(|| std::fs::read_link(&current).ok()).flatten() else {
+            break;
+        };
+        current = match current.parent() {
+            Some(dir) => dir.join(target),
+            None => target,
+        };
+    }
+    let mut clean = PathBuf::new();
+    for part in current.components() {
+        match part {
+            std::path::Component::ParentDir => {
+                clean.pop();
+            }
+            std::path::Component::CurDir => {}
+            other => clean.push(other),
+        }
+    }
+    let (mut tail, mut at) = (Vec::new(), clean.as_path());
     loop {
         if let Ok(mut found) = at.canonicalize() {
             found.extend(tail.iter().rev());
@@ -176,9 +197,70 @@ fn resolved(p: &Path) -> PathBuf {
                 tail.push(name.to_owned());
                 at = parent;
             }
-            _ => return absolute,
+            _ => return clean,
         }
     }
+}
+
+/// Destinations claimed BEFORE any inference, created with `create_new`
+/// (`O_CREAT|O_EXCL`: an existing file, directory or symlink — even a dangling
+/// one — fails, and a final symlink is never followed), so a name that was
+/// free when checked cannot be a link by the time it is written. An
+/// unwritten (still empty) reservation is removed when this guard drops, so a
+/// refused run leaves nothing behind. The recorder and the sidecar replace the
+/// reserved file by rename and never write through a link.
+struct Reserved(Vec<PathBuf>);
+
+impl Reserved {
+    fn new(paths: &[&Path]) -> Result<Self, String> {
+        let mut held = Self(Vec::new());
+        for path in paths {
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(path)
+                .map_err(|e| {
+                    format!(
+                        "{} cannot be reserved ({e}): it exists (a file, a directory or a \
+                         symlink, dangling or not) or is not creatable; record to a fresh path",
+                        path.display()
+                    )
+                })?;
+            held.0.push(path.to_path_buf());
+        }
+        Ok(held)
+    }
+}
+
+impl Drop for Reserved {
+    fn drop(&mut self) {
+        for path in &self.0 {
+            if std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && m.len() == 0) {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
+}
+
+/// Write `bytes` over the reserved `path` by a fresh temp file and a rename:
+/// the rename replaces whatever sits at `path` (a link included) instead of
+/// following it.
+fn write_replacing(path: &Path, bytes: &str) -> Result<(), String> {
+    use std::io::Write;
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let temp = path.with_file_name(format!(".{name}.{}.tmp", std::process::id()));
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp)
+        .map_err(|e| format!("{}: {e}", temp.display()))?;
+    file.write_all(bytes.as_bytes())
+        .and_then(|()| file.sync_all())
+        .map_err(|e| format!("{}: {e}", temp.display()))?;
+    std::fs::rename(&temp, path).map_err(|e| {
+        let _ = std::fs::remove_file(&temp);
+        format!("{}: {e}", path.display())
+    })
 }
 
 /// Whether two paths name one file: the same resolved path or, on unix, the
@@ -345,11 +427,17 @@ pub fn evaluate_with_repeat(
         // Before any inference: the hosted bound.
         check_repeat_count(repeat.k)?;
     }
-    if record {
-        // ... and no write destination over any read input or another write.
+    // ... and every write destination claimed before inference (kept for the
+    // whole run; an unwritten claim is released on an early return).
+    let _reserved = if record {
+        // No write destination over any read input or another write.
         let survey = judge_repeat.as_ref().map(|r| r.survey_cassette.as_path());
         check_destinations(&cassette, survey)?;
-    }
+        let sidecar = scorer::verdicts_sidecar(&cassette);
+        Some(Reserved::new(&[cassette.as_path(), sidecar.as_path()])?)
+    } else {
+        None
+    };
     let survey_replay_router = judge_repeat
         .as_ref()
         .map(|repeat| route(Arc::clone(&repeat.survey)));
@@ -585,9 +673,9 @@ pub fn evaluate_with_repeat(
     }
     if record {
         let sidecar = scorer::verdicts_sidecar(&cassette);
-        std::fs::write(
+        write_replacing(
             &sidecar,
-            scorer::live_verdicts(&facts, &model, temperature_applied)?,
+            &scorer::live_verdicts(&facts, &model, temperature_applied)?,
         )
         .map_err(|e| format!("verdicts sidecar {sidecar:?}: {e}"))?;
     }
@@ -725,17 +813,18 @@ fn minter(capability: &Arc<CapabilityRegistryAdapter>) -> Mint {
 
 /// Story 28-3 (AC6) — the Researcher's floors: its calibrated record
 /// `spirits/researcher/eval/floors.toml` when one exists, else the NFR-Aud-7
-/// spec minimums. A record that does not parse or does not apply is an
-/// error, never a silent fallback (same rule as Butler's, 28-1).
+/// spec minimums, resolved by the logic `xtask eval-report` shares
+/// ([`scorer::resolve_floors`]: schema, evidence, ruling shape and hash, and
+/// the judge archive when present). A record that does not parse or does not
+/// apply is an error, never a silent fallback (same rule as Butler's, 28-1). An
+/// ordinary run does not demand the archive (`require_archive = false`).
 fn distill_floors(judge_model: &str) -> Result<DistillFloors, String> {
-    let path = std::path::Path::new("spirits/researcher/eval/floors.toml");
+    let path = Path::new(FLOORS_FILE);
     let shown = |e: &dyn std::fmt::Display| format!("floor record {}: {e}", path.display());
-    match std::fs::read_to_string(path) {
-        Ok(text) => toml::from_str::<DistillFloorRecord>(&text)
-            .map_err(|e| shown(&e))?
-            .apply(DistillFloors::spec(), judge_model)
-            .map_err(|e| shown(&e)),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(DistillFloors::spec()),
-        Err(e) => Err(shown(&e)),
-    }
+    let record = match std::fs::read_to_string(path) {
+        Ok(text) => Some(toml::from_str::<DistillFloorRecord>(&text).map_err(|e| shown(&e))?),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(shown(&e)),
+    };
+    scorer::resolve_floors(record, Path::new("."), judge_model, false).map_err(|e| shown(&e))
 }

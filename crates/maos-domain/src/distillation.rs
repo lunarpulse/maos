@@ -21,12 +21,32 @@ use thiserror::Error;
 /// tab included: the prompt asks for ONE sentence, and a second paragraph is
 /// the meta-text the format floor exists to count. The string borrows from
 /// `text` unless it held escapes. Beyond that it checks SHAPE only: a
-/// schema-valid single line may still hold several sentences.
+/// schema-valid single line may still hold several sentences. Format
+/// characters that let a persisted finding spoof what a reader sees are
+/// refused as well: bidi embeddings/overrides/isolates (U+202A–U+202E,
+/// U+2066–U+2069), zero-width and joiner characters (U+200B–U+200D, U+2060,
+/// U+FEFF) and the line/paragraph separators (U+2028, U+2029).
 pub fn parse_finding_completion(text: &str) -> Option<Cow<'_, str>> {
     serde_json::from_str::<StrictFinding<'_>>(text)
         .ok()
         .map(|f| f.0)
-        .filter(|finding| !finding.trim().is_empty() && !finding.chars().any(char::is_control))
+        .filter(|finding| {
+            !finding.trim().is_empty() && !finding.chars().any(|c| c.is_control() || spoofs(c))
+        })
+}
+
+/// A format character a finding may not carry (see [`parse_finding_completion`]).
+fn spoofs(c: char) -> bool {
+    matches!(
+        c,
+        '\u{202A}'..='\u{202E}'
+            | '\u{2066}'..='\u{2069}'
+            | '\u{200B}'..='\u{200D}'
+            | '\u{2060}'
+            | '\u{FEFF}'
+            | '\u{2028}'
+            | '\u{2029}'
+    )
 }
 
 /// A JSON string borrowed when escape-free.
@@ -345,6 +365,18 @@ mod tests {
             r#"{"finding":"a\u0007b"}"#,
             r#"{"finding":"one sentence.\nA second paragraph."}"#,
             r#"{"finding":"tab\tseparated"}"#,
+            // Round 3 (9): format characters that spoof a persisted finding.
+            r#"{"finding":"a\u202Eb"}"#,
+            r#"{"finding":"a\u202Ab"}"#,
+            r#"{"finding":"a\u2066b"}"#,
+            r#"{"finding":"a\u2069b"}"#,
+            r#"{"finding":"a\u200Bb"}"#,
+            r#"{"finding":"a\u200Db"}"#,
+            r#"{"finding":"a\u2060b"}"#,
+            r#"{"finding":"a\uFEFFb"}"#,
+            r#"{"finding":"a\u2028b"}"#,
+            r#"{"finding":"a\u2029b"}"#,
+            r#"{"finding":"\u200B"}"#,
             r#"{}"#,
             r#"{"summary":"x"}"#,
             r#"{"other":"x"}"#,

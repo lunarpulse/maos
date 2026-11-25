@@ -161,7 +161,7 @@ fn build_request_body(req: &InferenceRequest, model_id: &str) -> serde_json::Val
 fn parse_response(
     json: &serde_json::Value,
     endpoint_url: &str,
-    model_id: &str,
+    _requested_model_id: &str,
 ) -> Result<InferenceResponse, ProviderError> {
     let blocks = json
         .get("content")
@@ -199,19 +199,21 @@ fn parse_response(
     let input_tokens = crate::provider::usage_count(usage, "input_tokens")?;
     let output_tokens = crate::provider::usage_count(usage, "output_tokens")?;
 
-    // Story 28-3 review (round 2, A): attribute the call to the model the
-    // Messages API says SERVED it (the response's `model`), not the one asked
-    // for. A snapshot of the requested model (`-YYYYMMDD` suffix) keeps the
-    // requested id; any other served model is reported as itself, so a
-    // consumer comparing it with its pin sees the mismatch. A response with no
-    // `model` field is unattributed (`None`): nothing verifies the model.
-    let served = json.get("model").and_then(|m| m.as_str()).map(|served| {
-        if base_id(served) == base_id(model_id) {
-            model_id.to_owned()
-        } else {
-            served.to_owned()
-        }
-    });
+    // Story 28-3 review (round 2 A, round 3 item 3): attribute the call to the
+    // model the Messages API says SERVED it (the response's `model`), not the
+    // one asked for, by EXACT id: a snapshot pin (`…-20251001`) answered by
+    // another snapshot is attributed to that other snapshot, so a consumer
+    // comparing it with its pin sees the mismatch. No alias mapping is applied
+    // (the pinned `claude-sonnet-5-5` is a canonical dateless id, not a
+    // documented alias of a dated one). The string reaches the transparency-log
+    // intent, cost frames, cassettes and report errors, so only
+    // `[A-Za-z0-9._-]{1,128}` is accepted; anything else — and a response with no
+    // `model` — is unattributed (`None`): nothing verifies the model.
+    let served = json
+        .get("model")
+        .and_then(|m| m.as_str())
+        .filter(|m| is_model_token(m))
+        .map(str::to_owned);
     Ok(InferenceResponse {
         text: texts.concat(),
         stop_reason,
@@ -225,6 +227,14 @@ fn parse_response(
             model_id: served,
         },
     })
+}
+
+/// A served model id safe to carry into logs, frames and cassettes.
+fn is_model_token(model: &str) -> bool {
+    (1..=128).contains(&model.len())
+        && model
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
 }
 
 #[cfg(test)]
@@ -523,10 +533,48 @@ mod tests {
             respond(Some("claude-sonnet-5-5")).as_deref(),
             Some("claude-sonnet-5-5")
         );
-        // A dated snapshot of the requested model is that model.
+        // Exact equality: another snapshot of the same family is another model.
+        for served in [
+            "claude-sonnet-5-5-20261101",
+            "claude-sonnet-5-5-99999999",
+            "claude-sonnet-5-5-evil",
+        ] {
+            assert_eq!(respond(Some(served)).as_deref(), Some(served), "{served}");
+        }
+        // A snapshot request answered by another snapshot is not attributed to the request.
+        let snapshot = parse_response(
+            &serde_json::json!({
+                "model": "claude-haiku-4-5-20260101",
+                "content": [{ "type": "text", "text": "x" }],
+                "usage": { "input_tokens": 1, "output_tokens": 1 }
+            }),
+            "https://api.anthropic.com",
+            "claude-haiku-4-5-20251001",
+        )
+        .unwrap();
         assert_eq!(
-            respond(Some("claude-sonnet-5-5-20261101")).as_deref(),
-            Some("claude-sonnet-5-5")
+            snapshot.provider_attribution.model_id.as_deref(),
+            Some("claude-haiku-4-5-20260101")
+        );
+        // Anything outside `[A-Za-z0-9._-]{1,128}` is unattributed.
+        let long = "m".repeat(129);
+        for bad in [
+            "",
+            "claude sonnet",
+            "claude-sonnet-5-5\n",
+            "claude\u{0}x",
+            "claude-\u{202E}5-5",
+            "claude-\u{200B}5",
+            "claudé",
+            "a/b",
+            "infer:x->y:z",
+            long.as_str(),
+        ] {
+            assert_eq!(respond(Some(bad)), None, "{bad:?}");
+        }
+        assert_eq!(
+            respond(Some(&"m".repeat(128))).as_deref().map(str::len),
+            Some(128)
         );
         // Another model is reported as itself, never as the requested one.
         assert_eq!(

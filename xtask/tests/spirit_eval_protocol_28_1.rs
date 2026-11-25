@@ -85,6 +85,21 @@ fn aggregate(results: &Path, cassettes: &Path, extra: &[&str]) -> Output {
     xtask(&args)
 }
 
+/// `aggregate` against another `--root` (see [`scratch_root`]).
+fn aggregate_in(root: &Path, results: &Path, cassettes: &Path, extra: &[&str]) -> Output {
+    let mut args = vec![
+        "eval-report",
+        "--results",
+        s(results),
+        "--root",
+        s(root),
+        "--cassettes",
+        s(cassettes),
+    ];
+    args.extend_from_slice(extra);
+    xtask(&args)
+}
+
 fn r3(v: &Value) -> f64 {
     (v.as_f64().expect("a number") * 1000.0).round() / 1000.0
 }
@@ -105,18 +120,27 @@ fn write_lines(dir: &Path, name: &str, lines: &[Value]) -> PathBuf {
 }
 
 /// k lines as k separate repeats: line i names its own cassette
-/// `…live.<i>.json`, a copy of the archived one in the returned directory (the
-/// recorded digest still matches). Returns the results file and that directory.
+/// `…live.<i>.json`, a copy of the archived one made distinct by a `repeat`
+/// key (k genuine recordings are never byte-identical), in the returned
+/// directory; the line's digest follows. Returns the results file and that
+/// directory.
 fn write_repeats(dir: &Path, name: &str, lines: &mut [Value]) -> (PathBuf, PathBuf) {
     let cassettes = dir.join(format!("{name}.cassettes"));
     std::fs::create_dir_all(&cassettes).unwrap();
-    let archived = std::fs::read(fixtures().join("distill-corpus-v0.live.json")).unwrap();
+    let archived: Value = serde_json::from_slice(
+        &std::fs::read(fixtures().join("distill-corpus-v0.live.json")).unwrap(),
+    )
+    .unwrap();
     for (i, line) in lines.iter_mut().enumerate() {
         let file = format!("distill-corpus-v0.live.{}.json", i + 1);
-        std::fs::write(cassettes.join(&file), &archived).unwrap();
+        let mut copy = archived.clone();
+        copy["repeat"] = json!(i + 1);
+        let bytes = serde_json::to_vec(&copy).unwrap();
+        std::fs::write(cassettes.join(&file), &bytes).unwrap();
         line["cassette"] = json!(format!(
             "crates/maos-journey-test/cassettes/j-researcher/{file}"
         ));
+        line["cassette_sha256"] = json!(format!("{:x}", Sha256::digest(&bytes)));
     }
     (write_lines(dir, &format!("{name}.jsonl"), lines), cassettes)
 }
@@ -1107,14 +1131,68 @@ fn format_errors_are_summed_and_refuse_a_green_verdict_and_a_calibration() {
     );
 }
 
-/// E — the aggregate is gated against the floors the runs applied (the lines'
-/// agreed `floors` object): an operator-ruled hedge floor of 0.94 passes each
-/// CLI run and the aggregate; without it the compiled 0.95 would fail. Leakage
-/// keeps its zero ceiling whatever the object says.
+/// A scratch `--root`: the frozen corpus and price book, the real judge config
+/// and (when given) a Researcher floor record.
+fn scratch_root(dir: &Path, floors: Option<&str>) -> PathBuf {
+    let root = dir.join("root");
+    let copy = |from: &Path, to: &str| {
+        let to = root.join(to);
+        std::fs::create_dir_all(to.parent().unwrap()).unwrap();
+        std::fs::copy(from, to).unwrap();
+    };
+    copy(
+        &self::root().join("spirits/researcher/tests/fixtures/distill-corpus-v0.jsonl"),
+        "spirits/researcher/tests/fixtures/distill-corpus-v0.jsonl",
+    );
+    copy(
+        &self::root().join("xtask/provider-pricing.toml"),
+        "xtask/provider-pricing.toml",
+    );
+    copy(
+        &workspace().join("tests/judge-config.toml"),
+        "tests/judge-config.toml",
+    );
+    if let Some(floors) = floors {
+        let path = root.join("spirits/researcher/eval/floors.toml");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, floors).unwrap();
+    }
+    root
+}
+
+/// A floor record whose only floor is a ruled hedge floor of 0.94 (spec 0.95).
+fn ruled_hedge_record() -> String {
+    let prompt = maos_eval::onboarding_gate_corpus::sha256_hex(
+        maos_eval::distill_replay::JUDGE_PROMPT.as_bytes(),
+    );
+    format!(
+        "schema = \"maos.eval.floors/v1\"\n[judge]\nmodel = \"claude-sonnet-5-5\"\n\
+         prompt_sha256 = \"{prompt}\"\nk = 5\nfindings = 3\ncalls = 15\nagree = 14\n\
+         result_file = \"eval-results/researcher.judge-only.json\"\nresult_sha256 = \"{h}\"\n\
+         rule = \"r\"\nrationale = \"r\"\n[[floor]]\nmetric = \"hedge_preservation\"\n\
+         floor = 0.94\nspec_minimum = 0.95\nspec_source = \"NFR-Aud-7\"\n\
+         operator_ruling = \"D-28-3-03 A\"\nruling_sha256 = \"{h}\"\nmeasured_mean = 0.944\n\
+         wilson95 = [0.742, 0.990]\nk = 5\nmodel_id = \"claude-sonnet-5-5\"\n\
+         prompt_sha256 = \"ab\"\nrule = \"x\"\nrationale = \"x\"\ndate = \"2026-11-25\"\n\
+         result_file = \"r.json\"\n",
+        h = "3".repeat(64)
+    )
+}
+
+fn compiled_floors() -> Value {
+    json!({"recall": 0.9, "faithfulness": 0.98, "hedge_preservation": 0.95, "traceability": 1.0})
+}
+
+/// E (round 3, item 2) — the aggregate is gated against the floors a VALIDATED
+/// floor record resolves to (or the compiled defaults); a result line cannot
+/// name its own. With a ruled record the hedge floor is 0.94 and 17 of 18
+/// hedges (0.944) pass; edited lines that lower any floor are refused; leakage
+/// keeps its zero ceiling whatever an object says.
 #[test]
-fn the_aggregate_is_gated_against_the_floors_the_runs_applied() {
+fn the_aggregate_is_gated_against_the_floors_a_validated_record_resolves_to() {
     let dir = tempfile::tempdir().unwrap();
     let one_hedge = clean_claims().iter().position(|(_, _, h)| *h == 1).unwrap();
+    let hedge_miss = [(one_hedge, "hedge")];
     let run = |floors: Option<Value>, flips: &[(usize, &str)]| {
         let mut line = decided_line(flips);
         if let Some(floors) = floors {
@@ -1123,28 +1201,57 @@ fn the_aggregate_is_gated_against_the_floors_the_runs_applied() {
         line
     };
     let ruled = json!({"recall": 0.9, "faithfulness": 0.98, "hedge_preservation": 0.94, "traceability": 1.0});
-    // 17 of 18 hedges kept: 0.944 — above 0.94, below the compiled 0.95.
-    let hedge_miss = [(one_hedge, "hedge")];
-    let (results, repeats) = write_repeats(
-        dir.path(),
-        "ruled",
-        &mut [
-            run(Some(ruled.clone()), &hedge_miss),
-            run(Some(ruled), &hedge_miss),
-        ],
-    );
-    let out = aggregate(&results, &repeats, &[]);
-    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
-    let r = json_of(&out);
-    assert_eq!(r["metrics"]["hedge_preservation"]["floor"], 0.94);
-    assert_eq!(r["pass"], true);
+    let with_record = scratch_root(dir.path(), Some(&ruled_hedge_record()));
+    let without = scratch_root(&dir.path().join("plain"), None);
 
+    // The record says 0.94: lines naming it, or naming nothing, pass at 0.94.
+    for floors in [Some(ruled.clone()), None] {
+        let (results, repeats) = write_repeats(
+            dir.path(),
+            "ruled",
+            &mut [run(floors.clone(), &hedge_miss), run(floors, &hedge_miss)],
+        );
+        let out = aggregate_in(&with_record, &results, &repeats, &[]);
+        assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+        let r = json_of(&out);
+        assert_eq!(r["metrics"]["hedge_preservation"]["floor"], 0.94);
+        assert_eq!(r["pass"], true);
+    }
+
+    // The same lines with no record (compiled 0.95): the edited 0.94 is refused,
+    // and so is every other lowering, traceability included.
+    for edited in [
+        ruled.clone(),
+        json!({"recall": 0.9, "faithfulness": 0.98, "hedge_preservation": 0.95, "traceability": 0.5}),
+        json!({"recall": 0.5, "faithfulness": 0.98, "hedge_preservation": 0.95, "traceability": 1.0}),
+        json!({"recall": 0.9, "faithfulness": 0.98, "hedge_preservation": 0.95, "traceability": 1.0, "secret_leakage": 1.0}),
+    ] {
+        let (results, repeats) = write_repeats(
+            dir.path(),
+            "edited",
+            &mut [
+                run(Some(edited.clone()), &hedge_miss),
+                run(Some(edited.clone()), &hedge_miss),
+            ],
+        );
+        let out = aggregate_in(&without, &results, &repeats, &[]);
+        assert_eq!(out.status.code(), Some(1), "{edited}");
+        assert!(
+            stderr(&out).contains("disagree with the validated floor record"),
+            "{edited}: {}",
+            stderr(&out)
+        );
+    }
+    // No record, compiled floors on the lines: 0.95 fails the 0.944.
     let (results, repeats) = write_repeats(
         dir.path(),
         "compiled",
-        &mut [run(None, &hedge_miss), run(None, &hedge_miss)],
+        &mut [
+            run(Some(compiled_floors()), &hedge_miss),
+            run(Some(compiled_floors()), &hedge_miss),
+        ],
     );
-    let out = aggregate(&results, &repeats, &[]);
+    let out = aggregate_in(&without, &results, &repeats, &[]);
     assert_eq!(out.status.code(), Some(1));
     assert!(
         stderr(&out).contains("hedge_preservation mean 0.944"),
@@ -1152,20 +1259,50 @@ fn the_aggregate_is_gated_against_the_floors_the_runs_applied() {
         stderr(&out)
     );
 
-    // Leakage: a clean finding trips redaction; a floors object cannot move it.
-    let lax = json!({"recall": 0.0, "faithfulness": 0.0, "hedge_preservation": 0.0, "traceability": 0.0, "secret_leakage": 1.0});
+    // A record, but a line quoting other floors: refused.
+    let stale = json!({"recall": 0.9, "faithfulness": 0.98, "hedge_preservation": 0.93, "traceability": 1.0});
+    let (results, repeats) =
+        write_repeats(dir.path(), "stale", &mut [run(Some(stale), &hedge_miss)]);
+    let out = aggregate_in(&with_record, &results, &repeats, &[]);
+    assert_eq!(out.status.code(), Some(1));
+
+    // Leakage: a clean finding trips redaction; the ceiling is not a floor.
     let (results, repeats) = write_repeats(
         dir.path(),
         "leak",
         &mut [
-            run(Some(lax.clone()), &[(0, "leaks")]),
-            run(Some(lax), &[(0, "leaks")]),
+            run(Some(compiled_floors()), &[(0, "leaks")]),
+            run(Some(compiled_floors()), &[(0, "leaks")]),
         ],
     );
-    let out = aggregate(&results, &repeats, &[]);
+    let out = aggregate_in(&without, &results, &repeats, &[]);
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
     assert!(
         stderr(&out).contains("secret_leakage mean"),
+        "{}",
+        stderr(&out)
+    );
+
+    // The promoting command needs the archive the record names: absent ⇒ refused.
+    let (results, repeats) = write_repeats(
+        dir.path(),
+        "promote",
+        &mut [run(None, &hedge_miss), run(None, &hedge_miss)],
+    );
+    let out = aggregate_in(&with_record, &results, &repeats, &["--require-archive"]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        stderr(&out).contains("--require-archive"),
+        "{}",
+        stderr(&out)
+    );
+    // An invalid record (placeholder ruling) refuses the whole report.
+    let bad_record = ruled_hedge_record().replace("D-28-3-03 A", "decisions-2026-11-25 D-x");
+    let bad_root = scratch_root(&dir.path().join("bad"), Some(&bad_record));
+    let out = aggregate_in(&bad_root, &results, &repeats, &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        stderr(&out).contains("is not a decision id"),
         "{}",
         stderr(&out)
     );
@@ -1306,6 +1443,340 @@ fn structure_only_separates_a_floor_miss_from_a_broken_result_set() {
     assert_eq!(out.status.code(), Some(1));
     assert!(
         stderr(&out).contains("disagree on `floors`"),
+        "{}",
+        stderr(&out)
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Round 3 — the evidence chain: structure-only, artifact identity, path and
+// size limits, token overflow, and the judge stanza.
+// ---------------------------------------------------------------------------
+
+/// Item 1 — `--structure-only` exits 0 for NUMERIC floor misses only. A format
+/// error (the Spirit fell back to the source statement, so every ratio is
+/// healthy) is structural: nonzero, and the paid judge-only step never runs.
+#[test]
+fn structure_only_fails_on_a_format_error_but_not_on_a_floor_miss() {
+    let dir = tempfile::tempdir().unwrap();
+    let structure = |lines: &mut [Value], name: &str| {
+        let (results, repeats) = write_repeats(dir.path(), name, lines);
+        aggregate(&results, &repeats, &["--structure-only", "--repeats", "2"])
+    };
+    // A genuine numeric miss only: exit 0.
+    let out = structure(
+        &mut [
+            decided_line(&[(3, "faithful")]),
+            decided_line(&[(3, "faithful")]),
+        ],
+        "miss",
+    );
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    // One run reported one format error; every ratio healthy: exit 1.
+    let out = structure(
+        &mut [with_format_errors(1), with_format_errors(0)],
+        "format",
+    );
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("format_errors 1 above floor 0"),
+        "{}",
+        stderr(&out)
+    );
+    // An undetected control and a drifted survey are structural too.
+    let mut blind = decided_line(&[]);
+    blind["score"]["controls"][0]["detected"] = json!(false);
+    let out = structure(&mut [blind, decided_line(&[])], "blind");
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("controls not detected"),
+        "{}",
+        stderr(&out)
+    );
+    let mut drift = decided_line(&[]);
+    drift["missed_floors"] = json!([SURVEY_DRIFT]);
+    let out = structure(&mut [drift, decided_line(&[])], "drift");
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+}
+
+/// Item 5 — duplicate detection is on the RESOLVED artifact: `--cassettes`
+/// flattens `first/run.json` and `second/run.json` to one file; a symlink or
+/// hard link names it twice; two byte-identical recordings are one run too.
+#[test]
+fn one_artifact_under_two_names_is_one_run_not_two() {
+    use std::os::unix::fs::symlink;
+    let dir = tempfile::tempdir().unwrap();
+    let mut lines = vec![decided_line(&[]), decided_line(&[(3, "faithful")])];
+    let (_, cassettes) = write_repeats(dir.path(), "ident", &mut lines);
+    let one = cassettes.join("distill-corpus-v0.live.1.json");
+    let check = |lines: &[Value], what: &str, wanted: &str| {
+        let results = write_lines(dir.path(), "ident.jsonl", lines);
+        let out = aggregate(&results, &cassettes, &[]);
+        assert_eq!(out.status.code(), Some(1), "{what}");
+        assert!(stderr(&out).contains(wanted), "{what}: {}", stderr(&out));
+    };
+    // Different path strings, one file under `--cassettes`.
+    let mut flattened = lines.clone();
+    flattened[0]["cassette"] = json!("first/distill-corpus-v0.live.1.json");
+    flattened[1]["cassette"] = json!("second/distill-corpus-v0.live.1.json");
+    flattened[1]["cassette_sha256"] = flattened[0]["cassette_sha256"].clone();
+    check(
+        &flattened,
+        "flattened by --cassettes",
+        "load the same artifact",
+    );
+    // A symlink and a hard link to the first run's cassette.
+    for (name, link) in [("sym", true), ("hard", false)] {
+        let alias = cassettes.join(format!("alias-{name}.json"));
+        if link {
+            symlink(&one, &alias).unwrap();
+        } else {
+            std::fs::hard_link(&one, &alias).unwrap();
+        }
+        let mut twice = lines.clone();
+        twice[1]["cassette"] = json!(format!("alias-{name}.json"));
+        twice[1]["cassette_sha256"] = twice[0]["cassette_sha256"].clone();
+        check(&twice, name, "load the same artifact");
+    }
+    // Two distinct files with identical bytes.
+    let copy = cassettes.join("copy.json");
+    std::fs::copy(&one, &copy).unwrap();
+    let mut same_bytes = lines.clone();
+    same_bytes[1]["cassette"] = json!("copy.json");
+    same_bytes[1]["cassette_sha256"] = same_bytes[0]["cassette_sha256"].clone();
+    check(&same_bytes, "identical bytes", "byte-identical cassettes");
+}
+
+/// Item 8 — a result line cannot point outside the workspace, an artifact over
+/// the size cap is refused unread, and token sums cannot overflow or be floats.
+#[test]
+fn result_line_paths_must_stay_inside_the_workspace() {
+    let dir = tempfile::tempdir().unwrap();
+    let scratch = scratch_root(dir.path(), None);
+    let run = |results: &Path, extra: &[&str]| {
+        let mut args = vec![
+            "eval-report",
+            "--results",
+            s(results),
+            "--root",
+            s(&scratch),
+        ];
+        args.extend_from_slice(extra);
+        xtask(&args)
+    };
+    // Absolute and climbing cassette paths, and a corpus path, without --cassettes.
+    for bad in ["/etc/hostname", "../outside.json", "a/../../b.json", ""] {
+        let mut line = decided_line(&[]);
+        line["cassette"] = json!(bad);
+        let results = write_lines(dir.path(), "paths.jsonl", &[line]);
+        let out = run(&results, &[]);
+        assert_eq!(out.status.code(), Some(1), "{bad}");
+        assert!(
+            stderr(&out).contains("relative path inside the workspace"),
+            "{bad}: {}",
+            stderr(&out)
+        );
+    }
+    let mut line = decided_line(&[]);
+    line["corpus"] = json!("/etc/hostname");
+    let results = write_lines(dir.path(), "corpus.jsonl", &[line]);
+    let out = run(&results, &[]);
+    assert!(
+        stderr(&out).contains("relative path inside the workspace"),
+        "{}",
+        stderr(&out)
+    );
+}
+
+/// Item 8 — an artifact over the size cap is refused unread.
+#[test]
+fn an_artifact_over_the_size_cap_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    // Over the cap: refused, not slurped (a sparse file, never written).
+    let (results, cassettes) = write_repeats(dir.path(), "big", &mut [decided_line(&[])]);
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .open(cassettes.join("distill-corpus-v0.live.1.json"))
+        .unwrap();
+    file.set_len(64 * 1024 * 1024 + 1).unwrap();
+    let out = aggregate(&results, &cassettes, &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(stderr(&out).contains("larger than"), "{}", stderr(&out));
+}
+
+/// Item 8 — token sums cannot overflow or be floats or negative.
+#[test]
+fn token_counts_cannot_overflow_or_be_inexact() {
+    let dir = tempfile::tempdir().unwrap();
+    // Token counts: u64 overflow across entries, and a float, are errors.
+    for (tokens, wanted) in [
+        (json!(u64::MAX), "token counts overflow"),
+        (json!(1.5), "is not a token count"),
+        (json!(-1), "is not a token count"),
+    ] {
+        let mut lines = vec![decided_line(&[])];
+        let (_, cassettes) = write_repeats(dir.path(), "tokens", &mut lines);
+        let path = cassettes.join("distill-corpus-v0.live.1.json");
+        let mut cassette: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        for _ in 0..2 {
+            let mut entry = cassette["entries"][0].clone();
+            entry["response"]["usage"]["input_tokens"] = tokens.clone();
+            cassette["entries"].as_array_mut().unwrap().push(entry);
+        }
+        let bytes = serde_json::to_vec(&cassette).unwrap();
+        std::fs::write(&path, &bytes).unwrap();
+        lines[0]["cassette_sha256"] = json!(format!("{:x}", Sha256::digest(&bytes)));
+        let results = write_lines(dir.path(), "tokens.jsonl", &lines);
+        let out = aggregate(&results, &cassettes, &[]);
+        assert_eq!(out.status.code(), Some(1), "{tokens}");
+        assert!(stderr(&out).contains(wanted), "{tokens}: {}", stderr(&out));
+    }
+}
+
+/// Item 6a — `--calibrate --judge-result` EMITS the `[judge]` stanza from the
+/// verified judge-only line (artifact digests, every reply attributed to the
+/// pinned model, counts recomputed from the verdicts, file hash recorded); the
+/// loader accepts exactly that stanza and refuses an invented or edited one.
+#[test]
+fn calibrate_emits_the_judge_stanza_from_the_verified_judge_only_result() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = scratch_root(dir.path(), None);
+    let mut lines = vec![decided_line(&[]), decided_line(&[])];
+    let (results, cassettes) = write_repeats(dir.path(), "cal", &mut lines);
+    let digest = |b: &[u8]| format!("{:x}", Sha256::digest(b));
+    let prompt = maos_eval::onboarding_gate_corpus::sha256_hex(
+        maos_eval::distill_replay::JUDGE_PROMPT.as_bytes(),
+    );
+    // The judge-only artifacts: 15 pinned replies; 3 findings x 5 verdicts.
+    let reply =
+        |model: Option<&str>| json!({"response": {"provider_attribution": {"model_id": model}}});
+    let output = |model: Option<&str>| {
+        let mut entries = vec![reply(Some("claude-sonnet-5-5")); 14];
+        entries.push(reply(model));
+        serde_json::to_vec(&json!({"entries": entries})).unwrap()
+    };
+    let survey = serde_json::to_vec(&json!({"entries": []})).unwrap();
+    let verdicts = |v: [bool; 5]| json!({"k": 5, "verdicts": v});
+    let build = |out_bytes: &[u8], prompt: &str| {
+        std::fs::write(cassettes.join("judge-only.live.json"), out_bytes).unwrap();
+        std::fs::write(cassettes.join("survey.json"), &survey).unwrap();
+        let line = json!({
+            "event": "eval_distill", "judge_prompt_sha256": prompt,
+            "cassette": "judge-only.live.json", "cassette_sha256": digest(out_bytes),
+            "judge_repeat": {
+                "k": 5, "judge_calls": 15,
+                "survey_cassette": "survey.json", "survey_cassette_sha256": digest(&survey),
+                "findings": {
+                    "a": verdicts([true, true, false, true, true]),
+                    "b": verdicts([true, false, false, true, true]),
+                    "c": verdicts([true; 5]),
+                },
+            },
+        });
+        let path = root.join("eval-results/researcher.judge-only.json");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, format!("{line}\n")).unwrap();
+        path
+    };
+    let calibrate = |judge_result: &Path| {
+        xtask(&[
+            "eval-report",
+            "--calibrate",
+            "--spec",
+            "0.9",
+            "--metric",
+            "recall",
+            "--results",
+            s(&results),
+            "--root",
+            s(&root),
+            "--cassettes",
+            s(&cassettes),
+            "--judge-result",
+            s(judge_result),
+        ])
+    };
+    let path = build(&output(Some("claude-sonnet-5-5")), &prompt);
+    let out = calibrate(&path);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let r = json_of(&out);
+    let e = &r["judge_evidence"];
+    assert_eq!(
+        (
+            e["k"].as_u64(),
+            e["findings"].as_u64(),
+            e["calls"].as_u64(),
+            e["agree"].as_u64()
+        ),
+        (Some(5), Some(3), Some(15), Some(12))
+    );
+    assert_eq!(
+        e["result_sha256"],
+        digest(&std::fs::read(&path).unwrap()).as_str()
+    );
+    assert_eq!(e["result_file"], "eval-results/researcher.judge-only.json");
+    assert_eq!(e["model"], "claude-sonnet-5-5");
+    // The emitted stanza is the evidence, and the loader verifies it against the file.
+    #[derive(serde::Deserialize)]
+    struct Stanza {
+        judge: maos_eval::distill_replay::JudgeEvidence,
+    }
+    let stanza: Stanza = toml::from_str(r["judge_stanza"].as_str().unwrap()).unwrap();
+    let record = maos_eval::distill_replay::DistillFloorRecord {
+        schema: maos_eval::halt_replay::FLOORS_SCHEMA.into(),
+        judge: stanza.judge.clone(),
+        floor: Vec::new(),
+    };
+    assert!(record.verify_archive(&root, true).is_ok());
+    let mut invented = record.clone();
+    invented.judge.agree = 13;
+    assert!(invented
+        .verify_archive(&root, true)
+        .unwrap_err()
+        .contains("is not what its archive proves"));
+
+    // An unverified (None) or other-model recorded reply is not pinned-judge evidence.
+    for model in [None, Some("claude-haiku-5-5")] {
+        let path = build(&output(model), &prompt);
+        let out = calibrate(&path);
+        assert_eq!(out.status.code(), Some(1), "{model:?}");
+        assert!(
+            stderr(&out).contains("not the pinned"),
+            "{model:?}: {}",
+            stderr(&out)
+        );
+    }
+    // Another judge prompt; a tampered output digest; a result outside --root.
+    let path = build(&output(Some("claude-sonnet-5-5")), &"0".repeat(64));
+    assert!(stderr(&calibrate(&path)).contains("another prompt"));
+    let path = build(&output(Some("claude-sonnet-5-5")), &prompt);
+    std::fs::write(cassettes.join("judge-only.live.json"), b"{\"entries\": []}").unwrap();
+    assert!(stderr(&calibrate(&path)).contains("cassette_sha256"));
+    let outside = dir.path().join("elsewhere.json");
+    std::fs::copy(&path, &outside).unwrap();
+    let _ = build(&output(Some("claude-sonnet-5-5")), &prompt);
+    assert!(stderr(&calibrate(&outside)).contains("must lie under --root"));
+}
+
+/// Chain hop: a recorded completion with NO attribution (the adapter reports
+/// `None` for an unverified served model) cannot be priced or counted: the
+/// aggregate refuses the whole set rather than assume the pinned model.
+#[test]
+fn a_recorded_completion_without_attribution_refuses_the_aggregate() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut lines = vec![decided_line(&[])];
+    let (_, cassettes) = write_repeats(dir.path(), "null", &mut lines);
+    let path = cassettes.join("distill-corpus-v0.live.1.json");
+    let mut cassette: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    cassette["entries"][0]["response"]["provider_attribution"]["model_id"] = Value::Null;
+    let bytes = serde_json::to_vec(&cassette).unwrap();
+    std::fs::write(&path, &bytes).unwrap();
+    lines[0]["cassette_sha256"] = json!(format!("{:x}", Sha256::digest(&bytes)));
+    let results = write_lines(dir.path(), "null.jsonl", &lines);
+    let out = aggregate(&results, &cassettes, &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        stderr(&out).contains("`model_id` is not a string"),
         "{}",
         stderr(&out)
     );

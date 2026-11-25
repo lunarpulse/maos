@@ -169,3 +169,79 @@ failed. `check-kernel-baseline` 28,339 (Δ 0), `kloc-check`, `check-env-contract
 warnings vs round 1 are pre-existing ones in `maos-providers/tests/{ollama,openai}_round_trip_test.rs` (newly linted crate).
 **Only the paid run can settle:** that the live Messages API returns `model` for the pinned judge in an id this adapter
 maps to the pin; that k = 5 repeats pass at the floors; that the judge-only step and the new structure step run in Actions.
+
+# Round 3 — the evidence chain, then the nine findings
+
+Base `241106bb`, fixes uncommitted, offline only. T4 (live k = 5) and T5 (promotion) remain unrun.
+Order note (honest): the checklist below was written AFTER the first fixes of this round, not before; writing it
+found two hops with no test of their own (a recorded completion with no attribution in a full-repeat cassette; the
+recorder writing through a planted link) — both now have one.
+
+## Chain checklist (every hop, what authenticates it, what a bad input does, the test that fails if the control is removed)
+
+| # | Hop | Authenticated by | Edited / forged / duplicated / missing / aliased input | Pinned by (test; plant in the table below) |
+|---|-----|------------------|---------------------------------------------------------|---------------------------------------------|
+| 1 | Model reply → persisted finding | the ONE strict decoder (`parse_finding_completion`: shape, no blank, no control or spoofing format character) shared by Spirit and scorer | malformed / blank / bidi / zero-width ⇒ format error; the Spirit persists the source statement | domain `finding_completion_rejects_every_other_shape…`; `a_malformed_completion_falls_back_to_the_source_summary…`; scorer `a_survey_reply_that_is_not_exactly_one_finding_object…` |
+| 2 | Provider response → attribution | adapter reads the response `model`, EXACT id, `[A-Za-z0-9._-]{1,128}` else `None` | other model / other snapshot / injection string / no `model` ⇒ attributed as itself or `None`; judge and workflow refuse | `attribution_comes_from_the_response_model_not_the_request`; `a_judge_reply_without_or_with_another_attribution_is_not_pinned_judge_evidence` |
+| 3 | Judge replies → verdicts | every one of the k replies: pinned model + one of two words, before flush | one reply from another model ⇒ run refused, recording flushed | `a_later_repeat_reply_from_another_model_is_refused_after_flushing` |
+| 4 | Destinations (`MAOS_REPLAY_CASSETTE`, `.verdicts.json`) | `check_destinations` (every write vs every read and vs each other; hard/sym/dangling links, relative, absent) + `Reserved` (`create_new`, refuses existing/dangling) + rename-replace writes (bench sidecar, recorder) | alias, dangling link, pre-existing file, link planted after the check ⇒ refused before inference / link replaced, never followed | `no_write_destination_may_alias…`, `destinations_that_do_not_exist_yet…`, `the_recorder_replaces_a_planted_link…` |
+| 5 | Run → result line | evaluator computes `decisions`, `format_errors`, `floors`, digests of both artifacts | line edited after the run: see 6–8 | `the_line_carries_the_decisions…`, `a_judge_repeat_reports_both_artifacts…` |
+| 6 | Result line → artifacts | `cassette_sha256` (+ survey digest); resolved artifact identity (canonical path / dev+inode) and digest uniqueness; relative-path-only without `--cassettes`; 64 MiB read cap; checked token sums | edited cassette, edited digest, same file under two names (`--cassettes` flattening, symlink, hard link), identical bytes, `..`/absolute path, oversize, token overflow, `model_id` null ⇒ refused | `a_stale_sha…` (28-1), `one_artifact_under_two_names_is_one_run_not_two`, `result_line_paths_must_stay_inside_the_workspace`, `an_artifact_over_the_size_cap_is_refused`, `token_counts_cannot_overflow_or_be_inexact`, `a_recorded_completion_without_attribution_refuses_the_aggregate` |
+| 7 | Result lines → a valid SET | `--structure-only --repeats k`: k lines, digests, consistency, no duplicate, decisions coherent, AND every structural failure (format error, drift, undetected control) | short/long/duplicated/format-error set ⇒ exit 1; only a numeric floor miss exits 0 | `structure_only_separates…`, `structure_only_fails_on_a_format_error_but_not_on_a_floor_miss` |
+| 8 | Floors | resolved by `resolve_floors` from the validated record `spirits/researcher/eval/floors.toml` (schema, evidence, ruling shape + `ruling_sha256`, no traceability lowering, pinned judge, archive recomputed when present, mandatory with `--require-archive`) or the compiled defaults; a line's own `floors` must EQUAL them | every line lowered 0.95→0.94, traceability lowered, extra key, record with placeholder ruling ⇒ refused | `the_aggregate_is_gated_against_the_floors_a_validated_record_resolves_to`; eval `a_ruling_must_be_a_decision_id…`, `the_loader_recomputes_judge_evidence_from_the_archive` |
+| 9 | Judge-only line → `[judge]` evidence | `--calibrate --judge-result`: both digests, 15 pinned replies, counts recomputed from verdicts, prompt, `result_sha256` of the file; stanza is emitted, not typed | invented counts, edited archive, unverified/other-model reply, other prompt, result outside `--root` ⇒ refused | `calibrate_emits_the_judge_stanza_from_the_verified_judge_only_result`, `evidence_without_a_well_formed_archive_hash_is_refused` |
+| 10 | Report → calibration | `--calibrate --results` recomputes the report from the digest-checked lines; format errors / structural failures refuse | hand-edited report ⇒ (only if `--result <file>` is used, see weakest hop) | `format_errors_are_summed_and_refuse…` |
+| 11 | Workflow gating | `repeats-validation` ⇒ record loop (a refusal without a result line stops it) ⇒ structure step ⇒ paid judge-only; upload on `always()`; job timeout 120 min; read-only token | refused repeat / short set ⇒ no paid step; timeout ⇒ evidence still uploaded | `ci_shape_18_0` (conditions, ids, order, upload, timeout, permissions) + `the_record_loop_keeps_a_floor_miss_but_stops_on_a_refusal` |
+| 12 | Paid spend | price book; an unpriced or unattributed model is an error | unpriced model ⇒ error, never 0 | `an_unpriced_model_and_a_mismatched_cassette_are_errors` (28-1) |
+
+**Weakest remaining hop: 10/8 trust at the operator's hands.** (a) `eval-report --calibrate --result <file>` still accepts a
+hand-edited `maos.eval.live/v1` file (the safe form is `--results`, which recomputes it); (b) the loader verifies that a
+below-evidence floor cites a decision id of the right SHAPE and a `ruling_sha256`, but cannot verify that the cited row
+EXISTS or says what it is used for (the decision files live outside this repository); (c) floors/ruling edits in a PR are
+reviewed, not machine-checked beyond (b); (d) the verdict sidecar's per-finding verdicts are copied into the corpus by hand
+(promotion procedure, not code); (e) Butler's halt leg still takes its floors from the lines (item 2 is Researcher-only).
+
+## Round 3 findings
+
+| # | Result |
+|---|--------|
+| 1 (P1) | **Fixed.** `--structure-only` returns the structural failures (format errors, undetected controls, drifted/refused runs) as failures; only numeric misses exit 0; digests, k, duplicates, invalid floor record/evidence already error. Test `structure_only_fails_on_a_format_error_but_not_on_a_floor_miss`. |
+| 2 (P1) | **Fixed (Researcher).** `resolve_distill_floors` resolves floors from `spirits/researcher/eval/floors.toml` under `--root` through `maos_eval::distill_replay::resolve_floors` (the loader the CLI also uses) or the compiled defaults; a line whose `floors` object differs (any value, an extra key) is refused; traceability/leakage keep fixed bounds. Test `the_aggregate_is_gated_against_the_floors_a_validated_record_resolves_to` (0.95→0.94 on every line refused; with a valid ruled record 0.94 passes). Butler's halt leg unchanged. |
+| 3 (P2) | **Fixed.** Exact equality; no alias mapping (the pinned `claude-sonnet-5-5` is a canonical dateless id; no documented alias→snapshot mapping is needed, so normalisation is dropped entirely — consequence: a request answered by ANY other id, a dated snapshot of the same family included, is attributed to that id and the judge/workflow refuse it); served `model` restricted to `[A-Za-z0-9._-]{1,128}`, else `None`. Tests: `-99999999`, `-evil`, snapshot-vs-snapshot, newline/NUL/bidi/zero-width/`é`/`/`/`infer:x->y:z`/129 chars. |
+| 4 (P2) | **Fixed.** `Reserved` claims both destinations with `create_new` (`O_CREAT|O_EXCL`, which never follows a final symlink — `libc`/`O_NOFOLLOW` not needed and no new dependency) BEFORE inference; an existing file/dir/link (dangling too) is refused; an unwritten claim is removed on any early return; sidecar and recorder write temp + rename (replaces a link, never follows it); `resolved()` now follows a dangling final symlink so the alias guard sees through it. Tests: dangling sidecar→output, dangling output→absent floors.toml, dangling link elsewhere, pre-existing file, recorder with a planted link. |
+| 5 (P2) | **Fixed.** Uniqueness on the resolved artifact (canonical path or dev+inode) for every kind, plus byte-identical digests for distill (k genuine recordings are never identical; the Butler k3 fixture deliberately copies one cassette, so halt keeps identity-only). Test `one_artifact_under_two_names_is_one_run_not_two` (flattening, symlink, hard link, identical bytes). |
+| 6 (P2) | **Fixed to the extent code can.** (a) `[judge]` carries `result_sha256`; `--calibrate --judge-result` emits the stanza from the verified judge-only line and records the file hash; `--calibrate --results` recomputes the report. (b) `DistillFloorRecord::verify_archive` recomputes hash + counts + prompt when the named file is present; `--require-archive` (on `eval-report`, the promoting command only) makes the record AND the archive mandatory; the CLI run passes without an archive. (c) a below-evidence floor needs `operator_ruling` of shape `^D-28-3-[0-9]{2}( [A-Z])?$` or `^RULING-[0-9]{4}-[0-9]{2}-[0-9]{2}-[A-Za-z0-9-]{3,64}$` AND `ruling_sha256` (64 hex of the cited decision text); `FloorEntry` gains optional `ruling_sha256` (Butler records unaffected). **Remaining operator trust (plainly):** nothing checks that the cited decision row exists in `dev_ws-course28/.../decisions-*.md`, or that its text is what `ruling_sha256` hashes; an operator can still cite a real id for a floor it does not justify. |
+| 7 (P2) | **Fixed.** Upload `if: ${{ always() }}` with `if-no-files-found: warn`; `timeout-minutes` 60 → 120 (k = 10: Butler 30 rows ×10 + Researcher ~58 calls ×10 + judge-only ~29 ×10 ≈ 1200 sequential calls, plus build and journey suites); pinned in `ci_shape_18_0`. |
+| 8 (P3) | **Fixed.** `under_root` refuses absolute paths and `..` for cassette, survey and corpus unless `--cassettes` is given (then file name only, as before); `read()` caps at 64 MiB on the opened handle; token sums use `u64::checked_add` over integer-only counts (float/negative refused). Tests `result_line_paths_must_stay_inside_the_workspace`, `an_artifact_over_the_size_cap_is_refused`, `token_counts_cannot_overflow_or_be_inexact`. |
+| 9 (P3) | **Fixed.** Decoder also refuses U+202A–202E, U+2066–2069, U+200B–200D, U+2060, U+FEFF, U+2028/2029; committed corpus/cassettes/tests grepped: none contain them. |
+
+## Plants, round 3 (marker `E283-PLANT`; all removed; the seven edited sources are byte-identical to the copies taken before planting, grep-verified)
+
+| Plant | Red |
+|-------|-----|
+| decoder: spoofing filter off | domain `finding_completion_rejects_every_other_shape…` |
+| adapter: sanitiser off / snapshot→pin normalisation back | `attribution_comes_from_the_response_model_not_the_request` (two plants, two assertions) |
+| `same_artifact` always false | `one_artifact_under_two_names_is_one_run_not_two` |
+| lines' `floors` not compared | `the_aggregate_is_gated_against_the_floors_a_validated_record_resolves_to` |
+| `--structure-only` returns no failures | `structure_only_fails_on_a_format_error_…` |
+| ruling-shape check off / archive-hash check off | eval `a_ruling_must_be_a_decision_id…` / `the_loader_recomputes_judge_evidence_from_the_archive` |
+| `Reserved` opens with `create` (follows links) | `destinations_that_do_not_exist_yet…` at the dangling-link-elsewhere case |
+| `resolved()` does not follow a dangling link | same test at the dangling-sidecar case |
+| recorder writes with `fs::write` | `the_recorder_replaces_a_planted_link_instead_of_writing_through_it` |
+| `under_root` off / read cap off / checked_add → `.or(Some(0))` | the three item-8 tests |
+| `judge_stanza` attribution check off | `calibrate_emits_the_judge_stanza…` |
+| upload on `!cancelled()` / timeout 60 | `ci_shape_18_0` (condition, timeout assertions) |
+
+## Verification, round 3
+
+`cargo test --locked`: `-p maos-domain` 353, `-p researcher` 79, `-p maos-eval` 99, `-p maos-bench` 38, `-p maos-providers` 115, `-p maos-bin`
+(`eval_distill_18_3`, `researcher_inference_18_3`, `epic_args_19_1`, `provider_endpoint_pin_20_4`, `researcher_8_14c`,
+`manifest_model_pin_s1`; random 0600 hex `MAOS_AUDIT_KEY`) 63, `-p xtask` 1303, `-p maos-journey-test` 69 (after `cargo build -p
+maos-bin -p maos-cli`, which the journey harness demands once a source is newer than its binary, and with `CI` unset
+(`env -u CI`): a `CI=true` shell declares a capable T3 runner and `journey_j1` then demands the provisioned substrate this
+host lacks — environment, not code). Gates: `check-kernel-baseline`
+28,339 (Δ 0), `kloc-check`, `check-env-contract` 159, composition root, dependency closure, four-shape `cargo check -p maos-bin`,
+fmt, deny: pass; clippy on the touched crates (+ `maos-bin`) exits 0, no warning in a line added this round.
+**Only the paid run can settle:** the id the live API returns for `claude-sonnet-5-5` (a dated id would make every judge reply
+refuse, loudly); k = 5 at the floors; the structure and judge-only steps in Actions; that the real `.verdicts.json` → corpus
+promotion is done by the operator as described.

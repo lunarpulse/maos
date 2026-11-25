@@ -160,6 +160,11 @@ pub struct FloorEntry {
     pub spec_source: String,
     /// The operator ruling that lowers a floor below the spec minimum.
     pub operator_ruling: Option<String>,
+    /// Story 28-3 round 3: the SHA-256 of the decision text `operator_ruling`
+    /// cites (the Researcher loader requires it for a below-evidence floor; a
+    /// Butler record may omit it).
+    #[serde(default)]
+    pub ruling_sha256: Option<String>,
     pub measured_mean: f64,
     pub wilson95: [f64; 2],
     pub k: usize,

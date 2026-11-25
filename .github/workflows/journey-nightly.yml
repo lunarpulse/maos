@@ -107,7 +107,12 @@ jobs:
   tier-2-rerecord:
     runs-on: ubuntu-24.04
     needs: [tier-2-journey, secret-gate]
-    timeout-minutes: 60
+    # Worst case k = 10, all paid legs: Butler 30 rows x 10 + Researcher ~58 calls
+    # (survey + judge) x 10 + judge-only ~29 judge calls x 10 = ~1200 sequential
+    # provider calls, each seconds (thinking models), after a workspace build and
+    # the journey suites: 60 minutes is not safe. A timeout cancels the job; the
+    # upload below therefore runs on `always()`.
+    timeout-minutes: 120
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.rerecord == true && needs.secret-gate.outputs.has_anthropic_key == 'true' }}
     steps:
       - uses: actions/checkout@v5
@@ -313,11 +318,12 @@ jobs:
       # sidecars `j-researcher/distill-corpus-v0.live.<i>.verdicts.json` and
       # `eval-results/` (`<class>.results.jsonl` and `<class>.report.json`).
       - name: Upload refreshed cassettes
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: refreshed-cassettes
           path: crates/maos-journey-test/cassettes/
+          if-no-files-found: warn
           retention-days: 7
 
       # TODO: Auto-open PR with refreshed cassettes via gh cli / peter-evans/create-pull-request

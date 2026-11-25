@@ -557,7 +557,20 @@ fn epic_18_exit_runs_line_2_verbatim_and_its_drift_blind_twin() {
         step_index(rerecord, "Upload refreshed cassettes")
             > step_index(rerecord, "Re-record the Butler halt-eval cassette (live)")
     );
-    assert_eq!(condition(upload).as_deref(), Some(NOT_CANCELLED));
+    // Round 3 (7): `!cancelled()` is false after a job TIMEOUT, which would drop
+    // the paid evidence; the upload runs on `always()` and tolerates no files.
+    assert_eq!(condition(upload).as_deref(), Some("always()"));
+    assert_eq!(
+        str_of(key(upload, "with"), "if-no-files-found"),
+        Some("warn")
+    );
+    let timeout = get(rerecord, "timeout-minutes")
+        .and_then(Value::as_u64)
+        .expect("timeout-minutes");
+    assert!(
+        timeout >= 120,
+        "k = 10 across the paid legs is ~1200 sequential calls; got {timeout} minutes"
+    );
 
     // Story 18-3 TIA-8 (review R4) — the Researcher re-record step: its
     // `.live.<i>.json` siblings, the shipped verb, `!cancelled()` (it runs after a

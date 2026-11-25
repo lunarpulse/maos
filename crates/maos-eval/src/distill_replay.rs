@@ -551,6 +551,10 @@ pub struct JudgeEvidence {
     pub agree: usize,
     /// The archived judge-only result this evidence was read from.
     pub result_file: String,
+    /// SHA-256 of that archived result file's bytes (the loader recomputes it
+    /// when the file is present; `--require-archive` makes it mandatory).
+    /// `xtask eval-report --calibrate --judge-result` emits it, nobody types it.
+    pub result_sha256: String,
     pub rule: String,
     pub rationale: String,
 }
@@ -598,6 +602,9 @@ impl JudgeEvidence {
                 .all(|c| matches!(c, std::path::Component::Normal(_)));
         if !traceable {
             return Err("judge result_file must be a relative archived path".into());
+        }
+        if !is_sha256_hex(&self.result_sha256) {
+            return Err("judge result_sha256 must be 64 lowercase hex characters".into());
         }
         if self.rule.trim().is_empty() || self.rationale.trim().is_empty() {
             return Err("judge evidence needs a rule and a rationale".into());
@@ -681,16 +688,217 @@ impl DistillFloorRecord {
                     e.floor
                 ));
             }
-            if e.floor < required && !ruled {
-                return Err(format!(
-                    "floor record '{}': floor {} is below the one its evidence requires \
-                     ({required}); an operator ruling is needed to go lower",
-                    e.metric, e.floor
-                ));
+            if e.floor < required {
+                if !ruled {
+                    return Err(format!(
+                        "floor record '{}': floor {} is below the one its evidence requires \
+                         ({required}); an operator ruling is needed to go lower",
+                        e.metric, e.floor
+                    ));
+                }
+                let ruling = e.operator_ruling.as_deref().unwrap_or_default().trim();
+                if !ruling_shape_ok(ruling) {
+                    return Err(format!(
+                        "floor record '{}': operator_ruling `{ruling}` is not a decision id \
+                         (`D-28-3-NN[ X]` or `RULING-YYYY-MM-DD-<slug>`)",
+                        e.metric
+                    ));
+                }
+                if !e.ruling_sha256.as_deref().is_some_and(is_sha256_hex) {
+                    return Err(format!(
+                        "floor record '{}': a ruling needs `ruling_sha256`, the SHA-256 of the \
+                         decision text it cites",
+                        e.metric
+                    ));
+                }
             }
             *slot = e.floor;
         }
         Ok(floors)
+    }
+}
+
+/// 64 lowercase hex characters.
+pub fn is_sha256_hex(s: &str) -> bool {
+    s.len() == 64 && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// The SHAPE of a decision id a below-spec floor may cite: `D-28-3-NN` with an
+/// optional ` <A-Z>` option letter, or `RULING-YYYY-MM-DD-<3..64 [A-Za-z0-9-]>`.
+/// The loader cannot verify that the cited row EXISTS (the decision files live
+/// outside this repository): the record's `ruling_sha256` binds the cited text,
+/// and an operator still has to trust that the cited row says what it is used
+/// for.
+pub fn ruling_shape_ok(ruling: &str) -> bool {
+    let digits = |s: &str, n: usize| s.len() == n && s.bytes().all(|b| b.is_ascii_digit());
+    if let Some(rest) = ruling.strip_prefix("D-28-3-") {
+        let (num, option) = rest.split_at(rest.len().min(2));
+        return digits(num, 2)
+            && (option.is_empty()
+                || option
+                    .strip_prefix(' ')
+                    .is_some_and(|o| o.len() == 1 && o.bytes().all(|b| b.is_ascii_uppercase())));
+    }
+    if let Some(rest) = ruling.strip_prefix("RULING-") {
+        let parts: Vec<&str> = rest.splitn(4, '-').collect();
+        return parts.len() == 4
+            && digits(parts[0], 4)
+            && digits(parts[1], 2)
+            && digits(parts[2], 2)
+            && (3..=64).contains(&parts[3].len())
+            && parts[3]
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-');
+    }
+    false
+}
+
+/// The largest archived artifact the loaders read.
+pub const MAX_ARTIFACT_BYTES: u64 = 64 * 1024 * 1024;
+
+/// The counts a judge-only result line proves: read from its per-finding
+/// verdicts, never from a typed number.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JudgeRepeatCounts {
+    pub k: usize,
+    pub findings: usize,
+    pub calls: usize,
+    /// Repeats equal to their finding's first verdict, summed.
+    pub agree: usize,
+    /// `judge_prompt_sha256` of the line.
+    pub prompt_sha256: String,
+}
+
+/// Read and cross-check a judge-only (`--judge-repeat`) result line: the
+/// repeat count in the hosted bounds, every finding judged exactly `k` times,
+/// `judge_calls == k * findings`, agreement recomputed from the verdicts.
+pub fn judge_repeat_counts(line: &serde_json::Value) -> Result<JudgeRepeatCounts, String> {
+    if line["event"] != "eval_distill" {
+        return Err("not an eval_distill result line".into());
+    }
+    let repeat = line
+        .get("judge_repeat")
+        .filter(|v| v.is_object())
+        .ok_or("the line is not a judge-only repeat (no `judge_repeat`)")?;
+    let k = repeat["k"]
+        .as_u64()
+        .ok_or("judge_repeat.k is not a count")? as usize;
+    if !(MIN_AGREEMENT_REPEAT..=MAX_JUDGE_REPEAT).contains(&k) {
+        return Err(format!(
+            "judge_repeat.k {k} is outside {MIN_AGREEMENT_REPEAT}..={MAX_JUDGE_REPEAT}"
+        ));
+    }
+    let findings = repeat["findings"]
+        .as_object()
+        .filter(|f| !f.is_empty())
+        .ok_or("judge_repeat.findings is empty")?;
+    let mut agree = 0usize;
+    for (claim, f) in findings {
+        let verdicts = f["verdicts"]
+            .as_array()
+            .filter(|v| v.len() == k)
+            .ok_or_else(|| format!("finding {claim} was not judged exactly {k} times"))?;
+        let first = verdicts[0]
+            .as_bool()
+            .ok_or_else(|| format!("finding {claim}: a verdict is not a boolean"))?;
+        for v in verdicts {
+            agree += usize::from(v.as_bool() == Some(first));
+        }
+    }
+    let calls = k * findings.len();
+    if repeat["judge_calls"].as_u64() != Some(calls as u64) {
+        return Err("judge_repeat.judge_calls is not k * findings".into());
+    }
+    Ok(JudgeRepeatCounts {
+        k,
+        findings: findings.len(),
+        calls,
+        agree,
+        prompt_sha256: line["judge_prompt_sha256"]
+            .as_str()
+            .ok_or("no judge_prompt_sha256")?
+            .to_owned(),
+    })
+}
+
+impl DistillFloorRecord {
+    /// Recompute the judge evidence from the archived result it names, under
+    /// `root`: the file's SHA-256 must be `result_sha256` and the counts and
+    /// judge prompt must be the ones its line proves. An ABSENT file passes
+    /// unless `require` (the promoting command's `--require-archive`): the loader
+    /// of an ordinary run has no archive to check and says so by passing.
+    pub fn verify_archive(&self, root: &std::path::Path, require: bool) -> Result<(), String> {
+        let judge = &self.judge;
+        let path = root.join(&judge.result_file);
+        let meta = match std::fs::symlink_metadata(&path) {
+            Ok(meta) => meta,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound && !require => return Ok(()),
+            Err(e) => {
+                return Err(format!(
+                    "judge result_file {}: {e}{}",
+                    path.display(),
+                    if require { " (--require-archive)" } else { "" }
+                ))
+            }
+        };
+        if !meta.is_file() || meta.len() > MAX_ARTIFACT_BYTES {
+            return Err(format!(
+                "judge result_file {} is not a regular file within {MAX_ARTIFACT_BYTES} bytes",
+                path.display()
+            ));
+        }
+        let bytes = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        if crate::onboarding_gate_corpus::sha256_hex(&bytes) != judge.result_sha256 {
+            return Err(format!(
+                "judge result_file {} is not the archive its record names (result_sha256)",
+                path.display()
+            ));
+        }
+        let line: serde_json::Value = serde_json::from_slice(&bytes)
+            .map_err(|e| format!("judge result_file {}: {e}", path.display()))?;
+        let counts = judge_repeat_counts(&line)
+            .map_err(|e| format!("judge result_file {}: {e}", path.display()))?;
+        let recorded = (judge.k, judge.findings, judge.calls, judge.agree);
+        if recorded != (counts.k, counts.findings, counts.calls, counts.agree)
+            || counts.prompt_sha256 != judge.prompt_sha256
+        {
+            return Err(format!(
+                "judge evidence (k, findings, calls, agree) = {recorded:?} is not what its \
+                 archive proves ({}, {}, {}, {})",
+                counts.k, counts.findings, counts.calls, counts.agree
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// The Researcher's calibrated-floor record, relative to the workspace root.
+pub const FLOORS_FILE: &str = "spirits/researcher/eval/floors.toml";
+
+/// The floors a Researcher run is held to: the compiled NFR-Aud-7 minimums when
+/// there is no record, else the record applied to them (schema, evidence,
+/// ruling shape and hash, pinned judge) and its judge archive verified under
+/// `root` — required to be present when `require_archive` (the promoting
+/// command's `--require-archive`; an ordinary run passes without it). The
+/// caller reads and parses the TOML (this crate carries no TOML parser).
+/// `eval-report` resolves the floors through this, so a result line cannot
+/// name a floor of its own.
+pub fn resolve_floors(
+    record: Option<DistillFloorRecord>,
+    root: &std::path::Path,
+    pinned_judge_model: &str,
+    require_archive: bool,
+) -> Result<DistillFloors, String> {
+    match record {
+        None if require_archive => {
+            Err("--require-archive: there is no floor record to promote".into())
+        }
+        None => Ok(DistillFloors::spec()),
+        Some(record) => {
+            let floors = record.apply(DistillFloors::spec(), pinned_judge_model)?;
+            record.verify_archive(root, require_archive)?;
+            Ok(floors)
+        }
     }
 }
 

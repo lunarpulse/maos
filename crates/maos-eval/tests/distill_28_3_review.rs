@@ -75,6 +75,7 @@ fn record_text(judge: &dyn Fn(String) -> String, floor: f64, ruling: Option<&str
     let judge_table = judge(format!(
         "[judge]\nmodel = \"{PIN}\"\nprompt_sha256 = \"{}\"\nk = 5\nfindings = 3\ncalls = 15\n\
          agree = 14\nresult_file = \"spirits/researcher/eval/judge-repeat.json\"\n\
+         result_sha256 = \"{ARCHIVE_SHA}\"\n\
          rule = \"agree = repeats equal to the finding's first verdict\"\nrationale = \"disclosure only\"\n",
         prompt_sha()
     ));
@@ -86,7 +87,7 @@ fn record_text(judge: &dyn Fn(String) -> String, floor: f64, ruling: Option<&str
          rationale = \"test\"\ndate = \"2026-11-25\"\nresult_file = \"r.json\"\n"
     );
     if let Some(ruling) = ruling {
-        text += &format!("operator_ruling = \"{ruling}\"\n");
+        text += &format!("operator_ruling = \"{ruling}\"\nruling_sha256 = \"{RULING_SHA}\"\n");
     }
     text
 }
@@ -114,9 +115,160 @@ fn a_below_spec_floor_needs_a_non_blank_operator_ruling() {
         let error = apply(&record_text(&keep, 0.80, Some(blank))).unwrap_err();
         assert!(error.contains("operator ruling"), "{blank:?}: {error}");
     }
-    let ruled = apply(&record_text(&keep, 0.80, Some("decisions-2026-11-25 D-x"))).unwrap();
+    let ruled = apply(&record_text(&keep, 0.80, Some("D-28-3-03 A"))).unwrap();
     assert_eq!(ruled.recall, 0.80);
 }
+
+/// Round 3 (6c): the ruling must have the SHAPE of a decision id and the record
+/// must carry the SHA-256 of the text it cites; a placeholder is refused.
+#[test]
+fn a_ruling_must_be_a_decision_id_with_the_hash_of_the_text_it_cites() {
+    for ok in ["D-28-3-03", "D-28-3-03 A", "RULING-2026-11-25-hedge-floor"] {
+        assert!(maos_eval::distill_replay::ruling_shape_ok(ok), "{ok}");
+        assert!(apply(&record_text(&keep, 0.80, Some(ok))).is_ok(), "{ok}");
+    }
+    for bad in [
+        "decisions-2026-11-25 D-x",
+        "D-x",
+        "D-28-3-3",
+        "D-28-3-033",
+        "D-28-3-03 a",
+        "D-28-3-03 AB",
+        "D-28-2-03",
+        "RULING-2026-11-25-ab",
+        "RULING-26-11-25-hedge",
+        "RULING-2026-11-25-bad slug",
+        "ok because I said so",
+    ] {
+        assert!(!maos_eval::distill_replay::ruling_shape_ok(bad), "{bad}");
+        let error = apply(&record_text(&keep, 0.80, Some(bad))).unwrap_err();
+        assert!(error.contains("is not a decision id"), "{bad}: {error}");
+    }
+    let no_hash = record_text(&keep, 0.80, Some("D-28-3-03 A"))
+        .replace(&format!("ruling_sha256 = \"{RULING_SHA}\"\n"), "");
+    let error = apply(&no_hash).unwrap_err();
+    assert!(error.contains("needs `ruling_sha256`"), "{error}");
+    let bad_hash = record_text(&keep, 0.80, Some("D-28-3-03 A")).replace(RULING_SHA, "nothex");
+    assert!(apply(&bad_hash)
+        .unwrap_err()
+        .contains("needs `ruling_sha256`"));
+    // A ruling that is not needed (floor not below its evidence) is not inspected.
+    assert!(apply(&record_text(&keep, 0.93, Some("whatever"))).is_ok());
+}
+
+fn sha(bytes: &[u8]) -> String {
+    maos_eval::onboarding_gate_corpus::sha256_hex(bytes)
+}
+
+/// A judge-only result line: 3 findings judged 5 times; finding a flips once,
+/// b flips twice, c never (agree 4 + 3 + 5 = 12).
+fn judge_line() -> serde_json::Value {
+    let verdicts = |v: [bool; 5]| serde_json::json!({"k": 5, "verdicts": v});
+    serde_json::json!({
+        "event": "eval_distill",
+        "judge_prompt_sha256": prompt_sha(),
+        "judge_repeat": {
+            "k": 5, "judge_calls": 15,
+            "findings": {
+                "a": verdicts([true, true, false, true, true]),
+                "b": verdicts([true, false, false, true, true]),
+                "c": verdicts([true, true, true, true, true]),
+            }
+        }
+    })
+}
+
+/// A record whose `[judge]` evidence matches `bytes` (the archived line).
+fn record_for(bytes: &[u8], agree: usize) -> DistillFloorRecord {
+    let text = record_text(&keep, 0.93, None)
+        .replace(ARCHIVE_SHA, &sha(bytes))
+        .replace("agree = 14", &format!("agree = {agree}"));
+    toml::from_str(&text).unwrap()
+}
+
+/// Round 3 (6a, 6b): the loader recomputes the evidence from the archived
+/// result: hash, counts (from the verdicts, not a typed number) and judge prompt.
+#[test]
+fn the_loader_recomputes_judge_evidence_from_the_archive() {
+    let dir = tempfile::tempdir().unwrap();
+    let archived = judge_line();
+    let bytes = serde_json::to_vec(&archived).unwrap();
+    let rel = "spirits/researcher/eval/judge-repeat.json";
+    std::fs::create_dir_all(dir.path().join("spirits/researcher/eval")).unwrap();
+
+    // Absent: an ordinary run passes; the promoting command (`require`) does not.
+    let record = record_for(&bytes, 12);
+    assert!(record.verify_archive(dir.path(), false).is_ok());
+    let error = record.verify_archive(dir.path(), true).unwrap_err();
+    assert!(error.contains("--require-archive"), "{error}");
+
+    // Present and true: both modes pass.
+    std::fs::write(dir.path().join(rel), &bytes).unwrap();
+    assert!(record.verify_archive(dir.path(), true).is_ok());
+
+    // Invented counts (self-consistent: calls = k * findings, agree in range).
+    let error = record_for(&bytes, 13)
+        .verify_archive(dir.path(), false)
+        .unwrap_err();
+    assert!(error.contains("is not what its archive proves"), "{error}");
+    // An archive edited after the record named it.
+    let mut edited = archived.clone();
+    edited["judge_repeat"]["findings"]["a"]["verdicts"] =
+        serde_json::json!([true, true, true, true, true]);
+    std::fs::write(dir.path().join(rel), serde_json::to_vec(&edited).unwrap()).unwrap();
+    let error = record.verify_archive(dir.path(), false).unwrap_err();
+    assert!(error.contains("result_sha256"), "{error}");
+    // A record naming the wrong judge prompt.
+    let mut other_prompt = archived.clone();
+    other_prompt["judge_prompt_sha256"] = serde_json::json!("0".repeat(64));
+    let other = serde_json::to_vec(&other_prompt).unwrap();
+    std::fs::write(dir.path().join(rel), &other).unwrap();
+    let error = record_for(&other, 12)
+        .verify_archive(dir.path(), false)
+        .unwrap_err();
+    assert!(error.contains("is not what its archive proves"), "{error}");
+    // Not a judge-only line / a verdict list of the wrong length / a lying judge_calls.
+    let mut short = archived.clone();
+    short["judge_repeat"]["findings"]["c"]["verdicts"] = serde_json::json!([true]);
+    assert!(maos_eval::distill_replay::judge_repeat_counts(&short)
+        .unwrap_err()
+        .contains("exactly 5"));
+    let mut calls = archived.clone();
+    calls["judge_repeat"]["judge_calls"] = serde_json::json!(16);
+    assert!(maos_eval::distill_replay::judge_repeat_counts(&calls)
+        .unwrap_err()
+        .contains("k * findings"));
+    assert!(maos_eval::distill_replay::judge_repeat_counts(
+        &serde_json::json!({"event": "eval_distill"})
+    )
+    .is_err());
+    let counts = maos_eval::distill_replay::judge_repeat_counts(&archived).unwrap();
+    assert_eq!(
+        (counts.k, counts.findings, counts.calls, counts.agree),
+        (5, 3, 15, 12)
+    );
+    // A symlink or directory in the archive's place is not an archive.
+    std::fs::remove_file(dir.path().join(rel)).unwrap();
+    std::fs::create_dir(dir.path().join(rel)).unwrap();
+    assert!(record
+        .verify_archive(dir.path(), false)
+        .unwrap_err()
+        .contains("regular file"));
+}
+
+/// A bad `result_sha256` is refused at load.
+#[test]
+fn evidence_without_a_well_formed_archive_hash_is_refused() {
+    let text = record_text(&keep, 0.93, None).replace(ARCHIVE_SHA, "ABC");
+    let error = apply(&text).unwrap_err();
+    assert!(
+        error.contains("result_sha256 must be 64 lowercase hex"),
+        "{error}"
+    );
+}
+
+const ARCHIVE_SHA: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+const RULING_SHA: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 
 #[test]
 fn the_record_carries_the_judge_model_and_agreement_or_it_is_refused() {
@@ -203,7 +355,7 @@ fn the_record_carries_the_judge_model_and_agreement_or_it_is_refused() {
 
 #[test]
 fn no_ruling_lowers_traceability() {
-    let text = record_text(&keep, 0.50, Some("decisions-2026-11-25 D-x"))
+    let text = record_text(&keep, 0.50, Some("D-28-3-03 A"))
         .replace("metric = \"recall\"", "metric = \"traceability\"");
     let error = apply(&text).unwrap_err();
     assert!(
@@ -211,7 +363,7 @@ fn no_ruling_lowers_traceability() {
         "{error}"
     );
     // The same ruling still lowers recall (the open decision J-2 of the evidence note).
-    let recall = record_text(&keep, 0.50, Some("decisions-2026-11-25 D-x"));
+    let recall = record_text(&keep, 0.50, Some("D-28-3-03 A"));
     assert_eq!(apply(&recall).unwrap().recall, 0.50);
 }
 

@@ -1115,3 +1115,126 @@ fn no_write_destination_may_alias_a_read_input_or_another_write() {
     );
     assert!(parsed.unwrap_err().contains("same file"));
 }
+
+/// Round 3 (4) — destinations that do not exist yet. A DANGLING symlink for the
+/// sidecar pointing at the output (the guard saw two different names), a
+/// dangling symlink as the output pointing at an absent floor record, a
+/// dangling link to an unrelated path and a pre-existing file are all refused
+/// before inference; nothing is created through a link and a refused run leaves
+/// no placeholder behind.
+#[test]
+fn destinations_that_do_not_exist_yet_cannot_be_redirected_by_a_dangling_link() {
+    use std::os::unix::fs::symlink;
+    let home = tempfile::tempdir().unwrap();
+    let dir = home.path();
+    std::env::set_current_dir(root()).unwrap();
+    let (_, survey) = record(dir, faithful, None);
+    let survey_bytes = std::fs::read(&survey).unwrap();
+    let floors = root().join("spirits/researcher/eval/floors.toml");
+    assert!(!floors.exists(), "this test needs the floor record absent");
+
+    // (a) sidecar := dangling link to the (absent) output.
+    let output = dir.join("fresh.json");
+    symlink(&output, dir.join("fresh.verdicts.json")).unwrap();
+    let r = judge_repeat_at(survey.clone(), output.clone(), 2, always_faithful());
+    let error = r.run.unwrap_err();
+    assert!(error.contains("same file"), "{error}");
+    assert_eq!(r.calls, 0);
+    assert!(!output.exists(), "nothing was created through the link");
+
+    // (b) output := dangling link to the absent floor record.
+    let link = dir.join("to-floors.json");
+    symlink(&floors, &link).unwrap();
+    let r = judge_repeat_at(survey.clone(), link.clone(), 2, always_faithful());
+    let error = r.run.unwrap_err();
+    assert!(error.contains("same file"), "{error}");
+    assert!(
+        !floors.exists(),
+        "the floor record was not created through the link"
+    );
+
+    // (c) a dangling link to an unrelated absent path passes the alias guard but
+    // cannot be reserved (O_CREAT|O_EXCL never follows it); the OTHER
+    // destination reserved first is released again.
+    let (elsewhere, out_c) = (dir.join("elsewhere.json"), dir.join("c.json"));
+    symlink(&elsewhere, dir.join("c.verdicts.json")).unwrap();
+    let r = judge_repeat_at(survey.clone(), out_c.clone(), 2, always_faithful());
+    let error = r.run.unwrap_err();
+    assert!(error.contains("cannot be reserved"), "{error}");
+    assert_eq!(r.calls, 0);
+    assert!(
+        !elsewhere.exists() && !out_c.exists(),
+        "no link followed, no placeholder left"
+    );
+
+    // (d) an output that already exists is never overwritten.
+    let existing = dir.join("existing.json");
+    std::fs::write(&existing, b"precious").unwrap();
+    let r = judge_repeat_at(survey.clone(), existing.clone(), 2, always_faithful());
+    assert!(r.run.unwrap_err().contains("cannot be reserved"));
+    assert_eq!(std::fs::read(&existing).unwrap(), b"precious");
+    assert_eq!(std::fs::read(&survey).unwrap(), survey_bytes);
+
+    // A fresh pair still works and leaves both artifacts, no temp file.
+    let ok = dir.join("ok.json");
+    let r = judge_repeat_at(survey.clone(), ok.clone(), 2, always_faithful());
+    r.run.unwrap();
+    assert!(ok.exists() && dir.join("ok.verdicts.json").exists());
+    let temps: Vec<_> = std::fs::read_dir(dir)
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|e| e.file_name().to_string_lossy().ends_with(".tmp"))
+        .collect();
+    assert!(temps.is_empty(), "{temps:?}");
+}
+
+/// Round 3 (4) — the recorder replaces its destination by rename: a link planted
+/// there after the check is replaced, never followed or truncated through.
+#[test]
+fn the_recorder_replaces_a_planted_link_instead_of_writing_through_it() {
+    use maos_domain::invariants::i1::{CapabilityToken, TokenId};
+    use maos_domain::ports::inference::{InferenceOptions, InferenceRequest};
+    use maos_providers::Provider;
+    let home = tempfile::tempdir().unwrap();
+    let (target, path) = (
+        home.path().join("victim.json"),
+        home.path().join("rec.json"),
+    );
+    std::fs::write(&target, b"victim").unwrap();
+    std::os::unix::fs::symlink(&target, &path).unwrap();
+    let recorder = Arc::new(CassetteRecorder::new(
+        path.clone(),
+        "maos".into(),
+        "t".into(),
+    ));
+    let stub = StubProvider {
+        answers: vec![],
+        judge: faithful,
+        model: None,
+    };
+    let driver = CassetteRecordProvider::new(Arc::new(stub), recorder.clone());
+    let request = InferenceRequest::new(
+        1,
+        CapabilityToken::new(TokenId::ZERO, 1, 0, [0; 64]),
+        format!("{JUDGE_PROMPT}\n\nSource claim: x\nDigest finding: y"),
+        InferenceOptions {
+            max_tokens: 8,
+            temperature: None,
+            model_id: Some(PINNED.into()),
+        },
+        None,
+        vec![],
+    );
+    driver.complete(&request).unwrap();
+    recorder.flush().unwrap();
+    assert_eq!(
+        std::fs::read(&target).unwrap(),
+        b"victim",
+        "the link target is untouched"
+    );
+    assert!(!std::fs::symlink_metadata(&path)
+        .unwrap()
+        .file_type()
+        .is_symlink());
+    assert_eq!(read_json(&path)["provenance"], "live-record");
+}
