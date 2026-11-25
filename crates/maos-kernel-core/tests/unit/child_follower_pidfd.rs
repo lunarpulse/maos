@@ -169,14 +169,20 @@ fn failing_inspect_runtime(dir: &Path) -> ContainerRuntime {
     }
 }
 
-/// The payload: a long-lived binary spawned DIRECTLY by the test (no shell,
-/// null stdio so no pipe is inherited) and kept UNREAPED until the end, so its
-/// PID cannot be recycled (it stays a zombie). Dropping it kills it, through
-/// the pidfd when held, else `Child::kill` (safe: the child is unreaped), and
-/// reaps it, on every path including a failure before the pidfd exists.
+/// The payload: `cat` spawned DIRECTLY by the test (no shell; stdout/stderr
+/// null) with the parent holding its stdin pipe, and kept UNREAPED until the
+/// end, so its PID cannot be recycled (it stays a zombie). Dropping it kills
+/// it, through the pidfd when held, else `Child::kill` (safe: the child is
+/// unreaped), and reaps it, on every path including a failure before the
+/// pidfd exists.
+///
+/// Order: `_stdin` is a FIELD, so it is closed only AFTER `drop` has run the
+/// kill and the reap; closing it earlier would let `cat` exit by itself
+/// (EOF) before the signal.
 struct Payload {
     child: Child,
     pidfd: Option<OwnedFd>,
+    _stdin: Option<std::process::ChildStdin>,
 }
 
 impl Drop for Payload {
@@ -203,15 +209,22 @@ impl Drop for Payload {
 /// through it (checked by [`require_pidfd_exit`]).
 fn killed_external_payload() -> (Payload, u32, OwnedFd) {
     use std::os::unix::process::ExitStatusExt;
-    let child = Command::new("sleep")
-        .arg("30")
-        .stdin(Stdio::null())
+    // `cat` blocks reading the parent-held stdin pipe, so it lives until the
+    // parent kills it (no timer can end it early); EOF on a harness exit also
+    // ends it.
+    let mut child = Command::new("cat")
+        .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
     let pid = child.id();
-    let mut guard = Payload { child, pidfd: None };
+    let stdin = child.stdin.take();
+    let mut guard = Payload {
+        child,
+        pidfd: None,
+        _stdin: stdin,
+    };
     let pidfd = crate::security::sandbox::linux::pidfd_open(pid).unwrap();
     guard.pidfd = Some(pidfd.try_clone().unwrap());
     rustix::process::pidfd_send_signal(pidfd.as_fd(), rustix::process::Signal::KILL)

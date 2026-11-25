@@ -149,3 +149,17 @@ Kernel src 28372 -> 28390 -> 28394 (+22 physical over main, +4 for the test hook
   lines per iteration and fails on `SKIP`: `plant-loop-driver.txt` (the driver text) and `plant-runs.md` (fixed 20/20 +
   20/20 busy16; each plant red 20/20 + 20/20 on the payload assertion `(Unknown, None)`; the other test green).
 - Kernel src unchanged (28394, tokei 22180): no re-pin.
+
+## Round 4 (final fixture and driver; supersedes the `sleep 30` payload of round 3)
+
+- The payload is `cat` spawned directly (no shell, stdout/stderr null) with its stdin PIPED and held by the parent, so
+  it blocks until the parent kills it (no timer can end it early); it stays unreaped, is signalled only through the
+  pidfd, then reaped. The stdin handle is a field of the `Payload` guard, so it is closed only AFTER `Drop` has run
+  the kill and the reap (asserted in the struct's doc comment); EOF on a harness exit also ends `cat`.
+- Driver hardened (`plant-loop-driver.txt`): a red iteration needs exit 101, `test result: FAILED`, the
+  `(Unknown, None)` payload assertion and the branch-specific message (the capped test's owner assertion is not
+  accepted); the script exits non-zero if any iteration is BAD; paths derive from the script location
+  (`S3FIX_ROOT`, `CARGO_TARGET_DIR`, `S3FIX_LOG_DIR` override); prerequisites are at the top of the file.
+- All loops redone on this fixture: `plant-runs.md` (fixed 20/20 plain + 20/20 busy16; plant 1 and plant 2 each red
+  20/20 + 20/20 busy16 on the payload assertion, the other test green 20/20 + 20/20; every driver run exited 0).
+- Kernel src unchanged (28394, tokei 22180): no re-pin.
