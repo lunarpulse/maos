@@ -1,0 +1,6 @@
+Lane P, P2-2: an RSA exponent above 2^33 - 1 (ring's limit) is a MALFORMED replacement.
+Marker: E232-PLANT-r4-P13 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs: RSA_EXPONENT_MAX `(1 << 33) - 1` -> `(1 << 34) - 1`.
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Observed: 41 passed, 1 FAILED: a_malformed_replacement_key_set_keeps_the_populated_cache
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:1946:9: assertion `left == right` failed: body `..."e":"AgAAAAE"}` (2^33 + 1)  left: None, right: Some(JwksMalformed).

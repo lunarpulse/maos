@@ -1,0 +1,7 @@
+Lane P, P2-2: an RSA modulus with a leading zero byte (ring rejects it) is a MALFORMED replacement.
+Marker: E232-PLANT-r4-P9 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, rsa_material_usable: `&& modulus.first() != Some(&0)` -> `&& true`.
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Observed: 41 passed, 1 FAILED: a_malformed_replacement_key_set_keeps_the_populated_cache
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:1942:9: assertion `left == right` failed:
+  {"keys":[{"kty":"RSA",...,"kid":"key-b","n":"ALJ0rcB0wNE5..." (a zero byte, then keyC's modulus; 257 bytes)...}  left: None, right: Some(JwksMalformed).

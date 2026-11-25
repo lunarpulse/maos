@@ -17,6 +17,17 @@ pub struct AuthenticatedPrincipal {
     pub attributes: HashMap<String, String>,
 }
 
+/// Story 23-2 (round 4) — what a verification relied on, so the issuance point can ask whether
+/// it still holds: the `kid` of the key that verified, the publication stamp of the key set that
+/// held it, and the clock reading (milliseconds, the verifier's clock) at which that set's hard
+/// TTL ends. Opaque to everyone but the verifier that made it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyFreshness {
+    pub kid: String,
+    pub key_set: u64,
+    pub expires_at_ms: u64,
+}
+
 /// Fail-closed identity verification errors.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum IdentityError {
@@ -65,6 +76,33 @@ pub trait IdentityAssertionPort: Send + Sync {
         assertion: &str,
     ) -> Result<AuthenticatedPrincipal, IdentityError> {
         self.verify(assertion)
+    }
+
+    /// Class: supervision
+    ///
+    /// [`Self::verify`] (`wait`) or [`Self::verify_without_refresh`] (`!wait`), and, when the
+    /// key came from a rotating source, the [`KeyFreshness`] the verdict rests on. The default
+    /// (a static key set that never expires or rotates) carries no proof; a verifier whose keys
+    /// expire or are replaced MUST override this and [`Self::key_still_fresh`].
+    fn verify_with_freshness(
+        &self,
+        assertion: &str,
+        wait: bool,
+    ) -> Result<(AuthenticatedPrincipal, Option<KeyFreshness>), IdentityError> {
+        let principal = if wait {
+            self.verify(assertion)
+        } else {
+            self.verify_without_refresh(assertion)
+        }?;
+        Ok((principal, None))
+    }
+
+    /// Class: supervision
+    ///
+    /// Whether the key a [`KeyFreshness`] names is still the published, unexpired key. MUST NOT
+    /// wait on discovery or hold a lock past its own answer; the default (no rotation) is `true`.
+    fn key_still_fresh(&self, _proof: &KeyFreshness) -> bool {
+        true
     }
 }
 

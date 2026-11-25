@@ -1,0 +1,7 @@
+Lane P, P2-2: a P-256 coordinate that is not 32 bytes is MALFORMED (cache kept).
+Marker: E232-PLANT-r4-P17 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, coordinate_width: `"P-256" => Some(32)` -> `"P-256" => None`.
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Observed: 41 passed, 1 FAILED: a_malformed_replacement_key_set_keeps_the_populated_cache
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:1946:9: assertion `left == right` failed:
+  {"keys":[{"kty":"EC",...,"kid":"key-es","crv":"P-256","x":"AQAB","y":"8FVQ..."}]}  left: None, right: Some(JwksMalformed).

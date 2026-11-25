@@ -19,7 +19,7 @@
 mod sso_fixtures;
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
@@ -30,9 +30,10 @@ use maos_bin::enterprise_identity::{EnterpriseConfig, EnterpriseRuntime};
 use maos_bin::governed_digest_read::{CollectiveReadGovernor, GovernedDigestReadPort};
 use maos_bin::worker_spawn::issue_enterprise_governed_capability_no_wait;
 use maos_cohort::{
-    CohortAuthority, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
-    ConsentTuple, DigestReadControl, InMemoryCohortAuditSink, ManifestSignature,
-    PinnedAuthorityKeys, COHORT_SCHEMA_V1, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
+    CohortAuditEvent, CohortAuditSink, CohortAuthority, CohortError, CohortManifest,
+    CohortManifestState, CohortMember, ConsentMatrix, ConsentTuple, DigestReadControl,
+    InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys, COHORT_SCHEMA_V1,
+    RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 use maos_domain::frame::{ConsentEnvelope, FrameAddress, FramePayload, IacFrame};
 use maos_domain::invariants::i9::SandboxTier;
@@ -113,16 +114,11 @@ fn signed_toml(version: u64) -> String {
     toml::to_string(&manifest).expect("signed manifest serializes")
 }
 
-fn state() -> Arc<CohortManifestState> {
+fn state(audit: Arc<dyn CohortAuditSink>) -> Arc<CohortManifestState> {
     let pins = PinnedAuthorityKeys::from_keys(vec![authority().verifying_key()]).unwrap();
     Arc::new(
-        CohortManifestState::load(
-            HostId("host-a".into()),
-            &signed_toml(1),
-            pins,
-            Arc::new(InMemoryCohortAuditSink::default()),
-        )
-        .expect("host-a loads the signed manifest"),
+        CohortManifestState::load(HostId("host-a".into()), &signed_toml(1), pins, audit)
+            .expect("host-a loads the signed manifest"),
     )
 }
 
@@ -356,6 +352,10 @@ struct Idp {
 
 impl Idp {
     fn start() -> Self {
+        Self::start_with(Arc::new(InMemoryCohortAuditSink::default()))
+    }
+
+    fn start_with(cohort_audit: Arc<dyn CohortAuditSink>) -> Self {
         let script = Arc::new(Script::default());
         script.serve(
             DOC_URL,
@@ -400,7 +400,7 @@ impl Idp {
             governed: AtomicUsize::new(0),
             _audit: audit,
         });
-        let state = state();
+        let state = state(cohort_audit);
         let port = Arc::new(GovernedDigestReadPort::new(
             state.clone(),
             Arc::clone(&governor),
@@ -492,7 +492,8 @@ fn a_cached_key_admits_once_and_a_replay_mints_nothing() {
 
 /// (a) An unknown `kid` under the guard is refused WITHOUT waiting while the refresher never
 /// answers, fires exactly one non-blocking refresh, and a retry after the refresher published
-/// the rotated key set succeeds (the "first digest request after a rotation is refused once").
+/// the rotated key set succeeds (the first digest request after a rotation is refused; this test
+/// takes the case where the limiter is open, so ONE retry recovers).
 #[test]
 fn an_unknown_kid_is_refused_without_waiting_and_a_retry_after_the_refresh_succeeds() {
     let _env = assertion_env(sso_fixtures::TOKEN_UNKNOWN_KID);
@@ -646,15 +647,73 @@ fn concurrent_requests_with_one_new_id_admit_once() {
     assert_eq!(idp.pending(), vec!["same".to_owned()]);
 }
 
+/// What the reissue's `MemberReissueAccepted` audit append reports: that the reissue reached its
+/// checkpoint (it holds `cached`, the signed manifest is accepted, the grant purge has not run),
+/// and whether the test had already released the admission at that moment. The append runs
+/// BEFORE the cached manifest is replaced and before any purge, so it is the earliest point at
+/// which the reissue is demonstrably inside the contested section.
+struct CheckpointSink {
+    reached: Mutex<std::sync::mpsc::Sender<()>>,
+    admission_released: Arc<AtomicBool>,
+    released_at_checkpoint: AtomicBool,
+}
+
+impl CohortAuditSink for CheckpointSink {
+    fn append(&self, event: &CohortAuditEvent) -> Result<(), CohortError> {
+        if matches!(
+            event,
+            CohortAuditEvent::MemberReissueAccepted { version: 2, .. }
+        ) {
+            self.released_at_checkpoint.store(
+                self.admission_released.load(Ordering::SeqCst),
+                Ordering::SeqCst,
+            );
+            let _ = self
+                .reached
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .send(());
+        }
+        Ok(())
+    }
+}
+
+/// The state every reissue test ends in: no obligation queued, no grant left, the capacity free.
+fn assert_purged(idp: &Idp) {
+    assert!(
+        idp.pending().is_empty(),
+        "the purge removed the reply obligation with the grant"
+    );
+    assert!(!idp.state.authorize_reply_send(&requester(), "held"));
+    // The capacity the grant held is free again: a full set of 256 new ids fits.
+    for n in 0..256 {
+        idp.admit(&format!("after-{n}"))
+            .expect("capacity was freed");
+    }
+}
+
 /// (d) A reissue that lands while an admission holds the cohort guard waits for it, and its purge
 /// then removes that grant AND its reply obligation: no grant is left behind without a queue
 /// entry, and none outlives the manifest version it was decided under. (The original `cached`
 /// serialization is back: an admission samples the version under the same mutex the reissue
 /// holds for its whole purge.)
+///
+/// The order is OBSERVED, not assumed: the admission is held inside its commit hook until the
+/// reissue has reached its `MemberReissueAccepted` checkpoint (reported by the audit sink, under
+/// `cached`, before the replacement and the purge). At that moment the reissue must be unfinished
+/// (it is parked on the admission's mutexes) and the sink must have seen the admission still held.
+/// Only then is the admission released.
 #[test]
 fn a_reissue_concurrent_with_an_admission_leaves_no_grant_or_obligation() {
     let _env = assertion_env(sso_fixtures::TOKEN_GOOD_RS256);
-    let idp = Idp::start();
+    let (checkpoint_tx, checkpoint_rx) = channel();
+    let admission_released = Arc::new(AtomicBool::new(false));
+    let sink = Arc::new(CheckpointSink {
+        reached: Mutex::new(checkpoint_tx),
+        admission_released: Arc::clone(&admission_released),
+        released_at_checkpoint: AtomicBool::new(true),
+    });
+    let idp = Idp::start_with(Arc::clone(&sink) as Arc<dyn CohortAuditSink>);
     let (entered_tx, entered_rx) = channel();
     let (release_tx, release_rx) = channel::<()>();
     let admission = {
@@ -680,6 +739,14 @@ fn a_reissue_concurrent_with_an_admission_leaves_no_grant_or_obligation() {
         let state = Arc::clone(&idp.state);
         std::thread::spawn(move || state.apply_reissue(&signed_toml(2)))
     };
+    checkpoint_rx.recv_timeout(SAFETY).expect(
+        "the reissue never reached its accepted-reissue checkpoint while the admission was held",
+    );
+    assert!(
+        !reissue.is_finished(),
+        "the reissue finished while the admission still held the grant tables"
+    );
+    admission_released.store(true, Ordering::SeqCst);
     release_tx.send(()).unwrap();
     admission
         .join()
@@ -690,13 +757,21 @@ fn a_reissue_concurrent_with_an_admission_leaves_no_grant_or_obligation() {
         .unwrap()
         .expect("the signed v2 applies once the admission is done");
     assert!(
-        idp.pending().is_empty(),
-        "the purge removed the reply obligation with the grant"
+        !sink.released_at_checkpoint.load(Ordering::SeqCst),
+        "the admission was already released when the reissue reached its checkpoint: not contended"
     );
-    assert!(!idp.state.authorize_reply_send(&requester(), "held"));
-    // The capacity the grant held is free again: a full set of 256 new ids fits.
-    for n in 0..256 {
-        idp.admit(&format!("after-{n}"))
-            .expect("capacity was freed");
-    }
+    assert_purged(&idp);
+}
+
+/// The serial control: the admission completes, then the reissue applies. The end state is the
+/// same; this is the outcome the contended test must not be confused with.
+#[test]
+fn a_reissue_after_an_admission_leaves_no_grant_or_obligation() {
+    let _env = assertion_env(sso_fixtures::TOKEN_GOOD_RS256);
+    let idp = Idp::start();
+    idp.admit("held").expect("the admission under v1 commits");
+    idp.state
+        .apply_reissue(&signed_toml(2))
+        .expect("the signed v2 applies");
+    assert_purged(&idp);
 }

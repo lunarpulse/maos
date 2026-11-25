@@ -1,0 +1,9 @@
+Lane P, P1-1 (Rev232G4): freshness recheck at the issuance point.
+Marker: E232-PLANT-r4-P1 (removed; grep-verified empty).
+Plant: crates/maos-bin/src/worker_spawn.rs, the recheck guard before issue_with_mediation:
+  `if let (Some(runtime), Some(proof)) = (...)`  ->  `if let (Some(runtime), Some(proof), false) = (..., true)`  (the recheck never runs).
+Command: cargo test --locked -p maos-bin --test issuance_key_freshness_23_2 (CARGO_TARGET_DIR=/mnt/build/cargo-maos-e232P)
+Observed: an_unchanged_key_mints_on_both_entry_points ok;
+  a_key_retired_between_verification_and_mint_is_refused_and_issues_nothing FAILED
+    panicked at crates/maos-bin/tests/issuance_key_freshness_23_2.rs:348:18 (assert_generic_denial: "the mint was not refused with the generic denial": the mint was issued)
+  a_key_set_that_expired_between_verification_and_mint_is_refused_and_issues_nothing FAILED, same line 348:18.

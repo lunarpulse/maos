@@ -1,0 +1,7 @@
+Lane P, P2-2: an RSA modulus above 8,192 bits is a MALFORMED replacement.
+Marker: E232-PLANT-r4-P12 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs: RSA_MODULUS_BYTES `256..=1_024` -> `256..=2_048`.
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+First run: GREEN (a test hole: the 1,025-byte fixture was even, so the parity check refused it). Fixed the fixture (`*long_modulus.last_mut() |= 1`, odd: only its length is wrong) and re-ran.
+Observed: 41 passed, 1 FAILED: a_malformed_replacement_key_set_keeps_the_populated_cache
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:1946:9: assertion `left == right` failed (the 1,025-byte odd modulus body)  left: None, right: Some(JwksMalformed).

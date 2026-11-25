@@ -1,0 +1,9 @@
+Lane P, P2-3: the REAL P-384 fixture (48-byte coordinates; openssl-generated, public numbers only) is the valid-but-ineligible control.
+Marker: E232-PLANT-r4-P16 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, coordinate_width: `"P-384" => Some(48)` -> `"P-384" => Some(32)` (the wrong width for the curve).
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Observed: 39 passed, 3 FAILED:
+  a_valid_withdrawal_retires_the_cached_keys: panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:1990:9, body = the real P-384 JWK  left: Some(JwksMalformed), right: Some(NoUsableKeys)
+    (the real key is no longer a valid withdrawal);
+  keys_that_may_not_verify_or_declare_the_wrong_family_load_nothing: panicked at oidc_discovery_23_2.rs:521:5 (assert_refused: left Some(JwksMalformed), right Some(NoUsableKeys));
+  a_malformed_replacement_key_set_keeps_the_populated_cache: panicked at oidc_discovery_23_2.rs:1946:9, the P-256-relabelled-P-384 body  left: Some(NoUsableKeys), right: Some(JwksMalformed).

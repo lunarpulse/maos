@@ -1,0 +1,7 @@
+Lane P, P2-2: an even RSA modulus is a MALFORMED replacement (populated cache kept).
+Marker: E232-PLANT-r4-P7 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, rsa_material_usable: `&& modulus.last().is_some_and(|byte| byte & 1 == 1)` -> `&& true`.
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Observed: 41 passed, 1 FAILED: a_malformed_replacement_key_set_keeps_the_populated_cache
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:1942:9 (assert_eq!(verifier.last_error(), Some(JwksMalformed)), message = the body,
+  `left: None, right: Some(JwksMalformed)`): the first body to escape is rsa_even_modulus (keyC's modulus with the low bit cleared, e = 65537).

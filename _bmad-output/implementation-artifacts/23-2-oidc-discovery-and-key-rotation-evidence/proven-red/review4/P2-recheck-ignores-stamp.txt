@@ -1,0 +1,8 @@
+Lane P, P1-1: the recheck compares the key set's publication stamp.
+Marker: E232-PLANT-r4-P2 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, DiscoveringVerifier::key_still_fresh: `keys.epoch == proof.key_set` -> `true`.
+Command: cargo test --locked -p maos-sso --features discovery --test key_freshness_23_2 (CARGO_TARGET_DIR=/mnt/build/cargo-maos-e232P)
+Observed: 4 passed, 2 FAILED:
+  a_proof_does_not_hold_once_another_key_set_was_published: panicked at crates/maos-sso/tests/key_freshness_23_2.rs:175:5
+    (assert!(!verifier.key_still_fresh(&old)), "the same kid in a newer set is a different publication")
+  a_forged_proof_is_refused: panicked at crates/maos-sso/tests/key_freshness_23_2.rs:199:5 (assert!(!verifier.key_still_fresh(&forged_stamp)), "another stamp")

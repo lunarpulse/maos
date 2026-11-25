@@ -1,0 +1,7 @@
+Lane P, P2-2: an RSA exponent longer than 5 bytes is MALFORMED (without the length bound a u64 fold wraps a 9-byte exponent to 3).
+Marker: E232-PLANT-r4-P14 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, rsa_material_usable: `&& exponent.len() <= 5` -> `&& true`.
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Observed: 41 passed, 1 FAILED: a_malformed_replacement_key_set_keeps_the_populated_cache
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:1946:9: assertion `left == right` failed: body `..."e":"AQAAAAAAAAAD"}` (nine bytes, wraps to 3)  left: None, right: Some(JwksMalformed).
+  (The six-byte exponent stays refused by the value bound; only the wrapping case needs the length bound.)

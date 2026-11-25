@@ -1081,7 +1081,7 @@ fn jwks_key_ops_sign_only() -> String {
 /// and an entry declaring one key family while carrying the other's material load nothing.
 #[test]
 fn keys_that_may_not_verify_or_declare_the_wrong_family_load_nothing() {
-    let ec_p384 = JWKS_KEY_ES256.replace("\"crv\":\"P-256\"", "\"crv\":\"P-384\"");
+    let ec_p384 = p384_jwks();
     // A well-formed entry that may not verify, or is not a P-256 key, is skipped: no usable key.
     for body in [jwks_key_ops_sign_only(), ec_p384] {
         let script = Arc::new(Script::default());
@@ -1776,6 +1776,48 @@ fn the_refresh_interval_starts_when_the_fetch_worker_starts() {
     assert_eq!(script.count(DOC_URL), 2, "30 s after the worker began");
 }
 
+fn b64(bytes: &[u8]) -> String {
+    base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, bytes)
+}
+
+/// keyC's modulus as bytes (256 bytes, odd, no leading zero).
+fn key_c_modulus() -> Vec<u8> {
+    base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, KEY_C_N).unwrap()
+}
+
+/// An RSA key set (`kid` `key-b`) with the given modulus and exponent bytes.
+fn rsa_jwks(modulus: &[u8], exponent: &[u8]) -> String {
+    format!(
+        "{{\"keys\":[{{\"kty\":\"RSA\",\"use\":\"sig\",\"alg\":\"RS256\",\"kid\":\"key-b\",\"n\":\"{}\",\"e\":\"{}\"}}]}}",
+        b64(modulus),
+        b64(exponent)
+    )
+}
+
+/// An EC key set (`kid` `key-ec`) on the named curve with the given coordinate bytes.
+fn ec_jwks(curve: &str, x: &[u8], y: &[u8]) -> String {
+    format!(
+        "{{\"keys\":[{{\"kty\":\"EC\",\"use\":\"sig\",\"kid\":\"key-ec\",\"crv\":\"{curve}\",\"x\":\"{}\",\"y\":\"{}\"}}]}}",
+        b64(x),
+        b64(y)
+    )
+}
+
+/// A REAL P-384 public key (generated offline with `openssl ecparam -name secp384r1`; only the
+/// public numbers are kept): two 48-byte coordinates.
+const P384_X: &str = "6rmuSoO5nDNq-C1XVDF3He85TTtIBQzru2o60hUl3iVjtgdN6ZQEaJmGh9qGXpfi";
+const P384_Y: &str = "9zrcFJ9V2NTD_uD8JyftR5T3iTZnwB6_pnBnplP_I3Om5dVx7W9RLfaq4DNju0D_";
+
+fn p384_jwks() -> String {
+    format!(
+        "{{\"keys\":[{{\"kty\":\"EC\",\"use\":\"sig\",\"kid\":\"key-p384\",\"crv\":\"P-384\",\"x\":\"{P384_X}\",\"y\":\"{P384_Y}\"}}]}}"
+    )
+}
+
+fn decode_b64(text: &str) -> Vec<u8> {
+    base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, text).unwrap()
+}
+
 /// B3: a MALFORMED replacement (entries that are not keys, a usable key whose material is
 /// missing or does not decode, an entry of the wrong type, or any of these beside a valid key)
 /// is refused with a typed error and the populated cache is kept.
@@ -1820,6 +1862,40 @@ fn a_malformed_replacement_key_set_keeps_the_populated_cache() {
     let ec_empty_y = JWKS_KEY_ES256.replace(es_y, "");
     let ec_bare_no_kid = "{\"keys\":[{\"kty\":\"EC\",\"crv\":\"P-256\"}]}";
     let ec_with_rsa_material = fixtures::JWKS_KEY_A.replace("\"kty\":\"RSA\"", "\"kty\":\"EC\"");
+    // Key material the signing backend cannot use (it only fails at signature time): each would
+    // replace a healthy key set with one that rejects every assertion.
+    let key_b_even_exponent = fixtures::JWKS_KEY_A
+        .replace("key-a", "key-b")
+        .replace("\"e\":\"AQAB\"", "\"e\":\"Ag\"");
+    let n_c = key_c_modulus();
+    let mut even_modulus = n_c.clone();
+    *even_modulus.last_mut().unwrap() &= 0xfe;
+    let mut leading_zero_modulus = vec![0u8];
+    leading_zero_modulus.extend_from_slice(&n_c);
+    let short_modulus = n_c[1..].to_vec(); // 255 bytes: below 2,048 bits
+    let mut long_modulus = n_c.repeat(5)[..1_025].to_vec();
+    *long_modulus.last_mut().unwrap() |= 1; // odd: only its length is wrong
+    let rsa_even_modulus = rsa_jwks(&even_modulus, &[1, 0, 1]);
+    let rsa_leading_zero_modulus = rsa_jwks(&leading_zero_modulus, &[1, 0, 1]);
+    let rsa_short_modulus = rsa_jwks(&short_modulus, &[1, 0, 1]);
+    let rsa_long_modulus = rsa_jwks(&long_modulus, &[1, 0, 1]);
+    let rsa_exponent_one = rsa_jwks(&n_c, &[1]);
+    let rsa_exponent_four = rsa_jwks(&n_c, &[4]);
+    let rsa_exponent_leading_zero = rsa_jwks(&n_c, &[0, 1, 0, 1]);
+    let rsa_exponent_2_33_plus_1 = rsa_jwks(&n_c, &[2, 0, 0, 0, 1]);
+    let rsa_exponent_six_bytes = rsa_jwks(&n_c, &[1, 0, 0, 0, 0, 1]);
+    // Nine bytes: a u64 fold would wrap this to 3 (odd, in range) unless the length is bounded.
+    let rsa_exponent_wrapping = rsa_jwks(&n_c, &[1, 0, 0, 0, 0, 0, 0, 0, 3]);
+    let x32 = decode_b64(es_x);
+    let y32 = decode_b64(es_y);
+    let ec_p256_short_x = ec_jwks("P-256", &x32[1..], &y32);
+    let ec_p256_long_y = ec_jwks("P-256", &x32, &[&y32[..], &[1u8][..]].concat());
+    // A P-256 key relabelled P-384 or P-521: coordinates of the wrong width are malformed, not
+    // a withdrawal of the cached keys.
+    let ec_p256_as_p384 = JWKS_KEY_ES256.replace("\"crv\":\"P-256\"", "\"crv\":\"P-384\"");
+    let ec_p256_as_p521 = JWKS_KEY_ES256.replace("\"crv\":\"P-256\"", "\"crv\":\"P-521\"");
+    let ec_p384_short_x = ec_jwks("P-384", &decode_b64(P384_X)[1..], &decode_b64(P384_Y));
+    let ec_p521_p384_width = ec_jwks("P-521", &decode_b64(P384_X), &decode_b64(P384_Y));
     let mut now = 0;
     for body in [
         "{\"keys\":[null]}".to_owned(),
@@ -1841,6 +1917,23 @@ fn a_malformed_replacement_key_set_keeps_the_populated_cache() {
         ec_empty_y,
         ec_bare_no_kid.to_owned(),
         ec_with_rsa_material,
+        key_b_even_exponent,
+        rsa_even_modulus,
+        rsa_leading_zero_modulus,
+        rsa_short_modulus,
+        rsa_long_modulus,
+        rsa_exponent_one,
+        rsa_exponent_four,
+        rsa_exponent_leading_zero,
+        rsa_exponent_2_33_plus_1,
+        rsa_exponent_six_bytes,
+        rsa_exponent_wrapping,
+        ec_p256_short_x,
+        ec_p256_long_y,
+        ec_p256_as_p384,
+        ec_p256_as_p521,
+        ec_p384_short_x,
+        ec_p521_p384_width,
     ] {
         now += 31;
         clock.set(now);
@@ -1870,13 +1963,19 @@ fn a_valid_withdrawal_retires_the_cached_keys() {
     let encryption_only = fixtures::JWKS_KEY_A.replace("\"use\":\"sig\"", "\"use\":\"enc\"");
     // Real material, so only the missing `kid` makes it ineligible.
     let no_kid = fixtures::JWKS_KEY_A.replace("\"kid\":\"key-a\",", "");
-    // A well-formed key on another curve: valid, never used.
-    let ec_p384 = JWKS_KEY_ES256.replace("\"crv\":\"P-256\"", "\"crv\":\"P-384\"");
+    // A REAL P-384 key (48-byte coordinates): valid, never used.
+    let ec_p384 = p384_jwks();
+    // The widest recognised curve with coordinates of its width, and an unrecognised curve: valid
+    // withdrawals too (nothing here is a width or shape fault).
+    let ec_p521 = ec_jwks("P-521", &[7u8; 66], &[9u8; 66]);
+    let ec_unknown_curve = JWKS_KEY_ES256.replace("\"crv\":\"P-256\"", "\"crv\":\"secp256k1\"");
     for body in [
         "{\"keys\":[]}",
         encryption_only.as_str(),
         no_kid.as_str(),
         ec_p384.as_str(),
+        ec_p521.as_str(),
+        ec_unknown_curve.as_str(),
     ] {
         let script = healthy_script();
         let clock = ManualClock::new();
@@ -1959,5 +2058,113 @@ fn the_static_source_is_stricter_on_keys_but_still_ignores_use() {
             verify_with(&jwks, OidcAlgorithm::Rs256, fixtures::TOKEN_GOOD_RS256).is_ok(),
             "the static path does not read `use`"
         );
+    }
+}
+
+/// P2-2 control: material at the edges of what the signing backend accepts is NOT malformed. The
+/// replacement is published (healthy, no error) and retires the old key; whether the signature
+/// then verifies is the verifier's business. Without this, "reject unusable material" could be
+/// satisfied by rejecting everything.
+#[test]
+fn key_material_at_the_backends_limits_is_published() {
+    let n_c = key_c_modulus();
+    let widest = n_c.repeat(4); // 1,024 bytes (8,192 bits), odd, no leading zero
+    let mut now = 0;
+    let script = healthy_script();
+    let clock = ManualClock::new();
+    let verifier = start(&script, &clock, LONG_WAIT);
+    assert!(verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok());
+    let mut published = 1;
+    for body in [
+        rsa_jwks(&n_c, &[3]),
+        rsa_jwks(&n_c, &[1, 0, 1]),
+        rsa_jwks(&n_c, &[1, 0xff, 0xff, 0xff, 0xff]), // 2^33 - 1
+        rsa_jwks(&widest, &[1, 0, 1]),
+    ] {
+        now += 31;
+        clock.set(now);
+        script.serve(JWKS_URL, &body);
+        assert_eq!(
+            verifier.verify(fixtures::TOKEN_UNKNOWN_KID),
+            Err(IdentityError::JwksUnavailable)
+        );
+        published += 1;
+        assert_eq!(verifier.completed_refreshes(), published, "{body}");
+        assert_eq!(verifier.last_error(), None, "{body}");
+        assert!(verifier.is_healthy(), "{body}");
+        assert_eq!(
+            verifier.verify(fixtures::TOKEN_GOOD_RS256),
+            Err(IdentityError::JwksUnavailable),
+            "the replacement was published and retired `key-a`: {body}"
+        );
+    }
+}
+
+/// P2-2: whether an EC point lies on its curve is NOT checked (no curve arithmetic is linked at
+/// this layer). A 32-byte pair that is no P-256 point is published and fails every signature
+/// check: the documented limit, with the genuine key as the control.
+#[test]
+fn an_off_curve_p256_key_is_published_and_fails_verification_only() {
+    let verify_with = |jwks: &str| {
+        let script = Arc::new(Script::default());
+        script.serve(DOC_URL, &document(fixtures::ISS_GOOD, JWKS_URL));
+        script.serve(JWKS_URL, jwks);
+        let verifier = DiscoveringVerifier::start(
+            DiscoveryConfig::new(fixtures::ISS_GOOD)
+                .with_verify_wait(LONG_WAIT)
+                .with_idle_tick(Duration::from_secs(3_600)),
+            &[OidcAlgorithm::Es256],
+            &[fixtures::ISS_GOOD],
+            fixtures::AUD_EXPECTED,
+            script as Arc<dyn Fetcher>,
+            ManualClock::new() as Arc<dyn Clock>,
+        )
+        .unwrap();
+        let verdict = verifier.verify(TOKEN_ES256);
+        (verdict, verifier.last_error(), verifier.is_healthy())
+    };
+    assert!(verify_with(JWKS_KEY_ES256).0.is_ok(), "the genuine key");
+    let off_curve = ec_jwks("P-256", &[1u8; 32], &[1u8; 32]).replace("key-ec", "key-es");
+    let (verdict, error, healthy) = verify_with(&off_curve);
+    assert!(verdict.is_err(), "an off-curve key verifies nothing");
+    assert_eq!(error, None, "the set was published, not refused");
+    assert!(healthy);
+}
+
+/// P2-6: the waiter counts whole milliseconds in both its publication check and its condvar wait,
+/// so a `verify_wait` with a sub-millisecond part is refused at start (zero stays legal).
+#[test]
+fn a_sub_millisecond_verify_wait_is_refused_at_start() {
+    let started_with = |wait: Duration| {
+        DiscoveringVerifier::start(
+            DiscoveryConfig::new(fixtures::ISS_GOOD)
+                .with_verify_wait(wait)
+                .with_idle_tick(Duration::from_secs(3_600)),
+            &[OidcAlgorithm::Rs256],
+            &[fixtures::ISS_GOOD],
+            fixtures::AUD_EXPECTED,
+            healthy_script() as Arc<dyn Fetcher>,
+            ManualClock::new() as Arc<dyn Clock>,
+        )
+        .err()
+    };
+    for wait in [
+        Duration::from_micros(500),
+        Duration::from_micros(1_500),
+        Duration::from_nanos(1_000_001),
+    ] {
+        assert_eq!(
+            started_with(wait),
+            Some(DiscoveryError::ConfigInvalid),
+            "{wait:?}"
+        );
+    }
+    for wait in [
+        Duration::ZERO,
+        Duration::from_millis(1),
+        Duration::from_millis(2),
+        Duration::from_secs(2),
+    ] {
+        assert_eq!(started_with(wait), None, "{wait:?}");
     }
 }

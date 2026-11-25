@@ -249,8 +249,13 @@ breaking TLS) can keep a withdrawn key valid for the full TTL. A key set that is
 malformed (as opposed to validly empty) keeps the old keys. A fetch that does not answer
 within 30 s is abandoned; an issuer that never answers at all leaves discovery down until
 it does. A cohort digest read is verified inside the cohort lock without ever waiting for
-the identity provider, so the first digest request after an IdP key rotation can be
-refused once (the peer retries; the refusal asks the key refresh to run). A `MAOS_SSO_*`
+the identity provider, so the first digest request after an IdP key rotation is refused.
+A retry recovers only after the refresh limiter has reopened (a new key id that arrives
+within the minimum refresh interval of the previous refresh is refused without scheduling a
+refresh) and a refresh has started and published, so repeated refusals are possible, and
+every retry is made by the caller; the daemon does not retry. If the issuer reuses a key id
+with new key material, recovery waits for the half-TTL idle refresh (about half
+`MAOS_SSO_JWKS_TTL_SECS` plus the idle tick). A `MAOS_SSO_*`
 variable that is not valid UTF-8 leaves SSO configured-down
 (`sso_env_not_unicode: <NAME>`). The principal is asserted, not authenticated, at the
 door. See the [enterprise daemon runbook](../runbooks/ent-1-enterprise-daemon-posture.md)

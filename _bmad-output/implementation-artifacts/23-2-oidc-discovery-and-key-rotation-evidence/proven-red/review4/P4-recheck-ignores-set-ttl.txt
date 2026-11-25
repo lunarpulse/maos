@@ -1,0 +1,6 @@
+Lane P, P1-1: the recheck judges the TTL against the verifier's OWN current set, not only the proof's claim.
+Marker: E232-PLANT-r4-P4 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, key_still_fresh: `&& self.shared.fresh(keys, now)` -> `&& true`.
+Command: cargo test --locked -p maos-sso --features discovery --test key_freshness_23_2
+Observed: 5 passed, 1 FAILED: a_forged_proof_is_refused panicked at crates/maos-sso/tests/key_freshness_23_2.rs:214:5
+  (assert!(!verifier.key_still_fresh(&forged_late)), "a later expiry than the set's own does not extend it").

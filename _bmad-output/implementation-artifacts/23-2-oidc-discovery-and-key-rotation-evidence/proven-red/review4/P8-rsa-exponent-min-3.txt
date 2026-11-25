@@ -1,0 +1,8 @@
+Lane P, P2-2: an RSA exponent below 3 is a MALFORMED replacement (populated cache kept).
+Marker: E232-PLANT-r4-P8 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, rsa_material_usable: `(3..=RSA_EXPONENT_MAX)` -> `(0..=RSA_EXPONENT_MAX)`.
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Observed: 41 passed, 1 FAILED: a_malformed_replacement_key_set_keeps_the_populated_cache
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:1942:9 (left: None, right: Some(JwksMalformed)): the escaping body is
+  rsa_exponent_one (keyC's modulus, e = 1: odd, so only the lower bound refuses it).
+Note on the reviewer's case: the old modulus with e = "Ag" (= 2) is refused by BOTH the parity check (P6) and this bound; P6 is red on e = 4 (rsa_exponent_four), P8 on e = 1.

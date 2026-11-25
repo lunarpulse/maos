@@ -1,0 +1,6 @@
+Lane P, P2-6: a verify_wait with a sub-millisecond part is refused at start (one precision for the publication check and the condvar wait: whole milliseconds).
+Marker: E232-PLANT-r4-P18 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, DiscoveryConfig::validate: `|| self.verify_wait.subsec_nanos() % 1_000_000 != 0` -> `|| false`.
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Observed: 41 passed, 1 FAILED: a_sub_millisecond_verify_wait_is_refused_at_start
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:2156:9: assertion `left == right` failed: 500µs  left: None, right: Some(ConfigInvalid).

@@ -39,6 +39,7 @@ pub use maos_audit::AuditFilter;
 #[cfg(feature = "online-adapters")]
 use maos_domain::outbound::OutboundPolicy;
 use maos_domain::outbound::ResolveHost;
+use maos_domain::ports::identity_assertion::KeyFreshness;
 #[cfg(feature = "online-adapters")]
 use maos_domain::ports::KmsError;
 use maos_domain::ports::{
@@ -409,6 +410,7 @@ impl EnterpriseRuntime {
         assertion: &str,
     ) -> Result<Option<AuthenticatedPrincipal>, EnterpriseFailure> {
         self.verify_principal(spirit_pid, assertion, true)
+            .map(|verified| verified.map(|(principal, _)| principal))
     }
 
     /// Story 23-2 — [`Self::verify_principal_for_issuance`] for a caller inside a critical
@@ -421,6 +423,51 @@ impl EnterpriseRuntime {
         assertion: &str,
     ) -> Result<Option<AuthenticatedPrincipal>, EnterpriseFailure> {
         self.verify_principal(spirit_pid, assertion, false)
+            .map(|verified| verified.map(|(principal, _)| principal))
+    }
+
+    /// Story 23-2 (round 4) — [`Self::verify_principal_for_issuance`] (`wait`) or its no-wait
+    /// form, and the [`KeyFreshness`] the verdict rests on (`None` for a static key set, which
+    /// never expires or rotates). The caller hands the proof to [`Self::ensure_key_fresh`]
+    /// right before it mints.
+    pub fn verify_principal_with_freshness(
+        &self,
+        spirit_pid: u32,
+        assertion: &str,
+        wait: bool,
+    ) -> Result<Option<(AuthenticatedPrincipal, Option<KeyFreshness>)>, EnterpriseFailure> {
+        self.verify_principal(spirit_pid, assertion, wait)
+    }
+
+    /// Story 23-2 (round 4) — the issuance-point recheck: the key a verification used must still
+    /// be published and unexpired. Never waits and holds no discovery lock afterwards; a key set
+    /// that expired, or a `kid` retired or replaced since, is a denial with the same generic
+    /// text as an unavailable identity provider.
+    ///
+    /// # Errors
+    /// [`EnterpriseFailure::SsoIssuanceDenied`] when the proof no longer holds.
+    pub fn ensure_key_fresh(
+        &self,
+        spirit_pid: u32,
+        proof: &KeyFreshness,
+    ) -> Result<(), EnterpriseFailure> {
+        match &self.identity_port {
+            Some(port) if !port.key_still_fresh(proof) => Err(self.idp_unavailable(spirit_pid)),
+            _ => Ok(()),
+        }
+    }
+
+    fn idp_unavailable(&self, spirit_pid: u32) -> EnterpriseFailure {
+        let typed = self.sso_diagnostic.as_ref().and_then(|last| last());
+        EnterpriseFailure::SsoIssuanceDenied {
+            spirit_pid,
+            reason: match typed {
+                Some(code) => {
+                    format!("MAOS_SSO_* configured but identity provider is unavailable: {code}")
+                }
+                None => "MAOS_SSO_* configured but identity provider is unavailable".to_string(),
+            },
+        }
     }
 
     fn verify_principal(
@@ -428,21 +475,8 @@ impl EnterpriseRuntime {
         spirit_pid: u32,
         assertion: &str,
         wait: bool,
-    ) -> Result<Option<AuthenticatedPrincipal>, EnterpriseFailure> {
-        let unavailable = || {
-            let typed = self.sso_diagnostic.as_ref().and_then(|last| last());
-            EnterpriseFailure::SsoIssuanceDenied {
-                spirit_pid,
-                reason: match typed {
-                    Some(code) => format!(
-                        "MAOS_SSO_* configured but identity provider is unavailable: {code}"
-                    ),
-                    None => {
-                        "MAOS_SSO_* configured but identity provider is unavailable".to_string()
-                    }
-                },
-            }
-        };
+    ) -> Result<Option<(AuthenticatedPrincipal, Option<KeyFreshness>)>, EnterpriseFailure> {
+        let unavailable = || self.idp_unavailable(spirit_pid);
         let denied = |reason: String| EnterpriseFailure::SsoIssuanceDenied { spirit_pid, reason };
         match self.config.sso {
             SubsystemState::Disabled => Ok(None),
@@ -455,13 +489,13 @@ impl EnterpriseRuntime {
                         return Err(unavailable());
                     }
                     return port
-                        .verify(assertion)
+                        .verify_with_freshness(assertion, true)
                         .map(Some)
                         .map_err(|e| denied(e.to_string()));
                 }
                 // No wait: ask the keys held (this also nudges the refresher on a key refusal),
                 // and say "unavailable" rather than the bare verdict when the set is unhealthy.
-                port.verify_without_refresh(assertion)
+                port.verify_with_freshness(assertion, false)
                     .map(Some)
                     .map_err(|e| {
                         if port.is_healthy() {

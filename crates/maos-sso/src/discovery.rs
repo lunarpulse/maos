@@ -35,13 +35,21 @@
 //! duplicate `kid` or a URL over [`MAX_URL_BYTES`] refuse the whole refresh and keep the
 //! previous keys until their TTL ends, and so does a MALFORMED entry (not an object naming a
 //! `kty`; a member of the wrong type; an `RSA` or `EC` entry, usable or not, whose key material
-//! is missing, undecodable, empty, an implausible RSA modulus (outside 1,024 to 8,192 bits) or
-//! a P-256 coordinate that is not 32 bytes, or an `EC` entry without `crv`; a usable key whose
+//! is missing, undecodable, empty, or material the signing backend cannot use (an RSA modulus
+//! that is even, starts with a zero byte or is outside 2,048 to 8,192 bits; an exponent that is
+//! even, below 3, above 2^33 - 1 or starts with a zero byte; an EC coordinate that is not the
+//! curve's width on `P-256` (32 bytes), `P-384` (48) or `P-521` (66)), or an `EC` entry without
+//! `crv`; a usable key whose
 //! material does not load). A VALID entry that is not a usable verification key (no `kid`, a
 //! `kid` over [`MAX_KID_BYTES`], `use` other than `sig`, `key_ops` without `verify` or naming
 //! operations `use` forbids, an `EC` key not on `P-256`, any other `kty`) is skipped; a well-formed set
 //! with NO usable key (empty, or only such entries) retires the cached keys (the verifier turns
 //! unhealthy): the issuer withdrew them, a documented trade-off.
+//!
+//! Limit: whether an EC point lies ON its curve is NOT verified (no curve arithmetic is linked at
+//! this layer). A coordinate pair of the right width that is no point is published and fails
+//! every signature check; a refresh holding only such keys therefore replaces a working set with
+//! one that verifies nothing (the same trade-off as any wrong key the publisher signs with).
 
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -49,6 +57,8 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
 use maos_domain::outbound::OutboundRefusal;
+#[cfg(not(feature = "sso-fault-inject"))]
+use maos_domain::ports::identity_assertion::KeyFreshness;
 use maos_domain::ports::io_subsystem::{IoError, IoSubsystemPort};
 use maos_domain::ports::{AuthenticatedPrincipal, IdentityAssertionPort, IdentityError};
 use serde::Deserialize;
@@ -247,7 +257,10 @@ impl DiscoveryConfig {
         self
     }
 
-    /// How long `verify` waits for a refresh it asked for or joined.
+    /// How long `verify` waits for a refresh it asked for or joined. Whole milliseconds: the
+    /// publication check and the condvar wait count the same unit, so a duration with a
+    /// sub-millisecond part makes [`DiscoveringVerifier::start`] fail with
+    /// [`DiscoveryError::ConfigInvalid`].
     #[must_use]
     pub fn with_verify_wait(mut self, verify_wait: Duration) -> Self {
         self.verify_wait = verify_wait;
@@ -278,6 +291,9 @@ impl DiscoveryConfig {
             || self.fetch_timeout_secs == 0
             || self.fetch_timeout_secs > MAX_FETCH_TIMEOUT_SECS
             || self.idle_tick.is_zero()
+            // One precision for the waiter: the publication check and the condvar both count
+            // whole milliseconds, so a sub-millisecond remainder cannot make them disagree.
+            || !self.verify_wait.subsec_nanos().is_multiple_of(1_000_000)
         {
             return Err(DiscoveryError::ConfigInvalid);
         }
@@ -394,8 +410,11 @@ fn usable(key: &Jwk) -> bool {
         && key.kid.len() <= MAX_KID_BYTES
 }
 
-/// The shortest and longest RSA modulus (bytes) a published key may have: 1,024 to 8,192 bits.
-const RSA_MODULUS_BYTES: std::ops::RangeInclusive<usize> = 128..=1_024;
+/// The shortest and longest RSA modulus (bytes) the RS256 verifier accepts (ring's
+/// `RSA_PKCS1_2048_8192_SHA256`): 2,048 to 8,192 bits, without a leading zero byte.
+const RSA_MODULUS_BYTES: std::ops::RangeInclusive<usize> = 256..=1_024;
+/// The largest RSA public exponent the verifier accepts (ring: below 2^33).
+const RSA_EXPONENT_MAX: u64 = (1 << 33) - 1;
 
 /// An RFC 7518 `Base64urlUInt` member of a key entry: a string, decodable, not all zero.
 fn uint_member(entry: &serde_json::Value, name: &str) -> Option<Vec<u8>> {
@@ -407,15 +426,46 @@ fn uint_member(entry: &serde_json::Value, name: &str) -> Option<Vec<u8>> {
     bytes.iter().any(|byte| *byte != 0).then_some(bytes)
 }
 
-/// The key material a recognised family (`RSA`, `EC`) must carry: an RSA modulus of a plausible
-/// size and an exponent that fits a `u64`, or an EC curve name and coordinates (exactly 32 bytes
-/// each on `P-256`). Judged BEFORE the entry is classed usable or not: an entry of a family we
-/// read that lacks its material is malformed, never an ineligible key quietly withdrawn.
+/// What the signing backend (ring, through `jsonwebtoken`) demands of an RSA public key: an odd
+/// modulus of 2,048 to 8,192 bits and an odd exponent from 3 to 2^33 - 1, neither with a
+/// leading zero byte. Anything else loads (the components are only decoded) and then fails
+/// every verification, so it must not replace a working key set.
+fn rsa_material_usable(modulus: &[u8], exponent: &[u8]) -> bool {
+    let exponent_value = exponent
+        .iter()
+        .fold(0u64, |value, byte| (value << 8) | u64::from(*byte));
+    RSA_MODULUS_BYTES.contains(&modulus.len())
+        && modulus.first() != Some(&0)
+        && modulus.last().is_some_and(|byte| byte & 1 == 1)
+        && exponent.len() <= 5
+        && exponent.first() != Some(&0)
+        && (3..=RSA_EXPONENT_MAX).contains(&exponent_value)
+        && exponent_value & 1 == 1
+}
+
+/// The fixed coordinate width (bytes) of a curve the verifier recognises (RFC 7518 §6.2.1.2:
+/// the full octet length of the curve's field).
+fn coordinate_width(curve: &str) -> Option<usize> {
+    match curve {
+        "P-256" => Some(32),
+        "P-384" => Some(48),
+        "P-521" => Some(66),
+        _ => None,
+    }
+}
+
+/// The key material a recognised family (`RSA`, `EC`) must carry: usable RSA material
+/// ([`rsa_material_usable`]), or an EC curve name and two nonzero coordinates of the curve's
+/// exact width (a curve we do not recognise has no width to check). Judged BEFORE the entry is
+/// classed usable or not: an entry of a family we read that lacks its material is malformed,
+/// never an ineligible key quietly withdrawn. Whether an EC point lies ON its curve is NOT
+/// checked (no curve arithmetic is linked at this layer and none may be added): such a key
+/// passes here and fails every signature check.
 fn material_plausible(kty: &str, entry: &serde_json::Value) -> bool {
     if kty == "RSA" {
         return matches!(
             (uint_member(entry, "n"), uint_member(entry, "e")),
-            (Some(n), Some(e)) if RSA_MODULUS_BYTES.contains(&n.len()) && e.len() <= 8
+            (Some(n), Some(e)) if rsa_material_usable(&n, &e)
         );
     }
     let Some(curve) = entry.get("crv").and_then(serde_json::Value::as_str) else {
@@ -423,7 +473,7 @@ fn material_plausible(kty: &str, entry: &serde_json::Value) -> bool {
     };
     matches!(
         (uint_member(entry, "x"), uint_member(entry, "y")),
-        (Some(x), Some(y)) if curve != "P-256" || (x.len() == 32 && y.len() == 32)
+        (Some(x), Some(y)) if coordinate_width(curve).is_none_or(|width| x.len() == width && y.len() == width)
     )
 }
 
@@ -479,7 +529,16 @@ fn parse_key_set(body: &[u8]) -> Result<HashMap<String, Jwk>, DiscoveryError> {
 struct KeySet {
     /// Clock milliseconds at which the fetch COMPLETED (the TTL starts here).
     fetched_at: u64,
+    /// Publication stamp: unique per published key set (the refresh attempt that made it).
+    epoch: u64,
     keys: HashMap<String, Jwk>,
+}
+
+/// A cached key with what it was served under (the freshness a verification rests on).
+struct Found {
+    jwk: Jwk,
+    key_set: u64,
+    expires_at: u64,
 }
 
 struct State {
@@ -586,14 +645,14 @@ impl Shared {
 
     /// The key for `kid`, asking the refresher at most once when the cache
     /// cannot answer. Never fetches.
-    fn key_for(&self, kid: &str) -> Option<Jwk> {
+    fn key_for(&self, kid: &str) -> Option<Found> {
         let mut state = self.lock();
         let mut asked = false;
         loop {
             let now = self.clock.now_millis();
             if let Some(keys) = state.keys.as_ref().filter(|keys| self.fresh(keys, now)) {
-                if let Some(key) = keys.keys.get(kid) {
-                    return Some(key.clone());
+                if let Some(found) = self.found(keys, kid) {
+                    return Some(found);
                 }
             }
             if asked || state.shutdown {
@@ -762,6 +821,7 @@ impl Shared {
                         // The TTL starts when the worker finished, not when the fetch began and
                         // not when this thread got to publish it.
                         fetched_at: completed,
+                        epoch: state.generation + 1,
                         keys,
                     });
                     state.last_error = None;
@@ -906,9 +966,8 @@ impl IdentityAssertionPort for DiscoveringVerifier {
 
         #[cfg(not(feature = "sso-fault-inject"))]
         {
-            self.shared
-                .rules
-                .verify(assertion, |kid| self.shared.key_for(kid))
+            self.verify_proved(assertion, true)
+                .map(|(principal, _)| principal)
         }
     }
 
@@ -938,33 +997,76 @@ impl IdentityAssertionPort for DiscoveringVerifier {
 
         #[cfg(not(feature = "sso-fault-inject"))]
         {
-            self.shared
-                .rules
-                .verify(assertion, |kid| self.shared.cached_key(kid))
+            self.verify_proved(assertion, false)
+                .map(|(principal, _)| principal)
         }
+    }
+
+    /// Story 23-2 (round 4) — verification plus the freshness proof it rests on: the `kid`, the
+    /// key set's publication stamp and its hard-TTL expiry. `wait` selects the waiting lookup
+    /// (`verify`) or the cached, non-waiting one (`verify_without_refresh`).
+    #[cfg(not(feature = "sso-fault-inject"))]
+    fn verify_with_freshness(
+        &self,
+        assertion: &str,
+        wait: bool,
+    ) -> Result<(AuthenticatedPrincipal, Option<KeyFreshness>), IdentityError> {
+        self.verify_proved(assertion, wait)
+            .map(|(principal, proof)| (principal, Some(proof)))
+    }
+
+    /// Story 23-2 (round 4) — the issuance-point recheck: never waits, never fetches, holds the
+    /// state mutex only for this comparison (not across PDP, sealing or audit). `true` only
+    /// while the key set the verification used is still the published one, unexpired at the
+    /// verifier's own clock, and still holds the `kid`. A key set published since (even with
+    /// the same `kid`) is refused: the caller re-verifies against it. A refusal nudges the
+    /// refresher without waiting.
+    #[cfg(not(feature = "sso-fault-inject"))]
+    fn key_still_fresh(&self, proof: &KeyFreshness) -> bool {
+        let mut state = self.shared.lock();
+        let now = self.shared.clock.now_millis();
+        let current = state.keys.as_ref().is_some_and(|keys| {
+            keys.epoch == proof.key_set
+                && now < proof.expires_at_ms
+                && self.shared.fresh(keys, now)
+                && keys.keys.contains_key(&proof.kid)
+        });
+        if !current {
+            self.shared.nudge_refresh_locked(&mut state, now);
+        }
+        current
     }
 }
 
 impl Shared {
     /// Story 23-2 (round 2) — the FRESH cached key for `kid`; never asks the refresher and
     /// never waits (the re-check a lock-holding commit point needs).
-    fn cached_key(&self, kid: &str) -> Option<Jwk> {
+    fn cached_key(&self, kid: &str) -> Option<Found> {
         let mut state = self.lock();
         let now = self.clock.now_millis();
         // The key is COPIED under the state mutex; the signature check runs after the mutex is
-        // released (a few microseconds of RSA/EC work, the same window every verifier has
-        // between reading a key and acting on the verdict). The mutex is never held across it.
+        // released (a few microseconds of RSA/EC work). The copy carries the proof that the
+        // issuance point rechecks (`key_still_fresh`); the mutex is never held across anything.
         let found = state
             .keys
             .as_ref()
             .filter(|keys| self.fresh(keys, now))
-            .and_then(|keys| keys.keys.get(kid).cloned());
+            .and_then(|keys| self.found(keys, kid));
         if found.is_none() {
             // Refused for want of a key (unknown `kid`, or a stale/absent set): nudge, so that
             // a retry after the refresher finished is answered.
             self.nudge_refresh_locked(&mut state, now);
         }
         found
+    }
+
+    /// The key for `kid` in `keys`, with the stamp and expiry of the set that holds it.
+    fn found(&self, keys: &KeySet, kid: &str) -> Option<Found> {
+        keys.keys.get(kid).map(|jwk| Found {
+            jwk: jwk.clone(),
+            key_set: keys.epoch,
+            expires_at: keys.fetched_at.saturating_add(self.ttl_millis()),
+        })
     }
 
     /// Story 23-2 (round 3) — ask the refresher for a refresh WITHOUT waiting: sets the pending
@@ -975,6 +1077,34 @@ impl Shared {
             state.pending = true;
             self.wake_refresher.notify_one();
         }
+    }
+}
+
+impl DiscoveringVerifier {
+    #[cfg(not(feature = "sso-fault-inject"))]
+    fn verify_proved(
+        &self,
+        assertion: &str,
+        wait: bool,
+    ) -> Result<(AuthenticatedPrincipal, KeyFreshness), IdentityError> {
+        let mut proof = None;
+        let principal = self.shared.rules.verify(assertion, |kid| {
+            let found = if wait {
+                self.shared.key_for(kid)
+            } else {
+                self.shared.cached_key(kid)
+            }?;
+            proof = Some(KeyFreshness {
+                kid: kid.to_owned(),
+                key_set: found.key_set,
+                expires_at_ms: found.expires_at,
+            });
+            Some(found.jwk)
+        })?;
+        // `Rules::verify` succeeds only after the lookup returned a key.
+        proof
+            .map(|proof| (principal, proof))
+            .ok_or(IdentityError::JwksUnavailable)
     }
 }
 

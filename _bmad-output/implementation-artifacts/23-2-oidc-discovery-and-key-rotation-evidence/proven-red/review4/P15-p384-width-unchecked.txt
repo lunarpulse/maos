@@ -1,0 +1,7 @@
+Lane P, P2-3: a P-256 key relabelled P-384 (32-byte coordinates) is MALFORMED, not a valid withdrawal.
+Marker: E232-PLANT-r4-P15 (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, coordinate_width: `"P-384" => Some(48)` -> `"P-384" => None` (round 3's behaviour: no width check off P-256).
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Observed: 41 passed, 1 FAILED: a_malformed_replacement_key_set_keeps_the_populated_cache
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs (assert_eq!(verifier.last_error(), Some(JwksMalformed)), message = body {"keys":[{"kty":"EC","use":"sig","alg":"ES256","kid":"key-es","crv":"P-384",...)
+  left: Some(NoUsableKeys), right: Some(JwksMalformed): the mislabelled key cleared the populated cache as a "withdrawal".

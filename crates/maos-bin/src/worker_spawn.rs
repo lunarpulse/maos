@@ -482,24 +482,26 @@ fn issue_governed_capability(
     wait: IdentityWait,
 ) -> Result<CapabilityToken, GovernedMintError> {
     let capability_key = scope_action_key(&scope).to_string();
-    let principal = match enterprise_runtime {
+    let verified = match enterprise_runtime {
         Some(runtime) if runtime.sso_configured() => {
             let assertion = crate::assertion_supply::supply(spirit_pid).ok_or_else(|| {
                 GovernedMintError::SsoAssertionMissing(format!(
                     "enterprise SSO is configured but MAOS_SSO_ASSERTION is absent for {capability_key}"
                 ))
             })?;
-            match wait {
-                IdentityWait::Bounded => {
-                    runtime.verify_principal_for_issuance(spirit_pid, &assertion)
-                }
-                IdentityWait::Never => {
-                    runtime.verify_principal_for_issuance_no_wait(spirit_pid, &assertion)
-                }
-            }
-            .map_err(|e| GovernedMintError::SsoAssertionMissing(e.to_string()))?
+            runtime
+                .verify_principal_with_freshness(
+                    spirit_pid,
+                    &assertion,
+                    matches!(wait, IdentityWait::Bounded),
+                )
+                .map_err(|e| GovernedMintError::SsoAssertionMissing(e.to_string()))?
         }
         _ => None,
+    };
+    let (principal, freshness) = match verified {
+        Some((principal, freshness)) => (Some(principal), freshness),
+        None => (None, None),
     };
     if let Some(pdp) = enterprise_pdp_runtime {
         let principal_attributes = principal.as_ref().map(principal_attributes_for_pdp);
@@ -519,6 +521,15 @@ fn issue_governed_capability(
         }
     }
 
+    // Story 23-2 (round 4): the discovered key the verification used must still be published and
+    // unexpired AT the authorization point, after PDP and immediately before the mint. Never
+    // waits for discovery and holds no discovery lock across PDP, sealing or audit; both the
+    // bounded-wait callers and the no-wait caller (the digest admission guard) pass through here.
+    if let (Some(runtime), Some(proof)) = (enterprise_runtime, freshness.as_ref()) {
+        runtime
+            .ensure_key_fresh(spirit_pid, proof)
+            .map_err(|e| GovernedMintError::SsoAssertionMissing(e.to_string()))?;
+    }
     let token = capability
         .issue_with_mediation(spirit_pid, scope, ttl_secs, posture_hash, intent_class)
         .map_err(|e| match e {
