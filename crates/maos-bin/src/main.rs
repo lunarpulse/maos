@@ -17787,14 +17787,36 @@ mod story_13_5a_enterprise_daemon_seam {
         unreachable!("the held-collector witness needs the `online-adapters` feature")
     }
 
-    /// R2-4: with the digest reply already received (the request completed) and the collector's
-    /// handshake gate still CLOSED, the governed row is in the log and nothing was delivered;
-    /// then the gate opens and that row's own `externalId` arrives.
+    /// R3-5: wait (no sleep: the task yields; 30 s is a deadline only) until the collector
+    /// reports it HAS the ClientHello of the exporter's connection and is holding the gate.
     #[cfg(feature = "online-adapters")]
-    async fn drive_held_siem(
-        fixture: &Fixture,
-        _runtime: &Arc<maos_bin::enterprise_identity::EnterpriseRuntime>,
-    ) -> Result<(), String> {
+    async fn await_held_handshake(fixture: &Fixture) -> Result<(), String> {
+        use fake_siem_for_13_5a::Event;
+        let held = fixture.held_siem.as_ref().ok_or("no held collector")?;
+        tokio::time::timeout(std::time::Duration::from_secs(30), async {
+            loop {
+                match held.fake.events.try_recv() {
+                    Ok(Event::Held) => return Ok(()),
+                    Ok(other) => {
+                        return Err(format!("an event before the handshake parked: {other:?}"))
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Empty) => tokio::task::yield_now().await,
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        return Err("the collector went away".to_string());
+                    }
+                }
+            }
+        })
+        .await
+        .map_err(|_| "the exporter never reached the held collector".to_string())?
+    }
+
+    /// R3-5/R2-4: with the correlated reply received while the handshake gate was closed the
+    /// whole time, the governed row is in the log and nothing was delivered; THEN the gate is
+    /// released and that row's own `externalId` arrives. The gate has no timeout-open path:
+    /// the fake drops a connection still held after its bound.
+    #[cfg(feature = "online-adapters")]
+    async fn release_held_siem(fixture: &Fixture) -> Result<(), String> {
         use fake_siem_for_13_5a::Event;
         let held = fixture.held_siem.as_ref().ok_or("no held collector")?;
         let governed = maos_audit::query(
@@ -17810,32 +17832,9 @@ mod story_13_5a_enterprise_daemon_seam {
             .ok_or("the request completed but its governed row is not in the log")?
             .frame_id_hex
             .clone();
-        // The exporter has dialled and is parked in the handshake (nothing sleeps: the task
-        // yields until the collector reports the held connection; 30 s is a deadline only).
-        tokio::time::timeout(std::time::Duration::from_secs(30), async {
-            loop {
-                match held.fake.events.try_recv() {
-                    Ok(Event::Held) => return Ok(()),
-                    Ok(other) => {
-                        return Err(format!("an event before the gate opened: {other:?}"));
-                    }
-                    Err(std::sync::mpsc::TryRecvError::Empty) => tokio::task::yield_now().await,
-                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                        return Err("the collector went away".to_string());
-                    }
-                }
-            }
-        })
-        .await
-        .map_err(|_| "the exporter never dialled the held collector".to_string())??;
-        if let Some(event) = held
-            .fake
-            .drain()
-            .into_iter()
-            .find(|e| !matches!(e, Event::Held))
-        {
+        if let Some(event) = held.fake.drain().into_iter().next() {
             return Err(format!(
-                "a delivery completed with the gate closed: {event:?}"
+                "the collector reported {event:?} while its gate was closed"
             ));
         }
 
@@ -17849,7 +17848,10 @@ mod story_13_5a_enterprise_daemon_seam {
                             return Ok(());
                         }
                     }
-                    Ok(Event::Held | Event::Unacked { .. }) => {}
+                    Ok(Event::Held) => {}
+                    Ok(Event::Unacked { .. }) => {
+                        return Err("a delivery went unacknowledged after the release".to_string());
+                    }
                     Ok(Event::Refused(reason)) => {
                         return Err(format!("collector refused: {reason}"))
                     }
@@ -17865,10 +17867,12 @@ mod story_13_5a_enterprise_daemon_seam {
     }
 
     #[cfg(not(feature = "online-adapters"))]
-    async fn drive_held_siem(
-        _fixture: &Fixture,
-        _runtime: &Arc<maos_bin::enterprise_identity::EnterpriseRuntime>,
-    ) -> Result<(), String> {
+    async fn await_held_handshake(_fixture: &Fixture) -> Result<(), String> {
+        Err("the held-collector witness needs the `online-adapters` feature".to_string())
+    }
+
+    #[cfg(not(feature = "online-adapters"))]
+    async fn release_held_siem(_fixture: &Fixture) -> Result<(), String> {
         Err("the held-collector witness needs the `online-adapters` feature".to_string())
     }
 
@@ -18088,6 +18092,17 @@ mod story_13_5a_enterprise_daemon_seam {
             .map_err(|error| error.to_string())?
         };
 
+        if matches!(wiring, TestWiring::FullHeldSiem) {
+            // A row for the immediate first export tick to send, so the exporter dials at boot.
+            transparency_log.insert_frame_event(
+                maos_kernel_core::iac::transparency_log::FrameKind::CapabilityInvocation,
+                1,
+                None,
+                "test.seed.before-the-request",
+                b"seed",
+                maos_domain::invariants::i3::FrameOrigin::Kernel,
+            );
+        }
         // The production spawn (`run_cohort_a2a_daemon` calls the same helper): without it
         // nothing exports and the governed-read nudge wakes no one.
         let siem_cancel = CancellationToken::new();
@@ -18169,6 +18184,11 @@ mod story_13_5a_enterprise_daemon_seam {
                 role: None,
             },
         );
+        if matches!(wiring, TestWiring::FullHeldSiem) {
+            // R3-5: the exporter is PARKED in the collector's handshake (the collector has its
+            // ClientHello and holds the gate) BEFORE the governed request is issued.
+            await_held_handshake(fixture).await?;
+        }
         let target = HostId("host-a".to_string());
         let request = distributor
             .request_read(&target, maos_cohort::DIGEST_DAILY_SCOPE)
@@ -18203,11 +18223,9 @@ mod story_13_5a_enterprise_daemon_seam {
         .map_err(|_| "timed out waiting for the daemon's correlated digest reply".to_string())?;
 
         if matches!(wiring, TestWiring::FullHeldSiem) {
-            drive_held_siem(
-                fixture,
-                runtime.as_ref().expect("held wiring builds a runtime"),
-            )
-            .await?;
+            // The reply is in and the collector's handshake gate is STILL closed (it was parked
+            // before the request was issued, and only this call opens it).
+            release_held_siem(fixture).await?;
         }
 
         if matches!(wiring, TestWiring::Full) {

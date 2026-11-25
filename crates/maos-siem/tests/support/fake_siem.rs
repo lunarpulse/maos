@@ -7,7 +7,7 @@
 #![allow(dead_code)]
 
 use std::collections::HashSet;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -110,6 +110,21 @@ impl Gate {
         self.0 .1.notify_all();
     }
 
+    pub fn close(&self) {
+        *self.0 .0.lock().unwrap() = false;
+    }
+
+    /// Wait until opened; `false` when [`OUTER`] passed first (a gate that cannot time out open).
+    pub fn wait_open(&self) -> bool {
+        let guard = self.0 .0.lock().unwrap();
+        let (guard, _) = self
+            .0
+             .1
+            .wait_timeout_while(guard, OUTER, |open| !*open)
+            .unwrap();
+        *guard
+    }
+
     fn wait(&self) {
         let guard = self.0 .0.lock().unwrap();
         let _ = self
@@ -125,6 +140,8 @@ impl Gate {
 /// How the next connection is treated.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
+    /// Complete the handshake, then close (alert and FIN) WITHOUT reading anything.
+    CloseWithoutReading,
     /// Read to the client's `close_notify`, then (after the ack gate) answer with ours.
     Ack,
     /// Read the batch, then drop the TCP stream without a `close_notify`.
@@ -133,8 +150,6 @@ pub enum Mode {
     HoldHandshake,
     /// Complete the handshake, send `close_notify` and close the TCP stream at once.
     CloseFirst,
-    /// After the handshake keep sending valid application records until the client leaves.
-    Flood,
     /// Read and acknowledge normally but report no bytes (the collector did not keep them).
     DiscardThenAck,
 }
@@ -168,6 +183,10 @@ pub struct Options {
 }
 
 pub struct FakeSiem {
+    /// Held closed, `Mode::CloseWithoutReading` waits before it sends its alert.
+    pub alert_hold: Gate,
+    /// Opened once that alert has been written to the socket.
+    pub alert_sent: Gate,
     pub addr: SocketAddr,
     pub events: Receiver<Event>,
     /// Held closed, the server does not answer a `close_notify`.
@@ -179,7 +198,8 @@ pub struct FakeSiem {
 }
 
 impl FakeSiem {
-    pub fn start(leaf: &Leaf, options: Options) -> Self {
+    /// The server configuration the fake serves with (also used for in-memory handshakes).
+    pub fn server_config(leaf: &Leaf, options: &Options) -> Arc<ServerConfig> {
         let provider = {
             let mut provider = rustls::crypto::ring::default_provider();
             if options.tls12_ecdhe_gcm_only {
@@ -208,20 +228,26 @@ impl FakeSiem {
             }
             None => builder.with_no_client_auth(),
         };
-        let config = Arc::new(
+        Arc::new(
             builder
                 .with_single_cert(
                     vec![leaf.der.clone()],
                     PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(leaf.key_der.clone())),
                 )
                 .expect("server cert"),
-        );
+        )
+    }
+
+    pub fn start(leaf: &Leaf, options: Options) -> Self {
+        let config = Self::server_config(leaf, &options);
 
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake siem");
         let addr = listener.local_addr().expect("fake siem addr");
         let (sender, events) = channel();
         let ack_gate = Gate::new(!options.hold_ack);
         let handshake_gate = Gate::new(false);
+        let alert_hold = Gate::new(true);
+        let alert_sent = Gate::new(false);
         let mode = Arc::new(Mutex::new(Mode::Ack));
         let stop = Arc::new(AtomicBool::new(false));
         let handle = {
@@ -231,6 +257,10 @@ impl FakeSiem {
                 Arc::clone(&mode),
                 Arc::clone(&stop),
             );
+            let gates = Gates {
+                alert_hold: alert_hold.clone(),
+                alert_sent: alert_sent.clone(),
+            };
             std::thread::spawn(move || {
                 for stream in listener.incoming() {
                     if stop.load(Ordering::SeqCst) {
@@ -238,12 +268,22 @@ impl FakeSiem {
                     }
                     let Ok(stream) = stream else { continue };
                     let mode = *mode.lock().unwrap();
-                    serve(stream, Arc::clone(&config), mode, &ack, &hold, &sender);
+                    serve(
+                        stream,
+                        Arc::clone(&config),
+                        mode,
+                        &ack,
+                        &hold,
+                        &gates,
+                        &sender,
+                    );
                 }
             })
         };
         Self {
             addr,
+            alert_hold,
+            alert_sent,
             events,
             ack_gate,
             handshake_gate,
@@ -293,22 +333,51 @@ impl Drop for FakeSiem {
     }
 }
 
+struct Gates {
+    alert_hold: Gate,
+    alert_sent: Gate,
+}
+
 fn serve(
     mut tcp: TcpStream,
     config: Arc<ServerConfig>,
     mode: Mode,
     ack: &Gate,
     hold: &Gate,
+    gates: &Gates,
     events: &Sender<Event>,
 ) {
-    if mode == Mode::HoldHandshake {
-        // The TCP connection is accepted; the client is now committed to a handshake that
-        // will not complete until the test opens the gate.
-        let _ = events.send(Event::Held);
-        hold.wait();
-    }
     let _ = tcp.set_read_timeout(Some(OUTER));
     let mut conn = ServerConnection::new(config).expect("server connection");
+    if mode == Mode::HoldHandshake {
+        // `Held` means the collector HAS the ClientHello and its own flight is ready: the
+        // handshake is parked, and stays parked until the test opens the gate. The gate
+        // cannot open by timing out: a connection still held after OUTER is dropped.
+        while !conn.wants_write() {
+            match conn.read_tls(&mut tcp) {
+                Ok(0) | Err(_) => {
+                    let _ = events.send(Event::Unacked { bytes: Vec::new() });
+                    return;
+                }
+                Ok(_) => {}
+            }
+            if conn.process_new_packets().is_err() {
+                let _ = events.send(Event::Refused("hello".to_owned()));
+                return;
+            }
+        }
+        let _ = events.send(Event::Held);
+        if !hold.wait_open() {
+            let _ = events.send(Event::Unacked { bytes: Vec::new() });
+            return;
+        }
+        while conn.wants_write() {
+            if conn.write_tls(&mut tcp).is_err() {
+                let _ = events.send(Event::Unacked { bytes: Vec::new() });
+                return;
+            }
+        }
+    }
     let mut bytes = Vec::new();
     loop {
         match conn.read_tls(&mut tcp) {
@@ -332,17 +401,6 @@ fn serve(
             conn.reader().read_exact(&mut chunk).expect("plaintext");
             bytes.extend_from_slice(&chunk);
         }
-        if mode == Mode::Flood && !conn.is_handshaking() {
-            // KeyUpdate records leave no plaintext behind, so the client's receive buffer
-            // never fills: only the deadline and the cap can end the pre-close look.
-            loop {
-                if conn.refresh_traffic_keys().is_err() || conn.write_tls(&mut tcp).is_err() {
-                    break;
-                }
-            }
-            let _ = events.send(Event::Unacked { bytes });
-            return;
-        }
         if mode == Mode::CloseFirst && !conn.is_handshaking() {
             conn.send_close_notify();
         }
@@ -360,6 +418,24 @@ fn serve(
             let mut sink = [0_u8; 4096];
             while matches!(std::io::Read::read(&mut tcp, &mut sink), Ok(n) if n > 0) {}
             let _ = events.send(Event::Unacked { bytes });
+            return;
+        }
+        if mode == Mode::CloseWithoutReading && !conn.is_handshaking() {
+            // The collector closes WITHOUT having read anything: it waits for the test to
+            // release the alert (open by default), sends close_notify and the FIN, never
+            // processes the batch, then only drains the socket so the close is not a reset.
+            gates.alert_hold.wait();
+            conn.send_close_notify();
+            while conn.wants_write() {
+                if conn.write_tls(&mut tcp).is_err() {
+                    break;
+                }
+            }
+            gates.alert_sent.open();
+            let _ = tcp.shutdown(std::net::Shutdown::Write);
+            let mut sink = [0_u8; 4096];
+            while matches!(std::io::Read::read(&mut tcp, &mut sink), Ok(n) if n > 0) {}
+            let _ = events.send(Event::Unacked { bytes: Vec::new() });
             return;
         }
         if state.peer_has_closed() {

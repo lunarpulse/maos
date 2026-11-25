@@ -115,7 +115,7 @@ fn an_unwritable_file_sink_keeps_the_cursor_and_reports_the_rows_after_it() {
     std::fs::create_dir(&rig.sink_path).unwrap();
     let failure = rig.tick().expect_err("sink down");
     assert_eq!(failure.code(), "siem_sink_file_io");
-    assert_eq!(failure.buffered(), 2);
+    assert_eq!(failure.buffered(), Some(2));
     std::fs::remove_dir(&rig.sink_path).unwrap();
     assert_eq!(
         rig.tick().unwrap().delivered,
@@ -428,4 +428,174 @@ fn a_frame_over_one_mebibyte_is_sent_alone_and_the_next_row_follows() {
         text.lines().nth(1).unwrap().len() > (1 << 20),
         "the big line is over 1 MiB"
     );
+}
+
+// ── review round 3 ───────────────────────────────────────────────────────────
+
+/// An appender that writes half of the batch and then fails once (ENOSPC mid-write).
+fn short_write_once() -> maos_siem::export::Appender {
+    use std::io::Write;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let failing = Arc::new(AtomicBool::new(true));
+    Arc::new(move |path, bytes| {
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)?;
+        if failing.swap(false, Ordering::SeqCst) {
+            file.write_all(&bytes[..bytes.len() / 2])?;
+            return Err(std::io::Error::other("injected ENOSPC after a short write"));
+        }
+        file.write_all(bytes)?;
+        file.sync_data()
+    })
+}
+
+fn assert_whole_lines(path: &Path, expected: usize) {
+    let text = std::fs::read_to_string(path).unwrap();
+    assert!(text.ends_with('\n'), "the file ends at a record boundary");
+    assert_eq!(text.lines().count(), expected);
+    for line in text.lines() {
+        assert!(
+            line.starts_with("<134>1 ") && line.contains(" CEF:0|"),
+            "a malformed record was acknowledged: {line:?}"
+        );
+    }
+}
+
+/// R3-2: a short write leaves a fragment; the retry cuts the file back to the offset recorded
+/// before the failed append (write permission alone is enough, so a WRITE-ONLY file works),
+/// and every record boundary is intact afterwards.
+#[cfg(unix)]
+#[test]
+fn a_short_write_is_cut_back_before_the_retry_even_on_a_write_only_file() {
+    use std::os::unix::fs::PermissionsExt;
+    let rig = Rig::new();
+    seed(&rig.db, 3);
+    std::fs::write(&rig.sink_path, "").unwrap();
+    std::fs::set_permissions(&rig.sink_path, std::fs::Permissions::from_mode(0o200)).unwrap();
+    let mut sink = rig.sink().with_appender(short_write_once());
+    let cursor = rig.db.with_file_name("siem-cursor.json");
+    let failure = rig
+        .tick_using(&mut sink)
+        .expect_err("the short write fails");
+    assert_eq!(failure.code(), "siem_sink_file_io");
+    assert!(!cursor.exists());
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 3);
+    std::fs::set_permissions(&rig.sink_path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert_whole_lines(&rig.sink_path, 3);
+}
+
+/// R3-2: a known partial tail that cannot be repaired (no write permission to cut it) is never
+/// appended to and acknowledged: the cursor stays and the error is typed; once the file is
+/// writable again the batch goes out whole.
+#[cfg(unix)]
+#[test]
+fn an_unrepairable_partial_tail_refuses_to_advance_the_cursor() {
+    use std::os::unix::fs::PermissionsExt;
+    let rig = Rig::new();
+    seed(&rig.db, 3);
+    let mut sink = rig.sink().with_appender(short_write_once());
+    let cursor = rig.db.with_file_name("siem-cursor.json");
+    rig.tick_using(&mut sink)
+        .expect_err("the short write fails");
+    let fragment = std::fs::read(&rig.sink_path).unwrap();
+    assert!(!fragment.is_empty() && !fragment.ends_with(b"\n"));
+
+    std::fs::set_permissions(&rig.sink_path, std::fs::Permissions::from_mode(0o400)).unwrap();
+    let failure = rig
+        .tick_using(&mut sink)
+        .expect_err("the tail cannot be cut");
+    assert_eq!(failure.code(), "siem_file_tail_unrecoverable");
+    assert!(!cursor.exists(), "the cursor did not move");
+    assert_eq!(
+        std::fs::read(&rig.sink_path).unwrap(),
+        fragment,
+        "nothing was appended"
+    );
+
+    std::fs::set_permissions(&rig.sink_path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 3);
+    assert_whole_lines(&rig.sink_path, 3);
+}
+
+/// R3-3: a service that may only SEARCH the directory of a provisioned file appends to it
+/// (no directory sync is required for a pre-existing entry).
+#[cfg(unix)]
+#[test]
+fn a_search_only_parent_directory_does_not_stop_appends_to_an_existing_file() {
+    use std::os::unix::fs::PermissionsExt;
+    let rig = Rig::new();
+    seed(&rig.db, 2);
+    let sub = rig.db.parent().unwrap().join("sink");
+    std::fs::create_dir(&sub).unwrap();
+    let path = sub.join("siem.log");
+    std::fs::write(&path, "").unwrap();
+    std::fs::set_permissions(&sub, std::fs::Permissions::from_mode(0o300)).unwrap();
+    let mut sink = FileSink::new(path.clone(), Arc::new(SiemExporter));
+    let result = rig.tick_using(&mut sink);
+    std::fs::set_permissions(&sub, std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(result.expect("append and cursor").delivered, 2);
+    assert_whole_lines(&path, 2);
+    assert!(rig.db.with_file_name("siem-cursor.json").exists());
+}
+
+/// R3-3: a pathname replaced between attempts does not inherit the directory-sync debt (or
+/// credit) of the file this sink created: the new entry is not ours to sync.
+#[test]
+fn a_replaced_file_does_not_inherit_the_directory_sync_state_of_the_old_one() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let rig = Rig::new();
+    seed(&rig.db, 2);
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let counter = Arc::clone(&attempts);
+    let mut sink = rig.sink().with_dir_sync(Arc::new(move |_| {
+        counter.fetch_add(1, Ordering::SeqCst);
+        Err(std::io::Error::other("injected dir sync failure"))
+    }));
+    rig.tick_using(&mut sink)
+        .expect_err("the created entry cannot be synced");
+    assert_eq!(attempts.load(Ordering::SeqCst), 1);
+    // Replace the entry with ANOTHER file (the new one exists while the old one does, so
+    // the inode numbers differ).
+    let other = rig.sink_path.with_file_name("replacement.log");
+    std::fs::write(&other, "").unwrap();
+    std::fs::rename(&other, &rig.sink_path).unwrap();
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 2);
+    assert_eq!(
+        attempts.load(Ordering::SeqCst),
+        1,
+        "no directory sync is owed for an entry this sink did not create"
+    );
+}
+
+/// R3-8: when the sink refuses a batch AND the log can no longer be read to count what remains,
+/// the backlog is UNKNOWN (`None`), never reported as 0.
+#[test]
+fn an_unreadable_log_after_a_sink_failure_reports_an_unknown_backlog_not_zero() {
+    struct RemovesTheSource(PathBuf);
+    impl BatchSink for RemovesTheSource {
+        fn identity(&self) -> String {
+            "test:removes-the-source".to_owned()
+        }
+        fn deliver(
+            &mut self,
+            _: &[maos_siem::export::Frame],
+        ) -> Result<(), maos_siem::export::SinkFailure> {
+            std::fs::remove_file(&self.0).unwrap();
+            Err(maos_siem::export::SinkFailure::new("siem_sink_timeout"))
+        }
+    }
+    let rig = Rig::new();
+    seed(&rig.db, 2);
+    let snapshot = rig.db.with_file_name("unknown-backlog.sqlite");
+    raw(&rig.db)
+        .execute("VACUUM INTO ?1", [snapshot.to_string_lossy().as_ref()])
+        .unwrap();
+    let mut sink = RemovesTheSource(snapshot.clone());
+    let store = CursorStore::beside(&rig.db, &sink.identity());
+    let failure =
+        run_tick(&snapshot, &store, &mut sink, &|_, _| Ok(())).expect_err("the sink refuses");
+    assert_eq!(failure.code(), "siem_sink_timeout");
+    assert_eq!(failure.buffered(), None, "unknown, not zero");
 }

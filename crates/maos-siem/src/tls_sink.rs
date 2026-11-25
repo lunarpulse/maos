@@ -117,6 +117,20 @@ pub fn client_config(
     Ok(Arc::new(config))
 }
 
+/// Where in a delivery a test hook runs.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CloseStage {
+    /// The batch is written and flushed; the pre-close look has not started.
+    BeforeEarlyCheck,
+    /// The pre-close look found nothing; our `close_notify` has not been sent.
+    AfterEarlyCheck,
+}
+
+/// A test hook (see [`TlsSink::with_close_hook`]).
+#[doc(hidden)]
+pub type CloseHook = Arc<dyn Fn(&TcpStream, CloseStage) + Send + Sync>;
+
 /// The syslog-over-TLS [`BatchSink`].
 pub struct TlsSink {
     host: String,
@@ -126,6 +140,7 @@ pub struct TlsSink {
     resolver: Arc<dyn ResolveHost>,
     timeouts: Timeouts,
     cancel: Option<Arc<AtomicBool>>,
+    hook: Option<CloseHook>,
 }
 
 impl std::fmt::Debug for TlsSink {
@@ -161,8 +176,17 @@ impl TlsSink {
             resolver,
             timeouts,
             cancel: None,
+            hook: None,
         }
     }
+    /// Install a test hook that runs on each side of the pre-close look (ordering fixtures).
+    #[doc(hidden)]
+    #[must_use]
+    pub fn with_close_hook(mut self, hook: CloseHook) -> Self {
+        self.hook = Some(hook);
+        self
+    }
+
     fn check_cancel(&self) -> Result<(), SinkFailure> {
         match &self.cancel {
             Some(flag) if flag.load(Ordering::SeqCst) => {
@@ -215,27 +239,14 @@ impl BatchSink for TlsSink {
         let mut tls = ClientConnection::new(Arc::clone(&self.config), name)
             .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?;
 
-        // The handshake is driven one record at a time: the deadline and the shutdown flag are
-        // re-checked on every step, so a peer that sends a byte now and then cannot stretch it.
-        let handshake = Instant::now() + self.timeouts.handshake;
-        while tls.is_handshaking() {
-            self.check_cancel()?;
-            arm(&tcp, handshake)?;
-            if tls.wants_write() {
-                tls.write_tls(&mut tcp)
-                    .map_err(|error| classify(&error, "siem_sink_io"))?;
-                continue;
-            }
-            match tls.read_tls(&mut tcp) {
-                Ok(0) => return Err(SinkFailure::new("siem_sink_io")),
-                Ok(_) => {
-                    tls.process_new_packets()
-                        .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?;
-                }
-                Err(error) if is_timeout(&error) => {}
-                Err(error) => return Err(classify(&error, "siem_sink_io")),
-            }
-        }
+        // The handshake is driven one record at a time (see `drive_handshake`).
+        drive_handshake(
+            &mut tls,
+            &mut tcp,
+            self.timeouts.handshake,
+            &Instant::now,
+            &|| self.check_cancel().is_err(),
+        )?;
 
         let write = Instant::now() + self.timeouts.write;
         let payload = octet_counted(frames);
@@ -255,7 +266,13 @@ impl BatchSink for TlsSink {
         // advance the cursor past rows it never saw. Look before we send ours. Residual
         // (RFC 5425 gives no way around it): a close_notify that crosses ours on the wire is
         // indistinguishable from the acknowledgement.
+        if let Some(hook) = &self.hook {
+            hook(&tcp, CloseStage::BeforeEarlyCheck);
+        }
         early_close_check(&mut tls, &mut tcp, write, &|| self.check_cancel().is_err())?;
+        if let Some(hook) = &self.hook {
+            hook(&tcp, CloseStage::AfterEarlyCheck);
+        }
         tls.send_close_notify();
         flush(&mut tls, &mut tcp, write)?;
 
@@ -284,10 +301,72 @@ impl BatchSink for TlsSink {
     }
 }
 
-/// Drain whatever the peer already sent, without blocking. `Err` when it already closed.
 /// Most reads the pre-close look takes before it stops looking.
-const MAX_DRAIN_READS: usize = 64;
+#[doc(hidden)]
+pub const MAX_DRAIN_READS: usize = 64;
 
+/// A stream whose next blocking operation can be bounded (the handshake seam).
+#[doc(hidden)]
+pub trait StepIo: std::io::Read + std::io::Write {
+    /// Bound the next read by `left` (at most one [`SLICE`]) and the next write by `left`.
+    ///
+    /// # Errors
+    /// The transport refused the bound.
+    fn bound(&mut self, left: Duration) -> std::io::Result<()>;
+}
+
+impl StepIo for TcpStream {
+    fn bound(&mut self, left: Duration) -> std::io::Result<()> {
+        self.set_read_timeout(Some(left.min(SLICE)))?;
+        self.set_write_timeout(Some(left))
+    }
+}
+
+/// The handshake, one record at a time: the cancel flag and the deadline (read from `now`) are
+/// checked on EVERY step, so a peer that keeps trickling forever cannot stretch it.
+///
+/// # Errors
+/// A typed [`SinkFailure`] (timeout, cancel, refusal, transport).
+#[doc(hidden)]
+pub fn drive_handshake<S: StepIo>(
+    tls: &mut ClientConnection,
+    io: &mut S,
+    budget: Duration,
+    now: &dyn Fn() -> Instant,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<(), SinkFailure> {
+    let deadline = now() + budget;
+    while tls.is_handshaking() {
+        if cancelled() {
+            return Err(SinkFailure::new("siem_export_cancelled"));
+        }
+        let left = deadline
+            .checked_duration_since(now())
+            .filter(|left| !left.is_zero())
+            .ok_or(SinkFailure::new("siem_sink_timeout"))?;
+        io.bound(left)
+            .map_err(|_| SinkFailure::new("siem_sink_io"))?;
+        if tls.wants_write() {
+            tls.write_tls(io)
+                .map_err(|error| classify(&error, "siem_sink_io"))?;
+            continue;
+        }
+        match tls.read_tls(io) {
+            Ok(0) => return Err(SinkFailure::new("siem_sink_io")),
+            Ok(_) => {
+                tls.process_new_packets()
+                    .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?;
+            }
+            Err(error) if is_timeout(&error) => {}
+            Err(error) => return Err(classify(&error, "siem_sink_io")),
+        }
+    }
+    Ok(())
+}
+
+/// Look at what the peer already sent, without blocking: a collector that closed first did not
+/// read this batch through OUR close, and counting its `close_notify` as the acknowledgement
+/// would move the cursor past rows it never saw.
 fn early_close_check(
     tls: &mut ClientConnection,
     tcp: &mut TcpStream,
@@ -296,47 +375,60 @@ fn early_close_check(
 ) -> Result<(), SinkFailure> {
     tcp.set_nonblocking(true)
         .map_err(|_| SinkFailure::new("siem_sink_io"))?;
+    let outcome = drain_pending(tls, tcp, deadline, &Instant::now, cancelled);
+    let _ = tcp.set_nonblocking(false);
+    outcome
+}
+
+/// Drain what `reader` (a NON-BLOCKING source) holds. `Ok` only when the source ran dry
+/// (`WouldBlock`) with no close seen. A close, a refusal, the deadline and the cancel flag are
+/// errors; so is EXHAUSTION: after [`MAX_DRAIN_READS`] successful reads the source may still
+/// hold a close queued behind them, so the batch is NOT acknowledgeable
+/// (`siem_sink_drain_exhausted`; the cursor stays and the batch is re-sent).
+///
+/// # Errors
+/// A typed [`SinkFailure`].
+#[doc(hidden)]
+pub fn drain_pending<R: std::io::Read>(
+    tls: &mut ClientConnection,
+    reader: &mut R,
+    deadline: Instant,
+    now: &dyn Fn() -> Instant,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<(), SinkFailure> {
     // A close_notify read together with the last handshake flight is already processed: ask
     // the connection before reading more.
     let pending = tls
         .process_new_packets()
-        .map_err(|_| SinkFailure::new("siem_sink_tls_refused"));
-    if !matches!(&pending, Ok(state) if !state.peer_has_closed()) {
-        let _ = tcp.set_nonblocking(false);
-        return Err(pending
-            .err()
-            .unwrap_or(SinkFailure::new("siem_sink_no_close_notify")));
+        .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?;
+    if pending.peer_has_closed() {
+        return Err(SinkFailure::new("siem_sink_no_close_notify"));
     }
-    // Bounded: a collector that keeps valid post-handshake records coming (TLS 1.3 session
-    // tickets have no receive-count cutoff) must neither hold the export past its write
-    // deadline nor ignore shutdown, so the deadline and the flag are looked at on EVERY
-    // iteration and at most `MAX_DRAIN_READS` reads are taken.
-    let outcome = (|| {
-        for _ in 0..MAX_DRAIN_READS {
-            if cancelled() {
-                return Err(SinkFailure::new("siem_export_cancelled"));
-            }
-            if remaining(deadline).is_none() {
-                return Err(SinkFailure::new("siem_sink_timeout"));
-            }
-            match tls.read_tls(tcp) {
-                Ok(0) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
-                Ok(_) => {
-                    let state = tls
-                        .process_new_packets()
-                        .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?;
-                    if state.peer_has_closed() {
-                        return Err(SinkFailure::new("siem_sink_no_close_notify"));
-                    }
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => return Ok(()),
-                Err(_) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
-            }
+    for _ in 0..MAX_DRAIN_READS {
+        if cancelled() {
+            return Err(SinkFailure::new("siem_export_cancelled"));
         }
-        Ok(())
-    })();
-    let _ = tcp.set_nonblocking(false);
-    outcome
+        if deadline
+            .checked_duration_since(now())
+            .is_none_or(|left| left.is_zero())
+        {
+            return Err(SinkFailure::new("siem_sink_timeout"));
+        }
+        match tls.read_tls(reader) {
+            Ok(0) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
+            Ok(_) => {
+                let state = tls
+                    .process_new_packets()
+                    .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?;
+                if state.peer_has_closed() {
+                    return Err(SinkFailure::new("siem_sink_no_close_notify"));
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => return Ok(()),
+            Err(_) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
+        }
+    }
+    Err(SinkFailure::new("siem_sink_drain_exhausted"))
 }
 
 /// RFC 5425 §4.3: `MSG-LEN SP SYSLOG-MSG`, MSG-LEN in octets.

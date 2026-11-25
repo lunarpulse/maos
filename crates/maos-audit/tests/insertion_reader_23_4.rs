@@ -320,3 +320,54 @@ fn the_planner_holds_one_lookahead_per_source_however_large_the_backlog() {
         ids[..25]
     );
 }
+
+// ── review round 3 ───────────────────────────────────────────────────────────
+
+/// R3-9: a zero row limit returns an empty batch (the old SQL `LIMIT 0` did), however many
+/// rows lie after the cursor.
+#[test]
+fn a_zero_row_limit_returns_an_empty_batch() {
+    let (_dir, db, tl) = seeded(5);
+    drop(tl);
+    let view = LogView::open(&db).unwrap();
+    assert!(view.read_after(0, 0, usize::MAX).unwrap().is_empty());
+    assert_eq!(view.read_after(0, 1, usize::MAX).unwrap().len(), 1);
+}
+
+/// Story 23-4 review round 3: the live view reads a database whose WAL is ACTIVE (a daemon
+/// owns it), where `LogView::open` refuses; it holds one read transaction until dropped, after
+/// which a TRUNCATE checkpoint is not blocked, and `live_high_water` probes the newest id
+/// without holding anything.
+#[test]
+fn the_live_view_reads_an_active_wal_and_releases_its_read_mark_when_dropped() {
+    let (_dir, db, tl) = seeded(4);
+    assert!(
+        LogView::open(&db).is_err(),
+        "the quiesced reader refuses a live WAL"
+    );
+    assert_eq!(LogView::live_high_water(&db).unwrap(), Some(4));
+    let view = LogView::open_live(&db).unwrap();
+    assert_eq!(view.read_after(2, 10, usize::MAX).unwrap().len(), 2);
+    tl.insert_frame_event(
+        FrameKind::CapabilityInvocation,
+        1,
+        None,
+        "test.capability.invoke",
+        b"after the view opened",
+        FrameOrigin::Kernel,
+    );
+    assert_eq!(
+        view.read_after(0, 10, usize::MAX).unwrap().len(),
+        4,
+        "one consistent snapshot: a row inserted after the view opened is not in it"
+    );
+    let checkpoint = |db: &Path| -> i64 {
+        raw(db)
+            .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))
+            .unwrap()
+    };
+    assert_eq!(checkpoint(&db), 1, "the open view pins a read mark");
+    drop(view);
+    assert_eq!(checkpoint(&db), 0, "dropping it releases the mark");
+    assert_eq!(LogView::live_high_water(&db).unwrap(), Some(5));
+}

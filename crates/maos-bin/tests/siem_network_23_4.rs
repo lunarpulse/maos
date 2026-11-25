@@ -604,11 +604,10 @@ mod online {
         );
         assert_eq!(payload["sink"].as_str().map(str::len), Some(16));
 
-        // The next tick delivers the journal rows themselves and invents no second gap.
-        let next = host.export().expect("second tick");
-        assert!(!next.is_empty());
+        // The journal row was written mid-tick and the next batch's FRESH read already carried
+        // it, so the next tick has nothing left and invents no second gap.
+        assert!(host.export().expect("second tick").is_empty());
         assert_eq!(host.rows_with_intent("siem.gap").len(), 1);
-        assert!(host.export().unwrap().is_empty());
     }
 
     /// AC4: a registered segment file missing at read time is a tick error, never a gap.
@@ -669,14 +668,109 @@ mod online {
             .join()
             .expect("export thread")
             .expect("the held export succeeds");
-        assert!(
-            tick.delivered >= 1,
-            "the held tick exports the snapshot it took before the burst"
+        assert_eq!(
+            tick.delivered, 51,
+            "the held batch, then the rest of the burst read after the stall"
         );
-        assert!(matches!(host.fake.next_event(), Event::Acked { .. }));
-        // The rest of the burst follows in the next tick, in order.
-        let rest = host.export().expect("next tick");
-        assert_eq!(mine(&rest), (2..=51).map(hex).collect::<Vec<_>>());
+        let mut ids = Vec::new();
+        for _ in 0..tick.batches {
+            match host.fake.next_event() {
+                Event::Acked { bytes, .. } => {
+                    ids.extend(external_ids(&fake_siem::octet_frames(&bytes)));
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+        assert_eq!(mine(&ids), (1..=51).map(hex).collect::<Vec<_>>());
+        assert_eq!(host.export().expect("idle tick"), Vec::<String>::new());
+    }
+
+    fn snapshot_files(db: &std::path::Path) -> Vec<String> {
+        std::fs::read_dir(db.parent().unwrap())
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.contains("siem-snapshot"))
+            .collect()
+    }
+
+    /// Story 23-4 review round 3 (R3-1): while the collector stalls the export, no read
+    /// transaction is pinned and no copy of the log exists. A WAL checkpoint (`TRUNCATE`, what a
+    /// rotation runs) completes without waiting for the exporter, the audit writer keeps
+    /// inserting, and a rotation seals the rows; when the collector answers, every row is
+    /// delivered once, in order. An idle tick afterwards creates no file and dials nothing.
+    #[test]
+    fn a_stalled_collector_pins_no_read_mark_and_leaves_no_snapshot_copy() {
+        let host = Arc::new(Host::with(Options::default(), true));
+        for n in 1..=3 {
+            host.put(n);
+        }
+        assert_eq!(mine(&host.export().unwrap()).len(), 3);
+
+        host.put(4);
+        host.fake.set_mode(Mode::HoldHandshake);
+        let exporter = {
+            let runtime = Arc::clone(&host.runtime);
+            std::thread::spawn(move || runtime.forward_audit_to_siem())
+        };
+        // The collector has the ClientHello and the handshake is parked: the exporter is in
+        // sink I/O NOW, with its batch already read.
+        assert!(matches!(host.fake.next_event(), Event::Held));
+        assert!(
+            snapshot_files(&host.db).is_empty(),
+            "no snapshot copy exists during the stall"
+        );
+
+        for n in 5..=30 {
+            host.put(n);
+        }
+        // A TRUNCATE checkpoint must not find a reader pinning the WAL: `busy` is 0.
+        let (busy, _log, _checkpointed): (i64, i64, i64) = rusqlite::Connection::open(&host.db)
+            .unwrap()
+            .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })
+            .unwrap();
+        assert_eq!(busy, 0, "a read mark is pinned across sink I/O");
+        host.rotate();
+        assert!(
+            snapshot_files(&host.db).is_empty(),
+            "still no snapshot copy after the rotation"
+        );
+        assert!(!exporter.is_finished(), "the export is still held");
+
+        host.fake.set_mode(Mode::Ack);
+        host.fake.handshake_gate.open();
+        let tick = exporter
+            .join()
+            .expect("export thread")
+            .expect("the held export succeeds");
+        assert_eq!(tick.delivered, 27, "rows 4..=30, the sealed ones included");
+        let mut ids = Vec::new();
+        for _ in 0..tick.batches {
+            match host.fake.next_event() {
+                Event::Acked { bytes, .. } => {
+                    ids.extend(external_ids(&fake_siem::octet_frames(&bytes)));
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+        assert_eq!(mine(&ids), (4..=30).map(hex).collect::<Vec<_>>());
+
+        // An idle tick: nothing after the cursor, so no file is created and nothing is dialled.
+        let files = std::fs::read_dir(host.db.parent().unwrap())
+            .unwrap()
+            .count();
+        let idle = host.runtime.forward_audit_to_siem().expect("idle tick");
+        assert_eq!((idle.delivered, idle.batches), (0, 0));
+        assert_eq!(
+            std::fs::read_dir(host.db.parent().unwrap())
+                .unwrap()
+                .count(),
+            files,
+            "an idle tick creates no file"
+        );
+        assert!(host.fake.drain().is_empty(), "an idle tick dials nothing");
     }
 
     /// AC5: a sink that is down leaves the cursor and reports the rows after it with a typed
@@ -704,7 +798,7 @@ mod online {
         else {
             panic!("expected a sink-down outcome, got {outcome:?}");
         };
-        assert_eq!((*buffered, *reason), (5, "siem_sink_no_close_notify"));
+        assert_eq!((*buffered, *reason), (Some(5), "siem_sink_no_close_notify"));
         assert!(matches!(host.fake.next_event(), Event::Unacked { .. }));
         assert_eq!(
             std::fs::read(host.cursor()).unwrap(),

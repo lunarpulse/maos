@@ -52,6 +52,7 @@ const ROW_OVERHEAD_BYTES: usize = 600;
 pub struct LogView {
     sources: Vec<Connection>,
     peak_lookahead: AtomicUsize,
+    read_tx: bool,
 }
 
 struct Meta {
@@ -59,6 +60,16 @@ struct Meta {
     frame: Vec<u8>,
     bytes: usize,
     source: usize,
+}
+
+impl Drop for LogView {
+    fn drop(&mut self) {
+        if self.read_tx {
+            if let Some(live) = self.sources.last() {
+                let _ = live.execute_batch("COMMIT");
+            }
+        }
+    }
 }
 
 impl LogView {
@@ -101,7 +112,39 @@ impl LogView {
         Ok(Self {
             sources: segment::open_log_sources_immutable(db_path)?,
             peak_lookahead: AtomicUsize::new(0),
+            read_tx: false,
         })
+    }
+
+    /// Open the view of a log a daemon is WRITING (Story 23-4 review round 3): the live file
+    /// through a normal read-only connection, inside one read transaction that this view holds
+    /// until it is dropped, and the quiesced sealed segments. The caller reads ONE bounded
+    /// batch and drops the view BEFORE any sink I/O, so no WAL read mark is pinned across a
+    /// slow collector (a pinned mark would stall a rotation checkpoint, and with it the audit
+    /// writer). No snapshot copy of the log is made.
+    ///
+    /// # Errors
+    /// An unreadable source (a registered segment that is missing is an error).
+    pub fn open_live(db_path: &Path) -> Result<Self, AuditError> {
+        Ok(Self {
+            sources: segment::open_log_sources_live(db_path)?,
+            peak_lookahead: AtomicUsize::new(0),
+            read_tx: true,
+        })
+    }
+
+    /// The highest insertion id in the LIVE file (`None` when it holds no row): one indexed
+    /// lookup through a normal read-only connection that holds nothing afterwards. The cheap
+    /// idle probe of an export tick.
+    ///
+    /// # Errors
+    /// The file cannot be opened or read.
+    pub fn live_high_water(db_path: &Path) -> Result<Option<i64>, AuditError> {
+        let conn = segment::open_ro_live(db_path).map_err(AuditError::Open)?;
+        conn.query_row("SELECT max(rowid) FROM transparency_log", [], |row| {
+            row.get(0)
+        })
+        .map_err(AuditError::Read)
     }
 
     /// The sanctioned, redaction-applying read: rows with `insertion_id > after`, in
@@ -120,6 +163,9 @@ impl LogView {
         max_rows: usize,
         max_bytes: usize,
     ) -> Result<Vec<InsertionRow>, AuditError> {
+        if max_rows == 0 {
+            return Ok(Vec::new());
+        }
         // Pass 1: a bounded ordered k-way merge over the sources. Each source holds ONE
         // lookahead entry (ids, frame id and size only), so the planner's memory is the number
         // of sources plus the chosen rows, never the backlog or a per-source row window.
@@ -137,10 +183,10 @@ impl LogView {
             };
             // Every source holding `id` must hold the same frame; the first one is kept.
             let mut taken: Option<Meta> = None;
-            for source in 0..heads.len() {
-                if heads[source].as_ref().is_some_and(|meta| meta.id == id) {
-                    let meta = heads[source].take().expect("checked");
-                    heads[source] = self.next_meta(source, id)?;
+            for (source, head) in heads.iter_mut().enumerate() {
+                if head.as_ref().is_some_and(|meta| meta.id == id) {
+                    let meta = head.take().expect("checked");
+                    *head = self.next_meta(source, id)?;
                     match &taken {
                         Some(first) if first.frame != meta.frame => {
                             return Err(AuditError::Row(format!(

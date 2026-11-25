@@ -454,7 +454,7 @@ fn a_collector_that_closes_without_close_notify_does_not_move_the_cursor() {
     assert_eq!(failure.code(), "siem_sink_no_close_notify");
     assert_eq!(
         failure.buffered(),
-        2,
+        Some(2),
         "the rows after the cursor are reported"
     );
     assert!(matches!(rig.fake.next_event(), Event::Unacked { .. }));
@@ -706,7 +706,7 @@ fn every_wait_is_bounded_and_a_held_collector_never_moves_the_cursor() {
         .tick(&mut make(&rig), &store)
         .expect_err("handshake held");
     assert_eq!(failure.code(), "siem_sink_timeout");
-    assert_eq!(failure.buffered(), 2);
+    assert_eq!(failure.buffered(), Some(2));
     assert!(matches!(rig.fake.next_event(), Event::Held));
     rig.fake.handshake_gate.open();
     assert!(matches!(rig.fake.next_event(), Event::Unacked { .. }));
@@ -914,131 +914,370 @@ fn the_gap_note_survives_a_sink_failure_in_the_same_tick() {
     assert_eq!(rig.journal.entries().len(), 1);
 }
 
-// ── review round 2 ───────────────────────────────────────────────────────────
+// ── review round 3 ───────────────────────────────────────────────────────────
 
-/// R2-5: a collector that KEEPS making progress (a real handshake relayed one byte at a time,
-/// every read succeeding) must still hit the handshake deadline. The old whole-handshake
-/// `complete_io` loop armed its read timeout once and let such a handshake run to completion.
-#[test]
-fn a_collector_that_keeps_making_progress_still_hits_the_handshake_deadline() {
-    use std::io::{Read, Write};
-    use std::net::{Shutdown, TcpListener, TcpStream};
+use std::io::{Cursor as IoCursor, Read, Write};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::time::Instant;
 
-    let rig = Rig::new();
-    let padded = FakeSiem::start(&rig.ca.server_padded(HOST), Options::default());
-    let upstream = padded.addr;
-    let proxy = TcpListener::bind("127.0.0.1:0").expect("proxy");
-    let port = proxy.local_addr().unwrap().port();
-    let (permit, permits) = std::sync::mpsc::channel::<()>();
-    let relay = std::thread::spawn(move || {
-        let (client, _) = proxy.accept().expect("accept");
-        let server = TcpStream::connect(upstream).expect("upstream");
-        let (mut from_client, mut to_server) =
-            (client.try_clone().unwrap(), server.try_clone().unwrap());
-        let forward = std::thread::spawn(move || {
-            let _ = std::io::copy(&mut from_client, &mut to_server);
-            let _ = to_server.shutdown(Shutdown::Write);
-        });
-        let (mut from_server, mut to_client) = (server, client);
-        let _ = to_client.set_nodelay(true); // else Nagle/delayed-ACK stalls masquerade as read timeouts
-        let mut byte = [0_u8; 1];
-        // Server -> client: one byte per permit; the feeder grants them as fast as it can, so
-        // no single read ever waits, yet the whole flight takes longer than the deadline.
-        while from_server.read(&mut byte).is_ok_and(|n| n == 1) {
-            if permits.recv().is_err() || to_client.write_all(&byte).is_err() {
-                break;
+use maos_siem::tls_sink::{drain_pending, drive_handshake, CloseStage, StepIo, MAX_DRAIN_READS};
+use rustls::pki_types::ServerName;
+use rustls::{ClientConnection, ServerConnection};
+
+/// A client and a server joined in memory, handshake complete and every flight delivered.
+fn memory_pair(options: &Options) -> (ClientConnection, ServerConnection) {
+    let ca = Ca::new("memory-ca");
+    let leaf = ca.server(HOST);
+    let mut client = ClientConnection::new(
+        client_config(ca.pem.as_bytes(), None).unwrap(),
+        ServerName::try_from(HOST).unwrap(),
+    )
+    .unwrap();
+    let mut server = ServerConnection::new(FakeSiem::server_config(&leaf, options)).unwrap();
+    loop {
+        let mut moved = false;
+        let mut bytes = Vec::new();
+        while client.wants_write() {
+            client.write_tls(&mut bytes).unwrap();
+        }
+        if !bytes.is_empty() {
+            moved = true;
+            let mut input = IoCursor::new(bytes);
+            while (input.position() as usize) < input.get_ref().len() {
+                server.read_tls(&mut input).unwrap();
+                server.process_new_packets().unwrap();
             }
         }
-        let _ = to_client.shutdown(Shutdown::Both);
-        let _ = forward.join();
-    });
-    let feeder = std::thread::spawn(move || while permit.send(()).is_ok() {});
-    let mut sink = TlsSink::new(
-        HOST,
-        port,
-        client_config(rig.ca.pem.as_bytes(), None).unwrap(),
-        OutboundPolicy::strict().allow_private(),
-        rig.resolver.clone(),
-        Timeouts {
-            handshake: Duration::from_millis(20),
-            ..Timeouts::default()
-        },
-    );
-    let failure = sink
-        .deliver(&[dummy_frame()])
-        .expect_err("progress beyond the deadline is still a timeout");
-    assert_eq!(failure.code, "siem_sink_timeout");
-    drop(sink);
-    relay.join().unwrap();
-    feeder.join().unwrap();
+        let mut bytes = Vec::new();
+        while server.wants_write() {
+            server.write_tls(&mut bytes).unwrap();
+        }
+        if !bytes.is_empty() {
+            moved = true;
+            let mut input = IoCursor::new(bytes);
+            while (input.position() as usize) < input.get_ref().len() {
+                client.read_tls(&mut input).unwrap();
+                client.process_new_packets().unwrap();
+            }
+        }
+        if !moved {
+            break;
+        }
+    }
+    assert!(!client.is_handshaking() && !server.is_handshaking());
+    (client, server)
 }
 
-/// R2-6: a collector that keeps valid records coming after the handshake cannot hold the
-/// pre-close look (or the export) past its deadlines: the call returns.
-#[test]
-fn a_flood_of_valid_records_cannot_hold_the_export_past_its_deadlines() {
-    let rig = Rig::new();
-    rig.fake.set_mode(Mode::Flood);
-    let mut sink = TlsSink::new(
-        HOST,
-        rig.fake.addr.port(),
-        client_config(rig.ca.pem.as_bytes(), None).unwrap(),
-        OutboundPolicy::strict().allow_private(),
-        rig.resolver.clone(),
-        Timeouts {
-            write: Duration::from_millis(300),
-            close: Duration::from_millis(300),
-            ..Timeouts::default()
-        },
-    );
-    let (done, result) = std::sync::mpsc::channel();
-    let worker = std::thread::spawn(move || {
-        let _ = done.send(sink.deliver(&[dummy_frame()]));
-    });
-    let outcome = result
-        .recv_timeout(fake_siem::OUTER)
-        .expect("the export returned instead of draining forever");
-    let failure = outcome.expect_err("a flood never answers our close");
-    assert!(
-        [
-            "siem_sink_no_close_notify",
-            "siem_sink_timeout",
-            "siem_sink_tls_refused"
-        ]
-        .contains(&failure.code),
-        "{failure}"
-    );
-    worker.join().unwrap();
-    assert!(matches!(rig.fake.next_event(), Event::Unacked { .. }));
+/// What the server puts on the wire for one application record.
+fn data_record(server: &mut ServerConnection) -> Vec<u8> {
+    server.writer().write_all(b"x").unwrap();
+    let mut out = Vec::new();
+    while server.wants_write() {
+        server.write_tls(&mut out).unwrap();
+    }
+    out
 }
 
-fn big_frame() -> Frame {
-    // Larger than any loopback socket buffering (a few MB): the client's write cannot finish
-    // until the collector reads, and the collector sends its alert BEFORE it reads past the
-    // handshake, so the alert is on the wire before the write ends, in TLS 1.3 as in 1.2,
-    // whatever the scheduling (a 900 KB first version lost that race under CPU load).
-    Frame {
-        syslog: "x".repeat(32 << 20),
-        ..dummy_frame()
+fn alert_record(server: &mut ServerConnection) -> Vec<u8> {
+    server.send_close_notify();
+    let mut out = Vec::new();
+    while server.wants_write() {
+        server.write_tls(&mut out).unwrap();
+    }
+    out
+}
+
+/// A scripted non-blocking source: one queued TLS record per read, then `WouldBlock`.
+struct Script(std::collections::VecDeque<Vec<u8>>);
+
+impl Read for Script {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self.0.pop_front() {
+            Some(record) => {
+                buf[..record.len()].copy_from_slice(&record);
+                Ok(record.len())
+            }
+            None => Err(std::io::ErrorKind::WouldBlock.into()),
+        }
     }
 }
 
-/// R2-8 (a): a collector alert that is ALREADY readable before ours is refused, for TLS 1.3
-/// as for 1.2 (the big batch makes the order deterministic).
+fn script(server: &mut ServerConnection, data: usize, alert: bool) -> Script {
+    let mut records = std::collections::VecDeque::new();
+    for _ in 0..data {
+        records.push_back(data_record(server));
+    }
+    if alert {
+        records.push_back(alert_record(server));
+    }
+    Script(records)
+}
+
+fn far() -> Instant {
+    Instant::now() + Duration::from_secs(3600)
+}
+
+/// R3-4: the drain boundary, with a scripted record source (no flood that rustls could refuse
+/// first). 63 records then dry => the batch may be closed; 64 records => exhausted, whatever
+/// is queued behind them (here: the collector's alert) => NOT acknowledgeable.
 #[test]
-fn an_alert_already_readable_before_ours_is_refused_in_tls_13_and_12() {
+fn the_drain_proceeds_at_63_records_and_refuses_at_exhaustion_with_an_alert_queued_behind() {
+    assert_eq!(MAX_DRAIN_READS, 64);
+    for tls12 in [false, true] {
+        let options = Options {
+            tls12_ecdhe_gcm_only: tls12,
+            ..Options::default()
+        };
+        let (mut client, mut server) = memory_pair(&options);
+        let mut source = script(&mut server, 63, false);
+        drain_pending(&mut client, &mut source, far(), &Instant::now, &|| false).unwrap_or_else(
+            |failure| panic!("63 records then dry proceeds (tls12={tls12}): {failure}"),
+        );
+
+        let (mut client, mut server) = memory_pair(&options);
+        let mut source = script(&mut server, 64, true);
+        let failure = drain_pending(&mut client, &mut source, far(), &Instant::now, &|| false)
+            .expect_err("64 records then an alert behind them");
+        assert_eq!(failure.code, "siem_sink_drain_exhausted", "tls12={tls12}");
+        assert_eq!(
+            source.0.len(),
+            1,
+            "the alert was never read: exhaustion is not success"
+        );
+
+        let (mut client, mut server) = memory_pair(&options);
+        let mut source = script(&mut server, 64, false);
+        let failure = drain_pending(&mut client, &mut source, far(), &Instant::now, &|| false)
+            .expect_err("64 records is exhaustion even when the source then runs dry");
+        assert_eq!(failure.code, "siem_sink_drain_exhausted");
+
+        let (mut client, mut server) = memory_pair(&options);
+        let mut source = script(&mut server, 3, true);
+        let failure = drain_pending(&mut client, &mut source, far(), &Instant::now, &|| false)
+            .expect_err("an alert within the cap is a close");
+        assert_eq!(failure.code, "siem_sink_no_close_notify");
+    }
+}
+
+/// R3-6: the drain checks the cancel flag and the deadline on EVERY read: a flag raised
+/// mid-drain and a clock that passes the deadline mid-drain both stop it before the cap.
+#[test]
+fn the_drain_checks_cancellation_and_the_deadline_at_every_read() {
+    let (mut client, mut server) = memory_pair(&Options::default());
+    let mut source = script(&mut server, 40, false);
+    let calls = AtomicUsize::new(0);
+    let failure = drain_pending(&mut client, &mut source, far(), &Instant::now, &|| {
+        calls.fetch_add(1, Ordering::SeqCst) >= 7
+    })
+    .expect_err("cancelled mid-drain");
+    assert_eq!(failure.code, "siem_export_cancelled");
+    assert_eq!(
+        source.0.len(),
+        40 - 7,
+        "seven reads happened, then the flag stopped it"
+    );
+
+    let (mut client, mut server) = memory_pair(&Options::default());
+    let mut source = script(&mut server, 100, false);
+    let base = Instant::now();
+    let ticks = AtomicU64::new(0);
+    let clock = || base + Duration::from_secs(ticks.fetch_add(1, Ordering::SeqCst));
+    let failure = drain_pending(
+        &mut client,
+        &mut source,
+        base + Duration::from_secs(5),
+        &clock,
+        &|| false,
+    )
+    .expect_err("the deadline passes mid-drain");
+    assert_eq!(failure.code, "siem_sink_timeout");
+    assert!(
+        source.0.len() > 100 - MAX_DRAIN_READS,
+        "stopped before the cap"
+    );
+}
+
+/// A client stream in memory: the server answers in lockstep, `chunk` bytes per read, every
+/// read succeeds (none ever times out), and the INJECTED clock advances `step` per read.
+struct Lockstep {
+    server: ServerConnection,
+    outbox: std::collections::VecDeque<u8>,
+    chunk: usize,
+    clock_ms: Arc<AtomicU64>,
+    step_ms: u64,
+    reads: usize,
+    timeouts: usize,
+}
+
+impl Read for Lockstep {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.clock_ms.fetch_add(self.step_ms, Ordering::SeqCst);
+        if self.outbox.is_empty() {
+            self.timeouts += 1;
+            return Err(std::io::ErrorKind::WouldBlock.into());
+        }
+        self.reads += 1;
+        let take = self.chunk.min(buf.len()).min(self.outbox.len());
+        for slot in &mut buf[..take] {
+            *slot = self.outbox.pop_front().unwrap();
+        }
+        Ok(take)
+    }
+}
+
+impl Write for Lockstep {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut input = IoCursor::new(buf);
+        while (input.position() as usize) < buf.len() {
+            self.server.read_tls(&mut input)?;
+            self.server
+                .process_new_packets()
+                .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+        }
+        let mut out = Vec::new();
+        while self.server.wants_write() {
+            self.server.write_tls(&mut out)?;
+        }
+        self.outbox.extend(out);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl StepIo for Lockstep {
+    fn bound(&mut self, _left: Duration) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+fn lockstep() -> (ClientConnection, Lockstep, Arc<AtomicU64>) {
+    let ca = Ca::new("lockstep-ca");
+    let leaf = ca.server(HOST);
+    let client = ClientConnection::new(
+        client_config(ca.pem.as_bytes(), None).unwrap(),
+        ServerName::try_from(HOST).unwrap(),
+    )
+    .unwrap();
+    let clock = Arc::new(AtomicU64::new(0));
+    let io = Lockstep {
+        server: ServerConnection::new(FakeSiem::server_config(&leaf, &Options::default())).unwrap(),
+        outbox: Default::default(),
+        chunk: 1,
+        clock_ms: Arc::clone(&clock),
+        step_ms: 10,
+        reads: 0,
+        timeouts: 0,
+    };
+    (client, io, clock)
+}
+
+/// R3-6 (replaces the relay witness): N steps of progress, each read succeeding within its
+/// own timeout, whose total exceeds the phase deadline on the INJECTED clock, end in
+/// `siem_sink_timeout`. The old whole-handshake `complete_io` loop never consults the clock
+/// and lets the same peer finish.
+#[test]
+fn steady_progress_beyond_the_handshake_deadline_is_a_timeout_on_an_injected_clock() {
+    let base = Instant::now();
+    let (mut client, mut io, clock) = lockstep();
+    let now = {
+        let clock = Arc::clone(&clock);
+        move || base + Duration::from_millis(clock.load(Ordering::SeqCst))
+    };
+    let failure = drive_handshake(
+        &mut client,
+        &mut io,
+        Duration::from_millis(100),
+        &now,
+        &|| false,
+    )
+    .expect_err("progress beyond the phase deadline is still a timeout");
+    assert_eq!(failure.code, "siem_sink_timeout");
+    assert!(
+        io.reads >= 5,
+        "the peer was making progress: {} reads",
+        io.reads
+    );
+    assert_eq!(io.timeouts, 0, "no single read ever timed out");
+
+    // The same peer inside a generous budget completes: the witness is not trivially red.
+    let (mut client, mut io, clock) = lockstep();
+    let now = {
+        let clock = Arc::clone(&clock);
+        move || base + Duration::from_millis(clock.load(Ordering::SeqCst))
+    };
+    drive_handshake(
+        &mut client,
+        &mut io,
+        Duration::from_secs(3600),
+        &now,
+        &|| false,
+    )
+    .expect("within the budget the handshake completes");
+    assert_eq!(io.timeouts, 0);
+}
+
+/// R3-7: the collector's alert is on the wire BEFORE our pre-close look (the fake proves it
+/// has written it; the client proves it can read it), so it is refused, in TLS 1.3 and 1.2.
+#[test]
+fn an_alert_readable_before_our_pre_close_look_is_refused_in_tls_13_and_12() {
     for tls12 in [false, true] {
         let rig = Rig::with(Options {
             tls12_ecdhe_gcm_only: tls12,
             ..Options::default()
         });
-        rig.fake.set_mode(Mode::CloseFirst);
-        let failure = rig
-            .sink()
-            .deliver(&[big_frame()])
-            .expect_err("an early close is not an acknowledgement");
+        rig.fake.set_mode(Mode::CloseWithoutReading);
+        let sent = rig.fake.alert_sent.clone();
+        let mut sink = rig.sink().with_close_hook(Arc::new(move |tcp, stage| {
+            if stage == CloseStage::BeforeEarlyCheck {
+                assert!(sent.wait_open(), "the collector never sent its alert");
+                // Readable now: peek blocks (one read slice) until bytes are queued.
+                let _ = tcp.peek(&mut [0_u8; 1]);
+            }
+        }));
+        let failure = sink
+            .deliver(&[dummy_frame()])
+            .expect_err("a close that is already readable is not an acknowledgement");
         assert_eq!(failure.code, "siem_sink_no_close_notify", "tls12={tls12}");
-        assert!(matches!(rig.fake.next_event(), Event::Unacked { .. }));
+        match rig.fake.next_event() {
+            Event::Unacked { bytes } => assert!(bytes.is_empty(), "the collector read nothing"),
+            other => panic!("{other:?}"),
+        }
+    }
+}
+
+/// R3-7, the DOCUMENTED RESIDUAL, precisely: a collector that reads NOTHING and whose alert
+/// becomes readable only AFTER our pre-close look (it crosses our close) is accepted as the
+/// acknowledgement, in TLS 1.3 and 1.2. What is refused: an alert readable before the look
+/// (test above). What is accepted: one that arrives later, whatever the collector did with
+/// the batch (RELEASE-HOLDS 23-4.i, D-23-4-16).
+#[test]
+fn an_alert_that_arrives_after_our_pre_close_look_is_accepted_though_nothing_was_read() {
+    for tls12 in [false, true] {
+        let rig = Rig::with(Options {
+            tls12_ecdhe_gcm_only: tls12,
+            ..Options::default()
+        });
+        rig.fake.set_mode(Mode::CloseWithoutReading);
+        rig.fake.alert_hold.close();
+        let (hold, sent) = (rig.fake.alert_hold.clone(), rig.fake.alert_sent.clone());
+        let mut sink = rig.sink().with_close_hook(Arc::new(move |tcp, stage| {
+            if stage == CloseStage::AfterEarlyCheck {
+                // The look found nothing; only now does the collector's alert leave.
+                hold.open();
+                assert!(sent.wait_open(), "the collector never sent its alert");
+                let _ = tcp.peek(&mut [0_u8; 1]);
+            }
+        }));
+        sink.deliver(&[dummy_frame()]).unwrap_or_else(|failure| {
+            panic!("the crossed alert is accepted (tls12={tls12}): {failure}")
+        });
+        match rig.fake.next_event() {
+            Event::Unacked { bytes } => assert!(bytes.is_empty(), "the collector read nothing"),
+            other => panic!("{other:?}"),
+        }
     }
 }
 

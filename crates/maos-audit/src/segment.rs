@@ -667,11 +667,24 @@ pub fn open_log_sources(db_path: &Path) -> Result<Vec<Connection>, crate::AuditE
 /// `-wal`/`-shm` sidecar, so a read leaves nothing beside a quiesced or snapshot database.
 /// Only valid when nothing writes the files while they are read (a checkpointed snapshot).
 pub fn open_log_sources_immutable(db_path: &Path) -> Result<Vec<Connection>, crate::AuditError> {
-    open_sources_with(db_path, true, true)
+    open_sources_with(db_path, true, true, false)
 }
 
 fn open_sources(db_path: &Path, strict: bool) -> Result<Vec<Connection>, crate::AuditError> {
-    open_sources_with(db_path, strict, false)
+    open_sources_with(db_path, strict, false, false)
+}
+
+/// Every source of a log whose live file a daemon may be writing: the live file through a
+/// NORMAL read-only connection (never `immutable=1`) inside ONE read transaction that the
+/// caller ends (`COMMIT`) as soon as its bounded read is done, plus the quiesced sealed
+/// segments (immutable). The last connection is the live file.
+pub fn open_log_sources_live(db_path: &Path) -> Result<Vec<Connection>, crate::AuditError> {
+    open_sources_with(db_path, true, false, true)
+}
+
+/// A normal (never `immutable=1`) read-only connection to a live file.
+pub fn open_ro_live(path: &Path) -> rusqlite::Result<Connection> {
+    open_ro(path, false)
 }
 
 fn open_ro(path: &Path, immutable: bool) -> rusqlite::Result<Connection> {
@@ -698,8 +711,16 @@ fn open_sources_with(
     db_path: &Path,
     strict: bool,
     immutable: bool,
+    live_tx: bool,
 ) -> Result<Vec<Connection>, crate::AuditError> {
     let live = open_ro(db_path, immutable).map_err(crate::AuditError::Open)?;
+    if live_tx {
+        // One read transaction on the LIVE file, begun before the registry is read: the
+        // registry, the live rows and the segment list all come from one snapshot, so a
+        // rotation between two of our statements cannot hide rows from us.
+        live.execute_batch("BEGIN")
+            .map_err(crate::AuditError::Read)?;
+    }
     let registered: bool = live
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' \
@@ -725,7 +746,8 @@ fn open_sources_with(
             .join("segments");
         for seq in seqs {
             let path = dir.join(format!("{seq:010}.sqlite"));
-            match open_ro(&path, immutable) {
+            // Sealed segments are quiesced: always immutable when the live file is read live.
+            match open_ro(&path, immutable || live_tx) {
                 Ok(conn) => sources.push(conn),
                 Err(_) if !strict => {}
                 Err(error) => {
