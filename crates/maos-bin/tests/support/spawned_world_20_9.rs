@@ -450,6 +450,7 @@ impl World {
             ("hostile-stderr-flood.wasm", Vec::new()),
             ("hostile-probe-flood.wasm", Vec::new()),
             ("hostile-slow-ready.wasm", Vec::new()),
+            ("hostile-slow-probe.wasm", Vec::new()),
             ("hostile-snapshot-then-exit.wasm", Vec::new()),
         ] {
             std::fs::write(path.join(name), bytes).unwrap();
@@ -506,7 +507,8 @@ impl World {
         manifest_path: &Path,
         recall_clock: Option<maos_iac::adapter::log_recall::ConsentClock>,
     ) -> Running {
-        self.start_with(manifest_path, recall_clock, None).await
+        self.start_with(manifest_path, recall_clock, None, true)
+            .await
     }
 
     /// [`Self::start`] under `turn_budget` as the session's startup/probe/turn wall instead of the
@@ -518,8 +520,14 @@ impl World {
         manifest_path: &Path,
         turn_budget: Duration,
     ) -> Running {
-        self.start_with(manifest_path, None, Some(turn_budget))
+        self.start_with(manifest_path, None, Some(turn_budget), true)
             .await
+    }
+
+    /// [`Self::start`] returning as soon as the session exists, while the component is still
+    /// starting and its lifecycle probe is unanswered (Story 22-9).
+    pub async fn start_unready(&self, manifest_path: &Path) -> Running {
+        self.start_with(manifest_path, None, None, false).await
     }
 
     async fn start_with(
@@ -527,6 +535,7 @@ impl World {
         manifest_path: &Path,
         recall_clock: Option<maos_iac::adapter::log_recall::ConsentClock>,
         turn_budget: Option<Duration>,
+        wait_ready: bool,
     ) -> Running {
         let text = std::fs::read_to_string(manifest_path).unwrap();
         let gated = gate_manifest(&text, &|_| false).unwrap();
@@ -585,10 +594,12 @@ impl World {
         let deadline = Instant::now() + Duration::from_secs(30);
         let target = loop {
             if let Some(target) = self.supervisor.spawned_target(&gated.spirit_id) {
-                if target
-                    .lifecycle()
-                    .wait_supported(Duration::from_millis(50))
-                    .is_some()
+                // `wait_ready = false`: the component is still starting; its probe is pending.
+                if !wait_ready
+                    || target
+                        .lifecycle()
+                        .wait_supported(Duration::from_millis(50))
+                        .is_some()
                 {
                     break target;
                 }

@@ -1,0 +1,11 @@
+AC3 plant: crates/maos-bin/src/loopback_cast.rs LoopbackCast::build: the 'router.install_rupture_sink(...).await' statement replaced by '// E228-PLANT AC3 ... let _ = &log;'. Command: cargo nextest run --locked -p maos-journey-test --test journey_j4. Result: j4_earned_consent_rupture_typed_oracle FAILS (the deny path finds 0 kind-22 ConsentRupture rows, expected exactly 1: the core has no sink to call); j4_mira_nash_topology_run_once stays green. Plant reverted.
+
+        FAIL [   0.640s] (1/2) maos-journey-test::journey_j4 j4_earned_consent_rupture_typed_oracle
+    thread 'j4_earned_consent_rupture_typed_oracle' (117057) panicked at crates/maos-journey-test/tests/journey_j4.rs:220:5:
+    assertion `left == right` failed: exactly one ConsentRupture row (kind=22) from the production deny path A2ARouterCore::handle_intake; stderr:
+      left: 0
+     right: 1
+        PASS [   0.451s] (2/2) maos-journey-test::journey_j4 j4_mira_nash_topology_run_once
+     Summary [   1.092s] 2 tests run: 1 passed, 1 failed, 0 skipped
+        FAIL [   0.640s] (1/2) maos-journey-test::journey_j4 j4_earned_consent_rupture_typed_oracle
+rc=100

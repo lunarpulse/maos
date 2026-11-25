@@ -347,6 +347,9 @@ const WASM_COMPONENT_SINCE_SCHEMA: u32 = 5;
 /// First schema supporting the four FR8 contract declarations.
 pub const FR8_DECLARATIONS_SINCE_SCHEMA: u32 = 7;
 
+/// Story 22-9 (D-22-9-04 A) — the first schema that can declare `[consent]`.
+pub const CONSENT_SINCE_SCHEMA: u32 = 9;
+
 /// Story 17-3b (D-17-3b-G) — upper bound on `[class].artifact`'s byte length.
 const ARTIFACT_PATH_MAX_BYTES: usize = 4096;
 
@@ -4661,6 +4664,20 @@ struct RawConsentSection {
 }
 
 impl ConsentSection {
+    /// Admission's entry: a `[consent]` table is refused below [`CONSENT_SINCE_SCHEMA`], never
+    /// degraded away (D-22-9-04 A).
+    pub fn from_toml_str_at(declared_schema: u32, s: &str) -> Result<Self, ManifestError> {
+        if declared_schema < CONSENT_SINCE_SCHEMA {
+            return Err(ManifestError::Toml(validation_msg(
+                "consent",
+                &format!(
+                    "requires manifest_schema_version >= {CONSENT_SINCE_SCHEMA}, got {declared_schema}"
+                ),
+            )));
+        }
+        Self::from_toml_str(s)
+    }
+
     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
         use maos_domain::frame::ConsentRecall;
         let raw: RawConsentSection = parse_raw(s)?;

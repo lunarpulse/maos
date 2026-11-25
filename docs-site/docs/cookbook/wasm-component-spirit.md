@@ -24,6 +24,8 @@ npm run build && npm run componentize
 
 The scaffold directly pins `@bytecodealliance/componentize-js` at `0.23.0`; its supported Node range is `^22.20 || ^24.12 || >=25`. `componentize-js` writes the component to `dist/spirit.wasm`.
 
+Before you publish, check the package with `maos-spirit validate --manifest manifest.toml --artifact dist/spirit.wasm`. It reports what the install gate and the Host's boot gate would refuse and whether the artifact is a component the runner can bind (exit 0 means none of them would refuse it), with no registry, daemon or signing key. The full path from scaffold to a signed, installed Spirit that answers `maosctl ask` is the [authoring kit](https://github.com/lunarpulse/maos/blob/main/kit/spirit-author/AGENTS.md).
+
 Declare the component with this complete schema v5 manifest:
 
 ```toml

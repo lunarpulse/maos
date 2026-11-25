@@ -60,6 +60,28 @@ impl ConsentPolicy {
             .remove_if(spirit_id, |_, (owner, _)| *owner == pid);
     }
 
+    /// The id's declaration as it stands now (22-9: an auto-revert's restore point).
+    pub fn snapshot(&self, spirit_id: &str) -> Option<(u32, Grants)> {
+        self.grants.get(spirit_id).map(|e| e.value().clone())
+    }
+
+    /// Put `prior` (a [`Self::snapshot`]) back, atomically, only while incarnation `pid` still
+    /// owns the id's entry and that entry is not `prior` itself: a declaration another pid
+    /// installed is never overwritten. `None` withdraws what the swap installed.
+    pub fn restore_if_installed(&self, spirit_id: &str, pid: u32, prior: Option<(u32, Grants)>) {
+        if let dashmap::mapref::entry::Entry::Occupied(mut slot) =
+            self.grants.entry(spirit_id.to_owned())
+        {
+            let (owner, now) = slot.get();
+            if *owner == pid && !prior.as_ref().is_some_and(|(_, p)| Arc::ptr_eq(p, now)) {
+                match prior {
+                    Some(prior) => drop(slot.insert(prior)),
+                    None => drop(slot.remove()),
+                }
+            }
+        }
+    }
+
     /// Replace `frame.consent_envelope` with the one the sender's declaration implies (or none)
     /// and pin that declaration to the frame for the gate. Whatever a guest supplied is
     /// discarded. The granter is `frame.from`, bound by the caller to the authenticated sender

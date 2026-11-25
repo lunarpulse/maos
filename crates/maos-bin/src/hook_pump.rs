@@ -1415,6 +1415,13 @@ impl ConsolidationWatchdog {
     }
 }
 
+/// Dropped without `shutdown` (a panic or early return), the loop still stops.
+impl Drop for ConsolidationWatchdog {
+    fn drop(&mut self) {
+        self.cancel.cancel();
+    }
+}
+
 async fn consolidate_once(
     shared: &Arc<Shared>,
     cadence: ConsolidationCadence,

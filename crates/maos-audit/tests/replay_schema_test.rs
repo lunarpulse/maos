@@ -182,58 +182,132 @@ fn replay_trace_shape_validates_against_schema() {
     validate_trace_shape(&val).expect("trace-shape must validate against trace-shape.schema.json");
 }
 
+const REPLAY_BUNDLE: &str = "two-process-test-bundle";
+
+/// Copy the pristine bundle directory (DB plus any sealed segments) into a
+/// fresh temp dir so every replay opens an untouched log.
+///
+/// Opening the log leaves a `-wal` file beside it, and `query_with_redaction`
+/// refuses a log with an active WAL (ADR-028 D6), so replays must not share
+/// one directory.
+fn pristine_copy(db_path: &std::path::Path) -> (TempDir, std::path::PathBuf) {
+    fn copy_dir(src: &std::path::Path, dst: &std::path::Path) {
+        std::fs::create_dir_all(dst).unwrap();
+        for entry in std::fs::read_dir(src).unwrap() {
+            let entry = entry.unwrap();
+            let target = dst.join(entry.file_name());
+            if entry.file_type().unwrap().is_dir() {
+                copy_dir(&entry.path(), &target);
+            } else {
+                std::fs::copy(entry.path(), &target).unwrap();
+            }
+        }
+    }
+    let copy = TempDir::new().unwrap();
+    copy_dir(db_path.parent().unwrap(), copy.path());
+    let copied_db = copy.path().join(db_path.file_name().unwrap());
+    (copy, copied_db)
+}
+
+/// Run `replay_worker` in a fresh OS process of this very test binary.
+///
+/// The worker's canonical bytes travel through the file `out`, never through
+/// libtest's stdout (which carries timing). `--exact` makes the filter select
+/// exactly the `replay_worker` test. Returns the child's exit success.
+fn run_replay_worker(db_path: &std::path::Path, out: &std::path::Path, set_db: bool) -> bool {
+    let exe = std::env::current_exe().unwrap();
+    let mut cmd = std::process::Command::new(exe);
+    cmd.args([
+        "--exact",
+        "replay_worker",
+        "--nocapture",
+        "--test-threads=1",
+    ])
+    .env("MAOS_REPLAY_INPUT", REPLAY_BUNDLE)
+    .env("MAOS_REPLAY_OUT", out)
+    .env_remove("MAOS_REPLAY_DB")
+    .stdout(std::process::Stdio::null())
+    .stderr(std::process::Stdio::piped());
+    if set_db {
+        cmd.env("MAOS_REPLAY_DB", db_path);
+    }
+    let output = cmd.output().expect("spawn replay worker");
+    if !output.status.success() {
+        eprintln!(
+            "replay worker failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    output.status.success()
+}
+
 /// Spawn two OS processes and assert each produces the same replay bytes.
 ///
 /// HashMap iteration order is stable within a process but NOT across processes,
 /// so this is the binding determinism gate required by ADR-028 D6.
+///
+/// The compared bytes are the worker's canonical replay bytes (written to a
+/// file), not libtest output. They must be non-empty and equal to an
+/// in-process replay of the same bundle, so the test cannot pass vacuously.
 #[test]
 fn replay_determinism_two_process_byte_identical() {
     let (_dir, db_path) = setup_test_db();
+    let out_dir = TempDir::new().unwrap();
+    let out1 = out_dir.path().join("replay-out-1.bin");
+    let out2 = out_dir.path().join("replay-out-2.bin");
 
-    let exe = std::env::current_exe().unwrap();
-    let child1 = std::process::Command::new(&exe)
-        .arg("replay_worker")
-        .arg(&db_path)
-        .env("MAOS_REPLAY_INPUT", "two-process-test-bundle")
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .expect("spawn replay worker 1");
-    let child2 = std::process::Command::new(&exe)
-        .arg("replay_worker")
-        .arg(&db_path)
-        .env("MAOS_REPLAY_INPUT", "two-process-test-bundle")
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .expect("spawn replay worker 2");
+    // A harness-style run (no MAOS_REPLAY_DB) must be a no-op: no output file.
+    let noop_out = out_dir.path().join("replay-out-noop.bin");
+    assert!(
+        run_replay_worker(&db_path, &noop_out, false),
+        "replay_worker without MAOS_REPLAY_DB must succeed as a no-op"
+    );
+    assert!(
+        !noop_out.exists(),
+        "replay_worker without MAOS_REPLAY_DB must not write output"
+    );
 
-    let out1 = child1.wait_with_output().expect("worker 1 output");
-    let out2 = child2.wait_with_output().expect("worker 2 output");
+    let (_copy1, db1) = pristine_copy(&db_path);
+    assert!(run_replay_worker(&db1, &out1, true), "worker 1 failed");
+    let (_copy2, db2) = pristine_copy(&db_path);
+    assert!(run_replay_worker(&db2, &out2, true), "worker 2 failed");
 
-    if !out1.status.success() {
-        panic!("worker 1 failed: {}", String::from_utf8_lossy(&out1.stderr));
-    }
-    if !out2.status.success() {
-        panic!("worker 2 failed: {}", String::from_utf8_lossy(&out2.stderr));
-    }
+    let bytes1 = std::fs::read(&out1).expect("worker 1 must write canonical bytes");
+    let bytes2 = std::fs::read(&out2).expect("worker 2 must write canonical bytes");
 
+    assert!(
+        !bytes1.is_empty(),
+        "worker 1 replay bytes must be non-empty"
+    );
     assert_eq!(
-        out1.stdout, out2.stdout,
+        bytes1, bytes2,
         "two OS-process replays of the same bundle must produce byte-identical output"
+    );
+
+    let (_copy, copy_db) = pristine_copy(&db_path);
+    let entries =
+        maos_audit::query_with_redaction(&copy_db, maos_audit::AuditFilter::default()).unwrap();
+    let shape = maos_audit::replay::replay(&entries, REPLAY_BUNDLE.as_bytes()).unwrap();
+    let in_process = maos_audit::replay::runner::replay_to_canonical_bytes(&shape).unwrap();
+    assert_eq!(
+        bytes1, in_process,
+        "worker output must equal the in-process canonical replay bytes"
     );
 }
 
 /// Worker entry point used by `replay_determinism_two_process_byte_identical`.
 ///
-/// When invoked directly by the test harness this is a no-op. When invoked from
-/// the two-process test (via `current_exe() --exact replay_worker` with the
-/// worker env vars set), it replays the TL and writes canonical bytes to stdout.
+/// When run by the normal harness (no `MAOS_REPLAY_DB`) this is a no-op. When
+/// spawned by the two-process test (`--exact replay_worker` with
+/// `MAOS_REPLAY_DB`, `MAOS_REPLAY_INPUT`, `MAOS_REPLAY_OUT` set), it replays
+/// the TL and writes the canonical bytes to the file named by `MAOS_REPLAY_OUT`.
 #[test]
 fn replay_worker() {
     let Ok(db_path) = std::env::var("MAOS_REPLAY_DB") else {
         return; // normal harness run: nothing to do
     };
+    let out_path =
+        std::env::var("MAOS_REPLAY_OUT").expect("MAOS_REPLAY_OUT must accompany MAOS_REPLAY_DB");
     let input = std::env::var("MAOS_REPLAY_INPUT").unwrap_or_default();
     let entries = maos_audit::query_with_redaction(
         std::path::Path::new(&db_path),
@@ -242,7 +316,7 @@ fn replay_worker() {
     .unwrap();
     let shape = maos_audit::replay::replay(&entries, input.as_bytes()).unwrap();
     let bytes = maos_audit::replay::runner::replay_to_canonical_bytes(&shape).unwrap();
-    std::io::Write::write_all(&mut std::io::stdout(), &bytes).unwrap();
+    std::fs::write(&out_path, &bytes).unwrap();
 }
 
 #[test]

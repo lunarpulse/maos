@@ -60,6 +60,14 @@ impl InstalledSpirits {
                     continue;
                 }
             };
+            if let Err(refusal) = check_pin(&name, &publisher, deps.transparency_log) {
+                eprintln!(
+                    "maos: installed spirit '{name}' refused at boot: {} ({refusal})",
+                    refusal.code()
+                );
+                result.refusals.insert(name, refusal);
+                continue;
+            }
             let admission = async {
                 // Registry installs never introduce compiled-in first-party classes.
                 let mut gated = crate::admission::gate_manifest(&text, &|_| false)?;
@@ -265,6 +273,36 @@ impl InstalledSpirits {
     }
 }
 
+/// Story 22-9 (D-22-9-11 A) — the verified package's publisher must be the durable pin's; a
+/// mismatch (or an unreadable pin) refuses this Spirit and journals it, an absent pin (an
+/// install made before pins) admits and says so.
+fn check_pin(
+    name: &str,
+    publisher: &[u8; 32],
+    tl: &maos_kernel_core::iac::TransparencyLogAdapter,
+) -> Result<(), AdmissionRefusal> {
+    let note = |admitted: bool, text: &str| {
+        crate::admission::emit_vetter_key_event(tl, name, "unknown", admitted, "N/A", text)
+    };
+    match maos_registry::storage::LocalFsRegistryStorage::default_installed_publisher(name) {
+        Ok(Some(pin)) if pin == *publisher => Ok(()),
+        Ok(None) => {
+            note(
+                true,
+                "installed_publisher_pin_absent: install predates pins",
+            );
+            Ok(())
+        }
+        outcome => {
+            let detail = match outcome {
+                Err(error) => format!("the durable publisher pin is unreadable: {error}"),
+                _ => "the package publisher differs from the durable pin".to_string(),
+            };
+            note(false, &format!("installed_publisher_mismatch: {detail}"));
+            Err(AdmissionRefusal::InstalledPublisherMismatch { detail })
+        }
+    }
+}
 /// An orderly supervisor stop (the shell left) is an end, not a refusal.
 #[cfg(feature = "wasm-host")]
 fn session_end(error: &crate::spirit_session::SessionError) -> &'static str {

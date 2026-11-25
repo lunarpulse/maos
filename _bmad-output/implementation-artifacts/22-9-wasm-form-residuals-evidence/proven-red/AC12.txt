@@ -1,0 +1,10 @@
+AC12 plant: crates/maos-kernel-core/src/hot_swap/coordinator.rs: the swap-invariant refusal disabled ('dropped.filter(|_| false)'). Command: cargo nextest run --locked -p maos-bin --test spawned_swap_20_9 -E 'test(a_spawned_successor_that_drops_a_swap_invariant_is_refused_typed_and_the_predecessor_keeps_serving)'. Result: FAILS (the swap succeeds). Plant reverted.
+
+        FAIL [   0.938s] (1/1) maos-bin::spawned_swap_20_9 a_spawned_successor_that_drops_a_swap_invariant_is_refused_typed_and_the_predecessor_keeps_serving
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.93s
+    thread 'a_spawned_successor_that_drops_a_swap_invariant_is_refused_typed_and_the_predecessor_keeps_serving' (690100) panicked at crates/maos-bin/tests/spawned_swap_20_9.rs:1401:10:
+    the successor drops a declared invariant: ()
+     Summary [   0.938s] 1 test run: 0 passed, 1 failed, 29 skipped
+        FAIL [   0.938s] (1/1) maos-bin::spawned_swap_20_9 a_spawned_successor_that_drops_a_swap_invariant_is_refused_typed_and_the_predecessor_keeps_serving
+error: test run failed
+rc=100

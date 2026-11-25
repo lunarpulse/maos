@@ -13,6 +13,7 @@ review_status: machine
 
 | 버전 | 상태 | 설명 |
 |---------|--------|-------------|
+| [v9](./v9) | 제안 중(Story 22-9) | `[consent]` 스키마 하한과 수신자 명단 검사. |
 | [v8](./v8) | **최신 비준 버전** | 명시적 텔레메트리 구독(Story 21-9). |
 | [v7](./v7) | 지원(N-1) | FR8 manifest 선언(Story 20-8). |
 | [v6](./v6) | 지원 | Native `skill.author.self` 선언(Story 18-7). |
@@ -24,9 +25,9 @@ review_status: machine
 
 ## 버전 정책
 
-스키마 8 kernel은 설정된 지원 범위 안에서 스키마 버전을 검사합니다.
+스키마 9 kernel은 설정된 지원 범위 안에서 스키마 버전을 검사합니다.
 
-- **지원 범위:** `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`, 현재 `1..=8`.
+- **지원 범위:** `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`, 현재 `1..=9`.
 - **`MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` 미만:** 어드미션 시점에 `EAbiTooOld`로 거부됩니다.
 - **`MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION` 초과:** 어드미션 시점에 `EAbiTooNew`로 거부됩니다.
 
@@ -37,7 +38,7 @@ review_status: machine
 권위 있는 버전 상수는 `crates/maos-spirit-abi/src/lib.rs`에 있습니다:
 
 ```rust
-pub const MANIFEST_SCHEMA_VERSION: u32 = 8;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 9;
 pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1;
 pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = MANIFEST_SCHEMA_VERSION;
 ```
@@ -46,4 +47,4 @@ pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = MANIFEST_SCHEMA_VERSION;
 
 ## 최신
 
-최신 비준 스키마는 **[v8](./v8)**입니다. 적용하기 전에 대상 kernel 버전을 확인하세요.
+최신 비준 스키마는 **[v8](./v8)**입니다. 스키마 [v9](./v9)는 제안 중(Story 22-9)이며 운영자 비준을 기다립니다. 적용하기 전에 대상 kernel 버전을 확인하세요.

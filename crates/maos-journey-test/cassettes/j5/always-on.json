@@ -1,0 +1,43 @@
+{
+  "schema_version": "maos.journey.cassette/v1",
+  "provenance": "seed",
+  "recorded_at": "2026-11-23T00:00:00Z",
+  "model_id": "agent-authored",
+  "spirit_id": "mira",
+  "session": "always-on",
+  "entries": [
+    {
+      "sequence": 0,
+      "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "prompt_len": 0,
+      "response": {
+        "text": "{\"subject\":\"payments-api\",\"metric\":\"error_rate\",\"observed\":0.42,\"baseline\":0.02,\"detail\":\"5xx rate on payments-api since the 14:02 deploy\",\"source_log_ref\":\"incident-feed:payments-api:1\"}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 120, "output_tokens": 60},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j5/always-on", "model_id": "agent-authored"}
+      }
+    },
+    {
+      "sequence": 1,
+      "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "prompt_len": 0,
+      "response": {
+        "text": "Add a bounded retry with backoff around the payments-api call path and alert on recurrence.",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 150, "output_tokens": 30},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j5/always-on", "model_id": "agent-authored"}
+      }
+    },
+    {
+      "sequence": 2,
+      "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "prompt_len": 0,
+      "response": {
+        "text": "Isolate ledger-sync behind a circuit breaker, add a fallback path and instrument the failure mode before widening the rollout.",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 150, "output_tokens": 35},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j5/always-on", "model_id": "agent-authored"}
+      }
+    }
+  ]
+}

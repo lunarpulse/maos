@@ -96,10 +96,11 @@ fn manifest_self_check_is_well_formed() {
             "output_shape must require '{f}'"
         );
     }
-    // Decision I — Mira declares no capabilities (no inference / no MCP).
+    // Story 22-8 (D-22-8-04 A) — Mira declares exactly one capability: the prompt adapter's
+    // `provider.complete` (the diagnosis itself stays deterministic).
     assert_eq!(
-        report.capabilities_required_count, 0,
-        "Mira declares no [capabilities.required] (Decision I)"
+        report.capabilities_required_count, 1,
+        "Mira declares [capabilities.required] provider.complete (Story 22-8)"
     );
     assert!(
         report.warnings.is_empty(),
@@ -125,12 +126,18 @@ fn manifest_sections_parse_with_authoritative_validators() {
     assert_eq!(ep.rules.len(), 1, "one diagnostic-confidence halt rule");
     assert_eq!(ep.rules[0].tag, mira::DIAGNOSTIC_CONFIDENCE_TAG);
 
-    // Decision I — [capabilities] deliberately ABSENT (no inference / no MCP).
+    // Story 22-8 — [capabilities.required] declares the Inference Port and nothing else: no
+    // MCP driver.
     let v = value(MANIFEST);
-    assert!(
-        v.get("capabilities").is_none(),
-        "Mira declares no [capabilities] (Decision I)"
+    let required = &v["capabilities"]["required"];
+    assert_eq!(
+        required["provider"]["complete"],
+        toml::Value::Array(vec![toml::Value::String(
+            "anthropic.claude-haiku-5-5".into()
+        )]),
+        "Mira pins the Butler model for her prompt adapter"
     );
+    assert!(required.get("mcp").is_none(), "Mira uses no MCP driver");
 }
 
 // ── TOML section extraction helpers ──────────────────────────────────────────

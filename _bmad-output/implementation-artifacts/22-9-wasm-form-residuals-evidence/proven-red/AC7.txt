@@ -1,0 +1,13 @@
+AC7 plant: crates/maos-kernel-core/src/scheduler/idle_watchdog.rs: the 'last_fire >= last_inbound' skip disabled ('if false && ...'). Command: cargo nextest run --locked -p maos-kernel-core --test on_idle_substrate -E 'test(idle_fires_once_per_quiescence_until_a_frame_arrives) | test(idle_watchdog_fires_on_idle_after_quiescence)'. Result: idle_fires_once_per_quiescence_until_a_frame_arrives FAILS; the after-quiescence vector passes. Plant reverted.
+
+        PASS [   0.406s] (1/2) maos-kernel-core::on_idle_substrate idle_watchdog_fires_on_idle_after_quiescence
+        FAIL [   0.837s] (2/2) maos-kernel-core::on_idle_substrate idle_fires_once_per_quiescence_until_a_frame_arrives
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.83s
+    thread 'idle_fires_once_per_quiescence_until_a_frame_arrives' (689523) panicked at crates/maos-kernel-core/tests/on_idle_substrate.rs:153:5:
+    assertion `left == right` failed: no frame arrived: `idle` does not fire again
+      left: 1795459397726765961
+     right: 1795459397324353037
+     Summary [   0.838s] 2 tests run: 1 passed, 1 failed, 4 skipped
+        FAIL [   0.837s] (2/2) maos-kernel-core::on_idle_substrate idle_fires_once_per_quiescence_until_a_frame_arrives
+error: test run failed
+rc=100

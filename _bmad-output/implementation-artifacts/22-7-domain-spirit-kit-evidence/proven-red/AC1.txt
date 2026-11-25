@@ -1,0 +1,33 @@
+AC1 plant: examples/incident-triage-ts/src/index.ts: resultText: triage(goal) -> `echo: ${goal}` (marked with the plant tag). (a) npm test: 5 tests FAIL on the result string (output below). (b) domain_spirit_22_7 under the plant, observed red END TO END on this host (see the end of the file: the test fails on the first ask with the echo string instead of the sev1 answer). Host caveat for (b): this host has no systemd and no writable delegated cgroup v2 (non-root, /sys/fs/cgroup is root-owned), so `scripts/run_cgroup_ceiling_17_2.py run --mode delegated` cannot start and the shipped manifest caps (cpu_max_pct, memory_max_mb) cannot be enforced. For the (b) observation ONLY, the two cap lines were removed from examples/incident-triage-ts/manifest.toml (temp tag), the unplanted run passed first (1 passed, 194.43s), then the plant was applied, rebuilt and run (1 failed, 187.45s). Plant and cap removal were both reverted; the files hash as before. The shipped manifest keeps its caps.
+
+      expected 'echo: Customers report data loss afte' to be 'sev1 | rule: data-loss | first step: ' // Object.is equality
+      expected 'echo: Checkout is slow, p99 latency d' to be 'sev2 | rule: degraded-latency | first' // Object.is equality
+      expected 'echo: There is a typo on the pricing ' to be 'sev3 | rule: minor-defect | first ste' // Object.is equality
+      expected 'echo: The cafeteria ran out of oat mi' to be 'sev4 | rule: none | first step: no ru' // Object.is equality
+      expected 'echo: hello' not to contain 'echo'
+ Failed Tests 5 
+ FAIL  tests/triage.test.ts > incident triage guest > answers "Customers report data loss after the migration"
+AssertionError: expected 'echo: Customers report data loss afte' to be 'sev1 | rule: data-loss | first step: ' // Object.is equality
+     43|   ])("answers %j", (goal, expected) => {
+     44|     expect(answer(goal)).toBe(expected);
+ FAIL  tests/triage.test.ts > incident triage guest > answers "Checkout is slow, p99 latency doubled"
+AssertionError: expected 'echo: Checkout is slow, p99 latency d' to be 'sev2 | rule: degraded-latency | first' // Object.is equality
+     43|   ])("answers %j", (goal, expected) => {
+     44|     expect(answer(goal)).toBe(expected);
+ FAIL  tests/triage.test.ts > incident triage guest > answers "There is a typo on the pricing page"
+AssertionError: expected 'echo: There is a typo on the pricing ' to be 'sev3 | rule: minor-defect | first ste' // Object.is equality
+     43|   ])("answers %j", (goal, expected) => {
+     44|     expect(answer(goal)).toBe(expected);
+ FAIL  tests/triage.test.ts > incident triage guest > answers an unknown text with sev4 and says no rule matched
+AssertionError: expected 'echo: The cafeteria ran out of oat mi' to be 'sev4 | rule: none | first step: no ru' // Object.is equality
+
+AC1 (b) end to end. Command (caps removed on this host only, see line 1): MAOS_DOMAIN_COMPONENT=$PWD/examples/incident-triage-ts/dist/spirit.wasm cargo test --locked -p maos-bin --test domain_spirit_22_7 -- --ignored --nocapture
+Unplanted: test the_shipped_domain_spirit_answers_maosctl_ask ... ok; test result: ok. 1 passed; finished in 194.43s.
+Planted (component rebuilt with npm run build && npm run componentize; dist/index.js held the plant):
+test the_shipped_domain_spirit_answers_maosctl_ask ... FAILED
+thread 'the_shipped_domain_spirit_answers_maosctl_ask' panicked at crates/maos-bin/tests/domain_spirit_22_7.rs:215:9:
+assertion `left == right` failed: "Customers report data loss after the migration": {"task_id":"01M84JRM8184RPJME3J04R00T9","spirit_id":"incident-triage-ts","origin":"door","state":"completed",...,"result":"echo: Customers report data loss after the migration",...}
+  left: String("echo: Customers report data loss after the migration")
+ right: "sev1 | rule: data-loss | first step: Freeze writes and page the data on-call."
+test result: FAILED. 0 passed; 1 failed; finished in 187.45s
+Reverted: src/index.ts and manifest.toml hash as before; dist rebuilt from the reverted source (no plant tag in dist/index.js).

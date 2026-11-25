@@ -8,3 +8,14 @@ manifest = "../mira/manifest.toml"
 
 [[topology.spirits]]
 manifest = "../nash/manifest.toml"
+
+# Story 22-8 (D-22-8-07 A) — the operator's ADR-012 consent between the two members, read by the
+# in-process router: Mira may SEND the read-only diagnosis handoff, Nash ACCEPTS it. Nothing else
+# crosses. `j4-mira-nash-deny.toml` is this file with Nash's accept list empty.
+[[topology.a2a_peers]]
+spirit = "mira"
+send_allowlist = ["diagnosis-handoff:read-only-evidence"]
+
+[[topology.a2a_peers]]
+spirit = "nash"
+accept_allowlist = ["diagnosis-handoff:read-only-evidence"]
