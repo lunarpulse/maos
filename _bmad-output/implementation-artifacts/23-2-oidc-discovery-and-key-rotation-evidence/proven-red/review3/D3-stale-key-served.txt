@@ -1,0 +1,15 @@
+Review round 3, Lane D — plant D3 (marker E232-PLANT-r3-D3), removed after the run.
+Env: CARGO_TARGET_DIR=/mnt/build/cargo-maos-e232D
+
+Plant: crates/maos-sso/src/discovery.rs `Shared::cached_key`: the freshness filter
+  .filter(|keys| self.fresh(keys, now))
+replaced by `.filter(|keys| self.fresh(keys, now) || true)` (a key set past its TTL is served).
+
+Commands and results:
+- cargo test -p maos-sso --features discovery --test verify_without_refresh_23_2
+  FAILED. 4 passed; 1 failed: an_expired_key_set_refuses_without_waiting_and_recovers_after_the_refresh
+    verify_without_refresh_23_2.rs:225:5  assertion `left == right` failed
+      left: Ok(AuthenticatedPrincipal { subject: "reza@maos.example", ... })   right: Err(JwksUnavailable)
+- cargo test -p maos-bin --test governed_digest_read_23_2
+  FAILED. 6 passed; 1 failed: a_stale_key_set_refuses_under_the_guard_and_recovers_after_the_refresh
+    governed_digest_read_23_2.rs:533:10  `.expect_err("a stale key set is refused, never served")` — the stale set admitted the request

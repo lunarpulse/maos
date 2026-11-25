@@ -1,0 +1,19 @@
+Review round 3, Lane D — plant D1 (marker E232-PLANT-r3-D1), removed after the run.
+Env: CARGO_TARGET_DIR=/mnt/build/cargo-maos-e232D
+
+Plant: crates/maos-bin/src/worker_spawn.rs, `issue_governed_capability`, branch `IdentityWait::Never`:
+  runtime.verify_principal_for_issuance_no_wait(spirit_pid, &assertion)
+    -> runtime.verify_principal_for_issuance(spirit_pid, &assertion)   // the WAITING verification
+(the digest-admission guard would wait for key discovery, up to the 60 s verify wait of the fixture).
+
+Command: cargo test -p maos-bin --test governed_digest_read_23_2
+Result: FAILED. 4 passed; 3 failed (finished in 60.39s). Failing assertions:
+- an_unknown_kid_is_refused_without_waiting_and_a_retry_after_the_refresh_succeeds
+    governed_digest_read_23_2.rs:430:14  "the admission parked its worker (it waited for discovery): Timeout"
+- a_silent_refresher_parks_no_worker_on_new_ids
+    governed_digest_read_23_2.rs:565:14  "a worker is parked on an identity that cannot be verified: Timeout"
+- a_stale_key_set_refuses_under_the_guard_and_recovers_after_the_refresh
+    governed_digest_read_23_2.rs:221:9   the `await_documents` assertion ("no refresh was requested (N document fetches)"; N not captured)
+  (the waiting path refuses an unhealthy verifier before the refresher is nudged)
+
+Restored; the same command is green (7 passed) without the plant.

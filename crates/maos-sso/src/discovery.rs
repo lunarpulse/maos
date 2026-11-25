@@ -34,10 +34,12 @@
 //! Limits (all fail closed): bodies over [`MAX_BODY_BYTES`], more than [`MAX_KEYS`] keys, a
 //! duplicate `kid` or a URL over [`MAX_URL_BYTES`] refuse the whole refresh and keep the
 //! previous keys until their TTL ends, and so does a MALFORMED entry (not an object naming a
-//! `kty`, a member of the wrong type, an otherwise usable key whose key material does not
-//! load). A VALID entry that is not a usable verification key (no `kid`, a `kid` over
-//! [`MAX_KID_BYTES`], `use` other than `sig`, `key_ops` without `verify` or naming operations
-//! `use` forbids, an `EC` key not on `P-256`, any other `kty`) is skipped; a well-formed set
+//! `kty`; a member of the wrong type; an `RSA` or `EC` entry, usable or not, whose key material
+//! is missing, undecodable, empty, an implausible RSA modulus (outside 1,024 to 8,192 bits) or
+//! a P-256 coordinate that is not 32 bytes, or an `EC` entry without `crv`; a usable key whose
+//! material does not load). A VALID entry that is not a usable verification key (no `kid`, a
+//! `kid` over [`MAX_KID_BYTES`], `use` other than `sig`, `key_ops` without `verify` or naming
+//! operations `use` forbids, an `EC` key not on `P-256`, any other `kty`) is skipped; a well-formed set
 //! with NO usable key (empty, or only such entries) retires the cached keys (the verifier turns
 //! unhealthy): the issuer withdrew them, a documented trade-off.
 
@@ -392,6 +394,39 @@ fn usable(key: &Jwk) -> bool {
         && key.kid.len() <= MAX_KID_BYTES
 }
 
+/// The shortest and longest RSA modulus (bytes) a published key may have: 1,024 to 8,192 bits.
+const RSA_MODULUS_BYTES: std::ops::RangeInclusive<usize> = 128..=1_024;
+
+/// An RFC 7518 `Base64urlUInt` member of a key entry: a string, decodable, not all zero.
+fn uint_member(entry: &serde_json::Value, name: &str) -> Option<Vec<u8>> {
+    let bytes = base64::Engine::decode(
+        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+        entry.get(name)?.as_str()?,
+    )
+    .ok()?;
+    bytes.iter().any(|byte| *byte != 0).then_some(bytes)
+}
+
+/// The key material a recognised family (`RSA`, `EC`) must carry: an RSA modulus of a plausible
+/// size and an exponent that fits a `u64`, or an EC curve name and coordinates (exactly 32 bytes
+/// each on `P-256`). Judged BEFORE the entry is classed usable or not: an entry of a family we
+/// read that lacks its material is malformed, never an ineligible key quietly withdrawn.
+fn material_plausible(kty: &str, entry: &serde_json::Value) -> bool {
+    if kty == "RSA" {
+        return matches!(
+            (uint_member(entry, "n"), uint_member(entry, "e")),
+            (Some(n), Some(e)) if RSA_MODULUS_BYTES.contains(&n.len()) && e.len() <= 8
+        );
+    }
+    let Some(curve) = entry.get("crv").and_then(serde_json::Value::as_str) else {
+        return false;
+    };
+    matches!(
+        (uint_member(entry, "x"), uint_member(entry, "y")),
+        (Some(x), Some(y)) if curve != "P-256" || (x.len() == 32 && y.len() == 32)
+    )
+}
+
 fn parse_key_set(body: &[u8]) -> Result<HashMap<String, Jwk>, DiscoveryError> {
     let set: KeySetBody =
         serde_json::from_slice(body).map_err(|_| DiscoveryError::JwksMalformed)?;
@@ -404,9 +439,16 @@ fn parse_key_set(body: &[u8]) -> Result<HashMap<String, Jwk>, DiscoveryError> {
         let Some(kty) = value.get("kty").and_then(serde_json::Value::as_str) else {
             return Err(DiscoveryError::JwksMalformed);
         };
-        // A valid entry this verifier never uses is skipped (fewer keys is the safe
-        // direction); an ambiguous `kid` refuses the whole set.
-        if !matches!(kty, "RSA" | "EC") || value.get("kid").is_none() {
+        // Another family is valid and never used (fewer keys is the safe direction).
+        if !matches!(kty, "RSA" | "EC") {
+            continue;
+        }
+        if !material_plausible(kty, &value) {
+            return Err(DiscoveryError::JwksMalformed);
+        }
+        // A recognised key without a `kid` cannot be selected: skipped. An ambiguous `kid`
+        // refuses the whole set.
+        if value.get("kid").is_none() {
             continue;
         }
         let key =
@@ -461,6 +503,8 @@ struct State {
     abandoned: Option<u64>,
     /// The wait the most recent waiting `verify` asked for.
     last_wait: Duration,
+    /// Clock milliseconds at which the latest refresh attempt was published.
+    published_at: u64,
 }
 
 struct Shared {
@@ -572,6 +616,9 @@ impl Shared {
             let seen = state.generation;
             let wait = self.config.verify_wait;
             state.last_wait = wait;
+            // One absolute deadline on the verifier's clock: a refresh published at or after it
+            // is not this caller's answer, however late the caller got the lock back.
+            let deadline = now.saturating_add(u64::try_from(wait.as_millis()).unwrap_or(u64::MAX));
             let (guard, wait) = self
                 .refresh_done
                 .wait_timeout_while(state, wait, |state| {
@@ -579,8 +626,10 @@ impl Shared {
                 })
                 .unwrap_or_else(PoisonError::into_inner);
             state = guard;
-            if wait.timed_out() && state.generation == seen {
-                state.stalled = true;
+            if state.generation == seen {
+                state.stalled |= wait.timed_out();
+            } else if state.published_at >= deadline {
+                return None;
             }
         }
     }
@@ -597,6 +646,7 @@ impl Shared {
         started: u64,
     ) -> Result<(HashMap<String, Jwk>, u64), DiscoveryError> {
         let unavailable = || Err(DiscoveryError::DocumentFetch(FetchError::Unavailable));
+        let bound = self.config.fetch_timeout_secs.saturating_mul(1_000);
         let answer: Reply = Arc::new((Mutex::new(Slot::Waiting), Condvar::new()));
         let reply = Sender(Arc::clone(&answer));
         let worker = Arc::clone(self);
@@ -612,6 +662,10 @@ impl Shared {
                     }
                     if first {
                         state.last_attempt = Some(worker.clock.now_millis());
+                    } else if worker.clock.now_millis().saturating_sub(started) >= bound {
+                        // The round is already overdue: whatever the key set says is refused
+                        // when it is consumed, so the request is not made.
+                        return false;
                     }
                     true
                 };
@@ -630,7 +684,6 @@ impl Shared {
             return unavailable();
         }
         let poll = self.config.idle_tick.min(Duration::from_secs(1));
-        let bound = self.config.fetch_timeout_secs.saturating_mul(1_000);
         // An answer is taken only if the worker finished inside the fetch bound: one that
         // finished later is overdue however early the watchdog notices it.
         let settle = |(outcome, completed): Completed| {
@@ -723,6 +776,7 @@ impl Shared {
             }
             state.pending = false;
             state.stalled = false;
+            state.published_at = self.clock.now_millis();
             state.generation += 1;
             self.refresh_done.notify_all();
         }
@@ -793,6 +847,7 @@ impl DiscoveringVerifier {
                 waits: 0,
                 abandoned: None,
                 last_wait: Duration::ZERO,
+                published_at: 0,
             }),
             wake_refresher: Condvar::new(),
             refresh_done: Condvar::new(),
@@ -869,7 +924,9 @@ impl IdentityAssertionPort for DiscoveringVerifier {
     }
 
     /// The only waiting verifier in the tree overrides this: it answers from the fresh cached
-    /// keys against the verifier's own clock and never asks the refresher.
+    /// keys against the verifier's own clock and NEVER waits. A refusal for want of a key
+    /// (unknown `kid`, stale or absent set) fires a non-blocking refresh nudge, so a retry
+    /// after the refresher finished can succeed.
     fn verify_without_refresh(
         &self,
         assertion: &str,
@@ -892,12 +949,42 @@ impl Shared {
     /// Story 23-2 (round 2) — the FRESH cached key for `kid`; never asks the refresher and
     /// never waits (the re-check a lock-holding commit point needs).
     fn cached_key(&self, kid: &str) -> Option<Jwk> {
-        let state = self.lock();
+        let mut state = self.lock();
         let now = self.clock.now_millis();
-        state
+        // The key is COPIED under the state mutex; the signature check runs after the mutex is
+        // released (a few microseconds of RSA/EC work, the same window every verifier has
+        // between reading a key and acting on the verdict). The mutex is never held across it.
+        let found = state
             .keys
             .as_ref()
             .filter(|keys| self.fresh(keys, now))
-            .and_then(|keys| keys.keys.get(kid).cloned())
+            .and_then(|keys| keys.keys.get(kid).cloned());
+        if found.is_none() {
+            // Refused for want of a key (unknown `kid`, or a stale/absent set): nudge, so that
+            // a retry after the refresher finished is answered.
+            self.nudge_refresh_locked(&mut state, now);
+        }
+        found
+    }
+
+    /// Story 23-2 (round 3) — ask the refresher for a refresh WITHOUT waiting: sets the pending
+    /// bit and wakes it, when none is pending and the limiter is open. Called with the state
+    /// lock held; never blocks, never fetches.
+    fn nudge_refresh_locked(&self, state: &mut State, now: u64) {
+        if !state.pending && !state.shutdown && self.limiter_open(state, now) {
+            state.pending = true;
+            self.wake_refresher.notify_one();
+        }
+    }
+}
+
+impl DiscoveringVerifier {
+    /// Story 23-2 (round 3) — a non-blocking refresh nudge: never waits for the refresh and
+    /// never fetches on the caller's thread; the minimum refresh interval still applies.
+    /// [`IdentityAssertionPort::verify_without_refresh`] fires it on every key refusal.
+    pub fn request_refresh(&self) {
+        let mut state = self.shared.lock();
+        let now = self.shared.clock.now_millis();
+        self.shared.nudge_refresh_locked(&mut state, now);
     }
 }

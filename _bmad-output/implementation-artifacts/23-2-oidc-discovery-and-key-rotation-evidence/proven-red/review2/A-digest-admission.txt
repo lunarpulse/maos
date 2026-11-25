@@ -1,3 +1,5 @@
+SUPERSEDED in review round 3 (Lane D): the design, the code and the tests this record plants were REMOVED (single admission guard, non-waiting verification). Nothing below claims anything about the current tree; see review3/D*.txt.
+
 Lane A, review round 2: P1-1 (consent version), P1-2 (stale identity at commit), P1-3 (duplicate off the SSO path)
 Each plant applied ONE AT A TIME, observed red, removed; marker E232-PLANT-r2-<id>. cargo target /mnt/build/cargo-maos-e232a.
 

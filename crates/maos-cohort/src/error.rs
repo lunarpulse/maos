@@ -326,13 +326,6 @@ pub enum CohortError {
     #[error("cohort digest-read capacity exceeded: {0}")]
     EDigestCapacityExceeded(String),
 
-    /// The manifest was reissued between the consent decision a digest admission rests on and
-    /// its commit; nothing was admitted (Story 23-2).
-    #[error(
-        "cohort digest-read admission is stale: decided at manifest v{expected}, now v{current}"
-    )]
-    EDigestAdmissionStale { expected: u64, current: u64 },
-
     #[error("cohort manifest control envelope has an invalid intent, frame kind, or event type")]
     EControlEnvelopeInvalid,
 

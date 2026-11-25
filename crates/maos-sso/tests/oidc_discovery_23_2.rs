@@ -37,6 +37,20 @@ const GATE_SAFETY: Duration = Duration::from_secs(30);
 /// RS256 fixtures (generated offline with `openssl`; no private key is kept).
 const JWKS_KEY_ES256: &str = "{\"keys\":[{\"kty\":\"EC\",\"use\":\"sig\",\"alg\":\"ES256\",\"kid\":\"key-es\",\"crv\":\"P-256\",\"x\":\"5c4IKQSiIVygYoSsDihGEQiPd82EHle2tU1ERiBY0QE\",\"y\":\"8FVQQagaI23r7lhVb7udfDUMZbutEACebVLAejfr6OQ\"}]}";
 const TOKEN_ES256: &str = "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleS1lcyJ9.eyJzdWIiOiJyZXphQG1hb3MuZXhhbXBsZSIsImlzcyI6Imh0dHBzOi8vaWRwLm1hb3MuZXhhbXBsZSIsImF1ZCI6Im1hb3MtZGVwbG95LWFscGhhIiwiZXhwIjo5OTk5OTk5OTk5LCJuYmYiOjAsImlhdCI6MTcwMDAwMDAwMCwibmFtZSI6IlJlemEgQ29ydGV4IiwiZW1haWwiOiJyZXphQG1hb3MuZXhhbXBsZSJ9.SlN3MshXGc-bskFOZFrbLwA24a13kIk2FPo3bcpU8ySNtOazXBwu3syefQ5VWYEXczZpMgd0rKwVL6lU2jikKw";
+/// keyC: a third RSA-2048 key (public half; the private key was discarded), the rotation's
+/// replacement material. The two assertions carry the claims of the RS256 fixtures and are
+/// signed by keyC under `kid` `key-c` and `key-a`.
+const KEY_C_N: &str = "snStwHTA0TkpMorcZpBbTh64v2mdnxZwguZfzqnEQX9DHk7Kvt6Str6XSwtQAEr9_gPgp7ihQcnNC5gUeRRLjwYkxzLLmpheICvnfqxKhrsh1B6061SF-NZhIqPU0H8xyF5AjIv_7kV26zBS5w8332k0XRlDZuj4tY-k2R8ckhCvDxRKj7kIeX12GqOeqjzR_9FiEjcXZ8qWAEEiFoMELJKHQNG3sWcWmdmSJoGt_U--99XcZ7dPMnwUJsukIfosHoSy8u2U_4U_g3iuprMGbLpiP6ThbxD3EYwE95JzzNhD3Ce5iJqCeTPVD3_DG0TDJ_tVF97tvVeYrixNwX7e7Q";
+const TOKEN_KEY_C_NEW: &str = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleS1jIn0.eyJzdWIiOiJyZXphQG1hb3MuZXhhbXBsZSIsImlzcyI6Imh0dHBzOi8vaWRwLm1hb3MuZXhhbXBsZSIsImF1ZCI6Im1hb3MtZGVwbG95LWFscGhhIiwiZXhwIjo5OTk5OTk5OTk5LCJuYmYiOjAsImlhdCI6MTcwMDAwMDAwMCwibmFtZSI6IlJlemEgQ29ydGV4IiwiZW1haWwiOiJyZXphQG1hb3MuZXhhbXBsZSJ9.iJXmeC_-BIMx7_DMWuwstoilfj3DA-aLcKLORWZ6fqSHRUSsuQA5x0bn1HLJB0DccjMevcSNswVNg2n_fZGGB7d-mWnXGLekOVbjUh-RP1eL4sdVSL6y71VbcGTTow98d9ATD79kVjF6eeycbSHGOcuwls_m8mJhdscgB70dHtM5x8YwNyNXS5vZnhVacFpqJDajAkiWjnzFuiQH4-phkUkbVYdta6n9orAkDHvt-kfrihzj0w9Hf2L-3l1WjFldHDy-xPhWrTtZ0gFssMDwJMgBLW3zHYKbY0MwB5niqRg4wMpw2N23auZLpOGBbPAWmycZTxJO9FWCgrDz1Ooqzw";
+const TOKEN_KEY_C_AS_KEY_A: &str = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleS1hIn0.eyJzdWIiOiJyZXphQG1hb3MuZXhhbXBsZSIsImlzcyI6Imh0dHBzOi8vaWRwLm1hb3MuZXhhbXBsZSIsImF1ZCI6Im1hb3MtZGVwbG95LWFscGhhIiwiZXhwIjo5OTk5OTk5OTk5LCJuYmYiOjAsImlhdCI6MTcwMDAwMDAwMCwibmFtZSI6IlJlemEgQ29ydGV4IiwiZW1haWwiOiJyZXphQG1hb3MuZXhhbXBsZSJ9.ImsJtYB9JOGfRx6pKX-6ODWa-ZFIl4DW4n4ATUKwU32rx8tSUPrYzPk887COFdl_9bF4cenGeNIQBMXZGtkgxJfZQDfQ7EGgUJpbayAfcWpmPg18FjZVFTqmSFQX3EzZ3MpVt84zgMtw6WvpfuEINAUeTSV5zuu-yus5QRGWkEKgXL5hlHzrFE3JxSvV0NAXQconjMQNPQQ6B15bLfZQJCH2NRfbpZq9uQvW6-UEoYizcBxretZvCqeVdnL7OdP7zaNA5bePbmcRS8ZmYRljZpoaj1wuxEPm50Dqfr8xYro7eorKemQyBS7vCKIsedpZ5S-pm7-xxeuI2rMaPqlKTA";
+
+/// A key set holding only keyC under `kid`.
+fn jwks_key_c(kid: &str) -> String {
+    format!(
+        "{{\"keys\":[{{\"kty\":\"RSA\",\"use\":\"sig\",\"alg\":\"RS256\",\"kid\":\"{kid}\",\"n\":\"{KEY_C_N}\",\"e\":\"AQAB\"}}]}}"
+    )
+}
+
 /// A clock the test sets by hand; it reads in milliseconds so sub-second limits are testable.
 struct ManualClock(AtomicU64);
 
@@ -260,33 +274,81 @@ fn a_published_key_verifies_through_discovery() {
     assert_eq!(script.count(JWKS_URL), 1);
 }
 
-/// AC1 b) an unknown `kid` causes exactly one more fetch, then verifies.
+/// AC1 b) an unknown `kid` causes exactly one more fetch, then verifies. The rotated-in key is
+/// DIFFERENT key material (keyC; keyA is retired), so an assertion signed by keyC verifies only if
+/// the replacement key was really loaded, and the retired key is refused afterwards.
 #[test]
 fn an_unknown_kid_refreshes_once_and_then_verifies() {
     let script = Arc::new(Script::default());
     script.serve(DOC_URL, &document(fixtures::ISS_GOOD, JWKS_URL));
-    script.serve(JWKS_URL, &old_keys());
+    script.serve(JWKS_URL, fixtures::JWKS_KEY_A);
     let clock = ManualClock::new();
     let verifier = start(&script, &clock, LONG_WAIT);
-    // Joins the boot fetch: the published set holds only `old-key`.
+    // Joins the boot fetch: the published set holds only keyA's `key-a`.
     assert_eq!(
-        verifier.verify(fixtures::TOKEN_GOOD_RS256),
+        verifier.verify(TOKEN_KEY_C_NEW),
         Err(IdentityError::JwksUnavailable)
     );
+    assert!(verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok());
     assert_eq!(script.count(DOC_URL), 1);
 
-    // The IdP rotates; the clock passes the limiter.
-    script.serve(JWKS_URL, &rotated_keys());
+    // The IdP rotates to a different key under a new `kid`; the clock passes the limiter.
+    script.serve(JWKS_URL, &jwks_key_c("key-c"));
     clock.set(31);
     let principal = verifier
-        .verify(fixtures::TOKEN_UNKNOWN_KID)
+        .verify(TOKEN_KEY_C_NEW)
         .expect("the rotated-in key verifies without a restart");
     assert_eq!(principal.subject, fixtures::PRINCIPAL_SUB);
     assert_eq!(script.count(DOC_URL), 2, "exactly one refresh");
     assert_eq!(script.count(JWKS_URL), 2);
-    // The cached keys now answer without another fetch.
-    assert!(verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok());
+    // The retired key is refused, and the cached keys answer without another fetch.
+    assert_eq!(
+        verifier.verify(fixtures::TOKEN_GOOD_RS256),
+        Err(IdentityError::JwksUnavailable),
+        "the retired key is not served after the rotation"
+    );
+    assert!(verifier.verify(TOKEN_KEY_C_NEW).is_ok());
     assert_eq!(script.count(DOC_URL), 2);
+}
+
+/// AC1 b) a replacement key under the SAME `kid` replaces the material too: keyC's assertion
+/// verifies as `key-a` and keyA's, signed by the retired material, is refused.
+#[test]
+fn a_replacement_key_under_the_same_kid_replaces_the_material() {
+    let script = healthy_script();
+    let clock = ManualClock::new();
+    let verifier = DiscoveringVerifier::start(
+        DiscoveryConfig::new(fixtures::ISS_GOOD)
+            .with_ttl_secs(100)
+            .with_verify_wait(LONG_WAIT)
+            .with_idle_tick(Duration::from_millis(5)),
+        &[OidcAlgorithm::Rs256],
+        &[fixtures::ISS_GOOD],
+        fixtures::AUD_EXPECTED,
+        Arc::clone(&script) as Arc<dyn Fetcher>,
+        Arc::clone(&clock) as Arc<dyn Clock>,
+    )
+    .unwrap();
+    assert!(verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok());
+    assert_eq!(
+        verifier.verify(TOKEN_KEY_C_AS_KEY_A),
+        Err(IdentityError::SignatureInvalid),
+        "keyC's signature does not verify under keyA's material"
+    );
+    script.serve(JWKS_URL, &jwks_key_c("key-a"));
+    clock.set(50); // half the TTL: the idle refresher refreshes by itself
+    eventually("the refresher replaced the key set", || {
+        verifier.completed_refreshes() >= 2
+    });
+    assert!(
+        verifier.verify(TOKEN_KEY_C_AS_KEY_A).is_ok(),
+        "the replacement material verifies"
+    );
+    assert_eq!(
+        verifier.verify(fixtures::TOKEN_GOOD_RS256),
+        Err(IdentityError::SignatureInvalid),
+        "the retired material no longer verifies"
+    );
 }
 
 /// AC1 c) the limiter: a second unknown `kid` inside the minimum interval
@@ -1019,20 +1081,24 @@ fn jwks_key_ops_sign_only() -> String {
 /// and an entry declaring one key family while carrying the other's material load nothing.
 #[test]
 fn keys_that_may_not_verify_or_declare_the_wrong_family_load_nothing() {
-    let ec_with_rsa_material = fixtures::JWKS_KEY_A.replace("\"kty\":\"RSA\"", "\"kty\":\"EC\"");
     let ec_p384 = JWKS_KEY_ES256.replace("\"crv\":\"P-256\"", "\"crv\":\"P-384\"");
-    let ec_no_curve = JWKS_KEY_ES256.replace("\"crv\":\"P-256\",", "");
-    for body in [
-        jwks_key_ops_sign_only(),
-        ec_with_rsa_material,
-        ec_p384,
-        ec_no_curve,
-    ] {
+    // A well-formed entry that may not verify, or is not a P-256 key, is skipped: no usable key.
+    for body in [jwks_key_ops_sign_only(), ec_p384] {
         let script = Arc::new(Script::default());
         script.serve(DOC_URL, &document(fixtures::ISS_GOOD, JWKS_URL));
         script.serve(JWKS_URL, &body);
         let verifier = start(&script, &ManualClock::new(), LONG_WAIT);
         assert_refused(&verifier, DiscoveryError::NoUsableKeys);
+    }
+    // An `EC` entry without its curve, or one carrying RSA material, is malformed.
+    let ec_with_rsa_material = fixtures::JWKS_KEY_A.replace("\"kty\":\"RSA\"", "\"kty\":\"EC\"");
+    let ec_no_curve = JWKS_KEY_ES256.replace("\"crv\":\"P-256\",", "");
+    for body in [ec_with_rsa_material, ec_no_curve] {
+        let script = Arc::new(Script::default());
+        script.serve(DOC_URL, &document(fixtures::ISS_GOOD, JWKS_URL));
+        script.serve(JWKS_URL, &body);
+        let verifier = start(&script, &ManualClock::new(), LONG_WAIT);
+        assert_refused(&verifier, DiscoveryError::JwksMalformed);
     }
     // A key that declares `verify` among other operations is still a verification key.
     let both = fixtures::JWKS_KEY_A.replace(
@@ -1475,36 +1541,168 @@ fn at_most_one_abandoned_fetch_worker_exists_at_a_time() {
     assert!(verifier.is_healthy());
 }
 
-/// Advances the clock when the document is requested, as if the answer took that long.
-struct Advancing {
-    inner: Arc<Script>,
-    clock: Arc<ManualClock>,
-    to_millis: u64,
+/// P2-7: a round that is already overdue when its document returns does not start the key-set
+/// request, even while an earlier worker still occupies the one abandoned slot (so the watchdog
+/// cannot abandon this round). Gated: fetch #1 is abandoned, fetch #2 begins, the clock crosses
+/// fetch #2's bound while its document is held, then the document is released.
+#[test]
+fn an_overdue_round_does_not_start_the_key_set_request() {
+    let script = healthy_script();
+    let (hung, entries) = hung_fetcher(&script, false, None);
+    let clock = ManualClock::new();
+    let verifier = DiscoveringVerifier::start(
+        DiscoveryConfig::new(fixtures::ISS_GOOD)
+            .with_min_refresh_secs(100)
+            .with_verify_wait(Duration::from_millis(50))
+            .with_idle_tick(Duration::from_millis(5)),
+        &[OidcAlgorithm::Rs256],
+        &[fixtures::ISS_GOOD],
+        fixtures::AUD_EXPECTED,
+        Arc::clone(&hung) as Arc<dyn Fetcher>,
+        Arc::clone(&clock) as Arc<dyn Clock>,
+    )
+    .unwrap();
+    entries
+        .recv_timeout(EVENT_BUDGET)
+        .expect("fetch #1 entered");
+    clock.set(31);
+    eventually("fetch #1 was abandoned", || {
+        verifier.abandoned_fetches() == 1
+    });
+    clock.set(100); // the refresh interval (100 s) opens: fetch #2 begins
+    entries
+        .recv_timeout(EVENT_BUDGET)
+        .expect("fetch #2 entered");
+    // Fetch #2 began at 100 s; its bound passes while its document is held, and the abandoned
+    // slot is taken, so only the per-request admission can stop it.
+    clock.set(131);
+    hung.gates[1].release();
+    eventually("fetch #2 finished", || verifier.completed_refreshes() >= 2);
+    assert_eq!(
+        script.count(JWKS_URL),
+        0,
+        "an overdue round made the key-set request"
+    );
+    assert_eq!(verifier.last_error(), Some(DiscoveryError::FetchAbandoned));
+    assert!(!verifier.is_healthy());
+    hung.gates[0].release();
+    eventually("the abandoned worker returned", || {
+        verifier.abandoned_fetches() == 0
+    });
 }
 
-impl Fetcher for Advancing {
-    fn get(&self, url: &str) -> Result<Vec<u8>, FetchError> {
-        if url == DOC_URL {
-            self.clock.set_millis(self.to_millis);
+/// P2-8: a refresh published after the waiter's own deadline is not accepted by that waiter,
+/// however late the waiter gets the lock back. No scheduler timeout is involved: the waiter is
+/// parked, the injected clock crosses its deadline, and only then is the document released.
+#[test]
+fn a_refresh_published_after_the_waiters_deadline_is_not_accepted() {
+    let script = Arc::new(Script::default());
+    script.serve(DOC_URL, &document(fixtures::ISS_GOOD, JWKS_URL));
+    script.serve(JWKS_URL, &old_keys());
+    let clock = ManualClock::new();
+    let verifier = DiscoveringVerifier::start(
+        DiscoveryConfig::new(fixtures::ISS_GOOD)
+            .with_fetch_timeout_secs(300)
+            .with_verify_wait(LONG_WAIT)
+            .with_idle_tick(Duration::from_secs(3_600)),
+        &[OidcAlgorithm::Rs256],
+        &[fixtures::ISS_GOOD],
+        fixtures::AUD_EXPECTED,
+        Arc::clone(&script) as Arc<dyn Fetcher>,
+        Arc::clone(&clock) as Arc<dyn Clock>,
+    )
+    .unwrap();
+    // Joins the boot fetch: only `old-key` is published.
+    assert_eq!(
+        verifier.verify(fixtures::TOKEN_UNKNOWN_KID),
+        Err(IdentityError::JwksUnavailable)
+    );
+    let gate = Arc::new(Gate::default());
+    *script.gate_on_document.lock().unwrap() = Some(Arc::clone(&gate));
+    script.serve(JWKS_URL, &rotated_keys());
+    clock.set(31);
+    let waits_before = verifier.refresh_waits();
+    let verdict = std::thread::scope(|scope| {
+        let waiter = scope.spawn(|| verifier.verify(fixtures::TOKEN_UNKNOWN_KID));
+        gate.wait_entered();
+        eventually("the waiter is parked", || {
+            verifier.refresh_waits() > waits_before
+        });
+        clock.set(31 + 61); // past the waiter's 60 s deadline (31 s + 60 s)
+        gate.release();
+        waiter.join().unwrap()
+    });
+    assert_eq!(
+        verdict,
+        Err(IdentityError::JwksUnavailable),
+        "a refresh published after the waiter's deadline was accepted"
+    );
+    // The refresh itself was published: the next caller is served from the cache.
+    assert!(verifier.verify(fixtures::TOKEN_UNKNOWN_KID).is_ok());
+}
+
+/// Reads 0 everywhere, except on the fetch worker once the key set has been served: there it
+/// reads `finish`. The watchdog and every other thread never see time pass, so only the
+/// completion stamp can make the answer overdue.
+struct LateClock {
+    served: AtomicBool,
+    finish: u64,
+}
+
+impl Clock for LateClock {
+    fn now_millis(&self) -> u64 {
+        let worker = std::thread::current().name() == Some("maos-sso-jwks-fetch");
+        if worker && self.served.load(Ordering::SeqCst) {
+            self.finish
+        } else {
+            0
         }
-        self.inner.get(url)
     }
 }
 
-/// B1: an answer that completed after the fetch bound is refused when it is consumed, even
-/// though it is already waiting when the watchdog next looks (the idle tick is an hour, so the
-/// watchdog polls once a second of REAL time; the answer is in long before).
+/// Serves from `inner`; once the key set went out, the worker's clock moves to `finish`.
+struct ServesThenAges {
+    inner: Arc<Script>,
+    clock: Arc<LateClock>,
+}
+
+impl Fetcher for ServesThenAges {
+    fn get(&self, url: &str) -> Result<Vec<u8>, FetchError> {
+        let answer = self.inner.get(url);
+        if url == JWKS_URL {
+            self.clock.served.store(true, Ordering::SeqCst);
+        }
+        answer
+    }
+}
+
+/// B1: an answer that completed after the fetch bound is refused when it is consumed. The
+/// worker's completion stamp is the only clock reading that moves (the watchdog reads 0 the
+/// whole time and the answer is in before it looks), so a verifier that does not check the
+/// stamp accepts it.
 #[test]
 fn an_answer_that_completed_after_the_fetch_bound_is_refused() {
     // Completed 1 ms inside the 30 s bound: accepted. At the bound: refused.
     for (finish, accepted) in [(29_999, true), (30_000, false)] {
-        let clock = ManualClock::new();
-        let fetcher = Arc::new(Advancing {
+        let clock = Arc::new(LateClock {
+            served: AtomicBool::new(false),
+            finish,
+        });
+        let fetcher = Arc::new(ServesThenAges {
             inner: healthy_script(),
             clock: Arc::clone(&clock),
-            to_millis: finish,
         });
-        let verifier = start_with(fetcher, &clock, LONG_WAIT);
+        let verifier = DiscoveringVerifier::start(
+            DiscoveryConfig::new(fixtures::ISS_GOOD)
+                .with_verify_wait(LONG_WAIT)
+                .with_idle_tick(Duration::from_secs(3_600)),
+            &[OidcAlgorithm::Rs256],
+            &[fixtures::ISS_GOOD],
+            fixtures::AUD_EXPECTED,
+            fetcher,
+            clock as Arc<dyn Clock>,
+        )
+        .unwrap();
         let verdict = verifier.verify(fixtures::TOKEN_GOOD_RS256);
         if accepted {
             assert!(verdict.is_ok(), "finished at {finish} ms");
@@ -1598,6 +1796,30 @@ fn a_malformed_replacement_key_set_keeps_the_populated_cache() {
         let rotated = rotated_keys();
         format!("{},null]}}", rotated.trim_end_matches("]}"))
     };
+    // Key material that is missing or implausible, in entries that would otherwise be ineligible
+    // (no `kid`, `use` = `enc`) or usable: none may take down the healthy cache.
+    let es_x = "5c4IKQSiIVygYoSsDihGEQiPd82EHle2tU1ERiBY0QE";
+    let es_y = "8FVQQagaI23r7lhVb7udfDUMZbutEACebVLAejfr6OQ";
+    let rsa_bare_no_kid = "{\"keys\":[{\"kty\":\"RSA\"}]}";
+    let rsa_enc_without_material = "{\"keys\":[{\"kty\":\"RSA\",\"use\":\"enc\"}]}";
+    let rsa_empty_components =
+        "{\"keys\":[{\"kty\":\"RSA\",\"use\":\"sig\",\"kid\":\"key-b\",\"n\":\"\",\"e\":\"\"}]}";
+    let rsa_empty_exponent = fixtures::JWKS_KEY_A
+        .replace("key-a", "key-b")
+        .replace("\"e\":\"AQAB\"", "\"e\":\"\"");
+    let rsa_tiny_modulus =
+        "{\"keys\":[{\"kty\":\"RSA\",\"use\":\"sig\",\"kid\":\"key-b\",\"n\":\"AQAB\",\"e\":\"AQAB\"}]}";
+    let rsa_undecodable_exponent = fixtures::JWKS_KEY_A
+        .replace("key-a", "key-b")
+        .replace("\"e\":\"AQAB\"", "\"e\":\"!\"");
+    let rsa_no_kid_no_exponent = fixtures::JWKS_KEY_A
+        .replace("\"kid\":\"key-a\",", "")
+        .replace(",\"e\":\"AQAB\"", "");
+    let ec_no_curve = JWKS_KEY_ES256.replace("\"crv\":\"P-256\",", "");
+    let ec_short_x = JWKS_KEY_ES256.replace(es_x, "AQAB");
+    let ec_empty_y = JWKS_KEY_ES256.replace(es_y, "");
+    let ec_bare_no_kid = "{\"keys\":[{\"kty\":\"EC\",\"crv\":\"P-256\"}]}";
+    let ec_with_rsa_material = fixtures::JWKS_KEY_A.replace("\"kty\":\"RSA\"", "\"kty\":\"EC\"");
     let mut now = 0;
     for body in [
         "{\"keys\":[null]}".to_owned(),
@@ -1607,6 +1829,18 @@ fn a_malformed_replacement_key_set_keeps_the_populated_cache() {
         undecodable_material,
         wrong_type.to_owned(),
         valid_beside_null,
+        rsa_bare_no_kid.to_owned(),
+        rsa_enc_without_material.to_owned(),
+        rsa_empty_components.to_owned(),
+        rsa_empty_exponent,
+        rsa_tiny_modulus.to_owned(),
+        rsa_undecodable_exponent,
+        rsa_no_kid_no_exponent,
+        ec_no_curve,
+        ec_short_x,
+        ec_empty_y,
+        ec_bare_no_kid.to_owned(),
+        ec_with_rsa_material,
     ] {
         now += 31;
         clock.set(now);
@@ -1634,8 +1868,16 @@ fn a_malformed_replacement_key_set_keeps_the_populated_cache() {
 #[test]
 fn a_valid_withdrawal_retires_the_cached_keys() {
     let encryption_only = fixtures::JWKS_KEY_A.replace("\"use\":\"sig\"", "\"use\":\"enc\"");
-    let no_kid = "{\"keys\":[{\"kty\":\"RSA\",\"use\":\"sig\",\"n\":\"AQAB\",\"e\":\"AQAB\"}]}";
-    for body in ["{\"keys\":[]}", encryption_only.as_str(), no_kid] {
+    // Real material, so only the missing `kid` makes it ineligible.
+    let no_kid = fixtures::JWKS_KEY_A.replace("\"kid\":\"key-a\",", "");
+    // A well-formed key on another curve: valid, never used.
+    let ec_p384 = JWKS_KEY_ES256.replace("\"crv\":\"P-256\"", "\"crv\":\"P-384\"");
+    for body in [
+        "{\"keys\":[]}",
+        encryption_only.as_str(),
+        no_kid.as_str(),
+        ec_p384.as_str(),
+    ] {
         let script = healthy_script();
         let clock = ManualClock::new();
         let verifier = start(&script, &clock, LONG_WAIT);

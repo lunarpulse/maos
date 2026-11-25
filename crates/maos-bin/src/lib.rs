@@ -56,8 +56,8 @@ pub mod enterprise_identity;
 pub mod enterprise_pdp_runtime;
 /// Read-only sandbox-anomaly consumer, shared with actual process-boundary proofs.
 pub mod escape_detector_consumer;
-/// Story 13.5a / 23-2 — the governed decorator over the daemon's collective-serve seam; it
-/// resolves the SSO identity before the cohort state's locks are taken.
+/// Story 13.5a / 23-2 — the governed decorator over the daemon's collective-serve seam; its
+/// governance chain runs in the cohort admission guard and never waits on key discovery.
 #[cfg(feature = "network")]
 pub mod governed_digest_read;
 /// Story 22-8 — an unresolved halt survives a restart of the standing cast: the boot-time

@@ -132,25 +132,40 @@ with the provider keys.
 
 ### Enterprise identity (SSO) key sources
 
-`MAOS_SSO_JWKS` (a static JWKS, the air-gap key source) or, with the
-`online-adapters` build, `MAOS_SSO_DISCOVERY_ISSUER` (an https OIDC issuer whose
-rotating keys the Host follows) supplies the verification keys; setting both
-leaves SSO configured-down, which denies issuance and never falls open.
-`MAOS_SSO_ISSUERS` must then hold exactly the discovery issuer.
-`MAOS_SSO_JWKS_TTL_SECS` (default 3600, 1 to 604800) is how long a discovered key
-set is trusted, and `MAOS_SSO_JWKS_MIN_REFRESH_SECS` (default 30, at most the TTL)
-is the minimum time between refreshes. A key the issuer withdrew verifies until the next
-successful refresh and never past the TTL (counted from the completion of the last
-successful fetch: at most 7 days at the maximum TTL, in monotonic time, plus any time the
-host is suspended). Only when refreshes succeed and the minimum refresh is at most half the
-TTL is that about half the TTL plus the idle tick; anyone who can block the fetch (without
-breaking TLS) can keep a withdrawn key valid for the full TTL. A key set that is malformed
-(as opposed to validly empty) keeps the old keys. A fetch that does
-not answer within 30 s is abandoned; an issuer that never answers at all leaves
-discovery down until it does. A `MAOS_SSO_*` variable that is not valid UTF-8
-leaves SSO configured-down (`sso_env_not_unicode: <NAME>`). The principal is
-asserted, not authenticated, at the door. Every variable and typed reason is in
-`docs/runbooks/ent-1-enterprise-daemon-posture.md` in the source tree.
+The SSO key source and its tuning are set with these variables (every variable and typed
+reason is in `docs/runbooks/ent-1-enterprise-daemon-posture.md` in the source tree):
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `MAOS_SSO_JWKS` | yes, unless `MAOS_SSO_DISCOVERY_ISSUER` | a static JWKS document: the air-gap key source |
+| `MAOS_SSO_DISCOVERY_ISSUER` | no (`online-adapters` build) | an https OIDC issuer whose rotating keys the Host follows instead of `MAOS_SSO_JWKS`; setting both leaves SSO configured-down |
+| `MAOS_SSO_JWKS_TTL_SECS` | no, default 3600 (1 to 604800) | how long a discovered key set is trusted; past it assertions fail closed |
+| `MAOS_SSO_JWKS_MIN_REFRESH_SECS` | no, default 30, at most the TTL | minimum time between two refreshes |
+| `MAOS_SSO_ISSUERS` | yes | trusted `iss` values; with discovery it must hold exactly the discovery issuer |
+| `MAOS_SSO_AUDIENCE` | yes | expected `aud` |
+| `MAOS_SSO_ALGS` | no, default `RS256,ES256` | allowed algorithms |
+| `MAOS_SSO_ASSERTION` | yes | the assertion the daemon presents at issuance; a task that carries its own (`maosctl ask --assertion-file`) overrides it for its turn |
+
+Setting both key sources leaves SSO configured-down, which denies issuance and never
+falls open. A key is revoked only by a successful refresh whose published set omits it:
+a fetch can obtain a set that contains the key, the issuer can then withdraw it, and that
+in-flight fetch still completes and renews the key's TTL. A withdrawn key therefore
+verifies until the first successful refresh that returns a set without it, and never past
+the TTL counted from the completion of the last successful fetch whose set contained it
+(at most 7 days at the maximum TTL, in monotonic time, plus any time the host is
+suspended). Half the TTL plus the idle tick is a scheduling target, not a completion
+bound: it needs a refresh to start and succeed and a minimum refresh of at most half the
+TTL, and when the minimum refresh equals the TTL the idle-only path can expire the keys
+(fail closed) before the next fetch completes. Anyone who can block the fetch (without
+breaking TLS) can keep a withdrawn key valid for the full TTL. A key set that is
+malformed (as opposed to validly empty) keeps the old keys. A fetch that does not answer
+within 30 s is abandoned; an issuer that never answers at all leaves discovery down until
+it does. A cohort digest read is verified inside the cohort lock without ever waiting for
+the identity provider, so the first digest request after an IdP key rotation can be
+refused once (the peer retries; the refusal asks the key refresh to run). A `MAOS_SSO_*`
+variable that is not valid UTF-8 leaves SSO configured-down
+(`sso_env_not_unicode: <NAME>`). The principal is asserted, not authenticated, at the
+door.
 
 ### Remove MAOS state
 

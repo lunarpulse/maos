@@ -112,8 +112,7 @@ fn story_13_5a_cohort_daemon_dispatch_threads_the_enterprise_runtime() {
     );
     let seam = block_from(find("fn govern_collective_read("));
     for required in [
-        "recheck_enterprise_principal(",
-        "issue_enterprise_governed_capability_for_principal(",
+        "issue_enterprise_governed_capability_no_wait(",
         "Scope::LoomRead",
         "self.at_rest.seal(",
         "forward_audit_to_siem_once(",
@@ -123,6 +122,12 @@ fn story_13_5a_cohort_daemon_dispatch_threads_the_enterprise_runtime() {
             "the daemon governance seam must run `{required}`:\n{seam}"
         );
     }
+    // Story 23-2: the seam runs inside the cohort admission guard, so it must NEVER use the
+    // waiting mint (a discovery refresh would park the guard).
+    assert!(
+        !seam.contains("issue_enterprise_governed_capability("),
+        "the daemon governance seam must not use the waiting governed mint:\n{seam}"
+    );
 
     // ── 5. Admission reuses the process-wide append-only journal owner. A
     // second independent file cursor can overwrite entries from the first.

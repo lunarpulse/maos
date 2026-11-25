@@ -823,6 +823,61 @@ impl Host {
         found
     }
 
+    /// What the Spirit's GUEST was handed for each task that said `inbound`, oldest first (Story
+    /// 23-2 round 3, P1-10): the probe component reports, as hex, the `Debug` text of the frame
+    /// it received over the session bridge (sender, recipients, kind, intent, payload, origin,
+    /// consent envelope, lineage). The report is read from the authorization row the session
+    /// journals for the probe's emission; it is hex, so no journal redaction can hide a byte the
+    /// guest received. The decoded text is what the bridge delivered, not what was journaled.
+    fn delivered_to_the_spirit(&self) -> Vec<String> {
+        fn reports(value: &serde_json::Value, out: &mut Vec<String>) {
+            match value {
+                serde_json::Value::Object(map) => {
+                    let is_report =
+                        map.get("event_type").and_then(|v| v.as_str()) == Some("recall.probe");
+                    match map.get("data").and_then(|v| v.as_str()) {
+                        Some(data) if is_report => out.push(data.to_owned()),
+                        _ => map.values().for_each(|inner| reports(inner, out)),
+                    }
+                }
+                serde_json::Value::Array(items) => items.iter().for_each(|i| reports(i, out)),
+                _ => {}
+            }
+        }
+        let conn = self.journal();
+        let mut statement = conn
+            .prepare(
+                "SELECT CAST(payload_redacted AS BLOB) FROM transparency_log \
+                 WHERE intent = 'spirit.frame.authorization' ORDER BY rowid",
+            )
+            .unwrap();
+        let bodies: Vec<Vec<u8>> = statement
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        let mut data = Vec::new();
+        for body in bodies {
+            if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&body) {
+                reports(&json, &mut data);
+            }
+        }
+        data.iter()
+            .flat_map(|report| report.lines())
+            .filter_map(|line| line.strip_prefix("inbound "))
+            .map(|groups| {
+                let hex: String = groups.split_whitespace().collect();
+                let bytes: Vec<u8> = (0..hex.len() / 2)
+                    .map(|at| {
+                        u8::from_str_radix(&hex[at * 2..at * 2 + 2], 16)
+                            .unwrap_or_else(|_| panic!("the guest's report is not hex: {hex:?}"))
+                    })
+                    .collect();
+                String::from_utf8(bytes).expect("the guest's report is UTF-8 text")
+            })
+            .collect()
+    }
+
     fn accepted_rows(&self) -> i64 {
         self.count(
             "SELECT COUNT(*) FROM transparency_log WHERE intent LIKE 'task.%:accepted'",
@@ -964,22 +1019,24 @@ fn an_invalid_assertion_is_refused_before_anything_is_queued() {
 
 /// AC3 confidentiality (canary): the carried assertion appears in no Transparency Log row (accept,
 /// `TaskAssign`, reply, terminal, the `operator.ask` receipt), in no task body, no reply, no
-/// error and no stderr; and it never reaches the Spirit: the `TaskAssign` payload is the one an
-/// ask without an assertion produces.
+/// error and no stderr; and it never reaches the Spirit: the probe component reports what its
+/// GUEST was handed over the session bridge (Story 23-2 round 3, P1-10), and that frame is the
+/// one an ask without an assertion produces, with no byte of the token, its header, claims or
+/// signature anywhere in it.
 #[test]
 fn an_asks_assertion_appears_in_no_row_reply_or_error() {
     let mut host = Host::new(false).with_sso();
     host.boot();
     let file = host.assertion_file("alice.jwt", sso::TOKEN_ALICE);
     let parts: Vec<&str> = sso::TOKEN_ALICE.split('.').collect();
-    let words = "identical words for both asks";
+    let words = "inbound";
 
     let with = host.ask(&[words, "--assertion-file", &file]);
     let (shown_with, _) = host.finished(&with);
     let without = host.ask(&[words]);
     let (shown_without, _) = host.finished(&without);
 
-    // The Spirit sees the same TaskAssign either way.
+    // The journal's `TaskAssign` row is the same either way ...
     let payload = |id: &str| -> Vec<u8> {
         let bytes = ulid::Ulid::from_string(id).unwrap().to_bytes();
         host.journal()
@@ -992,6 +1049,31 @@ fn an_asks_assertion_appears_in_no_row_reply_or_error() {
             .unwrap()
     };
     assert_eq!(payload(&with), payload(&without));
+
+    // ... and so is the frame the GUEST received over the bridge, which carries none of the token.
+    let delivered = host.delivered_to_the_spirit();
+    assert_eq!(
+        delivered.len(),
+        2,
+        "the guest reported both frames it was handed: {delivered:?}\n{}",
+        host.stderr()
+    );
+    assert!(
+        delivered
+            .iter()
+            .all(|frame| frame.contains("goal: \"inbound\"")),
+        "the report is the task frame the guest received: {delivered:?}"
+    );
+    assert_eq!(
+        delivered[0], delivered[1],
+        "the guest was handed a different frame for the ask that carried an assertion"
+    );
+    for needle in [sso::TOKEN_ALICE, parts[0], parts[1], parts[2]] {
+        assert!(
+            delivered.iter().all(|frame| !frame.contains(needle)),
+            "a frame delivered to the guest carries the assertion: {delivered:?}"
+        );
+    }
 
     // No row carries the token or either of its secret-bearing segments.
     for needle in [sso::TOKEN_ALICE, parts[1], parts[2]] {

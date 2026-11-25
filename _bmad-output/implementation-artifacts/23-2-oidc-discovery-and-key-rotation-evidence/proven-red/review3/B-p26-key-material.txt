@@ -1,0 +1,16 @@
+Review round 3 / Lane B - P2-6 (validate key material before classifying or publishing)
+Marker: E232-PLANT-r3-p26
+Plant: crates/maos-sso/src/discovery.rs, first statement of material_plausible():
+    if !kty.is_empty() { return true; } // E232-PLANT-r3-p26
+(every RSA/EC entry is treated as having plausible material, i.e. the pre-round-3 behaviour).
+Command: cargo test -p maos-sso --features discovery --test oidc_discovery_23_2
+Result: 2 failed, 37 passed.
+- a_malformed_replacement_key_set_keeps_the_populated_cache:
+  oidc_discovery_23_2.rs:1853  assert_eq!(verifier.last_error(), Some(JwksMalformed), "{body}")
+  body {"keys":[{"kty":"RSA"}]} (no kid, no n, no e): left Some(NoUsableKeys), right Some(JwksMalformed)
+  (the loop also carries: empty n/e, empty e, 4-byte modulus, undecodable e, no-kid/no-e, EC without crv,
+   short x, empty y, bare EC, EC carrying RSA material; it stops at the first failure)
+- keys_that_may_not_verify_or_declare_the_wrong_family_load_nothing:
+  oidc_discovery_23_2.rs:521 (assert_refused) left Some(NoUsableKeys) right Some(JwksMalformed)
+  (EC entry carrying RSA material / EC without crv must be malformed)
+Plant removed afterwards.

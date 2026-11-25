@@ -58,7 +58,7 @@ use maos_bin::enterprise_pdp_runtime;
 use maos_bin::inference_mode::{InferenceModeError, ResolvedInferenceMode};
 #[cfg(feature = "network")]
 use maos_bin::worker_spawn::{
-    issue_enterprise_governed_capability, issue_enterprise_governed_capability_for_principal,
+    issue_enterprise_governed_capability, issue_enterprise_governed_capability_no_wait,
     issue_governed_mcp_capability, parse_run_args, resolve_cli_binary, run_cli_wrapper_manifest,
 };
 
@@ -13043,24 +13043,13 @@ impl EnterpriseDaemonGovernance {
     ///
     /// Fails CLOSED at every stage — the caller turns an `Err` into a NACK, so
     /// an ungovernable collective read is refused, never silently served.
-    fn govern_collective_read(
-        &self,
-        resolved: Option<maos_bin::worker_spawn::ResolvedPrincipal>,
-        requester: &str,
-        request_id: &str,
-    ) -> Result<(), String> {
-        // Inside the cohort locks and without waiting: the identity resolved before them
-        // must still verify from the keys held now (Story 23-2 review round 2).
-        maos_bin::worker_spawn::recheck_enterprise_principal(
-            self.enterprise_runtime.as_deref(),
-            self.spirit_pid,
-            resolved.as_ref(),
-        )?;
-        let token = issue_enterprise_governed_capability_for_principal(
+    fn govern_collective_read(&self, requester: &str, request_id: &str) -> Result<(), String> {
+        // Inside the cohort admission guard: the SSO step never waits on key discovery (an
+        // unknown key id or a stale key set is refused and nudges the refresher, Story 23-2).
+        let token = issue_enterprise_governed_capability_no_wait(
             self.capability.as_ref(),
             self.enterprise_runtime.as_deref(),
             self.enterprise_pdp_runtime.as_ref(),
-            resolved.map(|resolved| resolved.principal),
             self.spirit_pid,
             Scope::LoomRead,
             DAEMON_GOVERNED_READ_TTL_SECS,
@@ -13123,31 +13112,14 @@ impl EnterpriseDaemonGovernance {
 }
 
 /// Story 13.5a — the governed decorator over the daemon's collective-serve seam is
-/// `maos_bin::governed_digest_read::GovernedDigestReadPort`: it resolves the SSO identity
-/// ([`maos_bin::governed_digest_read::CollectiveReadGovernor::resolve`]) BEFORE the cohort state
-/// takes its admitted-read and pending-reply mutexes, then runs `govern_collective_read` inside
-/// the guard (Story 23-2 F4). The inner state atomically rejects malformed, duplicate, and
-/// over-capacity requests before running the guard; only a new admissible request may mint a
-/// capability and publish the reply obligation.
+/// `maos_bin::governed_digest_read::GovernedDigestReadPort`: the inner state atomically rejects
+/// malformed, duplicate, and over-capacity requests before running the guard; only a new
+/// admissible request runs `govern_collective_read` (inside the admission guard, with the
+/// non-waiting SSO verification, Story 23-2) and may publish the reply obligation.
 #[cfg(feature = "network")]
 impl maos_bin::governed_digest_read::CollectiveReadGovernor for EnterpriseDaemonGovernance {
-    type Resolved = Option<maos_bin::worker_spawn::ResolvedPrincipal>;
-
-    fn resolve(&self) -> Result<Self::Resolved, String> {
-        Ok(maos_bin::worker_spawn::resolve_enterprise_principal(
-            self.enterprise_runtime.as_deref(),
-            self.spirit_pid,
-            maos_domain::ports::policy_decision::scope_action_key(&Scope::LoomRead),
-        )?)
-    }
-
-    fn govern(
-        &self,
-        principal: Self::Resolved,
-        requester: &str,
-        request_id: &str,
-    ) -> Result<(), String> {
-        self.govern_collective_read(principal, requester, request_id)
+    fn govern(&self, requester: &str, request_id: &str) -> Result<(), String> {
+        self.govern_collective_read(requester, request_id)
     }
 }
 

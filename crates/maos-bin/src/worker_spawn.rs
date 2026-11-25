@@ -403,66 +403,16 @@ impl From<GovernedMintError> for String {
     }
 }
 
-/// A principal verified by [`resolve_enterprise_principal`], with the assertion it came from
-/// so a lock-holding commit point can re-check it ([`recheck_enterprise_principal`]).
+/// Whether the SSO verification step of a governed mint may wait on key discovery.
 #[cfg(feature = "network")]
-pub struct ResolvedPrincipal {
-    pub principal: maos_domain::ports::AuthenticatedPrincipal,
-    assertion: String,
-}
-
-/// Resolve the SSO principal a mint for `spirit_pid` will be issued under (`Ok(None)` when SSO
-/// is not configured). This is the only step of a governed mint that can WAIT on the identity
-/// provider (a discovery refresh, bounded by `verify_wait`), so a caller that holds a lock for
-/// the commit resolves it BEFORE taking the lock, then calls [`recheck_enterprise_principal`]
-/// and [`issue_enterprise_governed_capability_for_principal`] inside it (Story 23-2 F4).
-#[cfg(feature = "network")]
-pub fn resolve_enterprise_principal(
-    enterprise_runtime: Option<&enterprise_identity::EnterpriseRuntime>,
-    spirit_pid: u32,
-    capability_key: &str,
-) -> Result<Option<ResolvedPrincipal>, GovernedMintError> {
-    match enterprise_runtime {
-        Some(runtime) if runtime.sso_configured() => {
-            let assertion = crate::assertion_supply::supply(spirit_pid).ok_or_else(|| {
-                GovernedMintError::SsoAssertionMissing(format!(
-                    "enterprise SSO is configured but MAOS_SSO_ASSERTION is absent for {capability_key}"
-                ))
-            })?;
-            let principal = runtime
-                .verify_principal_for_issuance(spirit_pid, &assertion)
-                .map_err(|e| GovernedMintError::SsoAssertionMissing(e.to_string()))?;
-            Ok(principal.map(|principal| ResolvedPrincipal {
-                principal,
-                assertion,
-            }))
-        }
-        _ => Ok(None),
-    }
-}
-
-/// Re-check a resolved principal at the commit point, WITHOUT waiting on discovery: the
-/// assertion must still verify from the keys already held (a key retired, a key set expired or
-/// a token expired since resolution refuses) and to the same principal.
-#[cfg(feature = "network")]
-pub fn recheck_enterprise_principal(
-    enterprise_runtime: Option<&enterprise_identity::EnterpriseRuntime>,
-    spirit_pid: u32,
-    resolved: Option<&ResolvedPrincipal>,
-) -> Result<(), GovernedMintError> {
-    let Some(resolved) = resolved else {
-        return Ok(());
-    };
-    let stale = |why: String| GovernedMintError::SsoAssertionMissing(why);
-    let runtime =
-        enterprise_runtime.ok_or_else(|| stale("enterprise runtime vanished".to_string()))?;
-    match runtime
-        .reverify_principal_no_wait(spirit_pid, &resolved.assertion)
-        .map_err(|e| stale(format!("resolved identity is stale at commit: {e}")))?
-    {
-        Some(now) if now == resolved.principal => Ok(()),
-        _ => Err(stale("resolved identity changed before commit".to_string())),
-    }
+#[derive(Clone, Copy)]
+enum IdentityWait {
+    /// The verifier may wait for a refresh, bounded by its own `verify_wait` (every caller that
+    /// holds no lock).
+    Bounded,
+    /// Never wait: an unknown `kid` or a stale key set is refused at once and a non-blocking
+    /// refresh nudge is fired (a caller inside a cohort critical section, Story 23-2).
+    Never,
 }
 
 #[cfg(feature = "network")]
@@ -476,39 +426,81 @@ pub fn issue_enterprise_governed_capability(
     posture_hash: [u8; 32],
     intent_class: IntentClass,
 ) -> Result<CapabilityToken, GovernedMintError> {
-    let principal =
-        resolve_enterprise_principal(enterprise_runtime, spirit_pid, scope_action_key(&scope))?
-            .map(|resolved| resolved.principal);
-    issue_enterprise_governed_capability_for_principal(
+    issue_governed_capability(
         capability,
         enterprise_runtime,
         enterprise_pdp_runtime,
-        principal,
         spirit_pid,
         scope,
         ttl_secs,
         posture_hash,
         intent_class,
+        IdentityWait::Bounded,
     )
 }
 
-/// The governed mint with the principal already resolved by
-/// [`resolve_enterprise_principal`]: PDP, kernel mint and `identity.asserted` persist only, so
-/// it never waits on the identity provider.
+/// [`issue_enterprise_governed_capability`] for a caller that holds a lock across the mint
+/// (the daemon's cohort digest-admission guard): the SSO verification NEVER waits on key
+/// discovery. An unknown `kid` or a stale/expired key set is refused, fail-closed and with the
+/// same generic denial, and fires a non-blocking refresh nudge so that a retry after the
+/// refresher finished succeeds. Everything else is identical.
 #[cfg(feature = "network")]
-#[allow(clippy::too_many_arguments)]
-pub fn issue_enterprise_governed_capability_for_principal(
+pub fn issue_enterprise_governed_capability_no_wait(
     capability: &CapabilityRegistryAdapter,
     enterprise_runtime: Option<&enterprise_identity::EnterpriseRuntime>,
     enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
-    principal: Option<maos_domain::ports::AuthenticatedPrincipal>,
     spirit_pid: u32,
     scope: Scope,
     ttl_secs: u32,
     posture_hash: [u8; 32],
     intent_class: IntentClass,
 ) -> Result<CapabilityToken, GovernedMintError> {
+    issue_governed_capability(
+        capability,
+        enterprise_runtime,
+        enterprise_pdp_runtime,
+        spirit_pid,
+        scope,
+        ttl_secs,
+        posture_hash,
+        intent_class,
+        IdentityWait::Never,
+    )
+}
+
+#[cfg(feature = "network")]
+#[allow(clippy::too_many_arguments)]
+fn issue_governed_capability(
+    capability: &CapabilityRegistryAdapter,
+    enterprise_runtime: Option<&enterprise_identity::EnterpriseRuntime>,
+    enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    spirit_pid: u32,
+    scope: Scope,
+    ttl_secs: u32,
+    posture_hash: [u8; 32],
+    intent_class: IntentClass,
+    wait: IdentityWait,
+) -> Result<CapabilityToken, GovernedMintError> {
     let capability_key = scope_action_key(&scope).to_string();
+    let principal = match enterprise_runtime {
+        Some(runtime) if runtime.sso_configured() => {
+            let assertion = crate::assertion_supply::supply(spirit_pid).ok_or_else(|| {
+                GovernedMintError::SsoAssertionMissing(format!(
+                    "enterprise SSO is configured but MAOS_SSO_ASSERTION is absent for {capability_key}"
+                ))
+            })?;
+            match wait {
+                IdentityWait::Bounded => {
+                    runtime.verify_principal_for_issuance(spirit_pid, &assertion)
+                }
+                IdentityWait::Never => {
+                    runtime.verify_principal_for_issuance_no_wait(spirit_pid, &assertion)
+                }
+            }
+            .map_err(|e| GovernedMintError::SsoAssertionMissing(e.to_string()))?
+        }
+        _ => None,
+    };
     if let Some(pdp) = enterprise_pdp_runtime {
         let principal_attributes = principal.as_ref().map(principal_attributes_for_pdp);
         match pdp

@@ -1,0 +1,13 @@
+Review round 3 / Lane B - P2-8 (a refresh published after the waiter's deadline is not accepted)
+Marker: E232-PLANT-r3-p28
+Plant: crates/maos-sso/src/discovery.rs, key_for post-wait decision:
+    `} else if state.published_at >= deadline {`  became  `} else if false && ... {  // E232-PLANT-r3-p28`
+(the waiter returns to the cache check and accepts a refresh published after its absolute deadline).
+Command: cargo test -p maos-sso --features discovery --test oidc_discovery_23_2
+Result: 1 failed, 38 passed.
+- a_refresh_published_after_the_waiters_deadline_is_not_accepted:
+  oidc_discovery_23_2.rs:1635  assert_eq!(verdict, Err(JwksUnavailable), "a refresh published after the waiter's deadline was accepted")
+  left: Ok(AuthenticatedPrincipal{..}), right: Err(JwksUnavailable)
+No scheduler timeout is involved: the waiter is parked (refresh_waits observed), the injected clock is moved past its
+60 s deadline, and only then is the gated document released.
+Plant removed afterwards.

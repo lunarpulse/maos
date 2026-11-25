@@ -1,42 +1,68 @@
-#![cfg(feature = "network")]
+#![cfg(all(
+    feature = "network",
+    feature = "online-adapters",
+    not(feature = "sso-fault-inject")
+))]
 #![forbid(unsafe_code)]
 
-//! Story 23-2 F4 — resolving the SSO identity never happens under the cohort state's locks.
+//! Story 23-2 (round 3) — the governed digest-read decorator has ONE linearization point and
+//! never waits for key discovery inside the cohort critical section.
 //!
 //! The REAL `CohortManifestState` takes its admitted-read and pending-reply mutexes around the
-//! governance guard. The governed decorator must resolve the identity (which can wait on an OIDC
-//! key refresh) before entering it, so an identity provider that never answers stalls only the
-//! intake worker that asked, never a second worker.
+//! governance guard; the guard runs the REAL governed mint wrapper
+//! (`issue_enterprise_governed_capability_no_wait`) against a REAL discovering verifier whose
+//! fetcher is held behind a gate (an identity provider that never answers) and a manual clock.
+//! No test waits on a refresh inside the guard: every admission call runs on its own thread and
+//! a call that has not returned at the safety bound fails the test.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+#[path = "../../maos-sso/tests/fixtures.rs"]
+mod sso_fixtures;
+
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::channel;
-use std::sync::{Arc, Condvar, Mutex};
-use std::time::Duration;
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
+use std::time::{Duration, Instant};
 
 use ed25519_dalek::SigningKey;
 use maos_a2a_core::{DigestReadPort, COHORT_INTENT_DIGEST_READ};
 use maos_bin::enterprise_identity::{EnterpriseConfig, EnterpriseRuntime};
 use maos_bin::governed_digest_read::{CollectiveReadGovernor, GovernedDigestReadPort};
-use maos_bin::worker_spawn::{
-    recheck_enterprise_principal, resolve_enterprise_principal, ResolvedPrincipal,
-};
+use maos_bin::worker_spawn::issue_enterprise_governed_capability_no_wait;
 use maos_cohort::{
     CohortAuthority, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
     ConsentTuple, DigestReadControl, InMemoryCohortAuditSink, ManifestSignature,
     PinnedAuthorityKeys, COHORT_SCHEMA_V1, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 use maos_domain::frame::{ConsentEnvelope, FrameAddress, FramePayload, IacFrame};
+use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::invariants::{
-    i1::IntentClass, i13::IntentLineage, i3::FrameOrigin, i8::A2AIntent,
+    i1::{IntentClass, Scope},
+    i13::IntentLineage,
+    i3::FrameOrigin,
+    i8::A2AIntent,
 };
 use maos_domain::ports::registry::SpiritId;
-use maos_domain::ports::{AuthenticatedPrincipal, IdentityAssertionPort, IdentityError};
+use maos_domain::ports::IdentityAssertionPort;
+use maos_kernel_core::capability::{
+    cap_audit,
+    cap_policy::{decision::TrustTier, ManifestCapabilityScope, PolicyTable},
+    cap_quota::{CapQuotaTracker, IssuanceQuota},
+    cap_tokens::Ed25519SigningKey,
+    CapabilityRegistryAdapter, WorkingMemoryStore,
+};
 use maos_spirit_abi::identity::{FrameKind, HostId};
-use std::sync::atomic::{AtomicBool, AtomicU64};
-use std::sync::PoisonError;
+use maos_sso::discovery::{Clock, DiscoveringVerifier, DiscoveryConfig, FetchError, Fetcher};
+use maos_sso::OidcAlgorithm;
 
 /// A fixture that waits this long fails closed (the test then fails).
 const SAFETY: Duration = Duration::from_secs(20);
+const PID: u32 = 4242;
+const NONCE: u64 = 0x23_02;
+const DOC_URL: &str = "https://idp.maos.example/.well-known/openid-configuration";
+const JWKS_URL: &str = "https://keys.maos.example/jwks";
+
+// ---- the cohort state and its requests -------------------------------------------------------
 
 fn fingerprint(byte: u8) -> String {
     format!("sha256:{}", hex::encode([byte; 32]))
@@ -46,9 +72,7 @@ fn authority() -> SigningKey {
     SigningKey::from_bytes(&[7u8; 32])
 }
 
-/// The signed manifest at `version`; `consent` false drops every consent tuple (the v2 of the
-/// round-2 tests, which removes the peer's consent).
-fn signed_toml(version: u64, consent: bool) -> String {
+fn signed_toml(version: u64) -> String {
     let authority = authority();
     let member = |host: &str, byte: u8| CohortMember {
         host_id: host.into(),
@@ -57,15 +81,11 @@ fn signed_toml(version: u64, consent: bool) -> String {
         team: None,
     };
     let tuples = || {
-        if consent {
-            vec![ConsentTuple {
-                peer: "host-b".into(),
-                role: "worker".into(),
-                intent: "readonly".into(),
-            }]
-        } else {
-            Vec::new()
-        }
+        vec![ConsentTuple {
+            peer: "host-b".into(),
+            role: "worker".into(),
+            intent: "readonly".into(),
+        }]
     };
     let manifest = CohortManifest {
         schema_version: COHORT_SCHEMA_V1,
@@ -98,7 +118,7 @@ fn state() -> Arc<CohortManifestState> {
     Arc::new(
         CohortManifestState::load(
             HostId("host-a".into()),
-            &signed_toml(1, true),
+            &signed_toml(1),
             pins,
             Arc::new(InMemoryCohortAuditSink::default()),
         )
@@ -106,10 +126,14 @@ fn state() -> Arc<CohortManifestState> {
     )
 }
 
+fn requester() -> HostId {
+    HostId("host-b".into())
+}
+
 fn request_frame(request_id: &str) -> IacFrame {
     let from = FrameAddress {
         spirit_id: SpiritId::from("cohort-digest"),
-        host_id: Some(HostId("host-b".into())),
+        host_id: Some(requester()),
         role: None,
     };
     let mut to = smallvec::SmallVec::new();
@@ -140,267 +164,231 @@ fn request_frame(request_id: &str) -> IacFrame {
     }
 }
 
-/// An identity provider that never answers for `slow-*` requests until released.
-#[derive(Default)]
-struct Governor {
-    gate: Mutex<(bool, bool)>, // (entered, released)
-    changed: Condvar,
-    refuse_identity: Mutex<bool>,
-    governed: AtomicUsize,
+// ---- the identity provider: scripted, gated, on a manual clock -------------------------------
+
+struct ManualClock(AtomicU64);
+
+impl ManualClock {
+    fn set_secs(&self, secs: u64) {
+        self.0.store(secs * 1_000, Ordering::SeqCst);
+    }
 }
 
-impl Governor {
-    fn wait_entered(&self) {
-        let state = self.gate.lock().unwrap();
-        let (state, timeout) = self
-            .changed
-            .wait_timeout_while(state, SAFETY, |state| !state.0)
-            .unwrap();
-        assert!(!timeout.timed_out() && state.0, "resolve never entered");
+impl Clock for ManualClock {
+    fn now_millis(&self) -> u64 {
+        self.0.load(Ordering::SeqCst)
     }
-    fn release(&self) {
-        self.gate.lock().unwrap().1 = true;
+}
+
+#[derive(Default)]
+struct GateState {
+    closed: bool,
+    documents: usize,
+}
+
+/// Canned answers; a closed gate holds every fetch ("the refresher never answers") and a fetch
+/// held for `SAFETY` fails closed.
+#[derive(Default)]
+struct Script {
+    routes: Mutex<HashMap<String, Vec<u8>>>,
+    gate: Mutex<GateState>,
+    changed: Condvar,
+}
+
+impl Script {
+    fn serve(&self, url: &str, body: &str) {
+        self.routes
+            .lock()
+            .unwrap()
+            .insert(url.to_owned(), body.as_bytes().to_vec());
+    }
+    fn close(&self) {
+        self.gate.lock().unwrap().closed = true;
+    }
+    fn open(&self) {
+        self.gate.lock().unwrap().closed = false;
         self.changed.notify_all();
     }
+    fn documents(&self) -> usize {
+        self.gate.lock().unwrap().documents
+    }
+    fn await_documents(&self, count: usize) {
+        let gate = self.gate.lock().unwrap_or_else(PoisonError::into_inner);
+        let (gate, result) = self
+            .changed
+            .wait_timeout_while(gate, SAFETY, |gate| gate.documents < count)
+            .unwrap_or_else(PoisonError::into_inner);
+        assert!(
+            !result.timed_out(),
+            "no refresh was requested ({} document fetches)",
+            gate.documents
+        );
+    }
 }
 
-impl CollectiveReadGovernor for Governor {
-    type Resolved = String;
-
-    fn resolve(&self) -> Result<String, String> {
-        if *self.refuse_identity.lock().unwrap() {
-            return Err("identity provider unavailable".into());
+impl Fetcher for Script {
+    fn get(&self, url: &str) -> Result<Vec<u8>, FetchError> {
+        {
+            let mut gate = self.gate.lock().unwrap_or_else(PoisonError::into_inner);
+            if url == DOC_URL {
+                gate.documents += 1;
+                self.changed.notify_all();
+            }
+            let (_gate, result) = self
+                .changed
+                .wait_timeout_while(gate, SAFETY, |gate| gate.closed)
+                .unwrap_or_else(PoisonError::into_inner);
+            if result.timed_out() {
+                return Err(FetchError::Unavailable);
+            }
         }
-        Ok("principal".into())
+        self.routes
+            .lock()
+            .unwrap()
+            .get(url)
+            .cloned()
+            .ok_or(FetchError::Unavailable)
     }
+}
 
-    fn govern(&self, _resolved: String, _requester: &str, _request_id: &str) -> Result<(), String> {
+/// keyA's material under its own `kid` and the rotated-in `kid` `TOKEN_UNKNOWN_KID` names.
+fn rotated_keys() -> String {
+    let own = sso_fixtures::JWKS_KEY_A
+        .split_once("\"keys\":[")
+        .unwrap()
+        .1
+        .trim_end_matches("]}");
+    format!(
+        "{{\"keys\":[{own},{}]}}",
+        own.replace("key-a", "missing-key")
+    )
+}
+
+// ---- the daemon's governance: the REAL no-wait governed mint ---------------------------------
+
+/// What `main.rs::EnterpriseDaemonGovernance::govern_collective_read` does for the identity and
+/// mint steps: `issue_enterprise_governed_capability_no_wait` over a real capability registry.
+struct MintGovernor {
+    runtime: EnterpriseRuntime,
+    registry: CapabilityRegistryAdapter,
+    governed: AtomicUsize,
+    /// Keeps the audit channel's receiver alive for the registry's lifetime.
+    _audit: Box<dyn std::any::Any + Send + Sync>,
+}
+
+impl CollectiveReadGovernor for MintGovernor {
+    fn govern(&self, _requester: &str, _request_id: &str) -> Result<(), String> {
+        issue_enterprise_governed_capability_no_wait(
+            &self.registry,
+            Some(&self.runtime),
+            None,
+            PID,
+            Scope::LoomRead,
+            60,
+            [0u8; 32],
+            IntentClass::Standard,
+        )?;
         self.governed.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 }
 
-/// The slow request's resolution waits on the gate; every other request resolves at once.
-struct Slow {
-    inner: Governor,
-    slow_entered: Mutex<bool>,
-}
+#[derive(Debug, Default)]
+struct StepClock;
 
-impl CollectiveReadGovernor for Slow {
-    type Resolved = ();
-
-    fn resolve(&self) -> Result<(), String> {
-        let mut slow = self.slow_entered.lock().unwrap();
-        if *slow {
-            return Ok(());
-        }
-        *slow = true;
-        drop(slow);
-        let mut gate = self.inner.gate.lock().unwrap();
-        gate.0 = true;
-        self.inner.changed.notify_all();
-        let (gate, timeout) = self
-            .inner
-            .changed
-            .wait_timeout_while(gate, SAFETY, |gate| !gate.1)
-            .unwrap();
-        if timeout.timed_out() || !gate.1 {
-            return Err("identity provider never answered".into());
-        }
-        Ok(())
-    }
-
-    fn govern(&self, _resolved: (), _requester: &str, _request_id: &str) -> Result<(), String> {
-        self.inner.governed.fetch_add(1, Ordering::SeqCst);
-        Ok(())
+impl maos_kernel_core::capability::cap_quota::QuotaClock for StepClock {
+    fn now_ns(&self) -> u64 {
+        0
     }
 }
 
-/// F4: an identity provider that never answers for one intake worker does not stop a second
-/// worker from admitting its request; once released, the first is granted too.
-#[test]
-fn a_silent_identity_provider_does_not_stall_a_second_intake_worker() {
-    let state = state();
-    let governor = Arc::new(Slow {
-        inner: Governor::default(),
-        slow_entered: Mutex::new(false),
-    });
-    let port = Arc::new(GovernedDigestReadPort::new(
-        state.clone(),
-        Arc::clone(&governor),
-    ));
-    let requester = HostId("host-b".into());
-
-    let first = {
-        let port = Arc::clone(&port);
-        let requester = requester.clone();
-        std::thread::spawn(move || {
-            port.note_admitted_request(&requester, "host-b:slow", &request_frame("host-b:slow"))
-        })
-    };
-    governor.inner.wait_entered();
-
-    let (done, finished) = channel();
-    let second = {
-        let port = Arc::clone(&port);
-        let requester = requester.clone();
-        std::thread::spawn(move || {
-            let outcome = port.note_admitted_request(
-                &requester,
-                "host-b:fast",
-                &request_frame("host-b:fast"),
-            );
-            let _ = done.send(outcome);
-        })
-    };
-    let second_outcome = finished.recv_timeout(SAFETY);
-    // Whatever the verdict, free the first worker before asserting so a failure cannot hang.
-    governor.inner.release();
-    assert_eq!(
-        second_outcome,
-        Ok(Ok(())),
-        "the second worker must admit while the first still waits on the identity provider"
-    );
-    second.join().unwrap();
-    assert_eq!(first.join().unwrap(), Ok(()));
-    assert_eq!(governor.inner.governed.load(Ordering::SeqCst), 2);
-    assert!(state.authorize_reply_send(&requester, "host-b:slow"));
-    assert!(state.authorize_reply_send(&requester, "host-b:fast"));
-}
-
-/// An identity that cannot be resolved refuses a NEW admission (nothing is published), but does
-/// not disturb a duplicate of a request that was already admitted.
-#[test]
-fn an_unresolvable_identity_refuses_only_a_new_admission() {
-    let state = state();
-    let governor = Arc::new(Governor::default());
-    let port = GovernedDigestReadPort::new(state.clone(), Arc::clone(&governor));
-    let requester = HostId("host-b".into());
-
-    port.note_admitted_request(&requester, "host-b:one", &request_frame("host-b:one"))
-        .expect("resolvable identity admits");
-    *governor.refuse_identity.lock().unwrap() = true;
-
-    let refused =
-        port.note_admitted_request(&requester, "host-b:two", &request_frame("host-b:two"));
-    assert_eq!(refused, Err("identity provider unavailable".to_string()));
-    assert!(!state.authorize_reply_send(&requester, "host-b:two"));
-    assert_eq!(governor.governed.load(Ordering::SeqCst), 1);
-
-    port.note_admitted_request(&requester, "host-b:one", &request_frame("host-b:one"))
-        .expect("a duplicate of an admitted request needs no identity");
-    assert_eq!(governor.governed.load(Ordering::SeqCst), 1);
-}
-
-// ---- Review round 2: the three regressions of resolving the identity before the locks ----
-
-/// A one-shot latch: `enter_and_wait` announces itself and blocks until `release`.
-#[derive(Default)]
-struct Latch {
-    state: Mutex<(bool, bool)>, // (entered, released)
-    changed: Condvar,
-}
-
-impl Latch {
-    fn enter_and_wait(&self) -> bool {
-        let mut state = self.state.lock().unwrap();
-        state.0 = true;
-        self.changed.notify_all();
-        let (state, timeout) = self
-            .changed
-            .wait_timeout_while(state, SAFETY, |state| !state.1)
-            .unwrap();
-        !timeout.timed_out() && state.1
-    }
-    fn wait_entered(&self) {
-        let state = self.state.lock().unwrap();
-        let (state, timeout) = self
-            .changed
-            .wait_timeout_while(state, SAFETY, |state| !state.0)
-            .unwrap();
-        assert!(
-            !timeout.timed_out() && state.0,
-            "the latch was never entered"
+fn registry() -> (
+    CapabilityRegistryAdapter,
+    Box<dyn std::any::Any + Send + Sync>,
+) {
+    // `monotonic_now_ns` panics before the base is set; it is idempotent.
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let policy = Arc::new(PolicyTable::new());
+    policy.inner().rcu(|old| {
+        let mut next = (**old).clone();
+        next.manifest_scopes.insert(
+            PID,
+            ManifestCapabilityScope {
+                scopes: vec![Scope::LoomRead],
+                declared_tier: SandboxTier::T3,
+                trust_tier: TrustTier::Verified,
+            },
         );
-    }
-    fn release(&self) {
-        self.state.lock().unwrap().1 = true;
-        self.changed.notify_all();
-    }
+        Arc::new(next)
+    });
+    let (sender, receiver) = cap_audit::channel();
+    let registry = CapabilityRegistryAdapter::new(
+        Arc::new(maos_kernel_core::api::RingCryptoProvider),
+        Ed25519SigningKey::new([0x79; 32]),
+        NONCE,
+        policy,
+        sender,
+        CapQuotaTracker::with_clock(
+            IssuanceQuota {
+                budget_per_window: 1_000_000,
+                window: Duration::from_secs(3600),
+            },
+            Arc::new(StepClock),
+        ),
+        Arc::new(WorkingMemoryStore::new()),
+        Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::new(10)),
+    );
+    (registry, Box::new(receiver))
 }
 
-/// A verifier whose keys can be retired or expire, and whose first-time verification can be
-/// made to wait on a refresher that never answers (`silent`: an unknown `kid`).
-struct FakeSso {
-    verify_calls: AtomicUsize,
-    silent: AtomicBool,
-    answer: Latch,
-    retired: AtomicBool,
-    now: AtomicU64,
-    valid_until: u64,
+type Port = GovernedDigestReadPort<MintGovernor>;
+
+/// The whole fixture: a discovering verifier on a gated script, the governor, the REAL cohort
+/// state and the decorator over it.
+struct Idp {
+    script: Arc<Script>,
+    clock: Arc<ManualClock>,
+    verifier: Arc<DiscoveringVerifier>,
+    governor: Arc<MintGovernor>,
+    state: Arc<CohortManifestState>,
+    port: Arc<Port>,
 }
 
-impl FakeSso {
-    fn new() -> Arc<Self> {
-        Arc::new(Self {
-            verify_calls: AtomicUsize::new(0),
-            silent: AtomicBool::new(false),
-            answer: Latch::default(),
-            retired: AtomicBool::new(false),
-            now: AtomicU64::new(0),
-            valid_until: 3_600,
-        })
-    }
-    fn principal() -> AuthenticatedPrincipal {
-        AuthenticatedPrincipal {
-            subject: "reza".into(),
-            issuer: "https://idp.maos.example".into(),
-            audience: "maos".into(),
-            attributes: Default::default(),
-        }
-    }
-}
-
-impl IdentityAssertionPort for FakeSso {
-    fn verify(&self, _: &str) -> Result<AuthenticatedPrincipal, IdentityError> {
-        self.verify_calls.fetch_add(1, Ordering::SeqCst);
-        if self.silent.load(Ordering::SeqCst) {
-            let _ = self.answer.enter_and_wait();
-            return Err(IdentityError::JwksUnavailable);
-        }
-        Ok(Self::principal())
-    }
-    fn verify_without_refresh(&self, _: &str) -> Result<AuthenticatedPrincipal, IdentityError> {
-        if self.retired.load(Ordering::SeqCst) {
-            return Err(IdentityError::JwksUnavailable);
-        }
-        if self.now.load(Ordering::SeqCst) >= self.valid_until {
-            return Err(IdentityError::JwksUnavailable);
-        }
-        Ok(Self::principal())
-    }
-    fn is_healthy(&self) -> bool {
-        true
-    }
-}
-
-const PID: u32 = 4242;
-const HOLDER: &str = "host-b:holder";
-
-/// The daemon's governance, minus the kernel: the SAME resolve and commit-time re-check
-/// functions `main.rs` calls; the request named `HOLDER` holds the guard until released.
-struct SsoGovernor {
-    runtime: EnterpriseRuntime,
-    holder: Latch,
-    committed: AtomicUsize,
-}
-
-impl SsoGovernor {
-    fn new(sso: &Arc<FakeSso>) -> Arc<Self> {
-        Arc::new(Self {
+impl Idp {
+    fn start() -> Self {
+        let script = Arc::new(Script::default());
+        script.serve(
+            DOC_URL,
+            &format!(
+                "{{\"issuer\":\"{}\",\"jwks_uri\":\"{JWKS_URL}\"}}",
+                sso_fixtures::ISS_GOOD
+            ),
+        );
+        script.serve(JWKS_URL, sso_fixtures::JWKS_KEY_A);
+        let clock = Arc::new(ManualClock(AtomicU64::new(0)));
+        let verifier = Arc::new(
+            DiscoveringVerifier::start(
+                // A verifier that WAITED would sit here for a minute: well past `SAFETY`.
+                DiscoveryConfig::new(sso_fixtures::ISS_GOOD)
+                    .with_verify_wait(Duration::from_secs(60))
+                    .with_idle_tick(Duration::from_secs(3_600)),
+                &[OidcAlgorithm::Rs256],
+                &[sso_fixtures::ISS_GOOD],
+                sso_fixtures::AUD_EXPECTED,
+                Arc::clone(&script) as Arc<dyn Fetcher>,
+                Arc::clone(&clock) as Arc<dyn Clock>,
+            )
+            .expect("a valid discovery configuration starts"),
+        );
+        // Joins the boot fetch: the key set holds `key-a`.
+        verifier
+            .verify(sso_fixtures::TOKEN_GOOD_RS256)
+            .expect("the published key verifies");
+        let (registry, audit) = registry();
+        let governor = Arc::new(MintGovernor {
             runtime: EnterpriseRuntime::from_ports(
                 EnterpriseConfig::empty().with_sso_available(),
-                Some(Arc::clone(sso) as Arc<dyn IdentityAssertionPort>),
+                Some(Arc::clone(&verifier) as Arc<dyn IdentityAssertionPort>),
                 None,
                 None,
                 None,
@@ -408,41 +396,62 @@ impl SsoGovernor {
                 None,
                 7,
             ),
-            holder: Latch::default(),
-            committed: AtomicUsize::new(0),
-        })
-    }
-}
-
-impl CollectiveReadGovernor for SsoGovernor {
-    type Resolved = Option<ResolvedPrincipal>;
-
-    fn resolve(&self) -> Result<Self::Resolved, String> {
-        resolve_enterprise_principal(Some(&self.runtime), PID, "loom.read")
-            .map_err(|e| e.to_string())
-    }
-
-    fn govern(
-        &self,
-        resolved: Self::Resolved,
-        _requester: &str,
-        request_id: &str,
-    ) -> Result<(), String> {
-        recheck_enterprise_principal(Some(&self.runtime), PID, resolved.as_ref())
-            .map_err(String::from)?;
-        if request_id == HOLDER && !self.holder.enter_and_wait() {
-            return Err("the holder latch timed out".into());
+            registry,
+            governed: AtomicUsize::new(0),
+            _audit: audit,
+        });
+        let state = state();
+        let port = Arc::new(GovernedDigestReadPort::new(
+            state.clone(),
+            Arc::clone(&governor),
+        ));
+        Self {
+            script,
+            clock,
+            verifier,
+            governor,
+            state,
+            port,
         }
-        self.committed.fetch_add(1, Ordering::SeqCst);
-        Ok(())
+    }
+
+    /// One admission on its own thread; a call still running at the safety bound is a parked
+    /// intake worker and fails the test.
+    fn admit(&self, id: &str) -> Result<(), String> {
+        let (sender, receiver) = channel();
+        let port = Arc::clone(&self.port);
+        let id = id.to_owned();
+        std::thread::spawn(move || {
+            let _ = sender.send(port.note_admitted_request(&requester(), &id, &request_frame(&id)));
+        });
+        receiver
+            .recv_timeout(SAFETY)
+            .expect("the admission parked its worker (it waited for discovery)")
+    }
+
+    fn await_refreshes(&self, count: u64) {
+        let until = Instant::now() + SAFETY;
+        while self.verifier.completed_refreshes() < count {
+            assert!(Instant::now() < until, "the refresher never finished");
+            std::thread::yield_now();
+        }
+    }
+
+    fn pending(&self) -> Vec<String> {
+        self.state
+            .drain_pending_digest_replies()
+            .unwrap()
+            .into_iter()
+            .map(|(_, id, _)| id)
+            .collect()
     }
 }
 
 static SSO_ENV: Mutex<()> = Mutex::new(());
 
-/// Holds the process environment for one SSO test and restores it.
+/// Holds the process environment for one test and restores it.
 struct Env {
-    _lock: std::sync::MutexGuard<'static, ()>,
+    _lock: MutexGuard<'static, ()>,
     prior: Option<std::ffi::OsString>,
 }
 
@@ -455,196 +464,239 @@ impl Drop for Env {
     }
 }
 
-fn assertion_env() -> Env {
+fn assertion_env(token: &str) -> Env {
     let lock = SSO_ENV.lock().unwrap_or_else(PoisonError::into_inner);
     let prior = std::env::var_os("MAOS_SSO_ASSERTION");
-    std::env::set_var("MAOS_SSO_ASSERTION", "an.unknown-kid.assertion");
+    std::env::set_var("MAOS_SSO_ASSERTION", token);
     Env { _lock: lock, prior }
 }
 
-/// Round 2 P1-1: manifest v1 admits a digest read, the request is held while its identity
-/// resolves, a signed v2 that removes the consent lands, and the resolution then succeeds. The
-/// admission was decided under v1 and MUST be refused (typed), never published as a v2 grant.
-#[test]
-fn a_reissue_that_removes_consent_while_the_identity_resolves_refuses_the_admission() {
-    let state = state();
-    let governor = Arc::new(Slow {
-        inner: Governor::default(),
-        slow_entered: Mutex::new(false),
-    });
-    let port = Arc::new(GovernedDigestReadPort::new(
-        state.clone(),
-        Arc::clone(&governor),
-    ));
-    let requester = HostId("host-b".into());
-    let first = {
-        let port = Arc::clone(&port);
-        let requester = requester.clone();
-        std::thread::spawn(move || {
-            port.note_admitted_request(&requester, "host-b:slow", &request_frame("host-b:slow"))
-        })
-    };
-    governor.inner.wait_entered();
-    state
-        .apply_reissue(&signed_toml(2, false))
-        .expect("a signed v2 without the peer's consent applies");
-    governor.inner.release();
-    let outcome = first.join().unwrap();
-
-    let error = outcome.expect_err("an admission decided under v1 must not commit under v2");
-    assert!(
-        error.contains("admission is stale"),
-        "the refusal is the typed stale-admission error, got {error}"
-    );
-    assert_eq!(governor.inner.governed.load(Ordering::SeqCst), 0);
-    assert!(!state.authorize_reply_send(&requester, "host-b:slow"));
+fn use_token(token: &str) {
+    std::env::set_var("MAOS_SSO_ASSERTION", token);
 }
 
-/// Round 2 P1-2: request A resolves its identity while the key is fresh, then waits behind
-/// request B, which holds the cohort guard. `invalidate` retires the key or expires the key set
-/// while A waits; A must be refused at commit, without waiting on discovery.
-fn identity_goes_stale_while_waiting_behind_another_request(
-    invalidate: impl FnOnce(&FakeSso),
-) -> (
-    Result<(), String>,
-    Arc<SsoGovernor>,
-    Arc<CohortManifestState>,
-) {
-    let _env = assertion_env();
-    let state = state();
-    let sso = FakeSso::new();
-    let governor = SsoGovernor::new(&sso);
-    let port = Arc::new(GovernedDigestReadPort::new(
-        state.clone(),
-        Arc::clone(&governor),
-    ));
-    let requester = HostId("host-b".into());
-    let holder = {
-        let port = Arc::clone(&port);
-        let requester = requester.clone();
-        std::thread::spawn(move || {
-            port.note_admitted_request(&requester, HOLDER, &request_frame(HOLDER))
-        })
-    };
-    governor.holder.wait_entered();
-    let waiter = {
-        let port = Arc::clone(&port);
-        let requester = requester.clone();
-        std::thread::spawn(move || {
-            port.note_admitted_request(&requester, "host-b:waiter", &request_frame("host-b:waiter"))
-        })
-    };
-    // The waiter has resolved once the verifier has been asked a second time.
-    let deadline = std::time::Instant::now() + SAFETY;
-    while sso.verify_calls.load(Ordering::SeqCst) < 2 {
-        assert!(
-            std::time::Instant::now() < deadline,
-            "the waiter never resolved"
-        );
-        std::thread::yield_now();
-    }
-    invalidate(&sso);
-    governor.holder.release();
-    assert_eq!(holder.join().unwrap(), Ok(()));
-    (waiter.join().unwrap(), governor, state)
+// ---- the tests ---------------------------------------------------------------------------------
+
+/// The control: a cached key mints, the grant is published once, and a replay is a duplicate ACK
+/// that mints nothing.
+#[test]
+fn a_cached_key_admits_once_and_a_replay_mints_nothing() {
+    let _env = assertion_env(sso_fixtures::TOKEN_GOOD_RS256);
+    let idp = Idp::start();
+    idp.admit("req-1").expect("a cached key verifies and mints");
+    idp.admit("req-1").expect("a replay is a duplicate ACK");
+    assert_eq!(idp.governor.governed.load(Ordering::SeqCst), 1);
+    assert_eq!(idp.pending(), vec!["req-1".to_owned()]);
+    assert!(idp.state.authorize_reply_send(&requester(), "req-1"));
 }
 
+/// (a) An unknown `kid` under the guard is refused WITHOUT waiting while the refresher never
+/// answers, fires exactly one non-blocking refresh, and a retry after the refresher published
+/// the rotated key set succeeds (the "first digest request after a rotation is refused once").
 #[test]
-fn a_key_retired_while_waiting_behind_another_request_refuses_at_commit() {
-    let (outcome, governor, state) =
-        identity_goes_stale_while_waiting_behind_another_request(|sso| {
-            sso.retired.store(true, Ordering::SeqCst);
+fn an_unknown_kid_is_refused_without_waiting_and_a_retry_after_the_refresh_succeeds() {
+    let _env = assertion_env(sso_fixtures::TOKEN_UNKNOWN_KID);
+    let idp = Idp::start();
+    idp.script.serve(JWKS_URL, &rotated_keys());
+    idp.script.close();
+    idp.clock.set_secs(31); // past the 30 s refresh interval
+
+    idp.admit("req-1")
+        .expect_err("an unknown key id is refused under the guard");
+    assert_eq!(idp.governor.governed.load(Ordering::SeqCst), 0);
+    assert!(idp.pending().is_empty(), "nothing was published");
+    // The refusal fired the nudge: the refresher started its round (held at the gate).
+    idp.script.await_documents(2);
+    // A second refusal while the refresh is pending nudges nothing more.
+    idp.admit("req-2")
+        .expect_err("still refused, still no wait");
+    assert_eq!(idp.script.documents(), 2, "one nudge, not one per refusal");
+
+    idp.script.open();
+    idp.await_refreshes(2);
+    idp.admit("req-1")
+        .expect("the retry after the refresher published succeeds");
+    assert_eq!(idp.governor.governed.load(Ordering::SeqCst), 1);
+    assert_eq!(idp.pending(), vec!["req-1".to_owned()]);
+}
+
+/// (b) A stale key set refuses under the guard without waiting (and nudges); after the refresh
+/// the same request is admitted.
+#[test]
+fn a_stale_key_set_refuses_under_the_guard_and_recovers_after_the_refresh() {
+    let _env = assertion_env(sso_fixtures::TOKEN_GOOD_RS256);
+    let idp = Idp::start();
+    idp.admit("req-0").expect("fresh keys verify");
+    idp.script.close();
+    idp.clock.set_secs(3_600); // the TTL is over
+    idp.admit("req-1")
+        .expect_err("a stale key set is refused, never served");
+    assert_eq!(idp.governor.governed.load(Ordering::SeqCst), 1);
+    idp.script.await_documents(2);
+
+    idp.script.open();
+    idp.await_refreshes(2);
+    idp.admit("req-1").expect("fresh keys admit again");
+    assert_eq!(idp.governor.governed.load(Ordering::SeqCst), 2);
+}
+
+/// (c) A refresher that never answers parks no intake worker: concurrent requests with a NEW id
+/// all return at once.
+#[test]
+fn a_silent_refresher_parks_no_worker_on_new_ids() {
+    let _env = assertion_env(sso_fixtures::TOKEN_UNKNOWN_KID);
+    let idp = Arc::new(Idp::start());
+    idp.script.close();
+    idp.clock.set_secs(31);
+    let (sender, receiver) = channel();
+    for n in 0..8 {
+        let (idp, sender) = (Arc::clone(&idp), sender.clone());
+        std::thread::spawn(move || {
+            let _ = sender.send(idp.port.note_admitted_request(
+                &requester(),
+                &format!("new-{n}"),
+                &request_frame(&format!("new-{n}")),
+            ));
         });
-    let error = outcome.expect_err("a retired key must not mint");
-    assert!(
-        error.contains("stale at commit"),
-        "typed stale refusal, got {error}"
+    }
+    for _ in 0..8 {
+        let outcome = receiver
+            .recv_timeout(SAFETY)
+            .expect("a worker is parked on an identity that cannot be verified");
+        assert!(outcome.is_err());
+    }
+    assert_eq!(idp.governor.governed.load(Ordering::SeqCst), 0);
+    idp.script.open();
+}
+
+/// (c) ... also at capacity (the full-queue refusal never reaches the identity) and for a replay
+/// of an admitted request (a duplicate ACK that never verifies anything), with the refresher
+/// silent and the assertion unverifiable.
+#[test]
+fn a_silent_refresher_parks_no_worker_at_capacity_or_on_a_replay() {
+    let env = assertion_env(sso_fixtures::TOKEN_GOOD_RS256);
+    let idp = Arc::new(Idp::start());
+    for n in 0..256 {
+        idp.admit(&format!("fill-{n}")).expect("below capacity");
+    }
+    idp.script.close();
+    idp.clock.set_secs(31);
+    use_token(sso_fixtures::TOKEN_UNKNOWN_KID);
+    let (sender, receiver) = channel();
+    for n in 0..8 {
+        let (idp, sender) = (Arc::clone(&idp), sender.clone());
+        std::thread::spawn(move || {
+            // Half new ids at capacity, half replays of admitted ones.
+            let id = if n % 2 == 0 {
+                format!("over-{n}")
+            } else {
+                format!("fill-{n}")
+            };
+            let _ = sender.send((
+                n % 2 == 0,
+                idp.port
+                    .note_admitted_request(&requester(), &id, &request_frame(&id)),
+            ));
+        });
+    }
+    for _ in 0..8 {
+        let (is_new, outcome) = receiver
+            .recv_timeout(SAFETY)
+            .expect("a worker is parked at capacity or on a replay");
+        assert_eq!(outcome.is_err(), is_new, "{outcome:?}");
+    }
+    assert_eq!(
+        idp.governor.governed.load(Ordering::SeqCst),
+        256,
+        "none of them reached the identity"
     );
     assert_eq!(
-        governor.committed.load(Ordering::SeqCst),
+        idp.script.documents(),
         1,
-        "only the holder committed"
+        "neither asked the refresher for anything"
     );
-    assert!(!state.authorize_reply_send(&HostId("host-b".into()), "host-b:waiter"));
+    idp.script.open();
+    drop(env);
 }
 
+/// (c) Two concurrent requests with the SAME new id (a replay racing its original) admit once:
+/// the second is a duplicate ACK under the same guard and mints nothing.
 #[test]
-fn a_key_set_that_expires_while_waiting_behind_another_request_refuses_at_commit() {
-    let (outcome, governor, state) =
-        identity_goes_stale_while_waiting_behind_another_request(|sso| {
-            sso.now.store(3_600, Ordering::SeqCst);
+fn concurrent_requests_with_one_new_id_admit_once() {
+    let _env = assertion_env(sso_fixtures::TOKEN_GOOD_RS256);
+    let idp = Arc::new(Idp::start());
+    let (sender, receiver) = channel();
+    for _ in 0..8 {
+        let (idp, sender) = (Arc::clone(&idp), sender.clone());
+        std::thread::spawn(move || {
+            let _ = sender.send(idp.port.note_admitted_request(
+                &requester(),
+                "same",
+                &request_frame("same"),
+            ));
         });
-    let error = outcome.expect_err("an expired key set must not mint");
-    assert!(
-        error.contains("stale at commit"),
-        "typed stale refusal, got {error}"
-    );
-    assert_eq!(governor.committed.load(Ordering::SeqCst), 1);
-    assert!(!state.authorize_reply_send(&HostId("host-b".into()), "host-b:waiter"));
-}
-
-/// The control: nothing goes stale, so the waiter commits (the two tests above are red for
-/// staleness, not because waiting behind another request refuses).
-#[test]
-fn a_still_valid_identity_commits_after_waiting_behind_another_request() {
-    let (outcome, governor, state) =
-        identity_goes_stale_while_waiting_behind_another_request(|_| {});
-    assert_eq!(outcome, Ok(()));
-    assert_eq!(governor.committed.load(Ordering::SeqCst), 2);
-    assert!(state.authorize_reply_send(&HostId("host-b".into()), "host-b:waiter"));
-}
-
-/// Round 2 P1-3: a replay of an admitted request returns the duplicate ACK without resolving
-/// anything. The verifier would wait on a refresher that never answers (an environment
-/// assertion with an unknown `kid`); sequential and concurrent replays must not enter it.
-#[test]
-fn a_duplicate_replay_never_resolves_and_never_occupies_an_intake_worker() {
-    const REPLAYS: usize = 8;
-    let _env = assertion_env();
-    let state = state();
-    let sso = FakeSso::new();
-    let governor = SsoGovernor::new(&sso);
-    let port = Arc::new(GovernedDigestReadPort::new(
-        state.clone(),
-        Arc::clone(&governor),
-    ));
-    let requester = HostId("host-b".into());
-    port.note_admitted_request(&requester, "host-b:dup", &request_frame("host-b:dup"))
-        .expect("the first request admits");
-    assert_eq!(sso.verify_calls.load(Ordering::SeqCst), 1);
-    sso.silent.store(true, Ordering::SeqCst);
-
-    let (done, finished) = channel();
-    let workers: Vec<_> = (0..REPLAYS)
-        .map(|_| {
-            let port = Arc::clone(&port);
-            let requester = requester.clone();
-            let done = done.clone();
-            std::thread::spawn(move || {
-                let _ = done.send(port.note_admitted_request(
-                    &requester,
-                    "host-b:dup",
-                    &request_frame("host-b:dup"),
-                ));
-            })
-        })
-        .collect();
-    let outcomes: Vec<_> = (0..REPLAYS)
-        .map(|_| finished.recv_timeout(SAFETY))
-        .collect();
-    // Free any worker a regression parked in the verifier before asserting.
-    sso.answer.release();
-    for worker in workers {
-        worker.join().unwrap();
     }
+    for _ in 0..8 {
+        receiver
+            .recv_timeout(SAFETY)
+            .expect("an admission never returned")
+            .expect("the original and every replay are acknowledged");
+    }
+    assert_eq!(idp.governor.governed.load(Ordering::SeqCst), 1);
+    assert_eq!(idp.pending(), vec!["same".to_owned()]);
+}
+
+/// (d) A reissue that lands while an admission holds the cohort guard waits for it, and its purge
+/// then removes that grant AND its reply obligation: no grant is left behind without a queue
+/// entry, and none outlives the manifest version it was decided under. (The original `cached`
+/// serialization is back: an admission samples the version under the same mutex the reissue
+/// holds for its whole purge.)
+#[test]
+fn a_reissue_concurrent_with_an_admission_leaves_no_grant_or_obligation() {
+    let _env = assertion_env(sso_fixtures::TOKEN_GOOD_RS256);
+    let idp = Idp::start();
+    let (entered_tx, entered_rx) = channel();
+    let (release_tx, release_rx) = channel::<()>();
+    let admission = {
+        let port = Arc::clone(&idp.port);
+        std::thread::spawn(move || {
+            port.note_admitted_request_guarded(
+                &requester(),
+                "held",
+                &request_frame("held"),
+                &mut || {
+                    let _ = entered_tx.send(());
+                    release_rx
+                        .recv_timeout(SAFETY)
+                        .map_err(|_| "the release never came".to_string())
+                },
+            )
+        })
+    };
+    entered_rx
+        .recv_timeout(SAFETY)
+        .expect("the admission reached its commit under the guard");
+    let reissue = {
+        let state = Arc::clone(&idp.state);
+        std::thread::spawn(move || state.apply_reissue(&signed_toml(2)))
+    };
+    release_tx.send(()).unwrap();
+    admission
+        .join()
+        .unwrap()
+        .expect("the admission under v1 commits");
+    reissue
+        .join()
+        .unwrap()
+        .expect("the signed v2 applies once the admission is done");
     assert!(
-        outcomes.iter().all(|outcome| outcome == &Ok(Ok(()))),
-        "every replay returns the duplicate ACK immediately: {outcomes:?}"
+        idp.pending().is_empty(),
+        "the purge removed the reply obligation with the grant"
     );
-    assert_eq!(
-        sso.verify_calls.load(Ordering::SeqCst),
-        1,
-        "a duplicate must not resolve the identity"
-    );
-    assert_eq!(governor.committed.load(Ordering::SeqCst), 1);
+    assert!(!idp.state.authorize_reply_send(&requester(), "held"));
+    // The capacity the grant held is free again: a full set of 256 new ids fits.
+    for n in 0..256 {
+        idp.admit(&format!("after-{n}"))
+            .expect("capacity was freed");
+    }
 }

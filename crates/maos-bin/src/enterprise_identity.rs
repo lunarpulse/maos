@@ -408,30 +408,67 @@ impl EnterpriseRuntime {
         spirit_pid: u32,
         assertion: &str,
     ) -> Result<Option<AuthenticatedPrincipal>, EnterpriseFailure> {
+        self.verify_principal(spirit_pid, assertion, true)
+    }
+
+    /// Story 23-2 — [`Self::verify_principal_for_issuance`] for a caller inside a critical
+    /// section: the same verdicts, answered from the keys already held and NEVER waiting on
+    /// discovery. An unknown `kid` or a stale key set is a denial (the same generic text) and
+    /// fires the verifier's non-blocking refresh nudge, so a retry can succeed.
+    pub fn verify_principal_for_issuance_no_wait(
+        &self,
+        spirit_pid: u32,
+        assertion: &str,
+    ) -> Result<Option<AuthenticatedPrincipal>, EnterpriseFailure> {
+        self.verify_principal(spirit_pid, assertion, false)
+    }
+
+    fn verify_principal(
+        &self,
+        spirit_pid: u32,
+        assertion: &str,
+        wait: bool,
+    ) -> Result<Option<AuthenticatedPrincipal>, EnterpriseFailure> {
+        let unavailable = || {
+            let typed = self.sso_diagnostic.as_ref().and_then(|last| last());
+            EnterpriseFailure::SsoIssuanceDenied {
+                spirit_pid,
+                reason: match typed {
+                    Some(code) => format!(
+                        "MAOS_SSO_* configured but identity provider is unavailable: {code}"
+                    ),
+                    None => {
+                        "MAOS_SSO_* configured but identity provider is unavailable".to_string()
+                    }
+                },
+            }
+        };
+        let denied = |reason: String| EnterpriseFailure::SsoIssuanceDenied { spirit_pid, reason };
         match self.config.sso {
             SubsystemState::Disabled => Ok(None),
             SubsystemState::Available => {
-                let port = match &self.identity_port {
-                    Some(p) if p.is_healthy() => p,
-                    _ => {
-                        let typed = self.sso_diagnostic.as_ref().and_then(|last| last());
-                        return Err(EnterpriseFailure::SsoIssuanceDenied {
-                            spirit_pid,
-                            reason: match typed {
-                                Some(code) => format!(
-                                    "MAOS_SSO_* configured but identity provider is unavailable: {code}"
-                                ),
-                                None => "MAOS_SSO_* configured but identity provider is unavailable"
-                                    .to_string(),
-                            },
-                        });
-                    }
+                let Some(port) = &self.identity_port else {
+                    return Err(unavailable());
                 };
-                port.verify(assertion)
+                if wait {
+                    if !port.is_healthy() {
+                        return Err(unavailable());
+                    }
+                    return port
+                        .verify(assertion)
+                        .map(Some)
+                        .map_err(|e| denied(e.to_string()));
+                }
+                // No wait: ask the keys held (this also nudges the refresher on a key refusal),
+                // and say "unavailable" rather than the bare verdict when the set is unhealthy.
+                port.verify_without_refresh(assertion)
                     .map(Some)
-                    .map_err(|e| EnterpriseFailure::SsoIssuanceDenied {
-                        spirit_pid,
-                        reason: e.to_string(),
+                    .map_err(|e| {
+                        if port.is_healthy() {
+                            denied(e.to_string())
+                        } else {
+                            unavailable()
+                        }
                     })
             }
             SubsystemState::ConfiguredDown => Err(EnterpriseFailure::SsoIssuanceDenied {
@@ -445,27 +482,6 @@ impl EnterpriseRuntime {
                     }
                 },
             }),
-        }
-    }
-
-    /// Story 23-2 (round 2) — [`Self::verify_principal_for_issuance`] for a commit point that
-    /// holds a lock: the same verdicts, but answered from the keys already held (never waits
-    /// on discovery), so a key retired or expired since the first verification refuses.
-    pub fn reverify_principal_no_wait(
-        &self,
-        spirit_pid: u32,
-        assertion: &str,
-    ) -> Result<Option<AuthenticatedPrincipal>, EnterpriseFailure> {
-        let denied = |reason: String| EnterpriseFailure::SsoIssuanceDenied { spirit_pid, reason };
-        match (self.config.sso, &self.identity_port) {
-            (SubsystemState::Disabled, _) => Ok(None),
-            (SubsystemState::Available, Some(port)) if port.is_healthy() => port
-                .verify_without_refresh(assertion)
-                .map(Some)
-                .map_err(|e| denied(e.to_string())),
-            _ => Err(denied(
-                "MAOS_SSO_* configured but identity provider is unavailable".to_string(),
-            )),
         }
     }
 

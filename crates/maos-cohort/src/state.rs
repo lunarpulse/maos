@@ -9,7 +9,6 @@ use maos_a2a_core::{
 use maos_domain::frame::IacFrame;
 use maos_spirit_abi::identity::HostId;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -151,9 +150,6 @@ pub struct CohortManifestState {
     pinned: PinnedAuthorityKeys,
     audit: Arc<dyn CohortAuditSink>,
     cached: Mutex<CachedManifest>,
-    /// Story 23-2 (round 2) — the live manifest version, stored by `apply_reissue` (under
-    /// the `cached` guard) BEFORE it clears the digest grants, readable without that guard.
-    live_version: AtomicU64,
     pull_requests: Mutex<Vec<HostId>>,
     clock: Arc<dyn CohortClock>,
     local_host: HostId,
@@ -171,9 +167,6 @@ pub struct CohortManifestState {
     outstanding_digest_reads: Mutex<HashMap<(String, String), DigestGrant>>,
     /// Target-side reply capabilities with the same immutable binding.
     admitted_digest_reads: Mutex<HashMap<(String, String), DigestGrant>>,
-    /// Story 23-2 (round 2) — the keys of `admitted_digest_reads`, behind its own leaf lock so
-    /// the duplicate pre-check never waits behind a guard holding the admitted-read lock.
-    admitted_index: Mutex<HashSet<(String, String)>>,
     /// Target-side bounded reply obligations.
     pending_digest_replies: Mutex<Vec<(String, String, String)>>,
     /// Reader-side immutable summaries keyed by `(member, request_id)`.
@@ -238,7 +231,6 @@ impl CohortManifestState {
     ) -> Result<Self, CohortError> {
         let manifest = CohortManifest::parse_and_validate(manifest_toml, &pinned)?;
         manifest.verify_signature(&pinned)?;
-        let live_version = manifest.version;
         Ok(Self {
             local_host,
             pinned,
@@ -249,13 +241,11 @@ impl CohortManifestState {
                 signed_toml: manifest_toml.to_string(),
                 confirmed_at_secs: clock.now_secs(),
             }),
-            live_version: AtomicU64::new(live_version),
             pull_requests: Mutex::new(Vec::new()),
             halt_presence: Mutex::new(HashMap::new()),
             halt_absence: Mutex::new(HashMap::new()),
             outstanding_digest_reads: Mutex::new(HashMap::new()),
             admitted_digest_reads: Mutex::new(HashMap::new()),
-            admitted_index: Mutex::new(HashSet::new()),
             pending_digest_replies: Mutex::new(Vec::new()),
             received_digest_summaries: Mutex::new(HashMap::new()),
             peer_convergence: Mutex::new(BTreeMap::new()),
@@ -753,7 +743,6 @@ impl CohortManifestState {
             signed_toml: manifest_toml.to_string(),
             confirmed_at_secs: self.clock.now_secs(),
         };
-        self.live_version.store(version, Ordering::SeqCst);
         // The observation surface represents the CURRENT signed cohort. The
         // cached-manifest guard serializes this purge with record insertion.
         if let Ok(mut table) = self.peer_convergence.lock() {
@@ -773,10 +762,6 @@ impl CohortManifestState {
             .map_err(|_| CohortError::EStatePoisoned)?
             .clear();
         self.admitted_digest_reads
-            .lock()
-            .map_err(|_| CohortError::EStatePoisoned)?
-            .clear();
-        self.admitted_index
             .lock()
             .map_err(|_| CohortError::EStatePoisoned)?
             .clear();
@@ -1287,15 +1272,10 @@ impl CohortManifestState {
         peer: &HostId,
         request_id: &str,
     ) -> Result<(), CohortError> {
-        let key = (peer.as_str().to_string(), request_id.to_string());
-        self.admitted_index
-            .lock()
-            .map_err(|_| CohortError::EStatePoisoned)?
-            .remove(&key);
         self.admitted_digest_reads
             .lock()
             .map_err(|_| CohortError::EStatePoisoned)?
-            .remove(&key);
+            .remove(&(peer.as_str().to_string(), request_id.to_string()));
         Ok(())
     }
 
@@ -1347,130 +1327,6 @@ impl CohortManifestState {
             .map(|map| map.len())
             .unwrap_or(0)
     }
-
-    /// Story 23-2 (round 2) — the live manifest version a digest admission decided now is
-    /// bound to, and whether `(requester, request_id)` is already admitted (a duplicate needs
-    /// no identity). The version is the one the consent decision is taken against; pass it to
-    /// [`Self::note_admitted_request_at_version`] so a reissue in between refuses the admission.
-    ///
-    /// # Errors
-    /// Poisoned state.
-    pub fn digest_admission_snapshot(
-        &self,
-        requester: &HostId,
-        request_id: &str,
-    ) -> Result<(u64, bool), String> {
-        let version = self.live_version.load(Ordering::SeqCst);
-        let key = (requester.as_str().to_string(), request_id.to_string());
-        let admitted = self
-            .admitted_index
-            .lock()
-            .map_err(|_| CohortError::EStatePoisoned.to_string())?
-            .contains(&key);
-        Ok((version, admitted))
-    }
-
-    /// As [`DigestReadPort::note_admitted_request_guarded`], but the grant is bound to
-    /// `expected_version` and the admission is REFUSED (typed, nothing published) when the
-    /// manifest is no longer at that version at commit.
-    ///
-    /// # Errors
-    /// Refusal, stale version, poisoned state or a failed guard/audit.
-    pub fn note_admitted_request_at_version(
-        &self,
-        requester: &HostId,
-        request_id: &str,
-        frame: &IacFrame,
-        expected_version: u64,
-        before_commit: &mut dyn FnMut() -> Result<(), String>,
-    ) -> Result<(), String> {
-        self.admit_digest_request(
-            requester,
-            request_id,
-            frame,
-            Some(expected_version),
-            before_commit,
-        )
-    }
-
-    fn admit_digest_request(
-        &self,
-        requester: &HostId,
-        request_id: &str,
-        frame: &IacFrame,
-        expected_version: Option<u64>,
-        before_commit: &mut dyn FnMut() -> Result<(), String>,
-    ) -> Result<(), String> {
-        let DigestReadControl::Request {
-            request_id: parsed_id,
-            scope,
-        } = DigestReadControl::from_frame(frame).map_err(|error| error.to_string())?
-        else {
-            return Err("admitted digest frame is not a request".into());
-        };
-        if parsed_id != request_id {
-            return Err("classified request id changed before admission".into());
-        }
-        let version = match expected_version {
-            Some(version) => version,
-            None => {
-                self.cached
-                    .lock()
-                    .map_err(|_| CohortError::EStatePoisoned.to_string())?
-                    .manifest
-                    .version
-            }
-        };
-        let key = (requester.as_str().to_string(), request_id.to_string());
-        let mut admitted = self
-            .admitted_digest_reads
-            .lock()
-            .map_err(|_| CohortError::EStatePoisoned.to_string())?;
-        if admitted.contains_key(&key) {
-            return Ok(());
-        }
-        let mut queue = self
-            .pending_digest_replies
-            .lock()
-            .map_err(|_| CohortError::EStatePoisoned.to_string())?;
-        if admitted.len() >= MAX_PENDING_DIGEST_READS || queue.len() >= MAX_PENDING_DIGEST_READS {
-            return Err(CohortError::EDigestCapacityExceeded(
-                "target has too many admitted digest reads".into(),
-            )
-            .to_string());
-        }
-        // A reissue stores the new version BEFORE it clears the grants, and waits for the
-        // admitted lock held here: either it is visible now (refuse) or it clears this grant.
-        let current = self.live_version.load(Ordering::SeqCst);
-        if expected_version.is_some_and(|expected| expected != current) {
-            return Err(CohortError::EDigestAdmissionStale {
-                expected: version,
-                current,
-            }
-            .to_string());
-        }
-        before_commit()?;
-        self.audit
-            .append(&CohortAuditEvent::DigestReadRequested {
-                requester: requester.as_str().to_string(),
-                request_id: request_id.to_string(),
-                scope: scope.clone(),
-            })
-            .map_err(|error| error.to_string())?;
-        self.admitted_index
-            .lock()
-            .map_err(|_| CohortError::EStatePoisoned.to_string())?
-            .insert(key.clone());
-        admitted.insert(
-            key.clone(),
-            DigestGrant {
-                scope: scope.clone(),
-                manifest_version: version,
-            },
-        );
-        queue.push((key.0, key.1, scope));
-        Ok(())
-    }
 }
 
 impl DigestReadPort for CohortManifestState {
@@ -1509,7 +1365,57 @@ impl DigestReadPort for CohortManifestState {
         frame: &IacFrame,
         before_commit: &mut dyn FnMut() -> Result<(), String>,
     ) -> Result<(), String> {
-        self.admit_digest_request(requester, request_id, frame, None, before_commit)
+        let DigestReadControl::Request {
+            request_id: parsed_id,
+            scope,
+        } = DigestReadControl::from_frame(frame).map_err(|error| error.to_string())?
+        else {
+            return Err("admitted digest frame is not a request".into());
+        };
+        if parsed_id != request_id {
+            return Err("classified request id changed before admission".into());
+        }
+        let version = self
+            .cached
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned.to_string())?
+            .manifest
+            .version;
+        let key = (requester.as_str().to_string(), request_id.to_string());
+        let mut admitted = self
+            .admitted_digest_reads
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned.to_string())?;
+        if admitted.contains_key(&key) {
+            return Ok(());
+        }
+        let mut queue = self
+            .pending_digest_replies
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned.to_string())?;
+        if admitted.len() >= MAX_PENDING_DIGEST_READS || queue.len() >= MAX_PENDING_DIGEST_READS {
+            return Err(CohortError::EDigestCapacityExceeded(
+                "target has too many admitted digest reads".into(),
+            )
+            .to_string());
+        }
+        before_commit()?;
+        self.audit
+            .append(&CohortAuditEvent::DigestReadRequested {
+                requester: requester.as_str().to_string(),
+                request_id: request_id.to_string(),
+                scope: scope.clone(),
+            })
+            .map_err(|error| error.to_string())?;
+        admitted.insert(
+            key.clone(),
+            DigestGrant {
+                scope: scope.clone(),
+                manifest_version: version,
+            },
+        );
+        queue.push((key.0, key.1, scope));
+        Ok(())
     }
 
     fn authorize_reply_send(&self, peer: &HostId, request_id: &str) -> bool {

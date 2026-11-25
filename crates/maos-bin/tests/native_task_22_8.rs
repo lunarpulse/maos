@@ -450,17 +450,25 @@ fn the_default_cast_boots_keyless_in_deterministic_mode() {
     );
 }
 
-/// Story 23-2 F2c (round 2, C1): Mira's turns are serialised AND each caller's mints see its own
-/// assertion. Overlapping callers of one runner each wait for the turn before them; none is
-/// refused with a busy scope, none mints under another's assertion (the probe records, per
-/// invocation, which caller it served and the principal its supply resolved), and no scope
-/// outlives its turn. The first invocation is HELD at a gate until another caller has started
-/// its own `run`: no sleep makes the callers overlap.
+/// Story 23-2 F2c (round 2, C1; round 3, P1-11): Mira's turns are serialised AND each caller's
+/// mints see its own assertion. Overlapping callers of one runner each wait for the turn before
+/// them; none is refused with a busy scope, none mints under another's assertion (the probe
+/// records, per invocation, which caller it served and the principal its supply resolved), and no
+/// scope outlives its turn.
+///
+/// The overlap is synchronised at Mira's serialisation point, not before it. The first invocation
+/// is HELD at a gate that opens only when `MiraRunner::contended_turns()` shows that every OTHER
+/// caller found the turn taken and is waiting for it (the counter is incremented at the lock,
+/// `try_lock` failing while the first call owns the turn). Without the serial lock nobody ever
+/// finds the turn taken, the gate never opens and the test fails by its own deadline: no
+/// scheduling decides the verdict.
 struct ScopeProbe {
     /// (caller index parsed from the prompt, the principal the supply resolved) per invocation.
     seen: Mutex<Vec<(usize, Option<String>)>>,
-    /// Callers announce themselves here just before `run`.
-    started: Mutex<std::sync::mpsc::Receiver<usize>>,
+    /// The runner under test, set once it exists (weak: the runner owns this probe).
+    runner: std::sync::OnceLock<std::sync::Weak<maos_bin::native_task::MiraRunner>>,
+    /// How many other callers must be observed waiting for the turn before the first is released.
+    others: usize,
     /// The first invocation takes the gate; later ones pass straight through.
     held: std::sync::atomic::AtomicBool,
     in_flight: std::sync::atomic::AtomicUsize,
@@ -481,16 +489,23 @@ impl InferencePort for ScopeProbe {
         self.max_in_flight.fetch_max(inside, SeqCst);
         let seen = maos_bin::assertion_supply::supply(SCOPE_PID);
         if !self.held.swap(true, SeqCst) {
-            // Hold the first turn open until a DIFFERENT caller has begun its `run`; a held
-            // gate that never opens fails the test.
-            let started = self.started.lock().unwrap();
-            loop {
-                let other = started
-                    .recv_timeout(WAIT)
-                    .expect("no second caller ever started while the first turn was held");
-                if other != caller {
-                    break;
-                }
+            // Hold the first turn open until every other caller is observed blocked at Mira's
+            // serial lock while this turn owns it; a gate that never opens fails the test.
+            let runner = self
+                .runner
+                .get()
+                .and_then(std::sync::Weak::upgrade)
+                .expect("the runner is registered with its probe");
+            let until = Instant::now() + WAIT;
+            while runner.contended_turns() < self.others {
+                assert!(
+                    Instant::now() < until,
+                    "the other callers never found Mira's turn taken ({} of {}): \
+                     the turns are not serialised",
+                    runner.contended_turns(),
+                    self.others
+                );
+                std::thread::sleep(Duration::from_millis(1));
             }
         }
         self.seen.lock().unwrap().push((caller, seen));
@@ -516,28 +531,27 @@ fn overlapping_mira_turns_are_serialised_and_never_share_a_scope() {
     use maos_bin::directed_task::TaskRunner;
     use std::sync::atomic::Ordering::SeqCst;
     let kernel = Kernel::new();
-    let (announce, started) = std::sync::mpsc::channel::<usize>();
+    let tokens: Vec<String> = (0..6)
+        .map(|n| format!("t{n}-head.t{n}-claims.t{n}-sig"))
+        .collect();
     let probe = Arc::new(ScopeProbe {
         seen: Mutex::new(Vec::new()),
-        started: Mutex::new(started),
+        runner: std::sync::OnceLock::new(),
+        others: tokens.len() - 1,
         held: std::sync::atomic::AtomicBool::new(false),
         in_flight: std::sync::atomic::AtomicUsize::new(0),
         max_in_flight: std::sync::atomic::AtomicUsize::new(0),
     });
-    let runner = kernel.mira_runner_at(SCOPE_PID, Some(probe.clone()));
-    let tokens: Vec<String> = (0..6)
-        .map(|n| format!("t{n}-head.t{n}-claims.t{n}-sig"))
-        .collect();
+    let runner = Arc::new(kernel.mira_runner_at(SCOPE_PID, Some(probe.clone())));
+    probe.runner.set(Arc::downgrade(&runner)).unwrap();
     let results: Vec<Result<String, &'static str>> = std::thread::scope(|scope| {
         let workers: Vec<_> = tokens
             .iter()
             .enumerate()
             .map(|(n, token)| {
                 let runner = &runner;
-                let announce = announce.clone();
                 scope.spawn(move || {
                     let assertion = maos_control::Assertion::parse(token).unwrap();
-                    announce.send(n).unwrap();
                     runner
                         .run(
                             [n as u8 + 1; 16],
@@ -552,6 +566,11 @@ fn overlapping_mira_turns_are_serialised_and_never_share_a_scope() {
             .collect();
         workers.into_iter().map(|w| w.join().unwrap()).collect()
     });
+    assert_eq!(
+        runner.contended_turns(),
+        tokens.len() - 1,
+        "every caller but the first found the turn taken and waited for it"
+    );
     for result in &results {
         assert!(
             result.is_ok(),

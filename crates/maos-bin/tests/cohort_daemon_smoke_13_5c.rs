@@ -1133,8 +1133,8 @@ fn composition_root_does_not_seed_manifest_scopes() {
             "bounded_resolver.rs",
             include_str!("../src/bounded_resolver.rs"),
         ),
-        // Story 23-2 — the governed digest-read decorator. It resolves an SSO identity and
-        // delegates to the cohort state; it never seeds the manifest-derived policy table.
+        // Story 23-2 — the governed digest-read decorator. It runs the governance chain around
+        // the cohort state; it never seeds the manifest-derived policy table.
         (
             "governed_digest_read.rs",
             include_str!("../src/governed_digest_read.rs"),
