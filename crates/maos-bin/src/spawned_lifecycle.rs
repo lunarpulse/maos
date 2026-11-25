@@ -21,6 +21,8 @@ use crate::supervision::BindingCore;
 
 /// What a hook learns when its session did not answer.
 pub const SESSION_ENDED: &str = "session_ended";
+/// The session ended before the guest was entered for this call: the trigger never ran.
+pub const NOT_ENTERED: &str = "session_ended_not_entered";
 pub const DEADLINE: &str = "deadline";
 /// A trigger that found its session busy for half its budget: dropped, never a strike.
 pub const BUSY: &str = "busy";
@@ -38,6 +40,8 @@ const WALL_SLACK: Duration = Duration::from_secs(2);
 pub enum Answer {
     Reply(LifecycleReply),
     SessionEnded,
+    /// The session closed and drained this call before the guest was entered for it.
+    NotEntered,
 }
 
 /// How far one queued export got. A hook that gives up and the session that answers race for
@@ -221,6 +225,18 @@ pub struct Prewarm {
     /// Where this swap attempt must be over, however long its stages' budgets: set when the
     /// attempt began, shared by the pre-warm and every exchange of the swap.
     pub deadline: Instant,
+    /// Where this successor's stderr rows go, until the session that adopts it takes over.
+    pub(crate) log: PrewarmLog,
+}
+
+/// The journal row writer of a pre-warmed successor's stderr (Story 22-9): the Spirit's pid and
+/// id, and the same row/byte bound a serving session applies.
+pub(crate) struct PrewarmLog {
+    pub(crate) tl: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+    pub(crate) spirit_id: String,
+    pub(crate) pid: u32,
+    pub(crate) dropped: u64,
+    pub(crate) budget: crate::spirit_session::DiagnosticBudget,
 }
 
 /// A committed successor: the predecessor's session adopts it.
@@ -231,10 +247,12 @@ pub struct Handover {
 
 impl Prewarm {
     /// The next stdout frame of a child nobody else is serving, never past `deadline`. Stderr
-    /// is drained and dropped, but every line is a turn of this loop, so a guest that never
-    /// stops writing diagnostics cannot outlast its cap; a frame that arrives late is refused.
+    /// is journaled as `spirit.diagnostic` rows tagged `prewarm` (Story 22-9) under the serving
+    /// bound, then dropped with the overflow counted; every line is a turn of this loop, so a
+    /// guest that never stops writing diagnostics cannot outlast its cap; a frame that arrives
+    /// late is refused.
     fn next_stdout(&mut self, deadline: Instant) -> Result<Vec<u8>, String> {
-        next_stdout_on(&mut Live(self), deadline)
+        next_stdout_on(&mut Live(self), deadline, &mut false)
     }
 
     /// The request's write, held to the same wall as its reply by the transport's own
@@ -286,6 +304,11 @@ trait StageIo {
     fn now(&self) -> Instant;
     fn write(&mut self, body: &[u8], deadline: Instant) -> Result<(), String>;
     fn poll(&mut self, wait: Duration) -> Result<BridgePoll, String>;
+    /// One guest stderr line; the scripted clock of the unit tests has no journal.
+    fn stderr(&mut self, _line: &[u8]) {}
+    /// A stage's reply was valid but its stage-end sentinel never came before the stage's
+    /// deadline or the child's close; the scripted clock of the unit tests has no operator.
+    fn stage_end_missing(&mut self, _why: &str) {}
 }
 
 struct Live<'a>(&'a mut Prewarm);
@@ -305,16 +328,60 @@ impl StageIo for Live<'_> {
             .poll_frame(wait)
             .map_err(|error| format!("child_poll: {error}"))
     }
+
+    fn stderr(&mut self, line: &[u8]) {
+        let log = &mut self.0.log;
+        crate::spirit_session::journal_guest_diagnostic(
+            &log.tl,
+            (&log.spirit_id, log.pid, self.0.bridge.child_pid()),
+            (&mut log.dropped, &mut log.budget),
+            line,
+            Some("prewarm"),
+        );
+    }
+
+    fn stage_end_missing(&mut self, why: &str) {
+        eprintln!(
+            "{{\"event\":\"prewarm_stage_end_missing\",\"child_pid\":{},\"why\":\"{why}\"}}",
+            self.0.bridge.child_pid()
+        );
+    }
 }
 
-fn next_stdout_on<I: StageIo>(io: &mut I, deadline: Instant) -> Result<Vec<u8>, String> {
+/// One stderr line of a stage: journaled, except the runner's stage-end sentinel, which is
+/// never a diagnostic (only the guest bytes the sentinel joined on an unterminated line are).
+/// `true` when the line carried the sentinel.
+fn route_stderr<I: StageIo>(io: &mut I, line: &[u8]) -> bool {
+    match maos_frame_codec::split_stage_end(line) {
+        Some(guest) => {
+            if !guest.is_empty() {
+                io.stderr(guest);
+            }
+            true
+        }
+        None => {
+            io.stderr(line);
+            false
+        }
+    }
+}
+
+/// `stage_end` is set when the stage's sentinel line is read, before or after the reply.
+fn next_stdout_on<I: StageIo>(
+    io: &mut I,
+    deadline: Instant,
+    stage_end: &mut bool,
+) -> Result<Vec<u8>, String> {
     loop {
         let left = deadline.saturating_duration_since(io.now());
         if left.is_zero() {
             return Err(DEADLINE.into());
         }
         match io.poll(left.min(Duration::from_millis(20)))? {
-            BridgePoll::Idle | BridgePoll::Data(SubStream::Stderr, _) => {}
+            BridgePoll::Idle => {}
+            BridgePoll::Data(SubStream::Stderr, line) => {
+                *stage_end |= route_stderr(io, &line);
+            }
             BridgePoll::Closed => return Err("child_closed".into()),
             BridgePoll::Data(SubStream::Stdout, bytes) => {
                 return if io.now() > deadline {
@@ -322,6 +389,36 @@ fn next_stdout_on<I: StageIo>(io: &mut I, deadline: Instant) -> Result<Vec<u8>, 
                 } else {
                     Ok(bytes)
                 };
+            }
+        }
+    }
+}
+
+/// After a stage's reply: the guest lines it wrote before that reply. The runner writes the
+/// stage-end sentinel to stderr right before the reply frame, and stderr is one ordered stream,
+/// so reading to the sentinel reads every earlier line however the two reader threads raced to
+/// enqueue the reply and those lines (the reply can be dequeued before any of them). Each line
+/// is journaled as it arrives; the sentinel itself never is. A deadline or a close before the
+/// sentinel leaves the stage's valid reply as it is (the child may be dying): it is reported,
+/// never a failure. A second stdout frame is the one thing a request/reply child must not send.
+fn drain_to_stage_end<I: StageIo>(io: &mut I, deadline: Instant) -> Result<(), String> {
+    loop {
+        let left = deadline.saturating_duration_since(io.now());
+        if left.is_zero() {
+            io.stage_end_missing(DEADLINE);
+            return Ok(());
+        }
+        match io.poll(left.min(Duration::from_millis(20)))? {
+            BridgePoll::Idle => {}
+            BridgePoll::Closed => {
+                io.stage_end_missing("child_closed");
+                return Ok(());
+            }
+            BridgePoll::Data(SubStream::Stdout, _) => return Err("child_protocol".into()),
+            BridgePoll::Data(SubStream::Stderr, line) => {
+                if route_stderr(io, &line) {
+                    return Ok(());
+                }
             }
         }
     }
@@ -338,11 +435,16 @@ fn exchange_on<I: StageIo>(
     let deadline = (io.now() + cap).min(attempt);
     let body = wire::encode_request(request).map_err(|error| format!("encode: {error}"))?;
     io.write(&body, deadline)?;
-    let bytes = next_stdout_on(io, deadline)?;
+    let mut stage_end = false;
+    let bytes = next_stdout_on(io, deadline, &mut stage_end)?;
     if !wire::is_reply(&bytes) {
         return Err("child_protocol".into());
     }
-    wire::decode_reply(&bytes).map_err(|error| format!("decode: {error}"))
+    let reply = wire::decode_reply(&bytes).map_err(|error| format!("decode: {error}"))?;
+    if !stage_end {
+        drain_to_stage_end(io, deadline)?;
+    }
+    Ok(reply)
 }
 
 /// Ends the successor's declaration attempt: `true` at commit, `false` when it is dropped first.
@@ -535,7 +637,7 @@ impl LifecycleLink {
         };
         loop {
             if self.closed.load(Ordering::Acquire) {
-                return Err(SESSION_ENDED.into());
+                return Err(NOT_ENTERED.into());
             }
             match self.tx.try_send(call) {
                 Ok(()) => break,
@@ -547,13 +649,14 @@ impl LifecycleLink {
                     state.cancel_queued();
                     return Err(BUSY.into());
                 }
-                Err(TrySendError::Disconnected(_)) => return Err(SESSION_ENDED.into()),
+                Err(TrySendError::Disconnected(_)) => return Err(NOT_ENTERED.into()),
             }
         }
         loop {
             match reply.recv_timeout(Duration::from_millis(20)) {
                 Ok(Answer::Reply(reply)) => return Ok(reply),
                 Ok(Answer::SessionEnded) => return Err(SESSION_ENDED.into()),
+                Ok(Answer::NotEntered) => return Err(NOT_ENTERED.into()),
                 // A session that ended after this call queued (its `close` drained first) never
                 // answers: fail now, not at the cap.
                 Err(RecvTimeoutError::Disconnected) => return Err(SESSION_ENDED.into()),
@@ -666,7 +769,7 @@ impl LifecycleLink {
     pub fn close(&self) {
         self.closed.store(true, Ordering::Release);
         while let Some(call) = self.take() {
-            let _ = call.answer.send(Answer::SessionEnded);
+            let _ = call.answer.send(Answer::NotEntered);
         }
     }
 
@@ -1038,9 +1141,6 @@ impl SwapHandles {
     }
 }
 
-/// How long a successor's pre-warm waits for the predecessor's own lifecycle probe.
-const PROBE_WAIT: Duration = Duration::from_secs(5);
-
 /// Slack past a component's start budget before a cold swap gives up waiting for its probe.
 const READY_GRACE: Duration = Duration::from_secs(5);
 
@@ -1105,15 +1205,19 @@ pub fn spawned_successor(
         .lifecycle()
         .swap_context()
         .ok_or("spawned_swap_unsupported")?;
-    match target.lifecycle().wait_supported(PROBE_WAIT) {
+    // D-21-PF-15 A / D-22-9-10 A: the door waits for the component's own lifecycle probe on
+    // the one attempt deadline, never a retry the operator must issue.
+    match target
+        .lifecycle()
+        .wait_supported(ATTEMPT_WALL.saturating_sub(began.elapsed()))
+    {
         Some(true) => {}
         Some(false) => {
             return Err("spawned_swap_unsupported: the running Spirit exports no lifecycle".into())
         }
-        // A slow component start (a TypeScript guest compiles for seconds) is not a missing export.
         None => {
             return Err(
-                "spawned_swap_not_ready: the running Spirit has not finished starting; retry"
+                "spawned_swap_not_ready: the running Spirit did not finish starting within the attempt wall"
                     .into(),
             )
         }
@@ -1136,11 +1240,18 @@ pub fn spawned_successor(
     effective.declared_scopes = successor_scopes;
     // Story 21-7: a swap keeps or narrows consent; the successor's declaration replaces the
     // predecessor's only at the committed handover.
-    let policy = Arc::clone(
-        (handles.session)(Arc::clone(&supervisor))
-            .iac
-            .consent_policy(),
-    );
+    let session = (handles.session)(Arc::clone(&supervisor));
+    crate::admission::check_consent_recipients(&gated, &|id| {
+        crate::admission::host_knows(id, &|loaded| {
+            supervisor.spawned_target(loaded).is_some()
+                || session
+                    .pid_by_spirit_id
+                    .read()
+                    .is_ok_and(|held| held.contains_key(loaded))
+        })
+    })
+    .map_err(refused)?;
+    let policy = Arc::clone(session.iac.consent_policy());
     let grants = gated.consent.as_ref().map(|c| c.recall.clone());
     if let Some(change) = policy.widened_by(&class.name, grants.as_ref()) {
         return Err(format!("swap_consent_widened: the successor {change}"));
@@ -1190,6 +1301,13 @@ pub fn spawned_successor(
         scopes: launch.scopes,
         sandbox: effective.clone(),
         deadline: began + ATTEMPT_WALL,
+        log: PrewarmLog {
+            tl: Arc::clone(tl),
+            spirit_id: class.name.clone(),
+            pid: target.spirit_pid(),
+            dropped: 0,
+            budget: Default::default(),
+        },
     };
     let launch_failed = |error: String| format!("spawned_swap_launch_failed: {error}");
     prewarm
@@ -1263,9 +1381,9 @@ impl LifecycleCallers {
 
     /// Stop and join every caller; each holds the scheduler and the capability registry, so
     /// the audit writer cannot drain while one runs.
-    pub async fn shutdown(self) {
+    pub async fn shutdown(mut self) {
         self.cancel.cancel();
-        for (name, handle) in self.watchdogs {
+        for (name, handle) in std::mem::take(&mut self.watchdogs) {
             match tokio::time::timeout(Duration::from_secs(5), handle).await {
                 Ok(Ok(())) => {}
                 Ok(Err(error)) => {
@@ -1275,6 +1393,14 @@ impl LifecycleCallers {
             }
         }
         self.consolidation.shutdown().await;
+    }
+}
+
+/// A panic or early return that never reaches `shutdown` still stops every caller (the
+/// consolidation watchdog cancels itself when dropped).
+impl Drop for LifecycleCallers {
+    fn drop(&mut self) {
+        self.cancel.cancel();
     }
 }
 
@@ -1378,7 +1504,11 @@ mod tests {
         let mut io = scripted(9, 12, 11);
         let result = run(&mut io, 12, 30);
         assert!(matches!(result, Ok(LifecycleReply::Supported(true))));
-        assert_eq!(io.polls, vec![Duration::from_millis(3)]);
+        // The reply poll, then the stage-end drain on the 1 ms the budget has left.
+        assert_eq!(
+            io.polls,
+            vec![Duration::from_millis(3), Duration::from_millis(1)]
+        );
     }
 
     #[test]
@@ -1387,6 +1517,144 @@ mod tests {
         let mut io = scripted(9, 13, 13);
         let result = run(&mut io, 12, 30);
         refused_after_shared_budget(&io, result);
+    }
+
+    /// Frames in the order the two reader threads happened to enqueue them.
+    struct Arrival {
+        base: Instant,
+        queue: std::collections::VecDeque<BridgePoll>,
+        journaled: Vec<Vec<u8>>,
+        missing: Vec<String>,
+    }
+
+    impl StageIo for Arrival {
+        fn now(&self) -> Instant {
+            self.base
+        }
+
+        fn write(&mut self, _body: &[u8], _deadline: Instant) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn poll(&mut self, _wait: Duration) -> Result<BridgePoll, String> {
+            Ok(self.queue.pop_front().unwrap_or(BridgePoll::Closed))
+        }
+
+        fn stderr(&mut self, line: &[u8]) {
+            self.journaled.push(line.to_vec());
+        }
+
+        fn stage_end_missing(&mut self, why: &str) {
+            self.missing.push(why.into());
+        }
+    }
+
+    fn arrival(order: Vec<BridgePoll>) -> Arrival {
+        Arrival {
+            base: Instant::now(),
+            queue: order.into(),
+            journaled: Vec::new(),
+            missing: Vec::new(),
+        }
+    }
+
+    fn stage_reply() -> BridgePoll {
+        BridgePoll::Data(
+            SubStream::Stdout,
+            wire::encode_reply(&LifecycleReply::Supported(true)).unwrap(),
+        )
+    }
+
+    fn stderr_line(line: &[u8]) -> BridgePoll {
+        BridgePoll::Data(SubStream::Stderr, line.to_vec())
+    }
+
+    fn exchange(io: &mut Arrival) -> Result<LifecycleReply, String> {
+        exchange_on(
+            io,
+            &LifecycleRequest::Probe,
+            Duration::from_secs(1),
+            io.base + Duration::from_secs(1),
+        )
+    }
+
+    #[test]
+    fn a_line_written_before_the_reply_is_journaled_whichever_arrived_first() {
+        let sentinel = maos_frame_codec::STAGE_END_SENTINEL.as_bytes();
+        // The stderr reader lost the race: the reply is in the channel ahead of the line the
+        // guest wrote first, and of the sentinel the runner wrote right after it.
+        let mut late = arrival(vec![
+            stage_reply(),
+            stderr_line(b"swap-in line"),
+            stderr_line(sentinel),
+        ]);
+        assert!(matches!(
+            exchange(&mut late),
+            Ok(LifecycleReply::Supported(true))
+        ));
+        assert_eq!(late.journaled, vec![b"swap-in line".to_vec()]);
+        assert!(late.missing.is_empty());
+        // The reader that raced ahead by only the line: the reply sits between it and the sentinel.
+        let mut middle = arrival(vec![
+            stderr_line(b"swap-in line"),
+            stage_reply(),
+            stderr_line(sentinel),
+        ]);
+        assert!(matches!(
+            exchange(&mut middle),
+            Ok(LifecycleReply::Supported(true))
+        ));
+        assert_eq!(middle.journaled, late.journaled);
+        assert!(middle.missing.is_empty());
+        // The order the runner wrote them: line, sentinel, reply. Nothing is left to drain.
+        let mut written = arrival(vec![
+            stderr_line(b"swap-in line"),
+            stderr_line(sentinel),
+            stage_reply(),
+        ]);
+        assert!(matches!(
+            exchange(&mut written),
+            Ok(LifecycleReply::Supported(true))
+        ));
+        assert_eq!(written.journaled, late.journaled);
+        assert!(written.missing.is_empty() && written.queue.is_empty());
+    }
+
+    #[test]
+    fn the_stage_end_sentinel_is_never_a_diagnostic_but_an_unterminated_guest_line_is() {
+        // The guest's last line had no LF, so the runner's sentinel joined it.
+        let joined = [
+            b"no newline".as_slice(),
+            maos_frame_codec::STAGE_END_SENTINEL.as_bytes(),
+        ]
+        .concat();
+        let mut io = arrival(vec![
+            stage_reply(),
+            stderr_line(b"first"),
+            stderr_line(&joined),
+        ]);
+        assert!(exchange(&mut io).is_ok());
+        assert_eq!(
+            io.journaled,
+            vec![b"first".to_vec(), b"no newline".to_vec()]
+        );
+    }
+
+    #[test]
+    fn a_missing_sentinel_never_fails_a_valid_reply() {
+        let mut closed = arrival(vec![stage_reply(), stderr_line(b"before the child died")]);
+        assert!(matches!(
+            exchange(&mut closed),
+            Ok(LifecycleReply::Supported(true))
+        ));
+        assert_eq!(closed.journaled, vec![b"before the child died".to_vec()]);
+        assert_eq!(closed.missing, vec!["child_closed".to_string()]);
+    }
+
+    #[test]
+    fn a_second_stdout_frame_after_the_reply_is_a_protocol_error() {
+        let mut io = arrival(vec![stage_reply(), stage_reply()]);
+        assert!(matches!(exchange(&mut io), Err(e) if e == "child_protocol"));
     }
     use super::*;
 

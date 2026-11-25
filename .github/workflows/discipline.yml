@@ -281,7 +281,7 @@ jobs:
         id: check-pentest-gate
         if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
         run: cargo run -p xtask -- check-pentest-gate --json
-      # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
+      # Story 10.2 AC1, simplified by Story 22-7 — third-party trial gate (conditional: advisory-if-absent); no N floor.
       # Story 15-3 AC2(b): the ship-phase env block that stood on the old job is retired. A GitHub *repository
       # variable* could move this one gate's ship phase with no code change, and `check-env-contract` can never see
       # it (it scans only the maos-bin src tree), so it was a third phase source no instrument could audit. The
@@ -577,22 +577,10 @@ jobs:
   kloc-check:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # BLOCKING since 2026-07-25 (founder-ratified ceiling-policy replacement).
-    # Was ADVISORY from 2026-06-11 under the "tight measured residual" rule, whose
-    # own revert condition read: "revert to blocking once the kernel-core
-    # decomposition lands and the ceilings can be met honestly."
-    # HONEST STATUS OF THAT CONDITION: the second half is met, the first is NOT.
-    # Decomposition Phase 3/4 has still not landed (kernel-core is 17,890 against
-    # an Epic-5 target of ~5,400 — a target whose own named extractions only ever
-    # totalled ~13,627 LOC, so it was never reachable as written). What changed is
-    # that ceilings are now set by a rule that leaves real operating capacity
-    # (`measured + max(100, ceil(0.02 * measured))`, see xtask/kloc.toml), so the
-    # gate can be met honestly and is therefore enforceable. It was advisory
-    # BECAUSE tight-residual made it unshippable, not because breaches were
-    # acceptable. Slack is capacity, NOT authorization: kernel-core changes still
-    # require a measured FLAG-Winston grant plus a kernel-core-baseline.toml
-    # HISTORY row, enforced separately by the BLOCKING check-kernel-baseline job.
-    # Phase 4 decomposition remains tracked architectural debt in kloc.toml.
+    # BLOCKING on one row only: `maos-kernel-core` above its xtask/kloc.toml row (the ADR-069
+    # envelope, 24,000, alarm 23,000) reds the job. Every other crate is measured and printed as
+    # a size table, never gated (operator decision 11, lean-gates WP-23, confirmed 2026-11-24).
+    # The kernel exact pin is enforced separately by the BLOCKING check-kernel-baseline job.
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -610,7 +598,7 @@ jobs:
           # Cargo.lock for reproducibility.
           cargo install --locked --version ${TOKEI_VERSION} tokei
       - name: Run kloc-check
-        run: cargo run -p xtask -- kloc-check --json
+        run: cargo run -p xtask -- kloc-check
 
   abi-diff:
     runs-on: ubuntu-24.04
@@ -689,6 +677,14 @@ jobs:
           cargo build -p worker --bin worker-cli-fixture
           cargo test -p maos-bin --test verb_table_15_3 -- --test-threads=1
           cargo test -p maos-bin --no-default-features --test verb_table_15_3 -- --test-threads=1
+      - name: Build and test the maos-bin profile without online-adapters (23-0 AC6, D-23-6-01 A iii)
+        run: |
+          cargo check --locked -p maos-bin --lib --bins --tests --no-default-features --features network,wasm-host
+          cargo test --locked -p maos-bin --no-default-features --features network,wasm-host --test online_adapters_23_0
+          # the shape-only test must exist and pass in this build (it is cfg-compiled out when the umbrella is on)
+          cargo test --locked -p maos-bin --no-default-features --features network,wasm-host --test online_adapters_23_0 -- --exact the_profile_without_online_adapters_has_network_and_wasm_host 2>&1 | tee "$RUNNER_TEMP/online-shape.log"
+          grep -q "test result: ok. 1 passed" "$RUNNER_TEMP/online-shape.log"
+          cargo test --locked -p maos-bin --test online_adapters_23_0
 
   # Story 20-12 AC1 — every test binary in the workspace suite's nextest junit
   # keeps its Σ per-test time under its `xtask/test-budgets.toml` budget
@@ -942,7 +938,7 @@ jobs:
 
   example-spirit-ts-tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: [check-workspace-count]
     steps:
       - uses: actions/checkout@v5
@@ -997,6 +993,51 @@ jobs:
         with:
           name: example-spirit-ts-component
           path: examples/example-spirit-ts/dist/spirit.wasm
+          if-no-files-found: error
+      # Story 22-7 AC1: the worked domain example (examples/incident-triage-ts) is built the same way and
+      # its component is what `domain_spirit_22_7` below publishes, installs and asks.
+      - name: Build, test, and componentize the domain example (Story 22-7)
+        shell: bash
+        run: |
+          set +e
+          (
+            cd examples/incident-triage-ts
+            npm ci &&
+              npm test &&
+              npm run build &&
+              npm run componentize
+          ) 2>&1 | tee incident-triage-ts.log
+          rc=${PIPESTATUS[0]}
+          vitest_verdict="$(
+            sed -E $'s/\x1B\\[[0-?]*[ -/]*[@-~]//g' incident-triage-ts.log |
+              tr -d '\r' |
+              grep -E '^[[:space:]]*Tests[[:space:]]+' |
+              paste -sd';' -
+          )"
+          if [ "$rc" -eq 0 ] && [ -z "$vitest_verdict" ]; then
+            echo "::error title=Domain example::rc=0 vitest=not reported"
+            exit 1
+          fi
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=Domain example::rc=0 vitest=$vitest_verdict"
+          else
+            echo "::error title=Domain example::rc=$rc vitest=${vitest_verdict:-not run}"
+          fi
+          exit "$rc"
+      - name: Record domain component outcome
+        shell: bash
+        run: |
+          component=examples/incident-triage-ts/dist/spirit.wasm
+          if [ ! -s "$component" ]; then
+            echo "::error title=Domain component artifact::missing or empty $component"
+            exit 1
+          fi
+          echo "::notice title=Domain component artifact::bytes=$(stat -c%s "$component") sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+      - name: Upload domain component
+        uses: actions/upload-artifact@v4
+        with:
+          name: incident-triage-ts-component
+          path: examples/incident-triage-ts/dist/spirit.wasm
           if-no-files-found: error
       - name: Build the release WASM runner
         shell: bash
@@ -1108,6 +1149,26 @@ jobs:
             echo "::notice title=Default WASM admission::rc=0 $(grep 'test result' wasm-admission-default.log | paste -sd';' -)"
           else
             echo "::error title=Default WASM admission::rc=$rc"
+          fi
+          exit "$rc"
+      # Story 22-7 AC1 (witness b): the SHIPPED domain Spirit answers `maosctl ask`. The test publishes
+      # examples/incident-triage-ts/manifest.toml and the component built above, installs it, boots
+      # `maos serve` from kit/spirit-author/host.toml.example and asks four texts. The shipped manifest keeps
+      # the template's caps, which need a delegated cgroup, so it runs in the harness's Delegate=yes unit
+      # (the harness passes a fixed environment: the component path crosses as `env NAME=VALUE`).
+      - name: Domain Spirit answers maosctl ask under a delegated cgroup (Story 22-7)
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-domain-spirit --timeout 1500 -- env MAOS_DOMAIN_COMPONENT="$PWD/examples/incident-triage-ts/dist/spirit.wasm" cargo test --locked -p maos-bin --test domain_spirit_22_7 -- --ignored --nocapture 2>&1 | tee domain-spirit-22-7.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            grep -q '^test the_shipped_domain_spirit_answers_maosctl_ask \.\.\. ok$' domain-spirit-22-7.log || { echo "::error title=Domain Spirit::the witness did not run and pass"; rc=1; }
+          fi
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=Domain Spirit::rc=0 $(grep 'test result' domain-spirit-22-7.log | paste -sd';' -)"
+          else
+            echo "::error title=Domain Spirit::rc=$rc"
           fi
           exit "$rc"
 
@@ -4618,7 +4679,7 @@ jobs:
   # bind at HEAD; the live route runs against two databases on Postgres 16.
   check-reza-production-path:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     services:
       postgres:
         image: pgvector/pgvector:pg16

@@ -1,0 +1,19 @@
+AC2 plant A: crates/maos-registry/src/validate.rs boot_gate: 'if sandbox.tier != ManifestTier::T2 {' -> 'if false && sandbox.tier != ManifestTier::T2 {' (marked with the plant tag). Commands: cargo test --locked -p maos-spirit-cli --test validate_22_7; cargo test --locked -p maos-bin --test validate_parity_22_7. Result: validate_refuses_a_component_below_t2 FAILS and validate_and_the_boot_gate_agree_on_every_corpus_manifest FAILS (the 'wasm at T0' corpus entry: the boot gate refuses wasm_component_requires_t2, validate no longer does). Plant reverted.
+
+test validate_refuses_rust_inproc_from_a_registry ... ok
+test validate_refuses_a_missing_required_section ... ok
+test validate_refuses_a_component_that_lacks_the_world_exports ... ok
+test validate_accepts_the_template_manifest_with_a_component ... ok
+test validate_refuses_a_core_module_as_artifact ... ok
+test validate_json_report_is_stable ... ok
+test validate_exit_2_on_a_missing_file ... ok
+test validate_exit_codes_follow_the_verdict ... ok
+test validate_refuses_a_component_below_t2 ... FAILED
+thread 'validate_refuses_a_component_below_t2' (4143112) panicked at crates/maos-spirit-cli/tests/validate_22_7.rs:70:5:
+test result: FAILED. 8 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test validate_is_stricter_than_the_gates_only_by_the_component_check ... ok
+test validate_and_the_boot_gate_agree_on_every_corpus_manifest ... FAILED
+thread 'validate_and_the_boot_gate_agree_on_every_corpus_manifest' (4147399) panicked at crates/maos-bin/tests/validate_parity_22_7.rs:189:9:
+assertion `left == right` failed: wasm at T0: boot-gate verdict
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+rc=101

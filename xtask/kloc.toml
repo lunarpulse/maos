@@ -1,68 +1,9 @@
-# Per-crate production-line ceilings checked by `xtask kloc-check` (physical tokei lines, production code only).
-# Lowering is always allowed. The kernel row is the ADR-069 envelope (23,000) and carries `ENVELOPE ALARM` (read by
-# xtask/tests/recovery_lane_ceiling_rule.rs). History of a ceiling is `git log -p xtask/kloc.toml`, not prose in this file.
+# `xtask kloc-check` measures every crate (physical tokei lines, production code only) and prints the size table.
+# It gates exactly one row, the kernel envelope: ADR-069 as raised by the operator on 2026-11-24 (alarm 23,000; the row
+# may not exceed 24,000, pinned by xtask/tests/recovery_lane_ceiling_rule.rs). Every other crate is measured, never gated
+# (operator decision 11, lean-gates WP-23). History is `git log -p xtask/kloc.toml`, not prose in this file.
 
-
-maos-kernel-core = 23000   # ENVELOPE ALARM: ADR-069 envelope 23,000 (operator ruling 2026-11-22); the exact pin is kernel-core-baseline.toml
-maos-capability = 1650
-maos-cap-registry = 0
-maos-corpus-gen = 2600
-maos-wire = 0
-maos-journal = 0
-maos-spirit-abi = 1150
-maos-spirit-sdk = 1200
-xtask = 51450
-maos-iac = 11000  # RAISED 9900->11000 (story 22-6, operator ruling 2026-11-23): measured 10,863; forecast was +420..+770, actual +1,308 over the 9,555 base
-maos-audit = 9600
-maos-loom-lite = 5850
-maos-manifest = 5350
-
-maos-domain = 11350
-maos-spirit-hello = 482
-maos-providers = 2150
-maos-mcp = 1300
-maos-acp = 750
-maos-a2a = 404
-maos-a2a-core = 5550
-maos-a2a-tcp = 1600
-maos-notify-push = 348
-maos-persistence = 487
-maos-secrets = 636
-maos-compliance = 2350
-maos-control = 1900
-maos-cli = 7700
-maos-bin = 45500
-maos-topology = 1050
-maos-bench = 3100
-
-
-
-"(unknown:spikes)" = 244
-"(unknown:templates)" = 111
-maos-attrs = 111
-maos-cohort = 6500
-maos-director-surface = 900
-maos-egress = 2000
-maos-escape-detector = 447
-maos-eval = 5300
-maos-exec-deps = 458
-maos-frame-codec = 349
-maos-fkcs = 582
-maos-host = 137
-maos-journey-test = 1050
-maos-orchestrator-buffer = 950
-maos-pdp = 538
-maos-registry = 6850
-maos-shell = 775
-maos-siem = 547
-maos-skill = 1400
-maos-spirit-cli = 1050
-maos-spirit-derive = 450
-maos-sso = 491
-maos-telemetry = 650
-maos-wasm-host = 3500
-
-_aggregate_alarm = 158608
+maos-kernel-core = 24000   # ENVELOPE ALARM: ADR-069 envelope 24,000, alarm 23,000 (operator ruling 2026-11-24); the exact pin is kernel-core-baseline.toml
 
 _docs_site_isolation = "ENFORCED by xtask kloc assert_docs_site_zero_rust() — docs-site must contribute 0 Rust LOC"
 

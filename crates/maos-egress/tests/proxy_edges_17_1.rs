@@ -395,6 +395,36 @@ fn a_granted_localhost_hostname_is_not_the_plaintext_loopback_exception() {
     running.proxy.stop_and_join().unwrap();
 }
 
+fn assert_unsafe_upstream_refused(route: &str) {
+    let mut running = start(&[destination(route)], Credential::None, Limits::default());
+    let response = exchange(&running.proxy, &request(route, &running.bearer, ""));
+    assert!(response.starts_with("HTTP/1.1 403"), "{route}: {response}");
+    let rows = running.journal.rows.lock();
+    assert_eq!(rows.len(), 1, "{route}");
+    assert_eq!(rows[0].3, "unsafe-upstream-resolution", "{route}");
+    drop(rows);
+    running.proxy.stop_and_join().unwrap();
+}
+
+/// Pins the literal-address call site of `classify_ip` in `vetted_addresses`.
+#[test]
+fn a_granted_private_or_link_local_literal_is_refused() {
+    for route in ["10.0.0.1:9", "169.254.169.254:9", "192.168.1.1:9"] {
+        assert_unsafe_upstream_refused(route);
+    }
+}
+
+/// Pins the resolved-answer call site: these are not IPv4 literals to
+/// `Ipv4Addr::from_str` but valid host names to the grant parser, and the
+/// system resolver (inet_aton hex forms, no DNS traffic) answers them with a
+/// private and a link-local address.
+#[test]
+fn a_granted_name_resolving_to_private_or_link_local_is_refused() {
+    for route in ["0xa.1:9", "0xa9.0xfe.0xa9fe:9"] {
+        assert_unsafe_upstream_refused(route);
+    }
+}
+
 #[test]
 fn permitted_loopback_reaches_an_authenticated_virtual_host() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();

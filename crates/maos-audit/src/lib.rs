@@ -16,6 +16,7 @@
 pub mod erasure;
 pub mod fr4_classifier;
 pub use fr4_classifier::{classify_fr4_row, Fr4RowDisposition, WriterShapeEntry};
+pub mod halts;
 pub mod log_composition;
 pub mod replay;
 pub mod session;

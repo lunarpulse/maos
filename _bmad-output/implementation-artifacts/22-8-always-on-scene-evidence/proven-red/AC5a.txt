@@ -1,0 +1,18 @@
+AC5 plant (skip re-admission): crates/maos-bin/src/halt_carry.rs admit(): an early 'return Ok(true)' (marked E228-PLANT AC5a) before registry.insert_pending_with_metadata. Command: cargo nextest run --locked -p maos-bin --test halt_carry_22_8 -p maos-journey-test --test journey_always_on. Result: a_pending_halt_is_carried_after_sigterm_and_sigkill FAILS (maosctl halt resolve -> halt_not_pending (HTTP 404), exit 1, expected 0); journey_always_on step (8) resolve FAILS the same way. Plant reverted.
+
+        PASS [   1.101s] (1/4) maos-bin::halt_carry_22_8 a_loaded_spirit_carries_nothing
+        FAIL [   1.049s] (2/4) maos-bin::halt_carry_22_8 a_pending_halt_is_carried_after_sigterm_and_sigkill
+    thread 'a_pending_halt_is_carried_after_sigterm_and_sigkill' (119970) panicked at crates/maos-bin/tests/halt_carry_22_8.rs:306:5:
+    assertion `left == right` failed: stdout: 
+      left: Some(1)
+     right: Some(0)
+        PASS [   1.196s] (3/4) maos-bin::halt_carry_22_8 a_resolved_halt_is_not_carried
+        FAIL [   1.397s] (4/4) maos-journey-test::journey_always_on the_standing_cast_takes_a_task_and_survives_a_restart
+    thread 'the_standing_cast_takes_a_task_and_survives_a_restart' (120245) panicked at crates/maos-journey-test/tests/journey_always_on.rs:354:5:
+    assertion `left == right` failed: stdout: 
+      left: Some(1)
+     right: Some(0)
+     Summary [   4.744s] 4 tests run: 2 passed, 2 failed, 0 skipped
+        FAIL [   1.049s] (2/4) maos-bin::halt_carry_22_8 a_pending_halt_is_carried_after_sigterm_and_sigkill
+        FAIL [   1.397s] (4/4) maos-journey-test::journey_always_on the_standing_cast_takes_a_task_and_survives_a_restart
+rc=100

@@ -116,6 +116,7 @@ mod check_j1_loopback_delegation;
 // j1-crosshost-2c AC5.1 — the two-host signed-run judge. ONE always-`Blocking`
 // hermetic gate: the paid run's evidence is a validated CAPTURE, not a substrate,
 // because a job needing an operator + two hosts + a funded key could never fire.
+mod bless;
 mod check_j1_two_host_signed_run;
 // Story j1-demo-one-command-scene — the one-command J1 founder-loop scene.
 // Orchestration only: it runs the founder loop in an isolated state home, calls
@@ -167,7 +168,9 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// AC3 — KLOC budget check with alarm and hard-fail thresholds.
+    /// Measure every crate with tokei and print the size table; fails only when
+    /// `maos-kernel-core` is above its `xtask/kloc.toml` row (the ADR-069 envelope).
+    /// Other crates are measured, never gated (operator decision 11, WP-23).
     KlocCheck {
         #[arg(long, default_value = "xtask/kloc.toml")]
         config: String,
@@ -410,12 +413,18 @@ enum Commands {
     CheckKernelBaseline {
         #[arg(long)]
         json: bool,
-        /// Print the paste-ready `[kernel_src]` block to stdout for a human to
-        /// commit. There is no in-place rewriter: a gate that heals itself is
-        /// not a gate.
+        /// Print the paste-ready `[kernel_src]` block to stdout (read-only). The
+        /// pin is rewritten by `bless`, never by the gate.
         #[arg(long)]
         emit_pin: bool,
     },
+    /// Lean-gates WP-23 — regenerate every derived artefact from its source, one
+    /// direction only: the kernel pin (`xtask/kernel-core-baseline.toml`),
+    /// `STABILITY.md`, `docs/errors/error-catalog.json`, the ABI reference pages
+    /// (`docs-site/abi/v1`) and the example Spirits from `templates/`. Every
+    /// `--check` gate over one of them names this command when it reds.
+    #[command(name = "bless")]
+    Bless,
     /// Story 17-5 — model-pin currency: every model id pinned in a manifest, the
     /// price book or a `main.rs` provider constructor must be current per
     /// `xtask/model-currency.toml`. Offline; names `file:line` for each violation.
@@ -903,9 +912,10 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Story 10.2 AC1 — third-party trial N=12 gate: parse trial-results.toml,
-    /// assert successes >= 10 + stratification + per-participant validation,
-    /// Wilson CI advisory (conditional per calibrate-per-commit).
+    /// Story 10.2 AC1, simplified by Story 22-7 — third-party trial gate: parse
+    /// trial-results.toml and judge every participant (integrity and the success
+    /// conjunction); no sampling floor, no strata, no Wilson CI (human-author
+    /// denominator removed).
     #[command(name = "check-third-party-trial")]
     CheckThirdPartyTrial {
         #[arg(long)]
@@ -1199,6 +1209,7 @@ fn main() {
             }
         }
         Commands::KlocCheck { config, json } => kloc_check::run(&config, json),
+        Commands::Bless => bless::run(&std::env::current_dir().expect("failed to get current dir")),
         Commands::AbiDiff { base, json } => abi_diff::run(&base, json),
         Commands::InvariantLock {
             changed_files,

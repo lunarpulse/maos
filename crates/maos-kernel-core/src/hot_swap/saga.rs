@@ -113,21 +113,19 @@ impl HotSwapSaga {
         // Story 5.2 review backfill: per AC3, the phase label MUST reflect the
         // saga's current state at compensation time. Exhaustive match — no silent
         // wildcards (carry-forward Epic 4 retro pattern #5).
+        let phase = match self.current_phase {
+            SagaPhase::NotStarted => "NotStarted",
+            SagaPhase::HaltContinuityChecked => "HaltContinuityChecked",
+            SagaPhase::SwapOutFired => "SwapOutFired",
+            SagaPhase::SnapshotTaken => "SnapshotTaken",
+            SagaPhase::SwapInFired => "SwapInFired",
+            SagaPhase::Committed => "Committed",
+        };
+        // 22-9: DiscardSuccessor journals the phase it really reached too
+        // (the unloaded-pid refusal fires at SnapshotTaken, before swap-in).
         let (reason, phase_str) = match &compensation {
-            SagaCompensation::RestorePredecessor { reason } => {
-                let phase = match self.current_phase {
-                    SagaPhase::NotStarted => "NotStarted",
-                    SagaPhase::HaltContinuityChecked => "HaltContinuityChecked",
-                    SagaPhase::SwapOutFired => "SwapOutFired",
-                    SagaPhase::SnapshotTaken => "SnapshotTaken",
-                    SagaPhase::SwapInFired => "SwapInFired",
-                    SagaPhase::Committed => "Committed",
-                };
-                (reason.clone(), phase)
-            }
-            // DiscardSuccessor fires from step 9 (on_swap_in failure), which is
-            // SagaPhase::SwapInFired — NOT SnapshotTaken (the prior label).
-            SagaCompensation::DiscardSuccessor { reason } => (reason.clone(), "SwapInFired"),
+            SagaCompensation::RestorePredecessor { reason }
+            | SagaCompensation::DiscardSuccessor { reason } => (reason.clone(), phase),
             SagaCompensation::AutoRevert { invariant } => {
                 (format!("{invariant:?}"), "PostSwapWindow")
             }

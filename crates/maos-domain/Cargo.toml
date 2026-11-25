@@ -17,6 +17,9 @@ hex = "0.4"
 ed25519-dalek = { version = "2", features = ["std"] }
 sha2 = "0.10"
 getrandom = "0.3"
+# Story 23-0 — the outbound-endpoint policy parses a server-supplied URL with the
+# same parser the IO adapter's ureq uses (url 2.5.9 is already in the kernel closure).
+url = "2.5"
 # Per ADR-010, `maos-domain` carries the trait shapes; adapters in
 # `maos-a2a` implement. The `async-trait` macro is already pulled in by
 # `IacBusPort::deliver` (Story 6.1 broke the sync-only constraint).

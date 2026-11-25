@@ -1,0 +1,3 @@
+plant (E230-PLANT): crates/maos-bin/Cargo.toml network list gains "online-adapters"
+command: cargo test --locked -p maos-bin --no-default-features --features network,wasm-host --test online_adapters_23_0 -- --exact the_profile_without_online_adapters_has_network_and_wasm_host
+result: 'running 0 tests ... 0 passed; 3 filtered out' -> CI's grep -q 'test result: ok. 1 passed' fails, the step is red

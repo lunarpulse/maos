@@ -2988,8 +2988,8 @@ impl DoorInner {
         Self::conflict(
             "spirit_not_directable",
             format!(
-                "spirit '{spirit_id}' is {form}; only installed WASM-component cast members \
-                 answer a directed task"
+                "spirit '{spirit_id}' is {form}, which takes no directed task: a task goes to an \
+                 installed component of the cast or to mira"
             ),
         )
     }

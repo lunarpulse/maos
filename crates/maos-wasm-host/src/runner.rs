@@ -73,9 +73,39 @@ enum RunnerExit {
     UnrepresentableFrame = 5,
     /// A recall reply broke the alternating in-band protocol.
     RecallProtocolDesync = 6,
+    /// The guest waited on a timer; guest timers are unsupported (story 22-9 D-22-9-09 B).
+    GuestTimersUnsupported = 7,
+}
+
+/// The text tokio panics with when a timer is requested on a runtime with no time driver.
+const TIMERS_DISABLED_PANIC: &str = "timers are disabled";
+
+/// Guest timers are unsupported on this release (story 22-9 D-22-9-09 B): the ambient runtime
+/// has no time driver, so a guest that waits on a monotonic-clock timer panics inside the host
+/// binding. Replace that panic with a typed refusal on stderr and a distinct exit status; any
+/// other panic keeps the default hook.
+fn install_guest_timers_refusal() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let payload = info.payload();
+        let message = payload
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+            .unwrap_or("");
+        if message.contains(TIMERS_DISABLED_PANIC) {
+            eprintln!(
+                "maos-wasm-runner: guest_timers_unsupported: the guest waited on a timer; \
+                 guest timers are not supported on this release"
+            );
+            std::process::exit(RunnerExit::GuestTimersUnsupported as i32);
+        }
+        default_hook(info);
+    }));
 }
 
 fn main() -> ExitCode {
+    install_guest_timers_refusal();
     let args = match parse_args() {
         Ok(a) => a,
         Err(e) => {
@@ -384,9 +414,15 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
     // host bindings, which run through `in_tokio`. With no ambient tokio runtime that helper
     // lazily builds its own multi-thread runtime with an I/O driver, whose `epoll_create1` /
     // `eventfd2` the T2 seccomp allow-list refuses with EPERM: the build `unwrap` panicked and
-    // killed the runner on a guest's first `console.log`. A current-thread runtime with no
-    // driver needs no syscall and spawns no thread; wasmtime-wasi finds it ambient and drives
-    // its always-ready stdio futures on this thread. The sandbox allow-list stays as it is.
+    // killed the runner on a guest's first `console.log`. An ambient runtime built here, with no
+    // I/O driver, needs no such syscall; wasmtime-wasi finds it ambient and drives its
+    // always-ready stdio futures on this thread. The sandbox allow-list stays as it is.
+    // Story 22-9 F5 (D-22-9-09 fallback B): a guest timer (`setTimeout` lowers to a
+    // `wasi:clocks/monotonic-clock` pollable) reaches `tokio::time::sleep`, which panics ("timers
+    // are disabled") on this driverless runtime; `main` turns that panic into the typed
+    // `guest_timers_unsupported` refusal. Guest timers are NOT supported on this release: the
+    // one-worker multi-thread runtime that fired them made every governed T2 runner die with
+    // SIGSEGV on hosted CI, so it was withdrawn (see RELEASE-HOLDS, story 22-9).
     let ambient = tokio::runtime::Builder::new_current_thread()
         .build()
         .map_err(|e| RunError::Other(format!("ambient runtime: {e}")))?;
@@ -807,6 +843,10 @@ fn serve_lifecycle<S>(
             lifecycle_wire::encode_reply(&LifecycleReply::Failed("reply_too_large".into()))
         })
         .map_err(|e| RunError::Other(format!("lifecycle reply encode error: {e}")))?;
+    // Story 22-9 F2: everything the guest wrote to fd 2 while serving this request precedes this
+    // line (guest stdio and this write are synchronous on the same fd). The host drains stderr to
+    // it after the reply, so no guest line is lost to the two reader threads' arrival order.
+    eprintln!("{}", maos_frame_codec::STAGE_END_SENTINEL);
     maos_frame_codec::write_frame(&mut store.data_mut().writer, &encoded)
         .map_err(|e| RunError::Other(format!("lifecycle reply write: {e}")))
 }

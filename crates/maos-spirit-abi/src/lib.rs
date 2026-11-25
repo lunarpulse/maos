@@ -33,6 +33,7 @@
 //! | `MANIFEST_SCHEMA_VERSION = 6` | Story 18-7 | Runtime `[capabilities.required.skill]` |
 //! | `MANIFEST_SCHEMA_VERSION = 7` | Story 20-8 | FR8 contract declarations |
 //! | `MANIFEST_SCHEMA_VERSION = 8` | Story 21-9 | `[lifecycle.telemetry]` subscription (D-21-9-02 A; schema ratified) |
+//! | `MANIFEST_SCHEMA_VERSION = 9` | Story 22-9 | `[consent]` floor (D-22-9-04 A; ratification proposed) |
 //!
 //! ## Modules
 //! | Module | Description | Introduced |
@@ -113,7 +114,9 @@ pub const ABI_VERSION: u32 = 1;
 /// subscription. It does not degrade away: below schema 8 an
 /// `on_telemetry_event` listing or a `[lifecycle.telemetry]` table is refused
 /// at load, and schemas 1–7 that do neither stay supported.
-///
+/// Bumped to `9` in Story 22-9 (D-22-9-04 A) for the `[consent]` declaration.
+/// It does not degrade away: below schema 9 a `[consent]` table is refused at
+/// admission, and schemas 1–8 that declare none stay supported.
 ///
 /// This constant is the single authoritative source consumed by
 /// `maos-manifest::ClassSection` validation and by the `xtask
@@ -126,9 +129,9 @@ pub const ABI_VERSION: u32 = 1;
 /// ```rust
 /// use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 ///
-/// assert_eq!(MANIFEST_SCHEMA_VERSION, 8);
+/// assert_eq!(MANIFEST_SCHEMA_VERSION, 9);
 /// ```
-pub const MANIFEST_SCHEMA_VERSION: u32 = 8;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 9;
 
 /// Lowest manifest schema version this kernel accepts at admission.
 ///
@@ -173,8 +176,8 @@ pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1;
 /// assert!(is_version_supported(1));  // Oldest supported
 /// assert!(is_version_supported(2));  // Supported
 /// assert!(is_version_supported(3));  // Supported
-/// assert!(is_version_supported(7));  // N-1 — supported
-/// assert!(is_version_supported(8));  // Current — supported
+/// assert!(is_version_supported(8));  // N-1 — supported
+/// assert!(is_version_supported(9));  // Current — supported
 /// assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
 /// ```
 pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = MANIFEST_SCHEMA_VERSION;

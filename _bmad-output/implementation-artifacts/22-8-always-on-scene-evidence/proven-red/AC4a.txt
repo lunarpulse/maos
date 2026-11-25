@@ -1,0 +1,19 @@
+AC4 plant (Mira's runner not registered): crates/maos-bin/src/directed_task.rs DirectedTasks::register: early 'return' when spirit_id == "mira" (marked E228-PLANT AC4a). Command: cargo nextest run --locked -p maos-bin --test native_task_22_8. Result: mira_answers_a_directed_task_and_its_reply_row_is_journaled FAILS with 'mira is directable: NotDirectable'; the_registry_exists_without_installed_members FAILS (assertion failed: tasks.is_directable("mira")); two more tests fail with NotDirectable; nash_stays_not_directable stays green. Plant reverted.
+
+        FAIL [   0.414s] (1/6) maos-bin::native_task_22_8 a_low_confidence_task_ends_halted
+    thread 'a_low_confidence_task_ends_halted' (127800) panicked at crates/maos-bin/tests/native_task_22_8.rs:289:63:
+        FAIL [   0.402s] (2/6) maos-bin::native_task_22_8 a_task_that_is_not_a_signal_ends_failed_with_a_typed_reason
+    thread 'a_task_that_is_not_a_signal_ends_failed_with_a_typed_reason' (127804) panicked at crates/maos-bin/tests/native_task_22_8.rs:331:71:
+        FAIL [   0.397s] (3/6) maos-bin::native_task_22_8 mira_answers_a_directed_task_and_its_reply_row_is_journaled
+    thread 'mira_answers_a_directed_task_and_its_reply_row_is_journaled' (127807) panicked at crates/maos-bin/tests/native_task_22_8.rs:247:10:
+        PASS [   0.233s] (4/6) maos-bin::native_task_22_8 nash_stays_not_directable
+        PASS [   0.481s] (5/6) maos-bin::native_task_22_8 the_default_cast_boots_keyless_in_deterministic_mode
+        FAIL [   0.376s] (6/6) maos-bin::native_task_22_8 the_registry_exists_without_installed_members
+    thread 'the_registry_exists_without_installed_members' (127893) panicked at crates/maos-bin/tests/native_task_22_8.rs:314:5:
+    assertion failed: tasks.is_directable("mira")
+     Summary [   2.305s] 6 tests run: 2 passed, 4 failed, 0 skipped
+        FAIL [   0.414s] (1/6) maos-bin::native_task_22_8 a_low_confidence_task_ends_halted
+        FAIL [   0.402s] (2/6) maos-bin::native_task_22_8 a_task_that_is_not_a_signal_ends_failed_with_a_typed_reason
+        FAIL [   0.397s] (3/6) maos-bin::native_task_22_8 mira_answers_a_directed_task_and_its_reply_row_is_journaled
+        FAIL [   0.376s] (6/6) maos-bin::native_task_22_8 the_registry_exists_without_installed_members
+rc=100

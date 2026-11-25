@@ -1094,7 +1094,7 @@ struct TurnState {
 
 /// Guest stderr rows/bytes already journaled this session.
 #[derive(Default)]
-struct DiagnosticBudget {
+pub(crate) struct DiagnosticBudget {
     rows: usize,
     bytes: usize,
 }
@@ -2188,15 +2188,41 @@ fn journal_diagnostic(
     budget: &mut DiagnosticBudget,
     line: &[u8],
 ) {
-    let record =
+    journal_guest_diagnostic(
+        &deps.journal,
+        (spirit_id, pid, report.child_pid),
+        (&mut report.dropped_diagnostics, budget),
+        line,
+        None,
+    );
+}
+
+/// [`journal_diagnostic`]'s one writer, shared with a pre-warmed successor (`phase =
+/// "prewarm"`, Story 22-9): the same 256-row / 64 KiB bound, with the overflow counted.
+pub(crate) fn journal_guest_diagnostic(
+    tl: &TransparencyLogAdapter,
+    (spirit_id, pid, child_pid): (&str, u32, u32),
+    (dropped, budget): (&mut u64, &mut DiagnosticBudget),
+    line: &[u8],
+    phase: Option<&str>,
+) {
+    // The runner's stage-end sentinel (Story 22-9 F2) is a control marker on the same stderr
+    // stream, never a diagnostic: a serving session sees it after every lifecycle reply. Guest
+    // bytes that preceded it on an unterminated line still are one.
+    let line = match maos_frame_codec::split_stage_end(line) {
+        Some([]) => return,
+        Some(guest) => guest,
+        None => line,
+    };
+    let mut record =
         if budget.rows >= MAX_DIAGNOSTIC_ROWS || line.len() > MAX_DIAGNOSTIC_BYTES - budget.bytes {
-            report.dropped_diagnostics += 1;
-            if report.dropped_diagnostics > 1 {
+            *dropped += 1;
+            if *dropped > 1 {
                 return;
             }
             serde_json::json!({
                 "event": "spirit_diagnostic_dropped",
-                "child_pid": report.child_pid,
+                "child_pid": child_pid,
                 "max_rows": MAX_DIAGNOSTIC_ROWS,
                 "max_bytes": MAX_DIAGNOSTIC_BYTES,
             })
@@ -2205,11 +2231,14 @@ fn journal_diagnostic(
             budget.bytes += line.len();
             serde_json::json!({
                 "event": "spirit_diagnostic",
-                "child_pid": report.child_pid,
+                "child_pid": child_pid,
                 "line": String::from_utf8_lossy(line),
             })
         };
-    let _ = deps.journal.insert_frame_event_with_sender(
+    if let Some(phase) = phase {
+        record["phase"] = phase.into();
+    }
+    let _ = tl.insert_frame_event_with_sender(
         JournalKind::CliSubprocessOutput,
         pid,
         spirit_id,

@@ -1,0 +1,10 @@
+AC1 plant (router not installed): crates/maos-bin/src/main.rs topology load: 'if !a2a_peers.is_empty()' -> 'if false /* E228-PLANT AC1a */ && !a2a_peers.is_empty()' (LoopbackCast never built). Command: cargo nextest run --locked -p maos-journey-test --test journey_always_on. Result: the_standing_cast_takes_a_task_and_survives_a_restart FAILS at step (4): Mira's answer reads advisory 'not_routed', expected 'delivered'. Plant reverted.
+
+        FAIL [   0.688s] (1/1) maos-journey-test::journey_always_on the_standing_cast_takes_a_task_and_survives_a_restart
+    thread 'the_standing_cast_takes_a_task_and_survives_a_restart' (117633) panicked at crates/maos-journey-test/tests/journey_always_on.rs:273:5:
+    assertion `left == right` failed: {"subject":"payments-api","finding":"prod-edge anomaly on 'payments-api': error_rate = 0.420 vs baseline 0.020 (deviation 100.0%)  matches a known diagnostic pattern","severity":1.0,"confidence":0.85,"advisory":"not_routed","prior_diagnoses":0}
+      left: String("not_routed")
+     right: "delivered"
+     Summary [   0.689s] 1 test run: 0 passed, 1 failed, 0 skipped
+        FAIL [   0.688s] (1/1) maos-journey-test::journey_always_on the_standing_cast_takes_a_task_and_survives_a_restart
+rc=100

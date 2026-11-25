@@ -1,0 +1,19 @@
+plant (E230-PLANT): 'online-adapters' removed from the default feature list
+command: cargo test --locked -p maos-bin --test online_adapters_23_0
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+test the_compiled_shape_matches_the_features ... ok
+test the_umbrella_is_in_default_and_enables_network ... FAILED
+test no_feature_but_default_reaches_the_umbrella ... FAILED
+failures:
+thread 'the_umbrella_is_in_default_and_enables_network' (1901512) panicked at crates/maos-bin/tests/online_adapters_23_0.rs:50:5:
+thread 'no_feature_but_default_reaches_the_umbrella' (1901510) panicked at crates/maos-bin/tests/online_adapters_23_0.rs:75:5:
+assertion `left == right` failed: only `default` may enable online-adapters
+  left: []
+ right: ["default"]
+failures:
+    no_feature_but_default_reaches_the_umbrella
+    the_umbrella_is_in_default_and_enables_network
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+error: test failed, to rerun pass `-p maos-bin --test online_adapters_23_0`
+rc=101

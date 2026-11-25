@@ -17,7 +17,7 @@ image:
 # manifests baked into the image (nash, observer); it needs no provider key.
 hostToml: |
   [host]
-  # inference_mode defaults to live (MAOS_INFERENCE_MODE). `replay` needs MAOS_REPLAY_CASSETTE.
+  # inference_mode unset is the Deterministic mode (ADR-064): no provider is contacted and no key is needed. `live`, `record` and `replay` are explicit (MAOS_INFERENCE_MODE); `replay` needs MAOS_REPLAY_CASSETTE.
 
   [[host.spirits]]
   manifest = "/usr/share/maos/spirits/nash/manifest.toml"

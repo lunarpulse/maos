@@ -25,6 +25,14 @@
 //!
 //! [[host.spirits]]
 //! installed = "researcher"            # a registry-installed Spirit
+//!
+//! [[host.a2a_peers]]                  # ADR-012 consent between cast members (Story 22-8)
+//! spirit = "mira"
+//! send_allowlist = ["diagnosis-handoff:read-only-evidence"]
+//!
+//! [[host.a2a_peers]]
+//! spirit = "nash"
+//! accept_allowlist = ["diagnosis-handoff:read-only-evidence"]
 //! ```
 //!
 //! A refusal is typed ([`HostConfigKind`]) and never a warning. The environment overrides a
@@ -70,6 +78,7 @@ pub enum HostConfigKind {
     OlderFile,
     InstalledMissing,
     InstalledRefused,
+    A2aPeer,
 }
 
 impl HostConfigKind {
@@ -83,6 +92,7 @@ impl HostConfigKind {
             Self::OlderFile => "host_config_older_file_disagrees",
             Self::InstalledMissing => "host_config_installed_missing",
             Self::InstalledRefused => "host_config_installed_refused",
+            Self::A2aPeer => "host_config_a2a_peer",
         }
     }
 }
@@ -127,6 +137,11 @@ struct HostSection {
     audit_keep_days: Option<SettingValue>,
     #[serde(default)]
     spirits: Vec<CastEntry>,
+    /// Story 22-8 (D-22-8-07 A) — `[[host.a2a_peers]]`: the operator's ADR-012 consent between
+    /// cast members, forwarded verbatim to the topology loader's `[[topology.a2a_peers]]`
+    /// (which refuses unknown keys). A table, so it carries no `MAOS_*` name (ADR-071 §2).
+    #[serde(default)]
+    a2a_peers: Vec<toml::Value>,
 }
 
 /// The keys of `[[topology.spirits]]` plus `installed`. `host` is parsed only so its
@@ -186,11 +201,20 @@ impl HostConfig {
         for (index, entry) in section.spirits.iter().enumerate() {
             cast.push(admit_entry(index, entry, base)?);
         }
-        Ok(Self {
+        let config = Self {
             path: path.to_path_buf(),
             section,
             cast,
-        })
+        };
+        let topology: toml::Value = toml::from_str(&config.topology_toml())
+            .map_err(|e| refuse(HostConfigKind::A2aPeer, e.to_string()))?;
+        crate::topology::topology_a2a_peers(&topology).map_err(|e| {
+            refuse(
+                HostConfigKind::A2aPeer,
+                e.replace("[[topology.a2a_peers]]", "[[host.a2a_peers]]"),
+            )
+        })?;
+        Ok(config)
     }
 
     pub fn path(&self) -> &Path {
@@ -247,6 +271,9 @@ impl HostConfig {
             .collect();
         let mut topology = toml::Table::new();
         topology.insert("spirits".into(), spirits.into());
+        if !self.section.a2a_peers.is_empty() {
+            topology.insert("a2a_peers".into(), self.section.a2a_peers.clone().into());
+        }
         let mut root = toml::Table::new();
         root.insert("topology".into(), topology.into());
         root.to_string()

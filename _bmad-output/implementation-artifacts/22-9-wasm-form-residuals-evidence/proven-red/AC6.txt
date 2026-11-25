@@ -1,0 +1,10 @@
+AC6 plant: crates/maos-bin/src/spawned_lifecycle.rs next_stdout_on: the stderr arm back to 'BridgePoll::Data(SubStream::Stderr, _) => {}'. Command: cargo nextest run --locked -p maos-bin --test spawned_swap_20_9 -E 'test(a_successors_swap_in_console_log_is_journaled_as_a_diagnostic)'. Result: FAILS ('the swap-in line is journaled: []'). Plant reverted.
+
+        FAIL [   0.891s] (1/1) maos-bin::spawned_swap_20_9 a_successors_swap_in_console_log_is_journaled_as_a_diagnostic
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.88s
+    thread 'a_successors_swap_in_console_log_is_journaled_as_a_diagnostic' (690695) panicked at crates/maos-bin/tests/spawned_swap_20_9.rs:1365:5:
+    the swap-in line is journaled: []
+     Summary [   0.892s] 1 test run: 0 passed, 1 failed, 29 skipped
+        FAIL [   0.891s] (1/1) maos-bin::spawned_swap_20_9 a_successors_swap_in_console_log_is_journaled_as_a_diagnostic
+error: test run failed
+rc=100

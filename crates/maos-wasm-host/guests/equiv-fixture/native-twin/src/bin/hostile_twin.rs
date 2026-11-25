@@ -85,10 +85,21 @@ fn main() -> ExitCode {
         // while its own hot swap is still running).
         if lifecycle_wire::is_request(&body) {
             let exits = mode == "snapshot-then-exit";
+            // `slow-probe` (Story 22-9) is a component still starting: its probe is answered
+            // only after 6 s, then it serves a lifecycle (a snapshot, no exit).
+            let serves = exits || mode == "slow-probe";
             let request = lifecycle_wire::decode_request(&body);
+            if mode == "slow-probe" && matches!(request, Ok(LifecycleRequest::Probe)) {
+                let until = std::time::Instant::now() + std::time::Duration::from_secs(6);
+                while std::time::Instant::now() < until {
+                    std::thread::park_timeout(
+                        until.saturating_duration_since(std::time::Instant::now()),
+                    );
+                }
+            }
             let reply = match request {
-                Ok(LifecycleRequest::Probe) => LifecycleReply::Supported(exits),
-                Ok(LifecycleRequest::Snapshot) if exits => {
+                Ok(LifecycleRequest::Probe) => LifecycleReply::Supported(serves),
+                Ok(LifecycleRequest::Snapshot) if serves => {
                     LifecycleReply::State(maos_wasm_host::recall_wire::WireBytes(7u64.to_le_bytes().to_vec()))
                 }
                 _ => LifecycleReply::Unsupported,

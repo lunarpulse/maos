@@ -1,0 +1,27 @@
+plant (E230-PLANT): PolicedIo::vet returns Ok before vetting (every URL reaches the inner port)
+command: cargo test --locked -p maos-domain --test outbound_policy_23_0
+test a_link_local_host_is_refused_even_with_private_allowed ... ok
+test a_host_and_port_for_a_tls_sink_is_vetted_by_host_class ... ok
+test a_name_whose_answers_include_a_private_address_is_refused ... ok
+test a_loopback_host_is_refused_unless_allowed ... ok
+test a_public_https_url_is_vetted ... ok
+test a_redirect_answer_is_refused_and_not_followed ... ok
+test a_private_host_is_refused_unless_private_is_allowed ... ok
+test a_refusal_names_its_class_and_never_the_url ... ok
+test an_http_url_to_a_public_host_is_refused ... ok
+test an_unresolvable_name_is_refused ... ok
+test classify_names_one_class_per_block ... ok
+test a_reserved_host_is_always_refused ... ok
+test localhost_resolving_to_loopback_is_refused ... ok
+test a_refused_url_never_reaches_the_inner_port ... FAILED
+test classify_public_equals_the_former_egress_predicate_on_the_whole_vector_table ... ok
+failures:
+thread 'a_refused_url_never_reaches_the_inner_port' (1900453) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:542:9:
+assertion `left == right` failed: http://1.1.1.1/
+  left: Ok([103, 101, 116, 45, 98, 111, 100, 121])
+ right: Err(InvalidUrl("outbound_http_refused"))
+failures:
+    a_refused_url_never_reaches_the_inner_port
+test result: FAILED. 14 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+error: test failed, to rerun pass `-p maos-domain --test outbound_policy_23_0`
+rc=101
