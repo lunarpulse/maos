@@ -1,0 +1,43 @@
+#!/bin/bash
+# Loop driver for the s3-pidfd-follower-fix evidence (run as: bash plant-loop-driver.txt LABEL FILTER EXPECT_RUN EXPECT)
+#   LABEL       free text for the output
+#   FILTER      libtest name filter ("follower_pidfd" = both tests, or one test name)
+#   EXPECT_RUN  number of `RUN (kernel ...)` lines one iteration must print
+#               (expired test = 4 instances, capped test = 1; a red iteration stops at its first failing
+#               instance, so a red expired test prints 1)
+#   EXPECT      green | red
+# Each mode (plain, busy16 = 16 `while :; do :; done` loops) runs 20 iterations. CI=true is DECLARED, so a
+# capability skip PANICS instead of printing SKIP; an iteration also FAILS if "SKIP" appears or the RUN count
+# is not EXPECT_RUN. A green iteration needs exit 0. A red iteration needs a non-zero exit whose own log carries
+# the payload assertion: `left: (Unknown, None)` and `right: (Signaled(9), Pidfd)`. The per-iteration log is
+# kept under /tmp/s3fix-driver/<label>-<mode>-<n>.log (never overwritten) and one line per iteration is printed.
+LABEL=$1; FILTER=$2; EXPECT_RUN=$3; EXPECT=$4
+unset GITHUB_ACTIONS MAOS_17_2_CGROUP_MODE
+export CI=true CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/mnt/build/cargo-maos-s3fix
+cd /home/lunarpulse/dev_ws-s3fix
+BIN=$(cargo test --locked -p maos-kernel-core --lib --no-run 2>&1 | grep -o '/mnt/build[^)]*maos_kernel_core-[0-9a-f]*' | tail -1)
+[ -x "$BIN" ] || { echo "no test binary"; exit 3; }
+mkdir -p /tmp/s3fix-driver
+run20() {
+  mode=$1; ok=0; bad=0
+  for i in $(seq 20); do
+    log=/tmp/s3fix-driver/$LABEL-$mode-$i.log
+    timeout 120 $BIN $FILTER --nocapture >"$log" 2>&1; rc=$?
+    runs=$(grep -c 'RUN (kernel' "$log"); skips=$(grep -c 'SKIP' "$log")
+    loc=$(grep -m1 -o 'child_follower_pidfd.rs:[0-9]*:[0-9]*' "$log")
+    left=$(grep -m1 'left:' "$log" | sed 's/^ *//'); right=$(grep -m1 'right:' "$log" | sed 's/^ *//')
+    verdict=BAD
+    if [ "$skips" = 0 ] && [ "$runs" = "$EXPECT_RUN" ]; then
+      if [ "$EXPECT" = green ] && [ $rc = 0 ]; then verdict=ok; fi
+      if [ "$EXPECT" = red ] && [ $rc != 0 ] && [ "$left" = 'left: (Unknown, None)' ] \
+         && [ "$right" = 'right: (Signaled(9), Pidfd)' ]; then verdict=ok; fi
+    fi
+    [ $verdict = ok ] && ok=$((ok+1)) || bad=$((bad+1))
+    echo "$LABEL $mode iter $i: rc=$rc RUN=$runs SKIP=$skips ${loc:+at $loc }${left:+| $left | $right }=> $verdict"
+  done
+  echo "== $LABEL $mode expect=$EXPECT: ok=$ok bad=$bad"
+}
+run20 plain
+pids=""; for i in $(seq 16); do (while :; do :; done) & pids="$pids $!"; done
+run20 busy16
+kill $pids

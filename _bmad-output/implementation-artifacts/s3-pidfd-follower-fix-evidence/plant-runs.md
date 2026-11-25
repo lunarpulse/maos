@@ -1,30 +1,38 @@
-# Plant runs (round 2) — failing assertion per iteration
+# Plant runs (round 3) — every loop redone on the direct-spawn fixture
 
-Host: Linux 7.3.3-1-cachyos, 32 cores. Driver: `/tmp/s3fix-loop2.sh` (not committed): 20 runs of the kernel-core lib
-test binary filtered to one test, plain, then 20 more under 16 `while :; do :; done` busy loops. For every
-non-zero exit it kept the first panic location and the `left:`/`right:` lines of that iteration's own log
-(no log is overwritten before it is read). Marker `S3FIX-PLANT`; each plant is removed afterwards
-(`grep -rn S3FIX-PLANT crates xtask .github docs` = 0 matches).
+Host: Linux 7.3.3-1-cachyos, 32 cores. Driver: `plant-loop-driver.txt` in this directory (run as
+`bash plant-loop-driver.txt LABEL FILTER EXPECT_RUN EXPECT`; read its header). It runs with `CI=true` declared, so a
+capability skip would PANIC; every iteration is also failed if `SKIP` appears or the number of
+`RUN (kernel ...)` lines is not the expected count. A green iteration needs exit 0; a red iteration needs a non-zero
+exit whose own log has `left: (Unknown, None)` and `right: (Signaled(9), Pidfd)`. One log per iteration is kept under
+`/tmp/s3fix-driver/` (not committed). 20 iterations plain, then 20 under 16 `while :; do :; done` loops.
 
-`child_follower_pidfd.rs:281:5` is the `assert_eq!` in `assert_sigkill_pidfd_facts` (the payload/source pair); the
-two tests share it, the filter names which test ran.
-
-| Variant | Test | Mode | Green | Red | Failing assertion, grouped (count) |
-|---|---|---|---|---|---|
-| fixed code | both | plain | 20 | 0 | - |
-| fixed code | both | busy16 | 20 | 0 | - |
-| plant 1: `facts_by` expiry branch -> `new(Err(DeadlineExpired), None)` | `expired_snapshot_follower_keeps_the_pidfd_fact_s3` | plain | 0 | 20 | 20 x `child_follower_pidfd.rs:281:5`, `left: (Unknown, None)`, `right: (Signaled(9), Pidfd)`; iterations 1-20 all identical |
-| plant 1 | same | busy16 | 0 | 20 | 20 x same line, same left/right; iterations 1-20 |
-| plant 1 | `capped_follower_fallback_keeps_the_pidfd_fact_s3` | plain / busy16 | 20 / 20 | 0 / 0 | - |
-| plant 2: `facts_capped` fallback -> `new(Err(DeadlineExpired), None)` | `capped_follower_fallback_keeps_the_pidfd_fact_s3` | plain | 0 | 20 | 20 x `child_follower_pidfd.rs:281:5`, `left: (Unknown, None)`, `right: (Signaled(9), Pidfd)`; iterations 1-20 |
-| plant 2 | same | busy16 | 0 | 20 | 20 x same; iterations 1-20 |
-| plant 2 | `expired_snapshot_follower_keeps_the_pidfd_fact_s3` | plain / busy16 | 20 / 20 | 0 / 0 | - |
-
-Per-iteration rows as recorded (plant 1, plain; busy16 and plant 2 are the same 20 identical rows):
+Commands (the plants were applied one at a time with marker `S3FIX-PLANT` and removed afterwards;
+`grep -rn S3FIX-PLANT crates xtask .github docs` = 0 matches):
 
 ```
-plain iter 1..20 | child_follower_pidfd.rs:281:5 | left: (Unknown, None) | right: (Signaled(9), Pidfd)
+fixed code : bash plant-loop-driver.txt fixed          follower_pidfd    5 green
+plant 1    : bash plant-loop-driver.txt plant1-expired expired_snapshot  1 red
+             bash plant-loop-driver.txt plant1-capped  capped_follower   1 green
+plant 2    : bash plant-loop-driver.txt plant2-capped  capped_follower   1 red
+             bash plant-loop-driver.txt plant2-expired expired_snapshot  4 green
 ```
 
-Every red is the payload assertion `(Unknown, None)` against `(Signaled(9), Pidfd)`; none is a timeout, a
-rendezvous panic, a poisoned lock or a different assertion.
+Plant 1 = `facts_by` expiry branch -> `new(Err(DeadlineExpired), None)`. Plant 2 = `facts_capped` fallback ->
+`new(Err(DeadlineExpired), None)`.
+
+Results (iterations grouped by identical normalized line; "20 x" = iterations 1-20 of that mode):
+
+| Variant | Mode | Normalized iteration line | Count | Verdict |
+|---|---|---|---|---|
+| fixed, both tests | plain | `rc=0 RUN=5 SKIP=0` | 20 | ok 20 / bad 0 |
+| fixed, both tests | busy16 | `rc=0 RUN=5 SKIP=0` | 20 | ok 20 / bad 0 |
+| plant 1, expired test | plain | `rc=101 RUN=1 SKIP=0 at child_follower_pidfd.rs:247:5 \| left: (Unknown, None) \| right: (Signaled(9), Pidfd)` | 20 | ok 20 / bad 0 (red) |
+| plant 1, expired test | busy16 | same line | 20 | ok 20 / bad 0 (red) |
+| plant 1, capped test | plain / busy16 | `rc=0 RUN=1 SKIP=0` | 20 / 20 | green, ok 20 / 20 |
+| plant 2, capped test | plain | `rc=101 RUN=1 SKIP=0 at child_follower_pidfd.rs:247:5 \| left: (Unknown, None) \| right: (Signaled(9), Pidfd)` | 20 | ok 20 / bad 0 (red) |
+| plant 2, capped test | busy16 | same line | 20 | ok 20 / bad 0 (red) |
+| plant 2, expired test | plain / busy16 | `rc=0 RUN=4 SKIP=0` | 20 / 20 | green, ok 20 / 20 |
+
+`child_follower_pidfd.rs:247:5` is the `assert_eq!` in `assert_sigkill_pidfd_facts` (payload/source pair). Every red
+is that payload assertion; none is a timeout, a rendezvous panic, a poisoned lock, a SKIP or another assertion.

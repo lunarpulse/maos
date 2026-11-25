@@ -129,3 +129,23 @@ Kernel src 28372 -> 28390 -> 28394 (+22 physical over main, +4 for the test hook
 - Residual: a non-waiting re-read of the frozen snapshot after teardown and before journaling in the bridge could
   make the journaled value agree with a snapshot that appeared meanwhile. The reviewer advised against it in this PR;
   not done.
+
+## Round 3 (fixture rewritten; supersedes the round-2 shell description above)
+
+- The shell fixture is gone. The payload is `sleep 30` spawned DIRECTLY by the test (null stdio, nothing inherited)
+  and kept unreaped until the end, so its PID cannot be recycled; `pidfd_open(child.id())` is safe; the kill goes
+  ONLY through the pidfd (`pidfd_send_signal`), then `Child::wait` reaps it and asserts `signal() == Some(9)`. The
+  guard kills through the pidfd if held, else `Child::kill` (safe: unreaped), and waits, on every path. No
+  numeric-PID signalling and no shell anywhere.
+- Consequence, disclosed: the payload is now the test's own child, not a grandchild. The production arm path takes
+  only `(pid, OwnedFd)`, so nothing in it needs a grandchild; the capability probe still reads the pidfd exit data
+  AFTER the reap and returned `signaled(9)` on this kernel (7.3.3), so the probe covers "exit data survives the reap
+  for an own child". On a kernel where it does not, the tests SKIP locally / PANIC under a declared CI (loud).
+- The owner's runtime-derived failure in the capped test accepts `InspectFailed` or `InspectTimedOut` (a descheduled
+  owner can see its initial deadline pass before `inspect`); `DeadlineExpired` is still rejected, and the owner's
+  `Arc` must still be the frozen one. The expired test never asserts the owner's own state (it must equal the
+  follower's frozen `DeadlineExpired`), so it has no such assumption.
+- Evidence redone on the new fixture with a driver that DECLARES CI (a skip would panic), counts `RUN (kernel ...)`
+  lines per iteration and fails on `SKIP`: `plant-loop-driver.txt` (the driver text) and `plant-runs.md` (fixed 20/20 +
+  20/20 busy16; each plant red 20/20 + 20/20 on the payload assertion `(Unknown, None)`; the other test green).
+- Kernel src unchanged (28394, tokei 22180): no re-pin.

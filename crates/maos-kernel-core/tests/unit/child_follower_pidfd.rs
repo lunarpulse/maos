@@ -15,10 +15,9 @@
 use super::*;
 use maos_domain::sandbox::{ContainerRuntimeKind, PayloadExitSource, TerminalUnavailable};
 use std::cell::RefCell;
-use std::io::{BufRead, BufReader};
 use std::os::fd::{AsFd, OwnedFd};
 use std::process::{Child, Command, Stdio};
-use std::sync::{mpsc, PoisonError};
+use std::sync::PoisonError;
 
 #[path = "../../../../tests/harness/ci.rs"]
 mod ci;
@@ -170,92 +169,59 @@ fn failing_inspect_runtime(dir: &Path) -> ContainerRuntime {
     }
 }
 
-/// The owner shell of an external payload. Dropping it kills the payload
-/// through its pidfd, then kills and reaps the shell, even when a test
-/// assertion unwinds.
-struct PayloadShell {
-    shell: Child,
-    release: Option<std::process::ChildStdin>,
+/// The payload: a long-lived binary spawned DIRECTLY by the test (no shell,
+/// null stdio so no pipe is inherited) and kept UNREAPED until the end, so its
+/// PID cannot be recycled (it stays a zombie). Dropping it kills it, through
+/// the pidfd when held, else `Child::kill` (safe: the child is unreaped), and
+/// reaps it, on every path including a failure before the pidfd exists.
+struct Payload {
+    child: Child,
     pidfd: Option<OwnedFd>,
 }
 
-impl Drop for PayloadShell {
+impl Drop for Payload {
     fn drop(&mut self) {
-        if let Some(pidfd) = &self.pidfd {
-            let _ =
-                rustix::process::pidfd_send_signal(pidfd.as_fd(), rustix::process::Signal::KILL);
-        }
-        // Closing the release pipe lets the shell SIGKILL and reap the payload
-        // itself, so the payload dies even when no pidfd was ever acquired.
-        drop(self.release.take());
-        let until = Instant::now() + HANG_GUARD;
-        while !matches!(self.shell.try_wait(), Ok(Some(_))) {
-            if Instant::now() >= until {
-                let _ = self.shell.kill();
-                let _ = self.shell.wait();
-                break;
+        match &self.pidfd {
+            Some(pidfd) => {
+                let _ = rustix::process::pidfd_send_signal(
+                    pidfd.as_fd(),
+                    rustix::process::Signal::KILL,
+                );
             }
-            std::thread::sleep(Duration::from_millis(5));
+            None => {
+                let _ = self.child.kill();
+            }
         }
+        let _ = self.child.wait();
     }
 }
 
-/// An external payload (a grandchild, never our child) with its pidfd open,
-/// SIGKILLed through that pidfd and reaped by its owner shell.
-///
-/// Lifetime handshake: the shell does not `wait` (reap) the payload until the
-/// parent writes to the release pipe, so the payload's PID stays reserved (at
-/// worst a zombie) until the parent has opened and cloned its pidfd; the PID
-/// cannot be reused before `pidfd_open`. The pipe reads are bounded by
-/// [`HANG_GUARD`].
-fn killed_external_payload() -> (PayloadShell, u32, OwnedFd) {
-    use std::io::Write;
-    let mut shell = Command::new("sh")
-        .arg("-c")
-        .arg("sleep 30 & p=$!; echo $p; read _; kill -9 $p 2>/dev/null; wait $p; echo reaped")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
+/// A payload with its pidfd open, SIGKILLed ONLY through that pidfd (no
+/// numeric-PID signalling anywhere), then reaped. `pidfd_open` is safe: the
+/// child is unreaped, so the PID cannot be reused before it. The returned
+/// pidfd is the one to arm; the reaped payload's exit data stays readable
+/// through it (checked by [`require_pidfd_exit`]).
+fn killed_external_payload() -> (Payload, u32, OwnedFd) {
+    use std::os::unix::process::ExitStatusExt;
+    let child = Command::new("sleep")
+        .arg("30")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
-    let stdout = shell.stdout.take().unwrap();
-    let release = shell.stdin.take();
-    let mut guard = PayloadShell {
-        shell,
-        release,
-        pidfd: None,
-    };
-    let (lines_tx, lines) = mpsc::channel();
-    std::thread::spawn(move || {
-        let mut reader = BufReader::new(stdout);
-        for _ in 0..2 {
-            let mut line = String::new();
-            if reader.read_line(&mut line).unwrap_or(0) == 0 {
-                break;
-            }
-            let _ = lines_tx.send(line);
-        }
-    });
-    let pid_line = lines
-        .recv_timeout(HANG_GUARD)
-        .expect("hang guard (10 s): the owner shell never printed the payload pid");
-    let pid: u32 = pid_line.trim().parse().unwrap();
+    let pid = child.id();
+    let mut guard = Payload { child, pidfd: None };
     let pidfd = crate::security::sandbox::linux::pidfd_open(pid).unwrap();
     guard.pidfd = Some(pidfd.try_clone().unwrap());
     rustix::process::pidfd_send_signal(pidfd.as_fd(), rustix::process::Signal::KILL)
-        .expect("SIGKILL the external payload through its pidfd");
-    // Release the shell only now: it reaps the (already killed) payload.
-    let mut release = guard.release.take().unwrap();
-    release.write_all(b"\n").unwrap();
-    drop(release);
-    let ack = lines
-        .recv_timeout(HANG_GUARD)
-        .expect("hang guard (10 s): the owner shell never acknowledged the reap");
-    assert_eq!(ack.trim(), "reaped", "the owner shell reaps, then says so");
+        .expect("SIGKILL the payload through its pidfd");
     assert!(
         crate::security::sandbox::linux::readable(pidfd.as_fd(), HANG_GUARD),
         "hang guard (10 s): the killed payload's pidfd never became readable"
     );
+    let status = guard.child.wait().expect("reap the killed payload");
+    assert_eq!(status.signal(), Some(9), "the payload died of SIGKILL");
     (guard, pid, pidfd)
 }
 
@@ -361,7 +327,10 @@ fn capped_follower_fallback_keeps_the_pidfd_fact_s3() {
     gate.release();
     let owner = owner.join().unwrap().expect("owner facts");
     assert!(
-        matches!(owner.state, Err(TerminalUnavailable::InspectFailed)),
+        matches!(
+            owner.state,
+            Err(TerminalUnavailable::InspectFailed | TerminalUnavailable::InspectTimedOut)
+        ),
         "the owner published its own observation, got {:?}",
         owner.state
     );
