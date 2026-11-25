@@ -1,0 +1,18 @@
+Review finding P3-1 (bearer pending/unreadable and failed calls are silent; the probe line claims "sealed writes resume").
+Two plants, each marked E238-PLANT, each run once, each reverted.
+
+Plant A  crates/maos-secrets/src/http_kms.rs  note_failure:
+    let changed = *last != Some(failure) || true;   /* E238-PLANT P3-1 */     (log on every failure, not once per change)
+  command: cargo test --locked -p maos-secrets --features http-kms --test external_kms_23_8 -- --skip the_probe_has_its_own
+  fails (with the P3-2 and P3-5 plants in the same run, each attributed below):
+    a_failed_call_is_logged_once_per_change_with_its_status_class_and_never_a_secret   left: 3  right: 1  "once per state change"
+    a_pending_or_unreadable_bearer_is_logged_once_and_sends_nothing                    left: 2  right: 1
+
+Plant B  crates/maos-bin/src/enterprise_identity.rs  KmsProbeOutcome::line:
+    (ReachableBearerPending, false) => "maos: external KMS endpoint is now reachable; sealed writes resume" /* E238-PLANT P3-1 */
+  command: cargo test --locked -p maos-bin --test external_kms_wiring_23_8
+  fails:
+    online::the_probe_outcome_follows_the_bearer_and_no_line_claims_writes_resume_until_calls_work
+      "ReachableBearerPending must not claim writes resume: maos: external KMS endpoint is now reachable; sealed writes resume"
+
+Both reverted; green again afterwards (see README).

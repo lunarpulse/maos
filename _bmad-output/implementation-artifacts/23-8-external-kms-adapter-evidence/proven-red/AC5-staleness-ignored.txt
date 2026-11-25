@@ -1,0 +1,11 @@
+plant (E238-PLANT): crates/maos-secrets/src/http_kms.rs HttpKms::is_healthy ignores the staleness bound
+(`let _ = (last_ok, self.staleness_bound()); true` instead of `now - last_ok <= bound`)
+command: cargo test --locked -p maos-secrets --features http-kms --test external_kms_23_8
+result: exit 101; 16 passed, 1 failed, finished in 2.01 s
+
+test a_stopped_prober_goes_unhealthy ... FAILED
+thread 'a_stopped_prober_goes_unhealthy' panicked at crates/maos-secrets/tests/external_kms_23_8.rs:324:5:
+a result older than 3 intervals is stale
+
+Every other test, including a_peer_that_never_answers_makes_wrap_unavailable, stayed green. The plant was reverted; the file hash
+after revert equals the hash before (AEA4).

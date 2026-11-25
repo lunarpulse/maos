@@ -1,0 +1,9 @@
+Review finding P3-6 (the example sidecar followed redirects and honoured proxy variables with the OpenBao token).
+
+Plant  examples/kms-sidecar-openbao/kms_sidecar.py  opener():
+    return urllib.request.build_opener()  # E238-PLANT P3-6      (default handlers: redirects followed, proxy variables honoured)
+  command: cargo test --locked -p maos-bin --test external_kms_wiring_23_8   (runs selftest.py)
+  fails:
+    the_reference_sidecar_passes_its_own_self_test
+      selftest.py line 183: the redirect arm (`GET /health` must be 503 when OpenBao answers 307; the default opener followed it to the trap)
+Reverted; green again. The handler socket-timeout arm (selftest "stalled" client) has no plant: without `timeout` the recv waits for its own 10 s bound and fails.

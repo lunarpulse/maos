@@ -14,6 +14,9 @@ pub enum SecretKey {
     KimiApiKey,
     /// Story 18-8 AC2 — the bearer MAOS sends to one MCP server.
     McpBearer(McpServer),
+    /// Story 23-8 — the bearer MAOS sends to the operator's external KMS
+    /// endpoint (`MAOS_KMS_ENDPOINT`).
+    KmsBearer,
 }
 
 /// The eight MCP servers with a `MAOS_MCP_<SERVER>_URI` row (closed, like
@@ -50,7 +53,7 @@ impl McpServer {
 }
 
 impl SecretKey {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::AnthropicApiKey,
         Self::OpenAiApiKey,
         Self::GeminiApiKey,
@@ -63,6 +66,7 @@ impl SecretKey {
         Self::McpBearer(McpServer::Arxiv),
         Self::McpBearer(McpServer::Github),
         Self::McpBearer(McpServer::CitationGraph),
+        Self::KmsBearer,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -72,6 +76,7 @@ impl SecretKey {
             Self::GeminiApiKey => "gemini-api-key",
             Self::KimiApiKey => "kimi-api-key",
             Self::McpBearer(server) => server.bearer_names().0,
+            Self::KmsBearer => "kms-bearer",
         }
     }
 
@@ -82,6 +87,7 @@ impl SecretKey {
             Self::GeminiApiKey => "MAOS_GEMINI_API_KEY",
             Self::KimiApiKey => "MAOS_KIMI_API_KEY",
             Self::McpBearer(server) => server.bearer_names().1,
+            Self::KmsBearer => "MAOS_KMS_BEARER",
         }
     }
 }

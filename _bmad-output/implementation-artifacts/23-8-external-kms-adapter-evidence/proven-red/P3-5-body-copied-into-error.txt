@@ -1,0 +1,10 @@
+Review finding P3-5 (no fixture ever contained the bearer, so copying a response body into an error could not be caught).
+
+Plant  crates/maos-secrets/src/http_kms.rs  HttpKms::call, the non-2xx arm:
+    "KMS endpoint answered status {status}: {}", String::from_utf8_lossy(&exchange.body) /* E238-PLANT P3-5 */
+  command: cargo test --locked -p maos-secrets --features http-kms --test external_kms_23_8 -- --skip the_probe_has_its_own
+  fails:
+    a_response_that_echoes_the_bearer_never_reaches_an_error_a_debug_or_a_log_line
+      "the bearer leaked into: Unavailable(\"KMS endpoint answered status 401: {\"detail\":\"Bearer kms-bearer-canary-9f3c\", ...}\")"
+  The pre-existing the_bearer_goes_only_on_wrap_and_unwrap_... stayed green under this plant (its fixtures never echo), which is the finding.
+Reverted; green again.

@@ -1,6 +1,6 @@
 //! Story 23-0 AC2 — the `online-adapters` umbrella (D-23-6-02 A, D-23-6-01 A iii).
 //!
-//! The feature gates no code in 23-0. These tests pin its place in the feature
+//! The feature gates the online adapters (23-8: the external KMS adapter). These tests pin its place in the feature
 //! graph: it is in `default`, it enables `network`, and nothing but `default`
 //! enables it, so `--no-default-features --features network,wasm-host` is the
 //! profile without online adapters.
@@ -52,10 +52,12 @@ fn the_umbrella_is_in_default_and_enables_network() {
         "default must contain {UMBRELLA}: {:?}",
         features["default"]
     );
+    // Story 23-8 (D-23-8-09 A): the umbrella enables `network` and the
+    // external KMS adapter of maos-secrets, and no other feature of this crate.
     assert_eq!(
         features[UMBRELLA],
-        ["network"],
-        "{UMBRELLA} enables network and nothing else"
+        ["network", "maos-secrets/http-kms"],
+        "{UMBRELLA} enables network and the KMS adapter (23-8) and nothing else"
     );
     for kept in ["network", "wasm-host"] {
         assert!(

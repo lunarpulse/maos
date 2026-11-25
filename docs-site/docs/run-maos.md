@@ -103,7 +103,9 @@ through the OS keyring by default. If the bounded keyring attempt is unavailable
 or the named entry is absent, MAOS falls back to the composition-root-captured
 environment value and records a `secret.source.fallback` audit event without key
 material. Set `MAOS_SECRETS_BACKEND=env` for headless CI, or
-`MAOS_SECRETS_BACKEND=encrypted-file` with `MAOS_KMS_MASTER_KEY` for the sealed
+`MAOS_SECRETS_BACKEND=encrypted-file` with `MAOS_KMS_MASTER_KEY` (or, for a KMS or
+HSM you run, `MAOS_KMS_ENDPOINT` pointing at a `maos.kms.v1` sidecar and the
+optional `MAOS_KMS_BEARER`; Story 23-8) for the sealed
 file vault. Keys are resolved when providers are constructed; just-in-time
 materialization and bounded in-memory lifetime remain open.
 

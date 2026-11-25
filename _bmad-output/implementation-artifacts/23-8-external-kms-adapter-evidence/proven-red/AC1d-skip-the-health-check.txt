@@ -1,0 +1,26 @@
+AC1 (d): "skipping the health check must fail (d)".
+
+Observation first (honest limit of the plant): with the endpoint STOPPED, skipping the health check does not by itself let a
+write through, because the wrap request then fails on the transport and the write is refused anyway. So (d) was sharpened:
+after the stop and the failed probe, the fixture is RESTARTED and the write is attempted BEFORE any probe sees it. The cached
+health still says down, so a correct build refuses (no I/O), and a build that skips the health check seals.
+
+plant (E238-PLANT), two edits applied together:
+  1. crates/maos-secrets/src/lib.rs seal_at_rest: `if false && !kms.is_healthy() { ... }` (the check is skipped)
+  2. crates/maos-bin/src/enterprise_identity.rs seal_row_at_rest: the match arm `(Some(k), Some(c)) if k.is_healthy()` -> `(Some(k), Some(c))`
+command: cargo test --locked -p maos-bin --test external_kms_wiring_23_8
+(applied together with the AC3 loopback plant and the D-23-8-07 bad-key plant, disjoint tests; see the other files)
+
+test online::with_the_endpoint_down_sealed_writes_are_refused_and_resume_when_it_returns ... FAILED
+thread 'online::with_the_endpoint_down_sealed_writes_are_refused_and_resume_when_it_returns' panicked at
+crates/maos-bin/tests/external_kms_wiring_23_8.rs:241:9:
+assertion failed: matches!(runtime.seal_row_at_rest(PLAINTEXT), Err(EnterpriseFailure::KmsSealedWriteRefused { .. }))
+
+Plant 1 alone, in maos-secrets: cargo test --locked -p maos-secrets --features http-kms --test external_kms_23_8 --test at_rest_seal
+  at_rest_seal: 9 passed
+  test a_stopped_prober_goes_unhealthy ... FAILED
+  panicked at crates/maos-secrets/tests/external_kms_23_8.rs:325:5:
+  assertion failed: matches!(seal_at_rest(&kms, &RingCryptoProvider, PAYLOAD), Err(KmsError::Unavailable(_)))
+  (16 passed, 1 failed)
+
+Both plants reverted (lib.rs hash after = B0E0 = before; enterprise_identity.rs restored by the next edit).

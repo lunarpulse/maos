@@ -2284,11 +2284,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // in an `Arc` so the at-rest seal hook (loom-lite) and the SIEM forwarder
     // (spawned consumer) share one runtime. Stays OUT of `api.rs` — a
     // composition-root concern, not a kernel-core adapter (L1 / F8).
+    // Story 23-8 — the KMS is selected once, before the secret store and the
+    // enterprise runtime, and both receive the same adapter (D-23-8-08 A). An
+    // invalid KMS configuration is a boot refusal; it used to latch
+    // `ConfiguredDown` and let the Collective store write plaintext
+    // (D-23-8-07 A).
+    let configured_kms = match maos_bin::enterprise_identity::configure_kms_from_env() {
+        Ok(kms) => kms,
+        Err(refusal) => {
+            eprintln!("maos: {refusal}");
+            std::process::exit(78);
+        }
+    };
     let enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>> =
         match maos_bin::enterprise_identity::EnterpriseRuntime::from_env(
             Arc::clone(&crypto),
             audit_db_path.clone(),
             boot_nonce,
+            configured_kms.as_ref(),
         ) {
             Ok(rt) if !rt.is_noop() => {
                 eprintln!(
@@ -2310,6 +2323,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err(format!("maos: enterprise runtime construction failed: {e}").into());
             }
         };
+
+    // Story 23-8 — one probe at boot so the posture line is honest. An
+    // unreachable endpoint is not a boot refusal: health recovers by probe and
+    // sealed writes are refused until then.
+    if let Some(probe) = enterprise_runtime.as_ref().and_then(|rt| rt.kms_probe()) {
+        let outcome = tokio::task::spawn_blocking(move || probe())
+            .await
+            .unwrap_or(maos_bin::enterprise_identity::KmsProbeOutcome::Unreachable);
+        eprintln!("{}", outcome.line(true));
+    }
+
+    // The shutdown token of the serve loop, created here so the KMS probe task
+    // runs from the moment the endpoint is known (a result older than three
+    // intervals is stale, and a slow boot must not outlive it). The cohort
+    // one-shot paths run inside this `main` and share the same probe task.
+    let cancel = CancellationToken::new();
+    let _kms_probe_handle = enterprise_runtime
+        .as_ref()
+        .and_then(|rt| rt.spawn_kms_probe_task(cancel.clone()));
 
     // Story 4.2 — HaltRegistry + WorkingMemoryOrchestrator for scalar-write pipeline.
     let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
@@ -3800,16 +3832,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("maos: MAOS_SECRETS_BACKEND=encrypted-file requires MAOS_HOME or HOME");
                 std::process::exit(78);
             });
-            let kms = maos_bin::enterprise_identity::build_local_kms().unwrap_or_else(|error| {
-                eprintln!(
-                    "maos: MAOS_SECRETS_BACKEND=encrypted-file requires a healthy \
-                     MAOS_KMS_MASTER_KEY: {error}"
-                );
-                std::process::exit(78);
-            });
+            let kms = configured_kms
+                .as_ref()
+                .map(maos_bin::enterprise_identity::ConfiguredKms::port)
+                .unwrap_or_else(|| {
+                    eprintln!(
+                        "maos: MAOS_SECRETS_BACKEND=encrypted-file requires a healthy configured KMS \
+                         (MAOS_KMS_MASTER_KEY or MAOS_KMS_ENDPOINT)"
+                    );
+                    std::process::exit(78);
+                });
             Arc::new(maos_secrets::EncryptedFileSecretStore::new(
                 home.join("secrets"),
-                Arc::new(kms),
+                kms,
                 Arc::clone(&crypto_provider),
             ))
         }
@@ -3886,6 +3921,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(78);
         }
     };
+
+    // Story 23-8 (D-23-8-08 A) — settle the external KMS bearer now that a
+    // secret store exists. It is read through the configured store, except
+    // under `encrypted-file`, whose store cannot unlock itself without the
+    // KMS: there it is read through the env store. Until this runs the adapter
+    // refuses every call, so nothing is sent without the operator's decision.
+    if let Some(kms) = configured_kms.as_ref().filter(|kms| kms.probe().is_some()) {
+        let bearer_source: &dyn maos_domain::ports::SecretStore =
+            if matches!(secret_backend, maos_secrets::Backend::EncryptedFile) {
+                env_secrets.as_ref()
+            } else {
+                secret_store.as_ref()
+            };
+        match bearer_source.get(maos_domain::ports::SecretKey::KmsBearer) {
+            Ok(bearer) => {
+                let bearer = bearer
+                    .map(|value| value.trim().to_owned())
+                    .filter(|value| !value.is_empty());
+                eprintln!(
+                    "maos: external KMS bearer {}; wrap and unwrap calls are now sent",
+                    if bearer.is_some() {
+                        "read"
+                    } else {
+                        "not configured (none is sent)"
+                    }
+                );
+                kms.provision_bearer(bearer);
+            }
+            Err(error) => {
+                kms.bearer_unreadable();
+                eprintln!(
+                    "maos: the external KMS bearer could not be read ({error}); every wrap and \
+                     unwrap is refused until restart and sealed writes are refused"
+                );
+            }
+        }
+    }
 
     let mut providers_map: std::collections::BTreeMap<String, Arc<dyn maos_providers::Provider>> =
         std::collections::BTreeMap::new();
@@ -10160,7 +10232,6 @@ description = "smoke test spirit successor"
     }
     // ─────────────────────────────────────────────────────────────
 
-    let cancel = CancellationToken::new();
     let enterprise_pdp_runtime = enterprise_pdp_runtime.map(|runtime| {
         let handle = runtime.spawn(cancel.child_token());
         eprintln!("maos: EnterprisePdpRuntime spawned (Story 11.4a)");
@@ -13207,7 +13278,9 @@ fn build_enterprise_daemon_governance(
     )?;
 
     let seal_hook = enterprise_runtime.and_then(|runtime| runtime.at_rest_seal_hook());
-    if enterprise_runtime.is_some_and(|runtime| runtime.kms_configured()) && seal_hook.is_none() {
+    if enterprise_runtime.is_some_and(|runtime| runtime.kms_configured())
+        && (seal_hook.is_none() || enterprise_runtime.is_some_and(|runtime| runtime.kms_unbuilt()))
+    {
         return Err(
             "enterprise daemon posture: MAOS_KMS_* is configured but no healthy at-rest \
              seal hook is available; refusing to start rather than persisting plaintext"

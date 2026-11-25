@@ -86,18 +86,26 @@ struct Root {
 }
 
 /// A fresh `HOME`/`MAOS_HOME` pair with `maos init` run in it.
+///
+/// The directory name carries a process-wide counter, so two tests that share a
+/// label (`refused_cold_swap_restores_retained_manifest` runs twice with one
+/// label) can never share a scratch directory, and with it a `MAOS_HOME`, a
+/// `control.json` and a daemon, whatever the clock resolution. `create_dir`
+/// (not `create_dir_all`) makes a collision an error instead of a shared home.
 fn fresh_home(label: &str) -> (PathBuf, PathBuf) {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let unique = NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let scratch = std::env::temp_dir().join(format!(
-        "maos-door-16-1-{label}-{}-{}",
+        "maos-door-16-1-{label}-{}-{unique}-{}",
         std::process::id(),
-        Instant::now().elapsed().as_nanos()
-            ^ std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .expect("clock after epoch")
-                .as_nanos()
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_nanos()
     ));
     let home = scratch.join("home");
-    std::fs::create_dir_all(&home).expect("create scratch home");
+    std::fs::create_dir(&scratch).expect("create a unique scratch dir");
+    std::fs::create_dir(&home).expect("create scratch home");
 
     let init = Command::new(maos())
         .arg("init")

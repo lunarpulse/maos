@@ -1,0 +1,10 @@
+Review finding P3-3 (the probe shared the 5 s overall limit instead of its own 2 s).
+
+Plant  crates/maos-secrets/src/http_kms.rs  TimedHttp::http_get:
+    let response = match self.agent.get(url).call() { // E238-PLANT P3-3      (no per-request probe limit)
+  command: cargo test --locked -p maos-secrets --features http-kms --test external_kms_23_8 the_probe_has_its_own
+  fails:
+    the_probe_has_its_own_overall_limit_and_a_hanging_endpoint_fails_it
+      "the probe must end under its own limit, not the 120 s ones: Timeout"   (outer 30 s failure bound; finished in 30.12s)
+  With the fix the same test passes in well under a second (probe limit 400 ms, every other limit 120 s).
+Reverted; green again.
