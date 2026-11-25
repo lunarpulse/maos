@@ -82,6 +82,17 @@ Decided by the operator on 2026-11-24 (D-23-6-02 A, D-23-6-01 A, D-23-0-02 A, D-
 - **Dependency.** `url` 2.5 enters `maos-domain` so that the policy parses a URL with the parser `ureq` already uses in the kernel closure. It is not an OIDC, KMS or SIEM dependency, so the Consequence "OIDC/KMS/SIEM dependencies stay out of `maos-kernel-core` and `maos-domain`" holds.
 - **Known boundary.** The rebinding window between the policy's lookup and the IO adapter's lookup is claim boundary 23-0.a in `RELEASE-HOLDS.md`.
 
+## Amendment — Story 23-0b (outbound connection binding; 2026-11-25)
+
+Decided by the operator on 2026-11-25 (D-23-0b-01 A, 02 a, 03 a, 04 a, 05 a, 06 a, 07 a). Each point adds to the Decision; nothing above changes. This amends lane rule 1 of Epic 23 and D-23-1-04 A's "the IO port stays as is; no kernel change" for this one seam.
+
+- **Port change.** `IoSubsystemPort` (`maos-domain`) gains `bind(&VettedUrl) -> Result<Box<dyn IoSubsystemPort>, IoError>`, whose default fails closed with `outbound_unbound_refused` (`OutboundRefusal::Unbound`), and `never_follows_redirects() -> bool`, default `false`. `VettedUrl` gains the accessors `is_name`, `host_str`, `port` and `socket_addrs`.
+- **Policy wrapper.** `PolicedIo::vet_url` resolves a host name once; a name goes through `inner.bind(&vetted)` and never down the raw-string path; a literal IP never calls `bind`. `PolicedIo::new` returns `Result` and refuses (`OutboundRefusal::Redirect`) an inner port that does not declare `never_follows_redirects`, and a bound port is held to the same declaration, because the 3xx check runs after the transport returned and a following transport would already have connected to an unvetted address.
+- **Kernel change (`crates/maos-kernel-core/src/io/mod.rs`, +19 tokei).** One private agent builder is shared by `new()` and `bind()` (`.redirects(0)` in one place). `bind` returns an adapter on a fresh agent with `max_idle_connections(0)` (no pooled connection from another resolution) and a resolver that answers only the vetted `host:port` with the vetted addresses and refuses any other netloc. TLS keeps the URL host name for SNI and certificate verification.
+- **Classifier.** `3fff::/20` (RFC 9637 documentation) is `Reserved`, so Worker egress refuses it too (more refused; `RELEASE-HOLDS.md` row 23-0.b).
+- **Production resolver.** Not part of this story: the first consumer (23-2) builds `ResolveHost` at the composition root.
+- **Boundary.** Claim boundary 23-0.a is closed for host names through `PolicedIo` over the kernel adapter only; row 23-0b.a states what remains open.
+
 ## Amendment — Story 23-8 (external KMS adapter; 2026-11-25)
 
 Decided by the operator on 2026-11-24/25 (D-23-8-01…10 as recommended; D-23-8-11 proposed A, implemented as A). Each point adds to the Decision; nothing above changes. "Vault/cloud KMS … deferred" now reads "vendor KMS through a sidecar".

@@ -3,11 +3,12 @@
 
 use maos_domain::outbound::{
     classify_ip, IpClass, OutboundPolicy, OutboundRefusal, PolicedIo, ResolveFailed, ResolveHost,
+    VettedUrl,
 };
 use maos_domain::ports::io_subsystem::{HttpExchange, IoError, IoSubsystemPort};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 struct FakeResolver(HashMap<&'static str, Result<Vec<IpAddr>, ResolveFailed>>);
 
@@ -390,13 +391,19 @@ fn classify_public_equals_the_former_egress_predicate_on_the_whole_vector_table(
             former_egress_public_ip(ip)
         );
     }
-    // IPv6: every first segment, with the second segment swept around the 2001 specials.
+    // IPv6: every first segment, with the second segment swept around the 2001
+    // specials and the 3fff::/20 edge. The ONE intended difference from the
+    // former predicate: 3fff::/20 (RFC 9637 documentation) was admitted and is
+    // now refused (23-0b ruling, 2026-11-25).
+    let refused_rfc_9637 =
+        |ip: std::net::Ipv6Addr| ip.segments()[0] == 0x3fff && ip.segments()[1] & 0xf000 == 0;
     for s0 in 0..=0xffffu16 {
-        for s1 in [0, 1, 0x01ff, 0x0200, 0x0db8, 0x0db9, 0xffff] {
-            let ip = IpAddr::V6(std::net::Ipv6Addr::new(s0, s1, 0, 0, 0, 0, 0, 1));
+        for s1 in [0, 1, 0x01ff, 0x0200, 0x0db8, 0x0db9, 0x0fff, 0x1000, 0xffff] {
+            let v6 = std::net::Ipv6Addr::new(s0, s1, 0, 0, 0, 0, 0, 1);
+            let ip = IpAddr::V6(v6);
             assert_eq!(
                 classify_ip(ip) == IpClass::Public,
-                former_egress_public_ip(ip),
+                former_egress_public_ip(ip) && !refused_rfc_9637(v6),
                 "{ip}"
             );
         }
@@ -440,23 +447,75 @@ fn classify_names_one_class_per_block() {
 // ---- PolicedIo (AC5) ----
 
 struct InnerPort {
-    calls: Mutex<Vec<String>>,
+    calls: Arc<Mutex<Vec<String>>>,
+    binds: Mutex<Vec<String>>,
     exchange_status: u16,
 }
 
 impl InnerPort {
     fn new(exchange_status: u16) -> Self {
         Self {
-            calls: Mutex::new(Vec::new()),
+            calls: Arc::new(Mutex::new(Vec::new())),
+            binds: Mutex::new(Vec::new()),
             exchange_status,
         }
     }
     fn calls(&self) -> Vec<String> {
         self.calls.lock().unwrap().clone()
     }
+    fn binds(&self) -> Vec<String> {
+        self.binds.lock().unwrap().clone()
+    }
+}
+
+/// What `InnerPort::bind` returns: records `bound ...` calls in the same list.
+struct BoundPort {
+    calls: Arc<Mutex<Vec<String>>>,
+    exchange_status: u16,
+}
+
+impl IoSubsystemPort for BoundPort {
+    fn never_follows_redirects(&self) -> bool {
+        true
+    }
+    fn http_get(&self, url: &str) -> Result<Vec<u8>, IoError> {
+        self.calls.lock().unwrap().push(format!("bound-get {url}"));
+        Ok(b"bound-get-body".to_vec())
+    }
+    fn http_post(&self, url: &str, _: &[u8], _: &[(&str, &str)]) -> Result<Vec<u8>, IoError> {
+        self.calls.lock().unwrap().push(format!("bound-post {url}"));
+        Ok(b"bound-post-body".to_vec())
+    }
+    fn http_post_exchange(
+        &self,
+        url: &str,
+        _: &[u8],
+        _: &[(&str, &str)],
+        _: &str,
+    ) -> Result<HttpExchange, IoError> {
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("bound-exchange {url}"));
+        Ok(HttpExchange {
+            status: self.exchange_status,
+            body: b"bound-exchange-body".to_vec(),
+            header: Some("https://elsewhere.example/".to_owned()),
+        })
+    }
 }
 
 impl IoSubsystemPort for &InnerPort {
+    fn never_follows_redirects(&self) -> bool {
+        true
+    }
+    fn bind(&self, vetted: &VettedUrl) -> Result<Box<dyn IoSubsystemPort>, IoError> {
+        self.binds.lock().unwrap().push(vetted.as_str().to_owned());
+        Ok(Box::new(BoundPort {
+            calls: Arc::clone(&self.calls),
+            exchange_status: self.exchange_status,
+        }))
+    }
     fn http_get(&self, url: &str) -> Result<Vec<u8>, IoError> {
         self.calls.lock().unwrap().push(format!("get {url}"));
         Ok(b"get-body".to_vec())
@@ -489,7 +548,7 @@ impl IoSubsystemPort for &InnerPort {
 #[test]
 fn a_redirect_answer_is_refused_and_not_followed() {
     let inner = InnerPort::new(302);
-    let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict());
+    let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict()).unwrap();
     let result = io.http_post_exchange("https://1.1.1.1/token", b"x", &[], "location");
     assert_eq!(
         result,
@@ -506,7 +565,7 @@ fn a_redirect_answer_is_refused_and_not_followed() {
     );
     for status in [300, 301, 303, 307, 308, 399] {
         let inner = InnerPort::new(status);
-        let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict());
+        let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict()).unwrap();
         assert!(io
             .http_post_exchange("https://1.1.1.1/", b"", &[], "location")
             .is_err());
@@ -514,7 +573,7 @@ fn a_redirect_answer_is_refused_and_not_followed() {
     // Non-3xx exchanges pass through as data, 4xx and 5xx included.
     for status in [200, 204, 400, 401, 500] {
         let inner = InnerPort::new(status);
-        let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict());
+        let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict()).unwrap();
         let exchange = io
             .http_post_exchange("https://1.1.1.1/", b"", &[], "location")
             .unwrap();
@@ -525,7 +584,7 @@ fn a_redirect_answer_is_refused_and_not_followed() {
 #[test]
 fn a_refused_url_never_reaches_the_inner_port() {
     let inner = InnerPort::new(200);
-    let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict());
+    let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict()).unwrap();
     for (url, code) in [
         ("http://1.1.1.1/", "outbound_http_refused"),
         ("https://127.0.0.1/", "outbound_loopback_refused"),
@@ -563,7 +622,7 @@ fn a_redirect_is_refused_on_post_and_a_failing_get_is_not_passed_as_bytes() {
     // by the inner adapter.
     for status in [301, 302, 307, 308] {
         let inner = InnerPort::new(status);
-        let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict());
+        let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict()).unwrap();
         assert_eq!(
             io.http_post("https://1.1.1.1/", b"", &[]),
             Err(IoError::Transport("outbound_redirect_refused".to_owned())),
@@ -572,12 +631,15 @@ fn a_redirect_is_refused_on_post_and_a_failing_get_is_not_passed_as_bytes() {
     }
     // Other non-2xx stays an error, never a body.
     let inner = InnerPort::new(500);
-    let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict());
+    let io = PolicedIo::new(&inner, FakeResolver::none(), OutboundPolicy::strict()).unwrap();
     assert!(io.http_post("https://1.1.1.1/", b"", &[]).is_err());
     // http_get gets bytes only: the inner adapter's refusal of a 3xx (the
     // kernel adapter's contract) comes through unchanged and no body does.
     struct RedirectingGet;
     impl IoSubsystemPort for RedirectingGet {
+        fn never_follows_redirects(&self) -> bool {
+            true
+        }
         fn http_get(&self, _url: &str) -> Result<Vec<u8>, IoError> {
             Err(IoError::Transport("status 302".to_owned()))
         }
@@ -589,7 +651,8 @@ fn a_redirect_is_refused_on_post_and_a_failing_get_is_not_passed_as_bytes() {
         RedirectingGet,
         FakeResolver::none(),
         OutboundPolicy::strict(),
-    );
+    )
+    .unwrap();
     assert_eq!(
         io.http_get("https://1.1.1.1/"),
         Err(IoError::Transport("status 302".to_owned()))
@@ -639,4 +702,246 @@ fn the_vetted_url_debug_shows_no_userinfo_path_or_query() {
         assert!(!text.contains(leak), "{text}");
     }
     assert!(text.contains("1.1.1.1") && text.contains("8443"), "{text}");
+}
+
+// ---- Story 23-0b: binding, no-follow contract, 3fff::/20 ----
+
+#[test]
+fn the_classifier_refuses_the_rfc_9637_documentation_block() {
+    let class = |text: &str| classify_ip(text.parse().unwrap());
+    // 3fff::/20 is refused at both ends of the block.
+    assert_eq!(class("3fff::"), IpClass::Reserved);
+    assert_eq!(
+        class("3fff:fff:ffff:ffff:ffff:ffff:ffff:ffff"),
+        IpClass::Reserved
+    );
+    assert_eq!(class("3fff:800::1"), IpClass::Reserved);
+    // The neighbours are unchanged: below it (inside 2000::/3), above it
+    // (outside 2000::/3), and just past its end.
+    assert_eq!(class("3ffe:ffff::"), IpClass::Public);
+    assert_eq!(class("4000::"), IpClass::Reserved);
+    assert_eq!(class("3fff:1000::"), IpClass::Public);
+    assert_eq!(class("2fff:ffff::"), IpClass::Public);
+}
+
+#[test]
+fn a_name_answering_in_the_rfc_9637_block_is_refused() {
+    let resolver = FakeResolver::with("doc.example", &["3fff:abc::1"]);
+    assert_eq!(
+        OutboundPolicy::strict().vet_url("https://doc.example/", &resolver),
+        Err(OutboundRefusal::Reserved)
+    );
+    assert_eq!(
+        OutboundPolicy::strict()
+            .allow_private()
+            .vet_url("https://[3fff::1]/", &FakeResolver::none())
+            .err(),
+        Some(OutboundRefusal::Reserved)
+    );
+}
+
+/// Counts every call; declares the no-follow contract and does not bind.
+struct NoBindPort {
+    raw_calls: Arc<Mutex<Vec<String>>>,
+}
+
+impl IoSubsystemPort for NoBindPort {
+    fn never_follows_redirects(&self) -> bool {
+        true
+    }
+    fn http_get(&self, url: &str) -> Result<Vec<u8>, IoError> {
+        self.raw_calls.lock().unwrap().push(format!("get {url}"));
+        Ok(Vec::new())
+    }
+    fn http_post(&self, url: &str, _: &[u8], _: &[(&str, &str)]) -> Result<Vec<u8>, IoError> {
+        self.raw_calls.lock().unwrap().push(format!("post {url}"));
+        Ok(Vec::new())
+    }
+    fn http_post_exchange(
+        &self,
+        url: &str,
+        _: &[u8],
+        _: &[(&str, &str)],
+        _: &str,
+    ) -> Result<HttpExchange, IoError> {
+        self.raw_calls
+            .lock()
+            .unwrap()
+            .push(format!("exchange {url}"));
+        Ok(HttpExchange {
+            status: 200,
+            body: Vec::new(),
+            header: None,
+        })
+    }
+}
+
+#[test]
+fn a_port_that_cannot_bind_refuses_host_names_and_is_never_called() {
+    let raw_calls = Arc::new(Mutex::new(Vec::new()));
+    let io = PolicedIo::new(
+        NoBindPort {
+            raw_calls: Arc::clone(&raw_calls),
+        },
+        FakeResolver::with("api.example", &["93.184.216.34"]),
+        OutboundPolicy::strict(),
+    )
+    .unwrap();
+    let expected = IoError::InvalidUrl("outbound_unbound_refused".to_owned());
+    assert_eq!(io.http_get("https://api.example/x"), Err(expected.clone()));
+    assert_eq!(
+        io.http_post("https://api.example/x", b"", &[]),
+        Err(expected.clone())
+    );
+    assert_eq!(
+        io.http_post_exchange("https://api.example/x", b"", &[], "")
+            .map(|_| ()),
+        Err(expected)
+    );
+    assert!(raw_calls.lock().unwrap().is_empty());
+    // A literal IP never needed to bind.
+    assert!(io.http_get("https://1.1.1.1/").is_ok());
+    assert_eq!(raw_calls.lock().unwrap().len(), 1);
+    assert_eq!(OutboundRefusal::Unbound.code(), "outbound_unbound_refused");
+}
+
+#[test]
+fn a_literal_ip_never_binds_and_a_name_binds_once_and_never_goes_raw() {
+    let inner = InnerPort::new(200);
+    let policy = OutboundPolicy::strict().allow_loopback_http();
+    let io = PolicedIo::new(
+        &inner,
+        FakeResolver::with("api.example", &["93.184.216.34"]),
+        policy,
+    )
+    .unwrap();
+    for url in [
+        "https://1.1.1.1/",
+        "https://[2606:4700::1111]/",
+        "http://127.0.0.1:9000/",
+    ] {
+        io.http_get(url).unwrap();
+    }
+    assert!(inner.binds().is_empty(), "{:?}", inner.binds());
+    assert_eq!(inner.calls().len(), 3);
+    // One name request: bind once, the request goes to the bound port only.
+    io.http_get("https://api.example/x").unwrap();
+    assert_eq!(inner.binds(), vec!["https://api.example/x".to_owned()]);
+    assert_eq!(
+        inner.calls().last().map(String::as_str),
+        Some("bound-get https://api.example/x")
+    );
+    assert_eq!(inner.calls().len(), 4, "{:?}", inner.calls());
+}
+
+#[test]
+fn a_redirect_on_the_bound_path_is_refused_with_no_location_and_no_body() {
+    for status in [301, 302, 307, 308] {
+        let inner = InnerPort::new(status);
+        let io = PolicedIo::new(
+            &inner,
+            FakeResolver::with("api.example", &["93.184.216.34"]),
+            OutboundPolicy::strict(),
+        )
+        .unwrap();
+        let result = io.http_post_exchange("https://api.example/token", b"x", &[], "location");
+        assert_eq!(
+            result,
+            Err(IoError::Transport("outbound_redirect_refused".to_owned())),
+            "{status}"
+        );
+        let text = format!("{result:?}");
+        assert!(
+            !text.contains("elsewhere") && !text.contains("bound-exchange-body"),
+            "{text}"
+        );
+        assert_eq!(
+            inner.calls(),
+            vec!["bound-exchange https://api.example/token".to_owned()],
+            "the bound port sees exactly one call"
+        );
+        assert_eq!(
+            io.http_post("https://api.example/token", b"", &[]),
+            Err(IoError::Transport("outbound_redirect_refused".to_owned()))
+        );
+    }
+}
+
+/// A transport that, like ureq with `.redirects(5)`, follows a 3xx before it
+/// returns: it records the private address it was sent to.
+struct FollowingPort {
+    connected: Arc<Mutex<Vec<String>>>,
+    bound_follows: bool,
+}
+
+impl IoSubsystemPort for FollowingPort {
+    fn http_get(&self, _url: &str) -> Result<Vec<u8>, IoError> {
+        self.connected
+            .lock()
+            .unwrap()
+            .push("followed https://10.0.0.5/internal".to_owned());
+        Ok(b"secret".to_vec())
+    }
+    fn http_post(&self, url: &str, _: &[u8], _: &[(&str, &str)]) -> Result<Vec<u8>, IoError> {
+        self.http_get(url)
+    }
+    fn bind(&self, _vetted: &VettedUrl) -> Result<Box<dyn IoSubsystemPort>, IoError> {
+        Ok(Box::new(FollowingPort {
+            connected: Arc::clone(&self.connected),
+            bound_follows: self.bound_follows,
+        }))
+    }
+    fn never_follows_redirects(&self) -> bool {
+        self.bound_follows
+    }
+}
+
+#[test]
+fn a_transport_that_follows_redirects_is_refused_before_any_request() {
+    let connected = Arc::new(Mutex::new(Vec::new()));
+    // Default declaration (false): the wrapper refuses to be built over it.
+    let result = PolicedIo::new(
+        FollowingPort {
+            connected: Arc::clone(&connected),
+            bound_follows: false,
+        },
+        FakeResolver::none(),
+        OutboundPolicy::strict(),
+    );
+    assert_eq!(result.err(), Some(OutboundRefusal::Redirect));
+    assert!(connected.lock().unwrap().is_empty());
+}
+
+#[test]
+fn a_bound_port_that_does_not_declare_no_follow_is_refused_before_any_request() {
+    struct DeclaresOnlyOuter(Arc<Mutex<Vec<String>>>);
+    impl IoSubsystemPort for DeclaresOnlyOuter {
+        fn never_follows_redirects(&self) -> bool {
+            true
+        }
+        fn http_get(&self, _: &str) -> Result<Vec<u8>, IoError> {
+            Ok(Vec::new())
+        }
+        fn http_post(&self, _: &str, _: &[u8], _: &[(&str, &str)]) -> Result<Vec<u8>, IoError> {
+            Ok(Vec::new())
+        }
+        fn bind(&self, _vetted: &VettedUrl) -> Result<Box<dyn IoSubsystemPort>, IoError> {
+            Ok(Box::new(FollowingPort {
+                connected: Arc::clone(&self.0),
+                bound_follows: false,
+            }))
+        }
+    }
+    let connected = Arc::new(Mutex::new(Vec::new()));
+    let io = PolicedIo::new(
+        DeclaresOnlyOuter(Arc::clone(&connected)),
+        FakeResolver::with("api.example", &["93.184.216.34"]),
+        OutboundPolicy::strict(),
+    )
+    .unwrap();
+    assert_eq!(
+        io.http_get("https://api.example/x"),
+        Err(IoError::InvalidUrl("outbound_redirect_refused".to_owned()))
+    );
+    assert!(connected.lock().unwrap().is_empty());
 }

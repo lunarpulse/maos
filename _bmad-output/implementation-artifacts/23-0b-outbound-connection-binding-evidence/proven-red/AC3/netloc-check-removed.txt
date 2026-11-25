@@ -1,0 +1,10 @@
+warning: unexpected `cfg` condition value: `test-introspection`
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = note: `#[warn(unexpected_cfgs)]` on by default
+a_bound_port_refuses_a_different_host_or_port --- FAILED
+failures:
+thread 'a_bound_port_refuses_a_different_host_or_port' (3042702) panicked at crates/maos-kernel-core/tests/io_binding_23_0b.rs:246:17:
+https://other.maos.test:42751/: ureq GET https://other.maos.test:42751/: https://other.maos.test:42751/: Connection Failed: tls connection init failed: unexpected end of file
+failures:
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+error: test failed, to rerun pass `-p maos-kernel-core --test io_binding_23_0b`

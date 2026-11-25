@@ -1,0 +1,25 @@
+a_name_answering_in_the_rfc_9637_block_is_refused --- FAILED
+the_classifier_refuses_the_rfc_9637_documentation_block --- FAILED
+classify_public_equals_the_former_egress_predicate_on_the_whole_vector_table --- FAILED
+failures:
+thread 'a_name_answering_in_the_rfc_9637_block_is_refused' (3049267) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:730:5:
+assertion `left == right` failed
+  left: Ok(VettedUrl { scheme: "https", host: Some("doc.example"), port: Some(443), addresses: [3fff:abc::1] })
+ right: Err(Reserved)
+thread 'the_classifier_refuses_the_rfc_9637_documentation_block' (3049285) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:713:5:
+assertion `left == right` failed
+  left: Public
+ right: Reserved
+thread 'classify_public_equals_the_former_egress_predicate_on_the_whole_vector_table' (3049282) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:404:13:
+assertion `left == right` failed: 3fff::1
+  left: true
+ right: false
+failures:
+test result: FAILED. 22 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+error: test failed, to rerun pass `-p maos-domain --test outbound_policy_23_0`
+proxy::tests::a_resolved_answer_in_the_rfc_9637_block_is_refused --- FAILED
+failures:
+thread 'proxy::tests::a_resolved_answer_in_the_rfc_9637_block_is_refused' (3049433) panicked at crates/maos-egress/src/proxy.rs:1107:13:
+failures:
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+error: test failed, to rerun pass `-p maos-egress --lib`

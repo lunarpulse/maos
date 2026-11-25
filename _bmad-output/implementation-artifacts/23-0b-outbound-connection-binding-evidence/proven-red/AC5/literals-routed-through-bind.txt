@@ -1,0 +1,30 @@
+a_literal_ip_never_binds_and_a_name_binds_once_and_never_goes_raw --- FAILED
+a_port_that_cannot_bind_refuses_host_names_and_is_never_called --- FAILED
+a_redirect_answer_is_refused_and_not_followed --- FAILED
+a_redirect_is_refused_on_post_and_a_failing_get_is_not_passed_as_bytes --- FAILED
+a_refused_url_never_reaches_the_inner_port --- FAILED
+failures:
+thread 'a_literal_ip_never_binds_and_a_name_binds_once_and_never_goes_raw' (3043410) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:825:5:
+thread 'a_port_that_cannot_bind_refuses_host_names_and_is_never_called' (3043414) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:803:5:
+assertion failed: io.http_get("https://1.1.1.1/").is_ok()
+thread 'a_redirect_answer_is_refused_and_not_followed' (3043417) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:562:5:
+assertion `left == right` failed
+  left: ["bound-exchange https://1.1.1.1/token"]
+ right: ["exchange https://1.1.1.1/token"]
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<alloc::vec::Vec<alloc::string::String>, alloc::vec::Vec<alloc::string::String>>
+thread 'a_redirect_is_refused_on_post_and_a_failing_get_is_not_passed_as_bytes' (3043418) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:656:5:
+assertion `left == right` failed
+  left: Err(InvalidUrl("outbound_unbound_refused"))
+ right: Err(Transport("status 302"))
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<core::result::Result<alloc::vec::Vec<u8>, maos_domain::ports::io_subsystem::IoError>, core::result::Result<alloc::vec::Vec<u8>, maos_domain::ports::io_subsystem::IoError>>
+thread 'a_refused_url_never_reaches_the_inner_port' (3043421) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:611:5:
+assertion `left == right` failed
+  left: [98, 111, 117, 110, 100, 45, 103, 101, 116, 45, 98, 111, 100, 121]
+ right: [103, 101, 116, 45, 98, 111, 100, 121]
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<alloc::vec::Vec<u8>, &[u8; 8]>
+failures:
+test result: FAILED. 20 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+error: test failed, to rerun pass `-p maos-domain --test outbound_policy_23_0`

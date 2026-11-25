@@ -1,0 +1,9 @@
+a_port_that_cannot_bind_refuses_host_names_and_is_never_called --- FAILED
+failures:
+thread 'a_port_that_cannot_bind_refuses_host_names_and_is_never_called' (3046749) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:791:5:
+assertion `left == right` failed
+  left: Ok([])
+ right: Err(InvalidUrl("outbound_unbound_refused"))
+failures:
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+error: test failed, to rerun pass `-p maos-domain --test outbound_policy_23_0`
