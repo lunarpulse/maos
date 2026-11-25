@@ -1,0 +1,39 @@
+[class]
+name = "incident-triage-ts"
+version = "0.1.0"
+abi = "1.0"
+manifest_schema_version = 7
+min_substrate_version = "0.1.0-alpha.1"
+forms = ["wasm-component"]
+artifact = "dist/spirit.wasm"
+trust_tier = "public-untrusted"
+description = "A deterministic incident-triage Spirit: severity, matched rule and first runbook step from a fixed rule table."
+
+# The only capability this Spirit uses: the reply to a directed task goes out on the bus.
+# It declares no `log` (recall/fetch) and no `skill` capability because its guest imports neither.
+[capabilities.required.iac]
+send = ["spirit:peer"]
+
+[posture]
+default = "assistive"
+allowed_max = "assistive"
+
+[output_shape]
+required_fields = ["introduction"]
+
+[budget]
+context_window_size = 4096
+time_cap_seconds = 360
+
+[resources]
+# The template's caps, kept. Starting a componentized-JS guest is CPU-bound (templates/spirit-ts
+# README). The CPU cap needs a writable delegated cgroup v2: start `maos serve` under
+# `systemd-run --user --scope -p Delegate=yes` (kit/spirit-author/AGENTS.md step 9).
+cpu_max_pct = 100
+memory_max_mb = 768
+
+[sandbox]
+tier = "T2"
+
+[author]
+name = "MAOS example"

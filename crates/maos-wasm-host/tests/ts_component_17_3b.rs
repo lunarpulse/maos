@@ -289,3 +289,89 @@ fn typescript_component_round_trips_a_fully_populated_frame() {
         output_bytes.len()
     );
 }
+
+/// One turn of the shipped TypeScript component under the release runner at `fuel`, whose
+/// `author` import is answered with `author_reply`; every other request gets its ordinary
+/// answer. Returns the runner's exit code, its stderr and every non-request frame it emitted.
+fn drive_turn(fuel: u64, author_reply: RecallReply) -> (Option<i32>, String, Vec<Vec<u8>>) {
+    let component = std::env::var("MAOS_TS_COMPONENT")
+        .expect("rule-11(b): MAOS_TS_COMPONENT names the componentize-js artifact");
+    let runner = runner_binary_path();
+    assert!(
+        runner.is_file(),
+        "release runner missing: {}",
+        runner.display()
+    );
+    let mut child = std::process::Command::new(&runner)
+        .arg("--component")
+        .arg(&component)
+        .arg("--fuel")
+        .arg(fuel.to_string())
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|error| panic!("cannot spawn {}: {error}", runner.display()));
+    let frame = full_frame();
+    let input = codec::encode_cbor(&frame).expect("canonical frame");
+    let mut writer = Some(BufWriter::new(child.stdin.take().expect("runner stdin")));
+    let first = writer.as_mut().expect("open");
+    maos_frame_codec::write_frame(first, &input).expect("write the inbound frame");
+    first.flush().expect("flush");
+    let mut reader = BufReader::new(child.stdout.take().expect("runner stdout"));
+    let stderr = child.stderr.take().expect("runner stderr");
+    let mut author_reply = Some(author_reply);
+    let mut emitted = Vec::new();
+    while let Ok(Some(frame)) = maos_frame_codec::read_frame(&mut reader) {
+        let reply = match recall_wire::decode_request(&frame) {
+            Ok(RecallRequest::SkillAuthor { .. }) => author_reply.take(),
+            Ok(RecallRequest::Recall { .. }) => Some(RecallReply::Page {
+                entries: Vec::new(),
+                next_cursor: None,
+            }),
+            Ok(RecallRequest::Fetch { .. }) => Some(RecallReply::Error(WireError::ScopeViolation)),
+            _ => {
+                emitted.push(frame);
+                None
+            }
+        };
+        if let Some(reply) = reply {
+            let bytes = recall_wire::encode_reply(&reply).expect("encode reply");
+            let last = matches!(reply, RecallReply::Error(WireError::ScopeViolation));
+            if let Some(mut open) = writer.take() {
+                maos_frame_codec::write_frame(&mut open, &bytes).expect("write the reply");
+                open.flush().expect("flush reply");
+                // The turn ends after the last reply: closing stdin lets the runner exit.
+                writer = (!last).then_some(open);
+            }
+        }
+    }
+    drop(writer);
+    let mut stderr_text = String::new();
+    BufReader::new(stderr)
+        .read_to_string(&mut stderr_text)
+        .expect("read runner stderr");
+    (child.wait().expect("wait").code(), stderr_text, emitted)
+}
+
+/// 22-9 F1 — a denied `author()` is answered by the guest's own `catch`: it logs the decline
+/// and the turn completes within the ordinary 10,000,000 fuel, with no `OutOfFuel` and no
+/// exit 4. Measured (release runner, this frame): the turn needs more than 7,000,000 and at most
+/// 8,000,000 fuel, denied or accepted alike, so 10,000,000 leaves a 20-30% margin, not more.
+#[test]
+#[ignore = "needs the componentize-js artifact; run by example-spirit-ts-tests with --ignored"]
+fn typescript_component_declines_a_denied_author_without_running_out_of_fuel() {
+    let (code, stderr, emitted) =
+        drive_turn(10_000_000, RecallReply::Error(WireError::CapabilityDenied));
+    assert!(!stderr.contains("OutOfFuel"), "runner stderr: {stderr}");
+    assert_eq!(code, Some(0), "runner stderr: {stderr}");
+    assert!(
+        stderr.contains("Skill authoring declined: capability-denied"),
+        "the decline is logged: {stderr}"
+    );
+    assert_eq!(
+        emitted.len(),
+        3,
+        "Ready, one echoed frame and the turn-complete marker"
+    );
+}

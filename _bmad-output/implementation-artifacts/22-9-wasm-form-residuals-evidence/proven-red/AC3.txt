@@ -1,0 +1,10 @@
+AC3 plant: crates/maos-kernel-core/src/hot_swap/coordinator.rs revert_committed: the consent_policy().restore_if_installed call removed. Command: cargo test --locked -p maos-kernel-core --lib -- revert_restores_the_predecessors_consent_declaration revert_leaves_a_consent_declaration_a_later_swap_installed (the kernel lib is outside the nextest default filter, so libtest). Result: revert_restores_the_predecessors_consent_declaration FAILS; the later-swap vector passes (it asserts nothing is overwritten). Plant reverted.
+
+test hot_swap::coordinator::publication_tests::revert_leaves_a_consent_declaration_a_later_swap_installed ... ok
+test hot_swap::coordinator::publication_tests::revert_restores_the_predecessors_consent_declaration ... FAILED
+thread 'hot_swap::coordinator::publication_tests::revert_restores_the_predecessors_consent_declaration' (689585) panicked at crates/maos-kernel-core/src/hot_swap/../../tests/unit/coordinator_publication.rs:363:5:
+  left: {"peer": Withheld}
+ right: {"peer": Full}
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 250 filtered out; finished in 0.05s
+error: test failed, to rerun pass `-p maos-kernel-core --lib`
+rc=101

@@ -1,0 +1,11 @@
+AC4 plant (floor): crates/maos-manifest/src/manifest.rs ConsentSection::from_toml_str_at: 'if declared_schema < CONSENT_SINCE_SCHEMA' -> 'if false && ...'. Command: cargo nextest run --locked -p maos-manifest --test consent_schema_floor_22_9. Result: a_consent_section_below_schema_9_is_refused FAILS. Plant reverted.
+
+        PASS [   0.003s] (1/2) maos-manifest::consent_schema_floor_22_9 a_consent_section_at_schema_9_parses
+        FAIL [   0.014s] (2/2) maos-manifest::consent_schema_floor_22_9 a_consent_section_below_schema_9_is_refused
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.01s
+    thread 'a_consent_section_below_schema_9_is_refused' (692192) panicked at crates/maos-manifest/tests/consent_schema_floor_22_9.rs:14:14:
+    a [consent] table below the floor is refused, not ignored: ConsentSection { recall: {"peer-b": HeaderOnly} }
+     Summary [   0.015s] 2 tests run: 1 passed, 1 failed, 0 skipped
+        FAIL [   0.014s] (2/2) maos-manifest::consent_schema_floor_22_9 a_consent_section_below_schema_9_is_refused
+error: test run failed
+rc=100

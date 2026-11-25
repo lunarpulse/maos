@@ -18,6 +18,8 @@
 //!   guest's stdout and stderr (`wasi:cli`), the way a TypeScript `console.log` does; `say
 //!   frame TEXT` writes it in this very turn. The runner routes both streams to its own stderr.
 //! - `to SPIRIT`: address the report to this Spirit.
+//! - `timer MILLIS`: this turn waits that long on a monotonic-clock timer (what a TypeScript
+//!   `setTimeout` lowers to), then writes `timer MILLIS ms elapsed` as `say frame` does.
 //!
 //! Each export's `recall` import asks for `export_limit` entries (idle 1, consolidate 2,
 //! telemetry 3, schedule 4), and the log's own `log.recall` row records that limit.
@@ -234,6 +236,13 @@ impl Guest for LifecycleProbe {
                         STATE.with(|state| state.borrow_mut().says.push((name.to_owned(), text)));
                     }
                 }
+                (Some("timer"), Some(millis)) => {
+                    // A monotonic-clock wait that parks (`wasi:clocks` + `wasi:io/poll`), the way a
+                    // TypeScript `setTimeout` lowers; it spends no fuel while it waits.
+                    let millis: u64 = millis.parse().unwrap_or(0);
+                    std::thread::sleep(std::time::Duration::from_millis(millis));
+                    say("frame", &format!("timer {millis} ms elapsed"));
+                }
                 (Some("to"), Some(id)) => {
                     frame.to = vec![maos::spirit::frames::FrameAddress {
                         spirit_id: id.into(),
@@ -306,6 +315,8 @@ impl LifecycleGuest for LifecycleProbe {
             s.counter = counter;
             s.swapped_in = Some(counter);
         });
+        // Story 22-9: a successor's `console.log` in `swap-in` (pre-warm) must reach the journal.
+        say("swap-in", &format!("restored counter {counter}"));
         Ok(())
     }
     fn migrate(state: Vec<u8>) -> Result<Vec<u8>, LifecycleError> {

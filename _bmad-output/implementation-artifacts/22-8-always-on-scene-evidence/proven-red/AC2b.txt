@@ -1,0 +1,12 @@
+AC2 plant (Deterministic-mode guard dropped): crates/maos-bin/src/main.rs ButlerSeam construction: '(run_args...live || inference_mode.is_explicit())' -> '(true /* E228-PLANT AC2b */ || ...)', so an unset mode binds the inference seam. Command: cargo nextest run --locked -p maos-bin --test native_task_22_8. Result: the_default_cast_boots_keyless_in_deterministic_mode FAILS: the host refuses to boot ('maos run: researcher inference: no inference provider is configured for its declared providers `anthropic`') so Nash and Observer never reach Running; the other 5 tests stay green. Plant reverted.
+
+        PASS [   0.284s] (1/6) maos-bin::native_task_22_8 a_low_confidence_task_ends_halted
+        PASS [   0.242s] (2/6) maos-bin::native_task_22_8 a_task_that_is_not_a_signal_ends_failed_with_a_typed_reason
+        PASS [   0.308s] (3/6) maos-bin::native_task_22_8 mira_answers_a_directed_task_and_its_reply_row_is_journaled
+        PASS [   0.223s] (4/6) maos-bin::native_task_22_8 nash_stays_not_directable
+        FAIL [   0.608s] (5/6) maos-bin::native_task_22_8 the_default_cast_boots_keyless_in_deterministic_mode
+    thread 'the_default_cast_boots_keyless_in_deterministic_mode' (131663) panicked at crates/maos-bin/tests/native_task_22_8.rs:430:5:
+        PASS [   0.272s] (6/6) maos-bin::native_task_22_8 the_registry_exists_without_installed_members
+     Summary [   1.939s] 6 tests run: 5 passed, 1 failed, 0 skipped
+        FAIL [   0.608s] (5/6) maos-bin::native_task_22_8 the_default_cast_boots_keyless_in_deterministic_mode
+rc=100

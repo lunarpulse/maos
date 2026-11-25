@@ -41,6 +41,12 @@ use maos_domain::ports::EpistemicScalarPort;
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
 use serde::{Deserialize, Serialize};
 
+mod task;
+pub use task::{
+    memory_key, AdvisoryRoute, DiagnosisMemory, TaskAnswer, TaskError, MEMORY_KEY_PREFIX,
+    SIGNAL_PROMPT,
+};
+
 /// The scalar tag Mira's `[epistemic_policy]` halt rule watches (must match
 /// `manifest.toml`'s `[[epistemic_policy.rules]] tag`).
 pub const DIAGNOSTIC_CONFIDENCE_TAG: &str = "diagnostic_confidence";

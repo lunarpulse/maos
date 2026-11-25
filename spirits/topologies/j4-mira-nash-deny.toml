@@ -1,0 +1,20 @@
+# Story 22-8 (D-22-8-07 A) — the J4 pair with consent withheld: Mira may send the read-only
+# diagnosis handoff, but Nash's accept list admits nothing, so the in-process router refuses it
+# at intake and journals a typed `ConsentRupture` row (`IntentAllowlistMismatch`) before the
+# refusal. Mira's answer to a directed task then says `advisory: "denied:intent_denied"`.
+[topology]
+name = "j4-mira-nash-deny"
+
+[[topology.spirits]]
+manifest = "../mira/manifest.toml"
+
+[[topology.spirits]]
+manifest = "../nash/manifest.toml"
+
+[[topology.a2a_peers]]
+spirit = "mira"
+send_allowlist = ["diagnosis-handoff:read-only-evidence"]
+
+[[topology.a2a_peers]]
+spirit = "nash"
+accept_allowlist = []

@@ -26,8 +26,16 @@
 
 use std::sync::{Arc, Mutex};
 
+use maos_domain::invariants::i1::{CapabilityToken, TokenId};
+use maos_domain::ports::inference::{InferenceOptions, InferencePort, InferenceRequest};
+
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
 use serde::{Deserialize, Serialize};
+
+/// The instruction that precedes the facts Nash asks to have phrased.
+pub const PHRASING_PROMPT: &str =
+    "You are a senior architect. Rephrase the deterministic fix below as one \
+short, concrete recommendation for the named subject, in plain prose, no markdown.\n\n";
 
 /// The cross-Host advisory Nash receives from Mira (the A2A wire payload). The
 /// field names mirror `mira::DiagnosticAdvisory` exactly so a frame Mira
@@ -74,7 +82,7 @@ pub struct ArchitectureProposal {
 /// Spirit id and an optional seeded batch of pending advisories an `on_idle` pass
 /// architects. `Arc<Mutex<...>>` interior state keeps Nash `Sync` as the
 /// `#[spirit]` macro requires (poison-safe `unwrap_or_else(|e| e.into_inner())`).
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Nash {
     /// This Nash's own Spirit id.
     spirit_id: String,
@@ -82,6 +90,20 @@ pub struct Nash {
     pending_advisories: Option<Vec<AdvisoryInput>>,
     /// Proposals produced by the most recent `on_idle` pass.
     last_proposals: Arc<Mutex<Vec<ArchitectureProposal>>>,
+    /// Story 22-8 (D-22-8-04 A) — the host-bound inference seam that phrases `proposed_fix`.
+    /// `None` under the Deterministic mode (ADR-064): the deterministic text stands.
+    inference: Option<Arc<dyn InferencePort + Send + Sync>>,
+}
+
+impl std::fmt::Debug for Nash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Nash")
+            .field("spirit_id", &self.spirit_id)
+            .field("pending_advisories", &self.pending_advisories)
+            .field("last_proposals", &self.last_proposals)
+            .field("inference", &self.inference.as_ref().map(|_| ".."))
+            .finish()
+    }
 }
 
 #[spirit]
@@ -114,6 +136,7 @@ impl Default for Nash {
             spirit_id: "nash".to_string(),
             pending_advisories: None,
             last_proposals: Arc::new(Mutex::new(Vec::new())),
+            inference: None,
         }
     }
 }
@@ -122,6 +145,13 @@ impl Nash {
     /// Override this Nash's own Spirit id.
     pub fn with_id(mut self, id: impl Into<String>) -> Self {
         self.spirit_id = id.into();
+        self
+    }
+
+    /// Bind the host's Inference Port (Story 22-8). [`Self::architect_phrased`] then asks it to
+    /// phrase the proposed fix; `components` and `confidence` stay deterministic.
+    pub fn with_inference_port(mut self, port: Arc<dyn InferencePort + Send + Sync>) -> Self {
+        self.inference = Some(port);
         self
     }
 
@@ -207,6 +237,45 @@ impl Nash {
             confidence,
             source_log_ref: advisory.source_log_ref.clone(),
         }
+    }
+
+    /// [`Self::architect`], with `proposed_fix` phrased by the bound Inference Port (Story 22-8,
+    /// D-22-8-04 A). `components` and `confidence` are the deterministic ones. With no port
+    /// bound this is exactly [`Self::architect`]; a refused or empty completion is an `Err`
+    /// the host reports (the deterministic proposal is still [`Self::architect`]'s).
+    pub fn architect_phrased(
+        &self,
+        advisory: &AdvisoryInput,
+    ) -> Result<ArchitectureProposal, String> {
+        let mut proposal = self.architect(advisory);
+        let Some(port) = self.inference.as_ref() else {
+            return Ok(proposal);
+        };
+        // The host re-binds the request's pid, token and provider; Nash holds none of them.
+        let request = InferenceRequest::new(
+            0,
+            CapabilityToken::new(TokenId([0; 16]), 0, 0, [0; 64]),
+            format!(
+                "{PHRASING_PROMPT}Subject: {}\nDiagnosis: {}\nDeterministic fix: {}\n",
+                advisory.subject, advisory.finding, proposal.proposed_fix
+            ),
+            InferenceOptions {
+                max_tokens: 300,
+                temperature: Some(0.0),
+                model_id: None,
+            },
+            None,
+            Vec::new(),
+        );
+        let response = port
+            .complete(request)
+            .map_err(|error| format!("the completion was refused: {error}"))?;
+        let phrased = response.text.trim();
+        if phrased.is_empty() {
+            return Err("the completion was empty".into());
+        }
+        proposal.proposed_fix = phrased.to_owned();
+        Ok(proposal)
     }
 }
 

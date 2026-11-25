@@ -72,3 +72,25 @@ were unregistered.
   Spirit is selected.
 - An existing home whose registry sits under `$HOME/.local/share/maos` keeps working without a move. A home that
   sets `MAOS_HOME` and has no data yet now keeps the registry and memory under `$MAOS_HOME`.
+
+## Amendment — Story 22-8
+
+Amended 2026-11-23 by Story `22-8-always-on-scene` (decision D-22-8-07 A), in the same change as the code it
+governs.
+
+- **`[[host.a2a_peers]]`** declares the operator's ADR-012 typed-intent consent between cast members:
+  `spirit` (a loaded member's `[class].name`), `send_allowlist` and `accept_allowlist` (typed intents; absent
+  or empty admits nothing). It is a table like `spirits`, so it carries no `MAOS_*` name (§2-§3); the Host
+  forwards it verbatim as `[[topology.a2a_peers]]`, the same table a topology file declares, which refuses
+  unknown keys, a spirit named twice and an empty intent (`host_config_a2a_peer`, exit 78, for a Host file;
+  a peer that names no loaded member refuses the topology load).
+- **Semantics.** A frame from `S` to `R` is admitted only if `S`'s `send_allowlist` and `R`'s
+  `accept_allowlist` both name its typed intent. The loader builds one in-process router per Host with one
+  pair of router peer entries per ordered pair of declared peers, so the two lists read as written; the
+  router's full chain runs on every frame (TOFU pin over synthetic per-edge fingerprints, consent granter and
+  expiry, accept allowlist) and the accept-allowlist deny writes a typed `ConsentRupture` row before it
+  refuses. No `a2a_peers` builds no router.
+- **Mira and Nash.** Mira routes her read-only advisory with the intent
+  `diagnosis-handoff:read-only-evidence`; Nash's intake consumer journals each admitted frame at his pid
+  before he architects, then journals the proposal row correlated to the advisory's frame id. Mira's task
+  answer says `advisory: "delivered"` or `"denied:<code>"`.

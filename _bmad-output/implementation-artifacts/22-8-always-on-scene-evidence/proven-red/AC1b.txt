@@ -1,0 +1,15 @@
+AC1 plant (carry-over disabled): crates/maos-bin/src/main.rs: 'if !run.once {' around halt_carry::carry_over -> 'if false /* E228-PLANT AC1b */ && !run.once {'. Command: cargo nextest run --locked -p maos-journey-test --test journey_always_on (+ halt_carry_22_8 run alongside). Result: the_standing_cast_takes_a_task_and_survives_a_restart FAILS at step (8) 'halt list shows the carried halt' (stdout empty; 'maosctl: halt list  0 halts shown'), so the following resolve is never reached; halt_carry_22_8::a_pending_halt_is_carried_after_sigterm_and_sigkill also FAILS ('one halt.carried row: []'). Plant reverted.
+
+        PASS [   1.082s] (1/4) maos-bin::halt_carry_22_8 a_loaded_spirit_carries_nothing
+        FAIL [   1.027s] (2/4) maos-bin::halt_carry_22_8 a_pending_halt_is_carried_after_sigterm_and_sigkill
+    thread 'a_pending_halt_is_carried_after_sigterm_and_sigkill' (118683) panicked at crates/maos-bin/tests/halt_carry_22_8.rs:295:5:
+    assertion `left == right` failed: one halt.carried row: []
+      left: 0
+     right: 1
+        PASS [   1.233s] (3/4) maos-bin::halt_carry_22_8 a_resolved_halt_is_not_carried
+        FAIL [   1.585s] (4/4) maos-journey-test::journey_always_on the_standing_cast_takes_a_task_and_survives_a_restart
+    thread 'the_standing_cast_takes_a_task_and_survives_a_restart' (118980) panicked at crates/maos-journey-test/tests/journey_always_on.rs:340:5:
+     Summary [   4.929s] 4 tests run: 2 passed, 2 failed, 0 skipped
+        FAIL [   1.027s] (2/4) maos-bin::halt_carry_22_8 a_pending_halt_is_carried_after_sigterm_and_sigkill
+        FAIL [   1.585s] (4/4) maos-journey-test::journey_always_on the_standing_cast_takes_a_task_and_survives_a_restart
+rc=100
