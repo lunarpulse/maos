@@ -450,6 +450,7 @@ struct InnerPort {
     calls: Arc<Mutex<Vec<String>>>,
     binds: Mutex<Vec<String>>,
     exchange_status: u16,
+    get_error: Option<IoError>,
 }
 
 impl InnerPort {
@@ -458,7 +459,13 @@ impl InnerPort {
             calls: Arc::new(Mutex::new(Vec::new())),
             binds: Mutex::new(Vec::new()),
             exchange_status,
+            get_error: None,
         }
+    }
+    /// The bound port's `http_get` fails with `error` (the raw-string path still succeeds).
+    fn with_get_error(mut self, error: IoError) -> Self {
+        self.get_error = Some(error);
+        self
     }
     fn calls(&self) -> Vec<String> {
         self.calls.lock().unwrap().clone()
@@ -472,6 +479,7 @@ impl InnerPort {
 struct BoundPort {
     calls: Arc<Mutex<Vec<String>>>,
     exchange_status: u16,
+    get_error: Option<IoError>,
 }
 
 impl IoSubsystemPort for BoundPort {
@@ -480,7 +488,10 @@ impl IoSubsystemPort for BoundPort {
     }
     fn http_get(&self, url: &str) -> Result<Vec<u8>, IoError> {
         self.calls.lock().unwrap().push(format!("bound-get {url}"));
-        Ok(b"bound-get-body".to_vec())
+        match &self.get_error {
+            Some(error) => Err(error.clone()),
+            None => Ok(b"bound-get-body".to_vec()),
+        }
     }
     fn http_post(&self, url: &str, _: &[u8], _: &[(&str, &str)]) -> Result<Vec<u8>, IoError> {
         self.calls.lock().unwrap().push(format!("bound-post {url}"));
@@ -514,6 +525,7 @@ impl IoSubsystemPort for &InnerPort {
         Ok(Box::new(BoundPort {
             calls: Arc::clone(&self.calls),
             exchange_status: self.exchange_status,
+            get_error: self.get_error.clone(),
         }))
     }
     fn http_get(&self, url: &str) -> Result<Vec<u8>, IoError> {
@@ -944,4 +956,28 @@ fn a_bound_port_that_does_not_declare_no_follow_is_refused_before_any_request() 
         Err(IoError::InvalidUrl("outbound_redirect_refused".to_owned()))
     );
     assert!(connected.lock().unwrap().is_empty());
+}
+
+#[test]
+fn a_failing_bound_get_reaches_the_caller_as_the_same_error_never_as_bytes() {
+    for error in [
+        IoError::Transport("status 302".to_owned()),
+        IoError::Transport("status 500".to_owned()),
+        IoError::Decode("body".to_owned()),
+    ] {
+        let inner = InnerPort::new(200).with_get_error(error.clone());
+        let io = PolicedIo::new(
+            &inner,
+            FakeResolver::with("api.example", &["93.184.216.34"]),
+            OutboundPolicy::strict(),
+        )
+        .unwrap();
+        assert_eq!(io.http_get("https://api.example/x"), Err(error));
+        assert_eq!(inner.binds(), vec!["https://api.example/x".to_owned()]);
+        assert_eq!(
+            inner.calls(),
+            vec!["bound-get https://api.example/x".to_owned()],
+            "exactly one bound call and no raw-string call"
+        );
+    }
 }

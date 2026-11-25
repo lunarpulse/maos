@@ -6,7 +6,7 @@
 //! depends on timing. `.test` is never resolvable (RFC 6761): the only way a
 //! connection can reach a fixture is through the vetted address set.
 
-use std::io::ErrorKind;
+use std::io::{ErrorKind, Read, Write};
 use std::net::{IpAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -59,12 +59,15 @@ enum Serve {
     HelloThenClose,
     /// Read the ClientHello, record the SNI, answer with the self-signed certificate.
     SelfSignedCertificate,
+    /// Plain http: answer every request with a 302 (no TLS), record the request line.
+    Redirect,
 }
 
 struct Fixture {
     port: u16,
     accepted: Arc<AtomicUsize>,
     snis: Arc<Mutex<Vec<Option<String>>>>,
+    requests: Arc<Mutex<Vec<String>>>,
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
     /// Listener B on 127.0.0.2 with the same port (Linux only: macOS has no 127.0.0.2).
@@ -91,8 +94,10 @@ impl Fixture {
         let accepted = Arc::new(AtomicUsize::new(0));
         let snis = Arc::new(Mutex::new(Vec::new()));
         let stop = Arc::new(AtomicBool::new(false));
+        let requests = Arc::new(Mutex::new(Vec::new()));
         let thread = {
             let (accepted, snis, stop) = (accepted.clone(), snis.clone(), stop.clone());
+            let requests = requests.clone();
             thread::spawn(move || {
                 // The deadline only ends a runaway fixture; no assertion reads it.
                 let deadline = Instant::now() + Duration::from_secs(60);
@@ -100,7 +105,7 @@ impl Fixture {
                     match listener.accept() {
                         Ok((stream, _)) => {
                             accepted.fetch_add(1, Ordering::SeqCst);
-                            handle(stream, serve, &snis);
+                            handle(stream, serve, &snis, port, &requests);
                         }
                         Err(e) if e.kind() == ErrorKind::WouldBlock => {
                             if stop.load(Ordering::SeqCst) || Instant::now() > deadline {
@@ -117,6 +122,7 @@ impl Fixture {
             port,
             accepted,
             snis,
+            requests,
             stop,
             thread: Some(thread),
             other,
@@ -146,10 +152,54 @@ impl Fixture {
     }
 }
 
-fn handle(mut stream: TcpStream, serve: Serve, snis: &Mutex<Vec<Option<String>>>) {
+fn redirect(mut stream: TcpStream, port: u16, requests: &Mutex<Vec<String>>) {
+    let mut head = Vec::new();
+    let mut byte = [0u8; 1];
+    while !head.ends_with(b"\r\n\r\n") {
+        match stream.read(&mut byte) {
+            Ok(1) => head.push(byte[0]),
+            _ => return,
+        }
+    }
+    let text = String::from_utf8_lossy(&head).into_owned();
+    let length = text
+        .lines()
+        .find_map(|l| {
+            l.to_ascii_lowercase()
+                .strip_prefix("content-length:")
+                .map(|v| v.trim().parse().unwrap_or(0))
+        })
+        .unwrap_or(0usize);
+    let mut body = vec![0u8; length];
+    if stream.read_exact(&mut body).is_err() {
+        return;
+    }
+    let line = text.lines().next().unwrap_or_default().to_owned();
+    let location = if line.contains("/to-b") {
+        format!("http://127.0.0.2:{port}/landing")
+    } else {
+        format!("http://127.0.0.1:{port}/landing")
+    };
+    requests.lock().unwrap().push(line);
+    let _ = stream.write_all(
+        format!("HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            .as_bytes(),
+    );
+}
+
+fn handle(
+    mut stream: TcpStream,
+    serve: Serve,
+    snis: &Mutex<Vec<Option<String>>>,
+    port: u16,
+    requests: &Mutex<Vec<String>>,
+) {
     stream.set_nonblocking(false).unwrap();
     stream.set_read_timeout(Some(Duration::from_secs(30))).ok();
     stream.set_write_timeout(Some(Duration::from_secs(30))).ok();
+    if let Serve::Redirect = serve {
+        return redirect(stream, port, requests);
+    }
     let mut acceptor = rustls::server::Acceptor::default();
     let accepted = loop {
         match acceptor.read_tls(&mut stream) {
@@ -275,8 +325,8 @@ fn an_untrusted_certificate_for_the_name_is_refused() {
     let result = io.http_get(&fixture.url("/x"));
     let text = format!("{result:?}").to_ascii_lowercase();
     assert!(
-        matches!(result, Err(IoError::Transport(_))) && text.contains("certificate"),
-        "expected a certificate refusal, got {text}"
+        matches!(result, Err(IoError::Transport(_))) && text.contains("unknownissuer"),
+        "expected an UnknownIssuer refusal, got {text}"
     );
     assert_eq!(fixture.finish(), 1);
     assert_eq!(*fixture.snis.lock().unwrap(), vec![Some(NAME.to_owned())]);
@@ -293,4 +343,55 @@ fn a_literal_ip_never_calls_bind_or_the_resolver() {
     assert_eq!(fixture.finish(), 1, "the literal reached listener A");
     // The raw-string path carries no pinned resolver: SNI is absent for an IP.
     assert_eq!(*fixture.snis.lock().unwrap(), vec![None]);
+}
+
+#[test]
+fn a_bound_adapter_returns_a_redirect_and_never_follows_it_on_the_wire() {
+    let mut fixture = Fixture::start(Serve::Redirect);
+    let resolver = Scripted::new(&[&["127.0.0.1"]]);
+    let vetted = OutboundPolicy::strict()
+        .allow_loopback_http()
+        .vet_url(
+            &format!("http://127.0.0.1:{}/start", fixture.port),
+            &Shared(Arc::clone(&resolver)),
+        )
+        .unwrap();
+    let bound = IoSubsystemAdapter::new().bind(&vetted).unwrap();
+    // `/to-b` points at listener B (127.0.0.2, same port); `/to-self` points back
+    // at the vetted netloc, where a followed redirect would arrive as a second request.
+    for path in ["/to-b", "/to-self"] {
+        let url = format!("http://127.0.0.1:{}{path}", fixture.port);
+        match bound.http_get(&url) {
+            Err(IoError::Transport(text)) => assert!(text.contains("status 302"), "{text}"),
+            result => panic!("GET {path}: expected the 302 as an error, got {result:?}"),
+        }
+        let exchange = bound
+            .http_post_exchange(&url, b"body", &[], "location")
+            .unwrap();
+        assert_eq!(exchange.status, 302);
+        assert!(exchange.body.is_empty());
+        assert_eq!(exchange.header, None, "no Location text reaches the caller");
+    }
+    assert_eq!(
+        fixture.finish(),
+        4,
+        "one connection per request, none for a Location"
+    );
+    assert_eq!(
+        fixture.requests.lock().unwrap().len(),
+        4,
+        "{:?}",
+        fixture.requests.lock().unwrap()
+    );
+    assert!(!fixture
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|r| r.contains("/landing")));
+    assert_eq!(
+        fixture.other_connections(),
+        0,
+        "listener B received nothing"
+    );
 }

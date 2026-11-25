@@ -1,0 +1,7 @@
+plant (E230B-PLANT AC4-CERT): the kernel agent gets a rustls ServerCertVerifier that accepts every certificate (ureq tls_config)
+command: cargo test --locked -q -p maos-kernel-core --test io_binding_23_0b
+failing test:
+an_untrusted_certificate_for_the_name_is_refused
+  expected an UnknownIssuer refusal, got err(transport("ureq get https://rebind.maos.test:35609/x: ... connection reset by peer (os error 104)"))
+  (the handshake completed; the request got as far as the fixture, which closes)
+test result: FAILED. 6 passed; 1 failed
