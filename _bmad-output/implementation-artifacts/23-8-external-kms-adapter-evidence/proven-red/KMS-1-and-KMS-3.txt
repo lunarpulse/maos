@@ -1,0 +1,19 @@
+Second review round (GPT static review). Plants carry E238-PLANT, each run once, all reverted; grep-verified.
+
+KMS-1  crates/maos-secrets/src/http_kms.rs  wrap_data_key:
+    if false && discloses(data_key, &wrapped) /* E238-PLANT KMS-1 */ {
+  command: cargo test --locked -p maos-secrets --features http-kms --test external_kms_23_8 -- --skip the_probe_has_its_own
+  fails: a_wrapped_key_that_discloses_the_data_key_is_refused_and_nothing_is_sealed
+         "a disclosing wrapped key must be refused: [7, 7, 7, ...]"  (the endpoint's echo of the data key was accepted as `wrapped`)
+  The test drives seven disclosures through a hostile fixture (`Mode::HostileWrap`): verbatim, padded with a constant, constant header, first half,
+  second half, base64 text, hex text; each also through `seal_at_rest` (no envelope).
+
+KMS-3a crates/maos-secrets/src/http_kms.rs  mark_ok:
+    if health.epoch == epoch || true /* E238-PLANT KMS-3a */ {
+  fails (same run): a_probe_in_flight_cannot_clear_a_failure_recorded_after_it_started
+         "a healthy answer that was discarded must say so, not report success   left: Applied"
+
+KMS-3b crates/maos-bin/src/enterprise_identity.rs  probe_outcome:
+    (ProbeResult::Discarded, _) => KmsProbeOutcome::Ready, /* E238-PLANT KMS-3b */
+  command: cargo test --locked -p maos-bin --test external_kms_wiring_23_8
+  fails: online::a_discarded_or_unhealthy_probe_is_never_reported_as_ready

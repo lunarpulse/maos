@@ -253,6 +253,18 @@ pub enum BearerStatus {
     Settled,
 }
 
+/// What one [`HttpKms::probe_checked`] did to the health state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProbeResult {
+    /// No healthy answer; the endpoint is marked down.
+    Unreachable,
+    /// A healthy answer that was discarded: a call failed while it was in
+    /// flight, so the adapter stays down.
+    Discarded,
+    /// A healthy answer, applied to the health state.
+    Applied,
+}
+
 #[derive(Debug, Default)]
 struct Health {
     last_ok: Option<Duration>,
@@ -275,6 +287,7 @@ enum Failure {
     OtherStatus,
     Transport,
     Malformed,
+    Disclosure,
 }
 
 impl Failure {
@@ -318,6 +331,9 @@ impl Failure {
             }
             Self::Malformed => {
                 "maos: external KMS answered something that is not a maos.kms.v1 message; sealed writes are refused"
+            }
+            Self::Disclosure => {
+                "maos: external KMS returned a wrapped key that discloses the data key; the write is refused (the wrapping endpoint is not trustworthy)"
             }
         }
     }
@@ -483,13 +499,17 @@ impl HttpKms {
     }
 
     /// Apply a successful probe that started at `epoch`. A failure recorded
-    /// since (a call that failed while the probe was in flight) wins.
-    fn mark_ok(&self, epoch: u64) {
+    /// since (a call that failed while the probe was in flight) wins and the
+    /// result is discarded (`false`).
+    fn mark_ok(&self, epoch: u64) -> bool {
         let now = self.clock.now();
         let mut health = lock(&self.health);
         if health.epoch == epoch {
             health.last_ok = Some(now);
             health.down = false;
+            true
+        } else {
+            false
         }
     }
 
@@ -512,10 +532,17 @@ impl HttpKms {
     }
 
     /// Run one `GET /health`. A success refreshes the cached state unless a
-    /// call failed while it was in flight; any failure marks the endpoint
-    /// down. Returns whether the endpoint answered
-    /// `{"version":"maos.kms.v1","status":"ok"}`.
+    /// call failed while it was in flight (then it is discarded); any failure
+    /// marks the endpoint down. `true` only when the endpoint answered
+    /// `{"version":"maos.kms.v1","status":"ok"}` **and** that result was
+    /// applied to the health state.
     pub fn probe(&self) -> bool {
+        self.probe_checked() == ProbeResult::Applied
+    }
+
+    /// As [`Self::probe`], telling a failed probe from one whose healthy answer
+    /// was discarded because a call failed while it was in flight.
+    pub fn probe_checked(&self) -> ProbeResult {
         let epoch = self.epoch();
         let ok = self
             .io
@@ -525,12 +552,15 @@ impl HttpKms {
             .is_some_and(|value| {
                 value.get("status").and_then(serde_json::Value::as_str) == Some("ok")
             });
-        if ok {
-            self.mark_ok(epoch);
-        } else {
+        if !ok {
             self.mark_down();
+            return ProbeResult::Unreachable;
         }
-        ok
+        if self.mark_ok(epoch) {
+            ProbeResult::Applied
+        } else {
+            ProbeResult::Discarded
+        }
     }
 
     fn authorization(&self) -> Result<Option<String>, KmsError> {
@@ -623,6 +653,49 @@ fn b64_field(value: &serde_json::Value, name: &str) -> Option<Vec<u8>> {
     base64::engine::general_purpose::STANDARD.decode(text).ok()
 }
 
+/// Whether `wrapped` visibly discloses `key`: it contains the key bytes, is
+/// a prefix or suffix of the key, or contains the key's base64 (standard or
+/// URL-safe, padded or not) or hex (either case) text. An opaque answer cannot
+/// prove encryption: this rejects obvious disclosure only, and
+/// confidentiality still needs a trusted wrapping endpoint.
+fn discloses(key: &[u8], wrapped: &[u8]) -> bool {
+    fn contains(haystack: &[u8], needle: &[u8]) -> bool {
+        !needle.is_empty()
+            && haystack
+                .windows(needle.len())
+                .any(|window| window == needle)
+    }
+    if wrapped.is_empty()
+        || contains(wrapped, key)
+        || key.starts_with(wrapped)
+        || key.ends_with(wrapped)
+    {
+        return true;
+    }
+    use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD};
+    let hex = |upper: bool| -> String {
+        key.iter()
+            .map(|byte| {
+                if upper {
+                    format!("{byte:02X}")
+                } else {
+                    format!("{byte:02x}")
+                }
+            })
+            .collect()
+    };
+    [
+        STANDARD.encode(key),
+        STANDARD_NO_PAD.encode(key),
+        URL_SAFE.encode(key),
+        URL_SAFE_NO_PAD.encode(key),
+        hex(false),
+        hex(true),
+    ]
+    .iter()
+    .any(|text| contains(wrapped, text.as_bytes()))
+}
+
 impl KeyManagementPort for HttpKms {
     fn wrap_data_key(&self, data_key: &[u8]) -> Result<Vec<u8>, KmsError> {
         if data_key.len() != DATA_KEY_LEN {
@@ -635,6 +708,12 @@ impl KeyManagementPort for HttpKms {
         let answer = self.call("/wrap", &request.to_string())?;
         match b64_field(&answer, "wrapped") {
             Some(wrapped) if !wrapped.is_empty() && wrapped.len() <= MAX_WRAPPED_BYTES => {
+                if discloses(data_key, &wrapped) {
+                    self.note_failure(Failure::Disclosure);
+                    return Err(KmsError::Crypto(
+                        "wrapped key discloses the data key".to_owned(),
+                    ));
+                }
                 self.note_success();
                 Ok(wrapped)
             }

@@ -71,6 +71,15 @@ bytes, or a body that is not JSON, is a malformed message.
 `wrapped` is opaque to MAOS. It is stored in the sealed envelope
 (`MAOSKMS1 | u16 wrapped_len | wrapped | nonce | ciphertext`) next to the row.
 
+**Confidentiality requires a trusted wrapping endpoint.** An opaque response
+cannot prove encryption. MAOS refuses only obvious disclosure: a `wrapped` that
+contains the request's data key bytes, is a prefix or suffix of them, or
+contains their base64 (standard or URL-safe, padded or not) or hex text is
+refused with `KmsError::Crypto` (no envelope, no plaintext fallback, no bytes in
+the error, health unchanged). A trivially derived value (reversed, XORed,
+truncated and re-keyed) is not detected. MAOS does not unwrap-verify a fresh
+`wrapped` either (RELEASE-HOLDS 23-8.h).
+
 ## Errors
 
 | Answer | MAOS result | Health |
@@ -79,6 +88,7 @@ bytes, or a body that is not JSON, is a malformed message.
 | any 2xx or a 422 that is a malformed message | `KmsError::MalformedPayload` | down at once |
 | 3xx, 4xx other than the typed 422, 5xx | `KmsError::Unavailable` | down at once |
 | connection refused, timeout, TLS failure, body over the cap | `KmsError::Unavailable` | down at once |
+| a `wrapped` that visibly discloses the data key (contains it, is a prefix or suffix of it, or its base64/hex text) | `KmsError::Crypto` | **unchanged** (a refusal of one payload; logged once) |
 
 A sidecar answers `502` or `503` when its KMS does not answer, and `422` only
 when its KMS refuses this one payload (for example a wrapped key it did not

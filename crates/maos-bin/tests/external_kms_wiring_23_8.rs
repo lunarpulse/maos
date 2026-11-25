@@ -299,6 +299,45 @@ mod online {
         assert!(!Outcome::Unreachable.reachable() && Outcome::Ready.reachable());
     }
 
+    /// KMS-3: the outcome is derived from what the probe did to the applied
+    /// health state. A healthy answer that was discarded because a call failed
+    /// while it was in flight (or that left the adapter unhealthy) is never
+    /// `Ready`, so the log never says that writes resume while health stayed down.
+    #[test]
+    fn a_discarded_or_unhealthy_probe_is_never_reported_as_ready() {
+        use maos_bin::enterprise_identity::{probe_outcome, KmsProbeOutcome as Outcome};
+        use maos_secrets::http_kms::{BearerStatus as Bearer, ProbeResult as Probe};
+
+        assert_eq!(
+            probe_outcome(Probe::Unreachable, Bearer::Settled, false, false),
+            Outcome::Unreachable
+        );
+        let discarded = probe_outcome(Probe::Discarded, Bearer::Settled, false, true);
+        assert_eq!(discarded, Outcome::ReachableCallsFailing);
+        assert!(!discarded.line(false).contains("resume"));
+        // Applied, but the adapter is not healthy afterwards.
+        assert_eq!(
+            probe_outcome(Probe::Applied, Bearer::Settled, false, false),
+            Outcome::ReachableCallsFailing
+        );
+        assert_eq!(
+            probe_outcome(Probe::Applied, Bearer::Settled, true, true),
+            Outcome::ReachableCallsFailing
+        );
+        assert_eq!(
+            probe_outcome(Probe::Applied, Bearer::Pending, false, false),
+            Outcome::ReachableBearerPending
+        );
+        assert_eq!(
+            probe_outcome(Probe::Applied, Bearer::Unreadable, false, false),
+            Outcome::ReachableBearerUnreadable
+        );
+        assert_eq!(
+            probe_outcome(Probe::Applied, Bearer::Settled, true, false),
+            Outcome::Ready
+        );
+    }
+
     fn runtime_over(kms: &ConfiguredKms) -> EnterpriseRuntime {
         kms.provision_bearer(None);
         let runtime = EnterpriseRuntime::from_ports(

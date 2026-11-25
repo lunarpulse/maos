@@ -865,21 +865,41 @@ fn external_kms(
     Ok(ConfiguredKms {
         port: Arc::clone(&kms) as Arc<dyn KeyManagementPort>,
         probe: Some(Arc::new(move || {
-            use maos_secrets::http_kms::BearerStatus;
-            if !probe_target.probe() {
-                return KmsProbeOutcome::Unreachable;
-            }
-            match probe_target.bearer_status() {
-                BearerStatus::Pending => KmsProbeOutcome::ReachableBearerPending,
-                BearerStatus::Unreadable => KmsProbeOutcome::ReachableBearerUnreadable,
-                BearerStatus::Settled if probe_target.calls_failing() => {
-                    KmsProbeOutcome::ReachableCallsFailing
-                }
-                BearerStatus::Settled => KmsProbeOutcome::Ready,
-            }
+            probe_outcome(
+                probe_target.probe_checked(),
+                probe_target.bearer_status(),
+                probe_target.is_healthy(),
+                probe_target.calls_failing(),
+            )
         })),
         http: Some(kms),
     })
+}
+
+/// The probe outcome from what the probe did to the *applied* health state:
+/// a healthy answer that was discarded (a call failed while it was in flight)
+/// or that left the adapter unhealthy is never `Ready`.
+#[cfg(feature = "online-adapters")]
+#[must_use]
+pub fn probe_outcome(
+    result: maos_secrets::http_kms::ProbeResult,
+    bearer: maos_secrets::http_kms::BearerStatus,
+    healthy: bool,
+    calls_failing: bool,
+) -> KmsProbeOutcome {
+    use maos_secrets::http_kms::{BearerStatus, ProbeResult};
+    match (result, bearer) {
+        (ProbeResult::Unreachable, _) => KmsProbeOutcome::Unreachable,
+        (ProbeResult::Discarded, _) => KmsProbeOutcome::ReachableCallsFailing,
+        (ProbeResult::Applied, BearerStatus::Pending) => KmsProbeOutcome::ReachableBearerPending,
+        (ProbeResult::Applied, BearerStatus::Unreadable) => {
+            KmsProbeOutcome::ReachableBearerUnreadable
+        }
+        (ProbeResult::Applied, BearerStatus::Settled) if calls_failing || !healthy => {
+            KmsProbeOutcome::ReachableCallsFailing
+        }
+        (ProbeResult::Applied, BearerStatus::Settled) => KmsProbeOutcome::Ready,
+    }
 }
 
 #[cfg(not(feature = "online-adapters"))]

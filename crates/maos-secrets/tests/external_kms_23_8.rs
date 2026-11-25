@@ -8,7 +8,7 @@
 #[path = "support/kms_fixture_23_8.rs"]
 mod kms_fixture;
 
-use kms_fixture::{b64_decode, b64_encode, KmsFixture, Mode};
+use kms_fixture::{b64_decode, b64_encode, Disclosure, KmsFixture, Mode};
 use maos_domain::ports::{KeyManagementPort, KmsError};
 use maos_kernel_core::security::RingCryptoProvider;
 use maos_secrets::http_kms::{
@@ -793,7 +793,12 @@ fn a_probe_in_flight_cannot_clear_a_failure_recorded_after_it_started() {
         ));
     }));
 
-    assert!(kms.probe(), "the probe itself saw a healthy answer");
+    // The healthy answer is discarded, so the probe does not report health.
+    assert_eq!(
+        kms.probe_checked(),
+        maos_secrets::http_kms::ProbeResult::Discarded,
+        "a healthy answer that was discarded must say so, not report success"
+    );
     assert!(
         !kms.is_healthy(),
         "a failure recorded while the probe was in flight must stand"
@@ -836,4 +841,59 @@ fn the_probe_has_its_own_overall_limit_and_a_hanging_endpoint_fails_it() {
         .recv_timeout(Duration::from_secs(30))
         .expect("the probe must end under its own limit, not the 120 s ones");
     assert!(!reachable && !healthy);
+}
+
+/// KMS-1: a wrapping endpoint that hands the data key back (verbatim, padded,
+/// headered, half of it, or as base64 or hex text) is refused with a typed
+/// `Crypto` error; no envelope is produced, no bytes are in the error and a
+/// refused payload is not an outage. An opaque answer cannot prove encryption:
+/// this rejects obvious disclosure only.
+#[test]
+fn a_wrapped_key_that_discloses_the_data_key_is_refused_and_nothing_is_sealed() {
+    for how in [
+        Disclosure::Verbatim,
+        Disclosure::Padded,
+        Disclosure::Headered,
+        Disclosure::Prefix,
+        Disclosure::Suffix,
+        Disclosure::Base64Text,
+        Disclosure::HexText,
+    ] {
+        let fixture = KmsFixture::start();
+        let clock = FakeClock::new();
+        let (kms, notices) = with_notices(healthy_adapter(&fixture, &clock));
+        fixture.set_mode(Mode::HostileWrap(how));
+
+        let key = [7u8; 32];
+        let error = kms
+            .wrap_data_key(&key)
+            .expect_err("a disclosing wrapped key must be refused");
+        assert!(matches!(error, KmsError::Crypto(_)), "{how:?}: {error:?}");
+        let text = format!("{error:?} {error}");
+        assert!(
+            !text.contains(&b64_encode(&key)) && !text.contains("0707"),
+            "{how:?}: bytes in the error: {text}"
+        );
+        assert!(
+            kms.is_healthy(),
+            "{how:?}: a refused payload is not an outage"
+        );
+
+        // The seal path: never an envelope, never plaintext.
+        match seal_at_rest(&kms, &RingCryptoProvider, PAYLOAD) {
+            Err(KmsError::Crypto(_)) => {}
+            other => panic!(
+                "{how:?}: expected a Crypto refusal, got {:?}",
+                other.map(|b| b.len())
+            ),
+        }
+        assert!(
+            notices
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("discloses")),
+            "{how:?}: the refusal is logged"
+        );
+    }
 }

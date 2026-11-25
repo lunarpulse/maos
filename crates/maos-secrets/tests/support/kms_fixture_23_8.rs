@@ -69,6 +69,43 @@ pub enum Mode {
     /// copy the request's `Authorization` value (a hostile or sloppy endpoint
     /// that reflects what it was sent).
     EchoAuthorization(u16),
+    /// A hostile or broken wrapping endpoint: `POST /wrap` answers a
+    /// `wrapped` that discloses the request's data key in this way.
+    HostileWrap(Disclosure),
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum Disclosure {
+    /// The data key itself.
+    Verbatim,
+    /// The data key followed by constant padding.
+    Padded,
+    /// A constant header followed by the data key.
+    Headered,
+    /// The first half of the data key.
+    Prefix,
+    /// The second half of the data key.
+    Suffix,
+    /// The base64 text of the data key.
+    Base64Text,
+    /// The lower-case hex text of the data key.
+    HexText,
+}
+
+fn hostile_wrapped(how: Disclosure, key: &[u8]) -> Vec<u8> {
+    match how {
+        Disclosure::Verbatim => key.to_vec(),
+        Disclosure::Padded => [key, &[0xAA; 24][..]].concat(),
+        Disclosure::Headered => [&b"MAOS-FAKE-HDR"[..], key].concat(),
+        Disclosure::Prefix => key[..key.len() / 2].to_vec(),
+        Disclosure::Suffix => key[key.len() / 2..].to_vec(),
+        Disclosure::Base64Text => b64_encode(key).into_bytes(),
+        Disclosure::HexText => key
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+            .into_bytes(),
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -286,7 +323,7 @@ fn handle(state: &State, mut stream: TcpStream) {
             respond(&mut stream, status, "", &body);
             return;
         }
-        Mode::Normal | Mode::WrongVersion => {}
+        Mode::Normal | Mode::WrongVersion | Mode::HostileWrap(_) => {}
     }
     let json: serde_json::Value = serde_json::from_str(&request.body).unwrap_or_default();
     let field = |name: &str| {
@@ -297,7 +334,10 @@ fn handle(state: &State, mut stream: TcpStream) {
     let answer = match (request.method.as_str(), request.path.as_str()) {
         ("GET", "/health") => Some(serde_json::json!({"version": version, "status": "ok"})),
         ("POST", "/wrap") => field("plaintext")
-            .and_then(|key| state.local.wrap_data_key(&key).ok())
+            .and_then(|key| match &mode {
+                Mode::HostileWrap(how) => Some(hostile_wrapped(*how, &key)),
+                _ => state.local.wrap_data_key(&key).ok(),
+            })
             .map(
                 |wrapped| serde_json::json!({"version": version, "wrapped": b64_encode(&wrapped)}),
             ),
