@@ -29,11 +29,19 @@
 //! `http_get`/`http_post` is a typed `IoError::Transport` naming the status;
 //! `http_post_exchange` returns it as data. Provider and MCP requests therefore
 //! reach only the URL the caller pinned.
+//!
+//! # Binding (Story 23-0b)
+//!
+//! `bind` returns an adapter built by the same builder (so `.redirects(0)`
+//! holds) with no idle pool and a resolver that answers only the vetted
+//! `host:port` with the vetted addresses; any other netloc is refused. TLS
+//! still names and verifies the URL host.
 
 pub use maos_domain::ports::IoSubsystemPort;
 
 use std::io::Read;
 
+use maos_domain::outbound::VettedUrl;
 use maos_domain::ports::io_subsystem::{HttpExchange, IoError};
 
 const MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
@@ -70,9 +78,15 @@ pub struct IoSubsystemAdapter {
 impl IoSubsystemAdapter {
     pub fn new() -> Self {
         Self {
-            agent: ureq::AgentBuilder::new().redirects(0).build(),
+            agent: agent_builder().build(),
         }
     }
+}
+
+/// The one agent builder: `new()` and `bind()` share it so `.redirects(0)`
+/// cannot diverge.
+fn agent_builder() -> ureq::AgentBuilder {
+    ureq::AgentBuilder::new().redirects(0)
 }
 
 /// `truncate`: a non-2xx body over the cap is cut at the cap so its status
@@ -101,6 +115,25 @@ impl Default for IoSubsystemAdapter {
 }
 
 impl IoSubsystemPort for IoSubsystemAdapter {
+    fn never_follows_redirects(&self) -> bool {
+        true
+    }
+
+    /// 23-0b: a fresh agent (no idle pool) whose resolver answers only the
+    /// vetted `host:port` with the vetted addresses; TLS keeps the URL host.
+    fn bind(&self, vetted: &VettedUrl) -> Result<Box<dyn IoSubsystemPort>, IoError> {
+        let netloc = format!("{}:{}", vetted.host_str(), vetted.port());
+        let addresses = vetted.socket_addrs();
+        let agent = agent_builder()
+            .max_idle_connections(0)
+            .resolver(move |asked: &str| match asked == netloc {
+                true => Ok(addresses.clone()),
+                false => Err(std::io::Error::other("outbound_unbound_refused")),
+            })
+            .build();
+        Ok(Box::new(Self { agent }))
+    }
+
     fn http_get(&self, url: &str) -> Result<Vec<u8>, IoError> {
         #[cfg(feature = "io_call_journal")]
         journal_record("GET", url);

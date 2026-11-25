@@ -1,0 +1,6 @@
+plant (E230B-PLANT AC10): kernel agent_builder() uses .redirects(5) instead of .redirects(0)
+command: cargo test --locked -q -p maos-kernel-core --test io_binding_23_0b
+failing test:
+a_bound_adapter_returns_a_redirect_and_never_follows_it_on_the_wire
+  panicked at crates/maos-kernel-core/tests/io_binding_23_0b.rs:365:46 (the POST exchange after the followed redirect is not the 302)
+test result: FAILED. 6 passed; 1 failed
