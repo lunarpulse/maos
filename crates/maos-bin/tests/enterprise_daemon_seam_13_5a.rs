@@ -115,13 +115,18 @@ fn story_13_5a_cohort_daemon_dispatch_threads_the_enterprise_runtime() {
         "issue_enterprise_governed_capability(",
         "Scope::LoomRead",
         "self.at_rest.seal(",
-        "forward_audit_to_siem_once(",
+        "siem_wake.notify_one()",
     ] {
         assert!(
             seam.contains(required),
             "the daemon governance seam must run `{required}`:\n{seam}"
         );
     }
+    // Story 23-4 (D-23-4-09 A): no request path does SIEM I/O; the seam only wakes the consumer.
+    assert!(
+        !seam.contains("forward_audit_to_siem"),
+        "the governed-read seam must not export inline:\n{seam}"
+    );
 
     // ── 5. Admission reuses the process-wide append-only journal owner. A
     // second independent file cursor can overwrite entries from the first.

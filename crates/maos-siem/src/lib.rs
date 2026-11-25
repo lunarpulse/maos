@@ -11,11 +11,17 @@
 //! [`project`] is crate-private, so external callers cannot bypass redaction —
 //! they go through [`export_from_tl`] or the [`SiemProjectionPort`] impl.
 //!
-//! # Sinks
-//!
-//! The shipped sink is a LOCALHOST-ONLY file appender ([`forward_to_file`]).
-//! Network / HTTPS SIEM collectors are additive-deferred — when introduced they
-//! MUST be TLS-only and live behind a feature flag (ADR-051 / NFR-Aud-11).
+//! The shipped sinks are a LOCALHOST-ONLY file appender ([`forward_to_file`], and the file
+//! [`export::BatchSink`] the daemon drives) and, behind the `tls-sink` feature, a TLS-only
+//! RFC 5425 syslog client (`tls_sink`, Story 23-4; ADR-051 amendment). Both are driven by
+//! [`export::run_tick`] over the durable [`cursor::CursorStore`]: rows are read in
+//! insertion-id order, a batch is acknowledged by its sink, and only then does the cursor
+//! move (at-least-once; `externalId` is the receiver's dedupe key).
+
+pub mod cursor;
+pub mod export;
+#[cfg(feature = "tls-sink")]
+pub mod tls_sink;
 
 #[cfg(all(feature = "siem-fault-inject", not(debug_assertions)))]
 compile_error!("siem-fault-inject is dev/CI-only and MUST NOT ship in release builds");
@@ -169,8 +175,8 @@ fn to_cef(entry: &AuditEntry) -> String {
     let payload = cef_escape(&entry.payload);
     let severity = derive_cef_severity(&entry.kind);
     format!(
-        "CEF:0|MAOS|maos-siem|0.1|{signature}|{name}|{severity}|rt={} sproc={} cs1Label=kind cs1={} msg={payload}",
-        entry.timestamp_ns, entry.spirit_pid, signature,
+        "CEF:0|MAOS|maos-siem|0.1|{signature}|{name}|{severity}|rt={} sproc={} cs1Label=kind cs1={} externalId={} msg={payload}",
+        entry.timestamp_ns, entry.spirit_pid, signature, entry.frame_id_hex,
     )
 }
 
@@ -302,9 +308,8 @@ fn cef_escape(input: &str) -> String {
 /// Returns the number of records appended.
 ///
 /// On I/O error this returns [`SiemError::Io`] — it does NOT silently drop
-/// records; buffering / backpressure is the caller's responsibility (wired in
-/// `maos-bin`). Network / HTTPS SIEM collectors are deferred and MUST be
-/// TLS-only when introduced.
+/// records. The daemon does not use this one-shot tail: it drives
+/// [`export::run_tick`] with the durable [`cursor::CursorStore`].
 pub fn forward_to_file(
     db_path: &Path,
     filter: AuditFilter,
@@ -312,34 +317,6 @@ pub fn forward_to_file(
 ) -> Result<usize, SiemError> {
     let records = export_from_tl(db_path, filter)?;
     append_records_to_file(&records, sink_path)?;
-    Ok(records.len())
-}
-
-/// Forward a redacted Transparency Log tail through the injected projection
-/// port before appending it to the localhost sink.
-///
-/// This is the composition-root injection seam: tests and alternate
-/// enterprise adapters observe the actual projection call rather than a
-/// health probe while the default [`forward_to_file`] path remains unchanged.
-pub fn forward_to_file_with_port(
-    db_path: &Path,
-    filter: AuditFilter,
-    sink_path: &Path,
-    port: &dyn SiemProjectionPort,
-) -> Result<usize, SiemError> {
-    use std::io::Write;
-
-    let records = export_from_tl(db_path, filter)?;
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(sink_path)?;
-    for record in &records {
-        let projected = port.project_redacted_entry(&record.ndjson)?;
-        file.write_all(projected.as_bytes())?;
-        file.write_all(b"\n")?;
-    }
-    file.flush()?;
     Ok(records.len())
 }
 

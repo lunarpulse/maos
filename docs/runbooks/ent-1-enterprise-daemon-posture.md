@@ -83,7 +83,11 @@ The endpoint is vetted once at boot. A host **name** is not SSRF-protected (the 
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `MAOS_SIEM_FILE` | yes | localhost sink path for the redacted NDJSON/CEF projection |
+| `MAOS_SIEM_FILE` | one of the two sinks | localhost sink path for the redacted NDJSON/CEF projection; resumes from a durable cursor |
+| `MAOS_SIEM_ENDPOINT` | one of the two sinks | `host:port` (IPv6 in brackets, port default 6514) of a syslog-over-TLS (RFC 5425) collector; TLS only, one TLS connection per batch, acknowledged by the collector's `close_notify`; needs `MAOS_SIEM_CA_FILE` and an `online-adapters` build; with `MAOS_SIEM_FILE` it refuses the boot (`siem_config_conflict`) |
+| `MAOS_SIEM_CA_FILE` | with the endpoint | PEM CA bundle the collector must chain to (the only trust anchors) |
+| `MAOS_SIEM_CLIENT_CERT_FILE` / `MAOS_SIEM_CLIENT_KEY` | both or neither | mutual TLS: the certificate chain, and its PEM private key read through the credential store (`siem-client-key`; never logged, removed by `maos purge`) |
+| `MAOS_SIEM_ALLOW_PRIVATE` | no | `1` or `true` admits private and loopback collector addresses; link-local and reserved are always refused |
 
 ---
 
@@ -155,7 +159,13 @@ export MAOS_PDP_POLICY_FILE=/etc/maos/policy.cedar
 
 export MAOS_KMS_MASTER_KEY="$(cat /run/secrets/org-master-key.hex)"
 
+# Either a local file sink ...
 export MAOS_SIEM_FILE=/var/log/maos/siem.ndjson
+# ... or a syslog-over-TLS collector (one sink per Host; online-adapters build):
+# export MAOS_SIEM_ENDPOINT=siem.example.com:6514
+# export MAOS_SIEM_CA_FILE=/etc/maos/siem-ca.pem
+# export MAOS_SIEM_CLIENT_CERT_FILE=/etc/maos/siem-client.pem   # optional mutual TLS
+# export MAOS_SIEM_CLIENT_KEY="$(cat /run/secrets/siem-client-key.pem)"
 
 export MAOS_COHORT_DAEMON_CONFIG=/etc/maos/daemon.toml
 export MAOS_ONE_SHOT=cohort-a2a-daemon
@@ -185,13 +195,14 @@ maosctl audit query --intent-contains cohort:digest-read-governed
 | Every collective read NACKs with `enterprise PDP denied capability issuance for loom.read` | a Cedar `forbid` fires for the control-Spirit subject | fix the policy, or accept the deny |
 | Every collective read NACKs with `at-rest seal refused` | the KMS is unhealthy: with `MAOS_KMS_ENDPOINT`, the sidecar or its KMS is down, answered 5xx or something other than `maos.kms.v1`, or no probe succeeded in the last 30 s; with `MAOS_KMS_MASTER_KEY`, the key is unusable | repair the KMS or the sidecar; sealing resumes at the next successful probe (every 10 s). The daemon will not write plaintext under a sealed posture |
 | Boot exits 78 with `kms_config_conflict`, `kms_config_incomplete`, `kms_master_key_invalid`, `kms_endpoint_refused` or `kms_endpoint_unsupported_build` | `MAOS_KMS_ENDPOINT` and `MAOS_KMS_MASTER_KEY` both set; a `MAOS_KMS_*` variable with neither; a master key that is not 64 hex characters or is all zero; an endpoint that is `http` to a non-loopback host, a private/link-local address without `MAOS_KMS_ALLOW_PRIVATE`, or carries userinfo/query/fragment; the endpoint in a build without `online-adapters` | fix the variables named in the message (no value is printed); an endpoint that is merely unreachable is not a boot refusal |
-| `SIEM export ... failed — records buffered` | snapshot, projection, or sink I/O failed | repair the local sink or inspect filesystem/SQLite health; reads keep flowing and records remain buffered |
+| `SIEM export not acknowledged (<code>) — N record(s) remain` | the sink did not acknowledge a batch; the cursor stayed. Codes: `siem_sink_connect_failed` (nothing listens or the route is down), `siem_sink_timeout` (a bounded wait expired), `siem_sink_tls_refused` (the collector's certificate does not chain to `MAOS_SIEM_CA_FILE` or does not name the endpoint host, or it refused our client certificate), `siem_sink_no_close_notify` (the collector read the batch but did not answer our `close_notify`, RFC 5425 §4.4), `siem_sink_io`, `outbound_*` (the endpoint's host class is refused: set `MAOS_SIEM_ALLOW_PRIVATE=1` for a private collector), `siem_sink_file_io` (the file sink cannot be written), `siem_source_unavailable` (the log or a registered segment file cannot be read), `siem_client_key_pending`, `siem_cursor_io`, `siem_journal_failed` | repair the collector, route or file sink named by the code; reads keep flowing, the rows stay in the Transparency Log and are delivered once the sink answers. One line is printed per distinct reason |
+| Boot exits 78 with `siem_config_conflict`, `siem_endpoint_unsupported_build`, `siem_endpoint_refused`, `siem_ca_missing`, `siem_ca_invalid`, `siem_client_incomplete`, `siem_client_cert_invalid` or `siem_client_key_invalid` | `MAOS_SIEM_ENDPOINT` and `MAOS_SIEM_FILE` both set; the endpoint in a build without `online-adapters`; an endpoint that is not `host:port` or whose host class the policy refuses; no `MAOS_SIEM_CA_FILE`, or one that holds no PEM certificate; `MAOS_SIEM_CLIENT_KEY` without `MAOS_SIEM_CLIENT_CERT_FILE`; a client certificate whose key is missing, unparsable or not its key | fix the variables named in the message (no value is printed); an endpoint that is merely unreachable is not a boot refusal |
 
 ---
 
 ## 6. Known limitations (v2.2)
 
 - **Live-WAL SIEM export uses a consistent snapshot.** `maos-audit::query_with_redaction` still requires a quiesced database for deterministic projection. The enterprise runtime therefore creates a transactionally consistent `VACUUM INTO` snapshot for each live forward, projects that snapshot, and removes it afterwards. Snapshot creation failure is surfaced as sink-down and leaves the source log untouched.
-- **The SIEM watermark is process-local.** Once-per-record holds within one daemon lifetime. After a restart the tail may be re-projected; deduplicate downstream.
+- **The SIEM cursor is durable, and delivery is at-least-once (Story 23-4).** The export keeps `siem-cursor.json` beside the audit database (the insertion id and `frame_id` of the last acknowledged row, plus a hash of the sink). A restart resumes after it: nothing acknowledged is re-sent and nothing is lost. A batch is re-sent only when its acknowledgement did not arrive (a crash before the cursor write, or a collector that did not answer our `close_notify`); a re-send carries the same CEF `externalId`, so deduplicate on it. A reset (first enable on an existing log, a changed sink, an unreadable cursor, a restored log) re-sends every retained row and journals a `siem.cursor.reset` row; the old file is kept as `siem-cursor.json.corrupt-<ns>`. If segment expiry removed rows the SIEM had not received, one `siem.gap` row says which ids (RELEASE-HOLDS 23-4.d). "Acknowledged" means the collector read the batch, not that it stored it (23-4.c).
 - **PDP subject granularity is per-posture.** The daemon governs under one control-Spirit pid, so a Cedar subject-deny binds to the daemon, not to an individual tenant Spirit.
 - **Air-gap builds cannot take this posture.** `maos-sso`, `maos-secrets`, and `maos-siem` are optional dependencies behind the `network` feature and are compiled out of `air-gap` builds. `maos-pdp` is non-optional, so PDP mediation remains available there; SSO, at-rest seal, and SIEM do not.

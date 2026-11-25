@@ -10,12 +10,22 @@ description = "MAOS SIEM export — read-only Transparency Log projection (NDJSO
 [dependencies]
 maos-audit = { path = "../maos-audit" }
 maos-domain = { path = "../maos-domain" }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
+hex = "0.4"
 thiserror = "2"
+# Story 23-4 (D-23-4-01 A) — the syslog-over-TLS sink. Optional: a build without
+# `tls-sink` carries no TLS client.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+rustls-pemfile = { version = "2", optional = true }
 
 [dev-dependencies]
 serde_json = "1"
 tempfile = "3"
+rusqlite = { version = "0.31", features = ["bundled"] }
+# Story 23-4 — the in-process fake SIEM (a rustls server with a generated CA).
+rcgen = "0.13"
 # Story 11.4c Task 4 (AC4) — redaction-before-forward integration tests seed a
 # real Transparency Log via the kernel adapter (mirrors maos-audit's dev-deps).
 # dev-only: does NOT enter the library dependency graph / closure checks.
@@ -23,4 +33,6 @@ maos-kernel-core = { path = "../maos-kernel-core" }
 
 [features]
 default = []
-siem-fault-inject = []
+# Story 23-4 — syslog over TLS (RFC 5425). Off by default; `maos-bin`'s `online-adapters` enables it.
+tls-sink = ["dep:rustls", "dep:rustls-pemfile"]
+siem-fault-inject = ["maos-audit/siem-fault-inject"]

@@ -322,7 +322,12 @@ fn audit_sidecar_roots(database: &Path) -> Vec<MaosRoot> {
     let Some(dir) = database.parent() else {
         return roots;
     };
-    for name in ["export-seq.json", "transparency.airgap-stub.log"] {
+    for name in [
+        "export-seq.json",
+        "transparency.airgap-stub.log",
+        "siem-cursor.json",
+        "siem-cursor.json.tmp",
+    ] {
         push(
             &mut roots,
             "audit export residue",
@@ -330,6 +335,21 @@ fn audit_sidecar_roots(database: &Path) -> Vec<MaosRoot> {
             RootKind::File,
             WrittenBy::Maos,
         );
+    }
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with("siem-cursor.json.corrupt-") {
+                push(
+                    &mut roots,
+                    "moved-aside SIEM cursor",
+                    entry.path(),
+                    RootKind::File,
+                    WrittenBy::Maos,
+                );
+            }
+        }
     }
     if let (Some(stem), Ok(entries)) = (database.file_stem(), std::fs::read_dir(dir)) {
         let stem = stem.to_string_lossy();
@@ -384,7 +404,7 @@ fn sibling_team_logs(keep_log: bool, audit_path: &Path) -> Vec<PathBuf> {
 
 /// Every MAOS-owned credential, from the closed `SecretKey::ALL` (Story 18-8
 /// AC2: the eight MCP bearers ride the same list; Story 23-8: the KMS bearer).
-fn known_secret_keys() -> [(maos_domain::ports::SecretKey, &'static str); 13] {
+fn known_secret_keys() -> [(maos_domain::ports::SecretKey, &'static str); 14] {
     maos_domain::ports::SecretKey::ALL.map(|key| {
         let label = match key {
             maos_domain::ports::SecretKey::AnthropicApiKey => "Anthropic API credential",
@@ -392,6 +412,7 @@ fn known_secret_keys() -> [(maos_domain::ports::SecretKey, &'static str); 13] {
             maos_domain::ports::SecretKey::GeminiApiKey => "Gemini API credential",
             maos_domain::ports::SecretKey::KimiApiKey => "Kimi API credential",
             maos_domain::ports::SecretKey::KmsBearer => "KMS bearer credential",
+            maos_domain::ports::SecretKey::SiemClientKey => "SIEM client private key",
             maos_domain::ports::SecretKey::McpBearer(_) => key.as_str(),
         };
         (key, label)

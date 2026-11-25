@@ -382,6 +382,23 @@ Back up the segment directory with the log: `maosctl backup` and `maosctl migrat
 live log only, and `maos purge` removes the segment directory it resolves at run time (`--keep-log` keeps it
 with the log and discloses the segment count and bytes).
 
+### Send the audit log to a SIEM
+
+`MAOS_SIEM_FILE=<path>` appends the redacted log to a local file; `MAOS_SIEM_ENDPOINT=host:port` (default port
+6514, IPv6 in brackets) streams it to a syslog-over-TLS collector (RFC 5425) in an `online-adapters` build. One
+sink per Host: both variables together refuse the boot (`siem_config_conflict`, exit 78). The collector is
+verified against `MAOS_SIEM_CA_FILE` only (required; no system roots). `MAOS_SIEM_CLIENT_CERT_FILE` plus
+`MAOS_SIEM_CLIENT_KEY` (the PEM private key, read through the credential store like the other credentials and
+removed by `maos purge`) add mutual TLS. A collector on a private or loopback address needs
+`MAOS_SIEM_ALLOW_PRIVATE=1`.
+
+Rows leave in insertion order, redacted, each with its frame id as the CEF `externalId`. MAOS keeps
+`siem-cursor.json` beside the audit database and moves it only after the collector answered the batch's TLS
+`close_notify`, so a restart or a collector outage of hours loses no row and re-sends at most the batch in
+flight: deduplicate on `externalId`. The audit write path never waits on the collector. If segment expiry
+removes rows the SIEM had not received, MAOS journals one `siem.gap` row naming the ids. See runbook ENT-1 and
+`RELEASE-HOLDS.md` rows 23-4.a to 23-4.h for what the release does not claim.
+
 ### Where data lives
 
 The private memory root, the registry store, the registry yank cursor and the migration plans share one

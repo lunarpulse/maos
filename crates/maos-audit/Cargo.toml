@@ -24,6 +24,11 @@ hex = "0.4"
 hkdf = "0.12"
 tempfile = "3"
 
+[features]
+# Story 23-4 — dev/CI-only twin of `insertion::read_after_insertion_id` that skips the
+# redaction mapper (forwarded by `maos-siem/siem-fault-inject`). Barred from release builds.
+siem-fault-inject = []
+
 [dev-dependencies]
 maos-kernel-core = { path = "../maos-kernel-core" }
 syn = { version = "2", features = ["full", "visit"] }

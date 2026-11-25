@@ -403,7 +403,7 @@ fn purge_dry_run_is_inert_then_removes_only_maos_owned_state() {
     assert_eq!(
         credential_roots.len(),
         maos_domain::ports::SecretKey::ALL.len(),
-        "receipt must cover every known credential (four provider keys, eight MCP bearers, the KMS bearer)"
+        "receipt must cover every known credential (four provider keys, eight MCP bearers, the KMS bearer, the SIEM client key)"
     );
     for key in maos_domain::ports::SecretKey::ALL {
         let path = format!("keyring://maos/{}", key.as_str());
@@ -419,6 +419,12 @@ fn purge_dry_run_is_inert_then_removes_only_maos_owned_state() {
             .iter()
             .any(|root| root["path"] == "keyring://maos/kms-bearer"),
         "Story 23-8 AC8: purge must name the KMS bearer"
+    );
+    assert!(
+        credential_roots
+            .iter()
+            .any(|root| root["path"] == "keyring://maos/siem-client-key"),
+        "Story 23-4 AC6: purge must name the SIEM client key"
     );
     assert!(credential_roots.iter().all(|root| {
         matches!(

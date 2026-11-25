@@ -25,9 +25,7 @@
 
 #![cfg(feature = "network")]
 
-use maos_bin::enterprise_identity::{
-    AuditFilter, EnterpriseConfig, EnterpriseFailure, EnterpriseRuntime,
-};
+use maos_bin::enterprise_identity::{EnterpriseConfig, EnterpriseFailure, EnterpriseRuntime};
 
 // ---------------------------------------------------------------------------
 // AC5 (a) — zero-config default: no subsystem, byte-identical no-op.
@@ -80,10 +78,11 @@ fn zero_config_reports_no_subsystems_and_is_a_byte_identical_noop() {
     // Forward path: with no SIEM configured, forwarding is a no-op — nothing
     // buffered, nothing dropped, nothing exported off-Host.
     let forwarded = runtime
-        .forward_audit_to_siem(AuditFilter::default())
+        .forward_audit_to_siem()
         .expect("zero-config MUST NOT forward or buffer SIEM records");
     assert_eq!(
-        forwarded, 0,
+        (forwarded.delivered, forwarded.batches),
+        (0, 0),
         "zero-config forward MUST be a no-op returning zero records forwarded"
     );
 }
@@ -174,13 +173,13 @@ fn siem_configured_but_down_surfaces_an_operator_error_and_never_drops() {
     // backpressure. (The buffered COUNT is determined by a real TL read on the
     // Available path; the from_config posture vector has no TL, so it is 0
     // here — the contract under test is the distinct error, never Ok.)
-    match runtime.forward_audit_to_siem(AuditFilter::default()) {
+    match runtime.forward_audit_to_siem() {
         Err(EnterpriseFailure::SiemSinkDown { .. }) => {
             // pass: surfaced loudly, never Ok (silent drop).
         }
-        Ok(n) => panic!(
+        Ok(tick) => panic!(
             "SIEM configured-but-down MUST surface an operator-visible SiemSinkDown error; \
-             Ok({n}) is a silent drop of the audit trail"
+             Ok({tick:?}) is a silent drop of the audit trail"
         ),
         other => {
             panic!("SIEM configured-but-down MUST surface a distinct SiemSinkDown; got {other:?}")

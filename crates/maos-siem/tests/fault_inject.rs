@@ -102,3 +102,20 @@ fn fault_inject_bypass_drops_redaction_provenance_so_a_leak_can_invert() {
          (proving the row was read, not dropped): {ndjson}"
     );
 }
+
+/// Story 23-4 — the insertion-id reader the SIEM cursor drives has the same twin: under the
+/// feature it drops the redaction provenance, so the sanctioned path's guarantee (asserted
+/// by `maos-audit`'s `insertion_reader_23_4` and the `tls_sink_23_4` wire canary) inverts.
+#[test]
+#[ignore = "requires --features siem-fault-inject; gate-driven via check-enterprise-identity (Story 15-1 R-4)"]
+fn fault_inject_bypass_also_inverts_the_insertion_id_reader() {
+    let (_dir, db_path) = seed_tl_with_secret();
+    let rows = maos_audit::insertion::LogView::open(&db_path)
+        .and_then(|view| view.read_after(0, 10))
+        .expect("the cursor reader must read a real, quiesced TL");
+    assert!(!rows.is_empty(), "the seeded TL row must be read");
+    assert!(
+        rows.iter().all(|row| row.entry.redaction.is_none()),
+        "under the siem-fault-inject BYPASS the cursor reader drops the redaction provenance"
+    );
+}

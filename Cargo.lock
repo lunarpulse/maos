@@ -3252,10 +3252,17 @@ dependencies = [
 name = "maos-siem"
 version = "1.0.0"
 dependencies = [
+ "hex",
  "maos-audit",
  "maos-domain",
  "maos-kernel-core",
+ "rcgen",
+ "rusqlite",
+ "rustls",
+ "rustls-pemfile",
+ "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "thiserror 2.0.18",
 ]

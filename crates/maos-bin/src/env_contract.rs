@@ -550,7 +550,32 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     },
     EnvVar {
         name: "MAOS_SIEM_FILE",
-        purpose: "Path to the local SIEM file sink; when set and non-empty, enables enterprise SIEM export (Story 11.4c)",
+        purpose: "Path to the local SIEM file sink; when set and non-empty, enables enterprise SIEM export; the export resumes from a durable cursor (siem-cursor.json beside the audit database) and never re-sends an acknowledged row; setting it together with MAOS_SIEM_ENDPOINT refuses the boot (Stories 11.4c, 23-4)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SIEM_ENDPOINT",
+        purpose: "host:port (IPv6 in brackets, port default 6514) of an operator-run syslog-over-TLS collector (RFC 5425); the redacted Transparency Log is streamed to it in insertion order and the durable cursor moves only after the collector answers our close_notify; needs MAOS_SIEM_CA_FILE and the online-adapters build; setting it together with MAOS_SIEM_FILE refuses the boot (Story 23-4)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SIEM_CA_FILE",
+        purpose: "PEM CA bundle the collector's certificate must chain to (the only trust anchors: no system roots); required with MAOS_SIEM_ENDPOINT (Story 23-4)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SIEM_CLIENT_CERT_FILE",
+        purpose: "PEM certificate chain MAOS presents to the collector (mutual TLS); needs the private key in MAOS_SIEM_CLIENT_KEY (Story 23-4)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SIEM_CLIENT_KEY",
+        purpose: "PEM private key of MAOS_SIEM_CLIENT_CERT_FILE; read through the credential store (the environment under MAOS_SECRETS_BACKEND=encrypted-file); never logged (Story 23-4)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SIEM_ALLOW_PRIVATE",
+        purpose: "1 or true admits private (RFC 1918 / fc00::/7) and loopback addresses for MAOS_SIEM_ENDPOINT; link-local and reserved stay refused (Story 23-4)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {

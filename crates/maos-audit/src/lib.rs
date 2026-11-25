@@ -22,6 +22,7 @@ pub mod replay;
 pub mod session;
 
 pub mod backup;
+pub mod insertion;
 pub mod release_verify;
 pub mod sealed_export;
 pub mod segment;
@@ -371,23 +372,7 @@ pub fn query_with_redaction(
     db_path: &Path,
     filter: AuditFilter,
 ) -> Result<Vec<AuditEntry>, AuditError> {
-    // ADR-028 D6: replay determinism requires a quiesced / WAL-checkpointed DB.
-    // If a SQLite WAL file is present, the DB may still have uncheckpointed
-    // writes from an open writer, making replay non-deterministic.
-    let wal_path = db_path.with_extension("sqlite-wal");
-    if wal_path.exists() {
-        return Err(AuditError::Open(rusqlite::Error::SqliteFailure(
-            rusqlite::ffi::Error {
-                code: rusqlite::ffi::ErrorCode::DatabaseBusy,
-                extended_code: 0,
-            },
-            Some(format!(
-                "Transparency Log has an active WAL ({}). \
-                 Quiesce/checkpoint the kernel before deterministic replay/export.",
-                wal_path.display()
-            )),
-        )));
-    }
+    refuse_active_wal(db_path)?;
 
     let sources = segment::open_log_sources(db_path)?;
     let mut all = Vec::new();
@@ -504,33 +489,7 @@ fn query_with_redaction_on(
     let mut stmt = conn.prepare(&sql).map_err(AuditError::Read)?;
     let params_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
     let rows = stmt
-        .query_map(params_refs.as_slice(), |row| {
-            let frame_id_blob: Vec<u8> = row.get(0)?;
-            let cap_blob: Option<Vec<u8>> = row.get(4)?;
-            let payload_blob: Vec<u8> = row.get(7)?;
-            let kind_int: i64 = row.get(5)?;
-            let kind_str = kind_to_string(kind_int);
-
-            let redaction = if payload_blob.is_empty() {
-                None
-            } else {
-                Some(RedactionMeta {
-                    class: kind_str.clone(),
-                    original_len_bucket: bucket_len(payload_blob.len()),
-                })
-            };
-            Ok(AuditEntry {
-                frame_id_hex: hex_encode(&frame_id_blob),
-                timestamp_ns: row.get::<_, i64>(1)? as u64,
-                spirit_pid: row.get::<_, i64>(2)? as u32,
-                boot_nonce: row.get::<_, i64>(3)? as u64,
-                capability_token_hex: cap_blob.as_ref().map(|b| hex_encode(b)),
-                kind: kind_str,
-                intent: row.get(6)?,
-                payload: String::from_utf8_lossy(&payload_blob).into_owned(),
-                redaction,
-            })
-        })
+        .query_map(params_refs.as_slice(), |row| redacted_entry(row))
         .map_err(AuditError::Read)?;
 
     let mut entries = Vec::new();
@@ -538,6 +497,58 @@ fn query_with_redaction_on(
         entries.push(row.map_err(AuditError::Read)?);
     }
     Ok(entries)
+}
+
+/// ADR-028 D6: replay determinism requires a quiesced / WAL-checkpointed DB.
+/// If a SQLite WAL file is present, the DB may still have uncheckpointed
+/// writes from an open writer, making replay non-deterministic.
+fn refuse_active_wal(db_path: &Path) -> Result<(), AuditError> {
+    let wal_path = db_path.with_extension("sqlite-wal");
+    if wal_path.exists() {
+        return Err(AuditError::Open(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error {
+                code: rusqlite::ffi::ErrorCode::DatabaseBusy,
+                extended_code: 0,
+            },
+            Some(format!(
+                "Transparency Log has an active WAL ({}). \
+                 Quiesce/checkpoint the kernel before deterministic replay/export.",
+                wal_path.display()
+            )),
+        )));
+    }
+    Ok(())
+}
+
+/// The redaction row mapper over `frame_id, timestamp_ns, spirit_pid, boot_nonce,
+/// capability_token, kind, intent, payload_redacted` (columns 0..=7): the ONLY
+/// place `AuditEntry::redaction` is populated.
+fn redacted_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<AuditEntry> {
+    let frame_id_blob: Vec<u8> = row.get(0)?;
+    let cap_blob: Option<Vec<u8>> = row.get(4)?;
+    let payload_blob: Vec<u8> = row.get(7)?;
+    let kind_int: i64 = row.get(5)?;
+    let kind_str = kind_to_string(kind_int);
+
+    let redaction = if payload_blob.is_empty() {
+        None
+    } else {
+        Some(RedactionMeta {
+            class: kind_str.clone(),
+            original_len_bucket: bucket_len(payload_blob.len()),
+        })
+    };
+    Ok(AuditEntry {
+        frame_id_hex: hex_encode(&frame_id_blob),
+        timestamp_ns: row.get::<_, i64>(1)? as u64,
+        spirit_pid: row.get::<_, i64>(2)? as u32,
+        boot_nonce: row.get::<_, i64>(3)? as u64,
+        capability_token_hex: cap_blob.as_ref().map(|b| hex_encode(b)),
+        kind: kind_str,
+        intent: row.get(6)?,
+        payload: String::from_utf8_lossy(&payload_blob).into_owned(),
+        redaction,
+    })
 }
 
 /// Write entries to an NDJSON stream. One JSON object per line.

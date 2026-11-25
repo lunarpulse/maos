@@ -52,12 +52,13 @@ fn the_umbrella_is_in_default_and_enables_network() {
         "default must contain {UMBRELLA}: {:?}",
         features["default"]
     );
-    // Story 23-8 (D-23-8-09 A): the umbrella enables `network` and the
-    // external KMS adapter of maos-secrets, and no other feature of this crate.
+    // Story 23-8 (D-23-8-09 A) and Story 23-4 (D-23-4-01 A): the umbrella enables
+    // `network`, the external KMS adapter of maos-secrets and the syslog-over-TLS SIEM
+    // sink of maos-siem, and no other feature of this crate.
     assert_eq!(
         features[UMBRELLA],
-        ["network", "maos-secrets/http-kms"],
-        "{UMBRELLA} enables network and the KMS adapter (23-8) and nothing else"
+        ["network", "maos-secrets/http-kms", "maos-siem/tls-sink"],
+        "{UMBRELLA} enables network, the KMS adapter (23-8), the TLS SIEM sink (23-4) and nothing else"
     );
     for kept in ["network", "wasm-host"] {
         assert!(

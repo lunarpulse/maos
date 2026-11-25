@@ -109,6 +109,13 @@ optional `MAOS_KMS_BEARER`; Story 23-8) for the sealed
 file vault. Keys are resolved when providers are constructed; just-in-time
 materialization and bounded in-memory lifetime remain open.
 
+To send the redacted audit log to a SIEM, set `MAOS_SIEM_FILE=<path>` (local file) or
+`MAOS_SIEM_ENDPOINT=host:port` with `MAOS_SIEM_CA_FILE` (syslog over TLS, RFC 5425; Story 23-4), one sink per
+Host. The optional mutual-TLS client key is `MAOS_SIEM_CLIENT_KEY`, read through the same credential store and
+removed by `maos purge`. A durable cursor (`siem-cursor.json` beside the audit database) moves only after the
+collector acknowledges a batch, so a restart re-sends at most the batch in flight; deduplicate on the CEF
+`externalId`.
+
 When the keyring is healthy and the named entry is absent, MAOS promotes the
 captured environment credential into the keyring at boot, and later boots
 resolve from the keyring; the promotion is journaled without key material. A

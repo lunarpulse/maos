@@ -209,70 +209,52 @@ fn enforce_vetted_upgrade_precondition(
     .map_err(|error| error.to_string())
 }
 
-/// Story 11.4c / 13.5a — ONE SIEM export tick against a shared in-memory
-/// watermark.
+/// Story 11.4c / 13.5a / 23-4 — the ONE SIEM export consumer.
 ///
-/// Extracted from the inline `default-server` consumer so the
-/// `cohort-a2a-daemon` — which returns from the dispatch long before that
-/// spawn is reached — can forward through the identical code path instead of
-/// running SIEM-blind (the 13.5a dead-wire).
+/// Every `siem_configured()` posture runs exactly one of these: `default-server` spawns it
+/// from the serve path and the `cohort-a2a-daemon` — which returns from the dispatch long
+/// before that spawn is reached — spawns it from its own root, so neither runs SIEM-blind
+/// (the 13.5a dead-wire). It drives `EnterpriseRuntime::forward_audit_to_siem`: a snapshot of
+/// the live Transparency Log, read after the DURABLE cursor (a restart re-sends nothing and
+/// loses nothing) and handed to the one configured sink (`MAOS_SIEM_ENDPOINT` or
+/// `MAOS_SIEM_FILE`), the cursor moving only after the sink acknowledged a batch.
 ///
-/// H5: the watermark is process-local and resets on restart. Callers may claim
-/// once-per-record within ONE daemon lifetime, never exactly-once across
-/// restarts.
-#[cfg(feature = "network")]
-fn forward_audit_to_siem_once(
-    runtime: &maos_bin::enterprise_identity::EnterpriseRuntime,
-    watermark: &std::sync::Mutex<Option<u64>>,
-) -> Result<usize, String> {
-    let mut watermark = watermark
-        .lock()
-        .map_err(|_| "SIEM export watermark poisoned".to_string())?;
-    let now_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
-    let mut filter = maos_audit::AuditFilter::default();
-    if let Some(since) = *watermark {
-        filter.since_ns = Some(since.saturating_add(1));
-    }
-    let forwarded = runtime
-        .forward_audit_to_siem(filter)
-        .map_err(|error| error.to_string())?;
-    *watermark = Some(now_ns);
-    Ok(forwarded)
-}
-
-/// Story 11.4c — the periodic SIEM export consumer. Periodically snapshots a
-/// live-WAL Transparency Log into a transactionally consistent quiesced copy,
-/// forwards redacted records to the configured localhost sink
-/// (`MAOS_SIEM_FILE`), and advances a serialized in-memory watermark. On
-/// sink-down the runtime surfaces a buffered + operator-visible error (never a
-/// silent drop). Network/HTTPS sinks are additive-deferred and MUST be TLS-only
-/// when introduced (ADR-051); a persistent max-ts watermark is the production
-/// follow-up.
-///
-/// Story 13.5a threads the SAME spawn into `cohort-a2a-daemon` mode.
+/// It wakes on its 60 s interval (the first tick is immediate: a backlog left by a restart
+/// or an outage goes out at boot) or when `wake` is notified (D-23-4-09 A: the daemon's
+/// request path only nudges, it does no SIEM I/O). Each export runs on a blocking thread,
+/// never on an async worker. One typed line per distinct failure reason (and one when the
+/// sink recovers), so a collector that stays down prints once, not once a minute.
 #[cfg(feature = "network")]
 fn spawn_siem_export_consumer(
     runtime: Arc<maos_bin::enterprise_identity::EnterpriseRuntime>,
-    watermark: Arc<std::sync::Mutex<Option<u64>>>,
+    wake: Arc<tokio::sync::Notify>,
     cancel: CancellationToken,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
-        interval.tick().await; // skip the immediate first tick
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        let mut report = maos_bin::enterprise_identity::SiemReport::default();
         loop {
             tokio::select! {
                 _ = cancel.cancelled() => break,
-                _ = interval.tick() => {
-                    match forward_audit_to_siem_once(&runtime, &watermark) {
-                        Ok(n) if n > 0 => eprintln!(
-                            "maos: SIEM export forwarded {n} record(s) to the localhost sink (Story 11.4c)"
-                        ),
-                        Ok(_) => {}
-                        Err(e) => eprintln!(
-                            "maos: SIEM export forward failed — records buffered, operator action required: {e}"
-                        ),
+                _ = interval.tick() => {}
+                _ = wake.notified() => {}
+            }
+            let export = {
+                let runtime = Arc::clone(&runtime);
+                tokio::task::spawn_blocking(move || runtime.forward_audit_to_siem())
+            };
+            let outcome = tokio::select! {
+                _ = cancel.cancelled() => break,
+                outcome = export => outcome,
+            };
+            match outcome {
+                Ok(outcome) => {
+                    for line in report.lines(&outcome) {
+                        eprintln!("{line}");
                     }
                 }
+                Err(join) => eprintln!("maos: SIEM export task failed: {join}"),
             }
         }
     })
@@ -2296,12 +2278,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(78);
         }
     };
+    // Story 23-4 (D-23-4-12 A) — the one SIEM sink (`MAOS_SIEM_ENDPOINT` or
+    // `MAOS_SIEM_FILE`), selected once. A conflict or an invalid endpoint, CA or client
+    // certificate is a boot refusal (exit 78) naming the variables and never a value.
+    let configured_siem = match maos_bin::enterprise_identity::configure_siem_from_env() {
+        Ok(siem) => siem,
+        Err(refusal) => {
+            eprintln!("maos: {refusal}");
+            std::process::exit(78);
+        }
+    };
+    if let Some(siem) = &configured_siem {
+        eprintln!("maos: SIEM sink selected: {}", siem.kind_name());
+    }
     let enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>> =
         match maos_bin::enterprise_identity::EnterpriseRuntime::from_env(
             Arc::clone(&crypto),
             audit_db_path.clone(),
             boot_nonce,
             configured_kms.as_ref(),
+            configured_siem.as_ref(),
         ) {
             Ok(rt) if !rt.is_noop() => {
                 eprintln!(
@@ -3957,6 +3953,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
         }
+    }
+
+    // Story 23-4 (D-23-4-11 A) — settle the optional mTLS client key of the SIEM sink now
+    // that a secret store exists. Same source rule as the KMS bearer (the encrypted-file
+    // store cannot unlock itself without the KMS). With a client certificate configured a
+    // missing, unparsable or foreign key is a boot refusal; until this runs the network
+    // sink sends nothing. The key is never printed.
+    if let Some(siem) = configured_siem
+        .as_ref()
+        .filter(|siem| siem.needs_client_key())
+    {
+        let key_source: &dyn maos_domain::ports::SecretStore =
+            if matches!(secret_backend, maos_secrets::Backend::EncryptedFile) {
+                env_secrets.as_ref()
+            } else {
+                secret_store.as_ref()
+            };
+        let key = match key_source.get(maos_domain::ports::SecretKey::SiemClientKey) {
+            Ok(key) => key,
+            Err(error) => {
+                eprintln!(
+                    "maos: the SIEM client key could not be read from the credential store ({error})"
+                );
+                None
+            }
+        };
+        if let Err(refusal) = siem.provision_client_key(key.as_deref()) {
+            eprintln!("maos: {refusal}");
+            std::process::exit(78);
+        }
+        eprintln!("maos: SIEM client key read; the syslog-over-TLS sink presents its certificate");
     }
 
     let mut providers_map: std::collections::BTreeMap<String, Arc<dyn maos_providers::Provider>> =
@@ -10241,16 +10268,21 @@ description = "smoke test spirit successor"
     let revocation_poller_handle = Arc::clone(&revocation_poller).spawn(cancel.child_token());
     eprintln!("maos: RevocationPoller spawned (Story 5.4)");
 
-    // Story 11.4c — SIEM export consumer (see `spawn_siem_export_consumer`).
-    let _siem_forward_handle = enterprise_runtime.as_ref().map(|rt| {
-        spawn_siem_export_consumer(
-            Arc::clone(rt),
-            Arc::new(std::sync::Mutex::new(None)),
-            cancel.clone(),
-        )
-    });
-    if enterprise_runtime.is_some() {
-        eprintln!("maos: SIEM export consumer spawned (Story 11.4c)");
+    // Story 11.4c / 23-4 — SIEM export consumer (see `spawn_siem_export_consumer`). Only a
+    // posture with a SIEM sink configured runs one: with no `MAOS_SIEM_*` there is no
+    // consumer and no socket.
+    let siem_wake = Arc::new(tokio::sync::Notify::new());
+    let _siem_forward_handle = enterprise_runtime
+        .as_ref()
+        .filter(|rt| rt.siem_configured())
+        .map(|rt| {
+            spawn_siem_export_consumer(Arc::clone(rt), Arc::clone(&siem_wake), cancel.clone())
+        });
+    if enterprise_runtime
+        .as_ref()
+        .is_some_and(|rt| rt.siem_configured())
+    {
+        eprintln!("maos: SIEM export consumer spawned (Story 11.4c, durable cursor Story 23-4)");
     }
 
     // Story 5.1 — IdleWatchdog spawned alongside the audit writer.
@@ -13022,7 +13054,8 @@ struct EnterpriseDaemonGovernance {
     transparency_log: Arc<maos_iac::TransparencyLogAdapter>,
     control_spirit: String,
     spirit_pid: u32,
-    siem_watermark: Arc<std::sync::Mutex<Option<u64>>>,
+    /// Wakes the SIEM export consumer (Story 23-4, D-23-4-09 A).
+    siem_wake: Arc<tokio::sync::Notify>,
 }
 
 #[cfg(feature = "network")]
@@ -13078,27 +13111,18 @@ impl EnterpriseDaemonGovernance {
             maos_domain::invariants::i3::FrameOrigin::Kernel,
         );
         // SIEM is the projection stage, and it runs AFTER the record is
-        // durably in the Transparency Log. A sink failure is therefore
-        // operator-visible and buffered (the row is already journaled), never
-        // silent — and never a refusal, because refusing the read would not
-        // improve auditability and would take the daemon down with the sink.
-        // This is the 11.4c posture the periodic consumer already runs under.
-        //
-        if let Some(runtime) = self
+        // durably in the Transparency Log. Story 23-4 (D-23-4-09 A): this request path
+        // does NO SIEM I/O — it only nudges the one export consumer, which reads the log
+        // after its durable cursor on its own blocking thread. A sink that is down
+        // therefore delays delivery (the row is already journaled and the consumer
+        // prints one typed line), never this read, and a refusal would not improve
+        // auditability anyway.
+        if self
             .enterprise_runtime
             .as_ref()
-            .filter(|runtime| runtime.siem_configured())
+            .is_some_and(|runtime| runtime.siem_configured())
         {
-            match forward_audit_to_siem_once(runtime, &self.siem_watermark) {
-                Ok(n) if n > 0 => eprintln!(
-                    "maos: SIEM export forwarded {n} record(s) for governed collective read {request_id}"
-                ),
-                Ok(_) => {}
-                Err(error) => eprintln!(
-                    "maos: SIEM export for governed collective read {request_id} failed — \
-                     records buffered in the Transparency Log, operator action required: {error}"
-                ),
-            }
+            self.siem_wake.notify_one();
         }
         Ok(())
     }
@@ -13305,8 +13329,29 @@ fn build_enterprise_daemon_governance(
         transparency_log: Arc::clone(transparency_log),
         control_spirit,
         spirit_pid: DAEMON_CONTROL_SPIRIT_PID,
-        siem_watermark: Arc::new(std::sync::Mutex::new(None)),
+        siem_wake: Arc::new(tokio::sync::Notify::new()),
     })))
+}
+
+#[cfg(feature = "network")]
+/// Spawn the one SIEM export consumer of a governed cohort daemon (Story 23-4, D-23-4-09 A):
+/// `None` unless the posture has a SIEM sink. The governed-read seam wakes it through the
+/// governance's `siem_wake`. `run_cohort_a2a_daemon` and the 13.5a lifecycle proof both
+/// call this, so the proof exercises the production spawn.
+fn spawn_governance_siem_consumer(
+    governance: &Option<Arc<EnterpriseDaemonGovernance>>,
+    cancel: CancellationToken,
+) -> Option<tokio::task::JoinHandle<()>> {
+    let governance = governance.as_ref()?;
+    let runtime = governance
+        .enterprise_runtime
+        .as_ref()
+        .filter(|runtime| runtime.siem_configured())?;
+    Some(spawn_siem_export_consumer(
+        Arc::clone(runtime),
+        Arc::clone(&governance.siem_wake),
+        cancel,
+    ))
 }
 
 #[cfg(feature = "network")]
@@ -13472,26 +13517,13 @@ async fn run_cohort_a2a_daemon(
     bootstrap.pin_persistence = Some(Arc::new(maos_persistence::FilePinStore::open(&pin_file)?));
     validate_enterprise_daemon_wiring(enterprise_posture_required, &enterprise_daemon_governance)?;
     // Story 13.5a — the SIEM export consumer previously never ran in daemon
-    // mode (the dispatch returns above its spawn). It shares the posture's
-    // watermark so the per-operation forward at the seam and the periodic tail
-    // never re-forward the same record within this daemon lifetime (H5).
+    // mode (the dispatch returns above its spawn). Story 23-4 (D-23-4-09 A): it is the
+    // ONLY exporter; the governed-read seam wakes it through `siem_wake` and does no
+    // SIEM I/O itself, and its durable cursor means nothing is re-sent or lost across a
+    // restart.
     let siem_cancel = tokio_util::sync::CancellationToken::new();
-    let _siem_forward_handle = enterprise_daemon_governance
-        .as_ref()
-        .and_then(|governance| {
-            governance
-                .enterprise_runtime
-                .as_ref()
-                .map(|runtime| (governance, runtime))
-        })
-        .filter(|(_, runtime)| runtime.siem_configured())
-        .map(|(governance, runtime)| {
-            spawn_siem_export_consumer(
-                Arc::clone(runtime),
-                Arc::clone(&governance.siem_watermark),
-                siem_cancel.clone(),
-            )
-        });
+    let _siem_forward_handle =
+        spawn_governance_siem_consumer(&enterprise_daemon_governance, siem_cancel.clone());
     // Story 13.6b / AC1 — the applier port is built HERE, from the one store
     // this process owns, and installed before the accept loop spawns so no
     // inbound connection observes a legacy-applier window.
@@ -17857,6 +17889,10 @@ mod story_13_5a_enterprise_daemon_seam {
             .map_err(|error| error.to_string())?
         };
 
+        // The production spawn (`run_cohort_a2a_daemon` calls the same helper): without it
+        // nothing exports and the governed-read nudge wakes no one.
+        let siem_cancel = CancellationToken::new();
+        let _siem_consumer = spawn_governance_siem_consumer(&governance, siem_cancel.clone());
         let daemon = build_cohort_a2a_daemon_runtime(
             Arc::clone(&transparency_log),
             DAEMON_BOOT_NONCE,
@@ -17968,6 +18004,22 @@ mod story_13_5a_enterprise_daemon_seam {
         .map_err(|_| "timed out waiting for the daemon's correlated digest reply".to_string())?;
 
         if matches!(wiring, TestWiring::Full) {
+            // Story 23-4 (D-23-4-09 A): the request path only nudges the export consumer.
+            // Wait for the consumer's acknowledged-batch event (a watch counter, no sleep;
+            // the 30 s bound is a deadline, not an expectation) before reading the sink.
+            let mut delivered = runtime
+                .as_ref()
+                .expect("full wiring builds a runtime")
+                .siem_delivery_events();
+            tokio::time::timeout(std::time::Duration::from_secs(30), async {
+                while *delivered.borrow_and_update() == 0 {
+                    if delivered.changed().await.is_err() {
+                        break;
+                    }
+                }
+            })
+            .await
+            .map_err(|_| "the SIEM export consumer never acknowledged a batch".to_string())?;
             let sink = std::fs::read_to_string(&fixture.siem_sink).unwrap_or_default();
             if sink.trim().is_empty() {
                 return Err(

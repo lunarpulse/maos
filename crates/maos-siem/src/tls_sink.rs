@@ -1,0 +1,306 @@
+//! Story 23-4 (D-23-4-01, -02, -10, -13) — the syslog-over-TLS sink (RFC 5425).
+//!
+//! TLS only: there is no plaintext path, and the server is verified against the operator's CA
+//! bundle alone (no system or bundled roots) under the configured host name (SNI). Each
+//! batch uses one fresh connection, resolved and vetted by the outbound policy on its own
+//! (a DNS change between ticks is vetted again) and made only to the vetted addresses.
+//! RFC 5425 has no application acknowledgement, so a batch is acknowledged exactly when the
+//! collector answers our `close_notify` with its own (§4.4); a peer that resets, closes
+//! without one, or stays silent is not an acknowledgement and the batch is re-sent.
+
+use std::io::Write;
+use std::net::{IpAddr, SocketAddr, TcpStream};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+use maos_domain::outbound::{OutboundPolicy, ResolveHost};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName};
+use rustls::{ClientConfig, ClientConnection, RootCertStore};
+
+use crate::export::{BatchSink, Frame, SinkFailure};
+
+/// Bounded waits of one batch connection (AC5: 5 s / 10 s / 10 s / 10 s by default).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Timeouts {
+    pub connect: Duration,
+    pub handshake: Duration,
+    pub write: Duration,
+    /// How long to wait for the collector's `close_notify` after ours.
+    pub close: Duration,
+}
+
+/// The TLS client configuration (it holds the client private key: never printed).
+pub type ClientConfigHandle = Arc<ClientConfig>;
+impl Default for Timeouts {
+    fn default() -> Self {
+        Self {
+            connect: Duration::from_secs(5),
+            handshake: Duration::from_secs(10),
+            write: Duration::from_secs(10),
+            close: Duration::from_secs(10),
+        }
+    }
+}
+
+/// Why the TLS material cannot be used. Carries nothing from the input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SetupError {
+    /// The CA bundle holds no usable certificate.
+    CaInvalid,
+    ClientCertInvalid,
+    /// The key is not a PEM private key, or does not match the certificate.
+    ClientKeyInvalid,
+}
+
+impl SetupError {
+    #[must_use]
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::CaInvalid => "siem_ca_invalid",
+            Self::ClientCertInvalid => "siem_client_cert_invalid",
+            Self::ClientKeyInvalid => "siem_client_key_invalid",
+        }
+    }
+}
+
+impl std::fmt::Display for SetupError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.code())
+    }
+}
+
+impl std::error::Error for SetupError {}
+
+/// The TLS client configuration: trust anchors from `ca_pem` only, TLS 1.3 and 1.2 over
+/// `ring`, and the optional client certificate (RFC 9662 §4: rustls offers
+/// `TLS_ECDHE_*_WITH_AES_128_GCM_SHA256` and TLS 1.3; it does not offer static-RSA CBC).
+///
+/// # Errors
+/// [`SetupError`] for a bundle with no certificate, or an unusable client certificate or key.
+pub fn client_config(
+    ca_pem: &[u8],
+    client: Option<(&[u8], &[u8])>,
+) -> Result<Arc<ClientConfig>, SetupError> {
+    let mut roots = RootCertStore::empty();
+    let mut anchors = 0_usize;
+    for cert in rustls_pemfile::certs(&mut &*ca_pem) {
+        let cert = cert.map_err(|_| SetupError::CaInvalid)?;
+        roots.add(cert).map_err(|_| SetupError::CaInvalid)?;
+        anchors += 1;
+    }
+    if anchors == 0 {
+        return Err(SetupError::CaInvalid);
+    }
+    let builder =
+        ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
+            .with_safe_default_protocol_versions()
+            .map_err(|_| SetupError::CaInvalid)?
+            .with_root_certificates(roots);
+    let config = match client {
+        None => builder.with_no_client_auth(),
+        Some((cert_pem, key_pem)) => {
+            let chain: Vec<CertificateDer<'static>> = rustls_pemfile::certs(&mut &*cert_pem)
+                .collect::<Result<_, _>>()
+                .map_err(|_| SetupError::ClientCertInvalid)?;
+            if chain.is_empty() {
+                return Err(SetupError::ClientCertInvalid);
+            }
+            let key: PrivateKeyDer<'static> = rustls_pemfile::private_key(&mut &*key_pem)
+                .ok()
+                .flatten()
+                .ok_or(SetupError::ClientKeyInvalid)?;
+            builder
+                .with_client_auth_cert(chain, key)
+                .map_err(|_| SetupError::ClientKeyInvalid)?
+        }
+    };
+    Ok(Arc::new(config))
+}
+
+/// The syslog-over-TLS [`BatchSink`].
+pub struct TlsSink {
+    host: String,
+    port: u16,
+    config: Arc<ClientConfig>,
+    policy: OutboundPolicy,
+    resolver: Arc<dyn ResolveHost>,
+    timeouts: Timeouts,
+}
+
+impl std::fmt::Debug for TlsSink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Never the TLS configuration: it holds the client private key.
+        f.debug_struct("TlsSink")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("timeouts", &self.timeouts)
+            .finish_non_exhaustive()
+    }
+}
+
+impl TlsSink {
+    /// `host` is a name, an IPv4 literal, or an IPv6 literal with or without brackets.
+    #[must_use]
+    pub fn new(
+        host: &str,
+        port: u16,
+        config: Arc<ClientConfig>,
+        policy: OutboundPolicy,
+        resolver: Arc<dyn ResolveHost>,
+        timeouts: Timeouts,
+    ) -> Self {
+        Self {
+            host: host
+                .trim_start_matches('[')
+                .trim_end_matches(']')
+                .to_owned(),
+            port,
+            config,
+            policy,
+            resolver,
+            timeouts,
+        }
+    }
+
+    fn connect(&self, addresses: &[IpAddr]) -> Result<TcpStream, SinkFailure> {
+        let deadline = Instant::now() + self.timeouts.connect;
+        let mut refused = SinkFailure::new("siem_sink_connect_failed");
+        for ip in addresses {
+            let Some(remaining) = remaining(deadline) else {
+                return Err(SinkFailure::new("siem_sink_timeout"));
+            };
+            match TcpStream::connect_timeout(&SocketAddr::new(*ip, self.port), remaining) {
+                Ok(stream) => return Ok(stream),
+                Err(error) if is_timeout(&error) => refused = SinkFailure::new("siem_sink_timeout"),
+                Err(_) => refused = SinkFailure::new("siem_sink_connect_failed"),
+            }
+        }
+        Err(refused)
+    }
+}
+
+impl BatchSink for TlsSink {
+    fn identity(&self) -> String {
+        if self.host.contains(':') {
+            format!("tls://[{}]:{}", self.host, self.port)
+        } else {
+            format!("tls://{}:{}", self.host, self.port)
+        }
+    }
+
+    fn deliver(&mut self, frames: &[Frame]) -> Result<(), SinkFailure> {
+        // One resolution per connection; the connection goes only to what it vetted.
+        let addresses = self
+            .policy
+            .vet_host_port(&self.host, self.port, self.resolver.as_ref())
+            .map_err(|refusal| SinkFailure::new(refusal.code()))?;
+        let mut tcp = self.connect(&addresses)?;
+        let _ = tcp.set_nodelay(true);
+        let name = ServerName::try_from(self.host.clone())
+            .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?;
+        let mut tls = ClientConnection::new(Arc::clone(&self.config), name)
+            .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?;
+
+        let handshake = Instant::now() + self.timeouts.handshake;
+        while tls.is_handshaking() {
+            arm(&tcp, handshake)?;
+            tls.complete_io(&mut tcp)
+                .map_err(|error| classify(&error, "siem_sink_io"))?;
+        }
+
+        let write = Instant::now() + self.timeouts.write;
+        let payload = octet_counted(frames);
+        let mut sent = 0;
+        while sent < payload.len() {
+            let accepted = tls
+                .writer()
+                .write(&payload[sent..])
+                .map_err(|_| SinkFailure::new("siem_sink_io"))?;
+            sent += accepted;
+            flush(&mut tls, &mut tcp, write)?;
+        }
+        tls.send_close_notify();
+        flush(&mut tls, &mut tcp, write)?;
+
+        // RFC 5425 §4.4: the receiver answers our close_notify with its own.
+        let close = Instant::now() + self.timeouts.close;
+        loop {
+            if tls
+                .process_new_packets()
+                .map_err(|error| {
+                    let _ = error;
+                    SinkFailure::new("siem_sink_tls_refused")
+                })?
+                .peer_has_closed()
+            {
+                return Ok(());
+            }
+            if arm(&tcp, close).is_err() {
+                return Err(SinkFailure::new("siem_sink_no_close_notify"));
+            }
+            match tls.read_tls(&mut tcp) {
+                // The peer closed the TCP stream without a close_notify.
+                Ok(0) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
+                Ok(_) => {}
+                Err(_) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
+            }
+        }
+    }
+}
+
+/// RFC 5425 §4.3: `MSG-LEN SP SYSLOG-MSG`, MSG-LEN in octets.
+fn octet_counted(frames: &[Frame]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for frame in frames {
+        out.extend_from_slice(frame.syslog.len().to_string().as_bytes());
+        out.push(b' ');
+        out.extend_from_slice(frame.syslog.as_bytes());
+    }
+    out
+}
+
+fn flush(
+    tls: &mut ClientConnection,
+    tcp: &mut TcpStream,
+    deadline: Instant,
+) -> Result<(), SinkFailure> {
+    while tls.wants_write() {
+        arm(tcp, deadline)?;
+        tls.write_tls(tcp)
+            .map_err(|error| classify(&error, "siem_sink_io"))?;
+    }
+    Ok(())
+}
+
+fn remaining(deadline: Instant) -> Option<Duration> {
+    deadline
+        .checked_duration_since(Instant::now())
+        .filter(|left| !left.is_zero())
+}
+
+/// Bound the next socket operation by what is left of the phase.
+fn arm(tcp: &TcpStream, deadline: Instant) -> Result<(), SinkFailure> {
+    let left = remaining(deadline).ok_or(SinkFailure::new("siem_sink_timeout"))?;
+    tcp.set_read_timeout(Some(left))
+        .and_then(|()| tcp.set_write_timeout(Some(left)))
+        .map_err(|_| SinkFailure::new("siem_sink_io"))
+}
+
+fn is_timeout(error: &std::io::Error) -> bool {
+    matches!(
+        error.kind(),
+        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+    )
+}
+
+/// A timeout is a timeout; a TLS alert or certificate failure (`InvalidData`) is a refusal;
+/// anything else is the transport.
+fn classify(error: &std::io::Error, fallback: &'static str) -> SinkFailure {
+    SinkFailure::new(if is_timeout(error) {
+        "siem_sink_timeout"
+    } else if error.kind() == std::io::ErrorKind::InvalidData {
+        "siem_sink_tls_refused"
+    } else {
+        fallback
+    })
+}

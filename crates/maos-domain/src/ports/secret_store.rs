@@ -17,6 +17,10 @@ pub enum SecretKey {
     /// Story 23-8 — the bearer MAOS sends to the operator's external KMS
     /// endpoint (`MAOS_KMS_ENDPOINT`).
     KmsBearer,
+    /// Story 23-4 — the PEM private key of the optional mTLS client certificate
+    /// MAOS presents to the operator's syslog-over-TLS collector
+    /// (`MAOS_SIEM_CLIENT_CERT_FILE`).
+    SiemClientKey,
 }
 
 /// The eight MCP servers with a `MAOS_MCP_<SERVER>_URI` row (closed, like
@@ -53,7 +57,7 @@ impl McpServer {
 }
 
 impl SecretKey {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::AnthropicApiKey,
         Self::OpenAiApiKey,
         Self::GeminiApiKey,
@@ -67,6 +71,7 @@ impl SecretKey {
         Self::McpBearer(McpServer::Github),
         Self::McpBearer(McpServer::CitationGraph),
         Self::KmsBearer,
+        Self::SiemClientKey,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -77,6 +82,7 @@ impl SecretKey {
             Self::KimiApiKey => "kimi-api-key",
             Self::McpBearer(server) => server.bearer_names().0,
             Self::KmsBearer => "kms-bearer",
+            Self::SiemClientKey => "siem-client-key",
         }
     }
 
@@ -88,6 +94,7 @@ impl SecretKey {
             Self::KimiApiKey => "MAOS_KIMI_API_KEY",
             Self::McpBearer(server) => server.bearer_names().1,
             Self::KmsBearer => "MAOS_KMS_BEARER",
+            Self::SiemClientKey => "MAOS_SIEM_CLIENT_KEY",
         }
     }
 }

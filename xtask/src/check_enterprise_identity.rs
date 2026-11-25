@@ -238,6 +238,8 @@ fn run_siem_redaction_export_leg() -> LegResult {
             ("maos-siem", "redaction_before_forward", "", None),
             ("maos-siem", "file_sink", "", None),
             ("maos-siem", "forward_count_derive", "", None),
+            ("maos-siem", "cursor_file_sink_23_4", "", None),
+            ("maos-siem", "tls_sink_23_4", "", Some("tls-sink")),
         ],
     )
 }

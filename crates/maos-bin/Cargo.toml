@@ -31,8 +31,8 @@ network = [
     "dep:maos-topology",
     "dep:maos-persistence",
 ]
-# Story 23-0 (D-23-6-02 A, D-23-6-01 A iii) — the one umbrella for every online adapter. It enables `network`; `network` must NOT enable it, so `--no-default-features --features network,wasm-host` builds the profile without online adapters. Story 23-8 (D-23-8-09 A) adds the first member: the external KMS adapter (`maos-secrets/http-kms`), the sixth adapter that dials out.
-online-adapters = ["network", "maos-secrets/http-kms"]
+# Story 23-0 (D-23-6-02 A, D-23-6-01 A iii) — the one umbrella for every online adapter. It enables `network`; `network` must NOT enable it, so `--no-default-features --features network,wasm-host` builds the profile without online adapters. Story 23-8 (D-23-8-09 A) adds the first member: the external KMS adapter (`maos-secrets/http-kms`), the sixth adapter that dials out. Story 23-4 (D-23-4-01 A) adds the syslog-over-TLS SIEM sink (`maos-siem/tls-sink`); the file sink and the durable cursor stay under `network`.
+online-adapters = ["network", "maos-secrets/http-kms", "maos-siem/tls-sink"]
 air-gap = []  # Compile-out all networking: reqwest, hyper client, tokio::net, DNS resolvers
 wasm-host = ["dep:maos-wasm-host"]  # Story 11.1a / 21-9 — ON by default. Gates the vendored `wasmtime` engine + maos-wasm-host (the `maos-wasm-runner` bin lives in maos-wasm-host, released as its own artifact). 5D002.c.1 stays unclassified; no counsel review or ECCN determination is claimed — see docs/compliance/export-counsel-precondition.md. Engine-free build: `--no-default-features` (drops `network` too; add `--features network` as needed).
 spirit_test = ["network", "maos-kernel-core/spirit_test", "maos-spirit-sdk/spirit_test"]
@@ -100,7 +100,7 @@ maos-digest = { path = "../../spirits/digest" }   # Story 12.4b — J3 day-30 na
 observer = { path = "../../spirits/observer" }   # Story 17-4 — Observer admitted as a compiled-in class; activity sink + telemetry hooks
 # Story 8.14b — async-trait for LiveButlerMcpPort (ButlerMcpPort impl in composition root).
 async-trait = { workspace = true }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time", "sync"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 getrandom = "0.3"
 serde = { version = "1.0", features = ["derive"] }

@@ -48,7 +48,9 @@ use maos_domain::ports::{
 };
 use maos_loom_lite::seal::AtRestSeal;
 use maos_secrets::{seal_at_rest_opt, LocalMasterKeyKms};
-use maos_siem::{export_report_from_tl, forward_to_file_with_port, SiemExporter};
+use maos_siem::cursor::CursorStore;
+use maos_siem::export::{run_tick, BatchSink, FileSink, Tick};
+use maos_siem::SiemExporter;
 use maos_sso::{OidcAlgorithm, OidcVerifier};
 use rusqlite::OpenFlags;
 use tokio_util::sync::CancellationToken;
@@ -158,6 +160,15 @@ pub struct EnterpriseRuntime {
     crypto: Option<Arc<dyn CryptoProvider>>,
     audit_db_path: Option<PathBuf>,
     siem_sink_path: Option<PathBuf>,
+    /// Story 23-4 — the syslog-over-TLS sink `MAOS_SIEM_ENDPOINT` selected (its client
+    /// key may still be pending).
+    #[cfg(feature = "online-adapters")]
+    siem_network: Option<Arc<NetworkSiem>>,
+    /// One export tick at a time: the consumer is the only production caller, but a
+    /// second concurrent tick would race the cursor.
+    siem_tick: std::sync::Mutex<()>,
+    /// Acknowledged batches so far (D-23-4-09 A).
+    siem_delivery: tokio::sync::watch::Sender<u64>,
     boot_nonce: u64,
     /// Probe of the external KMS endpoint (`None` for a local master key).
     kms_probe: Option<KmsProbeFn>,
@@ -176,6 +187,10 @@ impl EnterpriseRuntime {
             crypto: None,
             audit_db_path: None,
             siem_sink_path: None,
+            #[cfg(feature = "online-adapters")]
+            siem_network: None,
+            siem_tick: std::sync::Mutex::new(()),
+            siem_delivery: tokio::sync::watch::channel(0).0,
             boot_nonce: 0,
             kms_probe: None,
         })
@@ -190,12 +205,12 @@ impl EnterpriseRuntime {
         audit_db_path: PathBuf,
         boot_nonce: u64,
         kms: Option<&ConfiguredKms>,
+        siem: Option<&ConfiguredSiem>,
     ) -> Result<Self, EnterpriseFailure> {
         let mut config = EnterpriseConfig::from_env();
         let mut identity_port: Option<Arc<dyn IdentityAssertionPort>> = None;
         let mut kms_port: Option<Arc<dyn KeyManagementPort>> = None;
         let mut siem_port: Option<Arc<dyn SiemProjectionPort>> = None;
-        let mut siem_sink_path: Option<PathBuf> = None;
 
         if config.sso_configured() {
             match build_sso_verifier() {
@@ -217,29 +232,44 @@ impl EnterpriseRuntime {
         }
 
         if config.siem_configured() {
-            match std::env::var("MAOS_SIEM_FILE") {
-                Ok(path) if !path.is_empty() => {
-                    siem_sink_path = Some(PathBuf::from(path));
-                    siem_port = Some(Arc::new(SiemExporter));
-                }
-                _ => config = config.with_siem_down(),
+            // The sink is the one `configure_siem_from_env` selected at boot (Story 23-4,
+            // D-23-4-12 A); with none selected (`MAOS_SIEM_HOSTNAME` alone) the posture
+            // is a latched ConfiguredDown.
+            if siem.is_some() {
+                siem_port = Some(Arc::new(SiemExporter));
+            } else {
+                config = config.with_siem_down();
             }
         }
 
-        let runtime = Self::from_ports(
+        let mut runtime = Self::from_ports(
             config,
             identity_port,
             kms_port,
             siem_port,
             Some(crypto),
             Some(audit_db_path),
-            siem_sink_path,
+            None,
             boot_nonce,
         );
+        if let Some(siem) = siem.filter(|_| runtime.siem_port.is_some()) {
+            runtime = runtime.with_configured_siem(siem);
+        }
         Ok(match kms.and_then(ConfiguredKms::probe) {
             Some(probe) => runtime.with_kms_probe(probe),
             None => runtime,
         })
+    }
+
+    /// Route the SIEM export to the sink `configure_siem_from_env` selected (Story 23-4).
+    #[must_use]
+    pub fn with_configured_siem(mut self, siem: &ConfiguredSiem) -> Self {
+        self.siem_sink_path = siem.file_path();
+        #[cfg(feature = "online-adapters")]
+        {
+            self.siem_network = siem.network();
+        }
+        self
     }
 
     /// Story 13.5a — port-injection constructor. The production `from_env`
@@ -266,6 +296,10 @@ impl EnterpriseRuntime {
             crypto,
             audit_db_path,
             siem_sink_path,
+            #[cfg(feature = "online-adapters")]
+            siem_network: None,
+            siem_tick: std::sync::Mutex::new(()),
+            siem_delivery: tokio::sync::watch::channel(0).0,
             boot_nonce,
             kms_probe: None,
         }
@@ -405,30 +439,44 @@ impl EnterpriseRuntime {
         Ok(())
     }
 
-    /// Forward the (redacted) Transparency Log tail to the configured SIEM sink.
-    /// `Disabled` → no forward. `Available` → `maos_siem::forward_to_file`
-    /// (redaction applied before projection). On sink I/O error or
-    /// `ConfiguredDown` → `SiemSinkDown` (buffered count surfaced to the
-    /// operator); records are never silently dropped.
-    pub fn forward_audit_to_siem(&self, filter: AuditFilter) -> Result<usize, EnterpriseFailure> {
+    /// One cursor-driven export tick to the configured SIEM sink (Story 23-4).
+    ///
+    /// `Disabled` → nothing. `Available` → `maos_siem::export::run_tick`: the redacted log
+    /// is read after the durable cursor (insertion-id order, the sanctioned reader) and
+    /// sent in bounded batches; the cursor moves only after the sink acknowledged a batch.
+    /// Any other outcome, and `ConfiguredDown`, is `SiemSinkDown` with the reason code and
+    /// the rows left after the cursor: the log itself is the spool, so nothing is dropped.
+    /// Blocking: callers run it on a blocking thread, never on an async worker.
+    pub fn forward_audit_to_siem(&self) -> Result<Tick, EnterpriseFailure> {
+        let down = |reason: &'static str| EnterpriseFailure::SiemSinkDown {
+            buffered: 0,
+            reason,
+        };
         match self.config.siem {
-            SubsystemState::Disabled => Ok(0),
+            SubsystemState::Disabled => Ok(Tick::default()),
             SubsystemState::Available => {
+                let _one_tick_at_a_time = self
+                    .siem_tick
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
                 let port = self
                     .siem_port
                     .as_ref()
                     .filter(|port| port.is_healthy())
-                    .ok_or(EnterpriseFailure::SiemSinkDown { buffered: 0 })?;
-                let (db, sink) = match (&self.audit_db_path, &self.siem_sink_path) {
-                    (Some(db), Some(sink)) => (db, sink),
-                    _ => return Err(EnterpriseFailure::SiemSinkDown { buffered: 0 }),
-                };
+                    .ok_or(down("siem_sink_unconfigured"))?;
+                let db = self
+                    .audit_db_path
+                    .as_ref()
+                    .ok_or(down("siem_sink_unconfigured"))?;
+                let mut sink = self.siem_sink(port).map_err(down)?;
 
                 // `maos-audit` deliberately accepts only a quiesced database for
                 // deterministic redaction/export. A running daemon necessarily
                 // owns a live WAL, so take a transactionally consistent SQLite
                 // snapshot and export that snapshot within this same daemon
                 // lifecycle instead of silently buffering every live record.
+                // `VACUUM INTO` copies each row's rowid (SQLite 3.45.0), so insertion
+                // ids read from the snapshot are the live ones (the cursor's unit).
                 static SNAPSHOT_SEQUENCE: std::sync::atomic::AtomicU64 =
                     std::sync::atomic::AtomicU64::new(0);
                 let wal_path = db.with_extension("sqlite-wal");
@@ -442,11 +490,11 @@ impl EnterpriseRuntime {
                     ));
                     let _ = std::fs::remove_file(&path);
                     let connection = rusqlite::Connection::open(db)
-                        .map_err(|_| EnterpriseFailure::SiemSinkDown { buffered: 0 })?;
+                        .map_err(|_| down("siem_source_unavailable"))?;
                     let path_text = path.to_string_lossy().into_owned();
                     if connection.execute("VACUUM INTO ?1", [&path_text]).is_err() {
                         let _ = std::fs::remove_file(&path);
-                        return Err(EnterpriseFailure::SiemSinkDown { buffered: 0 });
+                        return Err(down("siem_source_unavailable"));
                     }
                     snapshot = Some(path.clone());
                     path
@@ -454,29 +502,60 @@ impl EnterpriseRuntime {
                     db.clone()
                 };
 
-                let outcome = match forward_to_file_with_port(
-                    &source_db,
-                    filter.clone(),
-                    sink,
-                    port.as_ref(),
-                ) {
-                    Ok(n) => Ok(n),
-                    Err(_) => {
-                        // On sink-down, surface how many records the
-                        // consistent source snapshot holds.
-                        let buffered = export_report_from_tl(&source_db, filter)
-                            .ok()
-                            .and_then(|report| report.forwarded_count)
-                            .unwrap_or(0);
-                        Err(EnterpriseFailure::SiemSinkDown { buffered })
-                    }
-                };
+                let store = CursorStore::beside(db, &sink.identity());
+                let boot_nonce = self.boot_nonce;
+                let outcome = run_tick(&source_db, &store, sink.as_mut(), &|intent, payload| {
+                    append_siem_event(db, boot_nonce, intent, &payload)
+                        .map_err(|error| error.to_string())
+                });
                 if let Some(path) = snapshot {
-                    let _ = std::fs::remove_file(path);
+                    for suffix in ["", "-wal", "-shm"] {
+                        let mut sidecar = path.clone().into_os_string();
+                        sidecar.push(suffix);
+                        let _ = std::fs::remove_file(sidecar);
+                    }
                 }
-                outcome
+                match outcome {
+                    Ok(tick) => {
+                        if tick.batches > 0 {
+                            self.siem_delivery
+                                .send_modify(|batches| *batches += tick.batches as u64);
+                        }
+                        Ok(tick)
+                    }
+                    Err(error) => Err(EnterpriseFailure::SiemSinkDown {
+                        buffered: usize::try_from(error.buffered()).unwrap_or(usize::MAX),
+                        reason: error.code(),
+                    }),
+                }
             }
-            SubsystemState::ConfiguredDown => Err(EnterpriseFailure::SiemSinkDown { buffered: 0 }),
+            SubsystemState::ConfiguredDown => Err(down("siem_sink_unconfigured")),
+        }
+    }
+
+    /// Acknowledged batches so far (Story 23-4, D-23-4-09 A): the event the lifecycle proof
+    /// waits on instead of sleeping.
+    #[must_use]
+    pub fn siem_delivery_events(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.siem_delivery.subscribe()
+    }
+
+    /// The sink this runtime exports to: the network sink when `MAOS_SIEM_ENDPOINT` selected
+    /// one (refused until its client key is settled), else the file sink.
+    fn siem_sink(
+        &self,
+        port: &Arc<dyn SiemProjectionPort>,
+    ) -> Result<Box<dyn BatchSink>, &'static str> {
+        #[cfg(feature = "online-adapters")]
+        if let Some(network) = &self.siem_network {
+            return network
+                .sink()
+                .map(|sink| Box::new(sink) as Box<dyn BatchSink>)
+                .ok_or("siem_client_key_pending");
+        }
+        match &self.siem_sink_path {
+            Some(path) => Ok(Box::new(FileSink::new(path.clone(), Arc::clone(port)))),
+            None => Err("siem_sink_unconfigured"),
         }
     }
 
@@ -548,12 +627,468 @@ pub enum EnterpriseFailure {
     SsoIssuanceDenied { spirit_pid: u32, reason: String },
     #[error("KMS sealed write refused: {reason}")]
     KmsSealedWriteRefused { reason: String },
-    #[error("SIEM sink down; {buffered} record(s) buffered")]
-    SiemSinkDown { buffered: usize },
+    #[error("SIEM sink down ({reason}); {buffered} record(s) buffered")]
+    SiemSinkDown {
+        buffered: usize,
+        reason: &'static str,
+    },
+}
+
+/// The operator lines of the SIEM export consumer (Story 23-4, AC5): the gap and reset notes
+/// of every tick, one line per DISTINCT failure reason (a collector that stays down prints
+/// once, not once a minute), one line when the sink answers again, and a summary line per
+/// tick that delivered rows. Pure, so the dedupe is testable without a clock or a stderr.
+#[derive(Debug, Default)]
+pub struct SiemReport {
+    last_failure: Option<&'static str>,
+}
+
+impl SiemReport {
+    /// The lines to print for one tick's `outcome`.
+    pub fn lines(&mut self, outcome: &Result<Tick, EnterpriseFailure>) -> Vec<String> {
+        let mut lines = Vec::new();
+        match outcome {
+            Ok(tick) => {
+                if self.last_failure.take().is_some() {
+                    lines.push("maos: SIEM export is acknowledged again".to_owned());
+                }
+                lines.extend(tick.notes.iter().map(|note| format!("maos: {note}")));
+                if tick.delivered > 0 {
+                    lines.push(format!(
+                        "maos: SIEM export delivered {} record(s) in {} acknowledged batch(es) (Story 23-4)",
+                        tick.delivered, tick.batches
+                    ));
+                }
+            }
+            Err(EnterpriseFailure::SiemSinkDown { buffered, reason }) => {
+                if self.last_failure != Some(reason) {
+                    self.last_failure = Some(reason);
+                    lines.push(format!(
+                        "maos: SIEM export not acknowledged ({reason}) — {buffered} record(s) \
+                         remain in the Transparency Log and are re-sent; operator action may be required"
+                    ));
+                }
+            }
+            Err(other) => lines.push(format!("maos: SIEM export failed: {other}")),
+        }
+        lines
+    }
 }
 
 fn any_env_with_prefix(prefix: &str) -> bool {
     std::env::vars_os().any(|(name, _)| name.to_string_lossy().starts_with(prefix))
+}
+
+// ── SIEM sink selection (Story 23-4, D-23-4-12 A) ───────────────────────────────────────
+
+/// Why the SIEM configuration is refused at boot (exit 78). Each variant names the variables
+/// involved and never a value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SiemBootRefusal {
+    /// Both `MAOS_SIEM_ENDPOINT` and `MAOS_SIEM_FILE` are set: one sink per Host.
+    Conflict,
+    /// `MAOS_SIEM_ENDPOINT` is set in a build without `online-adapters`.
+    UnsupportedBuild,
+    /// The endpoint is not `host:port`, or failed the outbound policy (the code names which).
+    EndpointRefused(&'static str),
+    /// `MAOS_SIEM_ENDPOINT` is set without `MAOS_SIEM_CA_FILE`.
+    CaMissing,
+    /// The CA file is unreadable or holds no certificate.
+    CaInvalid,
+    /// `MAOS_SIEM_CLIENT_KEY` is set without `MAOS_SIEM_CLIENT_CERT_FILE`.
+    ClientIncomplete,
+    /// The client certificate file is unreadable or holds no certificate.
+    ClientCertInvalid,
+    /// `MAOS_SIEM_CLIENT_CERT_FILE` is set and the key is missing, unparsable, or not its key.
+    ClientKeyInvalid,
+}
+
+impl SiemBootRefusal {
+    #[must_use]
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Conflict => "siem_config_conflict",
+            Self::UnsupportedBuild => "siem_endpoint_unsupported_build",
+            Self::EndpointRefused(_) => "siem_endpoint_refused",
+            Self::CaMissing => "siem_ca_missing",
+            Self::CaInvalid => "siem_ca_invalid",
+            Self::ClientIncomplete => "siem_client_incomplete",
+            Self::ClientCertInvalid => "siem_client_cert_invalid",
+            Self::ClientKeyInvalid => "siem_client_key_invalid",
+        }
+    }
+}
+
+impl std::fmt::Display for SiemBootRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let code = self.code();
+        match self {
+            Self::Conflict => write!(
+                f,
+                "{code}: MAOS_SIEM_ENDPOINT and MAOS_SIEM_FILE are both set; set exactly one"
+            ),
+            Self::UnsupportedBuild => write!(
+                f,
+                "{code}: MAOS_SIEM_ENDPOINT is set but this build has no online adapters"
+            ),
+            Self::EndpointRefused(detail) => {
+                write!(f, "{code}: MAOS_SIEM_ENDPOINT refused ({detail})")
+            }
+            Self::CaMissing => write!(
+                f,
+                "{code}: MAOS_SIEM_ENDPOINT needs MAOS_SIEM_CA_FILE (no system roots are trusted)"
+            ),
+            Self::CaInvalid => write!(
+                f,
+                "{code}: MAOS_SIEM_CA_FILE is unreadable or holds no PEM certificate"
+            ),
+            Self::ClientIncomplete => write!(
+                f,
+                "{code}: MAOS_SIEM_CLIENT_KEY is set but MAOS_SIEM_CLIENT_CERT_FILE is not"
+            ),
+            Self::ClientCertInvalid => write!(
+                f,
+                "{code}: MAOS_SIEM_CLIENT_CERT_FILE is unreadable or holds no PEM certificate"
+            ),
+            Self::ClientKeyInvalid => write!(
+                f,
+                "{code}: MAOS_SIEM_CLIENT_CERT_FILE is set but MAOS_SIEM_CLIENT_KEY is missing, \
+                 not a PEM private key, or not the key of that certificate"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SiemBootRefusal {}
+
+/// The SIEM-related environment, read once (so tests drive selection without mutating the
+/// process environment).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SiemEnv<'a> {
+    pub endpoint: Option<&'a str>,
+    pub file: Option<&'a str>,
+    pub ca_file: Option<&'a str>,
+    pub client_cert_file: Option<&'a str>,
+    /// `MAOS_SIEM_CLIENT_KEY` is set in the environment (a key held only in the OS keyring is
+    /// checked when the credential store is read).
+    pub client_key_in_env: bool,
+    /// `MAOS_SIEM_ALLOW_PRIVATE`: admit RFC 1918 / fc00::/7 and loopback endpoints.
+    pub allow_private: bool,
+}
+
+/// The SIEM sink the composition root selected (one per Host): built once at boot and handed
+/// to the enterprise runtime, so there is one sink and one cursor.
+pub struct ConfiguredSiem {
+    kind: SiemKind,
+}
+
+enum SiemKind {
+    File(PathBuf),
+    #[cfg(feature = "online-adapters")]
+    Network(Arc<NetworkSiem>),
+}
+
+impl std::fmt::Debug for ConfiguredSiem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConfiguredSiem")
+            .field("kind", &self.kind_name())
+            .finish_non_exhaustive()
+    }
+}
+
+impl ConfiguredSiem {
+    /// `"syslog over TLS"` or `"local file"`.
+    #[must_use]
+    pub fn kind_name(&self) -> &'static str {
+        match self.kind {
+            SiemKind::File(_) => "local file",
+            #[cfg(feature = "online-adapters")]
+            SiemKind::Network(_) => "syslog over TLS",
+        }
+    }
+
+    #[must_use]
+    pub fn file_path(&self) -> Option<PathBuf> {
+        match &self.kind {
+            SiemKind::File(path) => Some(path.clone()),
+            #[cfg(feature = "online-adapters")]
+            SiemKind::Network(_) => None,
+        }
+    }
+
+    #[cfg(feature = "online-adapters")]
+    #[must_use]
+    pub fn network(&self) -> Option<Arc<NetworkSiem>> {
+        match &self.kind {
+            SiemKind::Network(network) => Some(Arc::clone(network)),
+            SiemKind::File(_) => None,
+        }
+    }
+
+    /// Whether the sink needs the client key from the credential store (a client certificate
+    /// is configured).
+    #[must_use]
+    pub fn needs_client_key(&self) -> bool {
+        match &self.kind {
+            SiemKind::File(_) => false,
+            #[cfg(feature = "online-adapters")]
+            SiemKind::Network(network) => network.needs_client_key(),
+        }
+    }
+
+    /// Settle the client key (`None` = the credential store holds none). With a client
+    /// certificate configured a missing, unparsable or foreign key is a refusal; without
+    /// one this is a no-op. Until it runs a network sink with a certificate sends nothing.
+    ///
+    /// # Errors
+    /// [`SiemBootRefusal::ClientKeyInvalid`] (or the certificate / CA refusal).
+    pub fn provision_client_key(&self, key: Option<&str>) -> Result<(), SiemBootRefusal> {
+        match &self.kind {
+            SiemKind::File(_) => Ok(()),
+            #[cfg(feature = "online-adapters")]
+            SiemKind::Network(network) => network.provision_client_key(key),
+        }
+    }
+}
+
+/// Select the SIEM sink (D-23-4-12 A). `Ok(None)` when neither `MAOS_SIEM_ENDPOINT` nor
+/// `MAOS_SIEM_FILE` is set (a lone `MAOS_SIEM_HOSTNAME` keeps its configured-down posture).
+/// An invalid configuration is a refusal, never a silent downgrade. The endpoint is
+/// operator configuration: its host class is vetted here, once (a name that does not resolve
+/// yet is not a refusal: the sink is simply down until it does), and again for every batch
+/// connection.
+///
+/// # Errors
+/// The [`SiemBootRefusal`] of the first check that fails.
+pub fn configure_siem(
+    env: &SiemEnv<'_>,
+    resolver: Arc<dyn ResolveHost>,
+) -> Result<Option<ConfiguredSiem>, SiemBootRefusal> {
+    let endpoint = env
+        .endpoint
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let file = env.file.filter(|value| !value.is_empty());
+    match (endpoint, file) {
+        (Some(_), Some(_)) => Err(SiemBootRefusal::Conflict),
+        (Some(endpoint), None) => network_siem(env, endpoint, resolver).map(Some),
+        (None, Some(path)) => Ok(Some(ConfiguredSiem {
+            kind: SiemKind::File(PathBuf::from(path)),
+        })),
+        (None, None) => Ok(None),
+    }
+}
+
+/// [`configure_siem`] over the process environment.
+///
+/// # Errors
+/// As [`configure_siem`].
+pub fn configure_siem_from_env() -> Result<Option<ConfiguredSiem>, SiemBootRefusal> {
+    let var = |name: &str| std::env::var_os(name).map(|value| value.to_string_lossy().into_owned());
+    let (endpoint, file) = (var("MAOS_SIEM_ENDPOINT"), var("MAOS_SIEM_FILE"));
+    let (ca_file, client_cert_file) = (var("MAOS_SIEM_CA_FILE"), var("MAOS_SIEM_CLIENT_CERT_FILE"));
+    let allow_private = var("MAOS_SIEM_ALLOW_PRIVATE")
+        .is_some_and(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true"));
+    configure_siem(
+        &SiemEnv {
+            endpoint: endpoint.as_deref(),
+            file: file.as_deref(),
+            ca_file: ca_file.as_deref(),
+            client_cert_file: client_cert_file.as_deref(),
+            client_key_in_env: var("MAOS_SIEM_CLIENT_KEY")
+                .is_some_and(|value| !value.trim().is_empty()),
+            allow_private,
+        },
+        Arc::new(SystemResolver),
+    )
+}
+
+#[cfg(not(feature = "online-adapters"))]
+fn network_siem(
+    _env: &SiemEnv<'_>,
+    _endpoint: &str,
+    _resolver: Arc<dyn ResolveHost>,
+) -> Result<ConfiguredSiem, SiemBootRefusal> {
+    Err(SiemBootRefusal::UnsupportedBuild)
+}
+
+#[cfg(feature = "online-adapters")]
+fn network_siem(
+    env: &SiemEnv<'_>,
+    endpoint: &str,
+    resolver: Arc<dyn ResolveHost>,
+) -> Result<ConfiguredSiem, SiemBootRefusal> {
+    use maos_domain::outbound::OutboundRefusal;
+
+    let (host, port) = parse_siem_endpoint(endpoint)?;
+    let ca_path = env
+        .ca_file
+        .filter(|value| !value.is_empty())
+        .ok_or(SiemBootRefusal::CaMissing)?;
+    let mut policy = OutboundPolicy::strict();
+    if env.allow_private {
+        policy = policy.allow_private();
+    }
+    match policy.vet_host_port(&host, port, resolver.as_ref()) {
+        Ok(_) | Err(OutboundRefusal::Unresolved) => {}
+        Err(refusal) => return Err(SiemBootRefusal::EndpointRefused(refusal.code())),
+    }
+    let ca_pem = std::fs::read(ca_path).map_err(|_| SiemBootRefusal::CaInvalid)?;
+    let client_cert = match env.client_cert_file.filter(|value| !value.is_empty()) {
+        Some(path) => Some(std::fs::read(path).map_err(|_| SiemBootRefusal::ClientCertInvalid)?),
+        None => None,
+    };
+    if client_cert.is_none() && env.client_key_in_env {
+        return Err(SiemBootRefusal::ClientIncomplete);
+    }
+    let network = NetworkSiem::new(host, port, policy, ca_pem, client_cert, resolver)?;
+    Ok(ConfiguredSiem {
+        kind: SiemKind::Network(Arc::new(network)),
+    })
+}
+
+/// `host:port`, an IPv6 literal in brackets, port default 6514 (RFC 5425 §4.1).
+#[cfg(feature = "online-adapters")]
+fn parse_siem_endpoint(raw: &str) -> Result<(String, u16), SiemBootRefusal> {
+    const INVALID: SiemBootRefusal = SiemBootRefusal::EndpointRefused("endpoint_invalid");
+    const DEFAULT_PORT: u16 = 6514;
+    let raw = raw.trim();
+    let (host, port_text) = if let Some(inner) = raw.strip_prefix('[') {
+        let (host, rest) = inner.split_once(']').ok_or(INVALID)?;
+        host.parse::<std::net::Ipv6Addr>().map_err(|_| INVALID)?;
+        let port_text = if rest.is_empty() {
+            ""
+        } else {
+            rest.strip_prefix(':').ok_or(INVALID)?
+        };
+        (host, port_text)
+    } else {
+        match raw.matches(':').count() {
+            0 => (raw, ""),
+            1 => raw.split_once(':').ok_or(INVALID)?,
+            _ => return Err(INVALID),
+        }
+    };
+    let host_chars_ok = !host.is_empty()
+        && host
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ':'));
+    if !host_chars_ok {
+        return Err(INVALID);
+    }
+    let port = if port_text.is_empty() {
+        DEFAULT_PORT
+    } else {
+        port_text
+            .parse::<u16>()
+            .ok()
+            .filter(|port| *port != 0)
+            .ok_or(INVALID)?
+    };
+    Ok((host.to_owned(), port))
+}
+
+/// The syslog-over-TLS sink `MAOS_SIEM_ENDPOINT` selected (Story 23-4). Holds the CA bundle
+/// and the client certificate (public); the client private key is settled once, after the
+/// credential store exists, and lives only inside the TLS configuration (`Debug` shows
+/// the endpoint only).
+#[cfg(feature = "online-adapters")]
+pub struct NetworkSiem {
+    host: String,
+    port: u16,
+    policy: OutboundPolicy,
+    resolver: Arc<dyn ResolveHost>,
+    ca_pem: Vec<u8>,
+    client_cert: Option<Vec<u8>>,
+    tls: std::sync::OnceLock<maos_siem::tls_sink::ClientConfigHandle>,
+}
+
+#[cfg(feature = "online-adapters")]
+impl std::fmt::Debug for NetworkSiem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NetworkSiem")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(feature = "online-adapters")]
+impl NetworkSiem {
+    fn new(
+        host: String,
+        port: u16,
+        policy: OutboundPolicy,
+        ca_pem: Vec<u8>,
+        client_cert: Option<Vec<u8>>,
+        resolver: Arc<dyn ResolveHost>,
+    ) -> Result<Self, SiemBootRefusal> {
+        // The CA bundle is validated now, with or without a client certificate.
+        let server_only = maos_siem::tls_sink::client_config(&ca_pem, None)
+            .map_err(|_| SiemBootRefusal::CaInvalid)?;
+        let tls = std::sync::OnceLock::new();
+        if client_cert.is_none() {
+            let _ = tls.set(server_only);
+        }
+        Ok(Self {
+            host,
+            port,
+            policy,
+            resolver,
+            ca_pem,
+            client_cert,
+            tls,
+        })
+    }
+
+    /// `host:port` for operator lines (never a credential).
+    #[must_use]
+    pub fn endpoint(&self) -> String {
+        if self.host.contains(':') {
+            format!("[{}]:{}", self.host, self.port)
+        } else {
+            format!("{}:{}", self.host, self.port)
+        }
+    }
+
+    #[must_use]
+    pub fn needs_client_key(&self) -> bool {
+        self.client_cert.is_some()
+    }
+
+    fn provision_client_key(&self, key: Option<&str>) -> Result<(), SiemBootRefusal> {
+        let Some(cert) = &self.client_cert else {
+            return Ok(());
+        };
+        let key = key
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or(SiemBootRefusal::ClientKeyInvalid)?;
+        let config = maos_siem::tls_sink::client_config(&self.ca_pem, Some((cert, key.as_bytes())))
+            .map_err(|error| match error {
+                maos_siem::tls_sink::SetupError::CaInvalid => SiemBootRefusal::CaInvalid,
+                maos_siem::tls_sink::SetupError::ClientCertInvalid => {
+                    SiemBootRefusal::ClientCertInvalid
+                }
+                maos_siem::tls_sink::SetupError::ClientKeyInvalid => {
+                    SiemBootRefusal::ClientKeyInvalid
+                }
+            })?;
+        let _ = self.tls.set(config);
+        Ok(())
+    }
+
+    /// A sink for one tick; `None` until the client key is settled.
+    fn sink(&self) -> Option<maos_siem::tls_sink::TlsSink> {
+        Some(maos_siem::tls_sink::TlsSink::new(
+            &self.host,
+            self.port,
+            self.tls.get()?.clone(),
+            self.policy,
+            Arc::clone(&self.resolver),
+            maos_siem::tls_sink::Timeouts::default(),
+        ))
+    }
 }
 
 /// What one probe of the external KMS endpoint found.
@@ -1017,17 +1552,63 @@ pub fn append_identity_asserted(
     capability_key: &str,
     decision_time_ns: u64,
 ) -> Result<(), AuditError> {
-    let mut frame_id = [0u8; 16];
-    getrandom::fill(&mut frame_id)
-        .map_err(|e| AuditError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
-
     let payload = serde_json::json!({
         "subject": subject,
         "issuer": issuer,
         "capability_key": capability_key,
         "decision_time_ns": decision_time_ns,
     });
-    let payload_bytes = serde_json::to_vec(&payload)?;
+    append_raw_row(
+        db_path,
+        spirit_pid,
+        boot_nonce,
+        decision_time_ns,
+        30, // kind — identity.asserted
+        "identity.asserted",
+        &serde_json::to_vec(&payload)?,
+        None,
+    )
+}
+
+/// Journal one `siem.gap` or `siem.cursor.reset` row (Story 23-4, D-23-4-06 A / -08 A) into
+/// the LIVE Transparency Log: a raw kind-4 `telemetry.event` row (no kernel `FrameKind`
+/// variant, no payload beyond the ids or reason code), written like `identity.asserted`.
+///
+/// # Errors
+/// Any SQLite, serialization or clock error; the exporter then moves nothing and retries.
+pub fn append_siem_event(
+    db_path: &Path,
+    boot_nonce: u64,
+    intent: &str,
+    payload: &serde_json::Value,
+) -> Result<(), AuditError> {
+    let now = now_ns().map_err(|error| AuditError::Io(std::io::Error::other(error)))?;
+    append_raw_row(
+        db_path,
+        0,
+        boot_nonce,
+        now,
+        4, // kind — telemetry.event
+        intent,
+        &serde_json::to_vec(payload)?,
+        Some(Duration::from_secs(5)),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn append_raw_row(
+    db_path: &Path,
+    spirit_pid: u32,
+    boot_nonce: u64,
+    timestamp_ns: u64,
+    kind: i64,
+    intent: &str,
+    payload: &[u8],
+    busy_wait: Option<Duration>,
+) -> Result<(), AuditError> {
+    let mut frame_id = [0u8; 16];
+    getrandom::fill(&mut frame_id)
+        .map_err(|e| AuditError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
     let spirit_pid_i = i64::try_from(spirit_pid).map_err(|_| AuditError::ValueOverflow {
         field: "spirit_pid",
@@ -1037,17 +1618,21 @@ pub fn append_identity_asserted(
         field: "boot_nonce",
         value: boot_nonce,
     })?;
-    let decision_time_ns_i =
-        i64::try_from(decision_time_ns).map_err(|_| AuditError::ValueOverflow {
-            field: "decision_time_ns",
-            value: decision_time_ns,
-        })?;
+    let timestamp_ns_i = i64::try_from(timestamp_ns).map_err(|_| AuditError::ValueOverflow {
+        field: "timestamp_ns",
+        value: timestamp_ns,
+    })?;
 
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
         OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )
     .map_err(AuditError::Open)?;
+    // The SIEM journal waits for the kernel adapter's lock rather than lose a gap/reset row
+    // to SQLITE_BUSY; `identity.asserted` keeps its original no-wait behaviour.
+    if let Some(wait) = busy_wait {
+        conn.busy_timeout(wait).map_err(AuditError::Open)?;
+    }
 
     // Plain INSERT (NOT `INSERT OR IGNORE`): a frame_id PK collision surfaces as
     // SQLITE_CONSTRAINT_PRIMARYKEY → AuditError::Query rather than being silently
@@ -1059,13 +1644,13 @@ pub fn append_identity_asserted(
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         rusqlite::params![
             &frame_id[..],                                                  // frame_id
-            decision_time_ns_i,                                             // timestamp_ns
+            timestamp_ns_i,                                                 // timestamp_ns
             spirit_pid_i,                                                   // spirit_pid
             boot_nonce_i,                                                   // boot_nonce
             Option::<&[u8]>::None, // capability_token = NULL
-            30i64,                 // kind — identity.asserted
-            "identity.asserted",   // intent
-            payload_bytes,         // payload_redacted (compact JSON)
+            kind,                  // kind
+            intent,                // intent
+            payload,               // payload_redacted (compact JSON)
             maos_domain::invariants::i3::FrameOrigin::HumanAuthored as i64, // origin = 0 (non-kernel)
         ],
     )
@@ -1180,6 +1765,10 @@ mod available_arm_tests {
             crypto,
             audit_db_path,
             siem_sink_path,
+            #[cfg(feature = "online-adapters")]
+            siem_network: None,
+            siem_tick: std::sync::Mutex::new(()),
+            siem_delivery: tokio::sync::watch::channel(0).0,
             boot_nonce: 7,
             kms_probe: None,
         }
@@ -1312,10 +1901,18 @@ mod available_arm_tests {
             Some(tl.clone()),
             Some(sink.clone()),
         );
-        let n = rt
-            .forward_audit_to_siem(AuditFilter::default())
+        let tick = rt
+            .forward_audit_to_siem()
             .expect("Available SIEM MUST forward to the file sink");
-        assert!(n >= 1, "forwarded count MUST reflect the seeded record");
+        assert!(
+            tick.delivered >= 1,
+            "forwarded count MUST reflect the seeded record"
+        );
+        // The cursor is durable: a second tick re-sends nothing.
+        assert_eq!(
+            rt.forward_audit_to_siem().expect("second tick").delivered,
+            0
+        );
         let contents = std::fs::read_to_string(&sink).expect("sink readable");
         assert!(
             !contents.is_empty(),
@@ -1345,8 +1942,9 @@ mod available_arm_tests {
             Some(tl.clone()),
             Some(unwritable_sink),
         );
-        match rt.forward_audit_to_siem(AuditFilter::default()) {
-            Err(EnterpriseFailure::SiemSinkDown { buffered }) => {
+        match rt.forward_audit_to_siem() {
+            Err(EnterpriseFailure::SiemSinkDown { buffered, reason }) => {
+                assert_eq!(reason, "siem_sink_file_io");
                 assert_eq!(
                     buffered, 2,
                     "buffered MUST equal the 2 records the TL holds matching the filter (never silently dropped)"
