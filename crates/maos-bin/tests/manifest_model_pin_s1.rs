@@ -349,6 +349,53 @@ fn a_haiku_pinned_butler_carries_haiku_and_a_provider_only_orchestrator_the_defa
     assert_eq!(rig.wire_models(), ["claude-haiku-5-5"]);
 }
 
+#[test]
+fn a_butler_pin_listed_after_a_provider_only_entry_reaches_the_wire() {
+    let mixed = BUTLER.replace(
+        r#"provider.complete = ["anthropic.claude-haiku-5-5"]"#,
+        r#"provider.complete = ["anthropic", "anthropic.claude-sonnet-5-5"]"#,
+    );
+    assert_ne!(mixed, BUTLER, "the manifest line moved");
+    let gated = gate(&mixed);
+    assert_eq!(
+        first_declared_pin(&gated),
+        Some(("anthropic".to_owned(), Some("claude-sonnet-5-5".to_owned())))
+    );
+    let rig = Rig::new(&gated, "{}");
+    let butler = rig
+        .seam()
+        .attach(
+            butler::Butler::with_scenario(butler::ScenarioInput {
+                calendar: vec![
+                    butler::CalendarEvent {
+                        id: "a".into(),
+                        title: "a".into(),
+                        start_min: 540,
+                        end_min: 600,
+                        status: butler::EventStatus::Confirmed,
+                    },
+                    butler::CalendarEvent {
+                        id: "b".into(),
+                        title: "b".into(),
+                        start_min: 570,
+                        end_min: 630,
+                        status: butler::EventStatus::Confirmed,
+                    },
+                ],
+                ..Default::default()
+            }),
+            || first_declared_pin(&gated),
+            pid(),
+        )
+        .expect("the Butler binds");
+    butler.on_idle(&mut Ctx::for_rust_inproc_hook(
+        CapabilityHandle(0),
+        MailboxHandle(0),
+    ));
+    assert_eq!(rig.wire_models(), ["claude-sonnet-5-5"]);
+    assert_eq!(rig.tl_models(), ["claude-sonnet-5-5"]);
+}
+
 struct NoScalar;
 
 impl EpistemicScalarPort for NoScalar {
@@ -514,7 +561,7 @@ fn admission_admits_several_models_per_provider_and_still_refuses_unlisted_ones(
     for model in ["claude-3-haiku-20240307", "claude-sonnet-9", "gpt-4o-mini"] {
         let refusal = check_provider_pins(&section("anthropic", model), Some(&catalog))
             .expect_err("not on the allowlist");
-        assert_eq!(refusal.code(), "provider_unavailable", "{model}");
+        assert_eq!(refusal.code(), "model_not_admitted", "{model}");
     }
     // Gemini keeps its single-model rule (20-4 review F1): the pin must equal
     // the configured model.
@@ -570,8 +617,77 @@ fn shared_pin_validation_covers_the_shell_manifest_and_a_minimal_staged_successo
         check_staged_pins(&asserted, Some(&catalog))
             .expect_err("retired")
             .code(),
-        "provider_unavailable"
+        "model_not_admitted"
     );
     // Unparseable text is refused, not waved through.
     assert!(check_staged_pins("not [toml", Some(&catalog)).is_err());
+}
+
+/// S-7a A — a declaration pin on a known provider is validated whether or not
+/// that provider is registered on this host (a keyless host must not wave a
+/// retired id through), on both the gated and the staged path.
+#[test]
+fn declared_pins_are_validated_for_a_known_but_unregistered_provider() {
+    use maos_bin::admission::check_staged_pins;
+    let catalog: ProviderCatalog = BTreeMap::from([(
+        "openai".to_owned(),
+        ConfiguredProvider {
+            endpoint: "https://api.openai.com".into(),
+            model: "gpt-4o-mini",
+            registered: false,
+        },
+    )]);
+    let declared = |entries: &[&str]| entries.iter().map(|e| (*e).to_owned()).collect::<Vec<_>>();
+    // Bare provider, its default and an allowlisted non-default are admitted.
+    for entry in ["openai", "openai.gpt-4o-mini", "openai.gpt-6-sol"] {
+        check_declared_pins(&declared(&[entry]), Some(&catalog)).unwrap();
+    }
+    let refusal = check_declared_pins(&declared(&["openai.gpt-4"]), Some(&catalog))
+        .expect_err("a retired pin is refused though openai is unregistered");
+    assert!(matches!(
+        &refusal,
+        AdmissionRefusal::ModelNotAdmitted { provider, model }
+            if provider == "openai" && model == "gpt-4"
+    ));
+    assert_eq!(refusal.code(), "model_not_admitted");
+    // The same negative through the staged path.
+    let minimal = |pin: &str| format!("[capabilities.required]\nprovider.complete = [\"{pin}\"]\n");
+    check_staged_pins(&minimal("openai.gpt-6-sol"), Some(&catalog)).unwrap();
+    let refusal = check_staged_pins(&minimal("openai.gpt-4"), Some(&catalog))
+        .expect_err("staged: retired pin on an unregistered provider");
+    assert!(matches!(
+        &refusal,
+        AdmissionRefusal::ModelNotAdmitted { provider, model }
+            if provider == "openai" && model == "gpt-4"
+    ));
+    // A provider absent from the catalog stays out of scope of this check.
+    check_declared_pins(&declared(&["mystery.model-x"]), Some(&catalog)).unwrap();
+}
+
+/// The refusal echoes `[providers].primary.model_id`, an uncapped manifest field:
+/// the message stays bounded and printable whatever the id holds, and is still
+/// `model_not_admitted`.
+#[test]
+fn a_hostile_model_id_yields_a_bounded_printable_refusal() {
+    let catalog: ProviderCatalog = BTreeMap::from([(
+        "anthropic".to_owned(),
+        ConfiguredProvider {
+            endpoint: "https://api.anthropic.com".into(),
+            model: "claude-haiku-5-5",
+            registered: true,
+        },
+    )]);
+    // TOML escapes: BEL, ESC, newline, then padding to 4,000 characters.
+    let hostile = format!("bad\\u0007\\u001b[2J\\n{}", "x".repeat(4000 - 12));
+    let section = maos_kernel_core::security::ProvidersSection::from_toml_str(&format!(
+        "[primary]\nid = \"anthropic\"\nmodel_id = \"{hostile}\"\n"
+    ))
+    .expect("the section parses: the field is uncapped");
+    assert!(section.primary.model_id.as_deref().unwrap().len() >= 3_900);
+    let refusal = check_provider_pins(&section, Some(&catalog)).expect_err("not admitted");
+    assert_eq!(refusal.code(), "model_not_admitted");
+    let message = refusal.to_string();
+    assert!(message.chars().count() < 256, "{}", message.len());
+    assert!(!message.chars().any(char::is_control), "{message:?}");
+    assert!(message.contains("bad\\u{7}"), "{message:?}");
 }
